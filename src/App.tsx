@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileText, CreditCard, Users, RefreshCw, AlertCircle, DollarSign, TrendingUp, Clock, Download, Building2, Menu, X } from 'lucide-react';
+import { FileText, CreditCard, Users, RefreshCw, AlertCircle, DollarSign, TrendingUp, Clock, Download, Building2, Menu, X, LogOut, Loader2 } from 'lucide-react';
 import { useSupabaseData } from './hooks/useSupabaseData';
 import { InvoiceExplorer } from './components/InvoiceExplorer';
 import { PaymentsExplorer } from './components/PaymentsExplorer';
@@ -8,6 +8,8 @@ import { OpenInvoices } from './components/OpenInvoices';
 import { AccountsReceivable } from './components/AccountsReceivable';
 import { AgingReport } from './components/AgingReport';
 import { ARByCustomer } from './components/ARByCustomer';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthScreen } from './components/AuthScreen';
 
 type Tab = 'ar' | 'ar-by-customer' | 'open-invoices' | 'aging' | 'invoices' | 'payments' | 'customers';
 
@@ -15,6 +17,7 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState<Tab>('ar');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { invoices, payments, loading, error, syncing, lastSyncTime, triggerSync } = useSupabaseData();
+  const { signOut, user } = useAuth();
 
   const navItems = [
     {
@@ -119,8 +122,22 @@ function AppContent() {
           })}
         </nav>
 
-        {/* Sidebar Toggle */}
-        <div className="absolute bottom-4 left-0 right-0 px-4">
+        {/* User & Controls */}
+        <div className="absolute bottom-4 left-0 right-0 px-4 space-y-2">
+          {sidebarOpen && user && (
+            <div className="px-4 py-3 bg-gray-50 rounded-lg mb-2">
+              <p className="text-xs text-gray-500">Signed in as</p>
+              <p className="text-sm font-medium text-gray-900 truncate">{user.email}</p>
+            </div>
+          )}
+          <button
+            onClick={() => signOut()}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            title={!sidebarOpen ? 'Sign Out' : ''}
+          >
+            <LogOut className="w-4 h-4" />
+            {sidebarOpen && <span className="text-sm font-medium">Sign Out</span>}
+          </button>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
@@ -254,6 +271,31 @@ function AppContent() {
 }
 
 function App() {
+  return (
+    <AuthProvider>
+      <AuthenticatedApp />
+    </AuthProvider>
+  );
+}
+
+function AuthenticatedApp() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthScreen />;
+  }
+
   return <AppContent />;
 }
 
