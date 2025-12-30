@@ -1,0 +1,3 @@
+{
+  "query": "query { invoices(first: 500) { edges { node { id visualId total amountPaid amountOutstanding paidInFull status { name } createdAt } } } }"
+}

@@ -1,0 +1,3 @@
+{
+  "query": "query { invoices(first: 25, filter: { visualId: { contains: \"60003\" } }) { edges { node { id visualId total amountPaid amountOutstanding paidInFull status { name } createdAt } } } }"
+}
