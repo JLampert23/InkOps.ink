@@ -52,7 +52,7 @@ Deno.serve(async (req: Request) => {
       .eq("id", user.id)
       .maybeSingle();
 
-    const { action, email, full_name, role, userId } = await req.json();
+    const { action, email, full_name, role, userId, password } = await req.json();
 
     const isAdmin = profile?.role === "admin";
     const isUpdatingSelf = action === "update" && userId === user.id;
@@ -153,10 +153,14 @@ Deno.serve(async (req: Request) => {
         updates.role = role;
       }
 
-      if (email !== undefined) {
+      const authUpdates: any = {};
+      if (email !== undefined) authUpdates.email = email;
+      if (password !== undefined) authUpdates.password = password;
+
+      if (Object.keys(authUpdates).length > 0) {
         const { error: authUpdateError } = await supabase.auth.admin.updateUserById(
           userId,
-          { email }
+          authUpdates
         );
 
         if (authUpdateError) {

@@ -46,6 +46,8 @@ export function AccountSettings() {
   const [editingUserEmail, setEditingUserEmail] = useState('');
   const [editingUserName, setEditingUserName] = useState('');
   const [editingUserRole, setEditingUserRole] = useState('user');
+  const [editingUserPassword, setEditingUserPassword] = useState('');
+  const [editingUserPasswordConfirm, setEditingUserPasswordConfirm] = useState('');
   const [updatingUser, setUpdatingUser] = useState(false);
 
   const [availableStatuses, setAvailableStatuses] = useState<string[]>([]);
@@ -310,6 +312,8 @@ export function AccountSettings() {
     setEditingUserEmail(userProfile.email);
     setEditingUserName(userProfile.full_name || '');
     setEditingUserRole(userProfile.role);
+    setEditingUserPassword('');
+    setEditingUserPasswordConfirm('');
   };
 
   const cancelEditUser = () => {
@@ -317,12 +321,25 @@ export function AccountSettings() {
     setEditingUserEmail('');
     setEditingUserName('');
     setEditingUserRole('user');
+    setEditingUserPassword('');
+    setEditingUserPasswordConfirm('');
   };
 
   const updateUser = async (userId: string) => {
     if (!editingUserEmail.trim()) {
       alert('Email is required');
       return;
+    }
+
+    if (editingUserPassword || editingUserPasswordConfirm) {
+      if (editingUserPassword !== editingUserPasswordConfirm) {
+        alert('Passwords do not match');
+        return;
+      }
+      if (editingUserPassword.length < 6) {
+        alert('Password must be at least 6 characters');
+        return;
+      }
     }
 
     try {
@@ -333,19 +350,25 @@ export function AccountSettings() {
         return;
       }
 
+      const requestBody: any = {
+        action: 'update',
+        userId: userId,
+        email: editingUserEmail,
+        full_name: editingUserName || null,
+        role: editingUserRole,
+      };
+
+      if (editingUserPassword) {
+        requestBody.password = editingUserPassword;
+      }
+
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-users`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({
-          action: 'update',
-          userId: userId,
-          email: editingUserEmail,
-          full_name: editingUserName || null,
-          role: editingUserRole,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -800,6 +823,35 @@ export function AccountSettings() {
                                 <option value="user">User</option>
                                 <option value="viewer">Viewer</option>
                               </select>
+                            </div>
+                            <div className="border-t border-gray-200 pt-3">
+                              <p className="text-sm font-medium text-gray-700 mb-2">Change Password (Optional)</p>
+                              <div className="space-y-3">
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    New Password
+                                  </label>
+                                  <input
+                                    type="password"
+                                    value={editingUserPassword}
+                                    onChange={(e) => setEditingUserPassword(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    placeholder="Leave blank to keep current password"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Confirm New Password
+                                  </label>
+                                  <input
+                                    type="password"
+                                    value={editingUserPasswordConfirm}
+                                    onChange={(e) => setEditingUserPasswordConfirm(e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    placeholder="Re-enter new password"
+                                  />
+                                </div>
+                              </div>
                             </div>
                             <div className="flex gap-2">
                               <button
