@@ -37,6 +37,8 @@ export function AccountSettings() {
   const [printavoUsername, setPrintavoUsername] = useState('');
   const [printavoToken, setPrintavoToken] = useState('');
   const [savingIntegration, setSavingIntegration] = useState(false);
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [testResult, setTestResult] = useState<any>(null);
 
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -202,6 +204,31 @@ export function AccountSettings() {
     }
   };
 
+  const testPrintavoConnection = async () => {
+    try {
+      setTestingConnection(true);
+      setTestResult(null);
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-printavo`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+      setTestResult(result);
+    } catch (err) {
+      console.error('Error testing connection:', err);
+      setTestResult({
+        success: false,
+        error: err instanceof Error ? err.message : 'Failed to test connection',
+      });
+    } finally {
+      setTestingConnection(false);
+    }
+  };
+
   const saveIntegration = async () => {
     if (!printavoUsername.trim()) {
       alert('Printavo username/email is required');
@@ -269,6 +296,7 @@ export function AccountSettings() {
 
       alert('Printavo integration settings saved successfully!');
       setPrintavoToken('');
+      setTestResult(null);
       await loadSettings();
     } catch (err) {
       console.error('Error saving integration settings:', err);
@@ -702,15 +730,72 @@ export function AccountSettings() {
                 </div>
 
                 {companySettings?.printavo_username && (
-                  <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="flex items-center gap-2 text-green-800">
-                      <Key className="w-5 h-5" />
-                      <div>
-                        <p className="font-medium">Integration Active</p>
-                        <p className="text-sm mt-1">Connected as: {companySettings.printavo_username}</p>
+                  <>
+                    <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-green-800">
+                          <Key className="w-5 h-5" />
+                          <div>
+                            <p className="font-medium">Integration Active</p>
+                            <p className="text-sm mt-1">Connected as: {companySettings.printavo_username}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={testPrintavoConnection}
+                          disabled={testingConnection}
+                          className="flex items-center gap-2 px-4 py-2 bg-white border border-green-300 text-green-700 rounded-lg hover:bg-green-50 disabled:opacity-50 transition-colors"
+                        >
+                          {testingConnection ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Testing...
+                            </>
+                          ) : (
+                            'Test Connection'
+                          )}
+                        </button>
                       </div>
                     </div>
-                  </div>
+
+                    {testResult && (
+                      <div className={`p-4 rounded-lg border ${testResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                        <div className="space-y-3">
+                          <div className={`font-medium ${testResult.success ? 'text-green-800' : 'text-red-800'}`}>
+                            {testResult.success ? 'Connection Successful!' : 'Connection Failed'}
+                          </div>
+
+                          {testResult.success && testResult.company && (
+                            <div className="text-sm text-green-700">
+                              Connected to: {testResult.company.name}
+                            </div>
+                          )}
+
+                          {testResult.error && (
+                            <div className="text-sm text-red-700">
+                              Error: {testResult.error}
+                            </div>
+                          )}
+
+                          {testResult.printavoError && (
+                            <div className="text-sm text-red-700">
+                              Printavo Error: {testResult.printavoError}
+                            </div>
+                          )}
+
+                          {testResult.diagnostics && (
+                            <details className="text-xs mt-2">
+                              <summary className="cursor-pointer text-gray-600 hover:text-gray-900">
+                                Show Diagnostics
+                              </summary>
+                              <pre className="mt-2 p-2 bg-white rounded border border-gray-200 overflow-x-auto">
+                                {JSON.stringify(testResult.diagnostics, null, 2)}
+                              </pre>
+                            </details>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
