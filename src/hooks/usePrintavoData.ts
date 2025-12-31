@@ -33,8 +33,6 @@ export function usePrintavoData(): PrintavoData {
         setLoading(true);
         setError(null);
 
-        console.log('Fetching payments with query:', GET_PAYMENTS.loc?.source.body);
-
         const [invoicesData, paymentsData] = await Promise.all([
           fetchAllPagesWithRetry<Invoice>(
             apolloClient,
@@ -63,8 +61,6 @@ export function usePrintavoData(): PrintavoData {
             }
           ),
         ]);
-
-        console.log('Raw payments data sample:', paymentsData.slice(0, 2));
 
         if (isMounted) {
           setInvoices(invoicesData);

@@ -98,11 +98,6 @@ Deno.serve(async (req: Request) => {
 
     const data = await response.json();
 
-    // Debug: Log sample of API response
-    if (data?.data?.transactions?.edges?.[0]) {
-      console.log('Sample transaction from Printavo API:', JSON.stringify(data.data.transactions.edges[0], null, 2));
-    }
-
     if (!response.ok) {
       console.error('Printavo API error:', {
         status: response.status,

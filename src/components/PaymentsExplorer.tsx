@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Search, Calendar, FileDown, ExternalLink } from 'lucide-react';
-import { PaymentWithInvoice } from '../types/printavo';
+import { PaymentWithInvoice, Invoice } from '../types/printavo';
 import { formatCurrency } from '../utils/financial-aggregations';
 import { format, parseISO, isWithinInterval, subMonths, startOfDay, endOfDay } from 'date-fns';
 import { exportToCSV } from '../utils/csv-export';
@@ -10,49 +10,58 @@ import { getPrintavoInvoiceUrl } from '../utils/printavo-links';
 
 interface PaymentsExplorerProps {
   payments: PaymentWithInvoice[];
+  invoices: Invoice[];
   loading?: boolean;
 }
 
-function getCustomerName(payment: PaymentWithInvoice): string {
+function getCustomerName(payment: PaymentWithInvoice, invoiceMap: Map<string, Invoice>): string {
+  // First try to get customer from payment's nested contact (if available)
   const contact = payment.transactedFor?.contact;
-  if (!contact) return 'Unknown';
-
-  if (contact.customer?.companyName) {
-    return contact.customer.companyName;
+  if (contact) {
+    if (contact.customer?.companyName) {
+      return contact.customer.companyName;
+    }
+    if (contact.fullName) {
+      return contact.fullName;
+    }
+    if (contact.firstName || contact.lastName) {
+      return [contact.firstName, contact.lastName].filter(Boolean).join(' ');
+    }
   }
 
-  if (contact.fullName) {
-    return contact.fullName;
-  }
-
-  if (contact.firstName || contact.lastName) {
-    return [contact.firstName, contact.lastName].filter(Boolean).join(' ');
+  // Fall back to looking up the invoice by ID
+  const invoiceId = payment.transactedFor?.id;
+  if (invoiceId) {
+    const invoice = invoiceMap.get(invoiceId);
+    if (invoice?.contact) {
+      if (invoice.contact.customer?.companyName) {
+        return invoice.contact.customer.companyName;
+      }
+      if (invoice.contact.fullName) {
+        return invoice.contact.fullName;
+      }
+    }
   }
 
   return 'Unknown';
 }
 
-export function PaymentsExplorer({ payments, loading }: PaymentsExplorerProps) {
+export function PaymentsExplorer({ payments, invoices, loading }: PaymentsExplorerProps) {
+  // Create invoice lookup map for matching payments to invoices
+  const invoiceMap = useMemo(() => {
+    const map = new Map<string, Invoice>();
+    invoices.forEach(inv => {
+      map.set(inv.id, inv);
+    });
+    return map;
+  }, [invoices]);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>('this-month');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'amount'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-
-  // Debug: Log first payment to see what data we're getting
-  useEffect(() => {
-    if (payments.length > 0) {
-      console.log('=== PAYMENT DEBUG ===');
-      console.log('Total payments:', payments.length);
-      console.log('First payment full object:', payments[0]);
-      console.log('transactedFor:', payments[0]?.transactedFor);
-      console.log('contact:', payments[0]?.transactedFor?.contact);
-      console.log('customer:', payments[0]?.transactedFor?.contact?.customer);
-      console.log('Customer name result:', getCustomerName(payments[0]));
-      console.log('===================');
-    }
-  }, [payments]);
 
   const dateRange = useMemo(() => {
     if (dateRangePreset === 'custom' && customStartDate && customEndDate) {
@@ -67,7 +76,7 @@ export function PaymentsExplorer({ payments, loading }: PaymentsExplorerProps) {
   const filteredAndSortedPayments = useMemo(() => {
     let filtered = payments.filter(payment => {
       const orderNumber = payment.transactedFor?.visualId || '';
-      const customerName = getCustomerName(payment);
+      const customerName = getCustomerName(payment, invoiceMap);
 
       const matchesSearch =
         orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -98,7 +107,7 @@ export function PaymentsExplorer({ payments, loading }: PaymentsExplorerProps) {
     });
 
     return filtered;
-  }, [payments, searchTerm, dateRange, sortBy, sortOrder]);
+  }, [payments, searchTerm, dateRange, sortBy, sortOrder, invoiceMap]);
 
   const totalAmount = useMemo(() => {
     return filteredAndSortedPayments.reduce((sum, payment) => sum + payment.amount, 0);
@@ -108,7 +117,7 @@ export function PaymentsExplorer({ payments, loading }: PaymentsExplorerProps) {
     const data = filteredAndSortedPayments.map(payment => ({
       paymentDate: payment.transactionDate || payment.timestamps?.createdAt || '',
       invoiceNumber: payment.transactedFor?.visualId || 'N/A',
-      customer: getCustomerName(payment),
+      customer: getCustomerName(payment, invoiceMap),
       paymentMethod: payment.paymentMethod || 'N/A',
       processedBy: payment.isPrintavoPayment ? 'Printavo Payments' : (payment.processorName || payment.processor || 'Outside Printavo'),
       amount: payment.amount || 0
@@ -132,7 +141,7 @@ export function PaymentsExplorer({ payments, loading }: PaymentsExplorerProps) {
     const data = filteredAndSortedPayments.map(payment => ({
       paymentDate: payment.transactionDate || payment.timestamps?.createdAt || '',
       invoiceNumber: payment.transactedFor?.visualId || 'N/A',
-      customer: getCustomerName(payment),
+      customer: getCustomerName(payment, invoiceMap),
       paymentMethod: payment.paymentMethod || 'N/A',
       processedBy: payment.isPrintavoPayment ? 'Printavo Payments' : (payment.processorName || payment.processor || 'Outside Printavo'),
       amount: payment.amount || 0
@@ -348,7 +357,7 @@ export function PaymentsExplorer({ payments, loading }: PaymentsExplorerProps) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
-                          {getCustomerName(payment)}
+                          {getCustomerName(payment, invoiceMap)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">

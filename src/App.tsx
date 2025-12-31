@@ -257,7 +257,7 @@ function AppContent() {
               <InvoiceExplorer invoices={invoices} />
             )}
             {activeTab === 'payments' && (
-              <PaymentsExplorer payments={payments} />
+              <PaymentsExplorer payments={payments} invoices={invoices} />
             )}
             {activeTab === 'customers' && (
               <CustomerProfiles invoices={invoices} />
