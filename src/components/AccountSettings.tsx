@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload } from 'lucide-react';
+import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, Edit } from 'lucide-react';
 import { supabase } from '../lib/supabase-client';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -41,6 +41,12 @@ export function AccountSettings() {
   const [newUserName, setNewUserName] = useState('');
   const [newUserRole, setNewUserRole] = useState('user');
   const [addingUser, setAddingUser] = useState(false);
+
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editingUserEmail, setEditingUserEmail] = useState('');
+  const [editingUserName, setEditingUserName] = useState('');
+  const [editingUserRole, setEditingUserRole] = useState('user');
+  const [updatingUser, setUpdatingUser] = useState(false);
 
   const [availableStatuses, setAvailableStatuses] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
@@ -296,6 +302,72 @@ export function AccountSettings() {
       alert(err instanceof Error ? err.message : 'Failed to add user. Please try again.');
     } finally {
       setAddingUser(false);
+    }
+  };
+
+  const startEditUser = (userProfile: UserProfile) => {
+    setEditingUserId(userProfile.id);
+    setEditingUserEmail(userProfile.email);
+    setEditingUserName(userProfile.full_name || '');
+    setEditingUserRole(userProfile.role);
+  };
+
+  const cancelEditUser = () => {
+    setEditingUserId(null);
+    setEditingUserEmail('');
+    setEditingUserName('');
+    setEditingUserRole('user');
+  };
+
+  const updateUser = async (userId: string) => {
+    if (!editingUserEmail.trim()) {
+      alert('Email is required');
+      return;
+    }
+
+    try {
+      setUpdatingUser(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('You must be logged in to update users');
+        return;
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-users`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          action: 'update',
+          userId: userId,
+          email: editingUserEmail,
+          full_name: editingUserName || null,
+          role: editingUserRole,
+        }),
+      });
+
+      if (!response.ok) {
+        const responseText = await response.text();
+        console.error('Update user error response:', responseText);
+        let errorData;
+        try {
+          errorData = JSON.parse(responseText);
+        } catch (e) {
+          throw new Error(`Failed to update user: ${responseText}`);
+        }
+        throw new Error(errorData.error || 'Failed to update user');
+      }
+
+      alert('User updated successfully!');
+      cancelEditUser();
+      loadUsers();
+    } catch (err) {
+      console.error('Error updating user:', err);
+      alert(err instanceof Error ? err.message : 'Failed to update user. Please try again.');
+    } finally {
+      setUpdatingUser(false);
     }
   };
 
@@ -683,40 +755,124 @@ export function AccountSettings() {
                   <p className="text-center text-gray-500 py-8">No users found</p>
                 ) : (
                   users.map((userProfile) => (
-                    <div key={userProfile.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-100 rounded-full">
-                          <User className="w-5 h-5 text-blue-600" />
+                    <div key={userProfile.id}>
+                      {editingUserId === userProfile.id ? (
+                        <div className="p-4 bg-blue-50">
+                          <div className="flex items-center gap-2 mb-4">
+                            <User className="w-5 h-5 text-blue-600" />
+                            <h4 className="font-medium text-gray-900">Edit User</h4>
+                          </div>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Email Address *
+                              </label>
+                              <input
+                                type="email"
+                                value={editingUserEmail}
+                                onChange={(e) => setEditingUserEmail(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="user@example.com"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Full Name
+                              </label>
+                              <input
+                                type="text"
+                                value={editingUserName}
+                                onChange={(e) => setEditingUserName(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="John Doe"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Role
+                              </label>
+                              <select
+                                value={editingUserRole}
+                                onChange={(e) => setEditingUserRole(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              >
+                                <option value="admin">Admin</option>
+                                <option value="user">User</option>
+                                <option value="viewer">Viewer</option>
+                              </select>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => updateUser(userProfile.id)}
+                                disabled={updatingUser}
+                                className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                              >
+                                {updatingUser ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Updating...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Save className="w-4 h-4" />
+                                    Save Changes
+                                  </>
+                                )}
+                              </button>
+                              <button
+                                onClick={cancelEditUser}
+                                disabled={updatingUser}
+                                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="font-medium text-gray-900">
-                            {userProfile.full_name || 'No name'}
-                            {userProfile.id === user?.id && (
-                              <span className="ml-2 text-xs text-blue-600">(You)</span>
+                      ) : (
+                        <div className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-blue-100 rounded-full">
+                              <User className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <div>
+                              <div className="font-medium text-gray-900">
+                                {userProfile.full_name || 'No name'}
+                                {userProfile.id === user?.id && (
+                                  <span className="ml-2 text-xs text-blue-600">(You)</span>
+                                )}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {userProfile.email}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 px-3 py-1 bg-gray-100 rounded-full">
+                              <Shield className="w-3 h-3 text-gray-600" />
+                              <span className="text-xs font-medium text-gray-700 capitalize">
+                                {userProfile.role}
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => startEditUser(userProfile)}
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                              title="Edit user"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            {userProfile.id !== user?.id && (
+                              <button
+                                onClick={() => deleteUser(userProfile.id)}
+                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Remove user"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
                             )}
                           </div>
-                          <div className="text-sm text-gray-500">
-                            {userProfile.email}
-                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2 px-3 py-1 bg-gray-100 rounded-full">
-                          <Shield className="w-3 h-3 text-gray-600" />
-                          <span className="text-xs font-medium text-gray-700 capitalize">
-                            {userProfile.role}
-                          </span>
-                        </div>
-                        {userProfile.id !== user?.id && (
-                          <button
-                            onClick={() => deleteUser(userProfile.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Remove user"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
+                      )}
                     </div>
                   ))
                 )}
