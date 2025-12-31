@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Search, Calendar, FileDown, ExternalLink } from 'lucide-react';
+import { Search, Calendar, FileDown, ExternalLink, CreditCard, DollarSign, ChevronDown, ArrowUpDown } from 'lucide-react';
 import { PaymentWithInvoice, Invoice } from '../types/printavo';
 import { formatCurrency } from '../utils/financial-aggregations';
 import { format, parseISO, isWithinInterval, subMonths, startOfDay, endOfDay } from 'date-fns';
@@ -62,6 +62,7 @@ export function PaymentsExplorer({ payments, invoices, loading }: PaymentsExplor
   const [customEndDate, setCustomEndDate] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'amount'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   const dateRange = useMemo(() => {
     if (dateRangePreset === 'custom' && customStartDate && customEndDate) {
@@ -174,166 +175,208 @@ export function PaymentsExplorer({ payments, invoices, loading }: PaymentsExplor
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Payments Report</h2>
-            <p className="text-gray-600 mt-1">
-              {filteredAndSortedPayments.length} payments · {formatCurrency(totalAmount)} total
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleExportCSV}
-              disabled={filteredAndSortedPayments.length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
-            >
-              <FileDown className="w-4 h-4" />
-              <span className="font-medium">Export CSV</span>
-            </button>
-            <button
-              onClick={handleExportPDF}
-              disabled={filteredAndSortedPayments.length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
-            >
-              <FileDown className="w-4 h-4" />
-              <span className="font-medium">Export PDF</span>
-            </button>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl shadow-sm border border-blue-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-blue-700 mb-1">Total Payments</p>
+              <p className="text-3xl font-bold text-blue-900">{filteredAndSortedPayments.length}</p>
+            </div>
+            <div className="bg-blue-200 rounded-full p-3">
+              <CreditCard className="w-8 h-8 text-blue-700" />
+            </div>
           </div>
         </div>
-
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search by invoice or customer..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl shadow-sm border border-green-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-green-700 mb-1">Total Amount</p>
+              <p className="text-3xl font-bold text-green-900">{formatCurrency(totalAmount)}</p>
             </div>
-            <div className="flex gap-2">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as 'date' | 'amount')}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
-              >
-                <option value="date">Sort by Date</option>
-                <option value="amount">Sort by Amount</option>
-              </select>
-              <button
-                onClick={() => setSortOrder(order => order === 'asc' ? 'desc' : 'asc')}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors bg-white font-medium text-gray-700"
-                title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
-              >
-                {sortOrder === 'asc' ? '↑' : '↓'}
-              </button>
-            </div>
-          </div>
-
-          <div className="bg-gray-50 rounded-lg p-5 border border-gray-200">
-            <div className="flex items-center gap-2 mb-4">
-              <Calendar className="w-5 h-5 text-gray-700" />
-              <h3 className="text-base font-semibold text-gray-900">Date Range</h3>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-              {(Object.keys(dateRangePresetLabels).filter(key => key !== 'custom') as DateRangePreset[]).map((preset) => (
-                <button
-                  key={preset}
-                  onClick={() => setDateRangePreset(preset)}
-                  className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-all ${
-                    dateRangePreset === preset
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 shadow-sm'
-                  }`}
-                >
-                  {dateRangePresetLabels[preset]}
-                </button>
-              ))}
-            </div>
-            <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-gray-200">
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  checked={dateRangePreset === 'custom'}
-                  onChange={() => setDateRangePreset('custom')}
-                  className="w-4 h-4 text-blue-600"
-                />
-                <span className="text-sm font-medium text-gray-700">Custom Range:</span>
-              </label>
-              <input
-                type="date"
-                value={customStartDate}
-                onChange={(e) => {
-                  setCustomStartDate(e.target.value);
-                  setDateRangePreset('custom');
-                }}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <span className="text-gray-500 font-medium">to</span>
-              <input
-                type="date"
-                value={customEndDate}
-                onChange={(e) => {
-                  setCustomEndDate(e.target.value);
-                  setDateRangePreset('custom');
-                }}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-            <div className="mt-4 px-3 py-2 bg-white rounded border border-gray-200">
-              <p className="text-sm font-medium text-gray-700">
-                Showing: <span className="text-blue-600">{format(dateRange.startDate, 'MMM d, yyyy')}</span> - <span className="text-blue-600">{format(dateRange.endDate, 'MMM d, yyyy')}</span>
-              </p>
+            <div className="bg-green-200 rounded-full p-3">
+              <DollarSign className="w-8 h-8 text-green-700" />
             </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow">
+      {/* Filters & Controls */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        {/* Unified Search & Sort Bar */}
+        <div className="flex flex-col lg:flex-row gap-4 mb-6">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by invoice number or customer name..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-11 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm"
+            />
+          </div>
+          <div className="flex gap-3">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as 'date' | 'amount')}
+              className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm font-medium text-gray-700 min-w-[140px]"
+            >
+              <option value="date">Sort by Date</option>
+              <option value="amount">Sort by Amount</option>
+            </select>
+            <button
+              onClick={() => setSortOrder(order => order === 'asc' ? 'desc' : 'asc')}
+              className="px-3 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors bg-white"
+              title={sortOrder === 'asc' ? 'Sort Ascending' : 'Sort Descending'}
+            >
+              <ArrowUpDown className={`w-5 h-5 text-gray-600 ${sortOrder === 'desc' ? 'rotate-180' : ''} transition-transform`} />
+            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                disabled={filteredAndSortedPayments.length === 0}
+                className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium shadow-sm"
+              >
+                <FileDown className="w-4 h-4" />
+                Export
+                <ChevronDown className="w-4 h-4" />
+              </button>
+              {showExportMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
+                  <button
+                    onClick={() => {
+                      handleExportCSV();
+                      setShowExportMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <FileDown className="w-4 h-4" />
+                    Export as CSV
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleExportPDF();
+                      setShowExportMenu(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                  >
+                    <FileDown className="w-4 h-4" />
+                    Export as PDF
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Date Range Selector with Pills */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-gray-600" />
+            <h3 className="text-sm font-semibold text-gray-900">Date Range</h3>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {(Object.keys(dateRangePresetLabels).filter(key => key !== 'custom') as DateRangePreset[]).map((preset) => (
+              <button
+                key={preset}
+                onClick={() => setDateRangePreset(preset)}
+                className={`px-4 py-2 text-sm font-medium rounded-full transition-all ${
+                  dateRangePreset === preset
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {dateRangePresetLabels[preset]}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-gray-200">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                checked={dateRangePreset === 'custom'}
+                onChange={() => setDateRangePreset('custom')}
+                className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm font-medium text-gray-700">Custom Range</span>
+            </label>
+            <input
+              type="date"
+              value={customStartDate}
+              onChange={(e) => {
+                setCustomStartDate(e.target.value);
+                setDateRangePreset('custom');
+              }}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+            />
+            <span className="text-gray-400 font-medium text-sm">to</span>
+            <input
+              type="date"
+              value={customEndDate}
+              onChange={(e) => {
+                setCustomEndDate(e.target.value);
+                setDateRangePreset('custom');
+              }}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+            />
+          </div>
+          <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-lg border border-blue-100">
+            <p className="text-sm text-gray-700">
+              <span className="font-medium">Showing:</span> <span className="font-semibold text-blue-700">{format(dateRange.startDate, 'MMM d, yyyy')}</span> - <span className="font-semibold text-blue-700">{format(dateRange.endDate, 'MMM d, yyyy')}</span>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Date
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Invoice
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Customer
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Payment Method
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Processed By
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Amount
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-100">
               {filteredAndSortedPayments.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                    No payments found matching your criteria
+                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                    <div className="flex flex-col items-center gap-2">
+                      <CreditCard className="w-12 h-12 text-gray-300" />
+                      <p className="text-sm font-medium">No payments found matching your criteria</p>
+                    </div>
                   </td>
                 </tr>
               ) : (
-                filteredAndSortedPayments.map(payment => {
+                filteredAndSortedPayments.map((payment, index) => {
                   const processedBy = payment.isPrintavoPayment
                     ? 'Printavo Payments'
                     : (payment.processorName || payment.processor || 'Outside Printavo');
 
                   return (
-                    <tr key={payment.id} className="hover:bg-gray-50">
+                    <tr
+                      key={payment.id}
+                      className={`transition-colors hover:bg-blue-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                    >
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center text-sm text-gray-900">
+                        <div className="flex items-center text-sm text-gray-900 font-medium">
                           <Calendar className="w-4 h-4 mr-2 text-gray-400" />
                           {payment.transactionDate
                             ? format(parseISO(payment.transactionDate), 'MMM d, yyyy')
@@ -346,36 +389,36 @@ export function PaymentsExplorer({ payments, invoices, loading }: PaymentsExplor
                             href={getPrintavoInvoiceUrl(payment.transactedFor.id)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
+                            className="text-sm font-semibold text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
                           >
                             {payment.transactedFor.visualId}
                             <ExternalLink className="w-3 h-3" />
                           </a>
                         ) : (
-                          <div className="text-sm font-medium text-gray-900">N/A</div>
+                          <div className="text-sm font-medium text-gray-400">N/A</div>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
+                        <div className="text-sm text-gray-900 font-medium">
                           {getCustomerName(payment, invoiceMap)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
+                        <div className="text-sm text-gray-700">
                           {payment.paymentMethod || 'N/A'}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
                           payment.isPrintavoPayment
                             ? 'bg-blue-100 text-blue-800'
-                            : 'bg-gray-100 text-gray-800'
+                            : 'bg-gray-100 text-gray-700'
                         }`}>
                           {processedBy}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="text-sm font-medium text-green-600">
+                        <div className="text-sm font-bold text-green-600">
                           {formatCurrency(payment.amount)}
                         </div>
                       </td>
