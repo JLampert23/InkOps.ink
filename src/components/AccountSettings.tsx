@@ -234,7 +234,8 @@ export function AccountSettings() {
       });
 
       if (!encryptResponse.ok) {
-        throw new Error('Failed to encrypt API token');
+        const errorData = await encryptResponse.json();
+        throw new Error(errorData.error || 'Failed to encrypt API token');
       }
 
       const { result: encryptedToken } = await encryptResponse.json();
