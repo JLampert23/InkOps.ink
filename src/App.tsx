@@ -1,18 +1,17 @@
 import { useState } from 'react';
-import { FileText, CreditCard, Users, RefreshCw, AlertCircle, DollarSign, TrendingUp, Clock, Download, Building2, Menu, X, LogOut, Loader2, BarChart3 } from 'lucide-react';
+import { FileText, CreditCard, Users, RefreshCw, AlertCircle, DollarSign, TrendingUp, Download, Building2, Menu, X, LogOut, Loader2, BarChart3 } from 'lucide-react';
 import { useSupabaseData } from './hooks/useSupabaseData';
 import { InvoiceExplorer } from './components/InvoiceExplorer';
 import { PaymentsExplorer } from './components/PaymentsExplorer';
 import { CustomerProfiles } from './components/CustomerProfiles';
 import { OpenInvoices } from './components/OpenInvoices';
 import { AccountsReceivable } from './components/AccountsReceivable';
-import { AgingReport } from './components/AgingReport';
 import { ARByCustomer } from './components/ARByCustomer';
 import { ReportsTab } from './components/ReportsTab';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AuthScreen } from './components/AuthScreen';
 
-type Tab = 'ar' | 'ar-by-customer' | 'open-invoices' | 'aging' | 'reports' | 'invoices' | 'payments' | 'customers';
+type Tab = 'ar' | 'ar-by-customer' | 'open-invoices' | 'reports' | 'invoices' | 'payments' | 'customers';
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState<Tab>('ar');
@@ -38,12 +37,6 @@ function AppContent() {
       name: 'Open Invoices',
       icon: FileText,
       description: 'Unpaid invoices'
-    },
-    {
-      id: 'aging' as Tab,
-      name: 'Aging Report',
-      icon: Clock,
-      description: 'Invoice aging analysis'
     },
     {
       id: 'reports' as Tab,
@@ -256,9 +249,6 @@ function AppContent() {
             )}
             {activeTab === 'open-invoices' && (
               <OpenInvoices invoices={invoices} />
-            )}
-            {activeTab === 'aging' && (
-              <AgingReport invoices={invoices} />
             )}
             {activeTab === 'reports' && (
               <ReportsTab invoices={invoices} payments={payments} />
