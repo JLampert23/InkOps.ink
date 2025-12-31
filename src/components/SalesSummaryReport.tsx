@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { FileDown, TrendingUp, DollarSign, FileText, Calendar } from 'lucide-react';
+import { FileDown, TrendingUp, DollarSign, FileText, Calendar, ChevronDown } from 'lucide-react';
 import { Invoice } from '../types/printavo';
 import { format, startOfDay, endOfDay, eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval, startOfWeek, startOfMonth, endOfWeek, endOfMonth } from 'date-fns';
 import { exportToCSV } from '../utils/csv-export';
@@ -28,6 +28,7 @@ export function SalesSummaryReport({ invoices }: SalesSummaryReportProps) {
   const [customEndDate, setCustomEndDate] = useState('');
   const [grouping, setGrouping] = useState<GroupingPeriod>('week');
   const [chartType, setChartType] = useState<'bar' | 'line'>('bar');
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   const dateRange = useMemo(() => {
     if (dateRangePreset === 'custom' && customStartDate && customEndDate) {
@@ -147,264 +148,294 @@ export function SalesSummaryReport({ invoices }: SalesSummaryReportProps) {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Sales Summary Report</h2>
-            <p className="text-gray-600 mt-1">
-              {format(dateRange.startDate, 'MMM d, yyyy')} - {format(dateRange.endDate, 'MMM d, yyyy')}
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl shadow-sm border border-blue-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-blue-700 mb-1">Total Invoiced</p>
+              <p className="text-3xl font-bold text-blue-900">
+                ${summaryMetrics.totalInvoiced.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+            <div className="bg-blue-200 rounded-full p-3">
+              <DollarSign className="w-8 h-8 text-blue-700" />
+            </div>
+          </div>
+        </div>
+        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl shadow-sm border border-green-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-green-700 mb-1">Total Paid</p>
+              <p className="text-3xl font-bold text-green-900">
+                ${summaryMetrics.totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+            <div className="bg-green-200 rounded-full p-3">
+              <TrendingUp className="w-8 h-8 text-green-700" />
+            </div>
+          </div>
+        </div>
+        <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl shadow-sm border border-red-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-red-700 mb-1">Outstanding</p>
+              <p className="text-3xl font-bold text-red-900">
+                ${summaryMetrics.totalOutstanding.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+            <div className="bg-red-200 rounded-full p-3">
+              <DollarSign className="w-8 h-8 text-red-700" />
+            </div>
+          </div>
+        </div>
+        <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-1">Invoices</p>
+              <p className="text-3xl font-bold text-gray-900">{summaryMetrics.invoiceCount}</p>
+            </div>
+            <div className="bg-gray-200 rounded-full p-3">
+              <FileText className="w-8 h-8 text-gray-700" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filters & Controls */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        {/* Export Controls Bar */}
+        <div className="flex flex-col lg:flex-row gap-4 mb-6 justify-end">
+          <div className="relative">
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              disabled={salesData.length === 0}
+              className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium shadow-sm"
+            >
+              <FileDown className="w-4 h-4" />
+              Export
+              <ChevronDown className="w-4 h-4" />
+            </button>
+            {showExportMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
+                <button
+                  onClick={() => {
+                    handleExportCSV();
+                    setShowExportMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <FileDown className="w-4 h-4" />
+                  Export as CSV
+                </button>
+                <button
+                  onClick={() => {
+                    handleExportPDF();
+                    setShowExportMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <FileDown className="w-4 h-4" />
+                  Export as PDF
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Date Range Selector with Pills */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-gray-600" />
+            <h3 className="text-sm font-semibold text-gray-900">Date Range</h3>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {(Object.keys(dateRangePresetLabels).filter(key => key !== 'custom') as DateRangePreset[]).map((preset) => (
+              <button
+                key={preset}
+                onClick={() => setDateRangePreset(preset)}
+                className={`px-4 py-2 text-sm font-medium rounded-full transition-all ${
+                  dateRangePreset === preset
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {dateRangePresetLabels[preset]}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-gray-200">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                checked={dateRangePreset === 'custom'}
+                onChange={() => setDateRangePreset('custom')}
+                className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-sm font-medium text-gray-700">Custom Range</span>
+            </label>
+            <input
+              type="date"
+              value={customStartDate}
+              onChange={(e) => {
+                setCustomStartDate(e.target.value);
+                setDateRangePreset('custom');
+              }}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+            />
+            <span className="text-gray-400 font-medium text-sm">to</span>
+            <input
+              type="date"
+              value={customEndDate}
+              onChange={(e) => {
+                setCustomEndDate(e.target.value);
+                setDateRangePreset('custom');
+              }}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+            />
+          </div>
+          <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-lg border border-blue-100">
+            <p className="text-sm text-gray-700">
+              <span className="font-medium">Showing:</span> <span className="font-semibold text-blue-700">{format(dateRange.startDate, 'MMM d, yyyy')}</span> - <span className="font-semibold text-blue-700">{format(dateRange.endDate, 'MMM d, yyyy')}</span>
             </p>
           </div>
+        </div>
+
+        {/* Additional Controls */}
+        <div className="flex flex-wrap items-center gap-4 pt-6 border-t border-gray-200 mt-6">
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleExportCSV}
-              disabled={salesData.length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
-            >
-              <FileDown className="w-4 h-4" />
-              <span className="font-medium">Export CSV</span>
-            </button>
-            <button
-              onClick={handleExportPDF}
-              disabled={salesData.length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
-            >
-              <FileDown className="w-4 h-4" />
-              <span className="font-medium">Export PDF</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <DollarSign className="w-6 h-6 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-blue-600 font-medium">Total Invoiced</p>
-                <p className="text-2xl font-bold text-blue-900">
-                  ${summaryMetrics.totalInvoiced.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <TrendingUp className="w-6 h-6 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-green-600 font-medium">Total Paid</p>
-                <p className="text-2xl font-bold text-green-900">
-                  ${summaryMetrics.totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <DollarSign className="w-6 h-6 text-red-600" />
-              </div>
-              <div>
-                <p className="text-sm text-red-600 font-medium">Outstanding</p>
-                <p className="text-2xl font-bold text-red-900">
-                  ${summaryMetrics.totalOutstanding.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gray-100 rounded-lg">
-                <FileText className="w-6 h-6 text-gray-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600 font-medium">Invoices</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {summaryMetrics.invoiceCount}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          <div className="bg-gray-50 rounded-lg p-5 border border-gray-200">
-            <div className="flex items-center gap-2 mb-4">
-              <Calendar className="w-5 h-5 text-gray-700" />
-              <h3 className="text-base font-semibold text-gray-900">Filters</h3>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-              {(Object.keys(dateRangePresetLabels).filter(key => key !== 'custom') as DateRangePreset[]).map((preset) => (
+            <label className="text-sm font-medium text-gray-700">Group by:</label>
+            <div className="flex gap-2">
+              {(['day', 'week', 'month'] as GroupingPeriod[]).map((period) => (
                 <button
-                  key={preset}
-                  onClick={() => setDateRangePreset(preset)}
-                  className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-all ${
-                    dateRangePreset === preset
+                  key={period}
+                  onClick={() => setGrouping(period)}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+                    grouping === period
                       ? 'bg-blue-600 text-white shadow-sm'
-                      : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 shadow-sm'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
-                  {dateRangePresetLabels[preset]}
+                  {period.charAt(0).toUpperCase() + period.slice(1)}
                 </button>
               ))}
             </div>
-
-            <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-gray-200 mb-4">
-              <label className="flex items-center gap-2">
-                <input
-                  type="radio"
-                  checked={dateRangePreset === 'custom'}
-                  onChange={() => setDateRangePreset('custom')}
-                  className="w-4 h-4 text-blue-600"
-                />
-                <span className="text-sm font-medium text-gray-700">Custom Range:</span>
-              </label>
-              <input
-                type="date"
-                value={customStartDate}
-                onChange={(e) => {
-                  setCustomStartDate(e.target.value);
-                  setDateRangePreset('custom');
-                }}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <span className="text-gray-500 font-medium">to</span>
-              <input
-                type="date"
-                value={customEndDate}
-                onChange={(e) => {
-                  setCustomEndDate(e.target.value);
-                  setDateRangePreset('custom');
-                }}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div className="flex items-center gap-4 pt-3 border-t border-gray-200">
-              <label className="text-sm font-medium text-gray-700">Group by:</label>
-              <div className="flex gap-2">
-                {(['day', 'week', 'month'] as GroupingPeriod[]).map((period) => (
-                  <button
-                    key={period}
-                    onClick={() => setGrouping(period)}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
-                      grouping === period
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-                    }`}
-                  >
-                    {period.charAt(0).toUpperCase() + period.slice(1)}
-                  </button>
-                ))}
-              </div>
-
-              <label className="text-sm font-medium text-gray-700 ml-auto">Chart type:</label>
-              <div className="flex gap-2">
-                {(['bar', 'line'] as const).map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => setChartType(type)}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
-                      chartType === type
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-                    }`}
-                  >
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Sales Trends</h3>
-            <ResponsiveContainer width="100%" height={400}>
-              <ChartComponent data={salesData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="period" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip
-                  formatter={(value: number) => `$${value.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-                />
-                {chartType === 'bar' ? (
-                  <>
-                    <Bar dataKey="totalInvoiced" name="Total Invoiced" fill="#3b82f6" />
-                    <Bar dataKey="totalPaid" name="Total Paid" fill="#10b981" />
-                    <Bar dataKey="totalOutstanding" name="Outstanding" fill="#ef4444" />
-                  </>
-                ) : (
-                  <>
-                    <Line type="monotone" dataKey="totalInvoiced" name="Total Invoiced" stroke="#3b82f6" strokeWidth={2} />
-                    <Line type="monotone" dataKey="totalPaid" name="Total Paid" stroke="#10b981" strokeWidth={2} />
-                    <Line type="monotone" dataKey="totalOutstanding" name="Outstanding" stroke="#ef4444" strokeWidth={2} />
-                  </>
-                )}
-              </ChartComponent>
-            </ResponsiveContainer>
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium text-gray-700">Chart type:</label>
+            <div className="flex gap-2">
+              {(['bar', 'line'] as const).map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setChartType(type)}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+                    chartType === type
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                </button>
+              ))}
+            </div>
           </div>
+        </div>
+      </div>
 
-          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Period
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Invoices
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Total Invoiced
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Total Paid
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Outstanding
-                    </th>
+      {/* Chart */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Sales Trends</h3>
+        <ResponsiveContainer width="100%" height={400}>
+          <ChartComponent data={salesData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="period" tick={{ fontSize: 12 }} />
+            <YAxis tick={{ fontSize: 12 }} />
+            <Tooltip
+              formatter={(value: number) => `$${value.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+            />
+            {chartType === 'bar' ? (
+              <>
+                <Bar dataKey="totalInvoiced" name="Total Invoiced" fill="#3b82f6" />
+                <Bar dataKey="totalPaid" name="Total Paid" fill="#10b981" />
+                <Bar dataKey="totalOutstanding" name="Outstanding" fill="#ef4444" />
+              </>
+            ) : (
+              <>
+                <Line type="monotone" dataKey="totalInvoiced" name="Total Invoiced" stroke="#3b82f6" strokeWidth={2} />
+                <Line type="monotone" dataKey="totalPaid" name="Total Paid" stroke="#10b981" strokeWidth={2} />
+                <Line type="monotone" dataKey="totalOutstanding" name="Outstanding" stroke="#ef4444" strokeWidth={2} />
+              </>
+            )}
+          </ChartComponent>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  Period
+                </th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  Invoices
+                </th>
+                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  Total Invoiced
+                </th>
+                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  Total Paid
+                </th>
+                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  Outstanding
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {salesData.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                    <div className="flex flex-col items-center gap-2">
+                      <FileText className="w-12 h-12 text-gray-300" />
+                      <p className="text-sm font-medium">No data available for selected date range</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                salesData.map((data, index) => (
+                  <tr
+                    key={index}
+                    className={`transition-colors hover:bg-blue-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{data.period}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <div className="text-sm text-gray-900">{data.invoiceCount}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <div className="text-sm font-bold text-blue-600">
+                        ${data.totalInvoiced.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <div className="text-sm font-bold text-green-600">
+                        ${data.totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <div className="text-sm font-bold text-red-600">
+                        ${data.totalOutstanding.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </div>
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {salesData.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
-                        No data available for selected date range
-                      </td>
-                    </tr>
-                  ) : (
-                    salesData.map((data, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                          {data.period}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-900 text-center">
-                          {data.invoiceCount}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-blue-600 font-semibold text-right">
-                          ${data.totalInvoiced.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-green-600 font-semibold text-right">
-                          ${data.totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-red-600 font-semibold text-right">
-                          ${data.totalOutstanding.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
