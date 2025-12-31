@@ -51,7 +51,12 @@ Deno.serve(async (req: Request) => {
       .eq("id", user.id)
       .maybeSingle();
 
-    if (profile?.role !== "admin") {
+    const { action, email, full_name, role, userId } = await req.json();
+
+    const isAdmin = profile?.role === "admin";
+    const isUpdatingSelf = action === "update" && userId === user.id;
+
+    if (!isAdmin && !isUpdatingSelf) {
       return new Response(
         JSON.stringify({ error: "Admin access required" }),
         {
@@ -60,8 +65,6 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
-
-    const { action, email, full_name, role, userId } = await req.json();
 
     if (action === "create") {
       if (!email) {
@@ -135,7 +138,19 @@ Deno.serve(async (req: Request) => {
       const updates: any = {};
       if (email !== undefined) updates.email = email;
       if (full_name !== undefined) updates.full_name = full_name;
-      if (role !== undefined) updates.role = role;
+
+      if (role !== undefined) {
+        if (!isAdmin) {
+          return new Response(
+            JSON.stringify({ error: "Only admins can change user roles" }),
+            {
+              status: 403,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+        updates.role = role;
+      }
 
       if (email !== undefined) {
         const { error: authUpdateError } = await supabase.auth.admin.updateUserById(
