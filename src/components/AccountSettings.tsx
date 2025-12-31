@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Building2, Upload, User, Mail, Shield, Save, Loader2, X, Plus, Trash2 } from 'lucide-react';
+import { Building2, Upload, User, Mail, Shield, Save, Loader2, X, Plus, Trash2, Filter } from 'lucide-react';
 import { supabase } from '../lib/supabase-client';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -9,6 +9,8 @@ interface CompanySettings {
   logo_url: string | null;
   printavo_company_id: string | null;
   printavo_data: any;
+  available_invoice_statuses: string[];
+  selected_invoice_statuses: string[];
 }
 
 interface UserProfile {
@@ -38,10 +40,15 @@ export function AccountSettings() {
   const [editEmail, setEditEmail] = useState('');
   const [editName, setEditName] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
+  const [availableStatuses, setAvailableStatuses] = useState<string[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [loadingStatuses, setLoadingStatuses] = useState(false);
+  const [savingStatuses, setSavingStatuses] = useState(false);
 
   useEffect(() => {
     loadSettings();
     loadUsers();
+    loadAvailableStatuses();
   }, []);
 
   const loadSettings = async () => {
@@ -58,11 +65,78 @@ export function AccountSettings() {
         setCompanySettings(data);
         setCompanyName(data.company_name);
         setLogoPreview(data.logo_url);
+        setSelectedStatuses(data.selected_invoice_statuses || []);
       }
     } catch (err) {
       console.error('Error loading settings:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAvailableStatuses = async () => {
+    try {
+      setLoadingStatuses(true);
+      const { data, error } = await supabase
+        .from('printavo_invoices')
+        .select('status')
+        .not('status', 'is', null);
+
+      if (error) throw error;
+
+      const uniqueStatuses = Array.from(new Set(data?.map(item => item.status) || [])).sort();
+      setAvailableStatuses(uniqueStatuses);
+    } catch (err) {
+      console.error('Error loading statuses:', err);
+    } finally {
+      setLoadingStatuses(false);
+    }
+  };
+
+  const toggleStatus = (status: string) => {
+    setSelectedStatuses(prev =>
+      prev.includes(status)
+        ? prev.filter(s => s !== status)
+        : [...prev, status]
+    );
+  };
+
+  const saveStatusPreferences = async () => {
+    try {
+      setSavingStatuses(true);
+
+      const settingsData = {
+        available_invoice_statuses: availableStatuses,
+        selected_invoice_statuses: selectedStatuses,
+      };
+
+      if (companySettings?.id) {
+        const { error } = await supabase
+          .from('company_settings')
+          .update(settingsData)
+          .eq('id', companySettings.id);
+
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from('company_settings')
+          .insert([{
+            company_name: companyName || '',
+            ...settingsData
+          }])
+          .select()
+          .single();
+
+        if (error) throw error;
+        setCompanySettings(data);
+      }
+
+      alert('Status preferences saved successfully!');
+    } catch (err) {
+      console.error('Error saving status preferences:', err);
+      alert('Failed to save status preferences. Please try again.');
+    } finally {
+      setSavingStatuses(false);
     }
   };
 
@@ -658,6 +732,98 @@ export function AccountSettings() {
             ))
           )}
         </div>
+      </div>
+
+      {/* Invoice Status Preferences */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 bg-purple-50 rounded-lg">
+            <Filter className="w-6 h-6 text-purple-600" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Invoice Status Preferences</h2>
+            <p className="text-sm text-gray-500">Select which statuses to include in AR reports</p>
+          </div>
+        </div>
+
+        {loadingStatuses ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
+          </div>
+        ) : (
+          <>
+            {availableStatuses.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                No invoice statuses found. Sync your Printavo data to see available statuses.
+              </div>
+            ) : (
+              <>
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm text-gray-600">
+                      Select the statuses you want to include when filtering AR reports
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setSelectedStatuses(availableStatuses)}
+                        className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                      >
+                        Select All
+                      </button>
+                      <span className="text-gray-400">|</span>
+                      <button
+                        onClick={() => setSelectedStatuses([])}
+                        className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4">
+                  {availableStatuses.map(status => (
+                    <label
+                      key={status}
+                      className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors border border-gray-200"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedStatuses.includes(status)}
+                        onChange={() => toggleStatus(status)}
+                        className="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                      />
+                      <span className="text-sm text-gray-900 break-words flex-1">{status}</span>
+                    </label>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                  <p className="text-sm text-gray-600">
+                    {selectedStatuses.length} of {availableStatuses.length} statuses selected
+                  </p>
+                  <button
+                    onClick={saveStatusPreferences}
+                    disabled={savingStatuses}
+                    className="flex items-center gap-2 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors"
+                  >
+                    {savingStatuses ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Save Preferences
+                      </>
+                    )}
+                  </button>
+                </div>
+              </>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
