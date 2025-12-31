@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FileText, Users, RefreshCw, AlertCircle, DollarSign, TrendingUp, Download, Building2, Menu, X, LogOut, Loader2, BarChart3 } from 'lucide-react';
+import { FileText, Users, RefreshCw, AlertCircle, DollarSign, TrendingUp, Download, Building2, Menu, X, LogOut, Loader2, BarChart3, Settings } from 'lucide-react';
 import { useSupabaseData } from './hooks/useSupabaseData';
 import { InvoiceExplorer } from './components/InvoiceExplorer';
 import { CustomerProfiles } from './components/CustomerProfiles';
@@ -7,10 +7,11 @@ import { OpenInvoices } from './components/OpenInvoices';
 import { AccountsReceivable } from './components/AccountsReceivable';
 import { ARByCustomer } from './components/ARByCustomer';
 import { ReportsTab } from './components/ReportsTab';
+import { AccountSettings } from './components/AccountSettings';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AuthScreen } from './components/AuthScreen';
 
-type Tab = 'ar' | 'ar-by-customer' | 'open-invoices' | 'reports' | 'invoices' | 'customers';
+type Tab = 'ar' | 'ar-by-customer' | 'open-invoices' | 'reports' | 'invoices' | 'customers' | 'settings';
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState<Tab>('ar');
@@ -121,6 +122,13 @@ function AppContent() {
             <div className="px-4 py-3 bg-gray-50 rounded-lg mb-2">
               <p className="text-xs text-gray-500">Signed in as</p>
               <p className="text-sm font-medium text-gray-900 truncate">{user.email}</p>
+              <button
+                onClick={() => setActiveTab('settings')}
+                className="mt-2 w-full flex items-center gap-2 text-xs text-blue-600 hover:text-blue-800 transition-colors"
+              >
+                <Settings className="w-3 h-3" />
+                Account Settings
+              </button>
             </div>
           )}
           <button
@@ -251,6 +259,9 @@ function AppContent() {
             )}
             {activeTab === 'customers' && (
               <CustomerProfiles invoices={invoices} />
+            )}
+            {activeTab === 'settings' && (
+              <AccountSettings />
             )}
           </>
         )}
