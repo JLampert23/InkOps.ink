@@ -1,17 +1,13 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase-client';
-import { signUpCompany, CompanySignupData, getCompanySettings, CompanySettings } from '../services/auth-service';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  companySettings: CompanySettings | null;
-  refreshCompanySettings: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signUp: (email: string, password: string) => Promise<{ error: AuthError | null }>;
-  signUpWithCompany: (data: CompanySignupData) => Promise<{ error: Error | null }>;
   signOut: () => Promise<{ error: AuthError | null }>;
 }
 
@@ -21,22 +17,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
-
-  const refreshCompanySettings = async () => {
-    const settings = await getCompanySettings();
-    setCompanySettings(settings);
-  };
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-
-      if (session?.user) {
-        await refreshCompanySettings();
-      }
-
       setLoading(false);
     });
 
@@ -44,13 +29,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (async () => {
         setSession(session);
         setUser(session?.user ?? null);
-
-        if (session?.user) {
-          await refreshCompanySettings();
-        } else {
-          setCompanySettings(null);
-        }
-
         setLoading(false);
       })();
     });
@@ -74,17 +52,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error };
   };
 
-  const signUpWithCompany = async (data: CompanySignupData) => {
-    const result = await signUpCompany(data);
-    if (!result.error) {
-      await refreshCompanySettings();
-    }
-    return result;
-  };
-
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
-    setCompanySettings(null);
     return { error };
   };
 
@@ -92,11 +61,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     session,
     loading,
-    companySettings,
-    refreshCompanySettings,
     signIn,
     signUp,
-    signUpWithCompany,
     signOut,
   };
 
