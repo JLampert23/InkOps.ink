@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter } from 'lucide-react';
+import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload } from 'lucide-react';
 import { supabase } from '../lib/supabase-client';
 import { useAuth } from '../contexts/AuthContext';
 
 interface CompanySettings {
   id: string;
   company_name: string;
+  logo_url: string | null;
   available_invoice_statuses: string[];
   selected_invoice_statuses: string[];
 }
@@ -27,6 +28,8 @@ export function AccountSettings() {
   const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null);
 
   const [companyName, setCompanyName] = useState('');
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [savingCompany, setSavingCompany] = useState(false);
 
   const [editEmail, setEditEmail] = useState('');
@@ -63,6 +66,7 @@ export function AccountSettings() {
       if (data) {
         setCompanySettings(data);
         setCompanyName(data.company_name);
+        setLogoPreview(data.logo_url);
         setSelectedStatuses(data.selected_invoice_statuses || []);
       }
     } catch (err) {
@@ -115,12 +119,50 @@ export function AccountSettings() {
     }
   };
 
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setLogoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadLogo = async () => {
+    if (!logoFile) return null;
+
+    const fileExt = logoFile.name.split('.').pop();
+    const fileName = `logo-${Date.now()}.${fileExt}`;
+    const filePath = fileName;
+
+    const { error: uploadError } = await supabase.storage
+      .from('company-logos')
+      .upload(filePath, logoFile, { upsert: true });
+
+    if (uploadError) throw uploadError;
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('company-logos')
+      .getPublicUrl(filePath);
+
+    return publicUrl;
+  };
+
   const saveCompanySettings = async () => {
     try {
       setSavingCompany(true);
 
+      let logoUrl = companySettings?.logo_url;
+      if (logoFile) {
+        logoUrl = await uploadLogo();
+      }
+
       const settingsData = {
         company_name: companyName,
+        logo_url: logoUrl,
       };
 
       if (companySettings?.id) {
@@ -142,6 +184,7 @@ export function AccountSettings() {
       }
 
       alert('Company settings saved successfully!');
+      setLogoFile(null);
     } catch (err) {
       console.error('Error saving company settings:', err);
       alert('Failed to save company settings. Please try again.');
@@ -181,7 +224,14 @@ export function AccountSettings() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const responseText = await response.text();
+        console.error('Profile update error response:', responseText);
+        let errorData;
+        try {
+          errorData = JSON.parse(responseText);
+        } catch (e) {
+          throw new Error(`Failed to update profile: ${responseText}`);
+        }
         throw new Error(errorData.error || 'Failed to update profile');
       }
 
@@ -224,7 +274,14 @@ export function AccountSettings() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const responseText = await response.text();
+        console.error('Add user error response:', responseText);
+        let errorData;
+        try {
+          errorData = JSON.parse(responseText);
+        } catch (e) {
+          throw new Error(`Failed to create user: ${responseText}`);
+        }
         throw new Error(errorData.error || 'Failed to create user');
       }
 
@@ -475,6 +532,40 @@ export function AccountSettings() {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Enter company name"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Company Logo
+                  </label>
+                  <div className="flex items-start gap-4">
+                    {logoPreview && (
+                      <div className="w-32 h-32 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center flex-shrink-0">
+                        <img
+                          src={logoPreview}
+                          alt="Company logo"
+                          className="max-w-full max-h-full object-contain"
+                        />
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors cursor-pointer">
+                        <Upload className="w-5 h-5 text-gray-600" />
+                        <span className="text-sm font-medium text-gray-700">
+                          {logoFile ? logoFile.name : 'Upload Logo'}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleLogoChange}
+                          className="hidden"
+                        />
+                      </label>
+                      <p className="text-xs text-gray-500 mt-2">
+                        Recommended: Square image, at least 200x200px
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="pt-4">
