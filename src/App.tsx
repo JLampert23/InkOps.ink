@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { FileText, CreditCard, Users, RefreshCw, AlertCircle, DollarSign, TrendingUp, Download, Building2, Menu, X, LogOut, Loader2, BarChart3 } from 'lucide-react';
+import { FileText, Users, RefreshCw, AlertCircle, DollarSign, TrendingUp, Download, Building2, Menu, X, LogOut, Loader2, BarChart3 } from 'lucide-react';
 import { useSupabaseData } from './hooks/useSupabaseData';
 import { InvoiceExplorer } from './components/InvoiceExplorer';
-import { PaymentsExplorer } from './components/PaymentsExplorer';
 import { CustomerProfiles } from './components/CustomerProfiles';
 import { OpenInvoices } from './components/OpenInvoices';
 import { AccountsReceivable } from './components/AccountsReceivable';
@@ -11,7 +10,7 @@ import { ReportsTab } from './components/ReportsTab';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AuthScreen } from './components/AuthScreen';
 
-type Tab = 'ar' | 'ar-by-customer' | 'open-invoices' | 'reports' | 'invoices' | 'payments' | 'customers';
+type Tab = 'ar' | 'ar-by-customer' | 'open-invoices' | 'reports' | 'invoices' | 'customers';
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState<Tab>('ar');
@@ -43,12 +42,6 @@ function AppContent() {
       name: 'Reports',
       icon: BarChart3,
       description: 'Financial reports hub'
-    },
-    {
-      id: 'payments' as Tab,
-      name: 'Payments',
-      icon: CreditCard,
-      description: 'Payment history'
     },
     {
       id: 'invoices' as Tab,
@@ -255,9 +248,6 @@ function AppContent() {
             )}
             {activeTab === 'invoices' && (
               <InvoiceExplorer invoices={invoices} />
-            )}
-            {activeTab === 'payments' && (
-              <PaymentsExplorer payments={payments} invoices={invoices} />
             )}
             {activeTab === 'customers' && (
               <CustomerProfiles invoices={invoices} />
