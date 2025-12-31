@@ -30,13 +30,11 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
-      global: {
-        headers: { Authorization: authHeader }
-      }
-    });
+    const token = authHeader.replace("Bearer ", "");
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const supabaseAuth = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser(token);
 
     if (userError || !user) {
       console.error("Error getting user:", userError);
@@ -49,7 +47,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: profile } = await supabase
+    const { data: profile } = await supabaseAuth
       .from("user_profiles")
       .select("role")
       .eq("id", user.id)
@@ -81,7 +79,7 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+      const { data: newUser, error: createError } = await supabaseAuth.auth.admin.createUser({
         email,
         email_confirm: true,
         user_metadata: {
@@ -102,7 +100,7 @@ Deno.serve(async (req: Request) => {
 
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      const { error: profileError } = await supabase
+      const { error: profileError } = await supabaseAuth
         .from("user_profiles")
         .update({
           full_name: full_name || null,
@@ -161,7 +159,7 @@ Deno.serve(async (req: Request) => {
       if (password !== undefined) authUpdates.password = password;
 
       if (Object.keys(authUpdates).length > 0) {
-        const { error: authUpdateError } = await supabase.auth.admin.updateUserById(
+        const { error: authUpdateError } = await supabaseAuth.auth.admin.updateUserById(
           userId,
           authUpdates
         );
@@ -178,7 +176,7 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      const { error: profileUpdateError } = await supabase
+      const { error: profileUpdateError } = await supabaseAuth
         .from("user_profiles")
         .update(updates)
         .eq("id", userId);
