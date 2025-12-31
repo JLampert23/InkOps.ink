@@ -78,13 +78,22 @@ export function AccountSettings() {
     try {
       setLoadingStatuses(true);
       const { data, error } = await supabase
-        .from('printavo_invoices')
+        .from('printavo_invoices_calculated')
         .select('status')
         .not('status', 'is', null);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error querying statuses:', error);
+        throw error;
+      }
 
-      const uniqueStatuses = Array.from(new Set(data?.map(item => item.status) || [])).sort();
+      console.log('Status data from database:', data);
+
+      const uniqueStatuses = Array.from(
+        new Set(data?.map(item => item.status).filter(status => status && status.trim() !== '') || [])
+      ).sort();
+
+      console.log('Unique statuses found:', uniqueStatuses);
       setAvailableStatuses(uniqueStatuses);
     } catch (err) {
       console.error('Error loading statuses:', err);
@@ -393,30 +402,14 @@ export function AccountSettings() {
     <div className="space-y-6">
       {/* Company Information */}
       <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-50 rounded-lg">
-              <Building2 className="w-6 h-6 text-blue-600" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">Company Information</h2>
-              <p className="text-sm text-gray-500">Manage your company profile</p>
-            </div>
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 bg-blue-50 rounded-lg">
+            <Building2 className="w-6 h-6 text-blue-600" />
           </div>
-          <button
-            onClick={fetchPrintavoCompanyInfo}
-            disabled={fetchingPrintavo}
-            className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-          >
-            {fetchingPrintavo ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Loading...
-              </>
-            ) : (
-              'Fetch from Printavo'
-            )}
-          </button>
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Company Information</h2>
+            <p className="text-sm text-gray-500">Manage your company profile</p>
+          </div>
         </div>
 
         <div className="space-y-4">
@@ -742,7 +735,7 @@ export function AccountSettings() {
           </div>
           <div>
             <h2 className="text-xl font-bold text-gray-900">Invoice Status Preferences</h2>
-            <p className="text-sm text-gray-500">Select which statuses to include in AR reports</p>
+            <p className="text-sm text-gray-500">Select statuses to enable filtering in AR reports. After saving, a filter dropdown will appear on your reports.</p>
           </div>
         </div>
 

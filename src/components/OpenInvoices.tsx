@@ -36,8 +36,13 @@ export function OpenInvoices({ invoices }: OpenInvoicesProps) {
 
       if (error && error.code !== 'PGRST116') throw error;
 
+      console.log('Open Invoices - Loaded status preferences:', data?.selected_invoice_statuses);
+
       if (data?.selected_invoice_statuses && data.selected_invoice_statuses.length > 0) {
         setAvailableStatuses(data.selected_invoice_statuses);
+        console.log('Open Invoices - Available statuses set:', data.selected_invoice_statuses);
+      } else {
+        console.log('Open Invoices - No statuses selected in settings yet');
       }
     } catch (err) {
       console.error('Error loading status preferences:', err);
@@ -207,7 +212,7 @@ export function OpenInvoices({ invoices }: OpenInvoicesProps) {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            {availableStatuses.length > 0 && (
+            {availableStatuses.length > 0 ? (
               <div className="relative">
                 <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 <select
@@ -220,6 +225,10 @@ export function OpenInvoices({ invoices }: OpenInvoicesProps) {
                     <option key={status} value={status}>{status}</option>
                   ))}
                 </select>
+              </div>
+            ) : (
+              <div className="text-xs text-gray-500 italic px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+                Configure status filters in Account Settings
               </div>
             )}
             <button
