@@ -231,7 +231,7 @@ function AppContent() {
       <div className={`transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-20'}`}>
         {/* Top Bar */}
         <header className="h-20 bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm">
-          <div className="h-full px-6 flex items-center justify-between">
+          <div className="h-full px-4 flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">
                 {navItems.find(item => item.id === activeTab)?.name}
@@ -269,7 +269,7 @@ function AppContent() {
         </header>
 
         {/* Content */}
-        <main className="p-6">
+        <main className="py-6 px-4">
         {error ? (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
             <div className="flex items-start gap-3">
