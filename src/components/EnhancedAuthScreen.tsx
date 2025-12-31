@@ -4,7 +4,6 @@ import { Lock, Mail, AlertCircle, Loader2, Building2, User, Key } from 'lucide-r
 
 export function EnhancedAuthScreen() {
   const [isSignUp, setIsSignUp] = useState(false);
-  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [companyName, setCompanyName] = useState('');
@@ -14,7 +13,7 @@ export function EnhancedAuthScreen() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const { signIn, signUpWithCompany, resetPassword } = useAuth();
+  const { signIn, signUpWithCompany } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,24 +21,13 @@ export function EnhancedAuthScreen() {
     setSuccessMessage(null);
     setLoading(true);
 
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      setLoading(false);
+      return;
+    }
+
     try {
-      if (isForgotPassword) {
-        const { error } = await resetPassword(email);
-        if (error) {
-          setError(error.message);
-        } else {
-          setSuccessMessage('Password reset email sent! Check your inbox.');
-        }
-        setLoading(false);
-        return;
-      }
-
-      if (password.length < 6) {
-        setError('Password must be at least 6 characters');
-        setLoading(false);
-        return;
-      }
-
       if (isSignUp) {
         if (!companyName.trim()) {
           setError('Company name is required');
@@ -95,12 +83,10 @@ export function EnhancedAuthScreen() {
               <Building2 className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              {isForgotPassword ? 'Reset Password' : isSignUp ? 'Create Company Account' : 'Welcome Back'}
+              {isSignUp ? 'Create Company Account' : 'Welcome Back'}
             </h1>
             <p className="text-gray-600">
-              {isForgotPassword
-                ? 'Enter your email to receive a password reset link'
-                : isSignUp
+              {isSignUp
                 ? 'Set up your Printavo Financial Dashboard'
                 : 'Sign in to your financial dashboard'}
             </p>
@@ -121,7 +107,7 @@ export function EnhancedAuthScreen() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {!isForgotPassword && isSignUp && (
+            {isSignUp && (
               <div>
                 <label htmlFor="companyName" className="block text-sm font-medium text-gray-700 mb-2">
                   Company Name
@@ -159,28 +145,26 @@ export function EnhancedAuthScreen() {
               </div>
             </div>
 
-            {!isForgotPassword && (
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                  Password
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
-                    id="password"
-                    type="password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    placeholder={isSignUp ? 'At least 6 characters' : 'Enter your password'}
-                    minLength={6}
-                  />
-                </div>
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  id="password"
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  placeholder={isSignUp ? 'At least 6 characters' : 'Enter your password'}
+                  minLength={6}
+                />
               </div>
-            )}
+            </div>
 
-            {!isForgotPassword && isSignUp && (
+            {isSignUp && (
               <>
                 <div className="border-t border-gray-200 pt-5">
                   <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
@@ -241,36 +225,19 @@ export function EnhancedAuthScreen() {
               {loading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>
-                    {isForgotPassword ? 'Sending...' : isSignUp ? 'Creating Account...' : 'Signing In...'}
-                  </span>
+                  <span>{isSignUp ? 'Creating Account...' : 'Signing In...'}</span>
                 </>
               ) : (
-                <span>{isForgotPassword ? 'Send Reset Link' : isSignUp ? 'Create Company Account' : 'Sign In'}</span>
+                <span>{isSignUp ? 'Create Company Account' : 'Sign In'}</span>
               )}
             </button>
           </form>
 
-          <div className="mt-6 text-center space-y-3">
-            {!isForgotPassword && !isSignUp && (
-              <button
-                type="button"
-                onClick={() => {
-                  setIsForgotPassword(true);
-                  setError(null);
-                  setSuccessMessage(null);
-                }}
-                className="text-sm text-blue-600 hover:text-blue-700 transition-colors block w-full"
-              >
-                Forgot your password?
-              </button>
-            )}
-
+          <div className="mt-6 text-center">
             <button
               type="button"
               onClick={() => {
                 setIsSignUp(!isSignUp);
-                setIsForgotPassword(false);
                 setError(null);
                 setSuccessMessage(null);
                 setCompanyName('');
@@ -279,12 +246,7 @@ export function EnhancedAuthScreen() {
               }}
               className="text-sm text-slate-600 hover:text-slate-900 transition-colors"
             >
-              {isForgotPassword ? (
-                <>
-                  Remember your password?{' '}
-                  <span className="font-medium text-blue-600">Sign in</span>
-                </>
-              ) : isSignUp ? (
+              {isSignUp ? (
                 <>
                   Already have an account?{' '}
                   <span className="font-medium text-blue-600">Sign in</span>

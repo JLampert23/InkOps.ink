@@ -365,6 +365,10 @@ function AuthenticatedApp() {
     );
   }
 
+  if (!user) {
+    return <EnhancedAuthScreen />;
+  }
+
   return <AppContent />;
 }
 
