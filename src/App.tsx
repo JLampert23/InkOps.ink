@@ -9,7 +9,7 @@ import { ARByCustomer } from './components/ARByCustomer';
 import { ReportsTab } from './components/ReportsTab';
 import { AccountSettings } from './components/AccountSettings';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { AuthScreen } from './components/AuthScreen';
+import { EnhancedAuthScreen } from './components/EnhancedAuthScreen';
 import { supabase } from './lib/supabase-client';
 
 type Tab = 'ar' | 'ar-by-customer' | 'open-invoices' | 'reports' | 'invoices' | 'customers' | 'settings';
@@ -366,7 +366,7 @@ function AuthenticatedApp() {
   }
 
   if (!user) {
-    return <AuthScreen />;
+    return <EnhancedAuthScreen />;
   }
 
   return <AppContent />;
