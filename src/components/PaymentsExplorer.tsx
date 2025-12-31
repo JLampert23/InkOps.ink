@@ -73,21 +73,23 @@ export function PaymentsExplorer({ payments, loading }: PaymentsExplorerProps) {
 
   const handleExportCSV = () => {
     const data = filteredAndSortedPayments.map(payment => ({
-      customer: payment.transactedFor?.contact?.customer?.companyName || payment.transactedFor?.contact?.fullName || 'Unknown',
       paymentDate: payment.transactionDate || payment.timestamps?.createdAt || '',
+      invoiceNumber: payment.transactedFor?.visualId || 'N/A',
+      customer: payment.transactedFor?.contact?.customer?.companyName || payment.transactedFor?.contact?.fullName || 'Unknown',
       paymentMethod: payment.paymentMethod || 'N/A',
-      amount: payment.amount || 0,
-      invoiceNumber: payment.transactedFor?.visualId || 'N/A'
+      processedBy: payment.isPrintavoPayment ? 'Printavo Payments' : (payment.processorName || payment.processor || 'Outside Printavo'),
+      amount: payment.amount || 0
     }));
 
     exportToCSV(
       data,
       [
+        { header: 'Date', key: 'paymentDate', formatter: (val) => val ? format(new Date(val), 'MMM d, yyyy') : '' },
+        { header: 'Invoice #', key: 'invoiceNumber' },
         { header: 'Customer', key: 'customer' },
-        { header: 'Payment Date', key: 'paymentDate', formatter: (val) => val ? format(new Date(val), 'MMM d, yyyy') : '' },
         { header: 'Payment Method', key: 'paymentMethod' },
-        { header: 'Amount', key: 'amount', formatter: (val) => `$${val.toFixed(2)}` },
-        { header: 'Invoice #', key: 'invoiceNumber' }
+        { header: 'Processed By', key: 'processedBy' },
+        { header: 'Amount', key: 'amount', formatter: (val) => `$${val.toFixed(2)}` }
       ],
       `payments-report-${format(new Date(), 'yyyy-MM-dd')}`
     );
@@ -95,11 +97,12 @@ export function PaymentsExplorer({ payments, loading }: PaymentsExplorerProps) {
 
   const handleExportPDF = () => {
     const data = filteredAndSortedPayments.map(payment => ({
-      customer: payment.transactedFor?.contact?.customer?.companyName || payment.transactedFor?.contact?.fullName || 'Unknown',
       paymentDate: payment.transactionDate || payment.timestamps?.createdAt || '',
+      invoiceNumber: payment.transactedFor?.visualId || 'N/A',
+      customer: payment.transactedFor?.contact?.customer?.companyName || payment.transactedFor?.contact?.fullName || 'Unknown',
       paymentMethod: payment.paymentMethod || 'N/A',
-      amount: payment.amount || 0,
-      invoiceNumber: payment.transactedFor?.visualId || 'N/A'
+      processedBy: payment.isPrintavoPayment ? 'Printavo Payments' : (payment.processorName || payment.processor || 'Outside Printavo'),
+      amount: payment.amount || 0
     }));
 
     exportToPDF({
@@ -107,11 +110,12 @@ export function PaymentsExplorer({ payments, loading }: PaymentsExplorerProps) {
       subtitle: `${format(dateRange.startDate, 'MMM d, yyyy')} - ${format(dateRange.endDate, 'MMM d, yyyy')}`,
       filename: `payments-report-${format(new Date(), 'yyyy-MM-dd')}`,
       columns: [
+        { header: 'Date', dataKey: 'paymentDate', formatter: (val) => val ? format(new Date(val), 'MMM d, yyyy') : 'N/A' },
+        { header: 'Invoice #', dataKey: 'invoiceNumber' },
         { header: 'Customer', dataKey: 'customer' },
-        { header: 'Payment Date', dataKey: 'paymentDate', formatter: (val) => val ? format(new Date(val), 'MMM d, yyyy') : 'N/A' },
         { header: 'Method', dataKey: 'paymentMethod' },
-        { header: 'Amount', dataKey: 'amount', formatter: (val) => `$${val.toFixed(2)}` },
-        { header: 'Invoice #', dataKey: 'invoiceNumber' }
+        { header: 'Processed By', dataKey: 'processedBy' },
+        { header: 'Amount', dataKey: 'amount', formatter: (val) => `$${val.toFixed(2)}` }
       ],
       data,
       orientation: 'landscape'
@@ -260,6 +264,12 @@ export function PaymentsExplorer({ payments, loading }: PaymentsExplorerProps) {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Customer
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Payment Method
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Processed By
+                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Amount
                 </th>
@@ -268,48 +278,68 @@ export function PaymentsExplorer({ payments, loading }: PaymentsExplorerProps) {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredAndSortedPayments.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
                     No payments found matching your criteria
                   </td>
                 </tr>
               ) : (
-                filteredAndSortedPayments.map(payment => (
-                  <tr key={payment.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center text-sm text-gray-900">
-                        <Calendar className="w-4 h-4 mr-2 text-gray-400" />
-                        {payment.transactionDate
-                          ? format(parseISO(payment.transactionDate), 'MMM d, yyyy')
-                          : 'N/A'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {payment.transactedFor?.visualId ? (
-                        <a
-                          href={getPrintavoInvoiceUrl(payment.transactedFor.id)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
-                        >
-                          {payment.transactedFor.visualId}
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      ) : (
-                        <div className="text-sm font-medium text-gray-900">N/A</div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {payment.transactedFor?.contact?.customer?.companyName || payment.transactedFor?.contact?.fullName || 'Unknown'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <div className="text-sm font-medium text-green-600">
-                        {formatCurrency(payment.amount)}
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                filteredAndSortedPayments.map(payment => {
+                  const processedBy = payment.isPrintavoPayment
+                    ? 'Printavo Payments'
+                    : (payment.processorName || payment.processor || 'Outside Printavo');
+
+                  return (
+                    <tr key={payment.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center text-sm text-gray-900">
+                          <Calendar className="w-4 h-4 mr-2 text-gray-400" />
+                          {payment.transactionDate
+                            ? format(parseISO(payment.transactionDate), 'MMM d, yyyy')
+                            : 'N/A'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {payment.transactedFor?.visualId ? (
+                          <a
+                            href={getPrintavoInvoiceUrl(payment.transactedFor.id)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
+                          >
+                            {payment.transactedFor.visualId}
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        ) : (
+                          <div className="text-sm font-medium text-gray-900">N/A</div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {payment.transactedFor?.contact?.customer?.companyName || payment.transactedFor?.contact?.fullName || 'Unknown'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {payment.paymentMethod || 'N/A'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          payment.isPrintavoPayment
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {processedBy}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <div className="text-sm font-medium text-green-600">
+                          {formatCurrency(payment.amount)}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

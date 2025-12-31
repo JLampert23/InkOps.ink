@@ -48,6 +48,9 @@ export interface Payment {
   amount: number;
   transactionDate?: string;
   paymentMethod?: string;
+  processor?: string;
+  processorName?: string;
+  isPrintavoPayment?: boolean;
   timestamps?: {
     createdAt: string;
   };

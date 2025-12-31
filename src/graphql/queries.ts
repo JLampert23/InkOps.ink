@@ -49,6 +49,9 @@ export const GET_PAYMENTS = gql`
             amount
             paymentMethod
             transactionDate
+            processor
+            processorName
+            isPrintavoPayment
             timestamps {
               createdAt
             }
@@ -59,6 +62,7 @@ export const GET_PAYMENTS = gql`
                 contact {
                   id
                   fullName
+                  email
                   customer {
                     id
                     companyName
