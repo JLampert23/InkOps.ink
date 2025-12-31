@@ -18,6 +18,7 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const authHeader = req.headers.get("Authorization");
 
     if (!authHeader) {
@@ -30,10 +31,15 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
     const token = authHeader.replace("Bearer ", "");
-    
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: { Authorization: authHeader }
+      }
+    });
+
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
 
     if (userError || !user) {
       console.error("Error getting user:", userError);
@@ -45,6 +51,8 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
     const { data: profile } = await supabase
       .from("user_profiles")
