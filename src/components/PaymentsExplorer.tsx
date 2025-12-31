@@ -127,32 +127,39 @@ export function PaymentsExplorer({ payments, loading }: PaymentsExplorerProps) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Filter & Export</h3>
-          <div className="flex gap-2">
+    <div className="space-y-6">
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Payments Report</h2>
+            <p className="text-gray-600 mt-1">
+              {filteredAndSortedPayments.length} payments · {formatCurrency(totalAmount)} total
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
             <button
               onClick={handleExportCSV}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+              disabled={filteredAndSortedPayments.length === 0}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
             >
               <FileDown className="w-4 h-4" />
-              CSV
+              <span className="font-medium">Export CSV</span>
             </button>
             <button
               onClick={handleExportPDF}
-              className="flex items-center gap-2 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+              disabled={filteredAndSortedPayments.length === 0}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
             >
               <FileDown className="w-4 h-4" />
-              PDF
+              <span className="font-medium">Export PDF</span>
             </button>
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search by invoice or customer..."
@@ -165,41 +172,42 @@ export function PaymentsExplorer({ payments, loading }: PaymentsExplorerProps) {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as 'date' | 'amount')}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
               >
                 <option value="date">Sort by Date</option>
                 <option value="amount">Sort by Amount</option>
               </select>
               <button
                 onClick={() => setSortOrder(order => order === 'asc' ? 'desc' : 'asc')}
-                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors bg-white font-medium text-gray-700"
+                title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
               >
                 {sortOrder === 'asc' ? '↑' : '↓'}
               </button>
             </div>
           </div>
 
-          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-            <div className="flex items-center gap-2 mb-3">
-              <Calendar className="w-5 h-5 text-gray-600" />
-              <h4 className="text-sm font-semibold text-gray-700">Date Range</h4>
+          <div className="bg-gray-50 rounded-lg p-5 border border-gray-200">
+            <div className="flex items-center gap-2 mb-4">
+              <Calendar className="w-5 h-5 text-gray-700" />
+              <h3 className="text-base font-semibold text-gray-900">Date Range</h3>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
               {(Object.keys(dateRangePresetLabels).filter(key => key !== 'custom') as DateRangePreset[]).map((preset) => (
                 <button
                   key={preset}
                   onClick={() => setDateRangePreset(preset)}
-                  className={`px-3 py-2 text-sm rounded-lg transition-colors ${
+                  className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-all ${
                     dateRangePreset === preset
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 shadow-sm'
                   }`}
                 >
                   {dateRangePresetLabels[preset]}
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-gray-200">
               <label className="flex items-center gap-2">
                 <input
                   type="radio"
@@ -207,7 +215,7 @@ export function PaymentsExplorer({ payments, loading }: PaymentsExplorerProps) {
                   onChange={() => setDateRangePreset('custom')}
                   className="w-4 h-4 text-blue-600"
                 />
-                <span className="text-sm font-medium text-gray-700">Custom:</span>
+                <span className="text-sm font-medium text-gray-700">Custom Range:</span>
               </label>
               <input
                 type="date"
@@ -216,9 +224,9 @@ export function PaymentsExplorer({ payments, loading }: PaymentsExplorerProps) {
                   setCustomStartDate(e.target.value);
                   setDateRangePreset('custom');
                 }}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
-              <span className="text-gray-500">to</span>
+              <span className="text-gray-500 font-medium">to</span>
               <input
                 type="date"
                 value={customEndDate}
@@ -226,26 +234,19 @@ export function PaymentsExplorer({ payments, loading }: PaymentsExplorerProps) {
                   setCustomEndDate(e.target.value);
                   setDateRangePreset('custom');
                 }}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-            <div className="mt-3 text-sm text-gray-600">
-              Showing: {format(dateRange.startDate, 'MMM d, yyyy')} - {format(dateRange.endDate, 'MMM d, yyyy')}
+            <div className="mt-4 px-3 py-2 bg-white rounded border border-gray-200">
+              <p className="text-sm font-medium text-gray-700">
+                Showing: <span className="text-blue-600">{format(dateRange.startDate, 'MMM d, yyyy')}</span> - <span className="text-blue-600">{format(dateRange.endDate, 'MMM d, yyyy')}</span>
+              </p>
             </div>
           </div>
         </div>
       </div>
 
       <div className="bg-white rounded-lg shadow">
-        <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-          <h3 className="text-lg font-semibold">
-            Payments ({filteredAndSortedPayments.length})
-          </h3>
-          <div className="text-right">
-            <div className="text-sm text-gray-500">Total Amount</div>
-            <div className="text-xl font-bold text-green-600">{formatCurrency(totalAmount)}</div>
-          </div>
-        </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">

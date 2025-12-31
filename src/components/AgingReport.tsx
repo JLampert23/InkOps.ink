@@ -110,20 +110,22 @@ export function AgingReport({ invoices }: AgingReportProps) {
               {totalInvoices} open invoices · ${totalOutstanding.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} outstanding
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-3">
             <button
               onClick={handleExportCSV}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              disabled={openInvoices.length === 0}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
             >
               <FileDown className="w-4 h-4" />
-              CSV
+              <span className="font-medium">Export CSV</span>
             </button>
             <button
               onClick={handleExportPDF}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              disabled={openInvoices.length === 0}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
             >
               <FileDown className="w-4 h-4" />
-              PDF
+              <span className="font-medium">Export PDF</span>
             </button>
           </div>
         </div>
