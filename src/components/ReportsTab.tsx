@@ -52,7 +52,7 @@ export function ReportsTab({ invoices, payments }: ReportsTabProps) {
       case 'ar-aging':
         return <AgingReport invoices={invoices} />;
       case 'payments':
-        return <PaymentsExplorer payments={payments} />;
+        return <PaymentsExplorer payments={payments} invoices={invoices} />;
       case 'sales-summary':
         return <SalesSummaryReport invoices={invoices} />;
       case 'customer-summary':
