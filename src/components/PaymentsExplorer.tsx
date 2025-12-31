@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Search, Calendar, FileDown, ExternalLink } from 'lucide-react';
 import { PaymentWithInvoice } from '../types/printavo';
 import { formatCurrency } from '../utils/financial-aggregations';
@@ -39,6 +39,20 @@ export function PaymentsExplorer({ payments, loading }: PaymentsExplorerProps) {
   const [customEndDate, setCustomEndDate] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'amount'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  // Debug: Log first payment to see what data we're getting
+  useEffect(() => {
+    if (payments.length > 0) {
+      console.log('=== PAYMENT DEBUG ===');
+      console.log('Total payments:', payments.length);
+      console.log('First payment full object:', payments[0]);
+      console.log('transactedFor:', payments[0]?.transactedFor);
+      console.log('contact:', payments[0]?.transactedFor?.contact);
+      console.log('customer:', payments[0]?.transactedFor?.contact?.customer);
+      console.log('Customer name result:', getCustomerName(payments[0]));
+      console.log('===================');
+    }
+  }, [payments]);
 
   const dateRange = useMemo(() => {
     if (dateRangePreset === 'custom' && customStartDate && customEndDate) {
