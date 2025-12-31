@@ -240,16 +240,23 @@ function CustomerDetail({ customer }: CustomerDetailProps) {
                 <div key={invoice.id} className="p-4 hover:bg-gray-50">
                   <div className="flex justify-between items-start mb-2">
                     <div>
-                      <a
-                        href={getPrintavoInvoiceUrl(invoice.id)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-medium text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {invoice.visualId || invoice.id}
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={getPrintavoInvoiceUrl(invoice.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-medium text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {invoice.visualId || invoice.id}
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                        {invoice.contact?.fullName && (
+                          <span className="text-sm text-gray-600">
+                            - {invoice.contact.fullName}
+                          </span>
+                        )}
+                      </div>
                       <div className="text-sm text-gray-500">
                         {format(parseISO(invoice.createdAt), 'MMM d, yyyy')}
                       </div>
