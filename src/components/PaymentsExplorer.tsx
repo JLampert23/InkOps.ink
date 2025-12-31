@@ -161,7 +161,11 @@ export function PaymentsExplorer({ payments, invoices, loading }: PaymentsExplor
         { header: 'Amount', dataKey: 'amount', formatter: (val) => `$${val.toFixed(2)}` }
       ],
       data,
-      orientation: 'landscape'
+      orientation: 'landscape',
+      summary: [
+        { label: 'Total Payments', value: filteredAndSortedPayments.length.toString() },
+        { label: 'Total Amount', value: formatCurrency(totalAmount) }
+      ]
     });
   };
 

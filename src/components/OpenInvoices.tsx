@@ -176,14 +176,22 @@ export function OpenInvoices({ invoices }: OpenInvoicesProps) {
 
     const statusSuffix = selectedStatus !== 'all' ? `-${selectedStatus.replace(/[^a-zA-Z0-9]/g, '-')}` : '';
     const statusText = selectedStatus !== 'all' ? ` • Status: ${selectedStatus}` : '';
+    const totalPaid = filteredAndSortedInvoices.reduce((sum, inv) => sum + (inv.amountPaid || 0), 0);
+    const totalInvoiced = filteredAndSortedInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
 
     exportToPDF({
       title: 'Open Invoices Report',
-      subtitle: `Generated on ${format(new Date(), 'MMMM d, yyyy')} • ${filteredAndSortedInvoices.length} invoices • $${totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })} outstanding${statusText}`,
+      subtitle: `${format(new Date(), 'MMMM d, yyyy')}${statusText}`,
       filename: `open-invoices${statusSuffix}-${format(new Date(), 'yyyy-MM-dd')}`,
       columns,
       data: exportData,
       orientation: 'landscape',
+      summary: [
+        { label: 'Total Open Invoices', value: filteredAndSortedInvoices.length.toString() },
+        { label: 'Total Invoiced', value: `$${totalInvoiced.toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
+        { label: 'Total Paid', value: `$${totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
+        { label: 'Balance Outstanding', value: `$${totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}` }
+      ]
     });
   };
 

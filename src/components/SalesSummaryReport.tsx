@@ -140,6 +140,12 @@ export function SalesSummaryReport({ invoices }: SalesSummaryReportProps) {
       ],
       data: salesData,
       orientation: 'landscape',
+      summary: [
+        { label: 'Total Invoices', value: summaryMetrics.invoiceCount.toString() },
+        { label: 'Total Invoiced', value: `$${summaryMetrics.totalInvoiced.toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
+        { label: 'Total Paid', value: `$${summaryMetrics.totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
+        { label: 'Outstanding', value: `$${summaryMetrics.totalOutstanding.toLocaleString('en-US', { minimumFractionDigits: 2 })}` }
+      ]
     });
   };
 

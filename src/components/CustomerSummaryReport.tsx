@@ -167,7 +167,7 @@ export function CustomerSummaryReport({ invoices }: CustomerSummaryReportProps) 
   const handleExportPDF = () => {
     exportToPDF({
       title: 'Customer Summary Report',
-      subtitle: `${format(dateRange.startDate, 'MMM d, yyyy')} - ${format(dateRange.endDate, 'MMM d, yyyy')} • ${filteredAndSortedCustomers.length} customers`,
+      subtitle: `${format(dateRange.startDate, 'MMM d, yyyy')} - ${format(dateRange.endDate, 'MMM d, yyyy')}`,
       filename: `customer-summary-${format(new Date(), 'yyyy-MM-dd')}`,
       columns: [
         { header: 'Customer', dataKey: 'customerName' },
@@ -179,6 +179,12 @@ export function CustomerSummaryReport({ invoices }: CustomerSummaryReportProps) 
       ],
       data: filteredAndSortedCustomers,
       orientation: 'landscape',
+      summary: [
+        { label: 'Total Customers', value: summaryMetrics.totalCustomers.toString() },
+        { label: 'Total Revenue', value: `$${summaryMetrics.totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
+        { label: 'Total Paid', value: `$${summaryMetrics.totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
+        { label: 'Outstanding', value: `$${summaryMetrics.totalOutstanding.toLocaleString('en-US', { minimumFractionDigits: 2 })}` }
+      ]
     });
   };
 

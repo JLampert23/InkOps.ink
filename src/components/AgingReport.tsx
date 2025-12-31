@@ -136,7 +136,15 @@ export function AgingReport({ invoices }: AgingReportProps) {
         { header: 'Days', dataKey: 'daysOutstanding', formatter: (val) => `${val}d` }
       ],
       data,
-      orientation: 'landscape'
+      orientation: 'landscape',
+      summary: [
+        { label: 'Total Open Invoices', value: totalInvoices.toString() },
+        { label: 'Total Outstanding', value: `$${totalOutstanding.toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
+        ...agingBuckets.slice(0, 3).map(bucket => ({
+          label: bucket.label,
+          value: `$${bucket.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+        }))
+      ]
     });
   };
 
