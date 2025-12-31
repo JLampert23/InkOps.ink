@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,14 +18,23 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const printavoEmail = Deno.env.get("PRINTAVO_EMAIL");
-    const printavoToken = Deno.env.get("PRINTAVO_TOKEN");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    if (!printavoEmail || !printavoToken) {
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+    const { data: credentials, error: credError } = await supabase
+      .from("api_credentials")
+      .select("credentials")
+      .eq("service_name", "printavo")
+      .maybeSingle();
+
+    if (credError) {
+      console.error("Error fetching credentials:", credError);
       return new Response(
         JSON.stringify({
-          error: "Printavo credentials not configured",
-          message: "Please configure PRINTAVO_EMAIL and PRINTAVO_TOKEN environment variables",
+          error: "Failed to fetch API credentials",
+          message: credError.message,
         }),
         {
           status: 500,
@@ -36,7 +46,41 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Query to fetch current user's account/company information
+    if (!credentials) {
+      return new Response(
+        JSON.stringify({
+          error: "Printavo credentials not configured",
+          message: "Please configure Printavo API credentials in Account Settings",
+        }),
+        {
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+
+    const printavoEmail = credentials.credentials.email;
+    const printavoToken = credentials.credentials.token;
+
+    if (!printavoEmail || !printavoToken) {
+      return new Response(
+        JSON.stringify({
+          error: "Invalid Printavo credentials",
+          message: "Printavo email and token are required",
+        }),
+        {
+          status: 500,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+
     const query = `
       query GetCurrentAccount {
         currentAccount {

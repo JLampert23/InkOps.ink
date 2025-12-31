@@ -33,6 +33,11 @@ export function AccountSettings() {
   const [newUserName, setNewUserName] = useState('');
   const [newUserRole, setNewUserRole] = useState('user');
   const [fetchingPrintavo, setFetchingPrintavo] = useState(false);
+  const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [editEmail, setEditEmail] = useState('');
+  const [editName, setEditName] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -70,8 +75,61 @@ export function AccountSettings() {
 
       if (error) throw error;
       setUsers(data || []);
+
+      const currentProfile = data?.find(u => u.id === user?.id);
+      if (currentProfile) {
+        setCurrentUserProfile(currentProfile);
+        setEditEmail(currentProfile.email);
+        setEditName(currentProfile.full_name || '');
+      }
     } catch (err) {
       console.error('Error loading users:', err);
+    }
+  };
+
+  const saveProfile = async () => {
+    if (!user?.id || !currentUserProfile) return;
+
+    if (!editEmail.trim()) {
+      alert('Email is required');
+      return;
+    }
+
+    try {
+      setSavingProfile(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('You must be logged in to update your profile');
+        return;
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-users`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          action: 'update',
+          userId: user.id,
+          email: editEmail,
+          full_name: editName || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update profile');
+      }
+
+      alert('Profile updated successfully!');
+      setEditingProfile(false);
+      loadUsers();
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      alert(err instanceof Error ? err.message : 'Failed to update profile. Please try again.');
+    } finally {
+      setSavingProfile(false);
     }
   };
 
@@ -193,38 +251,30 @@ export function AccountSettings() {
     }
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/admin/users`, {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('You must be logged in to add users');
+        return;
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-users`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
+          action: 'create',
           email: newUserEmail,
-          email_confirm: true,
-          user_metadata: {
-            full_name: newUserName || undefined,
-          },
+          full_name: newUserName || null,
+          role: newUserRole,
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create user');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create user');
       }
-
-      const newUser = await response.json();
-
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .insert([{
-          id: newUser.id,
-          email: newUserEmail,
-          full_name: newUserName || null,
-          role: newUserRole,
-        }]);
-
-      if (profileError) throw profileError;
 
       alert('User added successfully! They will receive an email to set their password.');
       setShowAddUser(false);
@@ -234,7 +284,7 @@ export function AccountSettings() {
       loadUsers();
     } catch (err) {
       console.error('Error adding user:', err);
-      alert('Failed to add user. This feature requires admin access.');
+      alert(err instanceof Error ? err.message : 'Failed to add user. Please try again.');
     }
   };
 
@@ -363,6 +413,122 @@ export function AccountSettings() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* My Profile */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-orange-50 rounded-lg">
+              <User className="w-6 h-6 text-orange-600" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">My Profile</h2>
+              <p className="text-sm text-gray-500">Manage your account information</p>
+            </div>
+          </div>
+          {!editingProfile && (
+            <button
+              onClick={() => setEditingProfile(true)}
+              className="px-4 py-2 text-sm bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+            >
+              Edit Profile
+            </button>
+          )}
+        </div>
+
+        {editingProfile ? (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Email Address
+              </label>
+              <input
+                type="email"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                placeholder="your@email.com"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Full Name
+              </label>
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                placeholder="John Doe"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Role
+              </label>
+              <div className="px-4 py-2 bg-gray-100 rounded-lg text-gray-700 capitalize">
+                {currentUserProfile?.role}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={saveProfile}
+                disabled={savingProfile}
+                className="flex items-center gap-2 px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 transition-colors"
+              >
+                {savingProfile ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Save Changes
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setEditingProfile(false);
+                  setEditEmail(currentUserProfile?.email || '');
+                  setEditName(currentUserProfile?.full_name || '');
+                }}
+                disabled={savingProfile}
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Email Address
+              </label>
+              <div className="text-gray-900">{currentUserProfile?.email}</div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Full Name
+              </label>
+              <div className="text-gray-900">{currentUserProfile?.full_name || 'Not set'}</div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Role
+              </label>
+              <div className="flex items-center gap-2 px-3 py-1 bg-gray-100 rounded-full w-fit">
+                <Shield className="w-3 h-3 text-gray-600" />
+                <span className="text-xs font-medium text-gray-700 capitalize">
+                  {currentUserProfile?.role}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* User Management */}
