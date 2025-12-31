@@ -47,6 +47,7 @@ export async function signUpCompany(data: CompanySignupData): Promise<{ error: E
     const { error: settingsError } = await supabase
       .from('company_settings')
       .insert({
+        owner_id: authData.user.id,
         company_name: companyName,
         printavo_username: printavoUsername,
         printavo_api_token_encrypted: encryptedToken,
