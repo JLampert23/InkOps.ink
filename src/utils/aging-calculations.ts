@@ -59,11 +59,11 @@ export function getOpenInvoices(invoices: Invoice[]): Invoice[] {
 
 export function categorizeIntoAgingBuckets(invoices: Invoice[]): AgingBucket[] {
   const buckets: AgingBucket[] = [
-    { name: 'current', label: 'Current (0-29 days)', minDays: 0, maxDays: 29, invoices: [], total: 0, count: 0 },
-    { name: '30', label: '30-59 days', minDays: 30, maxDays: 59, invoices: [], total: 0, count: 0 },
-    { name: '60', label: '60-89 days', minDays: 60, maxDays: 89, invoices: [], total: 0, count: 0 },
-    { name: '90', label: '90-119 days', minDays: 90, maxDays: 119, invoices: [], total: 0, count: 0 },
-    { name: '120', label: '120+ days', minDays: 120, maxDays: null, invoices: [], total: 0, count: 0 },
+    { name: 'current', label: '1-30 days', minDays: 0, maxDays: 30, invoices: [], total: 0, count: 0 },
+    { name: '30', label: '31-60 days', minDays: 31, maxDays: 60, invoices: [], total: 0, count: 0 },
+    { name: '60', label: '61-90 days', minDays: 61, maxDays: 90, invoices: [], total: 0, count: 0 },
+    { name: '90', label: '91-120 days', minDays: 91, maxDays: 120, invoices: [], total: 0, count: 0 },
+    { name: '120', label: '121+ days', minDays: 121, maxDays: null, invoices: [], total: 0, count: 0 },
   ];
 
   const openInvoices = getOpenInvoices(invoices);
@@ -126,13 +126,13 @@ export function calculateCustomerAging(invoices: Invoice[]): CustomerAging[] {
     customer.invoiceCount++;
     customer.oldestInvoiceAge = Math.max(customer.oldestInvoiceAge, daysOutstanding);
 
-    if (daysOutstanding <= 29) {
+    if (daysOutstanding <= 30) {
       customer.current += balance;
-    } else if (daysOutstanding <= 59) {
+    } else if (daysOutstanding <= 60) {
       customer.days30 += balance;
-    } else if (daysOutstanding <= 89) {
+    } else if (daysOutstanding <= 90) {
       customer.days60 += balance;
-    } else if (daysOutstanding <= 119) {
+    } else if (daysOutstanding <= 120) {
       customer.days90 += balance;
     } else {
       customer.days120 += balance;

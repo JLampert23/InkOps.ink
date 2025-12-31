@@ -34,7 +34,7 @@ export function AgingReport({ invoices }: AgingReportProps) {
   const handleExportCSV = () => {
     const data = openInvoices.map(invoice => {
       const daysOut = calculateDaysOutstanding(invoice.createdAt);
-      const bucket = daysOut <= 30 ? '0-30 days' : daysOut <= 60 ? '31-60 days' : daysOut <= 90 ? '61-90 days' : '90+ days';
+      const bucket = daysOut <= 30 ? '1-30 days' : daysOut <= 60 ? '31-60 days' : daysOut <= 90 ? '61-90 days' : daysOut <= 120 ? '91-120 days' : '121+ days';
 
       return {
         customer: invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown',
@@ -67,7 +67,7 @@ export function AgingReport({ invoices }: AgingReportProps) {
   const handleExportPDF = () => {
     const data = openInvoices.map(invoice => {
       const daysOut = calculateDaysOutstanding(invoice.createdAt);
-      const bucket = daysOut <= 30 ? '0-30 days' : daysOut <= 60 ? '31-60 days' : daysOut <= 90 ? '61-90 days' : '90+ days';
+      const bucket = daysOut <= 30 ? '1-30 days' : daysOut <= 60 ? '31-60 days' : daysOut <= 90 ? '61-90 days' : daysOut <= 120 ? '91-120 days' : '121+ days';
 
       return {
         customer: invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown',
@@ -225,6 +225,7 @@ export function AgingReport({ invoices }: AgingReportProps) {
                               </td>
                               <td className="py-2 text-sm text-center">
                                 <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                  daysOutstanding > 120 ? 'bg-red-900 text-white' :
                                   daysOutstanding > 90 ? 'bg-red-100 text-red-800' :
                                   daysOutstanding > 60 ? 'bg-orange-100 text-orange-800' :
                                   daysOutstanding > 30 ? 'bg-yellow-100 text-yellow-800' :

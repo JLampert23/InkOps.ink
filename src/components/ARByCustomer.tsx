@@ -187,7 +187,9 @@ export function ARByCustomer({ invoices }: ARByCustomerProps) {
                       </td>
                       <td className="px-4 py-3 text-sm text-center">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          customer.averageInvoiceAge > 60 ? 'bg-red-100 text-red-800' :
+                          customer.averageInvoiceAge > 120 ? 'bg-red-900 text-white' :
+                          customer.averageInvoiceAge > 90 ? 'bg-red-100 text-red-800' :
+                          customer.averageInvoiceAge > 60 ? 'bg-orange-100 text-orange-800' :
                           customer.averageInvoiceAge > 30 ? 'bg-yellow-100 text-yellow-800' :
                           'bg-green-100 text-green-800'
                         }`}>
@@ -196,6 +198,7 @@ export function ARByCustomer({ invoices }: ARByCustomerProps) {
                       </td>
                       <td className="px-4 py-3 text-sm text-center">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          customer.oldestInvoiceAge > 120 ? 'bg-red-900 text-white' :
                           customer.oldestInvoiceAge > 90 ? 'bg-red-100 text-red-800' :
                           customer.oldestInvoiceAge > 60 ? 'bg-orange-100 text-orange-800' :
                           customer.oldestInvoiceAge > 30 ? 'bg-yellow-100 text-yellow-800' :
@@ -249,6 +252,7 @@ export function ARByCustomer({ invoices }: ARByCustomerProps) {
                                         </td>
                                         <td className="px-4 py-2 text-sm text-center">
                                           <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                            age > 120 ? 'bg-red-900 text-white' :
                                             age > 90 ? 'bg-red-100 text-red-800' :
                                             age > 60 ? 'bg-orange-100 text-orange-800' :
                                             age > 30 ? 'bg-yellow-100 text-yellow-800' :
