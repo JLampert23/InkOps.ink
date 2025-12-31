@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, Edit } from 'lucide-react';
+import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, Edit, Key } from 'lucide-react';
 import { supabase } from '../lib/supabase-client';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -9,6 +9,8 @@ interface CompanySettings {
   logo_url: string | null;
   available_invoice_statuses: string[];
   selected_invoice_statuses: string[];
+  printavo_username: string | null;
+  printavo_api_token_encrypted: string | null;
 }
 
 interface UserProfile {
@@ -21,7 +23,7 @@ interface UserProfile {
 
 export function AccountSettings() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'profile' | 'company' | 'users' | 'statuses'>('profile');
+  const [activeTab, setActiveTab] = useState<'company' | 'integration' | 'users' | 'statuses'>('company');
   const [loading, setLoading] = useState(true);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -32,9 +34,9 @@ export function AccountSettings() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [savingCompany, setSavingCompany] = useState(false);
 
-  const [editEmail, setEditEmail] = useState('');
-  const [editName, setEditName] = useState('');
-  const [savingProfile, setSavingProfile] = useState(false);
+  const [printavoUsername, setPrintavoUsername] = useState('');
+  const [printavoToken, setPrintavoToken] = useState('');
+  const [savingIntegration, setSavingIntegration] = useState(false);
 
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -76,6 +78,7 @@ export function AccountSettings() {
         setCompanyName(data.company_name);
         setLogoPreview(data.logo_url);
         setSelectedStatuses(data.selected_invoice_statuses || []);
+        setPrintavoUsername(data.printavo_username || '');
       }
     } catch (err) {
       console.error('Error loading settings:', err);
@@ -97,8 +100,6 @@ export function AccountSettings() {
       const currentProfile = data?.find(u => u.id === user?.id);
       if (currentProfile) {
         setCurrentUserProfile(currentProfile);
-        setEditEmail(currentProfile.email);
-        setEditName(currentProfile.full_name || '');
       }
     } catch (err) {
       console.error('Error loading users:', err);
@@ -201,55 +202,78 @@ export function AccountSettings() {
     }
   };
 
-  const saveProfile = async () => {
-    if (!user?.id || !currentUserProfile) return;
+  const saveIntegration = async () => {
+    if (!printavoUsername.trim()) {
+      alert('Printavo username/email is required');
+      return;
+    }
 
-    if (!editEmail.trim()) {
-      alert('Email is required');
+    if (!printavoToken.trim()) {
+      alert('Printavo API token is required');
       return;
     }
 
     try {
-      setSavingProfile(true);
+      setSavingIntegration(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        alert('You must be logged in to update your profile');
+        alert('You must be logged in to update integration settings');
         return;
       }
 
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-users`, {
+      const encryptResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crypto-service`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          action: 'update',
-          userId: user.id,
-          email: editEmail,
-          full_name: editName || null,
+          action: 'encrypt',
+          token: printavoToken,
         }),
       });
 
-      if (!response.ok) {
-        const responseText = await response.text();
-        console.error('Profile update error response:', responseText);
-        let errorData;
-        try {
-          errorData = JSON.parse(responseText);
-        } catch (e) {
-          throw new Error(`Failed to update profile: ${responseText}`);
-        }
-        throw new Error(errorData.error || 'Failed to update profile');
+      if (!encryptResponse.ok) {
+        throw new Error('Failed to encrypt API token');
       }
 
-      alert('Profile updated successfully!');
-      loadUsers();
+      const { result: encryptedToken } = await encryptResponse.json();
+
+      const settingsData = {
+        printavo_username: printavoUsername,
+        printavo_api_token_encrypted: encryptedToken,
+        encryption_key_version: 'v1',
+      };
+
+      if (companySettings?.id) {
+        const { error } = await supabase
+          .from('company_settings')
+          .update(settingsData)
+          .eq('id', companySettings.id);
+
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from('company_settings')
+          .insert([{
+            company_name: companyName || '',
+            ...settingsData
+          }])
+          .select()
+          .single();
+
+        if (error) throw error;
+        setCompanySettings(data);
+      }
+
+      alert('Printavo integration settings saved successfully!');
+      setPrintavoToken('');
+      await loadSettings();
     } catch (err) {
-      console.error('Error updating profile:', err);
-      alert(err instanceof Error ? err.message : 'Failed to update profile. Please try again.');
+      console.error('Error saving integration settings:', err);
+      alert(err instanceof Error ? err.message : 'Failed to save integration settings. Please try again.');
     } finally {
-      setSavingProfile(false);
+      setSavingIntegration(false);
     }
   };
 
@@ -474,25 +498,12 @@ export function AccountSettings() {
     <div className="max-w-5xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Account Settings</h1>
-        <p className="text-gray-600">Manage your profile, company, and preferences</p>
+        <p className="text-gray-600">Manage your company, integrations, and preferences</p>
       </div>
 
       <div className="bg-white rounded-lg shadow">
         <div className="border-b border-gray-200">
           <nav className="flex -mb-px">
-            <button
-              onClick={() => setActiveTab('profile')}
-              className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'profile'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <User className="w-4 h-4" />
-                My Profile
-              </div>
-            </button>
             <button
               onClick={() => setActiveTab('company')}
               className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
@@ -503,7 +514,20 @@ export function AccountSettings() {
             >
               <div className="flex items-center gap-2">
                 <Building2 className="w-4 h-4" />
-                Company Info
+                Company Settings
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('integration')}
+              className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'integration'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Key className="w-4 h-4" />
+                Integration
               </div>
             </button>
             {isAdmin && (
@@ -538,76 +562,6 @@ export function AccountSettings() {
         </div>
 
         <div className="p-6">
-          {activeTab === 'profile' && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Profile Information</h2>
-                <p className="text-sm text-gray-600 mb-6">Update your personal information</p>
-              </div>
-
-              <div className="space-y-4 max-w-xl">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email Address
-                  </label>
-                  <input
-                    type="email"
-                    value={editEmail}
-                    onChange={(e) => setEditEmail(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="your@email.com"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Full Name
-                  </label>
-                  <input
-                    type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="John Doe"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Role
-                  </label>
-                  <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg w-fit">
-                    <Shield className="w-4 h-4 text-gray-600" />
-                    <span className="text-sm font-medium text-gray-700 capitalize">
-                      {currentUserProfile?.role}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">Your role cannot be changed</p>
-                </div>
-
-                <div className="pt-4">
-                  <button
-                    onClick={saveProfile}
-                    disabled={savingProfile}
-                    className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                  >
-                    {savingProfile ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4" />
-                        Save Changes
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
           {activeTab === 'company' && (
             <div className="space-y-6">
               <div>
@@ -682,6 +636,81 @@ export function AccountSettings() {
                     )}
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'integration' && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Printavo Integration</h2>
+                <p className="text-sm text-gray-600 mb-6">Connect your Printavo account to sync data</p>
+              </div>
+
+              <div className="space-y-4 max-w-xl">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Printavo Email / Username
+                  </label>
+                  <input
+                    type="email"
+                    value={printavoUsername}
+                    onChange={(e) => setPrintavoUsername(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="your@email.com"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Your Printavo account email</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Printavo API Token
+                  </label>
+                  <input
+                    type="password"
+                    value={printavoToken}
+                    onChange={(e) => setPrintavoToken(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder={companySettings?.printavo_api_token_encrypted ? '••••••••••••••••' : 'Enter your API token'}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {companySettings?.printavo_api_token_encrypted
+                      ? 'Token is saved and encrypted. Enter a new token to update it.'
+                      : 'Find your API token in Printavo Settings → Integrations'}
+                  </p>
+                </div>
+
+                <div className="pt-4">
+                  <button
+                    onClick={saveIntegration}
+                    disabled={savingIntegration}
+                    className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  >
+                    {savingIntegration ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Save Credentials
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {companySettings?.printavo_username && (
+                  <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center gap-2 text-green-800">
+                      <Key className="w-5 h-5" />
+                      <div>
+                        <p className="font-medium">Integration Active</p>
+                        <p className="text-sm mt-1">Connected as: {companySettings.printavo_username}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
