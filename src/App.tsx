@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FileText, Users, RefreshCw, AlertCircle, DollarSign, TrendingUp, Download, Building2, Menu, X, LogOut, Loader2, BarChart3, Settings } from 'lucide-react';
 import { useSupabaseData } from './hooks/useSupabaseData';
 import { InvoiceExplorer } from './components/InvoiceExplorer';
@@ -10,14 +10,64 @@ import { ReportsTab } from './components/ReportsTab';
 import { AccountSettings } from './components/AccountSettings';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AuthScreen } from './components/AuthScreen';
+import { supabase } from './lib/supabase-client';
 
 type Tab = 'ar' | 'ar-by-customer' | 'open-invoices' | 'reports' | 'invoices' | 'customers' | 'settings';
+
+interface CompanySettings {
+  company_name: string;
+  logo_url: string | null;
+}
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState<Tab>('ar');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const { invoices, payments, loading, error, syncing, lastSyncTime, triggerSync } = useSupabaseData();
   const { signOut, user } = useAuth();
+
+  useEffect(() => {
+    const loadCompanySettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('company_settings')
+          .select('company_name, logo_url')
+          .maybeSingle();
+
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error loading company settings:', error);
+          return;
+        }
+
+        if (data) {
+          setCompanySettings(data);
+        }
+      } catch (err) {
+        console.error('Error loading company settings:', err);
+      }
+    };
+
+    loadCompanySettings();
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'settings') {
+      const loadCompanySettings = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('company_settings')
+            .select('company_name, logo_url')
+            .maybeSingle();
+
+          if (error && error.code !== 'PGRST116') return;
+          if (data) setCompanySettings(data);
+        } catch (err) {
+          console.error('Error reloading company settings:', err);
+        }
+      };
+      loadCompanySettings();
+    }
+  }, [activeTab]);
 
   const navItems = [
     {
@@ -65,21 +115,43 @@ function AppContent() {
         sidebarOpen ? 'w-64' : 'w-20'
       }`}>
         {/* Logo/Brand */}
-        <div className="h-20 border-b border-gray-200 flex items-center justify-between px-4 bg-gradient-to-r from-blue-600 to-blue-700">
+        <div className="h-20 border-b border-gray-200 flex items-center justify-center px-4 bg-gradient-to-r from-blue-600 to-blue-700">
           {sidebarOpen ? (
-            <div className="flex items-center gap-3">
+            companySettings?.logo_url ? (
+              <div className="flex items-center justify-center w-full">
+                <img
+                  src={companySettings.logo_url}
+                  alt={companySettings.company_name || 'Company Logo'}
+                  className="max-h-14 max-w-[200px] object-contain"
+                />
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
+                  <TrendingUp className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-white font-bold text-lg">
+                    {companySettings?.company_name || 'Printavo'}
+                  </h1>
+                  <p className="text-blue-100 text-xs">Financial Dashboard</p>
+                </div>
+              </div>
+            )
+          ) : (
+            companySettings?.logo_url ? (
+              <div className="flex items-center justify-center w-full">
+                <img
+                  src={companySettings.logo_url}
+                  alt={companySettings.company_name || 'Company Logo'}
+                  className="max-h-12 max-w-12 object-contain"
+                />
+              </div>
+            ) : (
               <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
                 <TrendingUp className="w-6 h-6 text-white" />
               </div>
-              <div>
-                <h1 className="text-white font-bold text-lg">Printavo</h1>
-                <p className="text-blue-100 text-xs">Financial Dashboard</p>
-              </div>
-            </div>
-          ) : (
-            <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
-              <TrendingUp className="w-6 h-6 text-white" />
-            </div>
+            )
           )}
         </div>
 
