@@ -93,17 +93,18 @@ Deno.serve(async (req: Request) => {
         );
       }
 
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       const { error: profileError } = await supabase
         .from("user_profiles")
-        .insert([{
-          id: newUser.user.id,
-          email,
+        .update({
           full_name: full_name || null,
           role: role || "user",
-        }]);
+        })
+        .eq("id", newUser.user.id);
 
       if (profileError) {
-        console.error("Error creating profile:", profileError);
+        console.error("Error updating profile:", profileError);
         return new Response(
           JSON.stringify({ error: profileError.message }),
           {
