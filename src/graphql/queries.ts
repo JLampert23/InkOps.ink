@@ -61,6 +61,8 @@ export const GET_PAYMENTS = gql`
                 visualId
                 contact {
                   id
+                  firstName
+                  lastName
                   fullName
                   email
                   customer {

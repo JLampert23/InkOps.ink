@@ -13,6 +13,25 @@ interface PaymentsExplorerProps {
   loading?: boolean;
 }
 
+function getCustomerName(payment: PaymentWithInvoice): string {
+  const contact = payment.transactedFor?.contact;
+  if (!contact) return 'Unknown';
+
+  if (contact.customer?.companyName) {
+    return contact.customer.companyName;
+  }
+
+  if (contact.fullName) {
+    return contact.fullName;
+  }
+
+  if (contact.firstName || contact.lastName) {
+    return [contact.firstName, contact.lastName].filter(Boolean).join(' ');
+  }
+
+  return 'Unknown';
+}
+
 export function PaymentsExplorer({ payments, loading }: PaymentsExplorerProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>('this-month');
@@ -34,7 +53,7 @@ export function PaymentsExplorer({ payments, loading }: PaymentsExplorerProps) {
   const filteredAndSortedPayments = useMemo(() => {
     let filtered = payments.filter(payment => {
       const orderNumber = payment.transactedFor?.visualId || '';
-      const customerName = payment.transactedFor?.contact?.customer?.companyName || payment.transactedFor?.contact?.fullName || '';
+      const customerName = getCustomerName(payment);
 
       const matchesSearch =
         orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -75,7 +94,7 @@ export function PaymentsExplorer({ payments, loading }: PaymentsExplorerProps) {
     const data = filteredAndSortedPayments.map(payment => ({
       paymentDate: payment.transactionDate || payment.timestamps?.createdAt || '',
       invoiceNumber: payment.transactedFor?.visualId || 'N/A',
-      customer: payment.transactedFor?.contact?.customer?.companyName || payment.transactedFor?.contact?.fullName || 'Unknown',
+      customer: getCustomerName(payment),
       paymentMethod: payment.paymentMethod || 'N/A',
       processedBy: payment.isPrintavoPayment ? 'Printavo Payments' : (payment.processorName || payment.processor || 'Outside Printavo'),
       amount: payment.amount || 0
@@ -99,7 +118,7 @@ export function PaymentsExplorer({ payments, loading }: PaymentsExplorerProps) {
     const data = filteredAndSortedPayments.map(payment => ({
       paymentDate: payment.transactionDate || payment.timestamps?.createdAt || '',
       invoiceNumber: payment.transactedFor?.visualId || 'N/A',
-      customer: payment.transactedFor?.contact?.customer?.companyName || payment.transactedFor?.contact?.fullName || 'Unknown',
+      customer: getCustomerName(payment),
       paymentMethod: payment.paymentMethod || 'N/A',
       processedBy: payment.isPrintavoPayment ? 'Printavo Payments' : (payment.processorName || payment.processor || 'Outside Printavo'),
       amount: payment.amount || 0
@@ -315,7 +334,7 @@ export function PaymentsExplorer({ payments, loading }: PaymentsExplorerProps) {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
-                          {payment.transactedFor?.contact?.customer?.companyName || payment.transactedFor?.contact?.fullName || 'Unknown'}
+                          {getCustomerName(payment)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
