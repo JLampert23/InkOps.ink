@@ -191,7 +191,7 @@ function CustomerDetail({ customer }: CustomerDetailProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <div className="bg-blue-50 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
               <DollarSign className="w-4 h-4 text-blue-600" />
@@ -217,15 +217,6 @@ function CustomerDetail({ customer }: CustomerDetailProps) {
             </div>
             <div className="text-2xl font-bold text-gray-900">
               {customer.totalInvoices}
-            </div>
-          </div>
-          <div className="bg-purple-50 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <FileText className="w-4 h-4 text-purple-600" />
-              <span className="text-sm text-purple-600 font-medium">Estimates</span>
-            </div>
-            <div className="text-2xl font-bold text-gray-900">
-              {customer.totalEstimates}
             </div>
           </div>
         </div>

@@ -48,6 +48,9 @@ export function useSupabaseData(): SupabaseData {
         const amountOutstanding = Number(row.amount_outstanding) || 0;
         const paidInFull = row.paid_in_full === true;
 
+        const rawData = row.raw_data || {};
+        const customerId = rawData.contact?.customer?.id || row.customer_email || row.id;
+
         return {
           id: row.id,
           visualId: row.invoice_number,
@@ -61,11 +64,11 @@ export function useSupabaseData(): SupabaseData {
           amountOutstanding,
           paidInFull,
           contact: {
-            id: row.customer_email || row.id,
+            id: rawData.contact?.id || row.customer_email || row.id,
             fullName: row.customer_name || 'Unknown',
             email: row.customer_email,
             customer: row.customer_company ? {
-              id: row.customer_email || row.id,
+              id: customerId,
               companyName: row.customer_company,
             } : undefined,
           },
