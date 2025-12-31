@@ -87,6 +87,56 @@ async function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits', 'deriveKey']
+  );
+
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    true,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function decryptToken(encryptedToken: string, encryptionKey: string): Promise<string> {
+  try {
+    const combined = new Uint8Array(
+      atob(encryptedToken).split('').map(c => c.charCodeAt(0))
+    );
+    
+    const salt = combined.slice(0, 16);
+    const iv = combined.slice(16, 28);
+    const encryptedData = combined.slice(28);
+    
+    const key = await deriveKey(encryptionKey, salt);
+    
+    const decryptedData = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: iv },
+      key,
+      encryptedData
+    );
+    
+    const decoder = new TextDecoder();
+    return decoder.decode(decryptedData);
+  } catch (error) {
+    console.error('Decryption error:', error);
+    throw new Error('Failed to decrypt token');
+  }
+}
+
 async function fetchFromPrintavo(
   query: string,
   variables: Record<string, unknown>,
@@ -321,8 +371,6 @@ async function syncInvoices(
 
     const invoices = result.data.invoices.edges.map((edge) => edge.node);
     const recentInvoices = invoices.filter(invoice => {
-      // Include all invoices that meet the date criteria
-      // We don't check updatedAt because some invoices don't have timestamps populated
       return invoice.createdAt && new Date(invoice.createdAt) >= new Date(MIN_INVOICE_DATE);
     });
 
@@ -353,7 +401,6 @@ async function syncInvoices(
     totalInvoices += recentInvoices.length;
     console.log(`Recent - Page ${pageCount + 1}: Found ${invoices.length} invoices, ${recentInvoices.length} after ${MIN_INVOICE_DATE}`);
 
-    // Stop after fetching a reasonable number of pages for quick sync
     if (pageCount >= 15) {
       console.log(`Fetched ${pageCount + 1} pages (${totalInvoices} invoices total), stopping quick sync`);
       break;
@@ -542,19 +589,24 @@ Deno.serve(async (req: Request) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
+    
+    if (!encryptionKey) {
+      throw new Error('ENCRYPTION_KEY not configured');
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { data: credentialsData, error: credentialsError } = await supabase
-      .from("api_credentials")
-      .select("credentials")
-      .eq("service_name", "printavo")
+    const { data: settings, error: settingsError } = await supabase
+      .from('company_settings')
+      .select('printavo_username, printavo_api_token_encrypted')
       .maybeSingle();
 
-    if (credentialsError || !credentialsData) {
-      console.error('Failed to fetch Printavo credentials:', credentialsError);
+    if (settingsError || !settings || !settings.printavo_username || !settings.printavo_api_token_encrypted) {
+      console.error('Failed to fetch Printavo credentials from company_settings:', settingsError);
       return new Response(
         JSON.stringify({
-          error: "Printavo credentials not configured in database.",
+          error: "Printavo credentials not configured. Please configure in Account Settings.",
         }),
         {
           status: 500,
@@ -563,8 +615,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const printavoEmail = credentialsData.credentials.email;
-    const printavoToken = credentialsData.credentials.token;
+    const printavoEmail = settings.printavo_username;
+    const printavoToken = await decryptToken(settings.printavo_api_token_encrypted, encryptionKey);
 
     console.log('Credentials check:', {
       supabaseUrlSet: !!supabaseUrl,
@@ -575,10 +627,10 @@ Deno.serve(async (req: Request) => {
     });
 
     if (!printavoEmail || !printavoToken) {
-      console.error('Printavo credentials missing from database');
+      console.error('Printavo credentials missing from company_settings');
       return new Response(
         JSON.stringify({
-          error: "Printavo credentials incomplete in database.",
+          error: "Printavo credentials incomplete. Please configure in Account Settings.",
         }),
         {
           status: 500,

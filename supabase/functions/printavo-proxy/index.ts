@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -56,6 +57,56 @@ async function rateLimitedFetch(
   });
 }
 
+async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits', 'deriveKey']
+  );
+
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    true,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function decryptToken(encryptedToken: string, encryptionKey: string): Promise<string> {
+  try {
+    const combined = new Uint8Array(
+      atob(encryptedToken).split('').map(c => c.charCodeAt(0))
+    );
+    
+    const salt = combined.slice(0, 16);
+    const iv = combined.slice(16, 28);
+    const encryptedData = combined.slice(28);
+    
+    const key = await deriveKey(encryptionKey, salt);
+    
+    const decryptedData = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: iv },
+      key,
+      encryptedData
+    );
+    
+    const decoder = new TextDecoder();
+    return decoder.decode(decryptedData);
+  } catch (error) {
+    console.error('Decryption error:', error);
+    throw new Error('Failed to decrypt token');
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -65,14 +116,26 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const printavoEmail = Deno.env.get("PRINTAVO_EMAIL");
-    const printavoToken = Deno.env.get("PRINTAVO_TOKEN");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
+    
+    if (!encryptionKey) {
+      throw new Error('ENCRYPTION_KEY not configured');
+    }
 
-    if (!printavoEmail || !printavoToken) {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const { data: settings, error: settingsError } = await supabase
+      .from('company_settings')
+      .select('printavo_username, printavo_api_token_encrypted')
+      .maybeSingle();
+
+    if (settingsError || !settings || !settings.printavo_username || !settings.printavo_api_token_encrypted) {
       return new Response(
         JSON.stringify({
           error: "Printavo credentials not configured",
-          message: "Please configure PRINTAVO_EMAIL and PRINTAVO_TOKEN environment variables in your Supabase Edge Function settings",
+          message: "Please configure Printavo credentials in Account Settings",
         }),
         {
           status: 500,
@@ -83,6 +146,9 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
+
+    const printavoEmail = settings.printavo_username;
+    const printavoToken = await decryptToken(settings.printavo_api_token_encrypted, encryptionKey);
 
     const body: GraphQLRequest = await req.json();
 
