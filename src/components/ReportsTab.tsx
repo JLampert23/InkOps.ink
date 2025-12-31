@@ -19,29 +19,29 @@ export function ReportsTab({ invoices, payments }: ReportsTabProps) {
   const reports = [
     {
       id: 'ar-aging' as ReportType,
-      name: 'AR Aging',
-      description: 'Accounts receivable aging by customer',
+      name: 'Accounts Receivables',
+      description: '',
       icon: FileText,
       color: 'blue',
     },
     {
       id: 'payments' as ReportType,
       name: 'Payments',
-      description: 'Payment history and trends',
+      description: '',
       icon: DollarSign,
       color: 'green',
     },
     {
       id: 'sales-summary' as ReportType,
       name: 'Sales Summary',
-      description: 'Revenue trends over time',
+      description: '',
       icon: BarChart3,
       color: 'purple',
     },
     {
       id: 'customer-summary' as ReportType,
       name: 'Customer Summary',
-      description: 'Customer-level financial metrics',
+      description: '',
       icon: Users,
       color: 'orange',
     },
@@ -81,13 +81,13 @@ export function ReportsTab({ invoices, payments }: ReportsTabProps) {
               <button
                 key={report.id}
                 onClick={() => setActiveReport(report.id)}
-                className={`text-left p-5 rounded-lg border-2 transition-all ${
+                className={`text-center p-5 rounded-lg border-2 transition-all ${
                   isActive
                     ? 'border-blue-600 bg-blue-50 shadow-md'
                     : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
                 }`}
               >
-                <div className="flex items-start gap-3">
+                <div className="flex flex-col items-center gap-3">
                   <div
                     className={`p-3 rounded-lg ${
                       isActive
@@ -105,19 +105,12 @@ export function ReportsTab({ invoices, payments }: ReportsTabProps) {
                   </div>
                   <div className="flex-1">
                     <h3
-                      className={`text-lg font-semibold ${
+                      className={`text-lg font-bold ${
                         isActive ? 'text-blue-900' : 'text-gray-900'
                       }`}
                     >
                       {report.name}
                     </h3>
-                    <p
-                      className={`text-sm mt-1 ${
-                        isActive ? 'text-blue-700' : 'text-gray-600'
-                      }`}
-                    >
-                      {report.description}
-                    </p>
                   </div>
                 </div>
               </button>
