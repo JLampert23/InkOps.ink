@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Clock } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../utils/analytics-export';
+import { differenceInDays } from 'date-fns';
 
 interface OutstandingBalancesReportProps {
   invoices: any[];
@@ -20,32 +21,26 @@ interface OutstandingBalanceData {
 
 export default function OutstandingBalancesReport({ invoices }: OutstandingBalancesReportProps) {
   const reportData = useMemo(() => {
-    // TODO: Replace with actual Printavo API v2 call
-    // This is placeholder logic for demonstration using filtered invoices
-    const mockData: OutstandingBalanceData[] = [
-      {
-        invoiceNumber: 'INV-001',
-        customerName: 'Acme Corp',
-        invoiceDate: '2024-01-15',
-        dueDate: '2024-02-15',
-        totalAmount: 11000,
-        amountPaid: 5000,
-        balance: 6000,
-        daysOutstanding: 15,
-      },
-      {
-        invoiceNumber: 'INV-003',
-        customerName: 'Global Industries',
-        invoiceDate: '2024-01-20',
-        dueDate: '2024-02-20',
-        totalAmount: 8500,
-        amountPaid: 2000,
-        balance: 6500,
-        daysOutstanding: 10,
-      },
-    ];
+    const now = new Date();
 
-    return mockData.filter(item => item.balance > 0);
+    return invoices
+      .filter(invoice => Number(invoice.amount_outstanding) > 0)
+      .map(invoice => {
+        const invoiceDate = invoice.invoice_date ? new Date(invoice.invoice_date) : now;
+        const daysOutstanding = differenceInDays(now, invoiceDate);
+
+        return {
+          invoiceNumber: invoice.invoice_number || invoice.id,
+          customerName: invoice.customer_name || invoice.customer_company || 'Unknown',
+          invoiceDate: invoice.invoice_date || '',
+          dueDate: invoice.due_date || '',
+          totalAmount: Number(invoice.total) || 0,
+          amountPaid: Number(invoice.amount_paid) || 0,
+          balance: Number(invoice.amount_outstanding) || 0,
+          daysOutstanding,
+        };
+      })
+      .sort((a, b) => b.balance - a.balance);
   }, [invoices]);
 
   return (

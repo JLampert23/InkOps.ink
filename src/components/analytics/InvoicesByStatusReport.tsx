@@ -16,16 +16,35 @@ interface StatusData {
 
 export default function InvoicesByStatusReport({ invoices }: InvoicesByStatusReportProps) {
   const reportData = useMemo(() => {
-    // TODO: Replace with actual Printavo API v2 call
-    // This is placeholder logic for demonstration using filtered invoices
-    const mockData: StatusData[] = [
-      { status: 'Paid', count: 45, totalAmount: 125000, percentOfTotal: 45.0 },
-      { status: 'Pending', count: 30, totalAmount: 85000, percentOfTotal: 30.0 },
-      { status: 'Overdue', count: 15, totalAmount: 45000, percentOfTotal: 15.0 },
-      { status: 'Draft', count: 10, totalAmount: 20000, percentOfTotal: 10.0 },
-    ];
+    // Group invoices by status
+    const statusMap = new Map<string, { count: number; totalAmount: number }>();
+    let grandTotal = 0;
 
-    return mockData;
+    invoices.forEach(invoice => {
+      const status = invoice.status || 'Unknown';
+      const total = Number(invoice.total) || 0;
+
+      if (!statusMap.has(status)) {
+        statusMap.set(status, { count: 0, totalAmount: 0 });
+      }
+
+      const statusData = statusMap.get(status)!;
+      statusData.count += 1;
+      statusData.totalAmount += total;
+      grandTotal += total;
+    });
+
+    // Convert to array and calculate percentages
+    const data: StatusData[] = Array.from(statusMap.entries())
+      .map(([status, data]) => ({
+        status,
+        count: data.count,
+        totalAmount: data.totalAmount,
+        percentOfTotal: grandTotal > 0 ? (data.totalAmount / grandTotal) * 100 : 0,
+      }))
+      .sort((a, b) => b.totalAmount - a.totalAmount);
+
+    return data;
   }, [invoices]);
 
   const getStatusColor = (status: string) => {

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../utils/analytics-export';
+import { differenceInDays } from 'date-fns';
 
 interface OverdueInvoicesReportProps {
   invoices: any[];
@@ -20,32 +21,31 @@ interface OverdueInvoiceData {
 
 export default function OverdueInvoicesReport({ invoices }: OverdueInvoicesReportProps) {
   const reportData = useMemo(() => {
-    // TODO: Replace with actual Printavo API v2 call
-    // This is placeholder logic for demonstration using filtered invoices
-    const mockData: OverdueInvoiceData[] = [
-      {
-        invoiceNumber: 'INV-001',
-        customerName: 'Acme Corp',
-        invoiceDate: '2023-11-15',
-        dueDate: '2023-12-15',
-        totalAmount: 11000,
-        amountPaid: 5000,
-        balance: 6000,
-        daysOverdue: 47,
-      },
-      {
-        invoiceNumber: 'INV-005',
-        customerName: 'Retail Plus',
-        invoiceDate: '2023-12-01',
-        dueDate: '2024-01-01',
-        totalAmount: 7500,
-        amountPaid: 1000,
-        balance: 6500,
-        daysOverdue: 30,
-      },
-    ];
+    const now = new Date();
 
-    return mockData.filter(item => item.balance > 0 && item.daysOverdue > 0);
+    return invoices
+      .filter(invoice => {
+        const hasBalance = Number(invoice.amount_outstanding) > 0;
+        const dueDate = invoice.due_date ? new Date(invoice.due_date) : null;
+        const isOverdue = dueDate ? dueDate < now : false;
+        return hasBalance && isOverdue;
+      })
+      .map(invoice => {
+        const dueDate = invoice.due_date ? new Date(invoice.due_date) : now;
+        const daysOverdue = differenceInDays(now, dueDate);
+
+        return {
+          invoiceNumber: invoice.invoice_number || invoice.id,
+          customerName: invoice.customer_name || invoice.customer_company || 'Unknown',
+          invoiceDate: invoice.invoice_date || '',
+          dueDate: invoice.due_date || '',
+          totalAmount: Number(invoice.total) || 0,
+          amountPaid: Number(invoice.amount_paid) || 0,
+          balance: Number(invoice.amount_outstanding) || 0,
+          daysOverdue,
+        };
+      })
+      .sort((a, b) => b.daysOverdue - a.daysOverdue);
   }, [invoices]);
 
   return (

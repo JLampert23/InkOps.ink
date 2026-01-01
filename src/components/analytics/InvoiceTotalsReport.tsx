@@ -19,32 +19,16 @@ interface InvoiceTotalsData {
 
 export default function InvoiceTotalsReport({ invoices }: InvoiceTotalsReportProps) {
   const reportData = useMemo(() => {
-    // TODO: Replace with actual Printavo API v2 call
-    // This is placeholder logic for demonstration using filtered invoices
-    const mockData: InvoiceTotalsData[] = [
-      {
-        invoiceNumber: 'INV-001',
-        customerName: 'Acme Corp',
-        subtotal: 10000,
-        tax: 800,
-        fees: 200,
-        total: 11000,
-        amountPaid: 5000,
-        balance: 6000,
-      },
-      {
-        invoiceNumber: 'INV-002',
-        customerName: 'Tech Solutions',
-        subtotal: 5000,
-        tax: 400,
-        fees: 100,
-        total: 5500,
-        amountPaid: 5500,
-        balance: 0,
-      },
-    ];
-
-    return mockData;
+    return invoices.map(invoice => ({
+      invoiceNumber: invoice.invoice_number || invoice.id,
+      customerName: invoice.customer_name || invoice.customer_company || 'Unknown',
+      subtotal: Number(invoice.subtotal) || 0,
+      tax: Number(invoice.tax) || 0,
+      fees: 0, // No fees field in current data
+      total: Number(invoice.total) || 0,
+      amountPaid: Number(invoice.amount_paid) || 0,
+      balance: Number(invoice.amount_outstanding) || 0,
+    }));
   }, [invoices]);
 
   return (
