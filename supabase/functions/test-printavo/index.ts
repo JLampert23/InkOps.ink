@@ -135,9 +135,13 @@ Deno.serve(async (req: Request) => {
 
     const testQuery = `
       query TestAuth {
-        company {
-          id
-          name
+        invoices(first: 1) {
+          edges {
+            node {
+              id
+              visualId
+            }
+          }
         }
       }
     `;
@@ -175,7 +179,7 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({
         success: true,
         message: "Printavo credentials are valid!",
-        company: result.data?.company,
+        invoiceCount: result.data?.invoices?.edges?.length || 0,
         diagnostics,
       }),
       {
