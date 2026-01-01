@@ -209,6 +209,7 @@ export function AccountSettings() {
       setTestingConnection(true);
       setTestResult(null);
 
+      console.log('Testing Printavo connection...');
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-printavo`, {
         method: 'POST',
         headers: {
@@ -216,7 +217,9 @@ export function AccountSettings() {
         },
       });
 
+      console.log('Response status:', response.status);
       const result = await response.json();
+      console.log('Test result:', result);
       setTestResult(result);
     } catch (err) {
       console.error('Error testing connection:', err);
@@ -760,38 +763,34 @@ export function AccountSettings() {
                     {testResult && (
                       <div className={`p-4 rounded-lg border ${testResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
                         <div className="space-y-3">
-                          <div className={`font-medium ${testResult.success ? 'text-green-800' : 'text-red-800'}`}>
-                            {testResult.success ? 'Connection Successful!' : 'Connection Failed'}
+                          <div className={`font-medium text-lg ${testResult.success ? 'text-green-800' : 'text-red-800'}`}>
+                            {testResult.success ? '✓ Connection Successful!' : '✗ Connection Failed'}
                           </div>
 
                           {testResult.success && testResult.company && (
                             <div className="text-sm text-green-700">
-                              Connected to: {testResult.company.name}
+                              Connected to: <strong>{testResult.company.name}</strong>
                             </div>
                           )}
 
                           {testResult.error && (
-                            <div className="text-sm text-red-700">
+                            <div className="text-sm text-red-700 font-medium">
                               Error: {testResult.error}
                             </div>
                           )}
 
                           {testResult.printavoError && (
-                            <div className="text-sm text-red-700">
+                            <div className="text-sm text-red-700 font-medium">
                               Printavo Error: {testResult.printavoError}
                             </div>
                           )}
 
-                          {testResult.diagnostics && (
-                            <details className="text-xs mt-2">
-                              <summary className="cursor-pointer text-gray-600 hover:text-gray-900">
-                                Show Diagnostics
-                              </summary>
-                              <pre className="mt-2 p-2 bg-white rounded border border-gray-200 overflow-x-auto">
-                                {JSON.stringify(testResult.diagnostics, null, 2)}
-                              </pre>
-                            </details>
-                          )}
+                          <div className="mt-3 pt-3 border-t border-gray-200">
+                            <div className="text-xs font-medium text-gray-700 mb-2">Diagnostics:</div>
+                            <pre className="text-xs p-3 bg-white rounded border border-gray-300 overflow-x-auto max-h-96">
+                              {JSON.stringify(testResult, null, 2)}
+                            </pre>
+                          </div>
                         </div>
                       </div>
                     )}
