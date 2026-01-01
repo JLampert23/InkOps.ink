@@ -5,7 +5,7 @@ export interface DateRange {
   endDate: Date;
 }
 
-export type DateRangePreset = 'today' | 'this-week' | 'last-week' | 'last-5-days' | 'this-month' | 'last-month' | 'custom';
+export type DateRangePreset = 'today' | 'this-week' | 'last-week' | 'last-5-days' | 'this-month' | 'last-month' | 'all-time' | 'custom';
 
 export const getDateRangeForPreset = (preset: DateRangePreset, customRange?: DateRange): DateRange => {
   const now = new Date();
@@ -49,6 +49,12 @@ export const getDateRangeForPreset = (preset: DateRangePreset, customRange?: Dat
         endDate: endOfMonth(lastMonth)
       };
 
+    case 'all-time':
+      return {
+        startDate: new Date(2000, 0, 1),
+        endDate: endOfDay(now)
+      };
+
     case 'custom':
       return customRange || {
         startDate: startOfMonth(now),
@@ -70,5 +76,6 @@ export const dateRangePresetLabels: Record<DateRangePreset, string> = {
   'last-5-days': 'Last 5 Days',
   'this-month': 'This Month',
   'last-month': 'Last Month',
+  'all-time': 'All Time',
   'custom': 'Custom Range'
 };

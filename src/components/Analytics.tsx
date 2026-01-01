@@ -226,9 +226,6 @@ export function Analytics({ invoices, payments }: AnalyticsProps) {
 
   if (selectedReport) {
     const ReportComponent = reportComponents[selectedReport];
-    const reportInfo = reportCategories
-      .flatMap(cat => cat.reports)
-      .find(r => r.id === selectedReport);
 
     return (
       <div className="space-y-6">
@@ -363,12 +360,6 @@ export function Analytics({ invoices, payments }: AnalyticsProps) {
 
         {/* Report Display */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          {reportInfo && (
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">{reportInfo.name}</h2>
-              <p className="text-gray-600 mt-1">{reportInfo.description}</p>
-            </div>
-          )}
           <Suspense fallback={
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
