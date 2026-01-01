@@ -146,3 +146,56 @@ export function formatDate(date: string | Date | null | undefined): string {
     day: 'numeric',
   }).format(dateObj);
 }
+
+export function exportAnalyticsReport(
+  invoices: any[],
+  _payments: any[],
+  reportName: string,
+  format: 'csv' | 'pdf',
+  dateRange: { startDate: Date; endDate: Date }
+): void {
+  const dateRangeStr = `${formatDate(dateRange.startDate)} - ${formatDate(dateRange.endDate)}`;
+  const timestamp = new Date().toISOString().split('T')[0];
+  const filename = `${reportName.toLowerCase().replace(/\s+/g, '-')}-${timestamp}`;
+
+  const columns: ExportColumn[] = [
+    { header: 'Customer', key: 'customer' },
+    { header: 'Invoice #', key: 'invoiceNumber' },
+    { header: 'Date', key: 'date', format: formatDate },
+    { header: 'Total', key: 'total', format: formatCurrency },
+    { header: 'Status', key: 'status' },
+  ];
+
+  const data = invoices.map(invoice => ({
+    customer: invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown',
+    invoiceNumber: invoice.visualId || invoice.id?.slice(0, 8) || '',
+    date: invoice.createdAt,
+    total: invoice.total || 0,
+    status: invoice.status?.name || 'N/A',
+  }));
+
+  const summary = [
+    { label: 'Report', value: reportName },
+    { label: 'Date Range', value: dateRangeStr },
+    { label: 'Total Invoices', value: String(invoices.length) },
+    {
+      label: 'Total Amount',
+      value: formatCurrency(invoices.reduce((sum, inv) => sum + (inv.total || 0), 0))
+    },
+  ];
+
+  const options: ExportOptions = {
+    filename,
+    title: reportName,
+    columns,
+    data,
+    dateRange: dateRangeStr,
+    summary,
+  };
+
+  if (format === 'csv') {
+    exportToCSV(options);
+  } else {
+    exportToPDF(options);
+  }
+}
