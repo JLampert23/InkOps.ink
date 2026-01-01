@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FileText, Users, RefreshCw, AlertCircle, DollarSign, TrendingUp, Download, Building2, Menu, X, LogOut, Loader2, BarChart3, Settings } from 'lucide-react';
+import { FileText, Users, RefreshCw, AlertCircle, DollarSign, TrendingUp, Download, Building2, Menu, X, LogOut, Loader2, BarChart3, Settings, LineChart } from 'lucide-react';
 import { useSupabaseData } from './hooks/useSupabaseData';
 import { InvoiceExplorer } from './components/InvoiceExplorer';
 import { CustomerProfiles } from './components/CustomerProfiles';
@@ -8,11 +8,12 @@ import { AccountsReceivable } from './components/AccountsReceivable';
 import { ARByCustomer } from './components/ARByCustomer';
 import { ReportsTab } from './components/ReportsTab';
 import { AccountSettings } from './components/AccountSettings';
+import { Analytics } from './components/Analytics';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { EnhancedAuthScreen } from './components/EnhancedAuthScreen';
 import { supabase } from './lib/supabase-client';
 
-type Tab = 'ar' | 'ar-by-customer' | 'open-invoices' | 'reports' | 'invoices' | 'customers' | 'settings';
+type Tab = 'ar' | 'ar-by-customer' | 'open-invoices' | 'reports' | 'analytics' | 'invoices' | 'customers' | 'settings';
 
 interface CompanySettings {
   company_name: string;
@@ -93,6 +94,12 @@ function AppContent() {
       name: 'Reports',
       icon: BarChart3,
       description: 'Financial reports hub'
+    },
+    {
+      id: 'analytics' as Tab,
+      name: 'Analytics',
+      icon: LineChart,
+      description: 'Advanced insights'
     },
     {
       id: 'invoices' as Tab,
@@ -325,6 +332,9 @@ function AppContent() {
             )}
             {activeTab === 'reports' && (
               <ReportsTab invoices={invoices} payments={payments} />
+            )}
+            {activeTab === 'analytics' && (
+              <Analytics invoices={invoices} payments={payments} />
             )}
             {activeTab === 'invoices' && (
               <InvoiceExplorer invoices={invoices} />
