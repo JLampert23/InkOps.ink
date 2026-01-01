@@ -226,18 +226,33 @@ export function Analytics({ invoices, payments }: AnalyticsProps) {
 
   if (selectedReport) {
     const ReportComponent = reportComponents[selectedReport];
+    const reportInfo = reportCategories
+      .flatMap(cat => cat.reports)
+      .find(r => r.id === selectedReport);
 
     return (
       <div className="space-y-6">
+        {/* Header */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <button
+            onClick={handleBackToList}
+            className="text-blue-600 hover:text-blue-800 font-medium mb-4"
+          >
+            ← Back to Reports List
+          </button>
+          <div className="flex items-center gap-3 mb-2">
+            {reportInfo && <reportInfo.icon className="w-6 h-6 text-blue-600" />}
+            <h1 className="text-2xl font-bold text-gray-900">{reportInfo?.name || 'Analytics'}</h1>
+          </div>
+          <p className="text-gray-600">
+            {reportInfo?.description || 'Select a report to generate detailed analytics and insights'}
+          </p>
+        </div>
+
         {/* Filters Bar */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
-            <button
-              onClick={handleBackToList}
-              className="text-blue-600 hover:text-blue-800 font-medium"
-            >
-              ← Back to Reports List
-            </button>
+            <h3 className="text-sm font-semibold text-gray-900">Filters</h3>
             <div className="relative">
               <button
                 onClick={() => setShowExportMenu(!showExportMenu)}
