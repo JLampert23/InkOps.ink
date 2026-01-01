@@ -118,7 +118,7 @@ function AppContent() {
         <div className="h-20 border-b border-gray-200 flex items-center justify-center px-4 bg-gradient-to-r from-blue-600 to-blue-700">
           {sidebarOpen ? (
             companySettings?.logo_url ? (
-              <div className="flex items-center justify-center w-full h-full py-3">
+              <div className="flex items-center justify-center w-full h-full py-1.5">
                 <img
                   src={companySettings.logo_url}
                   alt={companySettings.company_name || 'Company Logo'}
@@ -140,7 +140,7 @@ function AppContent() {
             )
           ) : (
             companySettings?.logo_url ? (
-              <div className="flex items-center justify-center w-full h-full py-3">
+              <div className="flex items-center justify-center w-full h-full py-1.5">
                 <img
                   src={companySettings.logo_url}
                   alt={companySettings.company_name || 'Company Logo'}
