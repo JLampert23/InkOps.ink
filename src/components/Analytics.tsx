@@ -1,5 +1,5 @@
 import { useState, useMemo, lazy, Suspense } from 'react';
-import { BarChart3, TrendingUp, Package, DollarSign, FileText, Clock, AlertCircle, Layers, Shirt, PieChart, Target, TrendingDown, Loader2, Search, ChevronDown, Calendar, FileDown } from 'lucide-react';
+import { BarChart3, TrendingUp, Package, DollarSign, Shirt, PieChart, Target, TrendingDown, Loader2, Search, ChevronDown, Calendar, FileDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { DateRangePreset, getDateRangeForPreset, dateRangePresetLabels } from '../utils/date-ranges';
 import { exportAnalyticsReport } from '../utils/analytics-export';
@@ -16,10 +16,6 @@ type ReportType =
   | 'top-garment-categories'
   | 'revenue-by-product'
   | 'units-sold-by-product'
-  | 'invoice-totals'
-  | 'outstanding-balances'
-  | 'overdue-invoices'
-  | 'invoices-by-status'
   | 'decoration-breakdown'
   | 'revenue-per-order'
   | 'estimated-margin'
@@ -32,10 +28,6 @@ const reportComponents = {
   'top-garment-categories': lazy(() => import('./analytics/TopGarmentCategoriesReport')),
   'revenue-by-product': lazy(() => import('./analytics/RevenueByProductReport')),
   'units-sold-by-product': lazy(() => import('./analytics/UnitsSoldByProductReport')),
-  'invoice-totals': lazy(() => import('./analytics/InvoiceTotalsReport')),
-  'outstanding-balances': lazy(() => import('./analytics/OutstandingBalancesReport')),
-  'overdue-invoices': lazy(() => import('./analytics/OverdueInvoicesReport')),
-  'invoices-by-status': lazy(() => import('./analytics/InvoicesByStatusReport')),
   'decoration-breakdown': lazy(() => import('./analytics/DecorationBreakdownReport')),
   'revenue-per-order': lazy(() => import('./analytics/RevenuePerOrderReport')),
   'estimated-margin': lazy(() => import('./analytics/EstimatedMarginReport')),
@@ -99,35 +91,6 @@ const reportCategories = [
         name: 'Revenue per Garment Type',
         description: 'Revenue breakdown by garment type',
         icon: Shirt,
-      },
-    ],
-  },
-  {
-    name: 'Invoice Analytics',
-    reports: [
-      {
-        id: 'invoice-totals' as ReportType,
-        name: 'Invoice Totals, Subtotals, Taxes & Fees',
-        description: 'Complete invoice financial breakdown',
-        icon: FileText,
-      },
-      {
-        id: 'outstanding-balances' as ReportType,
-        name: 'Outstanding Balances',
-        description: 'All unpaid invoice balances',
-        icon: Clock,
-      },
-      {
-        id: 'overdue-invoices' as ReportType,
-        name: 'Overdue Invoices',
-        description: 'Past due invoice tracking',
-        icon: AlertCircle,
-      },
-      {
-        id: 'invoices-by-status' as ReportType,
-        name: 'Invoices by Status',
-        description: 'Invoice breakdown by current status',
-        icon: Layers,
       },
     ],
   },
