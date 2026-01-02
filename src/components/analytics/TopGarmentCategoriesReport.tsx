@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Shirt } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Shirt, Search } from 'lucide-react';
 
 interface TopGarmentCategoriesReportProps {
   invoices: any[];
@@ -32,6 +32,8 @@ function extractGarmentType(description: string): string {
 }
 
 export default function TopGarmentCategoriesReport({ invoices, lineItems }: TopGarmentCategoriesReportProps) {
+  const [searchTerm, setSearchTerm] = useState('');
+
   const categoryData = useMemo(() => {
     const invoiceIds = new Set(invoices.map(inv => inv.id));
     const relevantLineItems = lineItems.filter(item => invoiceIds.has(item.invoice_id));
@@ -64,6 +66,13 @@ export default function TopGarmentCategoriesReport({ invoices, lineItems }: TopG
     return categories;
   }, [invoices, lineItems]);
 
+  const filteredCategories = useMemo(() => {
+    if (!searchTerm) return categoryData;
+    return categoryData.filter(category =>
+      category.category.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [categoryData, searchTerm]);
+
   if (categoryData.length === 0) {
     return (
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
@@ -78,7 +87,19 @@ export default function TopGarmentCategoriesReport({ invoices, lineItems }: TopG
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gray-900">Top-Selling Garment Categories</h3>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <h3 className="text-lg font-semibold text-gray-900">Top-Selling Garment Categories</h3>
+        <div className="relative flex-1 md:flex-none md:w-64">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search categories..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-11 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm"
+          />
+        </div>
+      </div>
 
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
@@ -91,7 +112,7 @@ export default function TopGarmentCategoriesReport({ invoices, lineItems }: TopG
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {categoryData.map((category, index) => (
+            {filteredCategories.map((category, index) => (
               <tr key={index} className="hover:bg-gray-50">
                 <td className="px-4 py-3 text-sm font-medium text-gray-900">
                   {category.category}

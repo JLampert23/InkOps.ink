@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Package } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Package, Search } from 'lucide-react';
 
 interface UnitsSoldByProductReportProps {
   invoices: any[];
@@ -14,6 +14,8 @@ interface ProductUnitsData {
 }
 
 export default function UnitsSoldByProductReport({ invoices, lineItems }: UnitsSoldByProductReportProps) {
+  const [searchTerm, setSearchTerm] = useState('');
+
   const productData = useMemo(() => {
     const invoiceIds = new Set(invoices.map(inv => inv.id));
     const relevantLineItems = lineItems.filter(item => invoiceIds.has(item.invoice_id));
@@ -39,6 +41,13 @@ export default function UnitsSoldByProductReport({ invoices, lineItems }: UnitsS
     return products;
   }, [invoices, lineItems]);
 
+  const filteredProducts = useMemo(() => {
+    if (!searchTerm) return productData;
+    return productData.filter(product =>
+      product.productName.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [productData, searchTerm]);
+
   const totalUnits = productData.reduce((sum, p) => sum + p.unitsSold, 0);
 
   if (productData.length === 0) {
@@ -55,10 +64,22 @@ export default function UnitsSoldByProductReport({ invoices, lineItems }: UnitsS
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h3 className="text-lg font-semibold text-gray-900">Units Sold by Product</h3>
-        <div className="text-sm text-gray-500">
-          Total Units: <span className="font-semibold text-gray-900">{totalUnits.toLocaleString()}</span>
+        <div className="flex items-center gap-4">
+          <div className="relative flex-1 md:flex-none md:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search products..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-11 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm"
+            />
+          </div>
+          <div className="text-sm text-gray-500 whitespace-nowrap">
+            Total: <span className="font-semibold text-gray-900">{totalUnits.toLocaleString()}</span>
+          </div>
         </div>
       </div>
 
@@ -72,7 +93,7 @@ export default function UnitsSoldByProductReport({ invoices, lineItems }: UnitsS
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {productData.map((product, index) => (
+            {filteredProducts.map((product, index) => (
               <tr key={index} className="hover:bg-gray-50">
                 <td className="px-4 py-3 text-sm text-gray-900">
                   {product.productName}

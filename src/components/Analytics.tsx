@@ -171,6 +171,11 @@ export function Analytics({ invoices, payments, lineItems }: AnalyticsProps) {
     });
   }, [payments, dateRange]);
 
+  const filteredLineItems = useMemo(() => {
+    const filteredInvoiceIds = new Set(filteredInvoices.map(inv => inv.id));
+    return lineItems.filter(item => filteredInvoiceIds.has(item.invoice_id));
+  }, [lineItems, filteredInvoices]);
+
   const handleReportSelect = (reportId: ReportType) => {
     setSelectedReport(reportId);
   };
@@ -184,7 +189,7 @@ export function Analytics({ invoices, payments, lineItems }: AnalyticsProps) {
     const reportName = reportCategories
       .flatMap(cat => cat.reports)
       .find(r => r.id === selectedReport)?.name || 'Report';
-    exportAnalyticsReport(filteredInvoices, filteredPayments, reportName, format, dateRange, selectedReport, lineItems);
+    exportAnalyticsReport(filteredInvoices, filteredPayments, reportName, format, dateRange, selectedReport, filteredLineItems);
     setShowExportMenu(false);
   };
 
@@ -345,7 +350,7 @@ export function Analytics({ invoices, payments, lineItems }: AnalyticsProps) {
               <span className="ml-3 text-gray-600">Loading report...</span>
             </div>
           }>
-            <ReportComponent invoices={filteredInvoices} payments={filteredPayments} lineItems={lineItems} />
+            <ReportComponent invoices={filteredInvoices} payments={filteredPayments} lineItems={filteredLineItems} />
           </Suspense>
         </div>
       </div>
