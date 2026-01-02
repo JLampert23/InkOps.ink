@@ -46,6 +46,23 @@ interface Invoice {
     createdAt?: string;
     updatedAt?: string;
   };
+  lineItemGroups?: {
+    edges: Array<{
+      node: {
+        id: string;
+        lineItems?: {
+          edges: Array<{
+            node: {
+              id: string;
+              description?: string;
+              items?: number;
+              price?: number;
+            };
+          }>;
+        };
+      };
+    }>;
+  };
 }
 
 interface Payment {
@@ -219,6 +236,23 @@ async function syncInvoices(
                 companyName
               }
             }
+            lineItemGroups {
+              edges {
+                node {
+                  id
+                  lineItems {
+                    edges {
+                      node {
+                        id
+                        description
+                        items
+                        price
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
         pageInfo {
@@ -260,6 +294,23 @@ async function syncInvoices(
                 companyName
               }
             }
+            lineItemGroups {
+              edges {
+                node {
+                  id
+                  lineItems {
+                    edges {
+                      node {
+                        id
+                        description
+                        items
+                        price
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
         pageInfo {
@@ -274,11 +325,16 @@ async function syncInvoices(
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - RECENT_DAYS_LOOKBACK);
   let batchBuffer: any[] = [];
+  let lineItemsBatchBuffer: any[] = [];
 
   const flushBatch = async () => {
     if (batchBuffer.length > 0) {
       await supabase.from("printavo_invoices").upsert(batchBuffer, { onConflict: "id" });
       batchBuffer = [];
+    }
+    if (lineItemsBatchBuffer.length > 0) {
+      await supabase.from("printavo_line_items").upsert(lineItemsBatchBuffer, { onConflict: "id" });
+      lineItemsBatchBuffer = [];
     }
   };
 
@@ -329,7 +385,29 @@ async function syncInvoices(
           raw_data: invoice,
         });
 
-        if (batchBuffer.length >= BATCH_SIZE) {
+        if (invoice.lineItemGroups?.edges) {
+          for (const groupEdge of invoice.lineItemGroups.edges) {
+            const group = groupEdge.node;
+            if (group.lineItems?.edges) {
+              for (const itemEdge of group.lineItems.edges) {
+                const lineItem = itemEdge.node;
+                lineItemsBatchBuffer.push({
+                  id: lineItem.id,
+                  invoice_id: invoice.id,
+                  line_item_group_id: group.id,
+                  description: lineItem.description,
+                  quantity: lineItem.items || 0,
+                  unit_price: lineItem.price || 0,
+                  total_price: (lineItem.items || 0) * (lineItem.price || 0),
+                  updated_at: new Date().toISOString(),
+                  raw_data: lineItem,
+                });
+              }
+            }
+          }
+        }
+
+        if (batchBuffer.length >= BATCH_SIZE || lineItemsBatchBuffer.length >= BATCH_SIZE * 5) {
           await flushBatch();
         }
       }
@@ -393,7 +471,28 @@ async function syncInvoices(
         raw_data: invoice,
       });
 
-      if (batchBuffer.length >= BATCH_SIZE) {
+      if (invoice.lineItemGroups?.edges) {
+        for (const groupEdge of invoice.lineItemGroups.edges) {
+          const group = groupEdge.node;
+          if (group.lineItems?.edges) {
+            for (const itemEdge of group.lineItems.edges) {
+              const lineItem = itemEdge.node;
+              lineItemsBatchBuffer.push({
+                id: lineItem.id,
+                invoice_id: invoice.id,
+                line_item_group_id: group.id,
+                description: lineItem.description,
+                quantity: lineItem.items || 0,
+                unit_price: lineItem.price || 0,
+                total_price: (lineItem.items || 0) * (lineItem.price || 0),
+                updated_at: new Date().toISOString(),
+                raw_data: lineItem,
+              });            }
+          }
+        }
+      }
+
+      if (batchBuffer.length >= BATCH_SIZE || lineItemsBatchBuffer.length >= BATCH_SIZE * 5) {
         await flushBatch();
       }
     }
