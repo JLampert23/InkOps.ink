@@ -46,7 +46,7 @@ Deno.serve(async (req: Request) => {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
+        JSON.stringify({ error: 'Unauthorized', details: userError?.message }),
         {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -61,7 +61,7 @@ Deno.serve(async (req: Request) => {
 
     if (settingsError || !settings || !settings.square_access_token) {
       return new Response(
-        JSON.stringify({ error: 'Square credentials not configured. Please add them in Account Settings.' }),
+        JSON.stringify({ error: 'Square credentials not configured. Please add them in Account Settings.', details: settingsError?.message }),
         {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
