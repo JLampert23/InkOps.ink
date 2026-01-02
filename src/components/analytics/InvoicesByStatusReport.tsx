@@ -21,7 +21,7 @@ export default function InvoicesByStatusReport({ invoices }: InvoicesByStatusRep
     let grandTotal = 0;
 
     invoices.forEach(invoice => {
-      const status = invoice.status || 'Unknown';
+      const status = String(invoice.status || 'Unknown');
       const total = Number(invoice.total) || 0;
 
       if (!statusMap.has(status)) {
@@ -48,7 +48,8 @@ export default function InvoicesByStatusReport({ invoices }: InvoicesByStatusRep
   }, [invoices]);
 
   const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
+    const statusLower = String(status).toLowerCase();
+    switch (statusLower) {
       case 'paid':
         return 'text-green-600 bg-green-50';
       case 'pending':
