@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { FileText, Users, RefreshCw, AlertCircle, DollarSign, TrendingUp, Download, Building2, Menu, X, LogOut, Loader2, BarChart3, Settings, LineChart } from 'lucide-react';
+import { useState, useEffect, lazy, Suspense } from 'react';
+import { FileText, Users, RefreshCw, AlertCircle, DollarSign, TrendingUp, Download, Building2, Menu, X, LogOut, Loader2, BarChart3, Settings, LineChart, CreditCard } from 'lucide-react';
 import { useSupabaseData } from './hooks/useSupabaseData';
 import { InvoiceExplorer } from './components/InvoiceExplorer';
 import { CustomerProfiles } from './components/CustomerProfiles';
@@ -13,7 +13,9 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { EnhancedAuthScreen } from './components/EnhancedAuthScreen';
 import { supabase } from './lib/supabase-client';
 
-type Tab = 'ar' | 'ar-by-customer' | 'open-invoices' | 'reports' | 'analytics' | 'invoices' | 'customers' | 'settings';
+const SquareData = lazy(() => import('./components/SquareData'));
+
+type Tab = 'ar' | 'ar-by-customer' | 'open-invoices' | 'reports' | 'analytics' | 'invoices' | 'customers' | 'square' | 'settings';
 
 interface CompanySettings {
   company_name: string;
@@ -70,7 +72,7 @@ function AppContent() {
     }
   }, [activeTab]);
 
-  const navItems = [
+  const printavoNavItems = [
     {
       id: 'ar' as Tab,
       name: 'Accounts Receivable',
@@ -112,6 +114,15 @@ function AppContent() {
       name: 'Customers',
       icon: Users,
       description: 'Customer profiles'
+    },
+  ];
+
+  const squareNavItems = [
+    {
+      id: 'square' as Tab,
+      name: 'Square Data',
+      icon: CreditCard,
+      description: 'Square transactions & reports'
     },
   ];
 
@@ -163,36 +174,87 @@ function AppContent() {
         </div>
 
         {/* Navigation */}
-        <nav className="p-4 space-y-1">
-          {navItems.map(item => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
-                  isActive
-                    ? 'bg-blue-50 text-blue-700 shadow-sm'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                }`}
-                title={!sidebarOpen ? item.name : ''}
-              >
-                <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
-                {sidebarOpen && (
-                  <div className="flex-1 text-left">
-                    <div className={`font-medium text-sm ${isActive ? 'text-blue-700' : ''}`}>
-                      {item.name}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-0.5">
-                      {item.description}
-                    </div>
-                  </div>
-                )}
-                {isActive && <div className="w-1 h-8 bg-blue-600 rounded-full absolute right-0" />}
-              </button>
-            );
-          })}
+        <nav className="p-4 space-y-4 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 180px)' }}>
+          {/* Printavo Section */}
+          <div>
+            {sidebarOpen && (
+              <div className="px-2 mb-2">
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Printavo Data</h3>
+              </div>
+            )}
+            <div className="space-y-1">
+              {printavoNavItems.map(item => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
+                      isActive
+                        ? 'bg-blue-50 text-blue-700 shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                    title={!sidebarOpen ? item.name : ''}
+                  >
+                    <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                    {sidebarOpen && (
+                      <div className="flex-1 text-left">
+                        <div className={`font-medium text-sm ${isActive ? 'text-blue-700' : ''}`}>
+                          {item.name}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          {item.description}
+                        </div>
+                      </div>
+                    )}
+                    {isActive && <div className="w-1 h-8 bg-blue-600 rounded-full absolute right-0" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Square Section */}
+          <div>
+            {sidebarOpen && (
+              <div className="px-2 mb-2 pt-4 border-t border-gray-200">
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Square Data</h3>
+              </div>
+            )}
+            {!sidebarOpen && <div className="border-t border-gray-200 my-2" />}
+            <div className="space-y-1">
+              {squareNavItems.map(item => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
+                      isActive
+                        ? 'bg-green-50 text-green-700 shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                    title={!sidebarOpen ? item.name : ''}
+                  >
+                    <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                    {sidebarOpen && (
+                      <div className="flex-1 text-left">
+                        <div className={`font-medium text-sm ${isActive ? 'text-green-700' : ''}`}>
+                          {item.name}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          {item.description}
+                        </div>
+                      </div>
+                    )}
+                    {isActive && <div className="w-1 h-8 bg-green-600 rounded-full absolute right-0" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </nav>
 
         {/* User & Controls */}
@@ -241,36 +303,46 @@ function AppContent() {
           <div className="h-full px-4 flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">
-                {navItems.find(item => item.id === activeTab)?.name}
+                {[...printavoNavItems, ...squareNavItems].find(item => item.id === activeTab)?.name || 'Settings'}
               </h2>
               <p className="text-sm text-gray-500 mt-0.5">
-                {invoices.length} invoices · {payments.length} payments
+                {activeTab === 'square' ? (
+                  'Square payment data and reports'
+                ) : activeTab === 'settings' ? (
+                  'Configure your integrations and preferences'
+                ) : (
+                  `${invoices.length} invoices · ${payments.length} payments`
+                )}
               </p>
             </div>
             <div className="flex items-center gap-4">
-              {lastSyncTime && (
-                <div className="text-sm text-gray-600 flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                  Last synced: {lastSyncTime.toLocaleTimeString()}
-                </div>
+              {activeTab !== 'square' && activeTab !== 'settings' && (
+                <>
+                  {lastSyncTime && (
+                    <div className="text-sm text-gray-600 flex items-center gap-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                      Last synced: {lastSyncTime.toLocaleTimeString()}
+                    </div>
+                  )}
+                  <button
+                    onClick={triggerSync}
+                    disabled={syncing || loading}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
+                  >
+                    {syncing ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Syncing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4" />
+                        <span>Sync Data</span>
+                      </>
+                    )}
+                  </button>
+                </>
               )}
-              <button
-                onClick={triggerSync}
-                disabled={syncing || loading}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
-              >
-                {syncing ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Syncing...</span>
-                  </>
-                ) : (
-                  <>
-                    <Download className="w-4 h-4" />
-                    <span>Sync Data</span>
-                  </>
-                )}
-              </button>
             </div>
           </div>
         </header>
@@ -341,6 +413,19 @@ function AppContent() {
             )}
             {activeTab === 'customers' && (
               <CustomerProfiles invoices={invoices} />
+            )}
+            {activeTab === 'square' && (
+              <Suspense fallback={
+                <div className="bg-white rounded-lg shadow p-8">
+                  <div className="text-center">
+                    <Loader2 className="w-12 h-12 text-green-600 animate-spin mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading Square Data</h3>
+                    <p className="text-gray-600">Initializing Square data module...</p>
+                  </div>
+                </div>
+              }>
+                <SquareData />
+              </Suspense>
             )}
             {activeTab === 'settings' && (
               <AccountSettings />

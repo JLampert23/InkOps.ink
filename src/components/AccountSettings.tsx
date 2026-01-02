@@ -40,6 +40,12 @@ export function AccountSettings() {
   const [testingConnection, setTestingConnection] = useState(false);
   const [testResult, setTestResult] = useState<any>(null);
 
+  const [squareAccessToken, setSquareAccessToken] = useState('');
+  const [squareApplicationId, setSquareApplicationId] = useState('');
+  const [squareLocationId, setSquareLocationId] = useState('');
+  const [squareEnvironment, setSquareEnvironment] = useState('production');
+  const [savingSquare, setSavingSquare] = useState(false);
+
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserName, setNewUserName] = useState('');
@@ -81,6 +87,7 @@ export function AccountSettings() {
         setLogoPreview(data.logo_url);
         setSelectedStatuses(data.selected_invoice_statuses || []);
         setPrintavoUsername(data.printavo_username || '');
+        setSquareEnvironment(data.square_environment || 'production');
       }
     } catch (err) {
       console.error('Error loading settings:', err);
@@ -306,6 +313,86 @@ export function AccountSettings() {
       alert(err instanceof Error ? err.message : 'Failed to save integration settings. Please try again.');
     } finally {
       setSavingIntegration(false);
+    }
+  };
+
+  const saveSquareIntegration = async () => {
+    if (!squareAccessToken.trim() && !companySettings?.id) {
+      alert('Square Access Token is required');
+      return;
+    }
+
+    try {
+      setSavingSquare(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('You must be logged in to update Square settings');
+        return;
+      }
+
+      let encryptedToken = null;
+
+      if (squareAccessToken.trim()) {
+        const encryptResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crypto-service`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action: 'encrypt',
+            token: squareAccessToken,
+          }),
+        });
+
+        if (!encryptResponse.ok) {
+          const errorData = await encryptResponse.json();
+          throw new Error(errorData.error || 'Failed to encrypt Square access token');
+        }
+
+        const { result } = await encryptResponse.json();
+        encryptedToken = result;
+      }
+
+      const settingsData: any = {
+        square_application_id: squareApplicationId.trim() || null,
+        square_location_id: squareLocationId.trim() || null,
+        square_environment: squareEnvironment,
+      };
+
+      if (encryptedToken) {
+        settingsData.square_access_token = encryptedToken;
+      }
+
+      if (companySettings?.id) {
+        const { error } = await supabase
+          .from('company_settings')
+          .update(settingsData)
+          .eq('id', companySettings.id);
+
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from('company_settings')
+          .insert([{
+            company_name: companyName || '',
+            ...settingsData
+          }])
+          .select()
+          .single();
+
+        if (error) throw error;
+        setCompanySettings(data);
+      }
+
+      alert('Square integration settings saved successfully!');
+      setSquareAccessToken('');
+      await loadSettings();
+    } catch (err) {
+      console.error('Error saving Square settings:', err);
+      alert(err instanceof Error ? err.message : 'Failed to save Square settings. Please try again.');
+    } finally {
+      setSavingSquare(false);
     }
   };
 
@@ -796,6 +883,109 @@ export function AccountSettings() {
                     )}
                   </>
                 )}
+              </div>
+
+              {/* Square Integration Section */}
+              <div className="mt-12 pt-8 border-t border-gray-200">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Square Integration</h2>
+                  <p className="text-sm text-gray-600 mb-6">Connect your Square account to access payment data</p>
+                </div>
+
+                <div className="space-y-4 max-w-xl">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Square Access Token <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="password"
+                      value={squareAccessToken}
+                      onChange={(e) => setSquareAccessToken(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      placeholder={companySettings?.square_access_token ? '••••••••••••••••' : 'Enter your Square access token'}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      {companySettings?.square_access_token
+                        ? 'Token is saved and encrypted. Enter a new token to update it.'
+                        : 'Find your access token in Square Developer Dashboard'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Application ID
+                    </label>
+                    <input
+                      type="text"
+                      value={squareApplicationId}
+                      onChange={(e) => setSquareApplicationId(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      placeholder="sq0idp-XXXXXXXXXXXXXXXXXXXX"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Your Square Application ID</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Location ID
+                    </label>
+                    <input
+                      type="text"
+                      value={squareLocationId}
+                      onChange={(e) => setSquareLocationId(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      placeholder="L1234567890"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Your Square Location ID (leave blank for all locations)</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Environment
+                    </label>
+                    <select
+                      value={squareEnvironment}
+                      onChange={(e) => setSquareEnvironment(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                      <option value="production">Production</option>
+                      <option value="sandbox">Sandbox (Testing)</option>
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">Select production for live data or sandbox for testing</p>
+                  </div>
+
+                  <div className="pt-4">
+                    <button
+                      onClick={saveSquareIntegration}
+                      disabled={savingSquare}
+                      className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                    >
+                      {savingSquare ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4" />
+                          Save Square Credentials
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {companySettings?.square_access_token && (
+                    <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-center gap-2 text-green-800">
+                        <Key className="w-5 h-5" />
+                        <div>
+                          <p className="font-medium">Square Integration Active</p>
+                          <p className="text-sm mt-1">Environment: {companySettings.square_environment || 'production'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
