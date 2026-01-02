@@ -24,11 +24,14 @@ interface StyleSalesData {
   averagePrice: number;
 }
 
-export default function SalesByStyleReport({ lineItems }: SalesByStyleReportProps) {
+export default function SalesByStyleReport({ invoices, lineItems }: SalesByStyleReportProps) {
   const reportData = useMemo(() => {
+    const invoiceIds = new Set(invoices.map(inv => inv.id));
+    const relevantLineItems = lineItems.filter(item => invoiceIds.has(item.invoice_id));
+
     const productMap = new Map<string, { quantity: number; revenue: number }>();
 
-    lineItems.forEach(item => {
+    relevantLineItems.forEach(item => {
       const description = item.description || 'Unknown Product';
       const quantity = item.quantity || 0;
       const revenue = item.total_price || 0;
@@ -54,7 +57,7 @@ export default function SalesByStyleReport({ lineItems }: SalesByStyleReportProp
       .slice(0, 25);
 
     return data;
-  }, [lineItems]);
+  }, [invoices, lineItems]);
 
   return (
     <div className="space-y-6">
