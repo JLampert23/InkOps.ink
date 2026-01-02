@@ -184,7 +184,7 @@ export function Analytics({ invoices, payments, lineItems }: AnalyticsProps) {
     const reportName = reportCategories
       .flatMap(cat => cat.reports)
       .find(r => r.id === selectedReport)?.name || 'Report';
-    exportAnalyticsReport(filteredInvoices, filteredPayments, reportName, format, dateRange);
+    exportAnalyticsReport(filteredInvoices, filteredPayments, reportName, format, dateRange, selectedReport, lineItems);
     setShowExportMenu(false);
   };
 
