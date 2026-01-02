@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Download, Search, Calendar, Loader2, AlertCircle } from 'lucide-react';
 import { exportToCSV, exportToPDF, formatCurrency, formatDateTime, type SquareExportOptions } from '../../utils/square-export';
+import { SquareApiService } from '../../services/square-api-service';
 
 export default function SquareTransactions() {
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
@@ -14,14 +15,31 @@ export default function SquareTransactions() {
     setLoading(true);
     setError(null);
     try {
-      // PLACEHOLDER: Replace with actual Square API call
-      // Example: const response = await fetch('/api/square/transactions', { ... });
-      // const data = await response.json();
-      // setTransactions(data);
+      const params: any = {};
 
-      alert('Fetch Transactions - Connect to Square API here');
-      // Placeholder data for demonstration
-      setTransactions([]);
+      if (dateRange.start) {
+        params.begin_time = new Date(dateRange.start).toISOString();
+      }
+      if (dateRange.end) {
+        const endDate = new Date(dateRange.end);
+        endDate.setHours(23, 59, 59, 999);
+        params.end_time = endDate.toISOString();
+      }
+
+      const data = await SquareApiService.listPayments(params);
+
+      if (data.payments) {
+        setTransactions(data.payments.map((payment: any) => ({
+          id: payment.id,
+          created_at: payment.created_at,
+          amount: payment.amount_money ? payment.amount_money.amount / 100 : 0,
+          status: payment.status,
+          payment_method: payment.card_details?.card?.card_brand || 'Unknown',
+          customer_name: payment.customer_id || 'N/A',
+        })));
+      } else {
+        setTransactions([]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch transactions');
     } finally {

@@ -1,22 +1,46 @@
-import { useState } from 'react';
-import { Download, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Download, Loader2, AlertCircle } from 'lucide-react';
 import { exportToCSV, exportToPDF, type SquareExportOptions } from '../../utils/square-export';
+import { SquareApiService } from '../../services/square-api-service';
 
 export default function SquareLocations() {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [locations, setLocations] = useState<any[]>([]);
   const [showExportMenu, setShowExportMenu] = useState(false);
 
   const fetchLocations = async () => {
     setLoading(true);
+    setError(null);
     try {
-      // PLACEHOLDER: Square API call
-      alert('Fetch Locations - Connect to Square API here');
-      setLocations([]);
+      const data = await SquareApiService.listLocations();
+
+      if (data.locations) {
+        setLocations(data.locations.map((loc: any) => ({
+          id: loc.id,
+          name: loc.name,
+          address: [
+            loc.address?.address_line_1,
+            loc.address?.locality,
+            loc.address?.administrative_district_level_1,
+            loc.address?.postal_code
+          ].filter(Boolean).join(', '),
+          phone: loc.phone_number || 'N/A',
+          status: loc.status,
+        })));
+      } else {
+        setLocations([]);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch locations');
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchLocations();
+  }, []);
 
   const handleExport = (format: 'csv' | 'pdf') => {
     const options: SquareExportOptions = {
@@ -57,7 +81,41 @@ export default function SquareLocations() {
           </div>
         </div>
       </div>
-      {locations.length === 0 && !loading && (
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="font-semibold text-red-900">Error</h3>
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {locations.length > 0 ? (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {locations.map((location, index) => (
+                <tr key={index} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{location.name}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{location.address}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{location.phone}</td>
+                  <td className="px-6 py-4 text-sm text-gray-900">{location.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : !loading && !error && (
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
           <p className="text-gray-600">No locations to display. Click "Fetch Data" to load from Square.</p>
         </div>
