@@ -16,12 +16,14 @@ export class SquareApiService {
     }
 
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
     const apiUrl = `${supabaseUrl}/functions/v1/square-proxy`;
 
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${session.access_token}`,
+        'apikey': supabaseAnonKey,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(request),

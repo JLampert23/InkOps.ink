@@ -19,6 +19,7 @@ export async function encryptToken(token: string): Promise<string> {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${session.access_token}`,
+      'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -49,6 +50,7 @@ export async function decryptToken(encryptedToken: string): Promise<string> {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${session.access_token}`,
+      'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
