@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import { exportToCSV, exportToPDF, type SquareExportOptions } from '../../utils/square-export';
+import SquareFilterBar from './SquareFilterBar';
 
 export default function SquareEmployees() {
   const [loading, setLoading] = useState(false);
@@ -37,6 +38,17 @@ export default function SquareEmployees() {
 
   return (
     <div className="space-y-6">
+      <SquareFilterBar
+        searchPlaceholder="Search employees by name, email, or role..."
+        sortOptions={[
+          { label: 'Sort by Name', value: 'name' },
+          { label: 'Sort by Role', value: 'role' },
+          { label: 'Sort by Status', value: 'status' }
+        ]}
+        showDateRange={false}
+        showSort={true}
+      />
+
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Employees</h2>
         <div className="flex gap-3">

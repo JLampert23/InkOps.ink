@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import { exportToCSV, exportToPDF, type SquareExportOptions } from '../../utils/square-export';
+import SquareFilterBar from './SquareFilterBar';
 
 export default function SquareInventory() {
   const [loading, setLoading] = useState(false);
@@ -37,6 +38,17 @@ export default function SquareInventory() {
 
   return (
     <div className="space-y-6">
+      <SquareFilterBar
+        searchPlaceholder="Search inventory by item name, SKU, or location..."
+        sortOptions={[
+          { label: 'Sort by Name', value: 'name' },
+          { label: 'Sort by Quantity', value: 'quantity' },
+          { label: 'Sort by Location', value: 'location' }
+        ]}
+        showDateRange={false}
+        showSort={true}
+      />
+
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Inventory</h2>
         <div className="flex gap-3">

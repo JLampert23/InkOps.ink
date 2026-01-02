@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Download, Loader2, AlertCircle } from 'lucide-react';
 import { exportToCSV, exportToPDF, type SquareExportOptions } from '../../utils/square-export';
 import { SquareApiService } from '../../services/square-api-service';
+import SquareFilterBar from './SquareFilterBar';
 
 export default function SquareLocations() {
   const [loading, setLoading] = useState(false);
@@ -61,6 +62,16 @@ export default function SquareLocations() {
 
   return (
     <div className="space-y-6">
+      <SquareFilterBar
+        searchPlaceholder="Search locations by name, address, or status..."
+        sortOptions={[
+          { label: 'Sort by Name', value: 'name' },
+          { label: 'Sort by Status', value: 'status' }
+        ]}
+        showDateRange={false}
+        showSort={true}
+      />
+
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Locations</h2>
         <div className="flex gap-3">

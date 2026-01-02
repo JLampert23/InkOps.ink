@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Download, Search, Calendar, Loader2, AlertCircle } from 'lucide-react';
+import { Download, Loader2, AlertCircle } from 'lucide-react';
 import { exportToCSV, exportToPDF, formatCurrency, formatDateTime, type SquareExportOptions } from '../../utils/square-export';
 import { SquareApiService } from '../../services/square-api-service';
+import SquareFilterBar from './SquareFilterBar';
 
 export default function SquareTransactions() {
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
@@ -78,53 +79,21 @@ export default function SquareTransactions() {
 
   return (
     <div className="space-y-6">
+      <SquareFilterBar
+        searchPlaceholder="Search transactions by ID, customer, or amount..."
+        sortOptions={[
+          { label: 'Sort by Date', value: 'date' },
+          { label: 'Sort by Amount', value: 'amount' },
+          { label: 'Sort by Status', value: 'status' }
+        ]}
+        onSearchChange={(value) => setSearchTerm(value)}
+        onDateRangeChange={(start, end) => setDateRange({ start, end })}
+        showDateRange={true}
+        showSort={true}
+      />
+
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Square Transactions</h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              <Calendar className="w-4 h-4 inline mr-1" />
-              Start Date
-            </label>
-            <input
-              type="date"
-              value={dateRange.start}
-              onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              <Calendar className="w-4 h-4 inline mr-1" />
-              End Date
-            </label>
-            <input
-              type="date"
-              value={dateRange.end}
-              onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              <Search className="w-4 h-4 inline mr-1" />
-              Search
-            </label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search transactions..."
-                className="w-full pl-11 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm"
-              />
-            </div>
-          </div>
-        </div>
 
         <div className="flex gap-3">
           <button
