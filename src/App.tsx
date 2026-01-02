@@ -24,7 +24,7 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState<Tab>('ar');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
-  const { invoices, payments, loading, error, syncing, lastSyncTime, triggerSync } = useSupabaseData();
+  const { invoices, payments, lineItems, loading, error, syncing, lastSyncTime, triggerSync } = useSupabaseData();
   const { signOut, user } = useAuth();
 
   useEffect(() => {
@@ -334,7 +334,7 @@ function AppContent() {
               <ReportsTab invoices={invoices} payments={payments} />
             )}
             {activeTab === 'analytics' && (
-              <Analytics invoices={invoices} payments={payments} />
+              <Analytics invoices={invoices} payments={payments} lineItems={lineItems} />
             )}
             {activeTab === 'invoices' && (
               <InvoiceExplorer invoices={invoices} />

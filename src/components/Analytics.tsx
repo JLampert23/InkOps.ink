@@ -7,6 +7,7 @@ import { exportAnalyticsReport } from '../utils/analytics-export';
 interface AnalyticsProps {
   invoices: any[];
   payments: any[];
+  lineItems: any[];
 }
 
 type ReportType =
@@ -149,7 +150,7 @@ const reportCategories = [
   },
 ];
 
-export function Analytics({ invoices, payments }: AnalyticsProps) {
+export function Analytics({ invoices, payments, lineItems }: AnalyticsProps) {
   const [selectedReport, setSelectedReport] = useState<ReportType | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'total' | 'customer'>('date');
@@ -381,7 +382,7 @@ export function Analytics({ invoices, payments }: AnalyticsProps) {
               <span className="ml-3 text-gray-600">Loading report...</span>
             </div>
           }>
-            <ReportComponent invoices={filteredInvoices} payments={filteredPayments} />
+            <ReportComponent invoices={filteredInvoices} payments={filteredPayments} lineItems={lineItems} />
           </Suspense>
         </div>
       </div>

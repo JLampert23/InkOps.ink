@@ -9,7 +9,7 @@ const corsHeaders = {
 
 const PRINTAVO_API_URL = "https://www.printavo.com/api/v2";
 const DELAY_BETWEEN_REQUESTS = 50;
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 10;
 const BATCH_SIZE = 50;
 const MAX_RETRIES = 3;
 const MIN_INVOICE_DATE = "2025-01-01T00:00:00Z";
