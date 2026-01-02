@@ -174,7 +174,7 @@ function AppContent() {
         </div>
 
         {/* Navigation */}
-        <nav className="p-4 space-y-4 overflow-y-auto" style={{ height: 'calc(100vh - 220px)' }}>
+        <nav className="p-4 space-y-4 overflow-y-auto pb-32" style={{ height: 'calc(100vh - 220px)' }}>
           {/* Printavo Section */}
           <div>
             {sidebarOpen && (
