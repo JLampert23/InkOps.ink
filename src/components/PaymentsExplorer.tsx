@@ -57,7 +57,7 @@ export function PaymentsExplorer({ payments, invoices, loading }: PaymentsExplor
   }, [invoices]);
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>('this-month');
+  const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>('today');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'amount'>('date');

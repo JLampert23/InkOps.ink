@@ -118,7 +118,7 @@ export function Analytics({ invoices, payments, lineItems }: AnalyticsProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'total' | 'customer'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>('this-month');
+  const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>('today');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [showExportMenu, setShowExportMenu] = useState(false);

@@ -24,7 +24,7 @@ type SortField = 'customerName' | 'totalRevenue' | 'totalOutstanding' | 'lastInv
 type SortDirection = 'asc' | 'desc';
 
 export function CustomerSummaryReport({ invoices }: CustomerSummaryReportProps) {
-  const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>('this-year');
+  const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>('today');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [searchTerm, setSearchTerm] = useState('');

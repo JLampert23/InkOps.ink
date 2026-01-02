@@ -23,7 +23,7 @@ interface SalesData {
 }
 
 export function SalesSummaryReport({ invoices }: SalesSummaryReportProps) {
-  const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>('this-month');
+  const [dateRangePreset, setDateRangePreset] = useState<DateRangePreset>('today');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [grouping, setGrouping] = useState<GroupingPeriod>('week');
