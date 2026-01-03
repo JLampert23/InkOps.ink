@@ -216,7 +216,6 @@ export function AccountSettings() {
       setTestingConnection(true);
       setTestResult(null);
 
-      console.log('Testing Printavo connection...');
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-printavo`, {
         method: 'POST',
         headers: {
@@ -224,9 +223,7 @@ export function AccountSettings() {
         },
       });
 
-      console.log('Response status:', response.status);
       const result = await response.json();
-      console.log('Test result:', result);
       setTestResult(result);
     } catch (err) {
       console.error('Error testing connection:', err);

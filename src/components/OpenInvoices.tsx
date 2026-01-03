@@ -36,16 +36,11 @@ export function OpenInvoices({ invoices }: OpenInvoicesProps) {
 
       if (error && error.code !== 'PGRST116') throw error;
 
-      console.log('Open Invoices - Loaded status preferences:', data?.selected_invoice_statuses);
-
       if (data?.selected_invoice_statuses && data.selected_invoice_statuses.length > 0) {
         setAvailableStatuses(data.selected_invoice_statuses);
-        console.log('Open Invoices - Available statuses set:', data.selected_invoice_statuses);
-      } else {
-        console.log('Open Invoices - No statuses selected in settings yet');
       }
     } catch (err) {
-      console.error('Error loading status preferences:', err);
+      // Silent fail - will use default behavior
     }
   };
 

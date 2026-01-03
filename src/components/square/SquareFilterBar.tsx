@@ -61,23 +61,32 @@ export default function SquareFilterBar({
 
     switch (range) {
       case 'today':
-        start = today;
-        end = today;
+        start = new Date(today);
+        end = new Date(today);
         break;
-      case 'thisWeek':
-        start = new Date(today.setDate(today.getDate() - today.getDay()));
+      case 'thisWeek': {
+        const weekStart = new Date(today);
+        weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+        start = weekStart;
         end = new Date();
         break;
-      case 'lastWeek':
-        const lastWeekStart = new Date(today.setDate(today.getDate() - today.getDay() - 7));
-        const lastWeekEnd = new Date(today.setDate(today.getDate() - today.getDay() + 6));
+      }
+      case 'lastWeek': {
+        const lastWeekStart = new Date(today);
+        lastWeekStart.setDate(lastWeekStart.getDate() - lastWeekStart.getDay() - 7);
+        const lastWeekEnd = new Date(lastWeekStart);
+        lastWeekEnd.setDate(lastWeekEnd.getDate() + 6);
         start = lastWeekStart;
         end = lastWeekEnd;
         break;
-      case 'last5Days':
-        start = new Date(today.setDate(today.getDate() - 5));
+      }
+      case 'last5Days': {
+        const fiveDaysAgo = new Date(today);
+        fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+        start = fiveDaysAgo;
         end = new Date();
         break;
+      }
       case 'thisMonth':
         start = new Date(today.getFullYear(), today.getMonth(), 1);
         end = new Date();
@@ -112,23 +121,32 @@ export default function SquareFilterBar({
     switch (selectedRange) {
       case 'today':
         return format(today, 'MMM d, yyyy');
-      case 'thisWeek':
-        const weekStart = new Date(today.setDate(today.getDate() - today.getDay()));
+      case 'thisWeek': {
+        const weekStart = new Date(today);
+        weekStart.setDate(weekStart.getDate() - weekStart.getDay());
         return `${format(weekStart, 'MMM d, yyyy')} - ${format(new Date(), 'MMM d, yyyy')}`;
-      case 'lastWeek':
-        const lastWeekStart = new Date(today.setDate(today.getDate() - today.getDay() - 7));
-        const lastWeekEnd = new Date(today.setDate(today.getDate() - today.getDay() + 6));
+      }
+      case 'lastWeek': {
+        const lastWeekStart = new Date(today);
+        lastWeekStart.setDate(lastWeekStart.getDate() - lastWeekStart.getDay() - 7);
+        const lastWeekEnd = new Date(lastWeekStart);
+        lastWeekEnd.setDate(lastWeekEnd.getDate() + 6);
         return `${format(lastWeekStart, 'MMM d, yyyy')} - ${format(lastWeekEnd, 'MMM d, yyyy')}`;
-      case 'last5Days':
-        const fiveDaysAgo = new Date(today.setDate(today.getDate() - 5));
+      }
+      case 'last5Days': {
+        const fiveDaysAgo = new Date(today);
+        fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
         return `${format(fiveDaysAgo, 'MMM d, yyyy')} - ${format(new Date(), 'MMM d, yyyy')}`;
-      case 'thisMonth':
+      }
+      case 'thisMonth': {
         const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
         return `${format(monthStart, 'MMM d, yyyy')} - ${format(new Date(), 'MMM d, yyyy')}`;
-      case 'lastMonth':
+      }
+      case 'lastMonth': {
         const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
         const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
         return `${format(lastMonthStart, 'MMM d, yyyy')} - ${format(lastMonthEnd, 'MMM d, yyyy')}`;
+      }
       case 'allTime':
         return 'All Time';
       default:
