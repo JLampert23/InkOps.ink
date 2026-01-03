@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FileText, Download, Loader2, AlertCircle, BarChart3, DollarSign, TrendingUp, Users } from 'lucide-react';
 import { SquareApiService } from '../../services/square-api-service';
+import SquareFilterBar from './SquareFilterBar';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatCurrency, formatDateTime } from '../../utils/square-export';
@@ -20,6 +21,10 @@ export default function SquareReports() {
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleDateRangeChange = (start: string, end: string) => {
+    setDateRange({ start, end });
+  };
 
   const reports: ReportCard[] = [
     {
@@ -557,6 +562,13 @@ export default function SquareReports() {
 
   return (
     <div className="space-y-6">
+      <SquareFilterBar
+        searchPlaceholder="Search reports..."
+        onDateRangeChange={handleDateRangeChange}
+        showDateRange={true}
+        showSort={false}
+      />
+
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Square Reports</h2>
         <p className="text-gray-600 mb-6">Generate comprehensive PDF reports from your Square data</p>
@@ -594,31 +606,10 @@ export default function SquareReports() {
           <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
             <h3 className="font-semibold text-gray-900 mb-3">Report Configuration</h3>
 
-            {needsDateRange && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Start Date
-                  </label>
-                  <input
-                    type="date"
-                    value={dateRange.start}
-                    onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    End Date
-                  </label>
-                  <input
-                    type="date"
-                    value={dateRange.end}
-                    onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
+            {needsDateRange && !dateRange.start && !dateRange.end && (
+              <p className="text-sm text-gray-600 mb-4">
+                Please select a date range using the filters above to generate this report.
+              </p>
             )}
 
             <button
@@ -657,7 +648,7 @@ export default function SquareReports() {
         <ul className="text-sm text-blue-800 space-y-1">
           <li>Reports are generated in real-time from your Square account</li>
           <li>All reports are exported as PDF files for easy sharing and printing</li>
-          <li>Date ranges are optional for some reports and required for others</li>
+          <li>Use the date range filter above to specify the reporting period</li>
           <li>Combined reports may take longer to generate as they fetch multiple data sources</li>
         </ul>
       </div>
