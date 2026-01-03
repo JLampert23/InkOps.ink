@@ -46,6 +46,8 @@ export function AccountSettings() {
   const [squareLocationId, setSquareLocationId] = useState('');
   const [squareEnvironment, setSquareEnvironment] = useState('production');
   const [savingSquare, setSavingSquare] = useState(false);
+  const [testingSquare, setTestingSquare] = useState(false);
+  const [squareTestResult, setSquareTestResult] = useState<any>(null);
 
   const [resendApiKey, setResendApiKey] = useState('');
   const [savingResend, setSavingResend] = useState(false);
@@ -390,6 +392,7 @@ export function AccountSettings() {
 
       alert('Square integration settings saved successfully!');
       setSquareAccessToken('');
+      setSquareTestResult(null);
       await loadSettings();
     } catch (err) {
       console.error('Error saving Square settings:', err);
@@ -473,6 +476,55 @@ export function AccountSettings() {
       alert(err instanceof Error ? err.message : 'Failed to save Resend settings. Please try again.');
     } finally {
       setSavingResend(false);
+    }
+  };
+
+  const testSquareConnection = async () => {
+    try {
+      setTestingSquare(true);
+      setSquareTestResult(null);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('You must be logged in to test the connection');
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/square-proxy`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          endpoint: '/v2/locations',
+          method: 'GET',
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setSquareTestResult({
+          success: false,
+          error: result.error || 'Failed to connect to Square API',
+          details: result,
+        });
+      } else {
+        setSquareTestResult({
+          success: true,
+          message: `Successfully connected to Square! Found ${result.locations?.length || 0} location(s).`,
+          locations: result.locations,
+          details: result,
+        });
+      }
+    } catch (err) {
+      setSquareTestResult({
+        success: false,
+        error: err instanceof Error ? err.message : 'Failed to test connection',
+      });
+    } finally {
+      setTestingSquare(false);
     }
   };
 
@@ -1123,15 +1175,84 @@ export function AccountSettings() {
                   </div>
 
                   {companySettings?.square_access_token && (
-                    <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-                      <div className="flex items-center gap-2 text-green-800">
-                        <Key className="w-5 h-5" />
-                        <div>
-                          <p className="font-medium">Square Integration Active</p>
-                          <p className="text-sm mt-1">Environment: {companySettings.square_environment || 'production'}</p>
+                    <>
+                      <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-green-800">
+                            <Key className="w-5 h-5" />
+                            <div>
+                              <p className="font-medium">Square Integration Active</p>
+                              <p className="text-sm mt-1">Environment: {companySettings.square_environment || 'production'}</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={testSquareConnection}
+                            disabled={testingSquare}
+                            className="flex items-center gap-2 px-4 py-2 bg-white border border-green-300 text-green-700 rounded-lg hover:bg-green-50 disabled:opacity-50 transition-colors"
+                          >
+                            {testingSquare ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Testing...
+                              </>
+                            ) : (
+                              'Test Connection'
+                            )}
+                          </button>
                         </div>
                       </div>
-                    </div>
+
+                      {squareTestResult && (
+                        <div className={`p-4 rounded-lg border ${squareTestResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                          <div className="space-y-3">
+                            {squareTestResult.success ? (
+                              <>
+                                <div className="flex items-start gap-3">
+                                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-bold">
+                                    ✓
+                                  </div>
+                                  <div className="flex-1">
+                                    <h4 className="font-medium text-green-900">Connection Successful!</h4>
+                                    <p className="text-sm text-green-800 mt-1">{squareTestResult.message}</p>
+                                    {squareTestResult.locations && squareTestResult.locations.length > 0 && (
+                                      <div className="mt-3">
+                                        <p className="text-xs font-medium text-green-900 mb-2">Locations:</p>
+                                        <ul className="text-xs text-green-800 space-y-1">
+                                          {squareTestResult.locations.slice(0, 5).map((loc: any) => (
+                                            <li key={loc.id}>
+                                              {loc.name} ({loc.id})
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="flex items-start gap-3">
+                                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-white text-sm font-bold">
+                                    ✕
+                                  </div>
+                                  <div className="flex-1">
+                                    <h4 className="font-medium text-red-900">Connection Failed</h4>
+                                    <p className="text-sm text-red-800 mt-1">{squareTestResult.error}</p>
+                                  </div>
+                                </div>
+                              </>
+                            )}
+
+                            <div className="mt-3 pt-3 border-t border-gray-200">
+                              <div className="text-xs font-medium text-gray-700 mb-2">Diagnostics:</div>
+                              <pre className="text-xs p-3 bg-white rounded border border-gray-300 overflow-x-auto max-h-96">
+                                {JSON.stringify(squareTestResult, null, 2)}
+                              </pre>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
