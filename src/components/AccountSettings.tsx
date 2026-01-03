@@ -49,6 +49,8 @@ export function AccountSettings() {
 
   const [resendApiKey, setResendApiKey] = useState('');
   const [savingResend, setSavingResend] = useState(false);
+  const [testingResend, setTestingResend] = useState(false);
+  const [resendTestResult, setResendTestResult] = useState<any>(null);
 
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -464,12 +466,81 @@ export function AccountSettings() {
 
       alert('Resend integration settings saved successfully!');
       setResendApiKey('');
+      setResendTestResult(null);
       await loadSettings();
     } catch (err) {
       console.error('Error saving Resend settings:', err);
       alert(err instanceof Error ? err.message : 'Failed to save Resend settings. Please try again.');
     } finally {
       setSavingResend(false);
+    }
+  };
+
+  const testResendConnection = async () => {
+    try {
+      setTestingResend(true);
+      setResendTestResult(null);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('You must be logged in to test the connection');
+      }
+
+      if (!user?.email) {
+        throw new Error('User email not found');
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          to: user.email,
+          subject: 'Resend Connection Test',
+          template: 'custom',
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #8b5cf6;">Resend Connection Test Successful!</h2>
+              <p>Your Resend integration is working correctly.</p>
+              <p>This test email was sent to verify that:</p>
+              <ul>
+                <li>Your API key is properly configured</li>
+                <li>The encryption/decryption is working</li>
+                <li>Resend can send emails from your account</li>
+              </ul>
+              <p style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 14px;">
+                Sent via ${companySettings?.company_name || 'Your Application'}
+              </p>
+            </div>
+          `,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setResendTestResult({
+          success: false,
+          error: result.error || 'Failed to send test email',
+          details: result,
+        });
+      } else {
+        setResendTestResult({
+          success: true,
+          message: `Test email sent successfully to ${user.email}`,
+          emailId: result.data?.id,
+          details: result,
+        });
+      }
+    } catch (err) {
+      setResendTestResult({
+        success: false,
+        error: err instanceof Error ? err.message : 'Failed to test connection',
+      });
+    } finally {
+      setTestingResend(false);
     }
   };
 
@@ -1126,15 +1197,75 @@ export function AccountSettings() {
                   </div>
 
                   {companySettings?.resend_api_key && (
-                    <div className="mt-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                      <div className="flex items-center gap-2 text-purple-800">
-                        <Key className="w-5 h-5" />
-                        <div>
-                          <p className="font-medium">Resend Integration Active</p>
-                          <p className="text-sm mt-1">Email sending is configured and ready to use</p>
+                    <>
+                      <div className="mt-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-purple-800">
+                            <Key className="w-5 h-5" />
+                            <div>
+                              <p className="font-medium">Resend Integration Active</p>
+                              <p className="text-sm mt-1">Email sending is configured and ready to use</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={testResendConnection}
+                            disabled={testingResend}
+                            className="flex items-center gap-2 px-4 py-2 bg-white border border-purple-300 text-purple-700 rounded-lg hover:bg-purple-50 disabled:opacity-50 transition-colors"
+                          >
+                            {testingResend ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Testing...
+                              </>
+                            ) : (
+                              'Test Connection'
+                            )}
+                          </button>
                         </div>
                       </div>
-                    </div>
+
+                      {resendTestResult && (
+                        <div className={`p-4 rounded-lg border ${resendTestResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                          <div className="space-y-3">
+                            {resendTestResult.success ? (
+                              <>
+                                <div className="flex items-start gap-3">
+                                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-bold">
+                                    ✓
+                                  </div>
+                                  <div className="flex-1">
+                                    <h4 className="font-medium text-green-900">Connection Successful!</h4>
+                                    <p className="text-sm text-green-800 mt-1">{resendTestResult.message}</p>
+                                    {resendTestResult.emailId && (
+                                      <p className="text-xs text-green-700 mt-2">Email ID: {resendTestResult.emailId}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="flex items-start gap-3">
+                                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-white text-sm font-bold">
+                                    ✕
+                                  </div>
+                                  <div className="flex-1">
+                                    <h4 className="font-medium text-red-900">Connection Failed</h4>
+                                    <p className="text-sm text-red-800 mt-1">{resendTestResult.error}</p>
+                                  </div>
+                                </div>
+                              </>
+                            )}
+
+                            <div className="mt-3 pt-3 border-t border-gray-200">
+                              <div className="text-xs font-medium text-gray-700 mb-2">Diagnostics:</div>
+                              <pre className="text-xs p-3 bg-white rounded border border-gray-300 overflow-x-auto max-h-96">
+                                {JSON.stringify(resendTestResult, null, 2)}
+                              </pre>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
 
                   <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
