@@ -11,10 +11,19 @@ export class EmailService {
   }
 
   private static async getHeaders(): Promise<HeadersInit> {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) {
-      throw new Error('User not authenticated');
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      console.error('Session error:', sessionError);
+      throw new Error('Failed to get session');
     }
+
+    if (!session?.access_token) {
+      console.error('No session found');
+      throw new Error('User not authenticated - please refresh the page and try again');
+    }
+
+    console.log('Using session token for email service');
 
     return {
       'Authorization': `Bearer ${session.access_token}`,
@@ -25,20 +34,33 @@ export class EmailService {
   static async sendEmail(request: SendEmailRequest): Promise<SendEmailResponse> {
     try {
       const headers = await this.getHeaders();
+      console.log('Sending email request to:', this.getApiUrl());
+
       const response = await fetch(this.getApiUrl(), {
         method: 'POST',
         headers,
         body: JSON.stringify(request),
       });
 
+      console.log('Email response status:', response.status);
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to send email');
+        const errorText = await response.text();
+        console.error('Email error response:', errorText);
+
+        try {
+          const errorData = JSON.parse(errorText);
+          throw new Error(errorData.error || `Failed to send email (${response.status})`);
+        } catch {
+          throw new Error(`Failed to send email: ${errorText || response.statusText}`);
+        }
       }
 
       const result: SendEmailResponse = await response.json();
+      console.log('Email sent successfully:', result);
       return result;
     } catch (error) {
+      console.error('Email service error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to send email',
