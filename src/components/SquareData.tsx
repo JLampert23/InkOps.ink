@@ -1,5 +1,5 @@
 import { useState, lazy, Suspense } from 'react';
-import { CreditCard, DollarSign, Users, Package, Archive, RefreshCw, MapPin, UserCheck, ArrowLeft, Loader2 } from 'lucide-react';
+import { CreditCard, DollarSign, Users, Package, Archive, RefreshCw, MapPin, UserCheck, ArrowLeft, Loader2, FileText } from 'lucide-react';
 
 const SquareTransactions = lazy(() => import('./square/SquareTransactions'));
 const SquareDeposits = lazy(() => import('./square/SquareDeposits'));
@@ -9,6 +9,7 @@ const SquareInventory = lazy(() => import('./square/SquareInventory'));
 const SquareRefunds = lazy(() => import('./square/SquareRefunds'));
 const SquareLocations = lazy(() => import('./square/SquareLocations'));
 const SquareEmployees = lazy(() => import('./square/SquareEmployees'));
+const SquareReports = lazy(() => import('./square/SquareReports'));
 
 type SquareModule =
   | 'transactions'
@@ -19,6 +20,7 @@ type SquareModule =
   | 'refunds'
   | 'locations'
   | 'employees'
+  | 'reports'
   | null;
 
 interface ModuleCard {
@@ -52,7 +54,7 @@ export default function SquareData() {
       name: 'Customers',
       icon: Users,
       description: 'Manage customer profiles and data',
-      color: 'purple'
+      color: 'orange'
     },
     {
       id: 'refunds',
@@ -60,6 +62,13 @@ export default function SquareData() {
       icon: RefreshCw,
       description: 'View refund and return transactions',
       color: 'red'
+    },
+    {
+      id: 'reports',
+      name: 'PDF Reports',
+      icon: FileText,
+      description: 'Generate comprehensive PDF reports from Square data',
+      color: 'teal'
     },
   ];
 
@@ -76,12 +85,6 @@ export default function SquareData() {
         text: 'text-green-600',
         border: 'border-green-200',
         hover: 'hover:bg-green-100'
-      },
-      purple: {
-        bg: 'bg-purple-50',
-        text: 'text-purple-600',
-        border: 'border-purple-200',
-        hover: 'hover:bg-purple-100'
       },
       orange: {
         bg: 'bg-orange-50',
@@ -135,6 +138,8 @@ export default function SquareData() {
         return <SquareLocations />;
       case 'employees':
         return <SquareEmployees />;
+      case 'reports':
+        return <SquareReports />;
       default:
         return null;
     }
