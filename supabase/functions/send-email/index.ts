@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -30,11 +31,51 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-    
-    if (!RESEND_API_KEY) {
-      throw new Error('RESEND_API_KEY is not configured');
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('Missing authorization header');
     }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Supabase configuration missing');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const { data: settings, error: settingsError } = await supabase
+      .from('company_settings')
+      .select('resend_api_key')
+      .maybeSingle();
+
+    if (settingsError) {
+      throw new Error(`Failed to load settings: ${settingsError.message}`);
+    }
+
+    if (!settings?.resend_api_key) {
+      throw new Error('Resend API key not configured. Please add it in Settings → Integrations.');
+    }
+
+    const cryptoResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': authHeader,
+      },
+      body: JSON.stringify({
+        action: 'decrypt',
+        encrypted: settings.resend_api_key,
+      }),
+    });
+
+    if (!cryptoResponse.ok) {
+      const errorData = await cryptoResponse.json();
+      throw new Error(`Failed to decrypt API key: ${errorData.error || 'Unknown error'}`);
+    }
+
+    const { result: RESEND_API_KEY } = await cryptoResponse.json();
 
     const emailRequest: EmailRequest = await req.json();
     const { to, subject, template, data, html: customHtml } = emailRequest;

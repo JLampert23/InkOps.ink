@@ -11,6 +11,7 @@ interface CompanySettings {
   selected_invoice_statuses: string[];
   printavo_username: string | null;
   printavo_api_token_encrypted: string | null;
+  resend_api_key: string | null;
 }
 
 interface UserProfile {
@@ -45,6 +46,9 @@ export function AccountSettings() {
   const [squareLocationId, setSquareLocationId] = useState('');
   const [squareEnvironment, setSquareEnvironment] = useState('production');
   const [savingSquare, setSavingSquare] = useState(false);
+
+  const [resendApiKey, setResendApiKey] = useState('');
+  const [savingResend, setSavingResend] = useState(false);
 
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -390,6 +394,82 @@ export function AccountSettings() {
       alert(err instanceof Error ? err.message : 'Failed to save Square settings. Please try again.');
     } finally {
       setSavingSquare(false);
+    }
+  };
+
+  const saveResendIntegration = async () => {
+    if (!resendApiKey.trim() && !companySettings?.id) {
+      alert('Resend API Key is required');
+      return;
+    }
+
+    try {
+      setSavingResend(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('You must be logged in to update Resend settings');
+        return;
+      }
+
+      let encryptedKey = null;
+
+      if (resendApiKey.trim()) {
+        const encryptResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crypto-service`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action: 'encrypt',
+            token: resendApiKey,
+          }),
+        });
+
+        if (!encryptResponse.ok) {
+          const errorData = await encryptResponse.json();
+          throw new Error(errorData.error || 'Failed to encrypt Resend API key');
+        }
+
+        const { result } = await encryptResponse.json();
+        encryptedKey = result;
+      }
+
+      const settingsData: any = {};
+
+      if (encryptedKey) {
+        settingsData.resend_api_key = encryptedKey;
+      }
+
+      if (companySettings?.id) {
+        const { error } = await supabase
+          .from('company_settings')
+          .update(settingsData)
+          .eq('id', companySettings.id);
+
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from('company_settings')
+          .insert([{
+            company_name: companyName || '',
+            ...settingsData
+          }])
+          .select()
+          .single();
+
+        if (error) throw error;
+        setCompanySettings(data);
+      }
+
+      alert('Resend integration settings saved successfully!');
+      setResendApiKey('');
+      await loadSettings();
+    } catch (err) {
+      console.error('Error saving Resend settings:', err);
+      alert(err instanceof Error ? err.message : 'Failed to save Resend settings. Please try again.');
+    } finally {
+      setSavingResend(false);
     }
   };
 
@@ -982,6 +1062,94 @@ export function AccountSettings() {
                       </div>
                     </div>
                   )}
+                </div>
+              </div>
+
+              {/* Resend Email Integration Section */}
+              <div className="mt-12 pt-8 border-t border-gray-200">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Resend Email Integration</h2>
+                  <p className="text-sm text-gray-600 mb-6">Connect Resend to send transactional emails</p>
+                </div>
+
+                <div className="space-y-4 max-w-xl">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Resend API Key <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="password"
+                      value={resendApiKey}
+                      onChange={(e) => setResendApiKey(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      placeholder={companySettings?.resend_api_key ? '••••••••••••••••' : 'Enter your Resend API key'}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      {companySettings?.resend_api_key
+                        ? 'API key is saved and encrypted. Enter a new key to update it.'
+                        : 'Get your API key from Resend Dashboard → API Keys'}
+                    </p>
+                  </div>
+
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-900">
+                      <strong>Note:</strong> You'll also need to verify your sending domain in the Resend dashboard before you can send emails.
+                    </p>
+                    <a
+                      href="https://resend.com/api-keys"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-600 hover:text-blue-700 underline mt-2 inline-block"
+                    >
+                      Get API Key from Resend →
+                    </a>
+                  </div>
+
+                  <div className="pt-4">
+                    <button
+                      onClick={saveResendIntegration}
+                      disabled={savingResend}
+                      className="flex items-center gap-2 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors"
+                    >
+                      {savingResend ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4" />
+                          Save Resend Credentials
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {companySettings?.resend_api_key && (
+                    <div className="mt-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                      <div className="flex items-center gap-2 text-purple-800">
+                        <Key className="w-5 h-5" />
+                        <div>
+                          <p className="font-medium">Resend Integration Active</p>
+                          <p className="text-sm mt-1">Email sending is configured and ready to use</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                    <p className="text-sm font-medium text-gray-900 mb-2">Available Email Templates:</p>
+                    <ul className="text-sm text-gray-600 space-y-1 ml-4 list-disc">
+                      <li>Invoice Reminders</li>
+                      <li>Payment Confirmations</li>
+                      <li>Overdue Notices</li>
+                      <li>Welcome Emails</li>
+                      <li>Custom HTML Emails</li>
+                    </ul>
+                    <p className="text-xs text-gray-500 mt-3">
+                      See <code className="bg-white px-2 py-0.5 rounded">EMAIL_GUIDE.md</code> for usage examples
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>

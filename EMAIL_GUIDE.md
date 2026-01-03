@@ -9,7 +9,7 @@ This project now includes email functionality powered by Resend. You can send tr
 1. Sign up or log in at [Resend](https://resend.com)
 2. Go to [API Keys](https://resend.com/api-keys)
 3. Create a new API key
-4. Copy the API key
+4. Copy the API key (you'll need it in the next step)
 
 ### 2. Configure Domain (Important!)
 
@@ -22,25 +22,29 @@ Before you can send emails, you need to verify your sending domain:
 
 **Note:** For testing, you can use Resend's sandbox domain, but emails will only be sent to verified addresses.
 
-### 3. Add API Key to Supabase
+### 3. Add API Key in Your Application
 
-1. Go to your Supabase Dashboard
-2. Navigate to **Edge Functions**
-3. Find the **send-email** function
-4. Click on **Settings** or **Environment Variables**
-5. Add a new secret:
-   - Name: `RESEND_API_KEY`
-   - Value: Your Resend API key from step 1
+1. Log in to your application
+2. Navigate to **Settings → Integrations**
+3. Scroll to the **Resend Email Integration** section
+4. Paste your Resend API key from step 1
+5. Click **Save Resend Credentials**
 
-### 4. Update the Default "From" Address
+Your API key is encrypted and stored securely in the database. You only need to enter it once.
 
-In the edge function, update line 64 to use your verified domain:
+### 4. Update the Default "From" Address (Optional)
 
-```typescript
-from: data?.from || 'noreply@yourdomain.com',
-```
+If you want to customize the default sender email address:
 
-Replace `yourdomain.com` with your actual verified domain.
+1. Go to your project files
+2. Open `supabase/functions/send-email/index.ts`
+3. Find line ~115 and update:
+   ```typescript
+   from: data?.from || 'noreply@yourdomain.com',
+   ```
+4. Replace `yourdomain.com` with your actual verified domain
+
+You can also specify the `from` address when calling the email service (see examples below).
 
 ## Available Email Templates
 
@@ -276,10 +280,11 @@ All templates use inline styles and are responsive. The base styling includes:
 
 ### Email not sending?
 
-1. Check that `RESEND_API_KEY` is set in Supabase Edge Functions
+1. Check that you've added your Resend API key in **Settings → Integrations**
 2. Verify your domain in Resend dashboard
 3. Check browser console for error messages
 4. Verify the "from" address uses your verified domain
+5. Make sure you're logged in (the email service requires authentication)
 
 ### Emails going to spam?
 
