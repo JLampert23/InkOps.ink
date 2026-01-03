@@ -94,8 +94,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { decrypted } = await decryptResponse.json();
-    const accessToken = decrypted;
+    const { result } = await decryptResponse.json();
+    const accessToken = result;
 
     const requestData: SquareRequest = await req.json();
     const { endpoint, method = 'GET', body, params } = requestData;
