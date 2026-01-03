@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, Edit, Key } from 'lucide-react';
+import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, Edit, Key, Clock } from 'lucide-react';
 import { supabase } from '../lib/supabase-client';
 import { useAuth } from '../contexts/AuthContext';
+import AutomatedReports from './automation/AutomatedReports';
 
 interface CompanySettings {
   id: string;
@@ -24,7 +25,7 @@ interface UserProfile {
 
 export function AccountSettings() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'company' | 'integration' | 'users' | 'statuses'>('company');
+  const [activeTab, setActiveTab] = useState<'company' | 'integration' | 'users' | 'statuses' | 'automation'>('company');
   const [loading, setLoading] = useState(true);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -875,6 +876,19 @@ export function AccountSettings() {
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4" />
                 Status Filters
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('automation')}
+              className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'automation'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4" />
+                Automated Reports
               </div>
             </button>
           </nav>
@@ -1730,6 +1744,10 @@ export function AccountSettings() {
                 </>
               )}
             </div>
+          )}
+
+          {activeTab === 'automation' && (
+            <AutomatedReports />
           )}
         </div>
       </div>
