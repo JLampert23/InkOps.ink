@@ -120,7 +120,7 @@ function AppContent() {
   const squareNavItems = [
     {
       id: 'square' as Tab,
-      name: 'Square Data',
+      name: 'Square Dashboard',
       icon: CreditCard,
       description: 'Square transactions & reports'
     },
