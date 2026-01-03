@@ -1,4 +1,5 @@
 import { SendEmailRequest, SendEmailResponse } from '../types/email';
+import { supabase } from '../lib/supabase-client';
 
 export class EmailService {
   private static getApiUrl(): string {
@@ -9,23 +10,24 @@ export class EmailService {
     return `${supabaseUrl}/functions/v1/send-email`;
   }
 
-  private static getHeaders(): HeadersInit {
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    if (!anonKey) {
-      throw new Error('VITE_SUPABASE_ANON_KEY environment variable is not set');
+  private static async getHeaders(): Promise<HeadersInit> {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      throw new Error('User not authenticated');
     }
 
     return {
-      'Authorization': `Bearer ${anonKey}`,
+      'Authorization': `Bearer ${session.access_token}`,
       'Content-Type': 'application/json',
     };
   }
 
   static async sendEmail(request: SendEmailRequest): Promise<SendEmailResponse> {
     try {
+      const headers = await this.getHeaders();
       const response = await fetch(this.getApiUrl(), {
         method: 'POST',
-        headers: this.getHeaders(),
+        headers,
         body: JSON.stringify(request),
       });
 
