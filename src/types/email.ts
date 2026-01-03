@@ -62,12 +62,19 @@ export type EmailTemplateData =
   | WelcomeEmailData
   | CustomEmailData;
 
+export interface EmailAttachment {
+  filename: string;
+  content: string;
+  type?: string;
+}
+
 export interface SendEmailRequest {
   to: string | string[];
   subject: string;
   template: EmailTemplate;
   data?: EmailTemplateData;
   html?: string;
+  attachments?: EmailAttachment[];
 }
 
 export interface SendEmailResponse {

@@ -7,12 +7,19 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+interface EmailAttachment {
+  filename: string;
+  content: string;
+  type?: string;
+}
+
 interface EmailRequest {
   to: string | string[];
   subject: string;
   template: 'invoice-reminder' | 'payment-received' | 'overdue-notice' | 'welcome' | 'custom';
   data?: Record<string, any>;
   html?: string;
+  attachments?: EmailAttachment[];
 }
 
 interface ResendResponse {
@@ -90,7 +97,7 @@ Deno.serve(async (req: Request) => {
     const { result: RESEND_API_KEY } = await cryptoResponse.json();
 
     const emailRequest: EmailRequest = await req.json();
-    const { to, subject, template, data, html: customHtml } = emailRequest;
+    const { to, subject, template, data, html: customHtml, attachments } = emailRequest;
 
     if (!to || !subject) {
       return new Response(
@@ -103,12 +110,26 @@ Deno.serve(async (req: Request) => {
     }
 
     let html = customHtml;
-    
+
     if (!customHtml && template !== 'custom') {
       html = generateEmailTemplate(template, data || {});
     }
 
     const toArray = Array.isArray(to) ? to : [to];
+
+    const emailPayload: any = {
+      from: data?.from || 'onboarding@resend.dev',
+      to: toArray,
+      subject: subject,
+      html: html,
+    };
+
+    if (attachments && attachments.length > 0) {
+      emailPayload.attachments = attachments.map(att => ({
+        filename: att.filename,
+        content: att.content,
+      }));
+    }
 
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -116,12 +137,7 @@ Deno.serve(async (req: Request) => {
         'Authorization': `Bearer ${RESEND_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        from: data?.from || 'onboarding@resend.dev',
-        to: toArray,
-        subject: subject,
-        html: html,
-      }),
+      body: JSON.stringify(emailPayload),
     });
 
     if (!response.ok) {

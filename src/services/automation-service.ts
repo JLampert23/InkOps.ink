@@ -145,12 +145,12 @@ export class AutomationService {
 
     const reportData = await this.fetchReportData(rule.report_type);
 
-    const attachments: Array<{ filename: string; content: string; type: string }> = [];
+    const attachments: Array<{ filename: string; content: string; type?: string }> = [];
 
     if (rule.file_formats.includes('pdf')) {
       const pdfContent = await this.generatePDF(rule.report_type, reportData);
       attachments.push({
-        filename: `${rule.report_name}-${new Date().toISOString().split('T')[0]}.pdf`,
+        filename: `${rule.report_name.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`,
         content: pdfContent,
         type: 'application/pdf',
       });
@@ -159,13 +159,13 @@ export class AutomationService {
     if (rule.file_formats.includes('csv')) {
       const csvContent = await this.generateCSV(rule.report_type, reportData);
       attachments.push({
-        filename: `${rule.report_name}-${new Date().toISOString().split('T')[0]}.csv`,
+        filename: `${rule.report_name.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.csv`,
         content: csvContent,
         type: 'text/csv',
       });
     }
 
-    await this.sendEmail(rule.email_recipients, rule.report_name, attachments);
+    await this.sendEmail(rule.email_recipients, rule.report_name, attachments, reportData);
 
     await supabase
       .from('automated_reports')
@@ -177,27 +177,161 @@ export class AutomationService {
   }
 
   private static async fetchReportData(reportType: string): Promise<any> {
-    console.log(`[Placeholder] Fetching data for report type: ${reportType}`);
-    return {};
+    const { data: invoices, error } = await supabase
+      .from('calculated_invoices')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw new Error(`Failed to fetch invoice data: ${error.message}`);
+    }
+
+    return { invoices: invoices || [] };
   }
 
   private static async generatePDF(reportType: string, data: any): Promise<string> {
-    console.log(`[Placeholder] Generating PDF for report type: ${reportType}`, data);
-    return 'base64-encoded-pdf-content';
+    const jsPDF = (await import('jspdf')).default;
+    const autoTable = (await import('jspdf-autotable')).default;
+
+    const doc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4',
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let yPosition = 20;
+
+    doc.setFillColor(59, 130, 246);
+    doc.rect(0, 0, pageWidth, 12, 'F');
+
+    doc.setFontSize(18);
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${reportType} Report`, 14, 9);
+
+    yPosition = 25;
+
+    if (data.invoices && data.invoices.length > 0) {
+      const tableData = data.invoices.slice(0, 50).map((inv: any) => [
+        inv.visual_id || '',
+        inv.customer_name || '',
+        inv.formatted_status || '',
+        `$${parseFloat(inv.total || 0).toFixed(2)}`,
+        `$${parseFloat(inv.amount_outstanding || 0).toFixed(2)}`,
+        new Date(inv.created_at).toLocaleDateString(),
+      ]);
+
+      autoTable(doc, {
+        startY: yPosition,
+        head: [['Invoice', 'Customer', 'Status', 'Total', 'Outstanding', 'Date']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: {
+          fillColor: [37, 99, 235],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+        },
+        styles: {
+          fontSize: 9,
+          cellPadding: 3,
+        },
+      });
+    }
+
+    return btoa(doc.output('datauristring').split(',')[1]);
   }
 
   private static async generateCSV(reportType: string, data: any): Promise<string> {
-    console.log(`[Placeholder] Generating CSV for report type: ${reportType}`, data);
-    return 'csv-content';
+    if (!data.invoices || data.invoices.length === 0) {
+      return btoa('No data available');
+    }
+
+    const headers = ['Invoice', 'Customer', 'Status', 'Total', 'Outstanding', 'Date'];
+    const rows = data.invoices.map((inv: any) => [
+      inv.visual_id || '',
+      inv.customer_name || '',
+      inv.formatted_status || '',
+      parseFloat(inv.total || 0).toFixed(2),
+      parseFloat(inv.amount_outstanding || 0).toFixed(2),
+      new Date(inv.created_at).toLocaleDateString(),
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map((row: any[]) =>
+        row.map(cell => {
+          const str = String(cell);
+          return str.includes(',') ? `"${str}"` : str;
+        }).join(',')
+      ),
+    ].join('\n');
+
+    return btoa(csvContent);
   }
 
   private static async sendEmail(
     recipients: string[],
     reportName: string,
-    attachments: Array<{ filename: string; content: string; type: string }>
+    attachments: Array<{ filename: string; content: string; type?: string }>,
+    reportData: any
   ): Promise<void> {
-    console.log(`[Placeholder] Sending email to: ${recipients.join(', ')}`);
-    console.log(`[Placeholder] Report name: ${reportName}`);
-    console.log(`[Placeholder] Attachments: ${attachments.map(a => a.filename).join(', ')}`);
+    const { EmailService } = await import('./email-service');
+
+    const totalInvoices = reportData.invoices?.length || 0;
+    const totalOutstanding = reportData.invoices?.reduce(
+      (sum: number, inv: any) => sum + parseFloat(inv.amount_outstanding || 0),
+      0
+    );
+
+    const html = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="margin: 0;">${reportName}</h1>
+          <p style="margin: 10px 0 0 0; opacity: 0.9;">Generated on ${new Date().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+          })}</p>
+        </div>
+        <div style="background: white; padding: 30px; border: 1px solid #e5e7eb; border-top: none;">
+          <h2 style="color: #1f2937; margin-top: 0;">Summary</h2>
+          <div style="background: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+              <span style="color: #6b7280;">Total Invoices:</span>
+              <strong style="color: #1f2937;">${totalInvoices}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: #6b7280;">Total Outstanding:</span>
+              <strong style="color: #ef4444; font-size: 18px;">$${totalOutstanding.toFixed(2)}</strong>
+            </div>
+          </div>
+          <p style="color: #4b5563; margin-bottom: 20px;">
+            This automated report has been generated and attached in the requested format(s). Please review the attached files for detailed information.
+          </p>
+          <div style="background: #eff6ff; border-left: 4px solid #3b82f6; padding: 16px; margin: 20px 0;">
+            <strong style="color: #1e40af;">Attachments:</strong>
+            <ul style="margin: 10px 0 0 0; padding-left: 20px; color: #1e40af;">
+              ${attachments.map(att => `<li>${att.filename}</li>`).join('')}
+            </ul>
+          </div>
+        </div>
+        <div style="background: #f9fafb; padding: 20px; text-align: center; color: #6b7280; font-size: 14px; border-radius: 0 0 10px 10px;">
+          <p style="margin: 0;">This is an automated report. Please do not reply to this email.</p>
+        </div>
+      </div>
+    `;
+
+    const response = await EmailService.sendEmail({
+      to: recipients,
+      subject: `${reportName} - ${new Date().toLocaleDateString()}`,
+      template: 'custom',
+      html,
+      attachments,
+    });
+
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to send email');
+    }
   }
 }
