@@ -178,7 +178,7 @@ export class AutomationService {
 
   private static async fetchReportData(reportType: string): Promise<any> {
     const { data: invoices, error } = await supabase
-      .from('calculated_invoices')
+      .from('printavo_invoices_calculated')
       .select('*')
       .order('created_at', { ascending: false });
 
@@ -214,12 +214,12 @@ export class AutomationService {
 
     if (data.invoices && data.invoices.length > 0) {
       const tableData = data.invoices.slice(0, 50).map((inv: any) => [
-        inv.visual_id || '',
+        inv.invoice_number || '',
         inv.customer_name || '',
-        inv.formatted_status || '',
+        inv.status || '',
         `$${parseFloat(inv.total || 0).toFixed(2)}`,
         `$${parseFloat(inv.amount_outstanding || 0).toFixed(2)}`,
-        new Date(inv.created_at).toLocaleDateString(),
+        inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString() : '',
       ]);
 
       autoTable(doc, {
@@ -249,12 +249,12 @@ export class AutomationService {
 
     const headers = ['Invoice', 'Customer', 'Status', 'Total', 'Outstanding', 'Date'];
     const rows = data.invoices.map((inv: any) => [
-      inv.visual_id || '',
+      inv.invoice_number || '',
       inv.customer_name || '',
-      inv.formatted_status || '',
+      inv.status || '',
       parseFloat(inv.total || 0).toFixed(2),
       parseFloat(inv.amount_outstanding || 0).toFixed(2),
-      new Date(inv.created_at).toLocaleDateString(),
+      inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString() : '',
     ]);
 
     const csvContent = [
