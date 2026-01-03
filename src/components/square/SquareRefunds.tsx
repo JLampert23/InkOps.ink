@@ -1,20 +1,47 @@
 import { useState } from 'react';
-import { Download, Loader2 } from 'lucide-react';
+import { Download, Loader2, AlertCircle } from 'lucide-react';
 import { exportToCSV, exportToPDF, formatCurrency, formatDateTime, type SquareExportOptions } from '../../utils/square-export';
+import { SquareApiService } from '../../services/square-api-service';
 import SquareFilterBar from './SquareFilterBar';
 
 export default function SquareRefunds() {
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [refunds, setRefunds] = useState<any[]>([]);
   const [showExportMenu, setShowExportMenu] = useState(false);
 
   const fetchRefunds = async () => {
     setLoading(true);
+    setError(null);
     try {
-      // PLACEHOLDER: Square API call
-      alert('Fetch Refunds - Connect to Square API here');
-      setRefunds([]);
+      const params: any = {};
+
+      if (dateRange.start) {
+        params.begin_time = new Date(dateRange.start).toISOString();
+      }
+      if (dateRange.end) {
+        const endDate = new Date(dateRange.end);
+        endDate.setHours(23, 59, 59, 999);
+        params.end_time = endDate.toISOString();
+      }
+
+      const data = await SquareApiService.listRefunds(params);
+
+      if (data.refunds) {
+        setRefunds(data.refunds.map((refund: any) => ({
+          id: refund.id,
+          created_at: refund.created_at,
+          amount: refund.amount_money ? refund.amount_money.amount / 100 : 0,
+          status: refund.status,
+          payment_id: refund.payment_id || 'N/A',
+          reason: refund.reason || 'N/A',
+        })));
+      } else {
+        setRefunds([]);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch refunds');
     } finally {
       setLoading(false);
     }
@@ -29,9 +56,14 @@ export default function SquareRefunds() {
         { header: 'Refund ID', key: 'id' },
         { header: 'Amount', key: 'amount', format: formatCurrency },
         { header: 'Status', key: 'status' },
+        { header: 'Reason', key: 'reason' },
       ],
       data: refunds,
       dateRange: dateRange.start && dateRange.end ? `${dateRange.start} to ${dateRange.end}` : undefined,
+      summary: [
+        { label: 'Total Refunds', value: String(refunds.length) },
+        { label: 'Total Amount', value: formatCurrency(refunds.reduce((sum, r) => sum + (r.amount || 0), 0)) },
+      ],
     };
     if (format === 'csv') exportToCSV(options);
     else exportToPDF(options);
@@ -55,11 +87,20 @@ export default function SquareRefunds() {
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Refunds</h2>
         <div className="flex gap-3">
-          <button onClick={fetchRefunds} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Fetch Data'}
+          <button
+            onClick={fetchRefunds}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+          >
+            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+            {loading ? 'Fetching...' : 'Fetch Data'}
           </button>
           <div className="relative">
-            <button onClick={() => setShowExportMenu(!showExportMenu)} disabled={refunds.length === 0} className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50">
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              disabled={refunds.length === 0}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
+            >
               <Download className="w-4 h-4" />
               Export
             </button>
@@ -72,9 +113,45 @@ export default function SquareRefunds() {
           </div>
         </div>
       </div>
-      {refunds.length === 0 && !loading && (
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="font-semibold text-red-900">Error</h3>
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {refunds.length > 0 ? (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date/Time</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Refund ID</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {refunds.map((refund, index) => (
+                <tr key={index} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 text-sm text-gray-900">{formatDateTime(refund.created_at)}</td>
+                  <td className="px-6 py-4 text-sm font-mono text-gray-600 text-xs">{refund.id}</td>
+                  <td className="px-6 py-4 text-sm text-right font-semibold text-red-600">{formatCurrency(refund.amount)}</td>
+                  <td className="px-6 py-4 text-sm text-gray-900">{refund.status}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{refund.reason}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : !loading && (
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
-          <p className="text-gray-600">No refunds to display. Click "Fetch Data" to load from Square.</p>
+          <p className="text-gray-600">No refunds to display. Click "Fetch Data" to load refunds from Square.</p>
         </div>
       )}
     </div>

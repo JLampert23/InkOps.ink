@@ -1,19 +1,36 @@
 import { useState } from 'react';
-import { Download, Loader2 } from 'lucide-react';
+import { Download, Loader2, AlertCircle } from 'lucide-react';
 import { exportToCSV, exportToPDF, type SquareExportOptions } from '../../utils/square-export';
+import { SquareApiService } from '../../services/square-api-service';
 import SquareFilterBar from './SquareFilterBar';
 
 export default function SquareEmployees() {
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [employees, setEmployees] = useState<any[]>([]);
   const [showExportMenu, setShowExportMenu] = useState(false);
 
   const fetchEmployees = async () => {
     setLoading(true);
+    setError(null);
     try {
-      // PLACEHOLDER: Square API call
-      alert('Fetch Employees - Connect to Square API here');
-      setEmployees([]);
+      const data = await SquareApiService.listTeamMembers();
+
+      if (data.team_members) {
+        setEmployees(data.team_members.map((member: any) => ({
+          id: member.id,
+          name: `${member.given_name || ''} ${member.family_name || ''}`.trim() || 'N/A',
+          email: member.email_address || 'N/A',
+          phone: member.phone_number || 'N/A',
+          status: member.status || 'N/A',
+          created_at: member.created_at,
+        })));
+      } else {
+        setEmployees([]);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch team members');
     } finally {
       setLoading(false);
     }
@@ -26,37 +43,56 @@ export default function SquareEmployees() {
       columns: [
         { header: 'Name', key: 'name' },
         { header: 'Email', key: 'email' },
-        { header: 'Role', key: 'role' },
+        { header: 'Phone', key: 'phone' },
         { header: 'Status', key: 'status' },
       ],
       data: employees,
+      summary: [
+        { label: 'Total Team Members', value: String(employees.length) },
+      ],
     };
     if (format === 'csv') exportToCSV(options);
     else exportToPDF(options);
     setShowExportMenu(false);
   };
 
+  const filteredEmployees = employees.filter(emp =>
+    searchTerm === '' ||
+    emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    emp.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    emp.phone.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="space-y-6">
       <SquareFilterBar
-        searchPlaceholder="Search employees by name, email, or role..."
+        searchPlaceholder="Search employees by name, email, or phone..."
         sortOptions={[
           { label: 'Sort by Name', value: 'name' },
-          { label: 'Sort by Role', value: 'role' },
           { label: 'Sort by Status', value: 'status' }
         ]}
+        onSearchChange={(value) => setSearchTerm(value)}
         showDateRange={false}
         showSort={true}
       />
 
       <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Employees</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Team Members</h2>
         <div className="flex gap-3">
-          <button onClick={fetchEmployees} disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50">
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Fetch Data'}
+          <button
+            onClick={fetchEmployees}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+          >
+            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+            {loading ? 'Fetching...' : 'Fetch Data'}
           </button>
           <div className="relative">
-            <button onClick={() => setShowExportMenu(!showExportMenu)} disabled={employees.length === 0} className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50">
+            <button
+              onClick={() => setShowExportMenu(!showExportMenu)}
+              disabled={employees.length === 0}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
+            >
               <Download className="w-4 h-4" />
               Export
             </button>
@@ -69,9 +105,47 @@ export default function SquareEmployees() {
           </div>
         </div>
       </div>
-      {employees.length === 0 && !loading && (
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="font-semibold text-red-900">Error</h3>
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {filteredEmployees.length > 0 ? (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredEmployees.map((employee, index) => (
+                <tr key={index} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 text-sm text-gray-900">{employee.name}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{employee.email}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{employee.phone}</td>
+                  <td className="px-6 py-4 text-sm text-gray-900">{employee.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : !loading && (
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
-          <p className="text-gray-600">No employees to display. Click "Fetch Data" to load from Square.</p>
+          <p className="text-gray-600">
+            {employees.length === 0
+              ? 'No team members to display. Click "Fetch Data" to load from Square.'
+              : 'No team members match your search criteria.'}
+          </p>
         </div>
       )}
     </div>

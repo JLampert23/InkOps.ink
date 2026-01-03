@@ -1,20 +1,41 @@
 import { useState } from 'react';
-import { Download, Loader2 } from 'lucide-react';
+import { Download, Loader2, AlertCircle } from 'lucide-react';
 import { exportToCSV, exportToPDF, formatCurrency, type SquareExportOptions } from '../../utils/square-export';
+import { SquareApiService } from '../../services/square-api-service';
 import SquareFilterBar from './SquareFilterBar';
 
 export default function SquareItems() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<any[]>([]);
   const [showExportMenu, setShowExportMenu] = useState(false);
 
   const fetchItems = async () => {
     setLoading(true);
+    setError(null);
     try {
-      // PLACEHOLDER: Square API call
-      alert('Fetch Items/Products - Connect to Square API here');
-      setItems([]);
+      const data = await SquareApiService.listCatalogItems();
+
+      if (data.objects) {
+        setItems(data.objects.map((item: any) => {
+          const itemData = item.item_data;
+          const variation = itemData?.variations?.[0];
+          const price = variation?.item_variation_data?.price_money?.amount;
+
+          return {
+            id: item.id,
+            name: itemData?.name || 'N/A',
+            sku: variation?.item_variation_data?.sku || 'N/A',
+            price: price ? price / 100 : 0,
+            category: itemData?.category_id || 'N/A',
+          };
+        }));
+      } else {
+        setItems([]);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch items');
     } finally {
       setLoading(false);
     }
@@ -31,11 +52,20 @@ export default function SquareItems() {
         { header: 'Category', key: 'category' },
       ],
       data: items,
+      summary: [
+        { label: 'Total Items', value: String(items.length) },
+      ],
     };
     if (format === 'csv') exportToCSV(options);
     else exportToPDF(options);
     setShowExportMenu(false);
   };
+
+  const filteredItems = items.filter(item =>
+    searchTerm === '' ||
+    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.sku.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
@@ -60,7 +90,7 @@ export default function SquareItems() {
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
           >
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-            Fetch Data
+            {loading ? 'Fetching...' : 'Fetch Data'}
           </button>
           <div className="relative">
             <button
@@ -80,9 +110,47 @@ export default function SquareItems() {
           </div>
         </div>
       </div>
-      {items.length === 0 && !loading && (
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="font-semibold text-red-900">Error</h3>
+            <p className="text-sm text-red-800">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {filteredItems.length > 0 ? (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Price</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item ID</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredItems.map((item, index) => (
+                <tr key={index} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 text-sm text-gray-900">{item.name}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{item.sku}</td>
+                  <td className="px-6 py-4 text-sm text-right font-semibold text-gray-900">{formatCurrency(item.price)}</td>
+                  <td className="px-6 py-4 text-sm font-mono text-gray-600 text-xs">{item.id}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : !loading && (
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
-          <p className="text-gray-600">No items to display. Click "Fetch Data" to load from Square.</p>
+          <p className="text-gray-600">
+            {items.length === 0
+              ? 'No items to display. Click "Fetch Data" to load from Square.'
+              : 'No items match your search criteria.'}
+          </p>
         </div>
       )}
     </div>

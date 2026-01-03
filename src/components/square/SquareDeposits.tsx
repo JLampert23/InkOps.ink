@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Download, Loader2, AlertCircle } from 'lucide-react';
 import { exportToCSV, exportToPDF, formatCurrency, formatDate, type SquareExportOptions } from '../../utils/square-export';
+import { SquareApiService } from '../../services/square-api-service';
 import SquareFilterBar from './SquareFilterBar';
 
 export default function SquareDeposits() {
@@ -14,9 +15,31 @@ export default function SquareDeposits() {
     setLoading(true);
     setError(null);
     try {
-      // PLACEHOLDER: Replace with actual Square API call
-      alert('Fetch Deposits - Connect to Square API here');
-      setDeposits([]);
+      const params: any = {};
+
+      if (dateRange.start) {
+        params.begin_time = new Date(dateRange.start).toISOString();
+      }
+      if (dateRange.end) {
+        const endDate = new Date(dateRange.end);
+        endDate.setHours(23, 59, 59, 999);
+        params.end_time = endDate.toISOString();
+      }
+
+      const data = await SquareApiService.listPayouts(params);
+
+      if (data.payouts) {
+        setDeposits(data.payouts.map((payout: any) => ({
+          id: payout.id,
+          date: payout.payout_at || payout.created_at,
+          amount: payout.amount_money ? payout.amount_money.amount / 100 : 0,
+          status: payout.status,
+          type: payout.type || 'PAYOUT',
+          destination: payout.destination?.type || 'N/A',
+        })));
+      } else {
+        setDeposits([]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch deposits');
     } finally {
@@ -38,6 +61,10 @@ export default function SquareDeposits() {
       ],
       data: deposits,
       dateRange: dateRange.start && dateRange.end ? `${dateRange.start} to ${dateRange.end}` : undefined,
+      summary: [
+        { label: 'Total Deposits', value: String(deposits.length) },
+        { label: 'Total Amount', value: formatCurrency(deposits.reduce((sum, d) => sum + (d.amount || 0), 0)) },
+      ],
     };
 
     if (format === 'csv') exportToCSV(options);
@@ -68,7 +95,8 @@ export default function SquareDeposits() {
             disabled={loading}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Fetch Data'}
+            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+            {loading ? 'Fetching...' : 'Fetch Data'}
           </button>
 
           <div className="relative">
@@ -101,7 +129,32 @@ export default function SquareDeposits() {
         </div>
       )}
 
-      {deposits.length === 0 && !loading && (
+      {deposits.length > 0 ? (
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Deposit ID</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {deposits.map((deposit, index) => (
+                <tr key={index} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 text-sm text-gray-900">{formatDate(deposit.date)}</td>
+                  <td className="px-6 py-4 text-sm font-mono text-gray-600 text-xs">{deposit.id}</td>
+                  <td className="px-6 py-4 text-sm text-right font-semibold text-gray-900">{formatCurrency(deposit.amount)}</td>
+                  <td className="px-6 py-4 text-sm text-gray-900">{deposit.status}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{deposit.type}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : !loading && (
         <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
           <p className="text-gray-600">No deposits to display. Click "Fetch Data" to load from Square.</p>
         </div>
