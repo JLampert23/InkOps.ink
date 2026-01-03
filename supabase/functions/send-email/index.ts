@@ -62,11 +62,11 @@ Deno.serve(async (req: Request) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': authHeader,
+        'Authorization': `Bearer ${supabaseServiceKey}`,
       },
       body: JSON.stringify({
         action: 'decrypt',
-        encrypted: settings.resend_api_key,
+        token: settings.resend_api_key,
       }),
     });
 
