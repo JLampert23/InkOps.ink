@@ -189,6 +189,15 @@ export class AutomationService {
     return { invoices: invoices || [] };
   }
 
+  private static utf8ToBase64(str: string): string {
+    const utf8Bytes = new TextEncoder().encode(str);
+    let binary = '';
+    utf8Bytes.forEach((byte) => {
+      binary += String.fromCharCode(byte);
+    });
+    return btoa(binary);
+  }
+
   private static async generatePDF(reportType: string, data: any): Promise<string> {
     const jsPDF = (await import('jspdf')).default;
     const autoTable = (await import('jspdf-autotable')).default;
@@ -239,12 +248,18 @@ export class AutomationService {
       });
     }
 
-    return btoa(doc.output('datauristring').split(',')[1]);
+    const pdfOutput = doc.output('arraybuffer');
+    const uint8Array = new Uint8Array(pdfOutput);
+    let binary = '';
+    uint8Array.forEach((byte) => {
+      binary += String.fromCharCode(byte);
+    });
+    return btoa(binary);
   }
 
   private static async generateCSV(reportType: string, data: any): Promise<string> {
     if (!data.invoices || data.invoices.length === 0) {
-      return btoa('No data available');
+      return this.utf8ToBase64('No data available');
     }
 
     const headers = ['Invoice', 'Customer', 'Status', 'Total', 'Outstanding', 'Date'];
@@ -267,7 +282,7 @@ export class AutomationService {
       ),
     ].join('\n');
 
-    return btoa(csvContent);
+    return this.utf8ToBase64(csvContent);
   }
 
   private static async sendEmail(
