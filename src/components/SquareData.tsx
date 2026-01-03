@@ -55,39 +55,11 @@ export default function SquareData() {
       color: 'purple'
     },
     {
-      id: 'items',
-      name: 'Items / Products',
-      icon: Package,
-      description: 'Browse your catalog of products and services',
-      color: 'orange'
-    },
-    {
-      id: 'inventory',
-      name: 'Inventory',
-      icon: Archive,
-      description: 'Monitor inventory levels and stock',
-      color: 'teal'
-    },
-    {
       id: 'refunds',
       name: 'Refunds',
       icon: RefreshCw,
       description: 'View refund and return transactions',
       color: 'red'
-    },
-    {
-      id: 'locations',
-      name: 'Locations',
-      icon: MapPin,
-      description: 'Manage your business locations',
-      color: 'indigo'
-    },
-    {
-      id: 'employees',
-      name: 'Employees',
-      icon: UserCheck,
-      description: 'View employee and team member data',
-      color: 'pink'
     },
   ];
 
@@ -197,7 +169,7 @@ export default function SquareData() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Square Data Dashboard</h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Square Dashboard</h1>
         <p className="text-gray-600">Select a category to view and analyze your Square data</p>
       </div>
 
