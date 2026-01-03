@@ -65,11 +65,16 @@ export class AutomationService {
       throw new Error('User not authenticated');
     }
 
+    const scheduleTime = rule.schedule_time.includes(':') && rule.schedule_time.split(':').length === 2
+      ? `${rule.schedule_time}:00`
+      : rule.schedule_time;
+
     const { data, error } = await supabase
       .from('automated_reports')
       .insert({
         user_id: user.user.id,
         ...rule,
+        schedule_time: scheduleTime,
       })
       .select()
       .single();
@@ -82,12 +87,20 @@ export class AutomationService {
   }
 
   static async updateAutomationRule(id: string, updates: Partial<CreateAutomationRuleInput>): Promise<AutomationRule> {
+    const updateData: any = {
+      ...updates,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (updates.schedule_time) {
+      updateData.schedule_time = updates.schedule_time.includes(':') && updates.schedule_time.split(':').length === 2
+        ? `${updates.schedule_time}:00`
+        : updates.schedule_time;
+    }
+
     const { data, error } = await supabase
       .from('automated_reports')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();
