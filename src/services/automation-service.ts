@@ -139,8 +139,8 @@ export class AutomationService {
 
   static async generateAndSendReport(ruleId: string): Promise<void> {
     const rule = await this.getAutomationRule(ruleId);
-    if (!rule || !rule.is_enabled) {
-      throw new Error('Automation rule not found or disabled');
+    if (!rule) {
+      throw new Error('Automation rule not found');
     }
 
     const reportData = await this.fetchReportData(rule.report_type);

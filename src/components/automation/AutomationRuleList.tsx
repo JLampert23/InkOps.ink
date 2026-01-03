@@ -1,15 +1,27 @@
-import { Edit2, Trash2, Clock, Mail, FileText, Calendar, Power } from 'lucide-react';
+import { Edit2, Trash2, Clock, Mail, FileText, Calendar, Power, Send } from 'lucide-react';
 import { AutomationRule } from '../../services/automation-service';
 import { format } from 'date-fns';
+import { useState } from 'react';
 
 interface AutomationRuleListProps {
   rules: AutomationRule[];
   onEdit: (ruleId: string) => void;
   onDelete: (ruleId: string) => void;
   onToggle: (ruleId: string, enabled: boolean) => void;
+  onTest: (ruleId: string) => Promise<void>;
 }
 
-export default function AutomationRuleList({ rules, onEdit, onDelete, onToggle }: AutomationRuleListProps) {
+export default function AutomationRuleList({ rules, onEdit, onDelete, onToggle, onTest }: AutomationRuleListProps) {
+  const [testingRuleId, setTestingRuleId] = useState<string | null>(null);
+
+  const handleTest = async (ruleId: string) => {
+    setTestingRuleId(ruleId);
+    try {
+      await onTest(ruleId);
+    } finally {
+      setTestingRuleId(null);
+    }
+  };
   const getScheduleDescription = (rule: AutomationRule) => {
     const time = rule.schedule_time.substring(0, 5);
     const tz = rule.schedule_timezone.split('/')[1].replace('_', ' ');
@@ -76,6 +88,18 @@ export default function AutomationRuleList({ rules, onEdit, onDelete, onToggle }
                 <p className="text-sm text-gray-600">{rule.report_type}</p>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleTest(rule.id)}
+                  disabled={testingRuleId === rule.id}
+                  className="p-2 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Test automation now"
+                >
+                  {testingRuleId === rule.id ? (
+                    <div className="w-4 h-4 border-2 border-orange-600 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                </button>
                 <button
                   onClick={() => onToggle(rule.id, !rule.is_enabled)}
                   className={`p-2 rounded-lg transition-colors ${

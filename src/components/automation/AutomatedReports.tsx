@@ -11,6 +11,7 @@ export default function AutomatedReports() {
   const [showEditor, setShowEditor] = useState(false);
   const [editingRuleId, setEditingRuleId] = useState<string | undefined>(undefined);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     loadRules();
@@ -63,6 +64,19 @@ export default function AutomatedReports() {
     }
   };
 
+  const handleTest = async (ruleId: string) => {
+    try {
+      setError(null);
+      setSuccessMessage(null);
+      await AutomationService.generateAndSendReport(ruleId);
+      setSuccessMessage('Test report sent successfully! Check your email inbox.');
+      await loadRules();
+      setTimeout(() => setSuccessMessage(null), 5000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send test report');
+    }
+  };
+
   const handleCloseEditor = () => {
     setShowEditor(false);
     setEditingRuleId(undefined);
@@ -97,6 +111,16 @@ export default function AutomatedReports() {
           <div className="flex-1">
             <h3 className="font-semibold text-red-900">Error</h3>
             <p className="text-sm text-red-800">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
+          <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="font-semibold text-green-900">Success</h3>
+            <p className="text-sm text-green-800">{successMessage}</p>
           </div>
         </div>
       )}
@@ -139,6 +163,7 @@ export default function AutomatedReports() {
             onEdit={handleEdit}
             onDelete={handleDelete}
             onToggle={handleToggle}
+            onTest={handleTest}
           />
         )}
       </div>
