@@ -316,7 +316,12 @@ function AppContent() {
               </p>
             </div>
             <div className="flex items-center gap-4">
-              {activeTab !== 'square' && activeTab !== 'settings' && (
+              {activeTab === 'square' ? (
+                <div className="text-sm text-gray-600 flex items-center gap-2 bg-green-50 px-4 py-2 rounded-lg border border-green-200">
+                  <div className="w-2 h-2 bg-green-500 rounded-full" />
+                  <span>Square data is fetched in real-time. Use "Fetch Data" buttons in each module.</span>
+                </div>
+              ) : activeTab !== 'settings' && (
                 <>
                   {lastSyncTime && (
                     <div className="text-sm text-gray-600 flex items-center gap-2">
@@ -337,7 +342,7 @@ function AppContent() {
                     ) : (
                       <>
                         <Download className="w-4 h-4" />
-                        <span>Sync Data</span>
+                        <span>Sync Printavo</span>
                       </>
                     )}
                   </button>
