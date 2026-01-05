@@ -13,17 +13,21 @@ export class EmailService {
   private static async getHeaders(): Promise<HeadersInit> {
     const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
 
-    if (refreshError) {
-      console.error('Failed to refresh session:', refreshError);
-      throw new Error('Session expired - please refresh the page and log in again');
+    if (refreshError || !session?.access_token) {
+      console.error('Session refresh failed, signing out user');
+      await supabase.auth.signOut();
+      throw new Error('Your session has expired. Please log in again.');
     }
 
-    if (!session?.access_token) {
-      console.error('No session after refresh');
-      throw new Error('User not authenticated - please log in again');
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      console.error('Token validation failed, signing out user');
+      await supabase.auth.signOut();
+      throw new Error('Your session is invalid. Please log in again.');
     }
 
-    console.log('Using refreshed session token for email service');
+    console.log('Using validated session token for email service');
 
     return {
       'Authorization': `Bearer ${session.access_token}`,
