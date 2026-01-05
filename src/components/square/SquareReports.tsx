@@ -21,9 +21,82 @@ export default function SquareReports() {
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [previewData, setPreviewData] = useState<any>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const handleDateRangeChange = (start: string, end: string) => {
     setDateRange({ start, end });
+    setPreviewData(null);
+    setError(null);
+  };
+
+  const loadPreviewData = async () => {
+    if (!selectedReport) return;
+
+    setPreviewLoading(true);
+    setError(null);
+    try {
+      const params: any = {};
+      if (dateRange.start) {
+        params.begin_time = new Date(dateRange.start).toISOString();
+      }
+      if (dateRange.end) {
+        const endDate = new Date(dateRange.end);
+        endDate.setHours(23, 59, 59, 999);
+        params.end_time = endDate.toISOString();
+      }
+
+      switch (selectedReport) {
+        case 'transaction-summary':
+        case 'sales-overview': {
+          const data = await SquareApiService.listPayments(params);
+          const payments = data.payments || [];
+          setPreviewData({
+            count: payments.length,
+            total: payments.reduce((sum: number, p: any) => sum + ((p.amount_money?.amount || 0) / 100), 0),
+            type: 'payments'
+          });
+          break;
+        }
+        case 'customer-activity': {
+          const data = await SquareApiService.listCustomers();
+          const customers = data.customers || [];
+          setPreviewData({
+            count: customers.length,
+            type: 'customers'
+          });
+          break;
+        }
+        case 'deposit-summary': {
+          const data = await SquareApiService.listPayouts(params);
+          const payouts = data.payouts || [];
+          setPreviewData({
+            count: payouts.length,
+            total: payouts.reduce((sum: number, p: any) => sum + ((p.amount_money?.amount || 0) / 100), 0),
+            type: 'payouts'
+          });
+          break;
+        }
+        case 'combined': {
+          const [paymentsData, payoutsData, customersData] = await Promise.all([
+            SquareApiService.listPayments(params),
+            SquareApiService.listPayouts(params),
+            SquareApiService.listCustomers(),
+          ]);
+          setPreviewData({
+            payments: paymentsData.payments?.length || 0,
+            payouts: payoutsData.payouts?.length || 0,
+            customers: customersData.customers?.length || 0,
+            type: 'combined'
+          });
+          break;
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load preview data');
+    } finally {
+      setPreviewLoading(false);
+    }
   };
 
   const reports: ReportCard[] = [
@@ -117,6 +190,12 @@ export default function SquareReports() {
       const data = await SquareApiService.listPayments(params);
       const payments = data.payments || [];
 
+      if (payments.length === 0) {
+        setError('No payment data found for the selected date range. Please try a different date range or check your Square account.');
+        setLoading(false);
+        return;
+      }
+
       const doc = new jsPDF();
 
       doc.setFontSize(20);
@@ -197,6 +276,12 @@ export default function SquareReports() {
 
       const data = await SquareApiService.listPayments(params);
       const payments = data.payments || [];
+
+      if (payments.length === 0) {
+        setError('No payment data found for the selected date range. Please try a different date range or check your Square account.');
+        setLoading(false);
+        return;
+      }
 
       const doc = new jsPDF();
 
@@ -289,6 +374,12 @@ export default function SquareReports() {
       const data = await SquareApiService.listCustomers();
       const customers = data.customers || [];
 
+      if (customers.length === 0) {
+        setError('No customer data found in your Square account.');
+        setLoading(false);
+        return;
+      }
+
       const doc = new jsPDF();
 
       doc.setFontSize(20);
@@ -351,6 +442,12 @@ export default function SquareReports() {
 
       const data = await SquareApiService.listPayouts(params);
       const payouts = data.payouts || [];
+
+      if (payouts.length === 0) {
+        setError('No payout data found for the selected date range. Please try a different date range or check your Square account.');
+        setLoading(false);
+        return;
+      }
 
       const doc = new jsPDF();
 
@@ -610,6 +707,80 @@ export default function SquareReports() {
               <p className="text-sm text-gray-600 mb-4">
                 Please select a date range using the filters above to generate this report.
               </p>
+            )}
+
+            {canGenerate && !previewData && (
+              <button
+                onClick={loadPreviewData}
+                disabled={previewLoading}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mb-4"
+              >
+                {previewLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Loading Preview...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-4 h-4" />
+                    <span>Preview Data</span>
+                  </>
+                )}
+              </button>
+            )}
+
+            {previewData && (
+              <div className="mb-4 p-4 bg-white rounded-lg border border-gray-200">
+                <h4 className="font-semibold text-gray-900 mb-2">Data Preview</h4>
+                {previewData.type === 'payments' && (
+                  <div className="space-y-1 text-sm">
+                    <p className="text-gray-700">
+                      <span className="font-medium">Transactions:</span> {previewData.count}
+                    </p>
+                    <p className="text-gray-700">
+                      <span className="font-medium">Total Revenue:</span> ${previewData.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                )}
+                {previewData.type === 'customers' && (
+                  <div className="space-y-1 text-sm">
+                    <p className="text-gray-700">
+                      <span className="font-medium">Total Customers:</span> {previewData.count}
+                    </p>
+                  </div>
+                )}
+                {previewData.type === 'payouts' && (
+                  <div className="space-y-1 text-sm">
+                    <p className="text-gray-700">
+                      <span className="font-medium">Deposits:</span> {previewData.count}
+                    </p>
+                    <p className="text-gray-700">
+                      <span className="font-medium">Total Amount:</span> ${previewData.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                )}
+                {previewData.type === 'combined' && (
+                  <div className="space-y-1 text-sm">
+                    <p className="text-gray-700">
+                      <span className="font-medium">Transactions:</span> {previewData.payments}
+                    </p>
+                    <p className="text-gray-700">
+                      <span className="font-medium">Deposits:</span> {previewData.payouts}
+                    </p>
+                    <p className="text-gray-700">
+                      <span className="font-medium">Customers:</span> {previewData.customers}
+                    </p>
+                  </div>
+                )}
+                {((previewData.type === 'payments' && previewData.count === 0) ||
+                  (previewData.type === 'customers' && previewData.count === 0) ||
+                  (previewData.type === 'payouts' && previewData.count === 0) ||
+                  (previewData.type === 'combined' && previewData.payments === 0 && previewData.payouts === 0)) && (
+                  <p className="text-sm text-amber-600 mt-2">
+                    No data found for the selected criteria. Report will be empty.
+                  </p>
+                )}
+              </div>
             )}
 
             <button
