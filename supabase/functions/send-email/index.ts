@@ -58,8 +58,19 @@ Deno.serve(async (req: Request) => {
     });
 
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+
+    console.log('User validation result:', { user: user?.id, error: userError?.message });
+
     if (userError || !user) {
-      throw new Error('Unauthorized: Invalid or expired token');
+      const errorMsg = userError?.message || 'No user found';
+      console.error('Authentication failed:', errorMsg);
+      return new Response(
+        JSON.stringify({ code: 401, message: `Invalid JWT: ${errorMsg}` }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
