@@ -77,7 +77,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: settings, error: settingsError } = await supabase
       .from('company_settings')
-      .select('resend_api_key')
+      .select('resend_api_key, email_from_address')
       .maybeSingle();
 
     if (settingsError) {
@@ -86,6 +86,10 @@ Deno.serve(async (req: Request) => {
 
     if (!settings?.resend_api_key) {
       throw new Error('Resend API key not configured. Please add it in Settings → Integrations.');
+    }
+
+    if (!settings?.email_from_address) {
+      throw new Error('From email address not configured. Please add it in Settings → Integrations.');
     }
 
     const cryptoResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
@@ -129,7 +133,7 @@ Deno.serve(async (req: Request) => {
     const toArray = Array.isArray(to) ? to : [to];
 
     const emailPayload: any = {
-      from: data?.from || 'onboarding@resend.dev',
+      from: data?.from || settings.email_from_address,
       to: toArray,
       subject: subject,
       html: html,

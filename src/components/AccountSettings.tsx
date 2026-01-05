@@ -51,6 +51,7 @@ export function AccountSettings() {
   const [squareTestResult, setSquareTestResult] = useState<any>(null);
 
   const [resendApiKey, setResendApiKey] = useState('');
+  const [emailFromAddress, setEmailFromAddress] = useState('');
   const [savingResend, setSavingResend] = useState(false);
   const [testingResend, setTestingResend] = useState(false);
   const [resendTestResult, setResendTestResult] = useState<any>(null);
@@ -97,6 +98,7 @@ export function AccountSettings() {
         setSelectedStatuses(data.selected_invoice_statuses || []);
         setPrintavoUsername(data.printavo_username || '');
         setSquareEnvironment(data.square_environment || 'production');
+        setEmailFromAddress(data.email_from_address || '');
       }
     } catch (err) {
       console.error('Error loading settings:', err);
@@ -445,6 +447,10 @@ export function AccountSettings() {
 
       if (encryptedKey) {
         settingsData.resend_api_key = encryptedKey;
+      }
+
+      if (emailFromAddress.trim()) {
+        settingsData.email_from_address = emailFromAddress.trim();
       }
 
       if (companySettings?.id) {
@@ -1294,6 +1300,22 @@ export function AccountSettings() {
                       {companySettings?.resend_api_key
                         ? 'API key is saved and encrypted. Enter a new key to update it.'
                         : 'Get your API key from Resend Dashboard → API Keys'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      From Email Address <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      value={emailFromAddress}
+                      onChange={(e) => setEmailFromAddress(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      placeholder="invoices@yourdomain.com"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Must use an email address from your verified domain (e.g., invoices@toddssportinggoods.com)
                     </p>
                   </div>
 
