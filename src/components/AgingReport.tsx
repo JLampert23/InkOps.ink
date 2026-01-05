@@ -67,13 +67,13 @@ export function AgingReport({ invoices }: AgingReportProps) {
 
   const handleExportCSV = () => {
     const data = openInvoices.map(invoice => {
-      const daysOut = calculateDaysOutstanding(invoice.createdAt);
+      const daysOut = calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt);
       const bucket = daysOut <= 30 ? '1-30 days' : daysOut <= 60 ? '31-60 days' : daysOut <= 90 ? '61-90 days' : daysOut <= 120 ? '91-120 days' : '121+ days';
 
       return {
         customer: invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown',
         invoiceNumber: invoice.visualId || '',
-        invoiceDate: invoice.createdAt,
+        invoiceDate: invoice.invoiceAt || invoice.createdAt,
         dueDate: invoice.dueAt || '',
         total: invoice.total || 0,
         outstanding: invoice.amountOutstanding || 0,
@@ -101,13 +101,13 @@ export function AgingReport({ invoices }: AgingReportProps) {
 
   const handleExportPDF = () => {
     const data = openInvoices.map(invoice => {
-      const daysOut = calculateDaysOutstanding(invoice.createdAt);
+      const daysOut = calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt);
       const bucket = daysOut <= 30 ? '1-30 days' : daysOut <= 60 ? '31-60 days' : daysOut <= 90 ? '61-90 days' : daysOut <= 120 ? '91-120 days' : '121+ days';
 
       return {
         customer: invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown',
         invoiceNumber: invoice.visualId || '',
-        invoiceDate: invoice.createdAt,
+        invoiceDate: invoice.invoiceAt || invoice.createdAt,
         dueDate: invoice.dueAt || '',
         total: invoice.total || 0,
         outstanding: invoice.amountOutstanding || 0,
@@ -265,7 +265,7 @@ export function AgingReport({ invoices }: AgingReportProps) {
                       </thead>
                       <tbody className="divide-y divide-gray-200">
                         {bucket.invoices.map(invoice => {
-                          const daysOutstanding = calculateDaysOutstanding(invoice.createdAt);
+                          const daysOutstanding = calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt);
                           return (
                             <tr key={invoice.id} className="hover:bg-gray-100 transition-colors">
                               <td className="py-2 text-sm">
@@ -283,7 +283,7 @@ export function AgingReport({ invoices }: AgingReportProps) {
                                 {invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown'}
                               </td>
                               <td className="py-2 text-sm text-gray-600">
-                                {format(new Date(invoice.createdAt), 'MMM d, yyyy')}
+                                {format(new Date(invoice.invoiceAt || invoice.createdAt), 'MMM d, yyyy')}
                               </td>
                               <td className="py-2 text-sm text-gray-600">
                                 {invoice.dueAt ? format(new Date(invoice.dueAt), 'MMM d, yyyy') : '-'}

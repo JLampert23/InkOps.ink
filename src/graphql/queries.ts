@@ -12,6 +12,7 @@ export const GET_INVOICES = gql`
             name
           }
           createdAt
+          invoiceAt
           dueAt
           total
           subtotal

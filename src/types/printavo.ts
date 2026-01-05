@@ -69,6 +69,7 @@ export interface Invoice {
   visualId?: string;
   status: Status;
   createdAt: string;
+  invoiceAt?: string;
   dueAt?: string;
   total?: number;
   subtotal?: number;

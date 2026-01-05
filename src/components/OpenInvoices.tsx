@@ -80,12 +80,12 @@ export function OpenInvoices({ invoices }: OpenInvoicesProps) {
           bValue = (b.contact?.customer?.companyName || b.contact?.fullName || '').toLowerCase();
           break;
         case 'daysOutstanding':
-          aValue = calculateDaysOutstanding(a.createdAt);
-          bValue = calculateDaysOutstanding(b.createdAt);
+          aValue = calculateDaysOutstanding(a.invoiceAt || a.createdAt);
+          bValue = calculateDaysOutstanding(b.invoiceAt || b.createdAt);
           break;
         case 'createdAt':
-          aValue = new Date(a.createdAt).getTime();
-          bValue = new Date(b.createdAt).getTime();
+          aValue = new Date(a.invoiceAt || a.createdAt).getTime();
+          bValue = new Date(b.invoiceAt || b.createdAt).getTime();
           break;
       }
 
@@ -134,12 +134,12 @@ export function OpenInvoices({ invoices }: OpenInvoicesProps) {
     const exportData = filteredAndSortedInvoices.map(invoice => ({
       customer: invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown',
       invoiceNumber: invoice.visualId || invoice.id.slice(0, 8),
-      createdDate: format(new Date(invoice.createdAt), 'MM/dd/yyyy'),
+      createdDate: format(new Date(invoice.invoiceAt || invoice.createdAt), 'MM/dd/yyyy'),
       dueDate: invoice.dueAt ? format(new Date(invoice.dueAt), 'MM/dd/yyyy') : '-',
       total: `$${(invoice.total || 0).toFixed(2)}`,
       paid: `$${(invoice.amountPaid || 0).toFixed(2)}`,
       balance: `$${(invoice.amountOutstanding || 0).toFixed(2)}`,
-      daysOut: calculateDaysOutstanding(invoice.createdAt).toString(),
+      daysOut: calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt).toString(),
     }));
 
     const statusSuffix = selectedStatus !== 'all' ? `-${selectedStatus.replace(/[^a-zA-Z0-9]/g, '-')}` : '';
@@ -161,12 +161,12 @@ export function OpenInvoices({ invoices }: OpenInvoicesProps) {
     const exportData = filteredAndSortedInvoices.map(invoice => ({
       customer: invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown',
       invoiceNumber: invoice.visualId || invoice.id.slice(0, 8),
-      createdDate: format(new Date(invoice.createdAt), 'MM/dd/yyyy'),
+      createdDate: format(new Date(invoice.invoiceAt || invoice.createdAt), 'MM/dd/yyyy'),
       dueDate: invoice.dueAt ? format(new Date(invoice.dueAt), 'MM/dd/yyyy') : '-',
       total: `$${(invoice.total || 0).toFixed(2)}`,
       paid: `$${(invoice.amountPaid || 0).toFixed(2)}`,
       balance: `$${(invoice.amountOutstanding || 0).toFixed(2)}`,
-      daysOut: calculateDaysOutstanding(invoice.createdAt).toString(),
+      daysOut: calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt).toString(),
     }));
 
     const statusSuffix = selectedStatus !== 'all' ? `-${selectedStatus.replace(/[^a-zA-Z0-9]/g, '-')}` : '';
@@ -315,7 +315,7 @@ export function OpenInvoices({ invoices }: OpenInvoicesProps) {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredAndSortedInvoices.map(invoice => {
                 const isExpanded = expandedInvoice === invoice.id;
-                const daysOutstanding = calculateDaysOutstanding(invoice.createdAt);
+                const daysOutstanding = calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt);
                 const lineItems = invoice.lineItemGroups?.edges?.flatMap(group =>
                   group.node.lineItems.edges.map(item => item.node)
                 ) || [];
@@ -340,7 +340,7 @@ export function OpenInvoices({ invoices }: OpenInvoicesProps) {
                         </a>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
-                        {format(new Date(invoice.createdAt), 'MMM d, yyyy')}
+                        {format(new Date(invoice.invoiceAt || invoice.createdAt), 'MMM d, yyyy')}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
                         {invoice.dueAt ? format(new Date(invoice.dueAt), 'MMM d, yyyy') : '-'}

@@ -140,6 +140,13 @@ Deno.serve(async (req: Request) => {
             node {
               id
               visualId
+              createdAt
+              invoiceAt
+              dueAt
+              timestamps {
+                createdAt
+                updatedAt
+              }
             }
           }
         }
@@ -180,6 +187,7 @@ Deno.serve(async (req: Request) => {
         success: true,
         message: "Printavo credentials are valid!",
         invoiceCount: result.data?.invoices?.edges?.length || 0,
+        sampleInvoice: result.data?.invoices?.edges?.[0]?.node || null,
         diagnostics,
       }),
       {
