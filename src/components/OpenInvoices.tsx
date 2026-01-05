@@ -1,12 +1,11 @@
-import { useState, useMemo, Fragment, useEffect } from 'react';
-import { ChevronDown, ChevronUp, Search, Calendar, FileDown, ExternalLink, Filter } from 'lucide-react';
+import { useState, useMemo, Fragment } from 'react';
+import { ChevronDown, ChevronUp, Search, Calendar, FileDown, ExternalLink } from 'lucide-react';
 import { Invoice } from '../types/printavo';
 import { getOpenInvoices, calculateDaysOutstanding } from '../utils/aging-calculations';
 import { format } from 'date-fns';
 import { exportToCSV, CSVColumn } from '../utils/csv-export';
 import { exportToPDF, PDFColumn } from '../utils/pdf-export';
 import { getPrintavoInvoiceUrl } from '../utils/printavo-links';
-import { supabase } from '../lib/supabase-client';
 
 interface OpenInvoicesProps {
   invoices: Invoice[];
@@ -20,36 +19,8 @@ export function OpenInvoices({ invoices }: OpenInvoicesProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState<SortField>('createdAt');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [selectedStatus, setSelectedStatus] = useState<string>('all');
-  const [availableStatuses, setAvailableStatuses] = useState<string[]>([]);
 
-  useEffect(() => {
-    loadStatusPreferences();
-  }, []);
-
-  const loadStatusPreferences = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('company_settings')
-        .select('selected_invoice_statuses')
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') throw error;
-
-      if (data?.selected_invoice_statuses && data.selected_invoice_statuses.length > 0) {
-        setAvailableStatuses(data.selected_invoice_statuses);
-      }
-    } catch (err) {
-      // Silent fail - will use default behavior
-    }
-  };
-
-  const statusFilteredInvoices = useMemo(() => {
-    if (selectedStatus === 'all') return invoices;
-    return invoices.filter(inv => inv.status?.name === selectedStatus);
-  }, [invoices, selectedStatus]);
-
-  const openInvoices = useMemo(() => getOpenInvoices(statusFilteredInvoices), [statusFilteredInvoices]);
+  const openInvoices = useMemo(() => getOpenInvoices(invoices), [invoices]);
 
   const filteredAndSortedInvoices = useMemo(() => {
     let filtered = openInvoices;
@@ -142,8 +113,7 @@ export function OpenInvoices({ invoices }: OpenInvoicesProps) {
       daysOut: calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt).toString(),
     }));
 
-    const statusSuffix = selectedStatus !== 'all' ? `-${selectedStatus.replace(/[^a-zA-Z0-9]/g, '-')}` : '';
-    exportToCSV(exportData, columns, `open-invoices${statusSuffix}-${format(new Date(), 'yyyy-MM-dd')}`);
+    exportToCSV(exportData, columns, `open-invoices-${format(new Date(), 'yyyy-MM-dd')}`);
   };
 
   const handleExportPDF = () => {
@@ -169,15 +139,13 @@ export function OpenInvoices({ invoices }: OpenInvoicesProps) {
       daysOut: calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt).toString(),
     }));
 
-    const statusSuffix = selectedStatus !== 'all' ? `-${selectedStatus.replace(/[^a-zA-Z0-9]/g, '-')}` : '';
-    const statusText = selectedStatus !== 'all' ? ` • Status: ${selectedStatus}` : '';
     const totalPaid = filteredAndSortedInvoices.reduce((sum, inv) => sum + (inv.amountPaid || 0), 0);
     const totalInvoiced = filteredAndSortedInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
 
     exportToPDF({
       title: 'Open Invoices Report',
-      subtitle: `${format(new Date(), 'MMMM d, yyyy')}${statusText}`,
-      filename: `open-invoices${statusSuffix}-${format(new Date(), 'yyyy-MM-dd')}`,
+      subtitle: `${format(new Date(), 'MMMM d, yyyy')}`,
+      filename: `open-invoices-${format(new Date(), 'yyyy-MM-dd')}`,
       columns,
       data: exportData,
       orientation: 'landscape',
@@ -211,29 +179,9 @@ export function OpenInvoices({ invoices }: OpenInvoicesProps) {
             <h2 className="text-2xl font-bold text-gray-900">Open Invoices</h2>
             <p className="text-gray-600 mt-1">
               {filteredAndSortedInvoices.length} open invoices · ${totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} outstanding
-              {selectedStatus !== 'all' && <span className="text-blue-600"> · Filtered by status</span>}
             </p>
           </div>
           <div className="flex items-center gap-3">
-            {availableStatuses.length > 0 ? (
-              <div className="relative">
-                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white appearance-none cursor-pointer"
-                >
-                  <option value="all">All Statuses</option>
-                  {availableStatuses.map(status => (
-                    <option key={status} value={status}>{status}</option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              <div className="text-xs text-gray-500 italic px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
-                Configure status filters in Account Settings
-              </div>
-            )}
             <button
               onClick={handleExportCSV}
               disabled={filteredAndSortedInvoices.length === 0}

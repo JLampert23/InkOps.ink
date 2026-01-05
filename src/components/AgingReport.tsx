@@ -1,14 +1,13 @@
-import { useMemo, useState, useEffect } from 'react';
-import { ChevronDown, ChevronUp, FileDown, ExternalLink, Filter } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ChevronDown, ChevronUp, FileDown, ExternalLink } from 'lucide-react';
 import { Invoice } from '../types/printavo';
-import { categorizeIntoAgingBuckets, calculateDaysOutstanding } from '../utils/aging-calculations';
+import { categorizeIntoAgingBuckets, calculateDaysOutstanding, calculateDaysPastDue } from '../utils/aging-calculations';
 import { format } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { exportToCSV } from '../utils/csv-export';
 import { exportToPDF } from '../utils/pdf-export';
 import { getOpenInvoices } from '../utils/aging-calculations';
 import { getPrintavoInvoiceUrl } from '../utils/printavo-links';
-import { supabase } from '../lib/supabase-client';
 
 interface AgingReportProps {
   invoices: Invoice[];
@@ -16,41 +15,8 @@ interface AgingReportProps {
 
 export function AgingReport({ invoices }: AgingReportProps) {
   const [expandedBucket, setExpandedBucket] = useState<string | null>(null);
-  const [selectedStatus, setSelectedStatus] = useState<string>('all');
-  const [availableStatuses, setAvailableStatuses] = useState<string[]>([]);
 
-  useEffect(() => {
-    loadStatusPreferences();
-  }, []);
-
-  const loadStatusPreferences = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('company_settings')
-        .select('selected_invoice_statuses')
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') throw error;
-
-      console.log('Aging Report - Loaded status preferences:', data?.selected_invoice_statuses);
-
-      if (data?.selected_invoice_statuses && data.selected_invoice_statuses.length > 0) {
-        setAvailableStatuses(data.selected_invoice_statuses);
-        console.log('Aging Report - Available statuses set:', data.selected_invoice_statuses);
-      } else {
-        console.log('Aging Report - No statuses selected in settings yet');
-      }
-    } catch (err) {
-      console.error('Error loading status preferences:', err);
-    }
-  };
-
-  const filteredInvoices = useMemo(() => {
-    if (selectedStatus === 'all') return invoices;
-    return invoices.filter(inv => inv.status?.name === selectedStatus);
-  }, [invoices, selectedStatus]);
-
-  const agingBuckets = useMemo(() => categorizeIntoAgingBuckets(filteredInvoices), [filteredInvoices]);
+  const agingBuckets = useMemo(() => categorizeIntoAgingBuckets(invoices), [invoices]);
 
   const totalOutstanding = agingBuckets.reduce((sum, bucket) => sum + bucket.total, 0);
   const totalInvoices = agingBuckets.reduce((sum, bucket) => sum + bucket.count, 0);
@@ -63,11 +29,12 @@ export function AgingReport({ invoices }: AgingReportProps) {
 
   const bucketColors = ['#10b981', '#fbbf24', '#f97316', '#ef4444', '#991b1b'];
 
-  const openInvoices = useMemo(() => getOpenInvoices(filteredInvoices), [filteredInvoices]);
+  const openInvoices = useMemo(() => getOpenInvoices(invoices), [invoices]);
 
   const handleExportCSV = () => {
     const data = openInvoices.map(invoice => {
       const daysOut = calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt);
+      const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
       const bucket = daysOut <= 30 ? '1-30 days' : daysOut <= 60 ? '31-60 days' : daysOut <= 90 ? '61-90 days' : daysOut <= 120 ? '91-120 days' : '121+ days';
 
       return {
@@ -78,11 +45,10 @@ export function AgingReport({ invoices }: AgingReportProps) {
         total: invoice.total || 0,
         outstanding: invoice.amountOutstanding || 0,
         agingBucket: bucket,
-        daysOutstanding: daysOut
+        daysPastDue: daysPastDue === 0 ? 'Not Due' : daysPastDue.toString()
       };
     });
 
-    const statusSuffix = selectedStatus !== 'all' ? `-${selectedStatus.replace(/[^a-zA-Z0-9]/g, '-')}` : '';
     exportToCSV(
       data,
       [
@@ -93,15 +59,16 @@ export function AgingReport({ invoices }: AgingReportProps) {
         { header: 'Total Amount', key: 'total', formatter: (val) => `$${val.toFixed(2)}` },
         { header: 'Amount Outstanding', key: 'outstanding', formatter: (val) => `$${val.toFixed(2)}` },
         { header: 'Aging Bucket', key: 'agingBucket' },
-        { header: 'Days Outstanding', key: 'daysOutstanding' }
+        { header: 'Days Past Due', key: 'daysPastDue' }
       ],
-      `aging-report${statusSuffix}-${format(new Date(), 'yyyy-MM-dd')}`
+      `aging-report-${format(new Date(), 'yyyy-MM-dd')}`
     );
   };
 
   const handleExportPDF = () => {
     const data = openInvoices.map(invoice => {
       const daysOut = calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt);
+      const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
       const bucket = daysOut <= 30 ? '1-30 days' : daysOut <= 60 ? '31-60 days' : daysOut <= 90 ? '61-90 days' : daysOut <= 120 ? '91-120 days' : '121+ days';
 
       return {
@@ -112,19 +79,14 @@ export function AgingReport({ invoices }: AgingReportProps) {
         total: invoice.total || 0,
         outstanding: invoice.amountOutstanding || 0,
         agingBucket: bucket,
-        daysOutstanding: daysOut
+        daysPastDue: daysPastDue === 0 ? 'Not Due' : `${daysPastDue}d`
       };
     });
 
-    const statusSuffix = selectedStatus !== 'all' ? `-${selectedStatus.replace(/[^a-zA-Z0-9]/g, '-')}` : '';
-    const subtitle = selectedStatus !== 'all'
-      ? `Generated on ${format(new Date(), 'MMMM d, yyyy')} · Filtered by status: ${selectedStatus}`
-      : `Generated on ${format(new Date(), 'MMMM d, yyyy')}`;
-
     exportToPDF({
       title: 'Accounts Receivable Aging Report',
-      subtitle,
-      filename: `aging-report${statusSuffix}-${format(new Date(), 'yyyy-MM-dd')}`,
+      subtitle: `Generated on ${format(new Date(), 'MMMM d, yyyy')}`,
+      filename: `aging-report-${format(new Date(), 'yyyy-MM-dd')}`,
       columns: [
         { header: 'Customer', dataKey: 'customer' },
         { header: 'Invoice #', dataKey: 'invoiceNumber' },
@@ -133,7 +95,7 @@ export function AgingReport({ invoices }: AgingReportProps) {
         { header: 'Total', dataKey: 'total', formatter: (val) => `$${val.toFixed(2)}` },
         { header: 'Outstanding', dataKey: 'outstanding', formatter: (val) => `$${val.toFixed(2)}` },
         { header: 'Aging Bucket', dataKey: 'agingBucket' },
-        { header: 'Days', dataKey: 'daysOutstanding', formatter: (val) => `${val}d` }
+        { header: 'Days Past Due', dataKey: 'daysPastDue' }
       ],
       data,
       orientation: 'landscape',
@@ -156,29 +118,9 @@ export function AgingReport({ invoices }: AgingReportProps) {
             <h2 className="text-2xl font-bold text-gray-900">Aging Report</h2>
             <p className="text-gray-600 mt-1">
               {totalInvoices} open invoices · ${totalOutstanding.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} outstanding
-              {selectedStatus !== 'all' && <span className="text-blue-600"> · Filtered by status</span>}
             </p>
           </div>
           <div className="flex items-center gap-3">
-            {availableStatuses.length > 0 ? (
-              <div className="relative">
-                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                <select
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white appearance-none cursor-pointer"
-                >
-                  <option value="all">All Statuses</option>
-                  {availableStatuses.map(status => (
-                    <option key={status} value={status}>{status}</option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              <div className="text-xs text-gray-500 italic px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
-                Configure status filters in Account Settings
-              </div>
-            )}
             <button
               onClick={handleExportCSV}
               disabled={openInvoices.length === 0}
@@ -260,12 +202,12 @@ export function AgingReport({ invoices }: AgingReportProps) {
                           <th className="pb-2 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
                           <th className="pb-2 text-left text-xs font-medium text-gray-500 uppercase">Due Date</th>
                           <th className="pb-2 text-right text-xs font-medium text-gray-500 uppercase">Balance Due</th>
-                          <th className="pb-2 text-center text-xs font-medium text-gray-500 uppercase">Days Out</th>
+                          <th className="pb-2 text-center text-xs font-medium text-gray-500 uppercase">Days Past Due</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
                         {bucket.invoices.map(invoice => {
-                          const daysOutstanding = calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt);
+                          const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
                           return (
                             <tr key={invoice.id} className="hover:bg-gray-100 transition-colors">
                               <td className="py-2 text-sm">
@@ -293,13 +235,14 @@ export function AgingReport({ invoices }: AgingReportProps) {
                               </td>
                               <td className="py-2 text-sm text-center">
                                 <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                  daysOutstanding > 120 ? 'bg-red-900 text-white' :
-                                  daysOutstanding > 90 ? 'bg-red-100 text-red-800' :
-                                  daysOutstanding > 60 ? 'bg-orange-100 text-orange-800' :
-                                  daysOutstanding > 30 ? 'bg-yellow-100 text-yellow-800' :
+                                  daysPastDue > 120 ? 'bg-red-900 text-white' :
+                                  daysPastDue > 90 ? 'bg-red-100 text-red-800' :
+                                  daysPastDue > 60 ? 'bg-orange-100 text-orange-800' :
+                                  daysPastDue > 30 ? 'bg-yellow-100 text-yellow-800' :
+                                  daysPastDue === 0 ? 'bg-gray-100 text-gray-600' :
                                   'bg-green-100 text-green-800'
                                 }`}>
-                                  {daysOutstanding}
+                                  {daysPastDue === 0 ? 'Not Due' : `${daysPastDue} days`}
                                 </span>
                               </td>
                             </tr>

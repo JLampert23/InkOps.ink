@@ -32,6 +32,18 @@ export function calculateDaysOutstanding(createdAt: string): number {
   return diffDays;
 }
 
+export function calculateDaysPastDue(dueDate: string | null | undefined, invoiceDate: string): number {
+  if (!dueDate) {
+    return calculateDaysOutstanding(invoiceDate);
+  }
+
+  const due = new Date(dueDate);
+  const today = new Date();
+  const diffTime = today.getTime() - due.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  return Math.max(0, diffDays);
+}
+
 export function isInvoiceOpen(invoice: Invoice): boolean {
   const total = invoice.total || 0;
   const amountPaid = invoice.amountPaid || 0;
