@@ -264,7 +264,7 @@ function CustomerDetail({ customer }: CustomerDetailProps) {
                   </div>
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-500">Total: {formatCurrency(invoice.total)}</span>
-                    {balance > 0 && (
+                    {balance > 0.01 && (
                       <span className="text-orange-600">Balance: {formatCurrency(balance)}</span>
                     )}
                   </div>
