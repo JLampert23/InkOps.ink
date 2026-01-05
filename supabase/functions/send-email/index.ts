@@ -51,13 +51,12 @@ Deno.serve(async (req: Request) => {
       throw new Error('Supabase configuration missing');
     }
 
-    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: { Authorization: authHeader },
-      },
-    });
+    // Extract JWT from Bearer token
+    const jwt = authHeader.replace('Bearer ', '');
 
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(jwt);
 
     console.log('User validation result:', { user: user?.id, error: userError?.message });
 
