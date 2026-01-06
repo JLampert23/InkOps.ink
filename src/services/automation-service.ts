@@ -177,7 +177,7 @@ export class AutomationService {
   }
 
   private static async fetchReportData(reportType: string): Promise<any> {
-    const { data: invoices, error } = await supabase
+    const { data: rawInvoices, error } = await supabase
       .from('printavo_invoices_calculated')
       .select('*')
       .order('created_at', { ascending: false });
@@ -186,7 +186,110 @@ export class AutomationService {
       throw new Error(`Failed to fetch invoice data: ${error.message}`);
     }
 
-    return { invoices: invoices || [] };
+    const invoices = rawInvoices || [];
+
+    const openInvoices = invoices.filter(inv => {
+      const total = inv.total || 0;
+      const amountOutstanding = inv.amount_outstanding || 0;
+      const amountPaid = inv.amount_paid || 0;
+
+      if (total === 0) return false;
+
+      const status = inv.status?.toLowerCase() || '';
+      if (status.includes('dead')) return false;
+
+      const hasBalance = amountOutstanding > 0;
+      const notPaidInFull = inv.paid_in_full === false;
+      const hasTotalNotPaid = total > amountPaid;
+
+      return hasBalance || notPaidInFull || hasTotalNotPaid;
+    });
+
+    const agingBuckets = [
+      { name: 'current', label: '1-30 days', minDays: 0, maxDays: 30, invoices: [] as any[], total: 0, count: 0 },
+      { name: '30', label: '31-60 days', minDays: 31, maxDays: 60, invoices: [] as any[], total: 0, count: 0 },
+      { name: '60', label: '61-90 days', minDays: 61, maxDays: 90, invoices: [] as any[], total: 0, count: 0 },
+      { name: '90', label: '91-120 days', minDays: 91, maxDays: 120, invoices: [] as any[], total: 0, count: 0 },
+      { name: '120', label: '121+ days', minDays: 121, maxDays: null, invoices: [] as any[], total: 0, count: 0 },
+    ];
+
+    const formattedInvoices = openInvoices.map(inv => {
+      const invoiceDate = inv.invoice_at || inv.created_at;
+      const daysOutstanding = Math.floor(
+        (Date.now() - new Date(invoiceDate).getTime()) / (1000 * 60 * 60 * 24)
+      );
+
+      const calculateDaysPastDue = () => {
+        if (!inv.due_at) {
+          return daysOutstanding;
+        }
+        const due = new Date(inv.due_at);
+        const today = new Date();
+        const diffTime = today.getTime() - due.getTime();
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        return Math.max(0, diffDays);
+      };
+
+      const daysPastDue = calculateDaysPastDue();
+
+      let bucket = '';
+      if (daysOutstanding <= 30) {
+        bucket = '1-30 days';
+      } else if (daysOutstanding <= 60) {
+        bucket = '31-60 days';
+      } else if (daysOutstanding <= 90) {
+        bucket = '61-90 days';
+      } else if (daysOutstanding <= 120) {
+        bucket = '91-120 days';
+      } else {
+        bucket = '121+ days';
+      }
+
+      for (const agingBucket of agingBuckets) {
+        if (agingBucket.maxDays === null) {
+          if (daysOutstanding >= agingBucket.minDays) {
+            agingBucket.invoices.push(inv);
+            agingBucket.total += inv.amount_outstanding || 0;
+            agingBucket.count++;
+            break;
+          }
+        } else {
+          if (daysOutstanding >= agingBucket.minDays && daysOutstanding <= agingBucket.maxDays) {
+            agingBucket.invoices.push(inv);
+            agingBucket.total += inv.amount_outstanding || 0;
+            agingBucket.count++;
+            break;
+          }
+        }
+      }
+
+      return {
+        customer: inv.customer_name || 'Unknown',
+        invoiceNumber: inv.invoice_number || '',
+        invoiceDate: invoiceDate,
+        dueDate: inv.due_at || null,
+        total: inv.total || 0,
+        outstanding: inv.amount_outstanding || 0,
+        agingBucket: bucket,
+        daysPastDue: daysPastDue,
+      };
+    });
+
+    const totalOutstanding = openInvoices.reduce(
+      (sum, inv) => sum + (inv.amount_outstanding || 0),
+      0
+    );
+
+    return {
+      openInvoices: formattedInvoices,
+      totalInvoices: openInvoices.length,
+      totalOutstanding,
+      agingBuckets: agingBuckets.map(b => ({
+        label: b.label,
+        total: b.total,
+        count: b.count,
+      })),
+    };
   }
 
   private static utf8ToBase64(str: string): string {
@@ -201,6 +304,7 @@ export class AutomationService {
   private static async generatePDF(reportType: string, data: any): Promise<string> {
     const jsPDF = (await import('jspdf')).default;
     const autoTable = (await import('jspdf-autotable')).default;
+    const { format } = await import('date-fns');
 
     const doc = new jsPDF({
       orientation: 'landscape',
@@ -221,19 +325,21 @@ export class AutomationService {
 
     yPosition = 25;
 
-    if (data.invoices && data.invoices.length > 0) {
-      const tableData = data.invoices.slice(0, 50).map((inv: any) => [
-        inv.invoice_number || '',
-        inv.customer_name || '',
-        inv.status || '',
+    if (data.openInvoices && data.openInvoices.length > 0) {
+      const tableData = data.openInvoices.map((inv: any) => [
+        inv.invoiceNumber || '',
+        inv.customer || '',
+        format(new Date(inv.invoiceDate), 'MMM d, yyyy'),
+        inv.dueDate ? format(new Date(inv.dueDate), 'MMM d, yyyy') : 'N/A',
         `$${parseFloat(inv.total || 0).toFixed(2)}`,
-        `$${parseFloat(inv.amount_outstanding || 0).toFixed(2)}`,
-        inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString() : '',
+        `$${parseFloat(inv.outstanding || 0).toFixed(2)}`,
+        inv.agingBucket || '',
+        inv.daysPastDue === 0 ? 'Not Due' : `${inv.daysPastDue}d`,
       ]);
 
       autoTable(doc, {
         startY: yPosition,
-        head: [['Invoice', 'Customer', 'Status', 'Total', 'Outstanding', 'Date']],
+        head: [['Invoice #', 'Customer', 'Invoice Date', 'Due Date', 'Total', 'Outstanding', 'Aging Bucket', 'Days Past Due']],
         body: tableData,
         theme: 'grid',
         headStyles: {
@@ -242,10 +348,40 @@ export class AutomationService {
           fontStyle: 'bold',
         },
         styles: {
-          fontSize: 9,
-          cellPadding: 3,
+          fontSize: 8,
+          cellPadding: 2,
+        },
+        columnStyles: {
+          0: { cellWidth: 25 },
+          1: { cellWidth: 40 },
+          2: { cellWidth: 28 },
+          3: { cellWidth: 28 },
+          4: { cellWidth: 25 },
+          5: { cellWidth: 25 },
+          6: { cellWidth: 30 },
+          7: { cellWidth: 25 },
         },
       });
+
+      const finalY = (doc as any).lastAutoTable.finalY || yPosition + 10;
+
+      doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Summary:', 14, finalY + 15);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.text(`Total Open Invoices: ${data.totalInvoices}`, 14, finalY + 22);
+      doc.text(`Total Outstanding: $${data.totalOutstanding.toFixed(2)}`, 14, finalY + 28);
+
+      if (data.agingBuckets && data.agingBuckets.length > 0) {
+        let summaryY = finalY + 34;
+        data.agingBuckets.forEach((bucket: any) => {
+          doc.text(`${bucket.label}: $${bucket.total.toFixed(2)} (${bucket.count} invoices)`, 14, summaryY);
+          summaryY += 6;
+        });
+      }
     }
 
     const pdfOutput = doc.output('arraybuffer');
@@ -258,18 +394,22 @@ export class AutomationService {
   }
 
   private static async generateCSV(reportType: string, data: any): Promise<string> {
-    if (!data.invoices || data.invoices.length === 0) {
+    if (!data.openInvoices || data.openInvoices.length === 0) {
       return this.utf8ToBase64('No data available');
     }
 
-    const headers = ['Invoice', 'Customer', 'Status', 'Total', 'Outstanding', 'Date'];
-    const rows = data.invoices.map((inv: any) => [
-      inv.invoice_number || '',
-      inv.customer_name || '',
-      inv.status || '',
+    const { format } = await import('date-fns');
+
+    const headers = ['Customer', 'Invoice #', 'Invoice Date', 'Due Date', 'Total Amount', 'Amount Outstanding', 'Aging Bucket', 'Days Past Due'];
+    const rows = data.openInvoices.map((inv: any) => [
+      inv.customer || '',
+      inv.invoiceNumber || '',
+      format(new Date(inv.invoiceDate), 'MMM d, yyyy'),
+      inv.dueDate ? format(new Date(inv.dueDate), 'MMM d, yyyy') : '',
       parseFloat(inv.total || 0).toFixed(2),
-      parseFloat(inv.amount_outstanding || 0).toFixed(2),
-      inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString() : '',
+      parseFloat(inv.outstanding || 0).toFixed(2),
+      inv.agingBucket || '',
+      inv.daysPastDue === 0 ? 'Not Due' : inv.daysPastDue.toString(),
     ]);
 
     const csvContent = [
@@ -293,11 +433,8 @@ export class AutomationService {
   ): Promise<void> {
     const { EmailService } = await import('./email-service');
 
-    const totalInvoices = reportData.invoices?.length || 0;
-    const totalOutstanding = reportData.invoices?.reduce(
-      (sum: number, inv: any) => sum + parseFloat(inv.amount_outstanding || 0),
-      0
-    );
+    const totalInvoices = reportData.totalInvoices || 0;
+    const totalOutstanding = reportData.totalOutstanding || 0;
 
     const html = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
