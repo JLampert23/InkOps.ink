@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, FileDown, ExternalLink } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileDown, ExternalLink, ArrowUpDown } from 'lucide-react';
 import { Invoice } from '../types/printavo';
 import { categorizeIntoAgingBuckets, calculateDaysPastDue } from '../utils/aging-calculations';
 import { format } from 'date-fns';
@@ -12,10 +12,48 @@ interface AgingReportProps {
   invoices: Invoice[];
 }
 
+type SortField = 'invoiceDate' | 'dueDate' | 'amount' | 'daysPastDue';
+type SortDirection = 'asc' | 'desc';
+
 export function AgingReport({ invoices }: AgingReportProps) {
   const [expandedBucket, setExpandedBucket] = useState<string | null>(null);
+  const [sortField, setSortField] = useState<SortField>('invoiceDate');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
-  const agingBuckets = useMemo(() => categorizeIntoAgingBuckets(invoices), [invoices]);
+  const sortInvoices = (invoicesToSort: Invoice[]) => {
+    return [...invoicesToSort].sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortField) {
+        case 'invoiceDate':
+          comparison = new Date(a.invoiceAt || a.createdAt).getTime() - new Date(b.invoiceAt || b.createdAt).getTime();
+          break;
+        case 'dueDate':
+          const aDue = a.dueAt ? new Date(a.dueAt).getTime() : 0;
+          const bDue = b.dueAt ? new Date(b.dueAt).getTime() : 0;
+          comparison = aDue - bDue;
+          break;
+        case 'amount':
+          comparison = (a.amountOutstanding || 0) - (b.amountOutstanding || 0);
+          break;
+        case 'daysPastDue':
+          const aDays = calculateDaysPastDue(a.dueAt, a.invoiceAt || a.createdAt);
+          const bDays = calculateDaysPastDue(b.dueAt, b.invoiceAt || b.createdAt);
+          comparison = aDays - bDays;
+          break;
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  };
+
+  const agingBuckets = useMemo(() => {
+    const buckets = categorizeIntoAgingBuckets(invoices);
+    return buckets.map(bucket => ({
+      ...bucket,
+      invoices: sortInvoices(bucket.invoices)
+    }));
+  }, [invoices, sortField, sortDirection]);
 
   const totalOutstanding = agingBuckets.reduce((sum, bucket) => sum + bucket.total, 0);
   const totalInvoices = agingBuckets.reduce((sum, bucket) => sum + bucket.count, 0);
@@ -154,6 +192,29 @@ export function AgingReport({ invoices }: AgingReportProps) {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+        </div>
+
+        <div className="mb-6 flex items-center gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+          <div className="flex items-center gap-2">
+            <ArrowUpDown className="w-4 h-4 text-gray-600" />
+            <span className="text-sm font-medium text-gray-700">Sort by:</span>
+          </div>
+          <select
+            value={sortField}
+            onChange={(e) => setSortField(e.target.value as SortField)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="invoiceDate">Invoice Date</option>
+            <option value="dueDate">Due Date</option>
+            <option value="amount">Amount</option>
+            <option value="daysPastDue">Days Past Due</option>
+          </select>
+          <button
+            onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-white transition-colors"
+          >
+            {sortDirection === 'asc' ? '↑ Ascending' : '↓ Descending'}
+          </button>
         </div>
 
         <div className="space-y-4">
