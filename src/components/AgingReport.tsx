@@ -32,9 +32,18 @@ export function AgingReport({ invoices }: AgingReportProps) {
   const openInvoices = useMemo(() => getOpenInvoices(invoices), [invoices]);
 
   const handleExportCSV = () => {
-    const data = openInvoices.map(invoice => {
+    const jan1_2025 = new Date('2025-01-01T00:00:00Z');
+    const filteredInvoices = invoices.filter(invoice => {
+      const createdDate = new Date(invoice.createdAt);
+      return createdDate >= jan1_2025;
+    });
+
+    const data = filteredInvoices.map(invoice => {
       const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
-      const bucket = daysPastDue <= 30 ? '1-30 days' : daysPastDue <= 60 ? '31-60 days' : daysPastDue <= 90 ? '61-90 days' : daysPastDue <= 120 ? '91-120 days' : '121+ days';
+      const bucket = daysPastDue >= 1 && daysPastDue <= 30 ? '1-30 days' :
+                     daysPastDue >= 31 && daysPastDue <= 60 ? '31-60 days' :
+                     daysPastDue >= 61 && daysPastDue <= 90 ? '61-90 days' :
+                     daysPastDue >= 90 ? '90+ days' : 'Not Due';
 
       return {
         customer: invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown',
@@ -65,9 +74,18 @@ export function AgingReport({ invoices }: AgingReportProps) {
   };
 
   const handleExportPDF = () => {
-    const data = openInvoices.map(invoice => {
+    const jan1_2025 = new Date('2025-01-01T00:00:00Z');
+    const filteredInvoices = invoices.filter(invoice => {
+      const createdDate = new Date(invoice.createdAt);
+      return createdDate >= jan1_2025;
+    });
+
+    const data = filteredInvoices.map(invoice => {
       const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
-      const bucket = daysPastDue <= 30 ? '1-30 days' : daysPastDue <= 60 ? '31-60 days' : daysPastDue <= 90 ? '61-90 days' : daysPastDue <= 120 ? '91-120 days' : '121+ days';
+      const bucket = daysPastDue >= 1 && daysPastDue <= 30 ? '1-30 days' :
+                     daysPastDue >= 31 && daysPastDue <= 60 ? '31-60 days' :
+                     daysPastDue >= 61 && daysPastDue <= 90 ? '61-90 days' :
+                     daysPastDue >= 90 ? '90+ days' : 'Not Due';
 
       return {
         customer: invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown',
@@ -233,12 +251,11 @@ export function AgingReport({ invoices }: AgingReportProps) {
                               </td>
                               <td className="py-2 text-sm text-center">
                                 <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                  daysPastDue > 120 ? 'bg-red-900 text-white' :
-                                  daysPastDue > 90 ? 'bg-red-100 text-red-800' :
-                                  daysPastDue > 60 ? 'bg-orange-100 text-orange-800' :
-                                  daysPastDue > 30 ? 'bg-yellow-100 text-yellow-800' :
-                                  daysPastDue === 0 ? 'bg-gray-100 text-gray-600' :
-                                  'bg-green-100 text-green-800'
+                                  daysPastDue >= 90 ? 'bg-red-100 text-red-800' :
+                                  daysPastDue >= 61 ? 'bg-orange-100 text-orange-800' :
+                                  daysPastDue >= 31 ? 'bg-yellow-100 text-yellow-800' :
+                                  daysPastDue >= 1 ? 'bg-green-100 text-green-800' :
+                                  'bg-gray-100 text-gray-600'
                                 }`}>
                                   {daysPastDue === 0 ? 'Not Due' : `${daysPastDue} days`}
                                 </span>

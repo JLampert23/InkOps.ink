@@ -187,10 +187,9 @@ export function ARByCustomer({ invoices }: ARByCustomerProps) {
                       </td>
                       <td className="px-4 py-3 text-sm text-center">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          customer.averageInvoiceAge > 120 ? 'bg-red-900 text-white' :
-                          customer.averageInvoiceAge > 90 ? 'bg-red-100 text-red-800' :
-                          customer.averageInvoiceAge > 60 ? 'bg-orange-100 text-orange-800' :
-                          customer.averageInvoiceAge > 30 ? 'bg-yellow-100 text-yellow-800' :
+                          customer.averageInvoiceAge >= 90 ? 'bg-red-100 text-red-800' :
+                          customer.averageInvoiceAge >= 61 ? 'bg-orange-100 text-orange-800' :
+                          customer.averageInvoiceAge >= 31 ? 'bg-yellow-100 text-yellow-800' :
                           'bg-green-100 text-green-800'
                         }`}>
                           {customer.averageInvoiceAge}
@@ -198,10 +197,9 @@ export function ARByCustomer({ invoices }: ARByCustomerProps) {
                       </td>
                       <td className="px-4 py-3 text-sm text-center">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          customer.oldestInvoiceAge > 120 ? 'bg-red-900 text-white' :
-                          customer.oldestInvoiceAge > 90 ? 'bg-red-100 text-red-800' :
-                          customer.oldestInvoiceAge > 60 ? 'bg-orange-100 text-orange-800' :
-                          customer.oldestInvoiceAge > 30 ? 'bg-yellow-100 text-yellow-800' :
+                          customer.oldestInvoiceAge >= 90 ? 'bg-red-100 text-red-800' :
+                          customer.oldestInvoiceAge >= 61 ? 'bg-orange-100 text-orange-800' :
+                          customer.oldestInvoiceAge >= 31 ? 'bg-yellow-100 text-yellow-800' :
                           'bg-green-100 text-green-800'
                         }`}>
                           {customer.oldestInvoiceAge}
@@ -211,7 +209,7 @@ export function ARByCustomer({ invoices }: ARByCustomerProps) {
 
                     {isExpanded && (
                       <tr>
-                        <td colSpan={5} className="px-4 py-4 bg-gray-50">
+                        <td colSpan={6} className="px-4 py-4 bg-gray-50">
                           <div className="ml-8">
                             <h4 className="text-sm font-semibold text-gray-700 mb-3">Open Invoices</h4>
                             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -252,10 +250,9 @@ export function ARByCustomer({ invoices }: ARByCustomerProps) {
                                         </td>
                                         <td className="px-4 py-2 text-sm text-center">
                                           <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                            age > 120 ? 'bg-red-900 text-white' :
-                                            age > 90 ? 'bg-red-100 text-red-800' :
-                                            age > 60 ? 'bg-orange-100 text-orange-800' :
-                                            age > 30 ? 'bg-yellow-100 text-yellow-800' :
+                                            age >= 90 ? 'bg-red-100 text-red-800' :
+                                            age >= 61 ? 'bg-orange-100 text-orange-800' :
+                                            age >= 31 ? 'bg-yellow-100 text-yellow-800' :
                                             'bg-green-100 text-green-800'
                                           }`}>
                                             {age}
