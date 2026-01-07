@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Search, Plus, Edit, X, Save, Loader2 } from 'lucide-react';
+import { Users, Search, Plus, Edit, X, Save, Loader2, Trash2, Star } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -13,6 +13,17 @@ interface Customer {
   billing_state: string | null;
   status: string;
   created_at: string;
+}
+
+interface Contact {
+  id?: string;
+  full_name: string;
+  title: string;
+  email: string;
+  phone: string;
+  mobile: string;
+  is_primary: boolean;
+  notes: string;
 }
 
 export function CustomersManager() {
@@ -44,6 +55,8 @@ export function CustomersManager() {
 
   const [paymentTerms, setPaymentTerms] = useState('Net 30');
   const [notes, setNotes] = useState('');
+
+  const [contacts, setContacts] = useState<Contact[]>([]);
 
   useEffect(() => {
     loadCustomers();
@@ -98,6 +111,17 @@ export function CustomersManager() {
       setShipZip(data.shipping_zip || '');
       setPaymentTerms(data.payment_terms || 'Net 30');
       setNotes(data.notes || '');
+
+      const { data: contactsData } = await supabase
+        .from('customer_contacts')
+        .select('*')
+        .eq('customer_id', customerId)
+        .order('is_primary', { ascending: false });
+
+      if (contactsData) {
+        setContacts(contactsData);
+      }
+
       setShowForm(true);
     }
   };
@@ -120,6 +144,7 @@ export function CustomersManager() {
     setShipZip('');
     setPaymentTerms('Net 30');
     setNotes('');
+    setContacts([]);
   };
 
   const copyBillingToShipping = () => {
@@ -128,6 +153,39 @@ export function CustomersManager() {
     setShipCity(billCity);
     setShipState(billState);
     setShipZip(billZip);
+  };
+
+  const addContact = () => {
+    setContacts([...contacts, {
+      full_name: '',
+      title: '',
+      email: '',
+      phone: '',
+      mobile: '',
+      is_primary: contacts.length === 0,
+      notes: '',
+    }]);
+  };
+
+  const updateContact = (index: number, field: keyof Contact, value: any) => {
+    const updated = [...contacts];
+    updated[index] = { ...updated[index], [field]: value };
+
+    if (field === 'is_primary' && value === true) {
+      updated.forEach((c, i) => {
+        if (i !== index) c.is_primary = false;
+      });
+    }
+
+    setContacts(updated);
+  };
+
+  const removeContact = (index: number) => {
+    const updated = contacts.filter((_, i) => i !== index);
+    if (updated.length > 0 && !updated.some(c => c.is_primary)) {
+      updated[0].is_primary = true;
+    }
+    setContacts(updated);
   };
 
   const handleSave = async () => {
@@ -160,15 +218,44 @@ export function CustomersManager() {
         created_by: user?.id,
       };
 
+      let customerId = editingCustomer?.id;
+
       if (editingCustomer) {
         await supabase
           .from('customers')
           .update(customerData)
           .eq('id', editingCustomer.id);
       } else {
-        await supabase
+        const { data, error } = await supabase
           .from('customers')
-          .insert([customerData]);
+          .insert([customerData])
+          .select()
+          .single();
+
+        if (error) throw error;
+        customerId = data.id;
+      }
+
+      if (customerId) {
+        await supabase
+          .from('customer_contacts')
+          .delete()
+          .eq('customer_id', customerId);
+
+        if (contacts.length > 0) {
+          const contactsToInsert = contacts
+            .filter(c => c.full_name.trim())
+            .map(c => ({
+              ...c,
+              customer_id: customerId,
+            }));
+
+          if (contactsToInsert.length > 0) {
+            await supabase
+              .from('customer_contacts')
+              .insert(contactsToInsert);
+          }
+        }
       }
 
       alert('Customer saved successfully!');
@@ -191,7 +278,7 @@ export function CustomersManager() {
 
   if (showForm) {
     return (
-      <div className="max-w-5xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200">
+      <div className="max-w-6xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="p-6 border-b border-gray-200 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Users className="w-6 h-6 text-blue-600" />
@@ -247,7 +334,7 @@ export function CustomersManager() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Contact Name
+                  Primary Contact Name
                 </label>
                 <input
                   type="text"
@@ -259,7 +346,7 @@ export function CustomersManager() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email
+                  Primary Email
                 </label>
                 <input
                   type="email"
@@ -271,7 +358,7 @@ export function CustomersManager() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Phone
+                  Primary Phone
                 </label>
                 <input
                   type="tel"
@@ -310,6 +397,142 @@ export function CustomersManager() {
                 </select>
               </div>
             </div>
+          </section>
+
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Additional Contacts</h3>
+              <button
+                onClick={addContact}
+                className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+              >
+                <Plus className="w-4 h-4" />
+                Add Contact
+              </button>
+            </div>
+
+            {contacts.length === 0 ? (
+              <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                <Users className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">No additional contacts added</p>
+                <button
+                  onClick={addContact}
+                  className="mt-3 text-sm text-blue-600 hover:text-blue-700"
+                >
+                  Add your first contact
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {contacts.map((contact, idx) => (
+                  <div key={idx} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-medium text-gray-900">Contact {idx + 1}</h4>
+                        {contact.is_primary && (
+                          <span className="flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
+                            <Star className="w-3 h-3" />
+                            Primary
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={contact.is_primary}
+                            onChange={(e) => updateContact(idx, 'is_primary', e.target.checked)}
+                            className="rounded border-gray-300"
+                          />
+                          Set as primary
+                        </label>
+                        <button
+                          onClick={() => removeContact(idx)}
+                          className="p-1 text-red-600 hover:bg-red-50 rounded"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Full Name
+                        </label>
+                        <input
+                          type="text"
+                          value={contact.full_name}
+                          onChange={(e) => updateContact(idx, 'full_name', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          placeholder="Jane Smith"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Title
+                        </label>
+                        <input
+                          type="text"
+                          value={contact.title}
+                          onChange={(e) => updateContact(idx, 'title', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          placeholder="Sales Manager"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Email
+                        </label>
+                        <input
+                          type="email"
+                          value={contact.email}
+                          onChange={(e) => updateContact(idx, 'email', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          placeholder="jane@company.com"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Phone
+                        </label>
+                        <input
+                          type="tel"
+                          value={contact.phone}
+                          onChange={(e) => updateContact(idx, 'phone', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          placeholder="(555) 123-4567"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Mobile
+                        </label>
+                        <input
+                          type="tel"
+                          value={contact.mobile}
+                          onChange={(e) => updateContact(idx, 'mobile', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          placeholder="(555) 987-6543"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Notes
+                        </label>
+                        <input
+                          type="text"
+                          value={contact.notes}
+                          onChange={(e) => updateContact(idx, 'notes', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          placeholder="Additional notes..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
           <section>
