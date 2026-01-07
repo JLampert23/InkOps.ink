@@ -71,8 +71,8 @@ export function getOpenInvoices(invoices: Invoice[]): Invoice[] {
 
 export function getAllInvoicesForAging(invoices: Invoice[]): Invoice[] {
   return invoices.filter(invoice => {
-    const total = invoice.total || 0;
-    return total > 0;
+    const amountOutstanding = invoice.amountOutstanding || 0;
+    return amountOutstanding > 0;
   });
 }
 
@@ -89,7 +89,7 @@ export function categorizeIntoAgingBuckets(invoices: Invoice[]): AgingBucket[] {
 
   allInvoices.forEach(invoice => {
     const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
-    const balance = invoice.amountOutstanding || invoice.total || 0;
+    const balance = invoice.amountOutstanding || 0;
 
     for (const bucket of buckets) {
       if (bucket.maxDays === null) {
@@ -121,7 +121,7 @@ export function calculateCustomerAging(invoices: Invoice[]): CustomerAging[] {
   allInvoices.forEach(invoice => {
     const customerId = invoice.contact?.customer?.id || invoice.contact?.id || 'unknown';
     const customerName = invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown Customer';
-    const balance = invoice.amountOutstanding || invoice.total || 0;
+    const balance = invoice.amountOutstanding || 0;
     const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
 
     if (!customerMap.has(customerId)) {

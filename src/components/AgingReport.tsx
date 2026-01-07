@@ -29,7 +29,7 @@ export function AgingReport({ invoices }: AgingReportProps) {
 
   const bucketColors = ['#10b981', '#fbbf24', '#f97316', '#ef4444', '#991b1b'];
 
-  const allInvoices = useMemo(() => invoices.filter(inv => (inv.total || 0) > 0), [invoices]);
+  const allInvoices = useMemo(() => invoices.filter(inv => (inv.amountOutstanding || 0) > 0), [invoices]);
 
   const handleExportCSV = () => {
     const data = allInvoices.map(invoice => {
@@ -42,7 +42,7 @@ export function AgingReport({ invoices }: AgingReportProps) {
         invoiceDate: invoice.invoiceAt || invoice.createdAt,
         dueDate: invoice.dueAt || '',
         total: invoice.total || 0,
-        outstanding: invoice.amountOutstanding || invoice.total || 0,
+        outstanding: invoice.amountOutstanding || 0,
         agingBucket: bucket,
         daysPastDue: daysPastDue <= 0 ? 'Not Due' : daysPastDue.toString()
       };
@@ -75,7 +75,7 @@ export function AgingReport({ invoices }: AgingReportProps) {
         invoiceDate: invoice.invoiceAt || invoice.createdAt,
         dueDate: invoice.dueAt || '',
         total: invoice.total || 0,
-        outstanding: invoice.amountOutstanding || invoice.total || 0,
+        outstanding: invoice.amountOutstanding || 0,
         agingBucket: bucket,
         daysPastDue: daysPastDue <= 0 ? 'Not Due' : `${daysPastDue}d`
       };

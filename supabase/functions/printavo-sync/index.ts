@@ -13,7 +13,6 @@ const PAGE_SIZE = 7;
 const BATCH_SIZE = 50;
 const MAX_RETRIES = 3;
 const MIN_INVOICE_DATE = "2025-01-01T00:00:00Z";
-const RECENT_DAYS_LOOKBACK = 30;
 
 interface GraphQLRequest {
   query: string;
@@ -322,8 +321,6 @@ async function syncInvoices(
   `;
 
   let totalInvoices = 0;
-  const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - RECENT_DAYS_LOOKBACK);
   let batchBuffer: any[] = [];
   let lineItemsBatchBuffer: any[] = [];
 
@@ -427,7 +424,7 @@ async function syncInvoices(
 
   await flushBatch();
 
-  console.log(`Syncing recently updated invoices (last ${RECENT_DAYS_LOOKBACK} days)...`);
+  console.log(`Syncing all invoices from ${MIN_INVOICE_DATE} forward...`);
   let hasNextPage = true;
   let after: string | null = null;
   let pageCount = 0;
@@ -498,20 +495,16 @@ async function syncInvoices(
     }
 
     totalInvoices += recentInvoices.length;
-    console.log(`Recent - Page ${pageCount + 1}: Found ${invoices.length} invoices, ${recentInvoices.length} after ${MIN_INVOICE_DATE}`);
+    console.log(`All invoices - Page ${pageCount + 1}: Found ${invoices.length} invoices, ${recentInvoices.length} after ${MIN_INVOICE_DATE}`);
 
-    if (pageCount >= 15) {
-      console.log(`Fetched ${pageCount + 1} pages (${totalInvoices} invoices total), stopping quick sync`);
+    if (recentInvoices.length === 0 || invoices.length === 0) {
+      console.log(`Reached invoices before ${MIN_INVOICE_DATE}, stopping sync`);
       break;
     }
 
     hasNextPage = result.data.invoices.pageInfo.hasNextPage;
     after = result.data.invoices.pageInfo.endCursor;
     pageCount++;
-
-    if (invoices.length === 0) {
-      break;
-    }
   }
 
   await flushBatch();
