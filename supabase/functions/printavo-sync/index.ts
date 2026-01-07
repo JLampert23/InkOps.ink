@@ -55,11 +55,11 @@ Deno.serve(async (req: Request) => {
 
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('company_settings')
-      .select('printavo_email, printavo_token')
-      .eq('user_id', user.id)
+      .select('printavo_username, printavo_api_token_encrypted')
+      .eq('owner_id', user.id)
       .maybeSingle();
 
-    if (settingsError || !settings?.printavo_email || !settings?.printavo_token) {
+    if (settingsError || !settings?.printavo_username || !settings?.printavo_api_token_encrypted) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -81,7 +81,7 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify({
         action: 'decrypt',
-        data: settings.printavo_token
+        data: settings.printavo_api_token_encrypted
       })
     });
 
@@ -99,7 +99,7 @@ Deno.serve(async (req: Request) => {
         'Authorization': `Bearer ${jwt}`,
       },
       body: JSON.stringify({
-        email: settings.printavo_email,
+        email: settings.printavo_username,
         token: printavoToken,
         query: `
           query GetInvoices {
@@ -140,9 +140,9 @@ Deno.serve(async (req: Request) => {
     const invoices = invoicesData?.data?.invoices?.edges?.map((edge: any) => edge.node) || [];
 
     const { error: deleteError } = await supabaseAdmin
-      .from('printavo_invoices_raw')
+      .from('printavo_invoices')
       .delete()
-      .eq('user_id', user.id);
+      .neq('id', '');
 
     if (deleteError) {
       console.error('Error deleting old invoices:', deleteError);
@@ -150,14 +150,25 @@ Deno.serve(async (req: Request) => {
 
     if (invoices.length > 0) {
       const invoicesToInsert = invoices.map((invoice: any) => ({
-        user_id: user.id,
-        invoice_id: invoice.id,
-        data: invoice,
-        synced_at: new Date().toISOString()
+        id: invoice.id,
+        invoice_number: invoice.visualId,
+        customer_email: invoice.contact?.email,
+        customer_name: invoice.contact?.fullName,
+        customer_company: invoice.contact?.customer?.companyName,
+        subtotal: invoice.subtotal || 0,
+        tax: invoice.salesTaxAmount || 0,
+        total: invoice.total || 0,
+        amount_paid: invoice.amountPaid || 0,
+        amount_outstanding: invoice.amountOutstanding || 0,
+        status: invoice.status?.name || invoice.status,
+        invoice_date: invoice.invoiceAt,
+        due_date: invoice.dueAt,
+        created_at: invoice.createdAt,
+        raw_data: invoice
       }));
 
       const { error: insertError } = await supabaseAdmin
-        .from('printavo_invoices_raw')
+        .from('printavo_invoices')
         .insert(invoicesToInsert);
 
       if (insertError) {
