@@ -57,6 +57,8 @@ export function QuoteBuilder({ quoteId, onSave, onCancel }: QuoteBuilderProps) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [companySettings, setCompanySettings] = useState<any>(null);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
 
   const [quoteNumber, setQuoteNumber] = useState('');
   const [title, setTitle] = useState('');
@@ -95,6 +97,7 @@ export function QuoteBuilder({ quoteId, onSave, onCancel }: QuoteBuilderProps) {
 
   useEffect(() => {
     loadCompanySettings();
+    loadCustomers();
     if (quoteId) {
       loadQuote();
     } else {
@@ -112,6 +115,48 @@ export function QuoteBuilder({ quoteId, onSave, onCancel }: QuoteBuilderProps) {
       .select('*')
       .maybeSingle();
     setCompanySettings(data);
+  };
+
+  const loadCustomers = async () => {
+    const { data } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('status', 'active')
+      .order('company_name');
+    if (data) setCustomers(data);
+  };
+
+  const handleCustomerSelect = (customerId: string) => {
+    setSelectedCustomerId(customerId);
+
+    if (!customerId) {
+      return;
+    }
+
+    const customer = customers.find(c => c.id === customerId);
+    if (customer) {
+      setBillName(customer.company_name || '');
+      setBillContact(customer.contact_name || '');
+      setBillAddress1(customer.billing_address_line1 || '');
+      setBillAddress2(customer.billing_address_line2 || '');
+      setBillCity(customer.billing_city || '');
+      setBillState(customer.billing_state || '');
+      setBillZip(customer.billing_zip || '');
+      setBillPhone(customer.phone || '');
+      setBillEmail(customer.email || '');
+
+      setShipName(customer.company_name || '');
+      setShipContact(customer.contact_name || '');
+      setShipAddress1(customer.shipping_address_line1 || '');
+      setShipAddress2(customer.shipping_address_line2 || '');
+      setShipCity(customer.shipping_city || '');
+      setShipState(customer.shipping_state || '');
+      setShipZip(customer.shipping_zip || '');
+
+      if (customer.payment_terms) {
+        setTerms(customer.payment_terms);
+      }
+    }
   };
 
   const generateQuoteNumber = async () => {
@@ -137,6 +182,10 @@ export function QuoteBuilder({ quoteId, onSave, onCancel }: QuoteBuilderProps) {
         setDueDate(quote.due_date?.split('T')[0] || '');
         setTerms(quote.terms);
         setValidUntil(quote.valid_until?.split('T')[0] || '');
+
+        if (quote.customer_id) {
+          setSelectedCustomerId(quote.customer_id);
+        }
 
         setBillName(quote.customer_billing_name || '');
         setBillContact(quote.customer_billing_contact || '');
@@ -304,6 +353,7 @@ export function QuoteBuilder({ quoteId, onSave, onCancel }: QuoteBuilderProps) {
         due_date: dueDate || null,
         terms,
         valid_until: validUntil || null,
+        customer_id: selectedCustomerId || null,
         customer_billing_name: billName,
         customer_billing_contact: billContact,
         customer_billing_address_line1: billAddress1,
@@ -526,6 +576,24 @@ export function QuoteBuilder({ quoteId, onSave, onCancel }: QuoteBuilderProps) {
               <Copy className="w-4 h-4" />
               Copy Billing to Shipping
             </button>
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Select Existing Customer
+            </label>
+            <select
+              value={selectedCustomerId}
+              onChange={(e) => handleCustomerSelect(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">-- Select a customer or enter manually --</option>
+              {customers.map((customer) => (
+                <option key={customer.id} value={customer.id}>
+                  {customer.company_name} {customer.contact_name && `(${customer.contact_name})`}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

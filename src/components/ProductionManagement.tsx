@@ -1,12 +1,13 @@
 import { useState, lazy, Suspense } from 'react';
-import { FileText, Image, DollarSign, LayoutDashboard, Loader2 } from 'lucide-react';
+import { FileText, Image, DollarSign, LayoutDashboard, Loader2, Users } from 'lucide-react';
 
 const QuotesManager = lazy(() => import('./production/QuotesManager').then(m => ({ default: m.QuotesManager })));
 const ProofsManager = lazy(() => import('./production/ProofsManager').then(m => ({ default: m.ProofsManager })));
 const InvoicingManager = lazy(() => import('./production/InvoicingManager').then(m => ({ default: m.InvoicingManager })));
 const ProductionDashboard = lazy(() => import('./production/ProductionDashboard').then(m => ({ default: m.ProductionDashboard })));
+const CustomersManager = lazy(() => import('./production/CustomersManager').then(m => ({ default: m.CustomersManager })));
 
-type ProductionTab = 'dashboard' | 'quotes' | 'proofs' | 'invoicing';
+type ProductionTab = 'dashboard' | 'quotes' | 'customers' | 'proofs' | 'invoicing';
 
 export function ProductionManagement() {
   const [activeTab, setActiveTab] = useState<ProductionTab>('dashboard');
@@ -14,6 +15,7 @@ export function ProductionManagement() {
   const tabs = [
     { id: 'dashboard' as ProductionTab, name: 'Production Board', icon: LayoutDashboard, description: 'Kanban-style workflow' },
     { id: 'quotes' as ProductionTab, name: 'Quotes', icon: FileText, description: 'Quote management & approvals' },
+    { id: 'customers' as ProductionTab, name: 'Customers', icon: Users, description: 'Customer database' },
     { id: 'proofs' as ProductionTab, name: 'Proofs', icon: Image, description: 'Artwork proof approvals' },
     { id: 'invoicing' as ProductionTab, name: 'Invoicing', icon: DollarSign, description: 'Invoice creation & tracking' },
   ];
@@ -72,6 +74,7 @@ export function ProductionManagement() {
       <Suspense fallback={<LoadingFallback message={tabs.find(t => t.id === activeTab)?.name || 'Module'} />}>
         {activeTab === 'dashboard' && <ProductionDashboard />}
         {activeTab === 'quotes' && <QuotesManager />}
+        {activeTab === 'customers' && <CustomersManager />}
         {activeTab === 'proofs' && <ProofsManager />}
         {activeTab === 'invoicing' && <InvoicingManager />}
       </Suspense>
