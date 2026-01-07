@@ -326,6 +326,7 @@ async function syncInvoices(
   cutoffDate.setDate(cutoffDate.getDate() - RECENT_DAYS_LOOKBACK);
   let batchBuffer: any[] = [];
   let lineItemsBatchBuffer: any[] = [];
+  const syncedInvoiceIds = new Set<string>();
 
   const flushBatch = async () => {
     if (batchBuffer.length > 0) {
@@ -367,6 +368,7 @@ async function syncInvoices(
       );
 
       for (const invoice of filteredInvoices) {
+        syncedInvoiceIds.add(invoice.id);
         batchBuffer.push({
           id: invoice.id,
           invoice_number: invoice.visualId,
@@ -453,6 +455,7 @@ async function syncInvoices(
     });
 
     for (const invoice of recentInvoices) {
+      syncedInvoiceIds.add(invoice.id);
       batchBuffer.push({
         id: invoice.id,
         invoice_number: invoice.visualId,
@@ -515,6 +518,53 @@ async function syncInvoices(
   }
 
   await flushBatch();
+
+  console.log(`Synced ${syncedInvoiceIds.size} unique invoices from Printavo`);
+
+  // Clean up invoices that are no longer in Printavo
+  // Only delete invoices that:
+  // 1. Were created after MIN_INVOICE_DATE (to avoid deleting historical data)
+  // 2. Are not in the synced set
+  // 3. Have not been updated in the last 7 days (to avoid race conditions)
+  const cleanupCutoff = new Date();
+  cleanupCutoff.setDate(cleanupCutoff.getDate() - 7);
+
+  const { data: existingInvoices } = await supabase
+    .from('printavo_invoices')
+    .select('id')
+    .gte('invoice_date', MIN_INVOICE_DATE)
+    .lt('updated_at', cleanupCutoff.toISOString());
+
+  if (existingInvoices && existingInvoices.length > 0) {
+    const invoicesToDelete = existingInvoices
+      .filter((inv: any) => !syncedInvoiceIds.has(inv.id))
+      .map((inv: any) => inv.id);
+
+    if (invoicesToDelete.length > 0) {
+      console.log(`Removing ${invoicesToDelete.length} invoices no longer in Printavo`);
+
+      // Delete line items first (foreign key constraint)
+      await supabase
+        .from('printavo_line_items')
+        .delete()
+        .in('invoice_id', invoicesToDelete);
+
+      // Delete payments
+      await supabase
+        .from('printavo_payments')
+        .delete()
+        .in('invoice_id', invoicesToDelete);
+
+      // Delete invoices
+      await supabase
+        .from('printavo_invoices')
+        .delete()
+        .in('id', invoicesToDelete);
+
+      console.log(`Successfully removed ${invoicesToDelete.length} stale invoices`);
+    }
+  }
+
   return totalInvoices;
 }
 
