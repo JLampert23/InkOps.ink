@@ -27,7 +27,7 @@ export function AgingReport({ invoices }: AgingReportProps) {
     count: bucket.count,
   }));
 
-  const bucketColors = ['#10b981', '#fbbf24', '#f97316', '#ef4444', '#991b1b'];
+  const bucketColors = ['#3b82f6', '#10b981', '#fbbf24', '#f97316', '#dc2626'];
 
   const openInvoices = useMemo(() => getOpenInvoices(invoices), [invoices]);
 
@@ -44,10 +44,11 @@ export function AgingReport({ invoices }: AgingReportProps) {
 
     const data = filteredInvoices.map(invoice => {
       const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
-      const bucket = daysPastDue >= 1 && daysPastDue <= 30 ? '1-30 days' :
+      const bucket = daysPastDue <= 0 ? 'Current' :
+                     daysPastDue >= 1 && daysPastDue <= 30 ? '1-30 days' :
                      daysPastDue >= 31 && daysPastDue <= 60 ? '31-60 days' :
                      daysPastDue >= 61 && daysPastDue <= 90 ? '61-90 days' :
-                     daysPastDue >= 90 ? '90+ days' : 'Not Due';
+                     '90+ days';
 
       return {
         customer: invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown',
@@ -57,7 +58,7 @@ export function AgingReport({ invoices }: AgingReportProps) {
         total: invoice.total || 0,
         outstanding: invoice.amountOutstanding || 0,
         agingBucket: bucket,
-        daysPastDue: daysPastDue === 0 ? 'Not Due' : daysPastDue.toString()
+        daysPastDue: daysPastDue <= 0 ? 'Not Due' : daysPastDue.toString()
       };
     });
 
@@ -90,10 +91,11 @@ export function AgingReport({ invoices }: AgingReportProps) {
 
     const data = filteredInvoices.map(invoice => {
       const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
-      const bucket = daysPastDue >= 1 && daysPastDue <= 30 ? '1-30 days' :
+      const bucket = daysPastDue <= 0 ? 'Current' :
+                     daysPastDue >= 1 && daysPastDue <= 30 ? '1-30 days' :
                      daysPastDue >= 31 && daysPastDue <= 60 ? '31-60 days' :
                      daysPastDue >= 61 && daysPastDue <= 90 ? '61-90 days' :
-                     daysPastDue >= 90 ? '90+ days' : 'Not Due';
+                     '90+ days';
 
       return {
         customer: invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown',
@@ -103,7 +105,7 @@ export function AgingReport({ invoices }: AgingReportProps) {
         total: invoice.total || 0,
         outstanding: invoice.amountOutstanding || 0,
         agingBucket: bucket,
-        daysPastDue: daysPastDue === 0 ? 'Not Due' : `${daysPastDue}d`
+        daysPastDue: daysPastDue <= 0 ? 'Not Due' : `${daysPastDue}d`
       };
     });
 
@@ -259,13 +261,13 @@ export function AgingReport({ invoices }: AgingReportProps) {
                               </td>
                               <td className="py-2 text-sm text-center">
                                 <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                  daysPastDue >= 90 ? 'bg-red-100 text-red-800' :
+                                  daysPastDue >= 91 ? 'bg-red-100 text-red-800' :
                                   daysPastDue >= 61 ? 'bg-orange-100 text-orange-800' :
                                   daysPastDue >= 31 ? 'bg-yellow-100 text-yellow-800' :
                                   daysPastDue >= 1 ? 'bg-green-100 text-green-800' :
-                                  'bg-gray-100 text-gray-600'
+                                  'bg-blue-100 text-blue-800'
                                 }`}>
-                                  {daysPastDue === 0 ? 'Not Due' : `${daysPastDue} days`}
+                                  {daysPastDue <= 0 ? 'Not Due' : `${daysPastDue} days`}
                                 </span>
                               </td>
                             </tr>

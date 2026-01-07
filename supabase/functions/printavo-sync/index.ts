@@ -88,52 +88,85 @@ Deno.serve(async (req: Request) => {
     const { result: printavoToken } = await decryptResponse.json();
 
     const printavoProxyUrl = `${supabaseUrl}/functions/v1/printavo-proxy`;
-    const invoicesResponse = await fetch(printavoProxyUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        email: settings.printavo_email,
-        token: printavoToken,
-        query: `
-          query GetInvoices {
-            invoices(first: 1000) {
-              edges {
-                node {
-                  id
-                  visualId
-                  invoiceAt
-                  createdAt
-                  dueAt
-                  total
-                  amountPaid
-                  amountOutstanding
-                  paidInFull
-                  status
-                  contact {
+
+    let allInvoices: any[] = [];
+    let hasNextPage = true;
+    let cursor: string | null = null;
+    let pageCount = 0;
+
+    while (hasNextPage && pageCount < 100) {
+      pageCount++;
+      console.log(`Fetching page ${pageCount}${cursor ? ` after cursor ${cursor.slice(0, 20)}...` : ''}`);
+
+      const invoicesResponse = await fetch(printavoProxyUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          email: settings.printavo_email,
+          token: printavoToken,
+          query: `
+            query GetInvoices${cursor ? '($after: String!)' : ''} {
+              invoices(first: 250${cursor ? ', after: $after' : ''}) {
+                edges {
+                  cursor
+                  node {
                     id
-                    fullName
-                    customer {
+                    visualId
+                    invoiceAt
+                    createdAt
+                    dueAt
+                    total
+                    amountPaid
+                    amountOutstanding
+                    paidInFull
+                    status
+                    contact {
                       id
-                      companyName
+                      fullName
+                      customer {
+                        id
+                        companyName
+                      }
                     }
                   }
                 }
+                pageInfo {
+                  hasNextPage
+                  endCursor
+                }
               }
             }
-          }
-        `
-      })
-    });
+          `,
+          variables: cursor ? { after: cursor } : {}
+        })
+      });
 
-    if (!invoicesResponse.ok) {
-      throw new Error('Failed to fetch invoices from Printavo');
+      if (!invoicesResponse.ok) {
+        throw new Error('Failed to fetch invoices from Printavo');
+      }
+
+      const invoicesData = await invoicesResponse.json();
+      const edges = invoicesData?.data?.invoices?.edges || [];
+      const pageInfo = invoicesData?.data?.invoices?.pageInfo || {};
+
+      const pageInvoices = edges.map((edge: any) => edge.node);
+      allInvoices = allInvoices.concat(pageInvoices);
+
+      hasNextPage = pageInfo.hasNextPage === true;
+      cursor = pageInfo.endCursor || null;
+
+      console.log(`Fetched ${pageInvoices.length} invoices (total so far: ${allInvoices.length})`);
+
+      if (!hasNextPage) {
+        console.log('Reached last page');
+        break;
+      }
     }
 
-    const invoicesData = await invoicesResponse.json();
-    const invoices = invoicesData?.data?.invoices?.edges?.map((edge: any) => edge.node) || [];
+    const invoices = allInvoices;
 
     const { error: deleteError } = await supabase
       .from('printavo_invoices_raw')

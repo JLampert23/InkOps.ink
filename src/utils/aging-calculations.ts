@@ -17,6 +17,7 @@ export interface CustomerAging {
   days30: number;
   days60: number;
   days90: number;
+  days90Plus: number;
   total: number;
   invoiceCount: number;
   oldestInvoiceAge: number;
@@ -40,7 +41,7 @@ export function calculateDaysPastDue(dueDate: string | null | undefined, invoice
   const today = new Date();
   const diffTime = today.getTime() - due.getTime();
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-  return Math.max(0, diffDays);
+  return diffDays;
 }
 
 export function isInvoiceOpen(invoice: Invoice): boolean {
@@ -70,10 +71,11 @@ export function getOpenInvoices(invoices: Invoice[]): Invoice[] {
 
 export function categorizeIntoAgingBuckets(invoices: Invoice[]): AgingBucket[] {
   const buckets: AgingBucket[] = [
-    { name: 'current', label: '1-30 days', minDays: 1, maxDays: 30, invoices: [], total: 0, count: 0 },
-    { name: '30', label: '31-60 days', minDays: 31, maxDays: 60, invoices: [], total: 0, count: 0 },
-    { name: '60', label: '61-90 days', minDays: 61, maxDays: 90, invoices: [], total: 0, count: 0 },
-    { name: '90', label: '90+ days', minDays: 90, maxDays: null, invoices: [], total: 0, count: 0 },
+    { name: 'current', label: 'Current', minDays: -Infinity, maxDays: 0, invoices: [], total: 0, count: 0 },
+    { name: '1-30', label: '1-30 days', minDays: 1, maxDays: 30, invoices: [], total: 0, count: 0 },
+    { name: '31-60', label: '31-60 days', minDays: 31, maxDays: 60, invoices: [], total: 0, count: 0 },
+    { name: '61-90', label: '61-90 days', minDays: 61, maxDays: 90, invoices: [], total: 0, count: 0 },
+    { name: '90+', label: '90+ days', minDays: 91, maxDays: Infinity, invoices: [], total: 0, count: 0 },
   ];
 
   const filteredInvoices = invoices.filter(invoice => {
@@ -91,20 +93,11 @@ export function categorizeIntoAgingBuckets(invoices: Invoice[]): AgingBucket[] {
     const balance = invoice.amountOutstanding || 0;
 
     for (const bucket of buckets) {
-      if (bucket.maxDays === null) {
-        if (daysPastDue >= bucket.minDays) {
-          bucket.invoices.push(invoice);
-          bucket.total += balance;
-          bucket.count++;
-          break;
-        }
-      } else {
-        if (daysPastDue >= bucket.minDays && daysPastDue <= bucket.maxDays) {
-          bucket.invoices.push(invoice);
-          bucket.total += balance;
-          bucket.count++;
-          break;
-        }
+      if (daysPastDue >= bucket.minDays && daysPastDue <= bucket.maxDays) {
+        bucket.invoices.push(invoice);
+        bucket.total += balance;
+        bucket.count++;
+        break;
       }
     }
   });
@@ -139,6 +132,7 @@ export function calculateCustomerAging(invoices: Invoice[]): CustomerAging[] {
         days30: 0,
         days60: 0,
         days90: 0,
+        days90Plus: 0,
         total: 0,
         invoiceCount: 0,
         oldestInvoiceAge: 0,
@@ -151,14 +145,16 @@ export function calculateCustomerAging(invoices: Invoice[]): CustomerAging[] {
     customer.invoiceCount++;
     customer.oldestInvoiceAge = Math.max(customer.oldestInvoiceAge, daysPastDue);
 
-    if (daysPastDue >= 1 && daysPastDue <= 30) {
+    if (daysPastDue <= 0) {
       customer.current += balance;
-    } else if (daysPastDue >= 31 && daysPastDue <= 60) {
+    } else if (daysPastDue >= 1 && daysPastDue <= 30) {
       customer.days30 += balance;
-    } else if (daysPastDue >= 61 && daysPastDue <= 90) {
+    } else if (daysPastDue >= 31 && daysPastDue <= 60) {
       customer.days60 += balance;
-    } else if (daysPastDue >= 90) {
+    } else if (daysPastDue >= 61 && daysPastDue <= 90) {
       customer.days90 += balance;
+    } else if (daysPastDue >= 91) {
+      customer.days90Plus += balance;
     }
   });
 
