@@ -71,8 +71,7 @@ export function useSupabaseData(): SupabaseData {
           id: row.id,
           visualId: row.invoice_number,
           status: { name: row.status || 'Unknown' },
-          createdAt: row.created_at,
-          invoiceAt: row.invoice_date,
+          createdAt: row.invoice_date || row.created_at,
           dueAt: row.due_date,
           total,
           subtotal: Number(row.subtotal) || 0,
@@ -157,17 +156,11 @@ export function useSupabaseData(): SupabaseData {
       setSyncing(true);
       setError(null);
 
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session) {
-        throw new Error('Not authenticated');
-      }
-
       console.log('Starting sync...');
       const response = await fetch(`${supabaseUrl}/functions/v1/printavo-sync`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${supabaseAnonKey}`,
           'Content-Type': 'application/json',
         },
       });

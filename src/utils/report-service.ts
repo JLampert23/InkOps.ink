@@ -48,7 +48,7 @@ export function filterInvoicesByDateRange(
   dateRange: DateRange
 ): Invoice[] {
   return invoices.filter(invoice => {
-    const invoiceDate = new Date(invoice.invoiceAt || invoice.createdAt);
+    const invoiceDate = new Date(invoice.createdAt);
     return isWithinInterval(invoiceDate, {
       start: startOfDay(dateRange.startDate),
       end: endOfDay(dateRange.endDate),
@@ -93,25 +93,14 @@ export function buildARAgingReport(
   ];
 
   openInvoices.forEach(invoice => {
-    const invoiceDate = invoice.invoiceAt || invoice.createdAt;
-    const dueDate = invoice.dueAt;
-    const today = new Date();
-
-    let daysPastDue: number;
-    if (dueDate) {
-      const due = new Date(dueDate);
-      const diffTime = today.getTime() - due.getTime();
-      daysPastDue = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
-    } else {
-      const created = new Date(invoiceDate);
-      const diffTime = today.getTime() - created.getTime();
-      daysPastDue = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    }
+    const daysOutstanding = Math.floor(
+      (Date.now() - new Date(invoice.createdAt).getTime()) / (1000 * 60 * 60 * 24)
+    );
 
     for (const bucket of buckets) {
       const inBucket =
-        daysPastDue >= bucket.minDays &&
-        (bucket.maxDays === null || daysPastDue <= bucket.maxDays);
+        daysOutstanding >= bucket.minDays &&
+        (bucket.maxDays === null || daysOutstanding <= bucket.maxDays);
 
       if (inBucket) {
         bucket.total += invoice.amountOutstanding || 0;
@@ -181,7 +170,7 @@ export function buildCustomerSummaryReport(
     metrics.totalOutstanding += invoice.amountOutstanding || 0;
     metrics.invoiceCount += 1;
 
-    const invoiceDate = new Date(invoice.invoiceAt || invoice.createdAt);
+    const invoiceDate = new Date(invoice.createdAt);
     if (!metrics.lastInvoiceDate || invoiceDate > metrics.lastInvoiceDate) {
       metrics.lastInvoiceDate = invoiceDate;
     }
