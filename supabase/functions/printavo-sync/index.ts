@@ -16,13 +16,6 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Supabase configuration missing');
-    }
-
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
@@ -34,15 +27,18 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
+      throw new Error('Supabase configuration missing');
+    }
+
+    const jwt = authHeader.replace('Bearer ', '');
+
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(jwt);
 
     if (userError || !user) {
       console.error('Auth error:', userError);
@@ -54,6 +50,8 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('company_settings')
@@ -98,7 +96,7 @@ Deno.serve(async (req: Request) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${jwt}`,
       },
       body: JSON.stringify({
         email: settings.printavo_email,
