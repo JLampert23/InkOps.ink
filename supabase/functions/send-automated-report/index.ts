@@ -196,39 +196,7 @@ Deno.serve(async (req: Request) => {
       </div>
     `;
 
-    // Send email via send-email edge function
-    const emailPayload = {
-      to: rule.email_recipients,
-      subject: `${rule.report_name} - ${new Date().toLocaleDateString()}`,
-      template: 'custom',
-      html,
-      attachments,
-      data: {
-        from: settings?.email_from_address,
-      },
-    };
-
-    // Get a user token to call the send-email function
-    const { data: userData } = await supabase
-      .from('users')
-      .select('id')
-      .eq('id', rule.user_id)
-      .maybeSingle();
-
-    if (!userData) {
-      throw new Error('User not found for automation rule');
-    }
-
-    // Create a temporary admin token for sending email
-    const { data: { session }, error: sessionError } = await supabase.auth.admin.generateLink({
-      type: 'magiclink',
-      email: `${rule.user_id}@temp.local`,
-      options: {
-        redirectTo: supabaseUrl,
-      },
-    });
-
-    // Instead, directly call Resend API
+    // Get Resend API key
     const { data: resendSettings } = await supabase
       .from('company_settings')
       .select('resend_api_key')
@@ -261,8 +229,8 @@ Deno.serve(async (req: Request) => {
     const resendPayload: any = {
       from: settings?.email_from_address || 'noreply@toddssportinggoods.com',
       to: rule.email_recipients,
-      subject: emailPayload.subject,
-      html: emailPayload.html,
+      subject: `${rule.report_name} - ${new Date().toLocaleDateString()}`,
+      html: html,
     };
 
     if (attachments && attachments.length > 0) {
@@ -286,6 +254,9 @@ Deno.serve(async (req: Request) => {
       throw new Error(`Resend API error: ${error}`);
     }
 
+    const resendResult = await resendResponse.json();
+    console.log('Email sent successfully:', resendResult);
+
     // Update last_sent_at
     await supabase
       .from('automated_reports')
@@ -296,7 +267,7 @@ Deno.serve(async (req: Request) => {
       .eq('id', rule_id);
 
     return new Response(
-      JSON.stringify({ success: true, message: 'Report sent successfully' }),
+      JSON.stringify({ success: true, message: 'Report sent successfully', emailId: resendResult.id }),
       {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -362,8 +333,6 @@ async function generateCSV(data: any): Promise<string> {
 }
 
 async function generatePDF(reportType: string, data: any): Promise<string> {
-  // For now, return a simple message that PDF generation needs jsPDF
-  // In production, you would use a PDF generation library
   const message = `PDF generation is not available in edge functions. Please use CSV format or implement a client-side PDF generation.`;
   return utf8ToBase64(message);
 }
