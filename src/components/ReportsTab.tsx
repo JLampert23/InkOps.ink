@@ -1,19 +1,21 @@
 import { useState } from 'react';
-import { FileText, DollarSign, TrendingUp, Users, BarChart3 } from 'lucide-react';
+import { FileText, DollarSign, TrendingUp, Users, BarChart3, LineChart } from 'lucide-react';
 import { Invoice, PaymentWithInvoice } from '../types/printavo';
 import { AgingReport } from './AgingReport';
 import { PaymentsExplorer } from './PaymentsExplorer';
 import { SalesSummaryReport } from './SalesSummaryReport';
 import { CustomerSummaryReport } from './CustomerSummaryReport';
+import { Analytics } from './Analytics';
 
 interface ReportsTabProps {
   invoices: Invoice[];
   payments: PaymentWithInvoice[];
+  lineItems: any[];
 }
 
-type ReportType = 'ar-aging' | 'payments' | 'sales-summary' | 'customer-summary';
+type ReportType = 'ar-aging' | 'payments' | 'sales-summary' | 'customer-summary' | 'analytics';
 
-export function ReportsTab({ invoices, payments }: ReportsTabProps) {
+export function ReportsTab({ invoices, payments, lineItems }: ReportsTabProps) {
   const [activeReport, setActiveReport] = useState<ReportType>('ar-aging');
 
   const reports = [
@@ -45,6 +47,13 @@ export function ReportsTab({ invoices, payments }: ReportsTabProps) {
       icon: Users,
       color: 'orange',
     },
+    {
+      id: 'analytics' as ReportType,
+      name: 'Advanced Analytics',
+      description: '',
+      icon: LineChart,
+      color: 'teal',
+    },
   ];
 
   const renderReport = () => {
@@ -57,6 +66,8 @@ export function ReportsTab({ invoices, payments }: ReportsTabProps) {
         return <SalesSummaryReport invoices={invoices} />;
       case 'customer-summary':
         return <CustomerSummaryReport invoices={invoices} />;
+      case 'analytics':
+        return <Analytics invoices={invoices} payments={payments} lineItems={lineItems} />;
       default:
         return null;
     }
@@ -66,13 +77,13 @@ export function ReportsTab({ invoices, payments }: ReportsTabProps) {
     <div className="space-y-6">
       <div className="bg-white rounded-lg shadow p-6">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Financial Reports</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Reports & Analytics</h1>
           <p className="text-gray-600 mt-2">
             Comprehensive reporting and analytics for your business
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           {reports.map((report) => {
             const Icon = report.icon;
             const isActive = activeReport === report.id;
@@ -98,7 +109,9 @@ export function ReportsTab({ invoices, payments }: ReportsTabProps) {
                         ? 'bg-green-100 text-green-600'
                         : report.color === 'purple'
                         ? 'bg-purple-100 text-purple-600'
-                        : 'bg-orange-100 text-orange-600'
+                        : report.color === 'orange'
+                        ? 'bg-orange-100 text-orange-600'
+                        : 'bg-teal-100 text-teal-600'
                     }`}
                   >
                     <Icon className="w-6 h-6" />

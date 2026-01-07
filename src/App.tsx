@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { FileText, Users, RefreshCw, AlertCircle, DollarSign, TrendingUp, Download, Building2, Menu, X, LogOut, Loader2, BarChart3, Settings, LineChart, CreditCard, Package } from 'lucide-react';
+import { FileText, Users, RefreshCw, AlertCircle, DollarSign, TrendingUp, Download, Building2, Menu, X, LogOut, Loader2, BarChart3, Settings, CreditCard, Package } from 'lucide-react';
 import { useSupabaseData } from './hooks/useSupabaseData';
 import { InvoiceExplorer } from './components/InvoiceExplorer';
 import { CustomerProfiles } from './components/CustomerProfiles';
@@ -8,7 +8,6 @@ import { AccountsReceivable } from './components/AccountsReceivable';
 import { ARByCustomer } from './components/ARByCustomer';
 import { ReportsTab } from './components/ReportsTab';
 import { AccountSettings } from './components/AccountSettings';
-import { Analytics } from './components/Analytics';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { EnhancedAuthScreen } from './components/EnhancedAuthScreen';
 import { supabase } from './lib/supabase-client';
@@ -16,7 +15,7 @@ import { supabase } from './lib/supabase-client';
 const SquareData = lazy(() => import('./components/SquareData'));
 const ProductionManagement = lazy(() => import('./components/ProductionManagement').then(m => ({ default: m.ProductionManagement })));
 
-type Tab = 'ar' | 'ar-by-customer' | 'open-invoices' | 'reports' | 'analytics' | 'invoices' | 'customers' | 'square' | 'production' | 'settings';
+type Tab = 'ar' | 'ar-by-customer' | 'open-invoices' | 'reports' | 'invoices' | 'customers' | 'square' | 'production' | 'settings';
 
 interface CompanySettings {
   company_name: string;
@@ -94,15 +93,9 @@ function AppContent() {
     },
     {
       id: 'reports' as Tab,
-      name: 'Reports',
+      name: 'Reports & Analytics',
       icon: BarChart3,
-      description: 'Financial reports hub'
-    },
-    {
-      id: 'analytics' as Tab,
-      name: 'Analytics',
-      icon: LineChart,
-      description: 'Advanced insights'
+      description: 'Financial reports & insights'
     },
     {
       id: 'invoices' as Tab,
@@ -466,10 +459,7 @@ function AppContent() {
               <OpenInvoices invoices={invoices} />
             )}
             {activeTab === 'reports' && (
-              <ReportsTab invoices={invoices} payments={payments} />
-            )}
-            {activeTab === 'analytics' && (
-              <Analytics invoices={invoices} payments={payments} lineItems={lineItems} />
+              <ReportsTab invoices={invoices} payments={payments} lineItems={lineItems} />
             )}
             {activeTab === 'invoices' && (
               <InvoiceExplorer invoices={invoices} />
