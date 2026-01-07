@@ -14,10 +14,10 @@ export interface CustomerAging {
   customerId: string;
   customerName: string;
   current: number;
-  days30: number;
-  days60: number;
-  days90: number;
-  days120: number;
+  days1to30: number;
+  days31to60: number;
+  days61to90: number;
+  days90Plus: number;
   total: number;
   invoiceCount: number;
   oldestInvoiceAge: number;
@@ -69,22 +69,27 @@ export function getOpenInvoices(invoices: Invoice[]): Invoice[] {
   return invoices.filter(isInvoiceOpen);
 }
 
+export function getAllInvoicesForAging(invoices: Invoice[]): Invoice[] {
+  return invoices.filter(invoice => {
+    const total = invoice.total || 0;
+    return total > 0;
+  });
+}
+
 export function categorizeIntoAgingBuckets(invoices: Invoice[]): AgingBucket[] {
   const buckets: AgingBucket[] = [
-    { name: 'current', label: '1-30 days', minDays: 0, maxDays: 30, invoices: [], total: 0, count: 0 },
-    { name: '30', label: '31-60 days', minDays: 31, maxDays: 60, invoices: [], total: 0, count: 0 },
-    { name: '60', label: '61-90 days', minDays: 61, maxDays: 90, invoices: [], total: 0, count: 0 },
-    { name: '90', label: '91-120 days', minDays: 91, maxDays: 120, invoices: [], total: 0, count: 0 },
-    { name: '120', label: '121+ days', minDays: 121, maxDays: null, invoices: [], total: 0, count: 0 },
+    { name: 'current', label: 'Current', minDays: -999999, maxDays: 0, invoices: [], total: 0, count: 0 },
+    { name: '1-30', label: '1-30', minDays: 1, maxDays: 30, invoices: [], total: 0, count: 0 },
+    { name: '31-60', label: '31-60', minDays: 31, maxDays: 60, invoices: [], total: 0, count: 0 },
+    { name: '61-90', label: '61-90', minDays: 61, maxDays: 90, invoices: [], total: 0, count: 0 },
+    { name: '90+', label: '90+', minDays: 91, maxDays: null, invoices: [], total: 0, count: 0 },
   ];
 
-  const openInvoices = getOpenInvoices(invoices);
+  const allInvoices = getAllInvoicesForAging(invoices);
 
-  openInvoices.forEach(invoice => {
-    // Use days past due (from due date) instead of days outstanding (from creation date)
-    // This matches Printavo's aging calculation methodology
+  allInvoices.forEach(invoice => {
     const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
-    const balance = invoice.amountOutstanding || 0;
+    const balance = invoice.amountOutstanding || invoice.total || 0;
 
     for (const bucket of buckets) {
       if (bucket.maxDays === null) {
@@ -111,13 +116,12 @@ export function categorizeIntoAgingBuckets(invoices: Invoice[]): AgingBucket[] {
 export function calculateCustomerAging(invoices: Invoice[]): CustomerAging[] {
   const customerMap = new Map<string, CustomerAging>();
 
-  const openInvoices = getOpenInvoices(invoices);
+  const allInvoices = getAllInvoicesForAging(invoices);
 
-  openInvoices.forEach(invoice => {
+  allInvoices.forEach(invoice => {
     const customerId = invoice.contact?.customer?.id || invoice.contact?.id || 'unknown';
     const customerName = invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown Customer';
-    const balance = invoice.amountOutstanding || 0;
-    // Use days past due instead of days outstanding to match Printavo
+    const balance = invoice.amountOutstanding || invoice.total || 0;
     const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
 
     if (!customerMap.has(customerId)) {
@@ -125,10 +129,10 @@ export function calculateCustomerAging(invoices: Invoice[]): CustomerAging[] {
         customerId,
         customerName,
         current: 0,
-        days30: 0,
-        days60: 0,
-        days90: 0,
-        days120: 0,
+        days1to30: 0,
+        days31to60: 0,
+        days61to90: 0,
+        days90Plus: 0,
         total: 0,
         invoiceCount: 0,
         oldestInvoiceAge: 0,
@@ -141,23 +145,23 @@ export function calculateCustomerAging(invoices: Invoice[]): CustomerAging[] {
     customer.invoiceCount++;
     customer.oldestInvoiceAge = Math.max(customer.oldestInvoiceAge, daysPastDue);
 
-    if (daysPastDue <= 30) {
+    if (daysPastDue <= 0) {
       customer.current += balance;
+    } else if (daysPastDue <= 30) {
+      customer.days1to30 += balance;
     } else if (daysPastDue <= 60) {
-      customer.days30 += balance;
+      customer.days31to60 += balance;
     } else if (daysPastDue <= 90) {
-      customer.days60 += balance;
-    } else if (daysPastDue <= 120) {
-      customer.days90 += balance;
+      customer.days61to90 += balance;
     } else {
-      customer.days120 += balance;
+      customer.days90Plus += balance;
     }
   });
 
   const customers = Array.from(customerMap.values());
 
   customers.forEach(customer => {
-    const invoicesForCustomer = openInvoices.filter(inv => {
+    const invoicesForCustomer = allInvoices.filter(inv => {
       const custId = inv.contact?.customer?.id || inv.contact?.id || 'unknown';
       return custId === customer.customerId;
     });

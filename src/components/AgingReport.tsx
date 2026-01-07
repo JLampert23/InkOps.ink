@@ -29,13 +29,12 @@ export function AgingReport({ invoices }: AgingReportProps) {
 
   const bucketColors = ['#10b981', '#fbbf24', '#f97316', '#ef4444', '#991b1b'];
 
-  const openInvoices = useMemo(() => getOpenInvoices(invoices), [invoices]);
+  const allInvoices = useMemo(() => invoices.filter(inv => (inv.total || 0) > 0), [invoices]);
 
   const handleExportCSV = () => {
-    const data = openInvoices.map(invoice => {
-      const daysOut = calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt);
+    const data = allInvoices.map(invoice => {
       const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
-      const bucket = daysOut <= 30 ? '1-30 days' : daysOut <= 60 ? '31-60 days' : daysOut <= 90 ? '61-90 days' : daysOut <= 120 ? '91-120 days' : '121+ days';
+      const bucket = daysPastDue <= 0 ? 'Current' : daysPastDue <= 30 ? '1-30' : daysPastDue <= 60 ? '31-60' : daysPastDue <= 90 ? '61-90' : '90+';
 
       return {
         customer: invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown',
@@ -43,9 +42,9 @@ export function AgingReport({ invoices }: AgingReportProps) {
         invoiceDate: invoice.invoiceAt || invoice.createdAt,
         dueDate: invoice.dueAt || '',
         total: invoice.total || 0,
-        outstanding: invoice.amountOutstanding || 0,
+        outstanding: invoice.amountOutstanding || invoice.total || 0,
         agingBucket: bucket,
-        daysPastDue: daysPastDue === 0 ? 'Not Due' : daysPastDue.toString()
+        daysPastDue: daysPastDue <= 0 ? 'Not Due' : daysPastDue.toString()
       };
     });
 
@@ -66,10 +65,9 @@ export function AgingReport({ invoices }: AgingReportProps) {
   };
 
   const handleExportPDF = () => {
-    const data = openInvoices.map(invoice => {
-      const daysOut = calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt);
+    const data = allInvoices.map(invoice => {
       const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
-      const bucket = daysOut <= 30 ? '1-30 days' : daysOut <= 60 ? '31-60 days' : daysOut <= 90 ? '61-90 days' : daysOut <= 120 ? '91-120 days' : '121+ days';
+      const bucket = daysPastDue <= 0 ? 'Current' : daysPastDue <= 30 ? '1-30' : daysPastDue <= 60 ? '31-60' : daysPastDue <= 90 ? '61-90' : '90+';
 
       return {
         customer: invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown',
@@ -77,9 +75,9 @@ export function AgingReport({ invoices }: AgingReportProps) {
         invoiceDate: invoice.invoiceAt || invoice.createdAt,
         dueDate: invoice.dueAt || '',
         total: invoice.total || 0,
-        outstanding: invoice.amountOutstanding || 0,
+        outstanding: invoice.amountOutstanding || invoice.total || 0,
         agingBucket: bucket,
-        daysPastDue: daysPastDue === 0 ? 'Not Due' : `${daysPastDue}d`
+        daysPastDue: daysPastDue <= 0 ? 'Not Due' : `${daysPastDue}d`
       };
     });
 
@@ -123,7 +121,7 @@ export function AgingReport({ invoices }: AgingReportProps) {
           <div className="flex items-center gap-3">
             <button
               onClick={handleExportCSV}
-              disabled={openInvoices.length === 0}
+              disabled={allInvoices.length === 0}
               className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
             >
               <FileDown className="w-4 h-4" />
@@ -131,7 +129,7 @@ export function AgingReport({ invoices }: AgingReportProps) {
             </button>
             <button
               onClick={handleExportPDF}
-              disabled={openInvoices.length === 0}
+              disabled={allInvoices.length === 0}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
             >
               <FileDown className="w-4 h-4" />
