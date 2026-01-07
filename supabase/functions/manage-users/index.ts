@@ -119,6 +119,76 @@ Deno.serve(async (req: Request) => {
         );
       }
 
+      // Generate password reset link for the new user
+      const { data: resetData, error: resetError } = await supabaseAuth.auth.admin.generateLink({
+        type: 'recovery',
+        email: email,
+      });
+
+      if (resetError) {
+        console.error("Error generating password reset link:", resetError);
+      }
+
+      // Send welcome email with password setup link
+      if (resetData?.properties?.action_link) {
+        try {
+          const { data: settings } = await supabaseAuth
+            .from('company_settings')
+            .select('email_from_address')
+            .maybeSingle();
+
+          const emailHtml = `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
+              <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+                <h1 style="margin: 0;">Welcome to Todd's Sporting Goods!</h1>
+              </div>
+              <div style="background: white; padding: 30px; border: 1px solid #e5e7eb; border-top: none;">
+                <p style="font-size: 16px; color: #1f2937;">Hello ${full_name || 'there'},</p>
+                <p style="color: #4b5563;">Your account has been created successfully. To get started, please set up your password by clicking the button below:</p>
+                <div style="text-align: center; margin: 30px 0;">
+                  <a href="${resetData.properties.action_link}" style="display: inline-block; padding: 14px 28px; background: #667eea; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">Set Up Your Password</a>
+                </div>
+                <p style="color: #6b7280; font-size: 14px;">If the button doesn't work, copy and paste this link into your browser:</p>
+                <p style="color: #3b82f6; font-size: 13px; word-break: break-all; background: #f3f4f6; padding: 12px; border-radius: 6px;">${resetData.properties.action_link}</p>
+                <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; margin: 20px 0;">
+                  <p style="margin: 0; color: #92400e; font-size: 14px;"><strong>Important:</strong> This link will expire in 24 hours. If it expires, you can request a new password reset link from the login page.</p>
+                </div>
+                <p style="color: #4b5563; margin-top: 30px;">Once you've set your password, you'll have full access to the dashboard and all its features.</p>
+              </div>
+              <div style="background: #f9fafb; padding: 20px; text-align: center; color: #6b7280; font-size: 14px; border-radius: 0 0 10px 10px;">
+                <p style="margin: 0;">If you didn't expect this email, please contact your administrator.</p>
+              </div>
+            </div>
+          `;
+
+          // Call send-email function
+          const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': authHeader,
+            },
+            body: JSON.stringify({
+              to: email,
+              subject: 'Welcome! Set Up Your Password',
+              template: 'custom',
+              html: emailHtml,
+              data: {
+                from: settings?.email_from_address,
+              },
+            }),
+          });
+
+          if (!emailResponse.ok) {
+            console.error("Failed to send welcome email:", await emailResponse.text());
+          } else {
+            console.log("Welcome email sent successfully to:", email);
+          }
+        } catch (emailError) {
+          console.error("Error sending welcome email:", emailError);
+        }
+      }
+
       return new Response(
         JSON.stringify({ success: true, user: newUser.user }),
         {
