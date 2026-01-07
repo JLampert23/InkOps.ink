@@ -33,9 +33,8 @@ export function AgingReport({ invoices }: AgingReportProps) {
 
   const handleExportCSV = () => {
     const data = openInvoices.map(invoice => {
-      const daysOut = calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt);
       const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
-      const bucket = daysOut <= 30 ? '1-30 days' : daysOut <= 60 ? '31-60 days' : daysOut <= 90 ? '61-90 days' : daysOut <= 120 ? '91-120 days' : '121+ days';
+      const bucket = daysPastDue <= 30 ? '1-30 days' : daysPastDue <= 60 ? '31-60 days' : daysPastDue <= 90 ? '61-90 days' : daysPastDue <= 120 ? '91-120 days' : '121+ days';
 
       return {
         customer: invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown',
@@ -67,9 +66,8 @@ export function AgingReport({ invoices }: AgingReportProps) {
 
   const handleExportPDF = () => {
     const data = openInvoices.map(invoice => {
-      const daysOut = calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt);
       const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
-      const bucket = daysOut <= 30 ? '1-30 days' : daysOut <= 60 ? '31-60 days' : daysOut <= 90 ? '61-90 days' : daysOut <= 120 ? '91-120 days' : '121+ days';
+      const bucket = daysPastDue <= 30 ? '1-30 days' : daysPastDue <= 60 ? '31-60 days' : daysPastDue <= 90 ? '61-90 days' : daysPastDue <= 120 ? '91-120 days' : '121+ days';
 
       return {
         customer: invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown',
