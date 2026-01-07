@@ -51,11 +51,11 @@ Deno.serve(async (req: Request) => {
 
     const { data: settings, error: settingsError } = await supabase
       .from('company_settings')
-      .select('printavo_email, printavo_token')
-      .eq('user_id', user.id)
+      .select('printavo_username, printavo_api_token_encrypted')
+      .eq('owner_id', user.id)
       .maybeSingle();
 
-    if (settingsError || !settings?.printavo_email || !settings?.printavo_token) {
+    if (settingsError || !settings?.printavo_username || !settings?.printavo_api_token_encrypted) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -77,7 +77,7 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify({
         action: 'decrypt',
-        data: settings.printavo_token
+        data: settings.printavo_api_token_encrypted
       })
     });
 
@@ -105,7 +105,7 @@ Deno.serve(async (req: Request) => {
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          email: settings.printavo_email,
+          email: settings.printavo_username,
           token: printavoToken,
           query: `
             query GetInvoices${cursor ? '($after: String!)' : ''} {
