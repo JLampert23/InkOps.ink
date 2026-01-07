@@ -1,15 +1,12 @@
 import { useState, lazy, Suspense } from 'react';
-import { FileText, Image, DollarSign, Zap, LayoutDashboard, Settings, CreditCard, Loader2 } from 'lucide-react';
+import { FileText, Image, DollarSign, LayoutDashboard, Loader2 } from 'lucide-react';
 
 const QuotesManager = lazy(() => import('./production/QuotesManager').then(m => ({ default: m.QuotesManager })));
 const ProofsManager = lazy(() => import('./production/ProofsManager').then(m => ({ default: m.ProofsManager })));
 const InvoicingManager = lazy(() => import('./production/InvoicingManager').then(m => ({ default: m.InvoicingManager })));
-const AutomationBuilder = lazy(() => import('./production/AutomationBuilder').then(m => ({ default: m.AutomationBuilder })));
 const ProductionDashboard = lazy(() => import('./production/ProductionDashboard').then(m => ({ default: m.ProductionDashboard })));
-const WorkflowCustomization = lazy(() => import('./production/WorkflowCustomization').then(m => ({ default: m.WorkflowCustomization })));
-const StripePayments = lazy(() => import('./production/StripePayments').then(m => ({ default: m.StripePayments })));
 
-type ProductionTab = 'dashboard' | 'quotes' | 'proofs' | 'invoicing' | 'automations' | 'workflow' | 'payments';
+type ProductionTab = 'dashboard' | 'quotes' | 'proofs' | 'invoicing';
 
 export function ProductionManagement() {
   const [activeTab, setActiveTab] = useState<ProductionTab>('dashboard');
@@ -19,9 +16,6 @@ export function ProductionManagement() {
     { id: 'quotes' as ProductionTab, name: 'Quotes', icon: FileText, description: 'Quote management & approvals' },
     { id: 'proofs' as ProductionTab, name: 'Proofs', icon: Image, description: 'Artwork proof approvals' },
     { id: 'invoicing' as ProductionTab, name: 'Invoicing', icon: DollarSign, description: 'Invoice creation & tracking' },
-    { id: 'automations' as ProductionTab, name: 'Automations', icon: Zap, description: 'Workflow automations' },
-    { id: 'workflow' as ProductionTab, name: 'Workflow Setup', icon: Settings, description: 'Customize stages' },
-    { id: 'payments' as ProductionTab, name: 'Stripe Payments', icon: CreditCard, description: 'Payment processing' },
   ];
 
   const LoadingFallback = ({ message }: { message: string }) => (
@@ -69,14 +63,17 @@ export function ProductionManagement() {
         </div>
       </div>
 
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <p className="text-sm text-blue-900">
+          <strong>Note:</strong> Workflow Setup, Automations, and Stripe Payments have been moved to <strong>Settings</strong> for centralized configuration.
+        </p>
+      </div>
+
       <Suspense fallback={<LoadingFallback message={tabs.find(t => t.id === activeTab)?.name || 'Module'} />}>
         {activeTab === 'dashboard' && <ProductionDashboard />}
         {activeTab === 'quotes' && <QuotesManager />}
         {activeTab === 'proofs' && <ProofsManager />}
         {activeTab === 'invoicing' && <InvoicingManager />}
-        {activeTab === 'automations' && <AutomationBuilder />}
-        {activeTab === 'workflow' && <WorkflowCustomization />}
-        {activeTab === 'payments' && <StripePayments />}
       </Suspense>
     </div>
   );

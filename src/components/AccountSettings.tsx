@@ -1,8 +1,12 @@
-import { useState, useEffect } from 'react';
-import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, Edit, Key, Clock } from 'lucide-react';
+import { useState, useEffect, lazy, Suspense } from 'react';
+import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, Edit, Key, Clock, Layers, Zap, CreditCard } from 'lucide-react';
 import { supabase } from '../lib/supabase-client';
 import { useAuth } from '../contexts/AuthContext';
 import AutomatedReports from './automation/AutomatedReports';
+
+const WorkflowCustomization = lazy(() => import('./production/WorkflowCustomization').then(m => ({ default: m.WorkflowCustomization })));
+const AutomationBuilder = lazy(() => import('./production/AutomationBuilder').then(m => ({ default: m.AutomationBuilder })));
+const StripePayments = lazy(() => import('./production/StripePayments').then(m => ({ default: m.StripePayments })));
 
 interface CompanySettings {
   id: string;
@@ -25,7 +29,7 @@ interface UserProfile {
 
 export function AccountSettings() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'company' | 'integration' | 'users' | 'statuses' | 'automation'>('company');
+  const [activeTab, setActiveTab] = useState<'company' | 'integration' | 'users' | 'statuses' | 'automation' | 'workflow' | 'automations' | 'stripe'>('company');
   const [loading, setLoading] = useState(true);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -895,6 +899,45 @@ export function AccountSettings() {
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4" />
                 Automated Reports
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('workflow')}
+              className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'workflow'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4" />
+                Workflow Setup
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('automations')}
+              className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'automations'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4" />
+                Automations
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('stripe')}
+              className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'stripe'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-4 h-4" />
+                Stripe Payments
               </div>
             </button>
           </nav>
@@ -1770,6 +1813,36 @@ export function AccountSettings() {
 
           {activeTab === 'automation' && (
             <AutomatedReports />
+          )}
+
+          {activeTab === 'workflow' && (
+            <Suspense fallback={
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+              </div>
+            }>
+              <WorkflowCustomization />
+            </Suspense>
+          )}
+
+          {activeTab === 'automations' && (
+            <Suspense fallback={
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+              </div>
+            }>
+              <AutomationBuilder />
+            </Suspense>
+          )}
+
+          {activeTab === 'stripe' && (
+            <Suspense fallback={
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+              </div>
+            }>
+              <StripePayments />
+            </Suspense>
           )}
         </div>
       </div>
