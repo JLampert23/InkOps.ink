@@ -76,10 +76,14 @@ export function categorizeIntoAgingBuckets(invoices: Invoice[]): AgingBucket[] {
     { name: '90', label: '90+ days', minDays: 90, maxDays: null, invoices: [], total: 0, count: 0 },
   ];
 
-  const jan1_2025 = new Date('2025-01-01T00:00:00Z');
   const filteredInvoices = invoices.filter(invoice => {
-    const createdDate = new Date(invoice.createdAt);
-    return createdDate >= jan1_2025;
+    const total = invoice.total || 0;
+    const amountOutstanding = invoice.amountOutstanding || 0;
+    const status = invoice.status?.name?.toLowerCase() || '';
+
+    return total > 0
+      && amountOutstanding > 0
+      && !status.includes('dead');
   });
 
   filteredInvoices.forEach(invoice => {
@@ -111,10 +115,14 @@ export function categorizeIntoAgingBuckets(invoices: Invoice[]): AgingBucket[] {
 export function calculateCustomerAging(invoices: Invoice[]): CustomerAging[] {
   const customerMap = new Map<string, CustomerAging>();
 
-  const jan1_2025 = new Date('2025-01-01T00:00:00Z');
   const filteredInvoices = invoices.filter(invoice => {
-    const createdDate = new Date(invoice.createdAt);
-    return createdDate >= jan1_2025;
+    const total = invoice.total || 0;
+    const amountOutstanding = invoice.amountOutstanding || 0;
+    const status = invoice.status?.name?.toLowerCase() || '';
+
+    return total > 0
+      && amountOutstanding > 0
+      && !status.includes('dead');
   });
 
   filteredInvoices.forEach(invoice => {

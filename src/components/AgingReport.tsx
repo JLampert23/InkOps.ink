@@ -32,10 +32,14 @@ export function AgingReport({ invoices }: AgingReportProps) {
   const openInvoices = useMemo(() => getOpenInvoices(invoices), [invoices]);
 
   const handleExportCSV = () => {
-    const jan1_2025 = new Date('2025-01-01T00:00:00Z');
     const filteredInvoices = invoices.filter(invoice => {
-      const createdDate = new Date(invoice.createdAt);
-      return createdDate >= jan1_2025;
+      const total = invoice.total || 0;
+      const amountOutstanding = invoice.amountOutstanding || 0;
+      const status = invoice.status?.name?.toLowerCase() || '';
+
+      return total > 0
+        && amountOutstanding > 0
+        && !status.includes('dead');
     });
 
     const data = filteredInvoices.map(invoice => {
@@ -74,10 +78,14 @@ export function AgingReport({ invoices }: AgingReportProps) {
   };
 
   const handleExportPDF = () => {
-    const jan1_2025 = new Date('2025-01-01T00:00:00Z');
     const filteredInvoices = invoices.filter(invoice => {
-      const createdDate = new Date(invoice.createdAt);
-      return createdDate >= jan1_2025;
+      const total = invoice.total || 0;
+      const amountOutstanding = invoice.amountOutstanding || 0;
+      const status = invoice.status?.name?.toLowerCase() || '';
+
+      return total > 0
+        && amountOutstanding > 0
+        && !status.includes('dead');
     });
 
     const data = filteredInvoices.map(invoice => {
