@@ -23,8 +23,6 @@ Deno.serve(async (req: Request) => {
       throw new Error('Supabase configuration missing');
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
@@ -36,12 +34,20 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
+
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
 
     if (userError || !user) {
+      console.error('Auth error:', userError);
       return new Response(
-        JSON.stringify({ success: false, error: 'Unauthorized' }),
+        JSON.stringify({ success: false, error: 'Unauthorized', details: userError?.message }),
         {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -49,7 +55,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: settings, error: settingsError } = await supabase
+    const { data: settings, error: settingsError } = await supabaseAdmin
       .from('company_settings')
       .select('printavo_email, printavo_token')
       .eq('user_id', user.id)
@@ -135,7 +141,7 @@ Deno.serve(async (req: Request) => {
     const invoicesData = await invoicesResponse.json();
     const invoices = invoicesData?.data?.invoices?.edges?.map((edge: any) => edge.node) || [];
 
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await supabaseAdmin
       .from('printavo_invoices_raw')
       .delete()
       .eq('user_id', user.id);
@@ -152,7 +158,7 @@ Deno.serve(async (req: Request) => {
         synced_at: new Date().toISOString()
       }));
 
-      const { error: insertError } = await supabase
+      const { error: insertError } = await supabaseAdmin
         .from('printavo_invoices_raw')
         .insert(invoicesToInsert);
 
