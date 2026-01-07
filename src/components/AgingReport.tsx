@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, FileDown, ExternalLink } from 'lucide-react';
 import { Invoice } from '../types/printavo';
-import { categorizeIntoAgingBuckets, calculateDaysOutstanding, calculateDaysPastDue } from '../utils/aging-calculations';
+import { categorizeIntoAgingBuckets, calculateDaysOutstanding } from '../utils/aging-calculations';
 import { format } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { exportToCSV } from '../utils/csv-export';
 import { exportToPDF } from '../utils/pdf-export';
-import { getOpenInvoices } from '../utils/aging-calculations';
 import { getPrintavoInvoiceUrl } from '../utils/printavo-links';
 
 interface AgingReportProps {
@@ -33,8 +32,8 @@ export function AgingReport({ invoices }: AgingReportProps) {
 
   const handleExportCSV = () => {
     const data = allInvoices.map(invoice => {
-      const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
-      const bucket = daysPastDue <= 0 ? 'Current' : daysPastDue <= 30 ? '1-30' : daysPastDue <= 60 ? '31-60' : daysPastDue <= 90 ? '61-90' : '90+';
+      const daysFromInvoice = calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt);
+      const bucket = daysFromInvoice <= 30 ? 'Current' : daysFromInvoice <= 60 ? '1-30' : daysFromInvoice <= 90 ? '31-60' : daysFromInvoice <= 120 ? '61-90' : '90+';
 
       return {
         customer: invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown',
@@ -44,7 +43,7 @@ export function AgingReport({ invoices }: AgingReportProps) {
         total: invoice.total || 0,
         outstanding: invoice.amountOutstanding || 0,
         agingBucket: bucket,
-        daysPastDue: daysPastDue <= 0 ? 'Not Due' : daysPastDue.toString()
+        daysFromInvoice: daysFromInvoice.toString()
       };
     });
 
@@ -58,7 +57,7 @@ export function AgingReport({ invoices }: AgingReportProps) {
         { header: 'Total Amount', key: 'total', formatter: (val) => `$${val.toFixed(2)}` },
         { header: 'Amount Outstanding', key: 'outstanding', formatter: (val) => `$${val.toFixed(2)}` },
         { header: 'Aging Bucket', key: 'agingBucket' },
-        { header: 'Days Past Due', key: 'daysPastDue' }
+        { header: 'Days From Invoice', key: 'daysFromInvoice' }
       ],
       `aging-report-${format(new Date(), 'yyyy-MM-dd')}`
     );
@@ -66,8 +65,8 @@ export function AgingReport({ invoices }: AgingReportProps) {
 
   const handleExportPDF = () => {
     const data = allInvoices.map(invoice => {
-      const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
-      const bucket = daysPastDue <= 0 ? 'Current' : daysPastDue <= 30 ? '1-30' : daysPastDue <= 60 ? '31-60' : daysPastDue <= 90 ? '61-90' : '90+';
+      const daysFromInvoice = calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt);
+      const bucket = daysFromInvoice <= 30 ? 'Current' : daysFromInvoice <= 60 ? '1-30' : daysFromInvoice <= 90 ? '31-60' : daysFromInvoice <= 120 ? '61-90' : '90+';
 
       return {
         customer: invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown',
@@ -77,7 +76,7 @@ export function AgingReport({ invoices }: AgingReportProps) {
         total: invoice.total || 0,
         outstanding: invoice.amountOutstanding || 0,
         agingBucket: bucket,
-        daysPastDue: daysPastDue <= 0 ? 'Not Due' : `${daysPastDue}d`
+        daysFromInvoice: `${daysFromInvoice}d`
       };
     });
 
@@ -93,7 +92,7 @@ export function AgingReport({ invoices }: AgingReportProps) {
         { header: 'Total', dataKey: 'total', formatter: (val) => `$${val.toFixed(2)}` },
         { header: 'Outstanding', dataKey: 'outstanding', formatter: (val) => `$${val.toFixed(2)}` },
         { header: 'Aging Bucket', dataKey: 'agingBucket' },
-        { header: 'Days Past Due', dataKey: 'daysPastDue' }
+        { header: 'Days From Invoice', dataKey: 'daysFromInvoice' }
       ],
       data,
       orientation: 'landscape',
@@ -200,12 +199,12 @@ export function AgingReport({ invoices }: AgingReportProps) {
                           <th className="pb-2 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
                           <th className="pb-2 text-left text-xs font-medium text-gray-500 uppercase">Due Date</th>
                           <th className="pb-2 text-right text-xs font-medium text-gray-500 uppercase">Balance Due</th>
-                          <th className="pb-2 text-center text-xs font-medium text-gray-500 uppercase">Days Past Due</th>
+                          <th className="pb-2 text-center text-xs font-medium text-gray-500 uppercase">Age (days)</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
                         {bucket.invoices.map(invoice => {
-                          const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
+                          const daysFromInvoice = calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt);
                           return (
                             <tr key={invoice.id} className="hover:bg-gray-100 transition-colors">
                               <td className="py-2 text-sm">
@@ -233,14 +232,13 @@ export function AgingReport({ invoices }: AgingReportProps) {
                               </td>
                               <td className="py-2 text-sm text-center">
                                 <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                  daysPastDue > 120 ? 'bg-red-900 text-white' :
-                                  daysPastDue > 90 ? 'bg-red-100 text-red-800' :
-                                  daysPastDue > 60 ? 'bg-orange-100 text-orange-800' :
-                                  daysPastDue > 30 ? 'bg-yellow-100 text-yellow-800' :
-                                  daysPastDue === 0 ? 'bg-gray-100 text-gray-600' :
+                                  daysFromInvoice > 120 ? 'bg-red-900 text-white' :
+                                  daysFromInvoice > 90 ? 'bg-red-100 text-red-800' :
+                                  daysFromInvoice > 60 ? 'bg-orange-100 text-orange-800' :
+                                  daysFromInvoice > 30 ? 'bg-yellow-100 text-yellow-800' :
                                   'bg-green-100 text-green-800'
                                 }`}>
-                                  {daysPastDue === 0 ? 'Not Due' : `${daysPastDue} days`}
+                                  {daysFromInvoice} days
                                 </span>
                               </td>
                             </tr>

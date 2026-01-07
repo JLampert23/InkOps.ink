@@ -78,29 +78,29 @@ export function getAllInvoicesForAging(invoices: Invoice[]): Invoice[] {
 
 export function categorizeIntoAgingBuckets(invoices: Invoice[]): AgingBucket[] {
   const buckets: AgingBucket[] = [
-    { name: 'current', label: 'Current', minDays: -999999, maxDays: 0, invoices: [], total: 0, count: 0 },
-    { name: '1-30', label: '1-30', minDays: 1, maxDays: 30, invoices: [], total: 0, count: 0 },
-    { name: '31-60', label: '31-60', minDays: 31, maxDays: 60, invoices: [], total: 0, count: 0 },
-    { name: '61-90', label: '61-90', minDays: 61, maxDays: 90, invoices: [], total: 0, count: 0 },
-    { name: '90+', label: '90+', minDays: 91, maxDays: null, invoices: [], total: 0, count: 0 },
+    { name: 'current', label: 'Current', minDays: 0, maxDays: 30, invoices: [], total: 0, count: 0 },
+    { name: '1-30', label: '1-30', minDays: 31, maxDays: 60, invoices: [], total: 0, count: 0 },
+    { name: '31-60', label: '31-60', minDays: 61, maxDays: 90, invoices: [], total: 0, count: 0 },
+    { name: '61-90', label: '61-90', minDays: 91, maxDays: 120, invoices: [], total: 0, count: 0 },
+    { name: '90+', label: '90+', minDays: 121, maxDays: null, invoices: [], total: 0, count: 0 },
   ];
 
   const allInvoices = getAllInvoicesForAging(invoices);
 
   allInvoices.forEach(invoice => {
-    const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
+    const daysFromInvoice = calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt);
     const balance = invoice.amountOutstanding || 0;
 
     for (const bucket of buckets) {
       if (bucket.maxDays === null) {
-        if (daysPastDue >= bucket.minDays) {
+        if (daysFromInvoice >= bucket.minDays) {
           bucket.invoices.push(invoice);
           bucket.total += balance;
           bucket.count++;
           break;
         }
       } else {
-        if (daysPastDue >= bucket.minDays && daysPastDue <= bucket.maxDays) {
+        if (daysFromInvoice >= bucket.minDays && daysFromInvoice <= bucket.maxDays) {
           bucket.invoices.push(invoice);
           bucket.total += balance;
           bucket.count++;
@@ -122,7 +122,7 @@ export function calculateCustomerAging(invoices: Invoice[]): CustomerAging[] {
     const customerId = invoice.contact?.customer?.id || invoice.contact?.id || 'unknown';
     const customerName = invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown Customer';
     const balance = invoice.amountOutstanding || 0;
-    const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
+    const daysFromInvoice = calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt);
 
     if (!customerMap.has(customerId)) {
       customerMap.set(customerId, {
@@ -143,15 +143,15 @@ export function calculateCustomerAging(invoices: Invoice[]): CustomerAging[] {
     const customer = customerMap.get(customerId)!;
     customer.total += balance;
     customer.invoiceCount++;
-    customer.oldestInvoiceAge = Math.max(customer.oldestInvoiceAge, daysPastDue);
+    customer.oldestInvoiceAge = Math.max(customer.oldestInvoiceAge, daysFromInvoice);
 
-    if (daysPastDue <= 0) {
+    if (daysFromInvoice <= 30) {
       customer.current += balance;
-    } else if (daysPastDue <= 30) {
+    } else if (daysFromInvoice <= 60) {
       customer.days1to30 += balance;
-    } else if (daysPastDue <= 60) {
+    } else if (daysFromInvoice <= 90) {
       customer.days31to60 += balance;
-    } else if (daysPastDue <= 90) {
+    } else if (daysFromInvoice <= 120) {
       customer.days61to90 += balance;
     } else {
       customer.days90Plus += balance;
@@ -167,7 +167,7 @@ export function calculateCustomerAging(invoices: Invoice[]): CustomerAging[] {
     });
 
     const totalDays = invoicesForCustomer.reduce((sum, inv) =>
-      sum + calculateDaysPastDue(inv.dueAt, inv.invoiceAt || inv.createdAt), 0
+      sum + calculateDaysOutstanding(inv.invoiceAt || inv.createdAt), 0
     );
     customer.averageInvoiceAge = customer.invoiceCount > 0
       ? Math.round(totalDays / customer.invoiceCount)
