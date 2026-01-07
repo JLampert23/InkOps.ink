@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import AutomatedReports from './automation/AutomatedReports';
 
 const WorkflowCustomization = lazy(() => import('./production/WorkflowCustomization').then(m => ({ default: m.WorkflowCustomization })));
-const AutomationBuilder = lazy(() => import('./production/AutomationBuilder').then(m => ({ default: m.AutomationBuilder })));
+const AutomationsDashboard = lazy(() => import('./automations/AutomationsDashboard').then(m => ({ default: m.AutomationsDashboard })));
 const StripePayments = lazy(() => import('./production/StripePayments').then(m => ({ default: m.StripePayments })));
 
 interface CompanySettings {
@@ -1828,10 +1828,10 @@ export function AccountSettings() {
           {activeTab === 'automations' && (
             <Suspense fallback={
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                <Loader2 className="w-8 h-8 text-purple-600 animate-spin" />
               </div>
             }>
-              <AutomationBuilder />
+              <AutomationsDashboard />
             </Suspense>
           )}
 
