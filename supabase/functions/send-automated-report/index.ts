@@ -92,25 +92,31 @@ Deno.serve(async (req: Request) => {
     const reportData = {
       openInvoices: openInvoices.map((inv: any) => {
         const invoiceDate = inv.invoice_at || inv.created_at;
-        const daysOutstanding = Math.floor(
-          (Date.now() - new Date(invoiceDate).getTime()) / (1000 * 60 * 60 * 24)
-        );
 
-        let bucket = '';
-        if (daysOutstanding <= 30) bucket = '1-30 days';
-        else if (daysOutstanding <= 60) bucket = '31-60 days';
-        else if (daysOutstanding <= 90) bucket = '61-90 days';
-        else if (daysOutstanding <= 120) bucket = '91-120 days';
-        else bucket = '121+ days';
-
+        // Calculate days past due (from due date, not creation date) to match Printavo
         const calculateDaysPastDue = () => {
-          if (!inv.due_at) return daysOutstanding;
+          if (!inv.due_at) {
+            // If no due date, calculate from invoice date
+            return Math.floor(
+              (Date.now() - new Date(invoiceDate).getTime()) / (1000 * 60 * 60 * 24)
+            );
+          }
           const due = new Date(inv.due_at);
           const today = new Date();
           const diffTime = today.getTime() - due.getTime();
           const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
           return Math.max(0, diffDays);
         };
+
+        const daysPastDue = calculateDaysPastDue();
+
+        // Bucket based on days past due, not days outstanding
+        let bucket = '';
+        if (daysPastDue <= 30) bucket = '1-30 days';
+        else if (daysPastDue <= 60) bucket = '31-60 days';
+        else if (daysPastDue <= 90) bucket = '61-90 days';
+        else if (daysPastDue <= 120) bucket = '91-120 days';
+        else bucket = '121+ days';
 
         return {
           customer: inv.customer_name || 'Unknown',
@@ -120,7 +126,7 @@ Deno.serve(async (req: Request) => {
           total: inv.total || 0,
           outstanding: inv.amount_outstanding || 0,
           agingBucket: bucket,
-          daysPastDue: calculateDaysPastDue(),
+          daysPastDue: daysPastDue,
         };
       }),
       totalInvoices: openInvoices.length,
