@@ -71,6 +71,7 @@ export interface Invoice {
   createdAt: string;
   invoiceAt?: string;
   dueAt?: string;
+  paymentDueAt?: string;
   total?: number;
   subtotal?: number;
   salesTaxAmount?: number;

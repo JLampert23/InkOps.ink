@@ -29,16 +29,18 @@ export function AgingReport({ invoices }: AgingReportProps) {
           comparison = new Date(a.invoiceAt || a.createdAt).getTime() - new Date(b.invoiceAt || b.createdAt).getTime();
           break;
         case 'dueDate':
-          const aDue = a.dueAt ? new Date(a.dueAt).getTime() : 0;
-          const bDue = b.dueAt ? new Date(b.dueAt).getTime() : 0;
-          comparison = aDue - bDue;
+          const aDue = a.paymentDueAt || a.dueAt;
+          const bDue = b.paymentDueAt || b.dueAt;
+          const aDueTime = aDue ? new Date(aDue).getTime() : 0;
+          const bDueTime = bDue ? new Date(bDue).getTime() : 0;
+          comparison = aDueTime - bDueTime;
           break;
         case 'amount':
           comparison = (a.amountOutstanding || 0) - (b.amountOutstanding || 0);
           break;
         case 'daysPastDue':
-          const aDays = calculateDaysPastDue(a.dueAt, a.invoiceAt || a.createdAt);
-          const bDays = calculateDaysPastDue(b.dueAt, b.invoiceAt || b.createdAt);
+          const aDays = calculateDaysPastDue(a.paymentDueAt, a.dueAt, a.invoiceAt, a.createdAt);
+          const bDays = calculateDaysPastDue(b.paymentDueAt, b.dueAt, b.invoiceAt, b.createdAt);
           comparison = aDays - bDays;
           break;
       }
@@ -265,7 +267,8 @@ export function AgingReport({ invoices }: AgingReportProps) {
                       </thead>
                       <tbody className="divide-y divide-gray-200">
                         {bucket.invoices.map(invoice => {
-                          const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
+                          const daysPastDue = calculateDaysPastDue(invoice.paymentDueAt, invoice.dueAt, invoice.invoiceAt, invoice.createdAt);
+                          const displayDueDate = invoice.paymentDueAt || invoice.dueAt;
                           return (
                             <tr key={invoice.id} className="hover:bg-gray-100 transition-colors">
                               <td className="py-2 text-sm">
@@ -286,7 +289,7 @@ export function AgingReport({ invoices }: AgingReportProps) {
                                 {format(new Date(invoice.invoiceAt || invoice.createdAt), 'MMM d, yyyy')}
                               </td>
                               <td className="py-2 text-sm text-gray-600">
-                                {invoice.dueAt ? format(new Date(invoice.dueAt), 'MMM d, yyyy') : '-'}
+                                {displayDueDate ? format(new Date(displayDueDate), 'MMM d, yyyy') : '-'}
                               </td>
                               <td className="py-2 text-sm text-red-600 font-semibold text-right">
                                 ${(invoice.amountOutstanding || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}

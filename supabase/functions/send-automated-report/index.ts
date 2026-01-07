@@ -112,7 +112,7 @@ Deno.serve(async (req: Request) => {
 
         // Bucket based on days past due, not days outstanding
         let bucket = '';
-        if (daysPastDue <= 30) bucket = '1-30 days';
+        if (daysPastDue <= 30) bucket = '0-30 days';
         else if (daysPastDue <= 60) bucket = '31-60 days';
         else if (daysPastDue <= 90) bucket = '61-90 days';
         else if (daysPastDue <= 120) bucket = '91-120 days';

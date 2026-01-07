@@ -233,13 +233,13 @@ export class AutomationService {
       const daysPastDue = calculateDaysPastDue();
 
       let bucket = '';
-      if (daysOutstanding <= 30) {
-        bucket = '1-30 days';
-      } else if (daysOutstanding <= 60) {
+      if (daysPastDue <= 30) {
+        bucket = '0-30 days';
+      } else if (daysPastDue <= 60) {
         bucket = '31-60 days';
-      } else if (daysOutstanding <= 90) {
+      } else if (daysPastDue <= 90) {
         bucket = '61-90 days';
-      } else if (daysOutstanding <= 120) {
+      } else if (daysPastDue <= 120) {
         bucket = '91-120 days';
       } else {
         bucket = '121+ days';

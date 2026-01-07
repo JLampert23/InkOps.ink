@@ -39,8 +39,10 @@ export function OpenInvoices({ invoices }: OpenInvoicesProps) {
 
       switch (sortField) {
         case 'dueDate':
-          aValue = a.dueAt ? new Date(a.dueAt).getTime() : 0;
-          bValue = b.dueAt ? new Date(b.dueAt).getTime() : 0;
+          const aDue = a.paymentDueAt || a.dueAt;
+          const bDue = b.paymentDueAt || b.dueAt;
+          aValue = aDue ? new Date(aDue).getTime() : 0;
+          bValue = bDue ? new Date(bDue).getTime() : 0;
           break;
         case 'balance':
           aValue = a.amountOutstanding || 0;
@@ -102,16 +104,19 @@ export function OpenInvoices({ invoices }: OpenInvoicesProps) {
       { header: 'Days Outstanding', key: 'daysOut' },
     ];
 
-    const exportData = filteredAndSortedInvoices.map(invoice => ({
-      customer: invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown',
-      invoiceNumber: invoice.visualId || invoice.id.slice(0, 8),
-      createdDate: format(new Date(invoice.invoiceAt || invoice.createdAt), 'MM/dd/yyyy'),
-      dueDate: invoice.dueAt ? format(new Date(invoice.dueAt), 'MM/dd/yyyy') : '-',
-      total: `$${(invoice.total || 0).toFixed(2)}`,
-      paid: `$${(invoice.amountPaid || 0).toFixed(2)}`,
-      balance: `$${(invoice.amountOutstanding || 0).toFixed(2)}`,
-      daysOut: calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt).toString(),
-    }));
+    const exportData = filteredAndSortedInvoices.map(invoice => {
+      const dueDate = invoice.paymentDueAt || invoice.dueAt;
+      return {
+        customer: invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown',
+        invoiceNumber: invoice.visualId || invoice.id.slice(0, 8),
+        createdDate: format(new Date(invoice.invoiceAt || invoice.createdAt), 'MM/dd/yyyy'),
+        dueDate: dueDate ? format(new Date(dueDate), 'MM/dd/yyyy') : '-',
+        total: `$${(invoice.total || 0).toFixed(2)}`,
+        paid: `$${(invoice.amountPaid || 0).toFixed(2)}`,
+        balance: `$${(invoice.amountOutstanding || 0).toFixed(2)}`,
+        daysOut: calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt).toString(),
+      };
+    });
 
     exportToCSV(exportData, columns, `open-invoices-${format(new Date(), 'yyyy-MM-dd')}`);
   };
@@ -128,16 +133,19 @@ export function OpenInvoices({ invoices }: OpenInvoicesProps) {
       { header: 'Days', dataKey: 'daysOut' },
     ];
 
-    const exportData = filteredAndSortedInvoices.map(invoice => ({
-      customer: invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown',
-      invoiceNumber: invoice.visualId || invoice.id.slice(0, 8),
-      createdDate: format(new Date(invoice.invoiceAt || invoice.createdAt), 'MM/dd/yyyy'),
-      dueDate: invoice.dueAt ? format(new Date(invoice.dueAt), 'MM/dd/yyyy') : '-',
-      total: `$${(invoice.total || 0).toFixed(2)}`,
-      paid: `$${(invoice.amountPaid || 0).toFixed(2)}`,
-      balance: `$${(invoice.amountOutstanding || 0).toFixed(2)}`,
-      daysOut: calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt).toString(),
-    }));
+    const exportData = filteredAndSortedInvoices.map(invoice => {
+      const dueDate = invoice.paymentDueAt || invoice.dueAt;
+      return {
+        customer: invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown',
+        invoiceNumber: invoice.visualId || invoice.id.slice(0, 8),
+        createdDate: format(new Date(invoice.invoiceAt || invoice.createdAt), 'MM/dd/yyyy'),
+        dueDate: dueDate ? format(new Date(dueDate), 'MM/dd/yyyy') : '-',
+        total: `$${(invoice.total || 0).toFixed(2)}`,
+        paid: `$${(invoice.amountPaid || 0).toFixed(2)}`,
+        balance: `$${(invoice.amountOutstanding || 0).toFixed(2)}`,
+        daysOut: calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt).toString(),
+      };
+    });
 
     const totalPaid = filteredAndSortedInvoices.reduce((sum, inv) => sum + (inv.amountPaid || 0), 0);
     const totalInvoiced = filteredAndSortedInvoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
@@ -291,7 +299,10 @@ export function OpenInvoices({ invoices }: OpenInvoicesProps) {
                         {format(new Date(invoice.invoiceAt || invoice.createdAt), 'MMM d, yyyy')}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
-                        {invoice.dueAt ? format(new Date(invoice.dueAt), 'MMM d, yyyy') : '-'}
+                        {(() => {
+                          const dueDate = invoice.paymentDueAt || invoice.dueAt;
+                          return dueDate ? format(new Date(dueDate), 'MMM d, yyyy') : '-';
+                        })()}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900 text-right">
                         ${(invoice.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}

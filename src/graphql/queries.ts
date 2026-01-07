@@ -14,6 +14,7 @@ export const GET_INVOICES = gql`
           createdAt
           invoiceAt
           dueAt
+          paymentDueAt
           total
           subtotal
           salesTaxAmount
