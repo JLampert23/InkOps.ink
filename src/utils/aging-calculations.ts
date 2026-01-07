@@ -88,19 +88,19 @@ export function categorizeIntoAgingBuckets(invoices: Invoice[]): AgingBucket[] {
   const allInvoices = getAllInvoicesForAging(invoices);
 
   allInvoices.forEach(invoice => {
-    const daysFromInvoice = calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt);
+    const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
     const balance = invoice.amountOutstanding || 0;
 
     for (const bucket of buckets) {
       if (bucket.maxDays === null) {
-        if (daysFromInvoice >= bucket.minDays) {
+        if (daysPastDue >= bucket.minDays) {
           bucket.invoices.push(invoice);
           bucket.total += balance;
           bucket.count++;
           break;
         }
       } else {
-        if (daysFromInvoice >= bucket.minDays && daysFromInvoice <= bucket.maxDays) {
+        if (daysPastDue >= bucket.minDays && daysPastDue <= bucket.maxDays) {
           bucket.invoices.push(invoice);
           bucket.total += balance;
           bucket.count++;
@@ -122,7 +122,7 @@ export function calculateCustomerAging(invoices: Invoice[]): CustomerAging[] {
     const customerId = invoice.contact?.customer?.id || invoice.contact?.id || 'unknown';
     const customerName = invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown Customer';
     const balance = invoice.amountOutstanding || 0;
-    const daysFromInvoice = calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt);
+    const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
 
     if (!customerMap.has(customerId)) {
       customerMap.set(customerId, {
@@ -143,15 +143,15 @@ export function calculateCustomerAging(invoices: Invoice[]): CustomerAging[] {
     const customer = customerMap.get(customerId)!;
     customer.total += balance;
     customer.invoiceCount++;
-    customer.oldestInvoiceAge = Math.max(customer.oldestInvoiceAge, daysFromInvoice);
+    customer.oldestInvoiceAge = Math.max(customer.oldestInvoiceAge, daysPastDue);
 
-    if (daysFromInvoice <= 30) {
+    if (daysPastDue <= 30) {
       customer.current += balance;
-    } else if (daysFromInvoice <= 60) {
+    } else if (daysPastDue <= 60) {
       customer.days1to30 += balance;
-    } else if (daysFromInvoice <= 90) {
+    } else if (daysPastDue <= 90) {
       customer.days31to60 += balance;
-    } else if (daysFromInvoice <= 120) {
+    } else if (daysPastDue <= 120) {
       customer.days61to90 += balance;
     } else {
       customer.days90Plus += balance;
@@ -167,7 +167,7 @@ export function calculateCustomerAging(invoices: Invoice[]): CustomerAging[] {
     });
 
     const totalDays = invoicesForCustomer.reduce((sum, inv) =>
-      sum + calculateDaysOutstanding(inv.invoiceAt || inv.createdAt), 0
+      sum + calculateDaysPastDue(inv.dueAt, inv.invoiceAt || inv.createdAt), 0
     );
     customer.averageInvoiceAge = customer.invoiceCount > 0
       ? Math.round(totalDays / customer.invoiceCount)

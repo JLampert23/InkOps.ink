@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, FileDown, ExternalLink } from 'lucide-react';
 import { Invoice } from '../types/printavo';
-import { categorizeIntoAgingBuckets, calculateDaysOutstanding } from '../utils/aging-calculations';
+import { categorizeIntoAgingBuckets, calculateDaysPastDue } from '../utils/aging-calculations';
 import { format } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { exportToCSV } from '../utils/csv-export';
@@ -32,8 +32,8 @@ export function AgingReport({ invoices }: AgingReportProps) {
 
   const handleExportCSV = () => {
     const data = allInvoices.map(invoice => {
-      const daysFromInvoice = calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt);
-      const bucket = daysFromInvoice <= 30 ? 'Current' : daysFromInvoice <= 60 ? '1-30' : daysFromInvoice <= 90 ? '31-60' : daysFromInvoice <= 120 ? '61-90' : '90+';
+      const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
+      const bucket = daysPastDue <= 30 ? 'Current' : daysPastDue <= 60 ? '1-30' : daysPastDue <= 90 ? '31-60' : daysPastDue <= 120 ? '61-90' : '90+';
 
       return {
         customer: invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown',
@@ -43,7 +43,7 @@ export function AgingReport({ invoices }: AgingReportProps) {
         total: invoice.total || 0,
         outstanding: invoice.amountOutstanding || 0,
         agingBucket: bucket,
-        daysFromInvoice: daysFromInvoice.toString()
+        daysPastDue: daysPastDue.toString()
       };
     });
 
@@ -57,7 +57,7 @@ export function AgingReport({ invoices }: AgingReportProps) {
         { header: 'Total Amount', key: 'total', formatter: (val) => `$${val.toFixed(2)}` },
         { header: 'Amount Outstanding', key: 'outstanding', formatter: (val) => `$${val.toFixed(2)}` },
         { header: 'Aging Bucket', key: 'agingBucket' },
-        { header: 'Days From Invoice', key: 'daysFromInvoice' }
+        { header: 'Days Past Due', key: 'daysPastDue' }
       ],
       `aging-report-${format(new Date(), 'yyyy-MM-dd')}`
     );
@@ -65,8 +65,8 @@ export function AgingReport({ invoices }: AgingReportProps) {
 
   const handleExportPDF = () => {
     const data = allInvoices.map(invoice => {
-      const daysFromInvoice = calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt);
-      const bucket = daysFromInvoice <= 30 ? 'Current' : daysFromInvoice <= 60 ? '1-30' : daysFromInvoice <= 90 ? '31-60' : daysFromInvoice <= 120 ? '61-90' : '90+';
+      const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
+      const bucket = daysPastDue <= 30 ? 'Current' : daysPastDue <= 60 ? '1-30' : daysPastDue <= 90 ? '31-60' : daysPastDue <= 120 ? '61-90' : '90+';
 
       return {
         customer: invoice.contact?.customer?.companyName || invoice.contact?.fullName || 'Unknown',
@@ -76,7 +76,7 @@ export function AgingReport({ invoices }: AgingReportProps) {
         total: invoice.total || 0,
         outstanding: invoice.amountOutstanding || 0,
         agingBucket: bucket,
-        daysFromInvoice: `${daysFromInvoice}d`
+        daysPastDue: `${daysPastDue}d`
       };
     });
 
@@ -92,7 +92,7 @@ export function AgingReport({ invoices }: AgingReportProps) {
         { header: 'Total', dataKey: 'total', formatter: (val) => `$${val.toFixed(2)}` },
         { header: 'Outstanding', dataKey: 'outstanding', formatter: (val) => `$${val.toFixed(2)}` },
         { header: 'Aging Bucket', dataKey: 'agingBucket' },
-        { header: 'Days From Invoice', dataKey: 'daysFromInvoice' }
+        { header: 'Days Past Due', dataKey: 'daysPastDue' }
       ],
       data,
       orientation: 'landscape',
@@ -204,7 +204,7 @@ export function AgingReport({ invoices }: AgingReportProps) {
                       </thead>
                       <tbody className="divide-y divide-gray-200">
                         {bucket.invoices.map(invoice => {
-                          const daysFromInvoice = calculateDaysOutstanding(invoice.invoiceAt || invoice.createdAt);
+                          const daysPastDue = calculateDaysPastDue(invoice.dueAt, invoice.invoiceAt || invoice.createdAt);
                           return (
                             <tr key={invoice.id} className="hover:bg-gray-100 transition-colors">
                               <td className="py-2 text-sm">
@@ -232,13 +232,13 @@ export function AgingReport({ invoices }: AgingReportProps) {
                               </td>
                               <td className="py-2 text-sm text-center">
                                 <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                  daysFromInvoice > 120 ? 'bg-red-900 text-white' :
-                                  daysFromInvoice > 90 ? 'bg-red-100 text-red-800' :
-                                  daysFromInvoice > 60 ? 'bg-orange-100 text-orange-800' :
-                                  daysFromInvoice > 30 ? 'bg-yellow-100 text-yellow-800' :
+                                  daysPastDue > 120 ? 'bg-red-900 text-white' :
+                                  daysPastDue > 90 ? 'bg-red-100 text-red-800' :
+                                  daysPastDue > 60 ? 'bg-orange-100 text-orange-800' :
+                                  daysPastDue > 30 ? 'bg-yellow-100 text-yellow-800' :
                                   'bg-green-100 text-green-800'
                                 }`}>
-                                  {daysFromInvoice} days
+                                  {daysPastDue} days
                                 </span>
                               </td>
                             </tr>
