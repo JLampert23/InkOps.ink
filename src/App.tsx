@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { FileText, Users, RefreshCw, AlertCircle, DollarSign, TrendingUp, Download, Building2, Menu, X, LogOut, Loader2, BarChart3, Settings, LineChart, CreditCard, Package } from 'lucide-react';
+import { FileText, Users, RefreshCw, AlertCircle, DollarSign, TrendingUp, Download, Building2, Menu, X, LogOut, Loader2, BarChart3, Settings, LineChart, CreditCard, Package, Zap } from 'lucide-react';
 import { useSupabaseData } from './hooks/useSupabaseData';
 import { InvoiceExplorer } from './components/InvoiceExplorer';
 import { CustomerProfiles } from './components/CustomerProfiles';
@@ -15,8 +15,9 @@ import { supabase } from './lib/supabase-client';
 
 const SquareData = lazy(() => import('./components/SquareData'));
 const ProductionManagement = lazy(() => import('./components/ProductionManagement').then(m => ({ default: m.ProductionManagement })));
+const AutomationsDashboard = lazy(() => import('./components/automations/AutomationsDashboard').then(m => ({ default: m.AutomationsDashboard })));
 
-type Tab = 'ar' | 'ar-by-customer' | 'open-invoices' | 'reports' | 'analytics' | 'invoices' | 'customers' | 'square' | 'production' | 'settings';
+type Tab = 'ar' | 'ar-by-customer' | 'open-invoices' | 'reports' | 'analytics' | 'invoices' | 'customers' | 'square' | 'production' | 'automations' | 'settings';
 
 interface CompanySettings {
   company_name: string;
@@ -133,6 +134,15 @@ function AppContent() {
       name: 'Production Management',
       icon: Package,
       description: 'Workflow & production tracking'
+    },
+  ];
+
+  const automationsNavItems = [
+    {
+      id: 'automations' as Tab,
+      name: 'Automations',
+      icon: Zap,
+      description: 'Workflow automation engine'
     },
   ];
 
@@ -306,6 +316,47 @@ function AppContent() {
               })}
             </div>
           </div>
+
+          {/* Automations Section */}
+          <div>
+            {sidebarOpen && (
+              <div className="px-2 mb-2 pt-4 border-t border-gray-200">
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Automation</h3>
+              </div>
+            )}
+            {!sidebarOpen && <div className="border-t border-gray-200 my-2" />}
+            <div className="space-y-1">
+              {automationsNavItems.map(item => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveTab(item.id)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
+                      isActive
+                        ? 'bg-purple-50 text-purple-700 shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                    title={!sidebarOpen ? item.name : ''}
+                  >
+                    <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-purple-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                    {sidebarOpen && (
+                      <div className="flex-1 text-left">
+                        <div className={`font-medium text-sm ${isActive ? 'text-purple-700' : ''}`}>
+                          {item.name}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          {item.description}
+                        </div>
+                      </div>
+                    )}
+                    {isActive && <div className="w-1 h-8 bg-purple-600 rounded-full absolute right-0" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </nav>
 
         {/* User & Controls */}
@@ -354,13 +405,15 @@ function AppContent() {
           <div className="h-full px-4 flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">
-                {[...printavoNavItems, ...squareNavItems, ...productionNavItems].find(item => item.id === activeTab)?.name || 'Settings'}
+                {[...printavoNavItems, ...squareNavItems, ...productionNavItems, ...automationsNavItems].find(item => item.id === activeTab)?.name || 'Settings'}
               </h2>
               <p className="text-sm text-gray-500 mt-0.5">
                 {activeTab === 'square' ? (
                   'Square payment data and reports'
                 ) : activeTab === 'production' ? (
                   'Manage quotes, proofs, invoicing, and production workflow'
+                ) : activeTab === 'automations' ? (
+                  'Create and manage custom workflow automations'
                 ) : activeTab === 'settings' ? (
                   'Configure your integrations and preferences'
                 ) : (
@@ -378,6 +431,11 @@ function AppContent() {
                 <div className="text-sm text-gray-600 flex items-center gap-2 bg-orange-50 px-4 py-2 rounded-lg border border-orange-200">
                   <div className="w-2 h-2 bg-orange-500 rounded-full" />
                   <span>Production workflows use placeholder data. Connect your systems in Settings.</span>
+                </div>
+              ) : activeTab === 'automations' ? (
+                <div className="text-sm text-gray-600 flex items-center gap-2 bg-purple-50 px-4 py-2 rounded-lg border border-purple-200">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full" />
+                  <span>Automations engine uses Printavo API data to trigger actions</span>
                 </div>
               ) : activeTab !== 'settings' && (
                 <>
@@ -501,6 +559,19 @@ function AppContent() {
                 </div>
               }>
                 <ProductionManagement />
+              </Suspense>
+            )}
+            {activeTab === 'automations' && (
+              <Suspense fallback={
+                <div className="bg-white rounded-lg shadow p-8">
+                  <div className="text-center">
+                    <Loader2 className="w-12 h-12 text-purple-600 animate-spin mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading Automations Engine</h3>
+                    <p className="text-gray-600">Initializing automation builder...</p>
+                  </div>
+                </div>
+              }>
+                <AutomationsDashboard />
               </Suspense>
             )}
             {activeTab === 'settings' && (
