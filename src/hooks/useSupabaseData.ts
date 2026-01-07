@@ -157,16 +157,11 @@ export function useSupabaseData(): SupabaseData {
       setSyncing(true);
       setError(null);
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('Not authenticated');
-      }
-
       console.log('Starting sync...');
       const response = await fetch(`${supabaseUrl}/functions/v1/printavo-sync`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${supabaseAnonKey}`,
           'Content-Type': 'application/json',
         },
       });

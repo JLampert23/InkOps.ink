@@ -18,11 +18,12 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
 
-    if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
+    if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error('Supabase configuration missing');
     }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -36,10 +37,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
-
-    // Use anon key client to validate user JWT
-    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);
-    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser(token);
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
 
     if (userError || !user) {
       return new Response(
@@ -51,16 +49,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Use service role client for database operations
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
     const { data: settings, error: settingsError } = await supabase
       .from('company_settings')
-      .select('printavo_username, printavo_api_token_encrypted')
-      .eq('owner_id', user.id)
+      .select('printavo_email, printavo_token')
+      .eq('user_id', user.id)
       .maybeSingle();
 
-    if (settingsError || !settings?.printavo_username || !settings?.printavo_api_token_encrypted) {
+    if (settingsError || !settings?.printavo_email || !settings?.printavo_token) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -82,7 +77,7 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify({
         action: 'decrypt',
-        data: settings.printavo_api_token_encrypted
+        data: settings.printavo_token
       })
     });
 
@@ -93,85 +88,52 @@ Deno.serve(async (req: Request) => {
     const { result: printavoToken } = await decryptResponse.json();
 
     const printavoProxyUrl = `${supabaseUrl}/functions/v1/printavo-proxy`;
-
-    let allInvoices: any[] = [];
-    let hasNextPage = true;
-    let cursor: string | null = null;
-    let pageCount = 0;
-
-    while (hasNextPage && pageCount < 100) {
-      pageCount++;
-      console.log(`Fetching page ${pageCount}${cursor ? ` after cursor ${cursor.slice(0, 20)}...` : ''}`);
-
-      const invoicesResponse = await fetch(printavoProxyUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          email: settings.printavo_username,
-          token: printavoToken,
-          query: `
-            query GetInvoices${cursor ? '($after: String!)' : ''} {
-              invoices(first: 250${cursor ? ', after: $after' : ''}) {
-                edges {
-                  cursor
-                  node {
+    const invoicesResponse = await fetch(printavoProxyUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        email: settings.printavo_email,
+        token: printavoToken,
+        query: `
+          query GetInvoices {
+            invoices(first: 1000) {
+              edges {
+                node {
+                  id
+                  visualId
+                  invoiceAt
+                  createdAt
+                  dueAt
+                  total
+                  amountPaid
+                  amountOutstanding
+                  paidInFull
+                  status
+                  contact {
                     id
-                    visualId
-                    invoiceAt
-                    createdAt
-                    dueAt
-                    total
-                    amountPaid
-                    amountOutstanding
-                    paidInFull
-                    status
-                    contact {
+                    fullName
+                    customer {
                       id
-                      fullName
-                      customer {
-                        id
-                        companyName
-                      }
+                      companyName
                     }
                   }
                 }
-                pageInfo {
-                  hasNextPage
-                  endCursor
-                }
               }
             }
-          `,
-          variables: cursor ? { after: cursor } : {}
-        })
-      });
+          }
+        `
+      })
+    });
 
-      if (!invoicesResponse.ok) {
-        throw new Error('Failed to fetch invoices from Printavo');
-      }
-
-      const invoicesData = await invoicesResponse.json();
-      const edges = invoicesData?.data?.invoices?.edges || [];
-      const pageInfo = invoicesData?.data?.invoices?.pageInfo || {};
-
-      const pageInvoices = edges.map((edge: any) => edge.node);
-      allInvoices = allInvoices.concat(pageInvoices);
-
-      hasNextPage = pageInfo.hasNextPage === true;
-      cursor = pageInfo.endCursor || null;
-
-      console.log(`Fetched ${pageInvoices.length} invoices (total so far: ${allInvoices.length})`);
-
-      if (!hasNextPage) {
-        console.log('Reached last page');
-        break;
-      }
+    if (!invoicesResponse.ok) {
+      throw new Error('Failed to fetch invoices from Printavo');
     }
 
-    const invoices = allInvoices;
+    const invoicesData = await invoicesResponse.json();
+    const invoices = invoicesData?.data?.invoices?.edges?.map((edge: any) => edge.node) || [];
 
     const { error: deleteError } = await supabase
       .from('printavo_invoices_raw')

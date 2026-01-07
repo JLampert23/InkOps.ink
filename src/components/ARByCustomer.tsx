@@ -187,22 +187,20 @@ export function ARByCustomer({ invoices }: ARByCustomerProps) {
                       </td>
                       <td className="px-4 py-3 text-sm text-center">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          customer.averageInvoiceAge >= 91 ? 'bg-red-100 text-red-800' :
+                          customer.averageInvoiceAge >= 90 ? 'bg-red-100 text-red-800' :
                           customer.averageInvoiceAge >= 61 ? 'bg-orange-100 text-orange-800' :
                           customer.averageInvoiceAge >= 31 ? 'bg-yellow-100 text-yellow-800' :
-                          customer.averageInvoiceAge >= 1 ? 'bg-green-100 text-green-800' :
-                          'bg-blue-100 text-blue-800'
+                          'bg-green-100 text-green-800'
                         }`}>
                           {customer.averageInvoiceAge}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-center">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          customer.oldestInvoiceAge >= 91 ? 'bg-red-100 text-red-800' :
+                          customer.oldestInvoiceAge >= 90 ? 'bg-red-100 text-red-800' :
                           customer.oldestInvoiceAge >= 61 ? 'bg-orange-100 text-orange-800' :
                           customer.oldestInvoiceAge >= 31 ? 'bg-yellow-100 text-yellow-800' :
-                          customer.oldestInvoiceAge >= 1 ? 'bg-green-100 text-green-800' :
-                          'bg-blue-100 text-blue-800'
+                          'bg-green-100 text-green-800'
                         }`}>
                           {customer.oldestInvoiceAge}
                         </span>
@@ -252,11 +250,10 @@ export function ARByCustomer({ invoices }: ARByCustomerProps) {
                                         </td>
                                         <td className="px-4 py-2 text-sm text-center">
                                           <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                            age >= 91 ? 'bg-red-100 text-red-800' :
+                                            age >= 90 ? 'bg-red-100 text-red-800' :
                                             age >= 61 ? 'bg-orange-100 text-orange-800' :
                                             age >= 31 ? 'bg-yellow-100 text-yellow-800' :
-                                            age >= 1 ? 'bg-green-100 text-green-800' :
-                                            'bg-blue-100 text-blue-800'
+                                            'bg-green-100 text-green-800'
                                           }`}>
                                             {age}
                                           </span>
