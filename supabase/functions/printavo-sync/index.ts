@@ -521,19 +521,26 @@ async function syncInvoices(
 
   console.log(`Synced ${syncedInvoiceIds.size} unique invoices from Printavo`);
 
-  // Clean up invoices that are no longer in Printavo
-  // Only delete invoices that:
-  // 1. Were created after MIN_INVOICE_DATE (to avoid deleting historical data)
-  // 2. Are not in the synced set
-  // 3. Have not been updated in the last 7 days (to avoid race conditions)
+  // Clean up invoices that have been paid or deleted in Printavo
+  // Our sync fetches:
+  // - ALL UNPAID invoices (regardless of age)
+  // - ALL PARTIAL_PAYMENT invoices (regardless of age)
+  // - Recent invoices from last 30 days (regardless of payment status)
+  //
+  // Therefore, if an invoice is NOT in the synced set AND is older than RECENT_DAYS_LOOKBACK,
+  // it means the invoice is either:
+  // 1. Paid in full (no longer UNPAID/PARTIAL_PAYMENT) and older than 30 days
+  // 2. Deleted from Printavo
+  //
+  // Both cases should be removed from our database.
   const cleanupCutoff = new Date();
-  cleanupCutoff.setDate(cleanupCutoff.getDate() - 7);
+  cleanupCutoff.setDate(cleanupCutoff.getDate() - RECENT_DAYS_LOOKBACK);
 
   const { data: existingInvoices } = await supabase
     .from('printavo_invoices')
-    .select('id')
+    .select('id, invoice_number, invoice_date')
     .gte('invoice_date', MIN_INVOICE_DATE)
-    .lt('updated_at', cleanupCutoff.toISOString());
+    .lt('invoice_date', cleanupCutoff.toISOString());
 
   if (existingInvoices && existingInvoices.length > 0) {
     const invoicesToDelete = existingInvoices
@@ -541,7 +548,7 @@ async function syncInvoices(
       .map((inv: any) => inv.id);
 
     if (invoicesToDelete.length > 0) {
-      console.log(`Removing ${invoicesToDelete.length} invoices no longer in Printavo`);
+      console.log(`Removing ${invoicesToDelete.length} paid or deleted invoices from database`);
 
       // Delete line items first (foreign key constraint)
       await supabase
@@ -561,7 +568,9 @@ async function syncInvoices(
         .delete()
         .in('id', invoicesToDelete);
 
-      console.log(`Successfully removed ${invoicesToDelete.length} stale invoices`);
+      console.log(`Successfully removed ${invoicesToDelete.length} invoices`);
+    } else {
+      console.log('No paid or deleted invoices to clean up');
     }
   }
 
