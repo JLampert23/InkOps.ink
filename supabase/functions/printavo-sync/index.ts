@@ -484,7 +484,8 @@ async function syncInvoices(
                 total_price: (lineItem.items || 0) * (lineItem.price || 0),
                 updated_at: new Date().toISOString(),
                 raw_data: lineItem,
-              });            }
+              });
+            }
           }
         }
       }
