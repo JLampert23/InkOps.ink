@@ -382,11 +382,15 @@ export const invoiceDetailService = {
   },
 
   extractFees(rawData: any): InvoiceFee[] {
+    console.log('extractFees called with rawData:', rawData);
+    console.log('rawData.fees:', rawData?.fees);
+
     if (!rawData || !rawData.fees || !rawData.fees.edges) {
+      console.log('No fees found in rawData');
       return [];
     }
 
-    return rawData.fees.edges.map((edge: any) => {
+    const fees = rawData.fees.edges.map((edge: any) => {
       const fee = edge.node;
       return {
         id: fee.id || `fee-${Math.random()}`,
@@ -396,6 +400,9 @@ export const invoiceDetailService = {
         taxable: fee.taxable || false,
       };
     });
+
+    console.log('Extracted fees:', fees);
+    return fees;
   },
 
   calculateFeesTotal(rawData: any): number {
@@ -404,27 +411,46 @@ export const invoiceDetailService = {
   },
 
   parseLineItemDetails(description: string, rawData?: any): { style: string; color: string; sizes: string } {
+    console.log('parseLineItemDetails called with:', { description, rawData });
     let style = '';
     let color = '';
     let sizes = '';
 
     if (rawData) {
-      style = rawData.style || rawData.styleName || rawData.product?.style || rawData.product?.styleName || '';
-      color = rawData.color || rawData.colorName || rawData.product?.color || rawData.product?.colorName || '';
+      console.log('Checking rawData for style/color/sizes:', rawData);
 
-      if (rawData.sizes && typeof rawData.sizes === 'object') {
+      if (rawData.style) {
+        const styleName = rawData.style.name || '';
+        const styleNumber = rawData.style.number || '';
+        style = styleName && styleNumber ? `${styleName} ${styleNumber}` : styleName || styleNumber || '';
+      }
+
+      if (!style && rawData.product) {
+        const styleName = rawData.product.styleName || '';
+        const styleNumber = rawData.product.styleNumber || '';
+        style = styleName && styleNumber ? `${styleName} ${styleNumber}` : styleName || styleNumber || '';
+      }
+
+      if (!style) {
+        style = rawData.styleName || rawData.styleNumber || '';
+      }
+
+      color = rawData.color?.name || rawData.product?.colorName || rawData.colorName || '';
+
+      if (rawData.sizeQuantities && typeof rawData.sizeQuantities === 'object') {
+        const sizeEntries = Object.entries(rawData.sizeQuantities)
+          .filter(([_, qty]) => qty && Number(qty) > 0)
+          .map(([size, qty]) => `${size}:${qty}`);
+        sizes = sizeEntries.join(', ');
+      } else if (rawData.sizes && typeof rawData.sizes === 'object') {
         const sizeEntries = Object.entries(rawData.sizes)
           .filter(([_, qty]) => qty && Number(qty) > 0)
           .map(([size, qty]) => `${size}:${qty}`);
         sizes = sizeEntries.join(', ');
       } else if (rawData.sizeBreakdown) {
         sizes = rawData.sizeBreakdown;
-      } else if (rawData.sizeQuantities) {
-        const sizeEntries = Object.entries(rawData.sizeQuantities)
-          .filter(([_, qty]) => qty && Number(qty) > 0)
-          .map(([size, qty]) => `${size}:${qty}`);
-        sizes = sizeEntries.join(', ');
       }
+      console.log('After rawData parsing:', { style, color, sizes });
     }
 
     if (!style || !color) {

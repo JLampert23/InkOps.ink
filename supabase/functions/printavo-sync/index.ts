@@ -246,6 +246,19 @@ async function syncInvoices(
                         description
                         items
                         price
+                        style {
+                          name
+                          number
+                        }
+                        color {
+                          name
+                        }
+                        sizeQuantities
+                        product {
+                          styleName
+                          styleNumber
+                          colorName
+                        }
                       }
                     }
                   }
@@ -315,6 +328,19 @@ async function syncInvoices(
                         description
                         items
                         price
+                        style {
+                          name
+                          number
+                        }
+                        color {
+                          name
+                        }
+                        sizeQuantities
+                        product {
+                          styleName
+                          styleNumber
+                          colorName
+                        }
                       }
                     }
                   }

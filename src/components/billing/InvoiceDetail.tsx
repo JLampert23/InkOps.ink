@@ -61,6 +61,10 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
       if (!data) {
         setError('Invoice not found');
       } else {
+        console.log('Invoice Data:', data);
+        console.log('Line Items:', data.lineItems);
+        console.log('Fees:', data.fees);
+        console.log('Raw Data:', data.rawData);
         setInvoice(data);
       }
     } catch (err) {
