@@ -83,6 +83,12 @@ function AppContent() {
       icon: Wallet,
       description: 'Manage invoices and payments'
     },
+    {
+      id: 'billing-settings' as Tab,
+      name: 'Billing Settings',
+      icon: Settings,
+      description: 'Configure status filters'
+    },
   ];
 
   const squareNavItems = [
@@ -348,6 +354,8 @@ function AppContent() {
               <p className="text-sm text-gray-500 mt-0.5">
                 {activeTab === 'billing-dashboard' ? (
                   'Manage invoices, send payments, and track billing'
+                ) : activeTab === 'billing-settings' ? (
+                  'Configure billing status filters and preferences'
                 ) : activeTab === 'square' ? (
                   'Square payment data and reports'
                 ) : activeTab === 'production' ? (
@@ -390,6 +398,10 @@ function AppContent() {
             }>
               <BillingDashboard />
             </Suspense>
+          )}
+
+          {activeTab === 'billing-settings' && (
+            <AccountSettings initialTab="billing-status-filters" />
           )}
 
           {activeTab === 'square' && (

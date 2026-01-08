@@ -1322,6 +1322,25 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
             </button>
           </div>
 
+          <div className="mb-2">
+            <button
+              onClick={() => setActiveTab('billing-dashboard')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
+                activeTab === 'billing-dashboard'
+                  ? 'bg-green-50 text-green-700 shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+            >
+              <Receipt className={`w-4 h-4 flex-shrink-0 ${activeTab === 'billing-dashboard' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+              <div className="flex-1 text-left">
+                <div className={`font-medium text-sm ${activeTab === 'billing-dashboard' ? 'text-green-700' : 'text-gray-700'}`}>
+                  Billing & Payments
+                </div>
+              </div>
+              {activeTab === 'billing-dashboard' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
+            </button>
+          </div>
+
           {/* Integrations Section - Collapsible */}
           <div className="mb-2">
             <button
@@ -1395,6 +1414,24 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
                   </div>
                   {activeTab === 'resend-integration' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
                 </button>
+
+                <button
+                  onClick={() => setActiveTab('stripe-payments')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'stripe-payments'
+                      ? 'bg-green-50 text-green-700 shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
+                  style={{ animationDelay: '60ms' }}
+                >
+                  <CreditCard className={`w-4 h-4 flex-shrink-0 ${activeTab === 'stripe-payments' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'stripe-payments' ? 'text-green-700' : 'text-gray-700'}`}>
+                      Stripe
+                    </div>
+                  </div>
+                  {activeTab === 'stripe-payments' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
+                </button>
               </div>
             )}
           </div>
@@ -1438,6 +1475,26 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
                 </div>
               </div>
               {activeTab === 'status-filters' && <div className="w-1 h-6 bg-blue-600 rounded-full absolute right-0" />}
+            </button>
+          </div>
+
+          {/* Billing Status Filters */}
+          <div className="mb-2">
+            <button
+              onClick={() => setActiveTab('billing-status-filters')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
+                activeTab === 'billing-status-filters'
+                  ? 'bg-blue-50 text-blue-700 shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+            >
+              <Filter className={`w-4 h-4 flex-shrink-0 ${activeTab === 'billing-status-filters' ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+              <div className="flex-1 text-left">
+                <div className={`font-medium text-sm ${activeTab === 'billing-status-filters' ? 'text-blue-700' : 'text-gray-700'}`}>
+                  Billing Filters
+                </div>
+              </div>
+              {activeTab === 'billing-status-filters' && <div className="w-1 h-6 bg-blue-600 rounded-full absolute right-0" />}
             </button>
           </div>
 
@@ -2392,6 +2449,199 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
             </div>
           )}
 
+          {activeTab === 'billing-status-filters' && (
+            <div className="bg-white rounded-lg shadow p-6 space-y-6">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 mb-1">Billing & Payments Status Filters</h2>
+                  <p className="text-sm text-gray-600">Select which statuses should appear in Billing Queue, then click Save to apply.</p>
+                </div>
+                <button
+                  onClick={syncStatuses}
+                  disabled={syncingStatuses || loadingStatuses}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {syncingStatuses ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Syncing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-4 h-4" />
+                      Sync from Printavo
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {billingFiltersSaveMessage && (
+                <div className={`flex items-center gap-2 p-3 rounded-lg ${
+                  billingFiltersSaveMessage.type === 'success'
+                    ? 'bg-green-50 border border-green-200 text-green-800'
+                    : 'bg-red-50 border border-red-200 text-red-800'
+                }`}>
+                  {billingFiltersSaveMessage.type === 'success' ? (
+                    <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  )}
+                  <span className="text-sm font-medium">{billingFiltersSaveMessage.text}</span>
+                </div>
+              )}
+
+              {loadingStatuses ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+                </div>
+              ) : fullStatuses.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 mb-4">No statuses found. Click "Sync from Printavo" to fetch all available statuses.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-sm text-gray-600">
+                      {fullStatuses.filter(s => s.is_billing_eligible).length} of {fullStatuses.length} statuses enabled for billing
+                      {pendingBillingChanges.size > 0 && (
+                        <span className="ml-2 text-amber-600 font-medium">
+                          ({pendingBillingChanges.size} unsaved change{pendingBillingChanges.size !== 1 ? 's' : ''})
+                        </span>
+                      )}
+                    </p>
+                  </div>
+
+                  {['Invoice', 'Quote'].map(statusType => {
+                    const typeStatuses = fullStatuses.filter(s => s.type === statusType);
+                    if (typeStatuses.length === 0) return null;
+                    return (
+                      <div key={statusType} className="mb-6">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                          <Layers className="w-4 h-4" />
+                          {statusType} Statuses ({typeStatuses.length})
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {typeStatuses.map(status => (
+                            <button
+                              key={status.id}
+                              onClick={() => toggleBillingEligibility(status.id, status.is_billing_eligible)}
+                              className={`flex items-center gap-3 p-3 rounded-lg transition-all border ${
+                                status.is_billing_eligible
+                                  ? 'bg-blue-50 border-blue-300 hover:bg-blue-100'
+                                  : 'bg-white border-gray-200 hover:bg-gray-50'
+                              }`}
+                            >
+                              <div
+                                className="w-4 h-4 rounded-full flex-shrink-0 border border-gray-300"
+                                style={{ backgroundColor: status.color || '#9ca3af' }}
+                              />
+                              <span className={`text-sm flex-1 text-left ${status.is_billing_eligible ? 'text-blue-900 font-medium' : 'text-gray-700'}`}>
+                                {status.name}
+                              </span>
+                              <div className={`w-5 h-5 rounded flex items-center justify-center ${
+                                status.is_billing_eligible ? 'bg-blue-600' : 'bg-gray-200'
+                              }`}>
+                                {status.is_billing_eligible && (
+                                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {fullStatuses.filter(s => !s.type || (s.type !== 'Invoice' && s.type !== 'Quote')).length > 0 && (
+                    <div className="mb-6">
+                      <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                        <Layers className="w-4 h-4" />
+                        Other Statuses
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {fullStatuses.filter(s => !s.type || (s.type !== 'Invoice' && s.type !== 'Quote')).map(status => (
+                          <button
+                            key={status.id}
+                            onClick={() => toggleBillingEligibility(status.id, status.is_billing_eligible)}
+                            className={`flex items-center gap-3 p-3 rounded-lg transition-all border ${
+                              status.is_billing_eligible
+                                ? 'bg-blue-50 border-blue-300 hover:bg-blue-100'
+                                : 'bg-white border-gray-200 hover:bg-gray-50'
+                            }`}
+                          >
+                            <div
+                              className="w-4 h-4 rounded-full flex-shrink-0 border border-gray-300"
+                              style={{ backgroundColor: status.color || '#9ca3af' }}
+                            />
+                            <span className={`text-sm flex-1 text-left ${status.is_billing_eligible ? 'text-blue-900 font-medium' : 'text-gray-700'}`}>
+                              {status.name}
+                            </span>
+                            <div className={`w-5 h-5 rounded flex items-center justify-center ${
+                              status.is_billing_eligible ? 'bg-blue-600' : 'bg-gray-200'
+                            }`}>
+                              {status.is_billing_eligible && (
+                                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="pt-6 border-t border-gray-200 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={saveBillingFilters}
+                        disabled={savingBillingFilters || pendingBillingChanges.size === 0}
+                        className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-all ${
+                          pendingBillingChanges.size > 0
+                            ? 'bg-green-600 text-white hover:bg-green-700 shadow-sm'
+                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        } disabled:opacity-50`}
+                      >
+                        {savingBillingFilters ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4" />
+                            Save Filters
+                          </>
+                        )}
+                      </button>
+                      {pendingBillingChanges.size > 0 && (
+                        <button
+                          onClick={discardBillingChanges}
+                          disabled={savingBillingFilters}
+                          className="px-4 py-2.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                          Discard Changes
+                        </button>
+                      )}
+                    </div>
+                    {pendingBillingChanges.size > 0 && (
+                      <p className="text-sm text-amber-600">
+                        You have unsaved changes
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+
           {activeTab === 'automated-reports' && (
             <div className="bg-white rounded-lg shadow p-6">
               <AutomatedReports />
@@ -2418,6 +2668,200 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
                 </div>
               }>
                 <AutomationsDashboard />
+              </Suspense>
+            </div>
+          )}
+
+          {activeTab === 'stripe-payments' && (
+            <div className="bg-white rounded-lg shadow p-6 space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Stripe Payment Integration</h2>
+                <p className="text-sm text-gray-600 mb-6">Configure Stripe to accept online payments from customers</p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Stripe Publishable Key <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={stripePublicKey}
+                    onChange={(e) => setStripePublicKey(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder={companySettings?.stripe_public_key ? '••••••••••••••••' : 'pk_live_...'}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {companySettings?.stripe_public_key
+                      ? 'Publishable key is saved and encrypted. Enter a new key to update it.'
+                      : 'Your publishable key from Stripe Dashboard → Developers → API keys'}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Stripe Secret Key <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    value={stripeSecretKey}
+                    onChange={(e) => setStripeSecretKey(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder={companySettings?.stripe_secret_key ? '••••••••••••••••' : 'sk_live_...'}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {companySettings?.stripe_secret_key
+                      ? 'Secret key is saved and encrypted. Enter a new key to update it.'
+                      : 'Your secret key from Stripe Dashboard → Developers → API keys (keep this confidential)'}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Stripe Webhook Secret
+                  </label>
+                  <input
+                    type="password"
+                    value={stripeWebhookSecret}
+                    onChange={(e) => setStripeWebhookSecret(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder={companySettings?.stripe_webhook_secret ? '••••••••••••••••' : 'whsec_...'}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {companySettings?.stripe_webhook_secret
+                      ? 'Webhook secret is saved and encrypted. Enter a new secret to update it.'
+                      : 'Your webhook signing secret from Stripe Dashboard → Developers → Webhooks'}
+                  </p>
+                </div>
+
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold text-blue-900 mb-2">Setup Instructions:</p>
+                    <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside ml-2">
+                      <li>Create a Stripe account at <a href="https://stripe.com" target="_blank" rel="noopener noreferrer" className="underline">stripe.com</a></li>
+                      <li>Get your API keys from Stripe Dashboard → Developers → API keys</li>
+                      <li>Set up a webhook endpoint for payment notifications (optional)</li>
+                      <li>Enter your credentials above and save</li>
+                    </ol>
+                  </div>
+                  <a
+                    href="https://dashboard.stripe.com/apikeys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-600 hover:text-blue-700 underline inline-block"
+                  >
+                    Get API Keys from Stripe →
+                  </a>
+                </div>
+
+                <div className="pt-4">
+                  <button
+                    onClick={saveStripeIntegration}
+                    disabled={savingStripe}
+                    className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  >
+                    {savingStripe ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Save Stripe Credentials
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {companySettings?.stripe_secret_key && (
+                  <>
+                    <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-blue-800">
+                          <CreditCard className="w-5 h-5" />
+                          <div>
+                            <p className="font-medium">Stripe Integration Active</p>
+                            <p className="text-sm mt-1">Payment processing is configured and ready to use</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={testStripeConnection}
+                          disabled={testingStripe}
+                          className="flex items-center gap-2 px-4 py-2 bg-white border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50 disabled:opacity-50 transition-colors"
+                        >
+                          {testingStripe ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Testing...
+                            </>
+                          ) : (
+                            'Test Connection'
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {stripeTestResult && (
+                      <div className={`p-4 rounded-lg border ${stripeTestResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                        <div className="space-y-3">
+                          {stripeTestResult.success ? (
+                            <div className="flex items-start gap-3">
+                              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-bold">
+                                ✓
+                              </div>
+                              <div className="flex-1">
+                                <h4 className="font-medium text-green-900">Connection Successful!</h4>
+                                <p className="text-sm text-green-800 mt-1">{stripeTestResult.message}</p>
+                                {stripeTestResult.balance && (
+                                  <div className="mt-3 p-3 bg-white rounded border border-green-200">
+                                    <p className="text-xs font-medium text-gray-600 mb-2">Account Balance:</p>
+                                    <div className="grid grid-cols-2 gap-3">
+                                      <div>
+                                        <p className="text-xs text-gray-500">Available</p>
+                                        <p className="text-lg font-semibold text-green-700">
+                                          ${stripeTestResult.balance.available.toFixed(2)} {stripeTestResult.balance.currency.toUpperCase()}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <p className="text-xs text-gray-500">Pending</p>
+                                        <p className="text-lg font-semibold text-gray-700">
+                                          ${stripeTestResult.balance.pending.toFixed(2)} {stripeTestResult.balance.currency.toUpperCase()}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-start gap-3">
+                              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-white text-sm font-bold">
+                                ✕
+                              </div>
+                              <div className="flex-1">
+                                <h4 className="font-medium text-red-900">Connection Failed</h4>
+                                <p className="text-sm text-red-800 mt-1">{stripeTestResult.error}</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'billing-dashboard' && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <Suspense fallback={
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
+                </div>
+              }>
+                <BillingDashboard />
               </Suspense>
             </div>
           )}
