@@ -386,19 +386,11 @@ Deno.serve(async (req: Request) => {
           throw new Error(error.error?.message || 'Failed to add item to invoice');
         }
 
-        const finalizeBody: any = {
-          auto_advance: true,
-        };
-
-        if (minimumDue && minimumDue > 0) {
-          finalizeBody.minimum_amount_due = minimumDue;
-        }
-
         const finalizeResponse = await callStripeAPI(
           `/invoices/${invoice.id}/finalize`,
           'POST',
           config.secretKey,
-          finalizeBody
+          { auto_advance: true }
         );
 
         if (!finalizeResponse.ok) {
@@ -417,7 +409,7 @@ Deno.serve(async (req: Request) => {
             status: finalInvoice.status,
             amountDue: finalInvoice.amount_due,
             amountPaid: finalInvoice.amount_paid,
-            minimumDue: finalInvoice.minimum_amount_due || minimumDue,
+            minimumDue: minimumDue,
           }),
           {
             status: 200,
