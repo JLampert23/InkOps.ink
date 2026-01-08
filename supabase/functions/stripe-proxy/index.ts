@@ -96,8 +96,33 @@ Deno.serve(async (req: Request) => {
       headers: corsHeaders,
     });
   }
-  
+
   try {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid authentication token' }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     const { action, data } = await req.json();
     
     const config = await getStripeConfig();
@@ -112,6 +137,46 @@ Deno.serve(async (req: Request) => {
     }
     
     switch (action) {
+      case 'testConnection': {
+        const balanceResponse = await callStripeAPI(
+          '/balance',
+          'GET',
+          config.secretKey
+        );
+
+        if (!balanceResponse.ok) {
+          const error = await balanceResponse.json();
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: error.error?.message || 'Failed to connect to Stripe'
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+
+        const balance = await balanceResponse.json();
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: 'Successfully connected to Stripe!',
+            balance: {
+              available: (balance.available?.[0]?.amount || 0) / 100,
+              pending: (balance.pending?.[0]?.amount || 0) / 100,
+              currency: balance.available?.[0]?.currency || 'usd',
+            },
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
       case 'createPaymentLink': {
         const { amount, currency, metadata, customerEmail, description } = data;
         

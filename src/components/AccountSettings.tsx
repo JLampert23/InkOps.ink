@@ -855,11 +855,39 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
         return;
       }
 
-      alert('Stripe connection test is not yet implemented. Your credentials are saved and will be used for payment processing.');
-      setStripeTestResult({
-        success: true,
-        message: 'Stripe credentials are saved and ready to use.',
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setStripeTestResult({
+          success: false,
+          error: 'You must be logged in to test Stripe connection',
+        });
+        return;
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-proxy`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
+          action: 'testConnection',
+          data: {},
+        }),
       });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setStripeTestResult({
+          success: false,
+          error: result.error || 'Failed to test Stripe connection',
+        });
+        return;
+      }
+
+      setStripeTestResult(result);
     } catch (err) {
       setStripeTestResult({
         success: false,
@@ -2785,6 +2813,25 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
                               <div className="flex-1">
                                 <h4 className="font-medium text-green-900">Connection Successful!</h4>
                                 <p className="text-sm text-green-800 mt-1">{stripeTestResult.message}</p>
+                                {stripeTestResult.balance && (
+                                  <div className="mt-3 p-3 bg-white rounded border border-green-200">
+                                    <p className="text-xs font-medium text-gray-600 mb-2">Account Balance:</p>
+                                    <div className="grid grid-cols-2 gap-3">
+                                      <div>
+                                        <p className="text-xs text-gray-500">Available</p>
+                                        <p className="text-lg font-semibold text-green-700">
+                                          ${stripeTestResult.balance.available.toFixed(2)} {stripeTestResult.balance.currency.toUpperCase()}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <p className="text-xs text-gray-500">Pending</p>
+                                        <p className="text-lg font-semibold text-gray-700">
+                                          ${stripeTestResult.balance.pending.toFixed(2)} {stripeTestResult.balance.currency.toUpperCase()}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           ) : (
