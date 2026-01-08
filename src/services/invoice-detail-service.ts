@@ -394,8 +394,8 @@ export const invoiceDetailService = {
       const fee = edge.node;
       return {
         id: fee.id || `fee-${Math.random()}`,
-        name: fee.name || fee.description || 'Fee',
-        description: fee.description || fee.name || 'Additional Charge',
+        name: fee.description || 'Fee',
+        description: fee.description || 'Additional Charge',
         amount: parseFloat(fee.amount) || 0,
         taxable: fee.taxable || false,
       };

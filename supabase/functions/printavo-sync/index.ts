@@ -269,7 +269,6 @@ async function syncInvoices(
               edges {
                 node {
                   id
-                  name
                   description
                   amount
                   taxable
@@ -351,7 +350,6 @@ async function syncInvoices(
               edges {
                 node {
                   id
-                  name
                   description
                   amount
                   taxable
