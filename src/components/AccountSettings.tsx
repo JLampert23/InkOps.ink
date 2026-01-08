@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, Receipt } from 'lucide-react';
+import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, Receipt, RefreshCw } from 'lucide-react';
 import { supabase } from '../lib/supabase-client';
 import { useAuth } from '../contexts/AuthContext';
 import AutomatedReports from './automation/AutomatedReports';
@@ -100,6 +100,7 @@ export function AccountSettings() {
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(false);
   const [savingStatuses, setSavingStatuses] = useState(false);
+  const [syncingStatuses, setSyncingStatuses] = useState(false);
 
   const [billingSelectedStatuses, setBillingSelectedStatuses] = useState<string[]>([]);
   const [savingBillingStatuses, setSavingBillingStatuses] = useState(false);
@@ -1100,6 +1101,19 @@ export function AccountSettings() {
       alert('Failed to save billing status preferences. Please try again.');
     } finally {
       setSavingBillingStatuses(false);
+    }
+  };
+
+  const syncStatuses = async () => {
+    try {
+      setSyncingStatuses(true);
+      await loadAvailableStatuses();
+      alert('Statuses synced successfully!');
+    } catch (err) {
+      console.error('Error syncing statuses:', err);
+      alert('Failed to sync statuses. Please try again.');
+    } finally {
+      setSyncingStatuses(false);
     }
   };
 
@@ -2272,9 +2286,28 @@ export function AccountSettings() {
 
           {activeTab === 'billing-status-filters' && (
             <div className="bg-white rounded-lg shadow p-6 space-y-6">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 mb-1">Billing & Payments Status Filters</h2>
-                <p className="text-sm text-gray-600">Select statuses to display in Billing & Payments section</p>
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 mb-1">Billing & Payments Status Filters</h2>
+                  <p className="text-sm text-gray-600">Select statuses to display in Billing & Payments section</p>
+                </div>
+                <button
+                  onClick={syncStatuses}
+                  disabled={syncingStatuses || loadingStatuses}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {syncingStatuses ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Syncing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="w-4 h-4" />
+                      Sync Statuses
+                    </>
+                  )}
+                </button>
               </div>
 
               {loadingStatuses ? (
