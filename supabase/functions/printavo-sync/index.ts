@@ -252,6 +252,17 @@ async function syncInvoices(
                 }
               }
             }
+            fees {
+              edges {
+                node {
+                  id
+                  name
+                  description
+                  amount
+                  taxable
+                }
+              }
+            }
           }
         }
         pageInfo {
@@ -307,6 +318,17 @@ async function syncInvoices(
                       }
                     }
                   }
+                }
+              }
+            }
+            fees {
+              edges {
+                node {
+                  id
+                  name
+                  description
+                  amount
+                  taxable
                 }
               }
             }

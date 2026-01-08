@@ -39,6 +39,14 @@ export interface PrintavoPayment {
   notes: string | null;
 }
 
+export interface InvoiceFee {
+  id: string;
+  name: string;
+  description: string;
+  amount: number;
+  taxable: boolean;
+}
+
 export interface InvoiceDetail {
   id: string;
   printavoInvoiceId: string;
@@ -56,6 +64,8 @@ export interface InvoiceDetail {
   customerPO: string | null;
 
   lineItems: InvoiceLineItem[];
+  fees: InvoiceFee[];
+  feesTotal: number;
 
   subtotal: number;
   tax: number;
@@ -181,6 +191,9 @@ export const invoiceDetailService = {
             rawData: item.raw_data,
           };
         }),
+
+        fees: this.extractFees(rawData),
+        feesTotal: this.calculateFeesTotal(rawData),
 
         subtotal: parseFloat(invoice.subtotal) || 0,
         tax: parseFloat(invoice.tax) || 0,
@@ -366,6 +379,28 @@ export const invoiceDetailService = {
 
   hasAddress(address: InvoiceAddress): boolean {
     return !!(address.line1 || address.city || address.state || address.zip);
+  },
+
+  extractFees(rawData: any): InvoiceFee[] {
+    if (!rawData || !rawData.fees || !rawData.fees.edges) {
+      return [];
+    }
+
+    return rawData.fees.edges.map((edge: any) => {
+      const fee = edge.node;
+      return {
+        id: fee.id || `fee-${Math.random()}`,
+        name: fee.name || fee.description || 'Fee',
+        description: fee.description || fee.name || 'Additional Charge',
+        amount: parseFloat(fee.amount) || 0,
+        taxable: fee.taxable || false,
+      };
+    });
+  },
+
+  calculateFeesTotal(rawData: any): number {
+    const fees = this.extractFees(rawData);
+    return fees.reduce((sum, fee) => sum + fee.amount, 0);
   },
 
   parseLineItemDetails(description: string, rawData?: any): { style: string; color: string; sizes: string } {
