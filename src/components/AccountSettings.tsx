@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, Edit, Key, Clock, Layers, Zap, CreditCard } from 'lucide-react';
+import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon } from 'lucide-react';
 import { supabase } from '../lib/supabase-client';
 import { useAuth } from '../contexts/AuthContext';
 import AutomatedReports from './automation/AutomatedReports';
@@ -27,13 +27,23 @@ interface UserProfile {
   created_at: string;
 }
 
+type SettingsTab =
+  | 'company-info'
+  | 'printavo-integration' | 'square-integration' | 'resend-integration'
+  | 'user-management'
+  | 'status-filters'
+  | 'automated-reports' | 'workflow-setup' | 'automations' | 'stripe-payments';
+
 export function AccountSettings() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'company' | 'integration' | 'users' | 'statuses' | 'automation' | 'workflow' | 'automations' | 'stripe'>('company');
+  const [activeTab, setActiveTab] = useState<SettingsTab>('company-info');
   const [loading, setLoading] = useState(true);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null);
+
+  const [integrationsExpanded, setIntegrationsExpanded] = useState(false);
+  const [automationExpanded, setAutomationExpanded] = useState(false);
 
   const [companyName, setCompanyName] = useState('');
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -133,20 +143,67 @@ export function AccountSettings() {
   const loadAvailableStatuses = async () => {
     try {
       setLoadingStatuses(true);
-      const { data, error } = await supabase
-        .from('printavo_invoices_calculated')
-        .select('status')
-        .not('status', 'is', null);
 
-      if (error) throw error;
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/printavo-company`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-      const uniqueStatuses = Array.from(
-        new Set(data?.map(item => item.status).filter(status => status && status.trim() !== '') || [])
-      ).sort();
+      if (!response.ok) {
+        console.warn('Could not fetch statuses from Printavo API, falling back to local data');
+        const { data, error } = await supabase
+          .from('printavo_invoices_calculated')
+          .select('status')
+          .not('status', 'is', null);
 
-      setAvailableStatuses(uniqueStatuses);
+        if (error) throw error;
+
+        const uniqueStatuses = Array.from(
+          new Set(data?.map(item => item.status).filter(status => status && status.trim() !== '') || [])
+        ).sort();
+
+        setAvailableStatuses(uniqueStatuses);
+        return;
+      }
+
+      const result = await response.json();
+
+      if (result.success && result.company?.visualStatuses) {
+        const statusNames = result.company.visualStatuses.map((status: any) => status.name).sort();
+        setAvailableStatuses(statusNames);
+      } else {
+        const { data, error } = await supabase
+          .from('printavo_invoices_calculated')
+          .select('status')
+          .not('status', 'is', null);
+
+        if (error) throw error;
+
+        const uniqueStatuses = Array.from(
+          new Set(data?.map(item => item.status).filter(status => status && status.trim() !== '') || [])
+        ).sort();
+
+        setAvailableStatuses(uniqueStatuses);
+      }
     } catch (err) {
       console.error('Error loading statuses:', err);
+      try {
+        const { data, error } = await supabase
+          .from('printavo_invoices_calculated')
+          .select('status')
+          .not('status', 'is', null);
+
+        if (!error) {
+          const uniqueStatuses = Array.from(
+            new Set(data?.map(item => item.status).filter(status => status && status.trim() !== '') || [])
+          ).sort();
+          setAvailableStatuses(uniqueStatuses);
+        }
+      } catch (fallbackErr) {
+        console.error('Fallback status loading also failed:', fallbackErr);
+      }
     } finally {
       setLoadingStatuses(false);
     }
@@ -320,6 +377,7 @@ export function AccountSettings() {
       setPrintavoToken('');
       setTestResult(null);
       await loadSettings();
+      await loadAvailableStatuses();
     } catch (err) {
       console.error('Error saving integration settings:', err);
       alert(err instanceof Error ? err.message : 'Failed to save integration settings. Please try again.');
@@ -825,133 +883,262 @@ export function AccountSettings() {
   const isAdmin = currentUserProfile?.role === 'admin';
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Account Settings</h1>
-        <p className="text-gray-600">Manage your company, integrations, and preferences</p>
-      </div>
-
-      <div className="bg-white rounded-lg shadow">
-        <div className="border-b border-gray-200">
-          <nav className="flex -mb-px">
-            <button
-              onClick={() => setActiveTab('company')}
-              className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'company'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Building2 className="w-4 h-4" />
-                Company Settings
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('integration')}
-              className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'integration'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Key className="w-4 h-4" />
-                Integration
-              </div>
-            </button>
-            {isAdmin && (
-              <button
-                onClick={() => setActiveTab('users')}
-                className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === 'users'
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4" />
-                  Users
-                </div>
-              </button>
-            )}
-            <button
-              onClick={() => setActiveTab('statuses')}
-              className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'statuses'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Filter className="w-4 h-4" />
-                Status Filters
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('automation')}
-              className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'automation'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4" />
-                Automated Reports
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('workflow')}
-              className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'workflow'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Layers className="w-4 h-4" />
-                Workflow Setup
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('automations')}
-              className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'automations'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4" />
-                Automations
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('stripe')}
-              className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'stripe'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <CreditCard className="w-4 h-4" />
-                Stripe Payments
-              </div>
-            </button>
-          </nav>
+    <div className="flex h-full">
+      {/* Left Sidebar Navigation */}
+      <div className="w-64 bg-white border-r border-gray-200 overflow-y-auto flex-shrink-0">
+        <div className="p-4">
+          <h1 className="text-lg font-bold text-gray-900 mb-1">Account Settings</h1>
+          <p className="text-xs text-gray-600">Manage your account</p>
         </div>
 
-        <div className="p-6">
-          {activeTab === 'company' && (
-            <div className="space-y-6">
+        <nav className="px-2 pb-4">
+          {/* Company Settings Section */}
+          <div className="mb-2">
+            <button
+              onClick={() => setActiveTab('company-info')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
+                activeTab === 'company-info'
+                  ? 'bg-blue-50 text-blue-700 shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+            >
+              <Building2 className={`w-4 h-4 flex-shrink-0 ${activeTab === 'company-info' ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+              <div className="flex-1 text-left">
+                <div className={`font-medium text-sm ${activeTab === 'company-info' ? 'text-blue-700' : 'text-gray-700'}`}>
+                  Company Settings
+                </div>
+              </div>
+              {activeTab === 'company-info' && <div className="w-1 h-6 bg-blue-600 rounded-full absolute right-0" />}
+            </button>
+          </div>
+
+          {/* Integrations Section - Collapsible */}
+          <div className="mb-2">
+            <button
+              onClick={() => setIntegrationsExpanded(!integrationsExpanded)}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 hover:bg-gray-50"
+            >
+              <LinkIcon className="w-4 h-4 flex-shrink-0 text-gray-600 group-hover:text-gray-900" />
+              <div className="flex-1 text-left">
+                <div className="font-medium text-sm text-gray-900">
+                  Integrations
+                </div>
+              </div>
+              {integrationsExpanded ? (
+                <ChevronDown className="w-4 h-4 text-gray-500 transition-transform duration-200" />
+              ) : (
+                <ChevronUp className="w-4 h-4 text-gray-500 transition-transform duration-200 rotate-180" />
+              )}
+            </button>
+
+            {integrationsExpanded && (
+              <div className="mt-1 ml-2 space-y-1 collapsible-section collapsible-section-enter">
+                <button
+                  onClick={() => setActiveTab('printavo-integration')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'printavo-integration'
+                      ? 'bg-green-50 text-green-700 shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
+                >
+                  <Key className={`w-4 h-4 flex-shrink-0 ${activeTab === 'printavo-integration' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'printavo-integration' ? 'text-green-700' : 'text-gray-700'}`}>
+                      Printavo
+                    </div>
+                  </div>
+                  {activeTab === 'printavo-integration' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('square-integration')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'square-integration'
+                      ? 'bg-green-50 text-green-700 shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
+                  style={{ animationDelay: '20ms' }}
+                >
+                  <CreditCard className={`w-4 h-4 flex-shrink-0 ${activeTab === 'square-integration' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'square-integration' ? 'text-green-700' : 'text-gray-700'}`}>
+                      Square
+                    </div>
+                  </div>
+                  {activeTab === 'square-integration' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('resend-integration')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'resend-integration'
+                      ? 'bg-green-50 text-green-700 shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
+                  style={{ animationDelay: '40ms' }}
+                >
+                  <SettingsIcon className={`w-4 h-4 flex-shrink-0 ${activeTab === 'resend-integration' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'resend-integration' ? 'text-green-700' : 'text-gray-700'}`}>
+                      Resend Email
+                    </div>
+                  </div>
+                  {activeTab === 'resend-integration' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* User Management (Admin only) */}
+          {isAdmin && (
+            <div className="mb-2">
+              <button
+                onClick={() => setActiveTab('user-management')}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
+                  activeTab === 'user-management'
+                    ? 'bg-blue-50 text-blue-700 shadow-sm'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                }`}
+              >
+                <Shield className={`w-4 h-4 flex-shrink-0 ${activeTab === 'user-management' ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                <div className="flex-1 text-left">
+                  <div className={`font-medium text-sm ${activeTab === 'user-management' ? 'text-blue-700' : 'text-gray-700'}`}>
+                    User Management
+                  </div>
+                </div>
+                {activeTab === 'user-management' && <div className="w-1 h-6 bg-blue-600 rounded-full absolute right-0" />}
+              </button>
+            </div>
+          )}
+
+          {/* Status Filters */}
+          <div className="mb-2">
+            <button
+              onClick={() => setActiveTab('status-filters')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
+                activeTab === 'status-filters'
+                  ? 'bg-blue-50 text-blue-700 shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+            >
+              <Filter className={`w-4 h-4 flex-shrink-0 ${activeTab === 'status-filters' ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+              <div className="flex-1 text-left">
+                <div className={`font-medium text-sm ${activeTab === 'status-filters' ? 'text-blue-700' : 'text-gray-700'}`}>
+                  Status Filters
+                </div>
+              </div>
+              {activeTab === 'status-filters' && <div className="w-1 h-6 bg-blue-600 rounded-full absolute right-0" />}
+            </button>
+          </div>
+
+          {/* Automation Section - Collapsible */}
+          <div className="mb-2">
+            <button
+              onClick={() => setAutomationExpanded(!automationExpanded)}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 hover:bg-gray-50"
+            >
+              <Zap className="w-4 h-4 flex-shrink-0 text-gray-600 group-hover:text-gray-900" />
+              <div className="flex-1 text-left">
+                <div className="font-medium text-sm text-gray-900">
+                  Automation
+                </div>
+              </div>
+              {automationExpanded ? (
+                <ChevronDown className="w-4 h-4 text-gray-500 transition-transform duration-200" />
+              ) : (
+                <ChevronUp className="w-4 h-4 text-gray-500 transition-transform duration-200 rotate-180" />
+              )}
+            </button>
+
+            {automationExpanded && (
+              <div className="mt-1 ml-2 space-y-1 collapsible-section collapsible-section-enter">
+                <button
+                  onClick={() => setActiveTab('automated-reports')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'automated-reports'
+                      ? 'bg-green-50 text-green-700 shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
+                >
+                  <Clock className={`w-4 h-4 flex-shrink-0 ${activeTab === 'automated-reports' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'automated-reports' ? 'text-green-700' : 'text-gray-700'}`}>
+                      Automated Reports
+                    </div>
+                  </div>
+                  {activeTab === 'automated-reports' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('workflow-setup')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'workflow-setup'
+                      ? 'bg-green-50 text-green-700 shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
+                  style={{ animationDelay: '20ms' }}
+                >
+                  <Layers className={`w-4 h-4 flex-shrink-0 ${activeTab === 'workflow-setup' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'workflow-setup' ? 'text-green-700' : 'text-gray-700'}`}>
+                      Workflow Setup
+                    </div>
+                  </div>
+                  {activeTab === 'workflow-setup' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('automations')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'automations'
+                      ? 'bg-green-50 text-green-700 shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
+                  style={{ animationDelay: '40ms' }}
+                >
+                  <Zap className={`w-4 h-4 flex-shrink-0 ${activeTab === 'automations' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'automations' ? 'text-green-700' : 'text-gray-700'}`}>
+                      Automations
+                    </div>
+                  </div>
+                  {activeTab === 'automations' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('stripe-payments')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'stripe-payments'
+                      ? 'bg-green-50 text-green-700 shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
+                  style={{ animationDelay: '60ms' }}
+                >
+                  <CreditCard className={`w-4 h-4 flex-shrink-0 ${activeTab === 'stripe-payments' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'stripe-payments' ? 'text-green-700' : 'text-gray-700'}`}>
+                      Stripe Payments
+                    </div>
+                  </div>
+                  {activeTab === 'stripe-payments' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
+                </button>
+              </div>
+            )}
+          </div>
+        </nav>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-y-auto bg-gray-50">
+        <div className="p-8 max-w-4xl mx-auto">
+          {activeTab === 'company-info' && (
+            <div className="bg-white rounded-lg shadow p-6 space-y-6">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Company Information</h2>
                 <p className="text-sm text-gray-600 mb-6">Manage your company details</p>
               </div>
 
-              <div className="space-y-4 max-w-xl">
+              <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Company Name
@@ -1022,14 +1209,14 @@ export function AccountSettings() {
             </div>
           )}
 
-          {activeTab === 'integration' && (
-            <div className="space-y-6">
+          {activeTab === 'printavo-integration' && (
+            <div className="bg-white rounded-lg shadow p-6 space-y-6">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Printavo Integration</h2>
                 <p className="text-sm text-gray-600 mb-6">Connect your Printavo account to sync data</p>
               </div>
 
-              <div className="space-y-4 max-w-xl">
+              <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Printavo Email / Username
@@ -1147,347 +1334,349 @@ export function AccountSettings() {
                   </>
                 )}
               </div>
+            </div>
+          )}
 
-              {/* Square Integration Section */}
-              <div className="mt-12 pt-8 border-t border-gray-200">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Square Integration</h2>
-                  <p className="text-sm text-gray-600 mb-6">Connect your Square account to access payment data</p>
-                </div>
-
-                <div className="space-y-4 max-w-xl">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Square Access Token <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="password"
-                      value={squareAccessToken}
-                      onChange={(e) => setSquareAccessToken(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      placeholder={companySettings?.square_access_token ? '••••••••••••••••' : 'Enter your Square access token'}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      {companySettings?.square_access_token
-                        ? 'Token is saved and encrypted. Enter a new token to update it.'
-                        : 'Find your access token in Square Developer Dashboard'}
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Application ID
-                    </label>
-                    <input
-                      type="text"
-                      value={squareApplicationId}
-                      onChange={(e) => setSquareApplicationId(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      placeholder="sq0idp-XXXXXXXXXXXXXXXXXXXX"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Your Square Application ID</p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Location ID
-                    </label>
-                    <input
-                      type="text"
-                      value={squareLocationId}
-                      onChange={(e) => setSquareLocationId(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      placeholder="L1234567890"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Your Square Location ID (leave blank for all locations)</p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Environment
-                    </label>
-                    <select
-                      value={squareEnvironment}
-                      onChange={(e) => setSquareEnvironment(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    >
-                      <option value="production">Production</option>
-                      <option value="sandbox">Sandbox (Testing)</option>
-                    </select>
-                    <p className="text-xs text-gray-500 mt-1">Select production for live data or sandbox for testing</p>
-                  </div>
-
-                  <div className="pt-4">
-                    <button
-                      onClick={saveSquareIntegration}
-                      disabled={savingSquare}
-                      className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
-                    >
-                      {savingSquare ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="w-4 h-4" />
-                          Save Square Credentials
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {companySettings?.square_access_token && (
-                    <>
-                      <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 text-green-800">
-                            <Key className="w-5 h-5" />
-                            <div>
-                              <p className="font-medium">Square Integration Active</p>
-                              <p className="text-sm mt-1">Environment: {companySettings.square_environment || 'production'}</p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={testSquareConnection}
-                            disabled={testingSquare}
-                            className="flex items-center gap-2 px-4 py-2 bg-white border border-green-300 text-green-700 rounded-lg hover:bg-green-50 disabled:opacity-50 transition-colors"
-                          >
-                            {testingSquare ? (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                Testing...
-                              </>
-                            ) : (
-                              'Test Connection'
-                            )}
-                          </button>
-                        </div>
-                      </div>
-
-                      {squareTestResult && (
-                        <div className={`p-4 rounded-lg border ${squareTestResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                          <div className="space-y-3">
-                            {squareTestResult.success ? (
-                              <>
-                                <div className="flex items-start gap-3">
-                                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-bold">
-                                    ✓
-                                  </div>
-                                  <div className="flex-1">
-                                    <h4 className="font-medium text-green-900">Connection Successful!</h4>
-                                    <p className="text-sm text-green-800 mt-1">{squareTestResult.message}</p>
-                                    {squareTestResult.locations && squareTestResult.locations.length > 0 && (
-                                      <div className="mt-3">
-                                        <p className="text-xs font-medium text-green-900 mb-2">Locations:</p>
-                                        <ul className="text-xs text-green-800 space-y-1">
-                                          {squareTestResult.locations.slice(0, 5).map((loc: any) => (
-                                            <li key={loc.id}>
-                                              {loc.name} ({loc.id})
-                                            </li>
-                                          ))}
-                                        </ul>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <div className="flex items-start gap-3">
-                                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-white text-sm font-bold">
-                                    ✕
-                                  </div>
-                                  <div className="flex-1">
-                                    <h4 className="font-medium text-red-900">Connection Failed</h4>
-                                    <p className="text-sm text-red-800 mt-1">{squareTestResult.error}</p>
-                                  </div>
-                                </div>
-                              </>
-                            )}
-
-                            <div className="mt-3 pt-3 border-t border-gray-200">
-                              <div className="text-xs font-medium text-gray-700 mb-2">Diagnostics:</div>
-                              <pre className="text-xs p-3 bg-white rounded border border-gray-300 overflow-x-auto max-h-96">
-                                {JSON.stringify(squareTestResult, null, 2)}
-                              </pre>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
+          {activeTab === 'square-integration' && (
+            <div className="bg-white rounded-lg shadow p-6 space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Square Integration</h2>
+                <p className="text-sm text-gray-600 mb-6">Connect your Square account to access payment data</p>
               </div>
 
-              {/* Resend Email Integration Section */}
-              <div className="mt-12 pt-8 border-t border-gray-200">
+              <div className="space-y-4">
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Resend Email Integration</h2>
-                  <p className="text-sm text-gray-600 mb-6">Connect Resend to send transactional emails</p>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Square Access Token <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    value={squareAccessToken}
+                    onChange={(e) => setSquareAccessToken(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder={companySettings?.square_access_token ? '••••••••••••••••' : 'Enter your Square access token'}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {companySettings?.square_access_token
+                      ? 'Token is saved and encrypted. Enter a new token to update it.'
+                      : 'Find your access token in Square Developer Dashboard'}
+                  </p>
                 </div>
 
-                <div className="space-y-4 max-w-xl">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Resend API Key <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="password"
-                      value={resendApiKey}
-                      onChange={(e) => setResendApiKey(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      placeholder={companySettings?.resend_api_key ? '••••••••••••••••' : 'Enter your Resend API key'}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      {companySettings?.resend_api_key
-                        ? 'API key is saved and encrypted. Enter a new key to update it.'
-                        : 'Get your API key from Resend Dashboard → API Keys'}
-                    </p>
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Application ID
+                  </label>
+                  <input
+                    type="text"
+                    value={squareApplicationId}
+                    onChange={(e) => setSquareApplicationId(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="sq0idp-XXXXXXXXXXXXXXXXXXXX"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Your Square Application ID</p>
+                </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      From Email Address <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="email"
-                      value={emailFromAddress}
-                      onChange={(e) => setEmailFromAddress(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      placeholder="invoices@yourdomain.com"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Must use an email address from your verified domain (e.g., invoices@toddssportinggoods.com)
-                    </p>
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Location ID
+                  </label>
+                  <input
+                    type="text"
+                    value={squareLocationId}
+                    onChange={(e) => setSquareLocationId(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="L1234567890"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Your Square Location ID (leave blank for all locations)</p>
+                </div>
 
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-sm text-blue-900">
-                      <strong>Note:</strong> You'll also need to verify your sending domain in the Resend dashboard before you can send emails.
-                    </p>
-                    <a
-                      href="https://resend.com/api-keys"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-blue-600 hover:text-blue-700 underline mt-2 inline-block"
-                    >
-                      Get API Key from Resend →
-                    </a>
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Environment
+                  </label>
+                  <select
+                    value={squareEnvironment}
+                    onChange={(e) => setSquareEnvironment(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  >
+                    <option value="production">Production</option>
+                    <option value="sandbox">Sandbox (Testing)</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">Select production for live data or sandbox for testing</p>
+                </div>
 
-                  <div className="pt-4">
-                    <button
-                      onClick={saveResendIntegration}
-                      disabled={savingResend}
-                      className="flex items-center gap-2 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors"
-                    >
-                      {savingResend ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="w-4 h-4" />
-                          Save Resend Credentials
-                        </>
-                      )}
-                    </button>
-                  </div>
+                <div className="pt-4">
+                  <button
+                    onClick={saveSquareIntegration}
+                    disabled={savingSquare}
+                    className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                  >
+                    {savingSquare ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Save Square Credentials
+                      </>
+                    )}
+                  </button>
+                </div>
 
-                  {companySettings?.resend_api_key && (
-                    <>
-                      <div className="mt-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 text-purple-800">
-                            <Key className="w-5 h-5" />
-                            <div>
-                              <p className="font-medium">Resend Integration Active</p>
-                              <p className="text-sm mt-1">Email sending is configured and ready to use</p>
-                            </div>
+                {companySettings?.square_access_token && (
+                  <>
+                    <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-green-800">
+                          <Key className="w-5 h-5" />
+                          <div>
+                            <p className="font-medium">Square Integration Active</p>
+                            <p className="text-sm mt-1">Environment: {companySettings.square_environment || 'production'}</p>
                           </div>
-                          <button
-                            onClick={testResendConnection}
-                            disabled={testingResend}
-                            className="flex items-center gap-2 px-4 py-2 bg-white border border-purple-300 text-purple-700 rounded-lg hover:bg-purple-50 disabled:opacity-50 transition-colors"
-                          >
-                            {testingResend ? (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                Testing...
-                              </>
-                            ) : (
-                              'Test Connection'
-                            )}
-                          </button>
+                        </div>
+                        <button
+                          onClick={testSquareConnection}
+                          disabled={testingSquare}
+                          className="flex items-center gap-2 px-4 py-2 bg-white border border-green-300 text-green-700 rounded-lg hover:bg-green-50 disabled:opacity-50 transition-colors"
+                        >
+                          {testingSquare ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Testing...
+                            </>
+                          ) : (
+                            'Test Connection'
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {squareTestResult && (
+                      <div className={`p-4 rounded-lg border ${squareTestResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                        <div className="space-y-3">
+                          {squareTestResult.success ? (
+                            <>
+                              <div className="flex items-start gap-3">
+                                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-bold">
+                                  ✓
+                                </div>
+                                <div className="flex-1">
+                                  <h4 className="font-medium text-green-900">Connection Successful!</h4>
+                                  <p className="text-sm text-green-800 mt-1">{squareTestResult.message}</p>
+                                  {squareTestResult.locations && squareTestResult.locations.length > 0 && (
+                                    <div className="mt-3">
+                                      <p className="text-xs font-medium text-green-900 mb-2">Locations:</p>
+                                      <ul className="text-xs text-green-800 space-y-1">
+                                        {squareTestResult.locations.slice(0, 5).map((loc: any) => (
+                                          <li key={loc.id}>
+                                            {loc.name} ({loc.id})
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex items-start gap-3">
+                                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-white text-sm font-bold">
+                                  ✕
+                                </div>
+                                <div className="flex-1">
+                                  <h4 className="font-medium text-red-900">Connection Failed</h4>
+                                  <p className="text-sm text-red-800 mt-1">{squareTestResult.error}</p>
+                                </div>
+                              </div>
+                            </>
+                          )}
+
+                          <div className="mt-3 pt-3 border-t border-gray-200">
+                            <div className="text-xs font-medium text-gray-700 mb-2">Diagnostics:</div>
+                            <pre className="text-xs p-3 bg-white rounded border border-gray-300 overflow-x-auto max-h-96">
+                              {JSON.stringify(squareTestResult, null, 2)}
+                            </pre>
+                          </div>
                         </div>
                       </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
 
-                      {resendTestResult && (
-                        <div className={`p-4 rounded-lg border ${resendTestResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                          <div className="space-y-3">
-                            {resendTestResult.success ? (
-                              <>
-                                <div className="flex items-start gap-3">
-                                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-bold">
-                                    ✓
-                                  </div>
-                                  <div className="flex-1">
-                                    <h4 className="font-medium text-green-900">Connection Successful!</h4>
-                                    <p className="text-sm text-green-800 mt-1">{resendTestResult.message}</p>
-                                    {resendTestResult.emailId && (
-                                      <p className="text-xs text-green-700 mt-2">Email ID: {resendTestResult.emailId}</p>
-                                    )}
-                                  </div>
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <div className="flex items-start gap-3">
-                                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-white text-sm font-bold">
-                                    ✕
-                                  </div>
-                                  <div className="flex-1">
-                                    <h4 className="font-medium text-red-900">Connection Failed</h4>
-                                    <p className="text-sm text-red-800 mt-1">{resendTestResult.error}</p>
-                                  </div>
-                                </div>
-                              </>
-                            )}
+          {activeTab === 'resend-integration' && (
+            <div className="bg-white rounded-lg shadow p-6 space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Resend Email Integration</h2>
+                <p className="text-sm text-gray-600 mb-6">Connect Resend to send transactional emails</p>
+              </div>
 
-                            <div className="mt-3 pt-3 border-t border-gray-200">
-                              <div className="text-xs font-medium text-gray-700 mb-2">Diagnostics:</div>
-                              <pre className="text-xs p-3 bg-white rounded border border-gray-300 overflow-x-auto max-h-96">
-                                {JSON.stringify(resendTestResult, null, 2)}
-                              </pre>
-                            </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Resend API Key <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    value={resendApiKey}
+                    onChange={(e) => setResendApiKey(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder={companySettings?.resend_api_key ? '••••••••••••••••' : 'Enter your Resend API key'}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {companySettings?.resend_api_key
+                      ? 'API key is saved and encrypted. Enter a new key to update it.'
+                      : 'Get your API key from Resend Dashboard → API Keys'}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    From Email Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={emailFromAddress}
+                    onChange={(e) => setEmailFromAddress(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="invoices@yourdomain.com"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Must use an email address from your verified domain (e.g., invoices@toddssportinggoods.com)
+                  </p>
+                </div>
+
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-900">
+                    <strong>Note:</strong> You'll also need to verify your sending domain in the Resend dashboard before you can send emails.
+                  </p>
+                  <a
+                    href="https://resend.com/api-keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-600 hover:text-blue-700 underline mt-2 inline-block"
+                  >
+                    Get API Key from Resend →
+                  </a>
+                </div>
+
+                <div className="pt-4">
+                  <button
+                    onClick={saveResendIntegration}
+                    disabled={savingResend}
+                    className="flex items-center gap-2 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors"
+                  >
+                    {savingResend ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Save Resend Credentials
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {companySettings?.resend_api_key && (
+                  <>
+                    <div className="mt-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-purple-800">
+                          <Key className="w-5 h-5" />
+                          <div>
+                            <p className="font-medium">Resend Integration Active</p>
+                            <p className="text-sm mt-1">Email sending is configured and ready to use</p>
                           </div>
                         </div>
-                      )}
-                    </>
-                  )}
+                        <button
+                          onClick={testResendConnection}
+                          disabled={testingResend}
+                          className="flex items-center gap-2 px-4 py-2 bg-white border border-purple-300 text-purple-700 rounded-lg hover:bg-purple-50 disabled:opacity-50 transition-colors"
+                        >
+                          {testingResend ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Testing...
+                            </>
+                          ) : (
+                            'Test Connection'
+                          )}
+                        </button>
+                      </div>
+                    </div>
 
-                  <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                    <p className="text-sm font-medium text-gray-900 mb-2">Available Email Templates:</p>
-                    <ul className="text-sm text-gray-600 space-y-1 ml-4 list-disc">
-                      <li>Invoice Reminders</li>
-                      <li>Payment Confirmations</li>
-                      <li>Overdue Notices</li>
-                      <li>Welcome Emails</li>
-                      <li>Custom HTML Emails</li>
-                    </ul>
-                    <p className="text-xs text-gray-500 mt-3">
-                      See <code className="bg-white px-2 py-0.5 rounded">EMAIL_GUIDE.md</code> for usage examples
-                    </p>
-                  </div>
+                    {resendTestResult && (
+                      <div className={`p-4 rounded-lg border ${resendTestResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                        <div className="space-y-3">
+                          {resendTestResult.success ? (
+                            <>
+                              <div className="flex items-start gap-3">
+                                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-bold">
+                                  ✓
+                                </div>
+                                <div className="flex-1">
+                                  <h4 className="font-medium text-green-900">Connection Successful!</h4>
+                                  <p className="text-sm text-green-800 mt-1">{resendTestResult.message}</p>
+                                  {resendTestResult.emailId && (
+                                    <p className="text-xs text-green-700 mt-2">Email ID: {resendTestResult.emailId}</p>
+                                  )}
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex items-start gap-3">
+                                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-white text-sm font-bold">
+                                  ✕
+                                </div>
+                                <div className="flex-1">
+                                  <h4 className="font-medium text-red-900">Connection Failed</h4>
+                                  <p className="text-sm text-red-800 mt-1">{resendTestResult.error}</p>
+                                </div>
+                              </div>
+                            </>
+                          )}
+
+                          <div className="mt-3 pt-3 border-t border-gray-200">
+                            <div className="text-xs font-medium text-gray-700 mb-2">Diagnostics:</div>
+                            <pre className="text-xs p-3 bg-white rounded border border-gray-300 overflow-x-auto max-h-96">
+                              {JSON.stringify(resendTestResult, null, 2)}
+                            </pre>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                  <p className="text-sm font-medium text-gray-900 mb-2">Available Email Templates:</p>
+                  <ul className="text-sm text-gray-600 space-y-1 ml-4 list-disc">
+                    <li>Invoice Reminders</li>
+                    <li>Payment Confirmations</li>
+                    <li>Overdue Notices</li>
+                    <li>Welcome Emails</li>
+                    <li>Custom HTML Emails</li>
+                  </ul>
+                  <p className="text-xs text-gray-500 mt-3">
+                    See <code className="bg-white px-2 py-0.5 rounded">EMAIL_GUIDE.md</code> for usage examples
+                  </p>
                 </div>
               </div>
             </div>
           )}
 
-          {activeTab === 'users' && isAdmin && (
-            <div className="space-y-6">
+          {activeTab === 'user-management' && isAdmin && (
+            <div className="bg-white rounded-lg shadow p-6 space-y-6">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900 mb-1">User Management</h2>
@@ -1732,8 +1921,8 @@ export function AccountSettings() {
             </div>
           )}
 
-          {activeTab === 'statuses' && (
-            <div className="space-y-6">
+          {activeTab === 'status-filters' && (
+            <div className="bg-white rounded-lg shadow p-6 space-y-6">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 mb-1">Invoice Status Filters</h2>
                 <p className="text-sm text-gray-600">Select statuses to enable filtering in reports</p>
@@ -1745,7 +1934,7 @@ export function AccountSettings() {
                 </div>
               ) : availableStatuses.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
-                  No invoice statuses found. Sync your Printavo data to see available statuses.
+                  No invoice statuses found. Configure your Printavo integration and test the connection to load available statuses.
                 </div>
               ) : (
                 <>
@@ -1811,38 +2000,46 @@ export function AccountSettings() {
             </div>
           )}
 
-          {activeTab === 'automation' && (
-            <AutomatedReports />
+          {activeTab === 'automated-reports' && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <AutomatedReports />
+            </div>
           )}
 
-          {activeTab === 'workflow' && (
-            <Suspense fallback={
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-              </div>
-            }>
-              <WorkflowCustomization />
-            </Suspense>
+          {activeTab === 'workflow-setup' && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <Suspense fallback={
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                </div>
+              }>
+                <WorkflowCustomization />
+              </Suspense>
+            </div>
           )}
 
           {activeTab === 'automations' && (
-            <Suspense fallback={
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 text-purple-600 animate-spin" />
-              </div>
-            }>
-              <AutomationsDashboard />
-            </Suspense>
+            <div className="bg-white rounded-lg shadow p-6">
+              <Suspense fallback={
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 text-purple-600 animate-spin" />
+                </div>
+              }>
+                <AutomationsDashboard />
+              </Suspense>
+            </div>
           )}
 
-          {activeTab === 'stripe' && (
-            <Suspense fallback={
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-              </div>
-            }>
-              <StripePayments />
-            </Suspense>
+          {activeTab === 'stripe-payments' && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <Suspense fallback={
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                </div>
+              }>
+                <StripePayments />
+              </Suspense>
+            </div>
           )}
         </div>
       </div>

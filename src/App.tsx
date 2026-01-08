@@ -28,8 +28,8 @@ interface CompanySettings {
 function AppContent() {
   const [activeTab, setActiveTab] = useState<Tab>('ar');
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [billingPaymentsExpanded, setBillingPaymentsExpanded] = useState(true);
-  const [printavoDashboardExpanded, setPrintavoDashboardExpanded] = useState(true);
+  const [billingPaymentsExpanded, setBillingPaymentsExpanded] = useState(false);
+  const [printavoDashboardExpanded, setPrintavoDashboardExpanded] = useState(false);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const { invoices, payments, lineItems, loading, error, syncing, lastSyncTime, triggerSync } = useSupabaseData();
   const { signOut, user } = useAuth();
