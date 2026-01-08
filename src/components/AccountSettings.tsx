@@ -160,7 +160,7 @@ export function AccountSettings() {
     }
   };
 
-  const loadAvailableStatuses = async () => {
+  const loadAvailableStatuses = async (): Promise<string[]> => {
     try {
       setLoadingStatuses(true);
 
@@ -185,7 +185,7 @@ export function AccountSettings() {
         ).sort();
 
         setAvailableStatuses(uniqueStatuses);
-        return;
+        return uniqueStatuses;
       }
 
       const result = await response.json();
@@ -193,6 +193,7 @@ export function AccountSettings() {
       if (result.success && result.company?.visualStatuses) {
         const statusNames = result.company.visualStatuses.map((status: any) => status.name).sort();
         setAvailableStatuses(statusNames);
+        return statusNames;
       } else {
         const { data, error } = await supabase
           .from('printavo_invoices_calculated')
@@ -206,6 +207,7 @@ export function AccountSettings() {
         ).sort();
 
         setAvailableStatuses(uniqueStatuses);
+        return uniqueStatuses;
       }
     } catch (err) {
       console.error('Error loading statuses:', err);
@@ -220,10 +222,12 @@ export function AccountSettings() {
             new Set(data?.map(item => item.status).filter(status => status && status.trim() !== '') || [])
           ).sort();
           setAvailableStatuses(uniqueStatuses);
+          return uniqueStatuses;
         }
       } catch (fallbackErr) {
         console.error('Fallback status loading also failed:', fallbackErr);
       }
+      return [];
     } finally {
       setLoadingStatuses(false);
     }
@@ -1107,8 +1111,35 @@ export function AccountSettings() {
   const syncStatuses = async () => {
     try {
       setSyncingStatuses(true);
-      await loadAvailableStatuses();
-      alert('Statuses synced successfully!');
+      const statuses = await loadAvailableStatuses();
+
+      // Save the synced statuses to the database
+      const settingsData = {
+        available_invoice_statuses: statuses,
+      };
+
+      if (companySettings?.id) {
+        const { error } = await supabase
+          .from('company_settings')
+          .update(settingsData)
+          .eq('id', companySettings.id);
+
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from('company_settings')
+          .insert([{
+            company_name: companyName || '',
+            ...settingsData
+          }])
+          .select()
+          .single();
+
+        if (error) throw error;
+        setCompanySettings(data);
+      }
+
+      alert(`Successfully synced ${statuses.length} statuses from Printavo!`);
     } catch (err) {
       console.error('Error syncing statuses:', err);
       alert('Failed to sync statuses. Please try again.');
