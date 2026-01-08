@@ -9,6 +9,10 @@ export interface InvoiceLineItem {
   unitPrice: number;
   totalPrice: number;
   lineItemGroupId: string | null;
+  style: string;
+  color: string;
+  sizes: string;
+  rawData: any;
 }
 
 export interface InvoiceContact {
@@ -162,14 +166,21 @@ export const invoiceDetailService = {
         productionDueDate: rawData.dueAt || null,
         customerPO: rawData.customerPurchaseOrder || rawData.poNumber || null,
 
-        lineItems: (lineItems || []).map((item: any) => ({
-          id: item.id,
-          description: item.description || 'Line Item',
-          quantity: item.quantity || 0,
-          unitPrice: parseFloat(item.unit_price) || 0,
-          totalPrice: parseFloat(item.total_price) || 0,
-          lineItemGroupId: item.line_item_group_id,
-        })),
+        lineItems: (lineItems || []).map((item: any) => {
+          const parsed = this.parseLineItemDetails(item.description, item.raw_data);
+          return {
+            id: item.id,
+            description: item.description || 'Line Item',
+            quantity: item.quantity || 0,
+            unitPrice: parseFloat(item.unit_price) || 0,
+            totalPrice: parseFloat(item.total_price) || 0,
+            lineItemGroupId: item.line_item_group_id,
+            style: parsed.style,
+            color: parsed.color,
+            sizes: parsed.sizes,
+            rawData: item.raw_data,
+          };
+        }),
 
         subtotal: parseFloat(invoice.subtotal) || 0,
         tax: parseFloat(invoice.tax) || 0,
@@ -355,5 +366,77 @@ export const invoiceDetailService = {
 
   hasAddress(address: InvoiceAddress): boolean {
     return !!(address.line1 || address.city || address.state || address.zip);
+  },
+
+  parseLineItemDetails(description: string, rawData?: any): { style: string; color: string; sizes: string } {
+    let style = '';
+    let color = '';
+    let sizes = '';
+
+    if (rawData) {
+      style = rawData.style || rawData.styleName || rawData.product?.style || rawData.product?.styleName || '';
+      color = rawData.color || rawData.colorName || rawData.product?.color || rawData.product?.colorName || '';
+
+      if (rawData.sizes && typeof rawData.sizes === 'object') {
+        const sizeEntries = Object.entries(rawData.sizes)
+          .filter(([_, qty]) => qty && Number(qty) > 0)
+          .map(([size, qty]) => `${size}:${qty}`);
+        sizes = sizeEntries.join(', ');
+      } else if (rawData.sizeBreakdown) {
+        sizes = rawData.sizeBreakdown;
+      } else if (rawData.sizeQuantities) {
+        const sizeEntries = Object.entries(rawData.sizeQuantities)
+          .filter(([_, qty]) => qty && Number(qty) > 0)
+          .map(([size, qty]) => `${size}:${qty}`);
+        sizes = sizeEntries.join(', ');
+      }
+    }
+
+    if (!style || !color) {
+      const patterns = [
+        /^([A-Za-z0-9&\+\s]+?)\s+([A-Z0-9]+)\s*[-–]\s*(.+?)(?:\s*[-–]|$)/i,
+        /^([A-Za-z\s]+)\s*[-–]\s*([A-Za-z\s]+?)(?:\s*[-–]|$)/,
+      ];
+
+      for (const pattern of patterns) {
+        const match = description.match(pattern);
+        if (match) {
+          if (!style && match[1] && match[2]) {
+            style = `${match[1].trim()} ${match[2].trim()}`;
+          }
+          if (!color && match[3]) {
+            color = match[3].trim();
+          }
+          break;
+        }
+      }
+
+      const brandMatch = description.match(/(Gildan|Next Level|Bella\+Canvas|Hanes|Fruit of the Loom|Champion|Comfort Colors|Port & Company|District|American Apparel|Jerzees|Anvil|Augusta|Sport-Tek|Port Authority)\s*([A-Za-z0-9]+)/i);
+      if (brandMatch && !style) {
+        style = `${brandMatch[1]} ${brandMatch[2]}`;
+      }
+
+      const colorMatch = description.match(/[-–]\s*([A-Za-z\s]+?)(?:\s*[-–]|\s*$)/);
+      if (colorMatch && !color) {
+        const possibleColor = colorMatch[1].trim();
+        const colorWords = ['Black', 'White', 'Navy', 'Red', 'Blue', 'Green', 'Gray', 'Grey', 'Yellow', 'Orange', 'Purple', 'Pink', 'Brown', 'Maroon', 'Heather', 'Charcoal', 'Royal', 'Forest', 'Ash', 'Sand', 'Natural', 'Cardinal', 'Gold', 'Kelly', 'Light', 'Dark'];
+        if (colorWords.some(c => possibleColor.toLowerCase().includes(c.toLowerCase()))) {
+          color = possibleColor;
+        }
+      }
+    }
+
+    if (!sizes) {
+      const sizesMatch = description.match(/\b((?:(?:2?X?S|S|M|L|2?X?L|3XL|4XL|5XL|YS|YM|YL)(?:\s*:\s*\d+)?(?:\s*[,\/]\s*)?)+)\b/i);
+      if (sizesMatch) {
+        sizes = sizesMatch[1].replace(/\//g, ', ');
+      }
+    }
+
+    return {
+      style: style || '-',
+      color: color || '-',
+      sizes: sizes || '-',
+    };
   },
 };

@@ -29,6 +29,7 @@ import {
 import { invoiceDetailService, InvoiceDetail as InvoiceDetailType } from '../../services/invoice-detail-service';
 import { billingService } from '../../services/billing-service';
 import { stripeService } from '../../services/stripe-service';
+import { generateInvoicePDF } from '../../utils/invoice-pdf-export';
 
 interface InvoiceDetailProps {
   invoiceId: string;
@@ -258,7 +259,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
               Sync
             </button>
             <button
-              onClick={() => {}}
+              onClick={() => invoice && generateInvoicePDF(invoice)}
               className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
               <Download className="w-4 h-4" />
@@ -417,16 +418,25 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Style
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Color
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Description
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Sizes
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Qty
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Unit Price
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Total
                     </th>
                   </tr>
@@ -435,40 +445,98 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                   {invoice.lineItems.length > 0 ? (
                     invoice.lineItems.map((item) => (
                       <tr key={item.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 text-sm text-gray-900">
-                          {item.description}
+                        <td className="px-4 py-3 text-sm text-gray-900">
+                          <span className="font-medium">{item.style}</span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-900 text-right">
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          {item.color}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600 max-w-xs">
+                          <span className="line-clamp-2" title={item.description}>
+                            {item.description}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-700">
+                          <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">
+                            {item.sizes}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900 text-right font-medium">
                           {item.quantity}
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-900 text-right">
+                        <td className="px-4 py-3 text-sm text-gray-900 text-right">
                           ${item.unitPrice.toFixed(2)}
                         </td>
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900 text-right">
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
                           ${item.totalPrice.toFixed(2)}
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                      <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                         No line items available
                       </td>
                     </tr>
                   )}
+                  {invoice.fees.length > 0 && (
+                    <>
+                      <tr className="bg-gray-100">
+                        <td colSpan={7} className="px-4 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                          Fees & Additional Charges
+                        </td>
+                      </tr>
+                      {invoice.fees.map((fee) => (
+                        <tr key={fee.id} className="hover:bg-gray-50 bg-gray-50/50">
+                          <td colSpan={4} className="px-4 py-3 text-sm text-gray-900">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{fee.name}</span>
+                              {fee.taxable && (
+                                <span className="text-xs text-gray-500 bg-gray-200 px-1.5 py-0.5 rounded">
+                                  Taxable
+                                </span>
+                              )}
+                            </div>
+                            {fee.description && fee.description !== fee.name && (
+                              <p className="text-xs text-gray-500 mt-0.5">{fee.description}</p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-500 text-right">
+                            1
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900 text-right">
+                            ${fee.amount.toFixed(2)}
+                          </td>
+                          <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
+                            ${fee.amount.toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </>
+                  )}
                 </tbody>
                 <tfoot className="bg-gray-50">
                   <tr>
-                    <td colSpan={3} className="px-6 py-3 text-right text-sm font-medium text-gray-500">
-                      Subtotal
+                    <td colSpan={6} className="px-6 py-3 text-right text-sm font-medium text-gray-500">
+                      Line Items Subtotal
                     </td>
                     <td className="px-6 py-3 text-right text-sm font-medium text-gray-900">
                       ${invoice.subtotal.toFixed(2)}
                     </td>
                   </tr>
+                  {invoice.feesTotal > 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-3 text-right text-sm font-medium text-gray-500">
+                        Fees Total
+                      </td>
+                      <td className="px-6 py-3 text-right text-sm font-medium text-gray-900">
+                        ${invoice.feesTotal.toFixed(2)}
+                      </td>
+                    </tr>
+                  )}
                   {invoice.discounts > 0 && (
                     <tr>
-                      <td colSpan={3} className="px-6 py-3 text-right text-sm font-medium text-gray-500">
+                      <td colSpan={6} className="px-6 py-3 text-right text-sm font-medium text-gray-500">
                         Discounts
                       </td>
                       <td className="px-6 py-3 text-right text-sm font-medium text-green-600">
@@ -477,7 +545,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                     </tr>
                   )}
                   <tr>
-                    <td colSpan={3} className="px-6 py-3 text-right text-sm font-medium text-gray-500">
+                    <td colSpan={6} className="px-6 py-3 text-right text-sm font-medium text-gray-500">
                       Tax
                     </td>
                     <td className="px-6 py-3 text-right text-sm font-medium text-gray-900">
@@ -485,7 +553,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                     </td>
                   </tr>
                   <tr className="border-t-2 border-gray-300">
-                    <td colSpan={3} className="px-6 py-4 text-right text-base font-bold text-gray-900">
+                    <td colSpan={6} className="px-6 py-4 text-right text-base font-bold text-gray-900">
                       Total
                     </td>
                     <td className="px-6 py-4 text-right text-base font-bold text-gray-900">
@@ -495,7 +563,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                   {invoice.amountPaid > 0 && (
                     <>
                       <tr>
-                        <td colSpan={3} className="px-6 py-3 text-right text-sm font-medium text-gray-500">
+                        <td colSpan={6} className="px-6 py-3 text-right text-sm font-medium text-gray-500">
                           Amount Paid
                         </td>
                         <td className="px-6 py-3 text-right text-sm font-medium text-green-600">
@@ -503,7 +571,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                         </td>
                       </tr>
                       <tr className="bg-blue-50">
-                        <td colSpan={3} className="px-6 py-4 text-right text-base font-bold text-blue-900">
+                        <td colSpan={6} className="px-6 py-4 text-right text-base font-bold text-blue-900">
                           Balance Due
                         </td>
                         <td className="px-6 py-4 text-right text-base font-bold text-blue-900">

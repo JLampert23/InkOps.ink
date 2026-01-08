@@ -10,8 +10,12 @@ import {
   Copy,
   AlertCircle,
   DollarSign,
+  Download,
+  Loader2,
 } from 'lucide-react';
 import { billingService, BillingQueueItem } from '../../services/billing-service';
+import { invoiceDetailService } from '../../services/invoice-detail-service';
+import { generateInvoicePDF } from '../../utils/invoice-pdf-export';
 
 interface BillingQueueProps {
   onSendInvoice?: (item: BillingQueueItem) => void;
@@ -26,6 +30,7 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
   const [syncStatus, setSyncStatus] = useState<string>('');
   const [generatingLinks, setGeneratingLinks] = useState(false);
   const [sendingInvoices, setSendingInvoices] = useState(false);
+  const [downloadingPDF, setDownloadingPDF] = useState<string | null>(null);
 
   useEffect(() => {
     loadQueue();
@@ -131,6 +136,22 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
       alert('Payment link copied to clipboard!');
     } catch (error: any) {
       alert(error.message || 'Failed to copy link');
+    }
+  };
+
+  const handleDownloadPDF = async (item: BillingQueueItem) => {
+    setDownloadingPDF(item.printavoInvoiceId);
+    try {
+      const invoiceDetail = await invoiceDetailService.getInvoiceDetail(item.printavoInvoiceId);
+      if (!invoiceDetail) {
+        alert('Failed to load invoice details');
+        return;
+      }
+      generateInvoicePDF(invoiceDetail);
+    } catch (error: any) {
+      alert(error.message || 'Failed to generate PDF');
+    } finally {
+      setDownloadingPDF(null);
     }
   };
 
@@ -323,6 +344,18 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
                     {getPaymentStatusBadge(item.paymentStatus)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                    <button
+                      onClick={() => handleDownloadPDF(item)}
+                      disabled={downloadingPDF === item.printavoInvoiceId}
+                      className="text-gray-600 hover:text-gray-800 disabled:opacity-50"
+                      title="Download PDF"
+                    >
+                      {downloadingPDF === item.printavoInvoiceId ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Download className="w-4 h-4" />
+                      )}
+                    </button>
                     <button
                       onClick={() => handleCopyLink(item)}
                       className="text-blue-600 hover:text-blue-800"
