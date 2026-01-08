@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { FileText, Users, RefreshCw, AlertCircle, DollarSign, TrendingUp, Download, Building2, Menu, X, LogOut, Loader2, BarChart3, Settings, CreditCard, Package, ChevronDown, ChevronUp, Send, Mail, Wallet } from 'lucide-react';
 import { useSupabaseData } from './hooks/useSupabaseData';
 import { InvoiceExplorer } from './components/InvoiceExplorer';
@@ -23,6 +23,8 @@ type Tab =
 interface CompanySettings {
   company_name: string;
   logo_url: string | null;
+  selected_invoice_statuses: string[];
+  billing_selected_invoice_statuses: string[];
 }
 
 function AppContent() {
@@ -39,7 +41,7 @@ function AppContent() {
       try {
         const { data, error } = await supabase
           .from('company_settings')
-          .select('company_name, logo_url')
+          .select('company_name, logo_url, selected_invoice_statuses, billing_selected_invoice_statuses')
           .maybeSingle();
 
         if (error && error.code !== 'PGRST116') {
@@ -48,7 +50,12 @@ function AppContent() {
         }
 
         if (data) {
-          setCompanySettings(data);
+          setCompanySettings({
+            company_name: data.company_name,
+            logo_url: data.logo_url,
+            selected_invoice_statuses: data.selected_invoice_statuses || [],
+            billing_selected_invoice_statuses: data.billing_selected_invoice_statuses || [],
+          });
         }
       } catch (err) {
         console.error('Error loading company settings:', err);
@@ -64,11 +71,18 @@ function AppContent() {
         try {
           const { data, error } = await supabase
             .from('company_settings')
-            .select('company_name, logo_url')
+            .select('company_name, logo_url, selected_invoice_statuses, billing_selected_invoice_statuses')
             .maybeSingle();
 
           if (error && error.code !== 'PGRST116') return;
-          if (data) setCompanySettings(data);
+          if (data) {
+            setCompanySettings({
+              company_name: data.company_name,
+              logo_url: data.logo_url,
+              selected_invoice_statuses: data.selected_invoice_statuses || [],
+              billing_selected_invoice_statuses: data.billing_selected_invoice_statuses || [],
+            });
+          }
         } catch (err) {
           console.error('Error reloading company settings:', err);
         }
@@ -76,6 +90,24 @@ function AppContent() {
       loadCompanySettings();
     }
   }, [activeTab]);
+
+  const dashboardInvoices = useMemo(() => {
+    if (!companySettings?.selected_invoice_statuses || companySettings.selected_invoice_statuses.length === 0) {
+      return invoices;
+    }
+    return invoices.filter(inv =>
+      companySettings.selected_invoice_statuses.includes(inv.status.name)
+    );
+  }, [invoices, companySettings?.selected_invoice_statuses]);
+
+  const billingInvoices = useMemo(() => {
+    if (!companySettings?.billing_selected_invoice_statuses || companySettings.billing_selected_invoice_statuses.length === 0) {
+      return invoices;
+    }
+    return invoices.filter(inv =>
+      companySettings.billing_selected_invoice_statuses.includes(inv.status.name)
+    );
+  }, [invoices, companySettings?.billing_selected_invoice_statuses]);
 
   const billingPaymentsNavItems = [
     {
@@ -636,7 +668,7 @@ function AppContent() {
                   <p className="text-gray-700 font-medium mb-2">Status-Based Invoice Sync</p>
                   <p className="text-gray-600 text-sm">Configure which Printavo invoice statuses should be synced for billing. Only invoices matching your filters will appear in Billing & Payments.</p>
                   <div className="mt-4 text-sm text-gray-600">
-                    <p>Configure status filters in: <span className="font-semibold">Settings → Status Filters</span></p>
+                    <p>Configure status filters in: <span className="font-semibold">Settings → Billing Filters</span></p>
                   </div>
                 </div>
               </div>
@@ -657,22 +689,22 @@ function AppContent() {
 
             {/* Printavo Dashboard Tabs */}
             {activeTab === 'ar' && (
-              <AccountsReceivable invoices={invoices} />
+              <AccountsReceivable invoices={dashboardInvoices} />
             )}
             {activeTab === 'ar-by-customer' && (
-              <ARByCustomer invoices={invoices} />
+              <ARByCustomer invoices={dashboardInvoices} />
             )}
             {activeTab === 'open-invoices' && (
-              <OpenInvoices invoices={invoices} />
+              <OpenInvoices invoices={dashboardInvoices} />
             )}
             {activeTab === 'reports' && (
-              <ReportsTab invoices={invoices} payments={payments} lineItems={lineItems} />
+              <ReportsTab invoices={dashboardInvoices} payments={payments} lineItems={lineItems} />
             )}
             {activeTab === 'invoices' && (
-              <InvoiceExplorer invoices={invoices} />
+              <InvoiceExplorer invoices={dashboardInvoices} />
             )}
             {activeTab === 'customers' && (
-              <CustomerProfiles invoices={invoices} />
+              <CustomerProfiles invoices={dashboardInvoices} />
             )}
             {activeTab === 'square' && (
               <Suspense fallback={

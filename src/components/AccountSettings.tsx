@@ -14,6 +14,7 @@ interface CompanySettings {
   logo_url: string | null;
   available_invoice_statuses: string[];
   selected_invoice_statuses: string[];
+  billing_selected_invoice_statuses: string[];
   printavo_username: string | null;
   printavo_api_token_encrypted: string | null;
   resend_api_key: string | null;
@@ -29,10 +30,10 @@ interface UserProfile {
 
 type SettingsTab =
   | 'company-info'
-  | 'printavo-integration' | 'square-integration' | 'resend-integration'
+  | 'printavo-integration' | 'square-integration' | 'resend-integration' | 'stripe-payments'
   | 'user-management'
-  | 'status-filters'
-  | 'automated-reports' | 'workflow-setup' | 'automations' | 'stripe-payments';
+  | 'status-filters' | 'billing-status-filters'
+  | 'automated-reports' | 'workflow-setup' | 'automations';
 
 export function AccountSettings() {
   const { user } = useAuth();
@@ -89,6 +90,9 @@ export function AccountSettings() {
   const [loadingStatuses, setLoadingStatuses] = useState(false);
   const [savingStatuses, setSavingStatuses] = useState(false);
 
+  const [billingSelectedStatuses, setBillingSelectedStatuses] = useState<string[]>([]);
+  const [savingBillingStatuses, setSavingBillingStatuses] = useState(false);
+
   useEffect(() => {
     loadSettings();
     loadUsers();
@@ -110,6 +114,7 @@ export function AccountSettings() {
         setCompanyName(data.company_name);
         setLogoPreview(data.logo_url);
         setSelectedStatuses(data.selected_invoice_statuses || []);
+        setBillingSelectedStatuses(data.billing_selected_invoice_statuses || []);
         setPrintavoUsername(data.printavo_username || '');
         setSquareEnvironment(data.square_environment || 'production');
         setEmailFromAddress(data.email_from_address || '');
@@ -872,6 +877,52 @@ export function AccountSettings() {
     }
   };
 
+  const toggleBillingStatus = (status: string) => {
+    setBillingSelectedStatuses(prev =>
+      prev.includes(status)
+        ? prev.filter(s => s !== status)
+        : [...prev, status]
+    );
+  };
+
+  const saveBillingStatusPreferences = async () => {
+    try {
+      setSavingBillingStatuses(true);
+
+      const settingsData = {
+        billing_selected_invoice_statuses: billingSelectedStatuses,
+      };
+
+      if (companySettings?.id) {
+        const { error } = await supabase
+          .from('company_settings')
+          .update(settingsData)
+          .eq('id', companySettings.id);
+
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from('company_settings')
+          .insert([{
+            company_name: companyName || '',
+            ...settingsData
+          }])
+          .select()
+          .single();
+
+        if (error) throw error;
+        setCompanySettings(data);
+      }
+
+      alert('Billing status preferences saved successfully!');
+    } catch (err) {
+      console.error('Error saving billing status preferences:', err);
+      alert('Failed to save billing status preferences. Please try again.');
+    } finally {
+      setSavingBillingStatuses(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -985,6 +1036,24 @@ export function AccountSettings() {
                   </div>
                   {activeTab === 'resend-integration' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
                 </button>
+
+                <button
+                  onClick={() => setActiveTab('stripe-payments')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'stripe-payments'
+                      ? 'bg-green-50 text-green-700 shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
+                  style={{ animationDelay: '60ms' }}
+                >
+                  <CreditCard className={`w-4 h-4 flex-shrink-0 ${activeTab === 'stripe-payments' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'stripe-payments' ? 'text-green-700' : 'text-gray-700'}`}>
+                      Stripe
+                    </div>
+                  </div>
+                  {activeTab === 'stripe-payments' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
+                </button>
               </div>
             )}
           </div>
@@ -1024,10 +1093,30 @@ export function AccountSettings() {
               <Filter className={`w-4 h-4 flex-shrink-0 ${activeTab === 'status-filters' ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
               <div className="flex-1 text-left">
                 <div className={`font-medium text-sm ${activeTab === 'status-filters' ? 'text-blue-700' : 'text-gray-700'}`}>
-                  Status Filters
+                  Dashboard Filters
                 </div>
               </div>
               {activeTab === 'status-filters' && <div className="w-1 h-6 bg-blue-600 rounded-full absolute right-0" />}
+            </button>
+          </div>
+
+          {/* Billing Status Filters */}
+          <div className="mb-2">
+            <button
+              onClick={() => setActiveTab('billing-status-filters')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
+                activeTab === 'billing-status-filters'
+                  ? 'bg-blue-50 text-blue-700 shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+            >
+              <Filter className={`w-4 h-4 flex-shrink-0 ${activeTab === 'billing-status-filters' ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+              <div className="flex-1 text-left">
+                <div className={`font-medium text-sm ${activeTab === 'billing-status-filters' ? 'text-blue-700' : 'text-gray-700'}`}>
+                  Billing Filters
+                </div>
+              </div>
+              {activeTab === 'billing-status-filters' && <div className="w-1 h-6 bg-blue-600 rounded-full absolute right-0" />}
             </button>
           </div>
 
@@ -1103,24 +1192,6 @@ export function AccountSettings() {
                     </div>
                   </div>
                   {activeTab === 'automations' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('stripe-payments')}
-                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
-                    activeTab === 'stripe-payments'
-                      ? 'bg-green-50 text-green-700 shadow-sm'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                  style={{ animationDelay: '60ms' }}
-                >
-                  <CreditCard className={`w-4 h-4 flex-shrink-0 ${activeTab === 'stripe-payments' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
-                  <div className="flex-1 text-left">
-                    <div className={`font-medium text-sm ${activeTab === 'stripe-payments' ? 'text-green-700' : 'text-gray-700'}`}>
-                      Stripe Payments
-                    </div>
-                  </div>
-                  {activeTab === 'stripe-payments' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
                 </button>
               </div>
             )}
@@ -1924,8 +1995,8 @@ export function AccountSettings() {
           {activeTab === 'status-filters' && (
             <div className="bg-white rounded-lg shadow p-6 space-y-6">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 mb-1">Invoice Status Filters</h2>
-                <p className="text-sm text-gray-600">Select statuses to enable filtering in reports</p>
+                <h2 className="text-lg font-semibold text-gray-900 mb-1">Printavo Dashboard Status Filters</h2>
+                <p className="text-sm text-gray-600">Select statuses to display in Printavo Dashboard section</p>
               </div>
 
               {loadingStatuses ? (
@@ -1983,6 +2054,85 @@ export function AccountSettings() {
                       className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                     >
                       {savingStatuses ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4" />
+                          Save Preferences
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'billing-status-filters' && (
+            <div className="bg-white rounded-lg shadow p-6 space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-1">Billing & Payments Status Filters</h2>
+                <p className="text-sm text-gray-600">Select statuses to display in Billing & Payments section</p>
+              </div>
+
+              {loadingStatuses ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+                </div>
+              ) : availableStatuses.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No invoice statuses found. Configure your Printavo integration and test the connection to load available statuses.
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-sm text-gray-600">
+                      {billingSelectedStatuses.length} of {availableStatuses.length} statuses selected
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setBillingSelectedStatuses(availableStatuses)}
+                        className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                      >
+                        Select All
+                      </button>
+                      <span className="text-gray-400">|</span>
+                      <button
+                        onClick={() => setBillingSelectedStatuses([])}
+                        className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                      >
+                        Clear All
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4">
+                    {availableStatuses.map(status => (
+                      <label
+                        key={status}
+                        className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors border border-gray-200"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={billingSelectedStatuses.includes(status)}
+                          onChange={() => toggleBillingStatus(status)}
+                          className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-900 break-words flex-1">{status}</span>
+                      </label>
+                    ))}
+                  </div>
+
+                  <div className="pt-4">
+                    <button
+                      onClick={saveBillingStatusPreferences}
+                      disabled={savingBillingStatuses}
+                      className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                    >
+                      {savingBillingStatuses ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin" />
                           Saving...
