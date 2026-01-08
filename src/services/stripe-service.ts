@@ -436,8 +436,16 @@ export const stripeService = {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create Stripe invoice');
+        const errorText = await response.text();
+        let errorMessage = 'Failed to create Stripe invoice';
+        try {
+          const error = JSON.parse(errorText);
+          errorMessage = error.error || errorMessage;
+        } catch {
+          errorMessage = errorText || errorMessage;
+        }
+        console.error('Stripe API error response:', errorText);
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
