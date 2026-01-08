@@ -74,8 +74,8 @@ Deno.serve(async (req: Request) => {
     );
 
     const query = `
-      query GetCurrentAccount {
-        currentAccount {
+      query GetCompanyInfo {
+        company {
           id
           name
           subdomain
@@ -146,7 +146,7 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         success: true,
-        company: data.data?.currentAccount || null,
+        company: data.data?.company || null,
       }),
       {
         status: 200,
