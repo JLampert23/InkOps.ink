@@ -158,18 +158,11 @@ Deno.serve(async (req: Request) => {
                           description
                           items
                           price
-                          style {
-                            name
-                            number
-                          }
-                          color {
-                            name
-                          }
-                          sizeQuantities
+                          color
                           product {
-                            styleName
-                            styleNumber
-                            colorName
+                            id
+                            name
+                            color
                           }
                         }
                       }
