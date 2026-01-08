@@ -88,6 +88,12 @@ Deno.serve(async (req: Request) => {
           name
           subdomain
           createdAt
+          visualStatuses {
+            id
+            name
+            color
+            position
+          }
         }
       }
     `;
