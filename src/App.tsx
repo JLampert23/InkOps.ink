@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { FileText, Users, RefreshCw, AlertCircle, DollarSign, TrendingUp, Download, Building2, Menu, X, LogOut, Loader2, BarChart3, Settings, CreditCard, Package, ChevronDown, ChevronRight } from 'lucide-react';
+import { FileText, Users, RefreshCw, AlertCircle, DollarSign, TrendingUp, Download, Building2, Menu, X, LogOut, Loader2, BarChart3, Settings, CreditCard, Package, ChevronDown, ChevronUp, Send, Mail, Wallet } from 'lucide-react';
 import { useSupabaseData } from './hooks/useSupabaseData';
 import { InvoiceExplorer } from './components/InvoiceExplorer';
 import { CustomerProfiles } from './components/CustomerProfiles';
@@ -15,7 +15,10 @@ import { supabase } from './lib/supabase-client';
 const SquareData = lazy(() => import('./components/SquareData'));
 const ProductionManagement = lazy(() => import('./components/ProductionManagement').then(m => ({ default: m.ProductionManagement })));
 
-type Tab = 'ar' | 'ar-by-customer' | 'open-invoices' | 'reports' | 'invoices' | 'customers' | 'square' | 'production' | 'settings';
+type Tab =
+  | 'ar' | 'ar-by-customer' | 'open-invoices' | 'reports' | 'invoices' | 'customers'
+  | 'square' | 'production' | 'settings'
+  | 'send-invoices' | 'accept-payments' | 'customer-communication' | 'sync-eligible-invoices' | 'billing-settings';
 
 interface CompanySettings {
   company_name: string;
@@ -25,6 +28,7 @@ interface CompanySettings {
 function AppContent() {
   const [activeTab, setActiveTab] = useState<Tab>('ar');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [billingPaymentsExpanded, setBillingPaymentsExpanded] = useState(true);
   const [printavoDashboardExpanded, setPrintavoDashboardExpanded] = useState(true);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const { invoices, payments, lineItems, loading, error, syncing, lastSyncTime, triggerSync } = useSupabaseData();
@@ -72,6 +76,39 @@ function AppContent() {
       loadCompanySettings();
     }
   }, [activeTab]);
+
+  const billingPaymentsNavItems = [
+    {
+      id: 'send-invoices' as Tab,
+      name: 'Send Invoices for Payment',
+      icon: Send,
+      description: 'Send invoices to customers for payment'
+    },
+    {
+      id: 'accept-payments' as Tab,
+      name: 'Accept Payments (Stripe)',
+      icon: CreditCard,
+      description: 'Process payments through Stripe'
+    },
+    {
+      id: 'customer-communication' as Tab,
+      name: 'Customer Communication',
+      icon: Mail,
+      description: 'Order complete notices & updates'
+    },
+    {
+      id: 'sync-eligible-invoices' as Tab,
+      name: 'Sync Eligible Invoices',
+      icon: RefreshCw,
+      description: 'Sync invoices based on status filters'
+    },
+    {
+      id: 'billing-settings' as Tab,
+      name: 'Billing Settings',
+      icon: Settings,
+      description: 'Configure billing preferences'
+    },
+  ];
 
   const printavoNavItems = [
     {
@@ -179,7 +216,85 @@ function AppContent() {
 
         {/* Navigation */}
         <nav className="p-4 space-y-2 overflow-y-auto pb-32" style={{ height: 'calc(100vh - 220px)' }}>
-          {/* 1. PRODUCTION DASHBOARD - Top-level link */}
+
+          {/* 1. BILLING & PAYMENTS - Collapsible section (NEW - AT TOP) */}
+          <div>
+            {/* Billing & Payments Header - Collapsible trigger */}
+            <button
+              onClick={() => setBillingPaymentsExpanded(!billingPaymentsExpanded)}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group text-gray-900 hover:bg-gray-50"
+              title={!sidebarOpen ? 'BILLING & PAYMENTS' : ''}
+              aria-label="Billing & Payments"
+              aria-expanded={billingPaymentsExpanded}
+              aria-controls="billing-payments-submenu"
+            >
+              <Wallet className="w-5 h-5 flex-shrink-0 text-gray-600 group-hover:text-gray-900" />
+              {sidebarOpen && (
+                <>
+                  <div className="flex-1 text-left">
+                    <div className="font-bold text-sm uppercase tracking-wide text-gray-900">
+                      Billing & Payments
+                    </div>
+                  </div>
+                  {billingPaymentsExpanded ? (
+                    <ChevronDown className="w-4 h-4 text-gray-500 transition-transform duration-200" />
+                  ) : (
+                    <ChevronUp className="w-4 h-4 text-gray-500 transition-transform duration-200 rotate-180" />
+                  )}
+                </>
+              )}
+              {!sidebarOpen && (
+                billingPaymentsExpanded ? (
+                  <ChevronDown className="w-4 h-4 text-gray-500 absolute right-2" />
+                ) : (
+                  <ChevronUp className="w-4 h-4 text-gray-500 absolute right-2 rotate-180" />
+                )
+              )}
+            </button>
+
+            {/* Billing & Payments Sub-items - Collapsible content with animation */}
+            {billingPaymentsExpanded && (
+              <div
+                id="billing-payments-submenu"
+                className="mt-1 space-y-1 ml-2 collapsible-section collapsible-section-enter"
+                role="group"
+                aria-label="Billing & Payments submenu"
+              >
+                {billingPaymentsNavItems.map((item, index) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveTab(item.id)}
+                      className={`collapsible-item w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 group ${
+                        isActive
+                          ? 'bg-green-50 text-green-700 shadow-sm'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      }`}
+                      title={!sidebarOpen ? item.name : ''}
+                      style={{ animationDelay: `${index * 20}ms` }}
+                    >
+                      <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                      {sidebarOpen && (
+                        <div className="flex-1 text-left">
+                          <div className={`font-medium text-sm ${isActive ? 'text-green-700' : 'text-gray-700'}`}>
+                            {item.name}
+                          </div>
+                        </div>
+                      )}
+                      {isActive && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Separator */}
+          <div className="border-t border-gray-200 my-3" />
+
+          {/* 2. PRODUCTION DASHBOARD - Top-level link */}
           <div className="space-y-1">
             {productionNavItems.map(item => {
               const Icon = item.icon;
@@ -213,7 +328,7 @@ function AppContent() {
           {/* Separator */}
           <div className="border-t border-gray-200 my-3" />
 
-          {/* 2. PRINTAVO DASHBOARD - Collapsible section */}
+          {/* 3. PRINTAVO DASHBOARD - Collapsible section */}
           <div>
             {/* Printavo Dashboard Header - Collapsible trigger */}
             <button
@@ -233,9 +348,9 @@ function AppContent() {
                     </div>
                   </div>
                   {printavoDashboardExpanded ? (
-                    <ChevronDown className="w-4 h-4 text-gray-500" />
+                    <ChevronDown className="w-4 h-4 text-gray-500 transition-transform duration-200" />
                   ) : (
-                    <ChevronRight className="w-4 h-4 text-gray-500" />
+                    <ChevronUp className="w-4 h-4 text-gray-500 transition-transform duration-200 rotate-180" />
                   )}
                 </>
               )}
@@ -243,37 +358,38 @@ function AppContent() {
                 printavoDashboardExpanded ? (
                   <ChevronDown className="w-4 h-4 text-gray-500 absolute right-2" />
                 ) : (
-                  <ChevronRight className="w-4 h-4 text-gray-500 absolute right-2" />
+                  <ChevronUp className="w-4 h-4 text-gray-500 absolute right-2 rotate-180" />
                 )
               )}
             </button>
 
-            {/* Printavo Dashboard Sub-items - Collapsible content */}
+            {/* Printavo Dashboard Sub-items - Collapsible content with animation */}
             {printavoDashboardExpanded && (
               <div
                 id="printavo-submenu"
-                className="mt-1 space-y-1 ml-2"
+                className="mt-1 space-y-1 ml-2 collapsible-section collapsible-section-enter"
                 role="group"
                 aria-label="Printavo Dashboard submenu"
               >
-                {printavoNavItems.map(item => {
+                {printavoNavItems.map((item, index) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
                   return (
                     <button
                       key={item.id}
                       onClick={() => setActiveTab(item.id)}
-                      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 group ${
+                      className={`collapsible-item w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 group ${
                         isActive
                           ? 'bg-green-50 text-green-700 shadow-sm'
                           : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                       }`}
                       title={!sidebarOpen ? item.name : ''}
+                      style={{ animationDelay: `${index * 20}ms` }}
                     >
                       <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
                       {sidebarOpen && (
                         <div className="flex-1 text-left">
-                          <div className={`font-medium text-sm ${isActive ? 'text-green-700' : ''}`}>
+                          <div className={`font-medium text-sm ${isActive ? 'text-green-700' : 'text-gray-700'}`}>
                             {item.name}
                           </div>
                         </div>
@@ -289,7 +405,7 @@ function AppContent() {
           {/* Separator */}
           <div className="border-t border-gray-200 my-3" />
 
-          {/* 3. SQUARE DASHBOARD - Top-level link */}
+          {/* 4. SQUARE DASHBOARD - Top-level link */}
           <div className="space-y-1">
             {squareNavItems.map(item => {
               const Icon = item.icon;
@@ -469,6 +585,77 @@ function AppContent() {
           </div>
         ) : (
           <>
+            {/* Billing & Payments Tabs */}
+            {activeTab === 'send-invoices' && (
+              <div className="bg-white rounded-lg shadow p-8">
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Send Invoices for Payment</h2>
+                  <p className="text-gray-600">Send unpaid invoices to customers via email with payment links.</p>
+                </div>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+                  <Send className="w-12 h-12 text-blue-600 mx-auto mb-4" />
+                  <p className="text-gray-700 font-medium mb-2">Invoice Sending Module</p>
+                  <p className="text-gray-600 text-sm">Select invoices from the Printavo Dashboard and send them to customers with payment instructions.</p>
+                </div>
+              </div>
+            )}
+            {activeTab === 'accept-payments' && (
+              <div className="bg-white rounded-lg shadow p-8">
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Accept Payments (Stripe)</h2>
+                  <p className="text-gray-600">Process customer payments securely through Stripe integration.</p>
+                </div>
+                <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
+                  <CreditCard className="w-12 h-12 text-green-600 mx-auto mb-4" />
+                  <p className="text-gray-700 font-medium mb-2">Stripe Payment Processing</p>
+                  <p className="text-gray-600 text-sm">Accept online payments from customers and automatically sync payment status with Printavo invoices.</p>
+                </div>
+              </div>
+            )}
+            {activeTab === 'customer-communication' && (
+              <div className="bg-white rounded-lg shadow p-8">
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Customer Communication</h2>
+                  <p className="text-gray-600">Send order complete notices and updates to customers.</p>
+                </div>
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-6 text-center">
+                  <Mail className="w-12 h-12 text-purple-600 mx-auto mb-4" />
+                  <p className="text-gray-700 font-medium mb-2">Automated Customer Notifications</p>
+                  <p className="text-gray-600 text-sm">Automatically notify customers when their orders are complete and ready for pickup or shipment.</p>
+                </div>
+              </div>
+            )}
+            {activeTab === 'sync-eligible-invoices' && (
+              <div className="bg-white rounded-lg shadow p-8">
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Sync Eligible Invoices</h2>
+                  <p className="text-gray-600">Sync invoices from Printavo based on configured status filters.</p>
+                </div>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 text-center">
+                  <RefreshCw className="w-12 h-12 text-amber-600 mx-auto mb-4" />
+                  <p className="text-gray-700 font-medium mb-2">Status-Based Invoice Sync</p>
+                  <p className="text-gray-600 text-sm">Configure which Printavo invoice statuses should be synced for billing. Only invoices matching your filters will appear in Billing & Payments.</p>
+                  <div className="mt-4 text-sm text-gray-600">
+                    <p>Configure status filters in: <span className="font-semibold">Settings → Status Filters</span></p>
+                  </div>
+                </div>
+              </div>
+            )}
+            {activeTab === 'billing-settings' && (
+              <div className="bg-white rounded-lg shadow p-8">
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Billing Settings</h2>
+                  <p className="text-gray-600">Configure billing preferences and payment options.</p>
+                </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                  <Settings className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+                  <p className="text-gray-700 font-medium mb-2">Billing Configuration</p>
+                  <p className="text-gray-600 text-sm">Manage payment gateway settings, email templates, invoice status filters, and billing automation rules.</p>
+                </div>
+              </div>
+            )}
+
+            {/* Printavo Dashboard Tabs */}
             {activeTab === 'ar' && (
               <AccountsReceivable invoices={invoices} />
             )}
