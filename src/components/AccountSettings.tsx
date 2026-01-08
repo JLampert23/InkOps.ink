@@ -125,6 +125,7 @@ export function AccountSettings() {
         setCompanySettings(data);
         setCompanyName(data.company_name);
         setLogoPreview(data.logo_url);
+        setAvailableStatuses(data.available_invoice_statuses || []);
         setSelectedStatuses(data.selected_invoice_statuses || []);
         setBillingSelectedStatuses(data.billing_selected_invoice_statuses || []);
         setPrintavoUsername(data.printavo_username || '');
