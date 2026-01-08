@@ -48,9 +48,13 @@ type SettingsTab =
   | 'status-filters' | 'billing-status-filters'
   | 'automated-reports' | 'workflow-setup' | 'automations';
 
-export function AccountSettings() {
+interface AccountSettingsProps {
+  initialTab?: SettingsTab;
+}
+
+export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<SettingsTab>('company-info');
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab || 'company-info');
   const [loading, setLoading] = useState(true);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -115,6 +119,9 @@ export function AccountSettings() {
   const [savingBillingStatuses, setSavingBillingStatuses] = useState(false);
 
   const [fullStatuses, setFullStatuses] = useState<PrintavoStatus[]>([]);
+  const [pendingBillingChanges, setPendingBillingChanges] = useState<Map<string, boolean>>(new Map());
+  const [savingBillingFilters, setSavingBillingFilters] = useState(false);
+  const [billingFiltersSaveMessage, setBillingFiltersSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     loadSettings();
@@ -279,38 +286,83 @@ export function AccountSettings() {
     }
   };
 
-  const toggleBillingEligibility = async (statusId: string, currentValue: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('printavo_statuses')
-        .update({
-          is_billing_eligible: !currentValue,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', statusId);
+  const toggleBillingEligibility = (statusId: string, currentValue: boolean) => {
+    const newPending = new Map(pendingBillingChanges);
+    const currentPendingValue = newPending.get(statusId);
 
-      if (error) throw error;
-
-      setFullStatuses(prev =>
-        prev.map(s =>
-          s.id === statusId
-            ? { ...s, is_billing_eligible: !currentValue }
-            : s
-        )
-      );
-
-      const statusName = fullStatuses.find(s => s.id === statusId)?.name;
-      if (statusName) {
-        if (!currentValue) {
-          setBillingSelectedStatuses(prev => [...prev, statusName]);
-        } else {
-          setBillingSelectedStatuses(prev => prev.filter(n => n !== statusName));
-        }
+    if (currentPendingValue !== undefined) {
+      if (currentPendingValue === currentValue) {
+        newPending.delete(statusId);
+      } else {
+        newPending.set(statusId, !currentValue);
       }
-    } catch (err) {
-      console.error('Error toggling billing eligibility:', err);
-      alert('Failed to update status. Please try again.');
+    } else {
+      newPending.set(statusId, !currentValue);
     }
+
+    setPendingBillingChanges(newPending);
+    setBillingFiltersSaveMessage(null);
+
+    setFullStatuses(prev =>
+      prev.map(s =>
+        s.id === statusId
+          ? { ...s, is_billing_eligible: !s.is_billing_eligible }
+          : s
+      )
+    );
+  };
+
+  const getEffectiveBillingEligibility = (status: PrintavoStatus): boolean => {
+    const pendingValue = pendingBillingChanges.get(status.id);
+    return pendingValue !== undefined ? pendingValue : status.is_billing_eligible;
+  };
+
+  const saveBillingFilters = async () => {
+    if (pendingBillingChanges.size === 0) {
+      setBillingFiltersSaveMessage({ type: 'success', text: 'No changes to save' });
+      setTimeout(() => setBillingFiltersSaveMessage(null), 3000);
+      return;
+    }
+
+    try {
+      setSavingBillingFilters(true);
+      setBillingFiltersSaveMessage(null);
+
+      for (const [statusId, isEligible] of pendingBillingChanges) {
+        const { error } = await supabase
+          .from('printavo_statuses')
+          .update({
+            is_billing_eligible: isEligible,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', statusId);
+
+        if (error) throw error;
+      }
+
+      const eligibleNames = fullStatuses
+        .filter(s => s.is_billing_eligible)
+        .map(s => s.name);
+      setBillingSelectedStatuses(eligibleNames);
+
+      setPendingBillingChanges(new Map());
+      setBillingFiltersSaveMessage({ type: 'success', text: 'Billing status filters saved successfully!' });
+
+      setTimeout(() => setBillingFiltersSaveMessage(null), 4000);
+    } catch (err) {
+      console.error('Error saving billing filters:', err);
+      setBillingFiltersSaveMessage({ type: 'error', text: 'Failed to save filters. Please try again.' });
+
+      await loadStatusesFromDatabase();
+    } finally {
+      setSavingBillingFilters(false);
+    }
+  };
+
+  const discardBillingChanges = async () => {
+    setPendingBillingChanges(new Map());
+    setBillingFiltersSaveMessage(null);
+    await loadStatusesFromDatabase();
   };
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2374,7 +2426,7 @@ export function AccountSettings() {
               <div className="flex items-start justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900 mb-1">Billing & Payments Status Filters</h2>
-                  <p className="text-sm text-gray-600">Select which statuses should appear in Billing Queue. Changes save automatically.</p>
+                  <p className="text-sm text-gray-600">Select which statuses should appear in Billing Queue, then click Save to apply.</p>
                 </div>
                 <button
                   onClick={syncStatuses}
@@ -2395,6 +2447,25 @@ export function AccountSettings() {
                 </button>
               </div>
 
+              {billingFiltersSaveMessage && (
+                <div className={`flex items-center gap-2 p-3 rounded-lg ${
+                  billingFiltersSaveMessage.type === 'success'
+                    ? 'bg-green-50 border border-green-200 text-green-800'
+                    : 'bg-red-50 border border-red-200 text-red-800'
+                }`}>
+                  {billingFiltersSaveMessage.type === 'success' ? (
+                    <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  )}
+                  <span className="text-sm font-medium">{billingFiltersSaveMessage.text}</span>
+                </div>
+              )}
+
               {loadingStatuses ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
@@ -2408,6 +2479,11 @@ export function AccountSettings() {
                   <div className="flex items-center justify-between mb-4">
                     <p className="text-sm text-gray-600">
                       {fullStatuses.filter(s => s.is_billing_eligible).length} of {fullStatuses.length} statuses enabled for billing
+                      {pendingBillingChanges.size > 0 && (
+                        <span className="ml-2 text-amber-600 font-medium">
+                          ({pendingBillingChanges.size} unsaved change{pendingBillingChanges.size !== 1 ? 's' : ''})
+                        </span>
+                      )}
                     </p>
                   </div>
 
@@ -2492,6 +2568,46 @@ export function AccountSettings() {
                       </div>
                     </div>
                   )}
+
+                  <div className="pt-6 border-t border-gray-200 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={saveBillingFilters}
+                        disabled={savingBillingFilters || pendingBillingChanges.size === 0}
+                        className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-all ${
+                          pendingBillingChanges.size > 0
+                            ? 'bg-green-600 text-white hover:bg-green-700 shadow-sm'
+                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        } disabled:opacity-50`}
+                      >
+                        {savingBillingFilters ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4" />
+                            Save Filters
+                          </>
+                        )}
+                      </button>
+                      {pendingBillingChanges.size > 0 && (
+                        <button
+                          onClick={discardBillingChanges}
+                          disabled={savingBillingFilters}
+                          className="px-4 py-2.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+                        >
+                          Discard Changes
+                        </button>
+                      )}
+                    </div>
+                    {pendingBillingChanges.size > 0 && (
+                      <p className="text-sm text-amber-600">
+                        You have unsaved changes
+                      </p>
+                    )}
+                  </div>
                 </>
               )}
             </div>
