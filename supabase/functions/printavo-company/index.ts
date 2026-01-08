@@ -32,39 +32,74 @@ async function decryptToken(encryptedToken: string, supabaseUrl: string, service
 }
 
 async function fetchInvoiceStatuses(email: string, token: string): Promise<string[]> {
-  const query = `
-    query GetInvoiceStatuses {
-      invoiceStatuses {
-        name
+  const allStatuses = new Set<string>();
+  let hasNextPage = true;
+  let cursor = null;
+
+  // Fetch invoices in batches to extract all unique statuses
+  while (hasNextPage) {
+    const query = `
+      query GetInvoiceStatuses($after: String) {
+        invoices(after: $after, first: 100) {
+          edges {
+            node {
+              status {
+                name
+              }
+            }
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+        }
       }
+    `;
+
+    const response = await fetch(PRINTAVO_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        email,
+        token,
+      },
+      body: JSON.stringify({
+        query,
+        variables: {
+          after: cursor,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`API request failed with status ${response.status}: ${JSON.stringify(errorData)}`);
     }
-  `;
 
-  const response = await fetch(PRINTAVO_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      email,
-      token,
-    },
-    body: JSON.stringify({
-      query,
-    }),
-  });
+    const data = await response.json();
 
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(`API request failed with status ${response.status}: ${JSON.stringify(errorData)}`);
+    if (data.errors && data.errors.length > 0) {
+      throw new Error(`GraphQL errors: ${JSON.stringify(data.errors)}`);
+    }
+
+    const invoices = data.data?.invoices?.edges || [];
+    invoices.forEach((edge: any) => {
+      const statusName = edge.node?.status?.name;
+      if (statusName) {
+        allStatuses.add(statusName);
+      }
+    });
+
+    hasNextPage = data.data?.invoices?.pageInfo?.hasNextPage || false;
+    cursor = data.data?.invoices?.pageInfo?.endCursor || null;
+
+    // Safety limit: stop after 10 pages (1000 invoices)
+    if (!hasNextPage || allStatuses.size > 50) {
+      break;
+    }
   }
 
-  const data = await response.json();
-
-  if (data.errors && data.errors.length > 0) {
-    throw new Error(`GraphQL errors: ${JSON.stringify(data.errors)}`);
-  }
-
-  const statuses = data.data?.invoiceStatuses || [];
-  return statuses.map((s: any) => s.name).sort();
+  return Array.from(allStatuses).sort();
 }
 
 Deno.serve(async (req: Request) => {
