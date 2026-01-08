@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon } from 'lucide-react';
+import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, Receipt } from 'lucide-react';
 import { supabase } from '../lib/supabase-client';
 import { useAuth } from '../contexts/AuthContext';
 import AutomatedReports from './automation/AutomatedReports';
@@ -7,6 +7,7 @@ import AutomatedReports from './automation/AutomatedReports';
 const WorkflowCustomization = lazy(() => import('./production/WorkflowCustomization').then(m => ({ default: m.WorkflowCustomization })));
 const AutomationsDashboard = lazy(() => import('./automations/AutomationsDashboard').then(m => ({ default: m.AutomationsDashboard })));
 const StripePayments = lazy(() => import('./production/StripePayments').then(m => ({ default: m.StripePayments })));
+const BillingDashboard = lazy(() => import('./billing/BillingDashboard').then(m => ({ default: m.BillingDashboard })));
 
 interface CompanySettings {
   id: string;
@@ -1139,6 +1140,25 @@ export function AccountSettings() {
                 </div>
               </div>
               {activeTab === 'company-info' && <div className="w-1 h-6 bg-blue-600 rounded-full absolute right-0" />}
+            </button>
+          </div>
+
+          <div className="mb-2">
+            <button
+              onClick={() => setActiveTab('billing-dashboard')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
+                activeTab === 'billing-dashboard'
+                  ? 'bg-green-50 text-green-700 shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+            >
+              <Receipt className={`w-4 h-4 flex-shrink-0 ${activeTab === 'billing-dashboard' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+              <div className="flex-1 text-left">
+                <div className={`font-medium text-sm ${activeTab === 'billing-dashboard' ? 'text-green-700' : 'text-gray-700'}`}>
+                  Billing & Payments
+                </div>
+              </div>
+              {activeTab === 'billing-dashboard' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
             </button>
           </div>
 
@@ -2519,6 +2539,18 @@ export function AccountSettings() {
                   </>
                 )}
               </div>
+            </div>
+          )}
+
+          {activeTab === 'billing-dashboard' && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <Suspense fallback={
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
+                </div>
+              }>
+                <BillingDashboard />
+              </Suspense>
             </div>
           )}
         </div>

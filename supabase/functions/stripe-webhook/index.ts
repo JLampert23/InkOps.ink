@@ -121,8 +121,38 @@ Deno.serve(async (req: Request) => {
               paid_at: new Date().toISOString(),
             })
             .eq('printavo_invoice_id', metadata.printavo_invoice_id);
+
+          const { data: queueItem } = await supabase
+            .from('billing_queue')
+            .select('*')
+            .eq('printavo_invoice_id', metadata.printavo_invoice_id)
+            .maybeSingle();
+
+          if (queueItem) {
+            await supabase
+              .from('billing_queue')
+              .update({
+                payment_status: 'paid',
+              })
+              .eq('id', queueItem.id);
+
+            await supabase.from('paid_invoices').insert([{
+              company_id: companyId,
+              printavo_invoice_id: queueItem.printavo_invoice_id,
+              printavo_visual_id: queueItem.printavo_visual_id,
+              customer_name: queueItem.customer_name,
+              customer_email: queueItem.customer_email,
+              invoice_total: queueItem.invoice_total,
+              amount_paid: paymentIntent.amount / 100,
+              payment_date: new Date().toISOString(),
+              stripe_payment_intent_id: paymentIntent.id,
+              stripe_charge_id: paymentIntent.latest_charge || null,
+              payment_method: paymentIntent.payment_method_types?.[0] || 'card',
+              metadata: { payment_intent: paymentIntent },
+            }]);
+          }
         }
-        
+
         await supabase
           .from('stripe_webhook_events')
           .update({
@@ -214,9 +244,39 @@ Deno.serve(async (req: Request) => {
                 paid_at: new Date().toISOString(),
               })
               .eq('printavo_invoice_id', metadata.printavo_invoice_id);
+
+            const { data: queueItem } = await supabase
+              .from('billing_queue')
+              .select('*')
+              .eq('printavo_invoice_id', metadata.printavo_invoice_id)
+              .maybeSingle();
+
+            if (queueItem) {
+              await supabase
+                .from('billing_queue')
+                .update({
+                  payment_status: 'paid',
+                })
+                .eq('id', queueItem.id);
+
+              await supabase.from('paid_invoices').insert([{
+                company_id: companyId,
+                printavo_invoice_id: queueItem.printavo_invoice_id,
+                printavo_visual_id: queueItem.printavo_visual_id,
+                customer_name: queueItem.customer_name,
+                customer_email: queueItem.customer_email,
+                invoice_total: queueItem.invoice_total,
+                amount_paid: session.amount_total / 100,
+                payment_date: new Date().toISOString(),
+                stripe_payment_intent_id: session.payment_intent,
+                stripe_charge_id: null,
+                payment_method: 'card',
+                metadata: { checkout_session: session },
+              }]);
+            }
           }
         }
-        
+
         await supabase
           .from('stripe_webhook_events')
           .update({

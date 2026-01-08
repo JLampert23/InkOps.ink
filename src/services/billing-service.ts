@@ -1,0 +1,477 @@
+import { supabase } from '../lib/supabase-client';
+import { stripeService } from './stripe-service';
+import { Invoice } from '../types/printavo';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+export interface BillingQueueItem {
+  id: string;
+  printavoInvoiceId: string;
+  printavoVisualId: string;
+  printavoStatus: string;
+  customerName: string;
+  customerEmail: string;
+  customerCompany: string;
+  invoiceTotal: number;
+  invoiceDate: string;
+  dueDate: string;
+  stripePaymentLinkId: string | null;
+  stripeInvoiceId: string | null;
+  sentAt: string | null;
+  sentMethod: string | null;
+  paymentStatus: string;
+  metadata: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CommunicationLog {
+  id: string;
+  printavoInvoiceId: string;
+  communicationType: string;
+  method: string;
+  recipient: string;
+  subject: string;
+  message: string;
+  status: string;
+  sentAt: string;
+}
+
+export interface PaidInvoice {
+  id: string;
+  printavoInvoiceId: string;
+  printavoVisualId: string;
+  customerName: string;
+  customerEmail: string;
+  invoiceTotal: number;
+  amountPaid: number;
+  paymentDate: string;
+  stripePaymentIntentId: string;
+  paymentMethod: string;
+}
+
+export const billingService = {
+  async syncBillingQueue(selectedStatuses: string[]): Promise<void> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('You must be logged in to sync billing queue');
+      }
+
+      const { data: settings } = await supabase
+        .from('company_settings')
+        .select('id, billing_selected_invoice_statuses')
+        .maybeSingle();
+
+      if (!settings) {
+        throw new Error('Company settings not found');
+      }
+
+      const statusesToSync = selectedStatuses.length > 0
+        ? selectedStatuses
+        : settings.billing_selected_invoice_statuses || [];
+
+      if (statusesToSync.length === 0) {
+        console.log('No statuses selected for billing queue');
+        return;
+      }
+
+      const { data: invoices, error } = await supabase
+        .from('printavo_invoices')
+        .select('*')
+        .in('status', statusesToSync);
+
+      if (error) throw error;
+
+      if (!invoices || invoices.length === 0) {
+        console.log('No invoices found matching billing statuses');
+        return;
+      }
+
+      for (const invoice of invoices) {
+        const { data: existing } = await supabase
+          .from('billing_queue')
+          .select('id, payment_status')
+          .eq('printavo_invoice_id', invoice.id)
+          .maybeSingle();
+
+        if (existing) {
+          if (existing.payment_status !== 'paid') {
+            await supabase
+              .from('billing_queue')
+              .update({
+                printavo_status: invoice.status,
+                customer_name: invoice.customer_name,
+                customer_email: invoice.customer_email,
+                customer_company: invoice.customer_company,
+                invoice_total: invoice.total,
+                invoice_date: invoice.invoice_date,
+                due_date: invoice.due_date,
+              })
+              .eq('id', existing.id);
+          }
+        } else {
+          await supabase
+            .from('billing_queue')
+            .insert([{
+              company_id: settings.id,
+              printavo_invoice_id: invoice.id,
+              printavo_visual_id: invoice.invoice_number,
+              printavo_status: invoice.status,
+              customer_name: invoice.customer_name,
+              customer_email: invoice.customer_email,
+              customer_company: invoice.customer_company,
+              invoice_total: invoice.total,
+              invoice_date: invoice.invoice_date,
+              due_date: invoice.due_date,
+              payment_status: 'unpaid',
+            }]);
+        }
+      }
+    } catch (error) {
+      console.error('Error syncing billing queue:', error);
+      throw error;
+    }
+  },
+
+  async getBillingQueue(): Promise<BillingQueueItem[]> {
+    try {
+      const { data, error } = await supabase
+        .from('billing_queue')
+        .select('*')
+        .neq('payment_status', 'paid')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      return (data || []).map(item => ({
+        id: item.id,
+        printavoInvoiceId: item.printavo_invoice_id,
+        printavoVisualId: item.printavo_visual_id,
+        printavoStatus: item.printavo_status,
+        customerName: item.customer_name,
+        customerEmail: item.customer_email,
+        customerCompany: item.customer_company,
+        invoiceTotal: parseFloat(item.invoice_total),
+        invoiceDate: item.invoice_date,
+        dueDate: item.due_date,
+        stripePaymentLinkId: item.stripe_payment_link_id,
+        stripeInvoiceId: item.stripe_invoice_id,
+        sentAt: item.sent_at,
+        sentMethod: item.sent_method,
+        paymentStatus: item.payment_status,
+        metadata: item.metadata,
+        createdAt: item.created_at,
+        updatedAt: item.updated_at,
+      }));
+    } catch (error) {
+      console.error('Error fetching billing queue:', error);
+      return [];
+    }
+  },
+
+  async generatePaymentLink(queueItemId: string): Promise<string> {
+    try {
+      const { data: queueItem, error: queueError } = await supabase
+        .from('billing_queue')
+        .select('*')
+        .eq('id', queueItemId)
+        .maybeSingle();
+
+      if (queueError || !queueItem) {
+        throw new Error('Billing queue item not found');
+      }
+
+      const { data: invoice, error: invoiceError } = await supabase
+        .from('printavo_invoices')
+        .select('*')
+        .eq('id', queueItem.printavo_invoice_id)
+        .maybeSingle();
+
+      if (invoiceError || !invoice) {
+        throw new Error('Printavo invoice not found');
+      }
+
+      const mappedInvoice: Invoice = {
+        id: invoice.id,
+        visualId: invoice.invoice_number,
+        total: parseFloat(invoice.total),
+        contact: {
+          fullName: invoice.customer_name,
+          email: invoice.customer_email,
+        },
+      } as Invoice;
+
+      const paymentLink = await stripeService.createPaymentLink(mappedInvoice);
+
+      await supabase
+        .from('billing_queue')
+        .update({
+          stripe_payment_link_id: paymentLink.id,
+        })
+        .eq('id', queueItemId);
+
+      return paymentLink.url;
+    } catch (error) {
+      console.error('Error generating payment link:', error);
+      throw error;
+    }
+  },
+
+  async sendInvoiceEmail(queueItemId: string, customMessage?: string): Promise<void> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('You must be logged in to send invoices');
+      }
+
+      const { data: queueItem } = await supabase
+        .from('billing_queue')
+        .select('*')
+        .eq('id', queueItemId)
+        .maybeSingle();
+
+      if (!queueItem) {
+        throw new Error('Billing queue item not found');
+      }
+
+      if (!queueItem.customer_email) {
+        throw new Error('Customer email not found');
+      }
+
+      let paymentLink = queueItem.stripe_payment_link_id;
+      if (!paymentLink) {
+        const url = await this.generatePaymentLink(queueItemId);
+        const { data: link } = await supabase
+          .from('stripe_payment_links')
+          .select('stripe_payment_link_id')
+          .eq('printavo_invoice_id', queueItem.printavo_invoice_id)
+          .maybeSingle();
+        paymentLink = url;
+      }
+
+      const { data: linkData } = await supabase
+        .from('stripe_payment_links')
+        .select('stripe_payment_link_url')
+        .eq('printavo_invoice_id', queueItem.printavo_invoice_id)
+        .maybeSingle();
+
+      const paymentUrl = linkData?.stripe_payment_link_url || '';
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': supabaseAnonKey,
+        },
+        body: JSON.stringify({
+          to: queueItem.customer_email,
+          subject: `Invoice ${queueItem.printavo_visual_id} - Payment Required`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2>Invoice ${queueItem.printavo_visual_id}</h2>
+              <p>Dear ${queueItem.customer_name},</p>
+              ${customMessage ? `<p>${customMessage}</p>` : ''}
+              <p>Your invoice is ready for payment.</p>
+              <div style="background: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 8px;">
+                <p><strong>Invoice Number:</strong> ${queueItem.printavo_visual_id}</p>
+                <p><strong>Amount Due:</strong> $${parseFloat(queueItem.invoice_total).toFixed(2)}</p>
+                <p><strong>Due Date:</strong> ${queueItem.due_date ? new Date(queueItem.due_date).toLocaleDateString() : 'Upon receipt'}</p>
+              </div>
+              <p style="margin: 30px 0;">
+                <a href="${paymentUrl}"
+                   style="background: #0066ff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                  Pay Invoice Now
+                </a>
+              </p>
+              <p style="color: #666; font-size: 14px;">
+                If you have any questions, please don't hesitate to contact us.
+              </p>
+            </div>
+          `,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to send email');
+      }
+
+      await supabase
+        .from('billing_queue')
+        .update({
+          sent_at: new Date().toISOString(),
+          sent_method: 'email',
+        })
+        .eq('id', queueItemId);
+
+      await supabase
+        .from('communication_logs')
+        .insert([{
+          printavo_invoice_id: queueItem.printavo_invoice_id,
+          communication_type: 'invoice',
+          method: 'email',
+          recipient: queueItem.customer_email,
+          subject: `Invoice ${queueItem.printavo_visual_id} - Payment Required`,
+          message: customMessage || 'Invoice sent with payment link',
+          status: 'sent',
+          sent_by: session.user.id,
+        }]);
+    } catch (error) {
+      console.error('Error sending invoice email:', error);
+      throw error;
+    }
+  },
+
+  async markAsPaid(queueItemId: string, paymentIntentId: string): Promise<void> {
+    try {
+      const { data: queueItem } = await supabase
+        .from('billing_queue')
+        .select('*')
+        .eq('id', queueItemId)
+        .maybeSingle();
+
+      if (!queueItem) {
+        throw new Error('Billing queue item not found');
+      }
+
+      const { data: payment } = await supabase
+        .from('stripe_payments')
+        .select('*')
+        .eq('stripe_payment_intent_id', paymentIntentId)
+        .maybeSingle();
+
+      const { data: settings } = await supabase
+        .from('company_settings')
+        .select('id')
+        .maybeSingle();
+
+      await supabase
+        .from('paid_invoices')
+        .insert([{
+          company_id: settings?.id,
+          printavo_invoice_id: queueItem.printavo_invoice_id,
+          printavo_visual_id: queueItem.printavo_visual_id,
+          customer_name: queueItem.customer_name,
+          customer_email: queueItem.customer_email,
+          invoice_total: queueItem.invoice_total,
+          amount_paid: payment?.amount || queueItem.invoice_total,
+          payment_date: new Date().toISOString(),
+          stripe_payment_intent_id: paymentIntentId,
+          stripe_charge_id: payment?.stripe_charge_id,
+          payment_method: payment?.payment_method || 'card',
+          metadata: {
+            original_queue_item: queueItem,
+          },
+        }]);
+
+      await supabase
+        .from('billing_queue')
+        .update({
+          payment_status: 'paid',
+        })
+        .eq('id', queueItemId);
+    } catch (error) {
+      console.error('Error marking as paid:', error);
+      throw error;
+    }
+  },
+
+  async getPaidInvoices(): Promise<PaidInvoice[]> {
+    try {
+      const { data, error } = await supabase
+        .from('paid_invoices')
+        .select('*')
+        .order('payment_date', { ascending: false });
+
+      if (error) throw error;
+
+      return (data || []).map(item => ({
+        id: item.id,
+        printavoInvoiceId: item.printavo_invoice_id,
+        printavoVisualId: item.printavo_visual_id,
+        customerName: item.customer_name,
+        customerEmail: item.customer_email,
+        invoiceTotal: parseFloat(item.invoice_total),
+        amountPaid: parseFloat(item.amount_paid),
+        paymentDate: item.payment_date,
+        stripePaymentIntentId: item.stripe_payment_intent_id,
+        paymentMethod: item.payment_method,
+      }));
+    } catch (error) {
+      console.error('Error fetching paid invoices:', error);
+      return [];
+    }
+  },
+
+  async getCommunicationLogs(printavoInvoiceId: string): Promise<CommunicationLog[]> {
+    try {
+      const { data, error } = await supabase
+        .from('communication_logs')
+        .select('*')
+        .eq('printavo_invoice_id', printavoInvoiceId)
+        .order('sent_at', { ascending: false });
+
+      if (error) throw error;
+
+      return (data || []).map(log => ({
+        id: log.id,
+        printavoInvoiceId: log.printavo_invoice_id,
+        communicationType: log.communication_type,
+        method: log.method,
+        recipient: log.recipient,
+        subject: log.subject,
+        message: log.message,
+        status: log.status,
+        sentAt: log.sent_at,
+      }));
+    } catch (error) {
+      console.error('Error fetching communication logs:', error);
+      return [];
+    }
+  },
+
+  async removeFromQueue(queueItemId: string): Promise<void> {
+    try {
+      await supabase
+        .from('billing_queue')
+        .delete()
+        .eq('id', queueItemId);
+    } catch (error) {
+      console.error('Error removing from queue:', error);
+      throw error;
+    }
+  },
+
+  async bulkGeneratePaymentLinks(queueItemIds: string[]): Promise<number> {
+    let successCount = 0;
+
+    for (const id of queueItemIds) {
+      try {
+        await this.generatePaymentLink(id);
+        successCount++;
+      } catch (error) {
+        console.error(`Failed to generate link for ${id}:`, error);
+      }
+    }
+
+    return successCount;
+  },
+
+  async bulkSendInvoices(queueItemIds: string[]): Promise<number> {
+    let successCount = 0;
+
+    for (const id of queueItemIds) {
+      try {
+        await this.sendInvoiceEmail(id);
+        successCount++;
+      } catch (error) {
+        console.error(`Failed to send invoice for ${id}:`, error);
+      }
+    }
+
+    return successCount;
+  },
+};
