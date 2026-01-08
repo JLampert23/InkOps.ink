@@ -10,45 +10,6 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-async function getWebhookSecret(): Promise<string | null> {
-  try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    
-    const { data, error } = await supabase
-      .from('company_settings')
-      .select('stripe_webhook_secret')
-      .maybeSingle();
-    
-    if (error || !data?.stripe_webhook_secret) {
-      console.log('No webhook secret configured');
-      return null;
-    }
-    
-    const decryptResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${supabaseServiceKey}`,
-      },
-      body: JSON.stringify({
-        action: 'decrypt',
-        token: data.stripe_webhook_secret,
-      }),
-    });
-    
-    if (!decryptResponse.ok) {
-      console.error('Failed to decrypt webhook secret');
-      return null;
-    }
-    
-    const { result } = await decryptResponse.json();
-    return result;
-  } catch (error) {
-    console.error('Error getting webhook secret:', error);
-    return null;
-  }
-}
-
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -219,9 +180,9 @@ Deno.serve(async (req: Request) => {
       case 'checkout.session.completed': {
         const session = event.data.object;
         const metadata = session.metadata || {};
-        
+
         console.log('Checkout session completed:', session.id);
-        
+
         if (session.payment_status === 'paid') {
           await supabase.from('stripe_payments').insert([{
             company_id: companyId,
@@ -235,7 +196,7 @@ Deno.serve(async (req: Request) => {
             payment_method: 'card',
             metadata: metadata,
           }]);
-          
+
           if (metadata.printavo_invoice_id) {
             await supabase
               .from('stripe_payment_links')
@@ -284,10 +245,183 @@ Deno.serve(async (req: Request) => {
             processed_at: new Date().toISOString(),
           })
           .eq('stripe_event_id', event.id);
-        
+
         break;
       }
-      
+
+      case 'invoice.paid':
+      case 'invoice.payment_succeeded': {
+        const invoice = event.data.object;
+        const metadata = invoice.metadata || {};
+        const printavoInvoiceId = metadata.printavo_invoice_id;
+
+        console.log('Invoice payment succeeded:', invoice.id);
+
+        const { data: stripeInvoice } = await supabase
+          .from('stripe_invoices')
+          .select('*')
+          .eq('stripe_invoice_id', invoice.id)
+          .maybeSingle();
+
+        if (!stripeInvoice) {
+          console.log('Stripe invoice not found in database');
+          break;
+        }
+
+        const paymentIntentId = invoice.payment_intent;
+        const chargeId = invoice.charge;
+        const amountPaid = invoice.amount_paid || 0;
+        const amountRemaining = invoice.amount_remaining || 0;
+
+        const { data: existingPayment } = await supabase
+          .from('stripe_payment_history')
+          .select('id')
+          .eq('payment_intent_id', paymentIntentId)
+          .maybeSingle();
+
+        if (!existingPayment && paymentIntentId) {
+          await supabase.from('stripe_payment_history').insert([{
+            stripe_invoice_id: stripeInvoice.id,
+            payment_intent_id: paymentIntentId,
+            charge_id: chargeId,
+            amount: amountPaid,
+            currency: invoice.currency || 'usd',
+            status: 'succeeded',
+            payment_method: 'card',
+            metadata: { invoice: invoice },
+          }]);
+        }
+
+        const isFullyPaid = amountRemaining === 0 || invoice.status === 'paid';
+
+        await supabase
+          .from('stripe_invoices')
+          .update({
+            status: invoice.status,
+            amount_paid: amountPaid,
+            amount_remaining: amountRemaining,
+            paid_at: isFullyPaid ? new Date().toISOString() : null,
+          })
+          .eq('id', stripeInvoice.id);
+
+        if (isFullyPaid && printavoInvoiceId) {
+          const { data: queueItem } = await supabase
+            .from('billing_queue')
+            .select('*')
+            .eq('printavo_invoice_id', printavoInvoiceId)
+            .maybeSingle();
+
+          if (queueItem) {
+            await supabase
+              .from('billing_queue')
+              .update({
+                payment_status: 'paid',
+              })
+              .eq('id', queueItem.id);
+
+            await supabase.from('paid_invoices').insert([{
+              company_id: companyId,
+              printavo_invoice_id: queueItem.printavo_invoice_id,
+              printavo_visual_id: queueItem.printavo_visual_id,
+              customer_name: queueItem.customer_name,
+              customer_email: queueItem.customer_email,
+              invoice_total: queueItem.invoice_total,
+              amount_paid: amountPaid / 100,
+              payment_date: new Date().toISOString(),
+              stripe_payment_intent_id: paymentIntentId,
+              stripe_charge_id: chargeId,
+              payment_method: 'card',
+              metadata: { invoice: invoice },
+            }]);
+          }
+        } else if (printavoInvoiceId) {
+          await supabase
+            .from('billing_queue')
+            .update({
+              payment_status: 'partial',
+            })
+            .eq('printavo_invoice_id', printavoInvoiceId);
+        }
+
+        await supabase
+          .from('stripe_webhook_events')
+          .update({
+            processed: true,
+            processed_at: new Date().toISOString(),
+          })
+          .eq('stripe_event_id', event.id);
+
+        break;
+      }
+
+      case 'invoice.payment_action_required': {
+        const invoice = event.data.object;
+        const metadata = invoice.metadata || {};
+        const printavoInvoiceId = metadata.printavo_invoice_id;
+
+        console.log('Invoice payment action required:', invoice.id);
+
+        await supabase
+          .from('stripe_invoices')
+          .update({
+            status: 'action_required',
+          })
+          .eq('stripe_invoice_id', invoice.id);
+
+        if (printavoInvoiceId) {
+          await supabase
+            .from('billing_queue')
+            .update({
+              payment_status: 'action_required',
+            })
+            .eq('printavo_invoice_id', printavoInvoiceId);
+        }
+
+        await supabase
+          .from('stripe_webhook_events')
+          .update({
+            processed: true,
+            processed_at: new Date().toISOString(),
+          })
+          .eq('stripe_event_id', event.id);
+
+        break;
+      }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object;
+        const metadata = invoice.metadata || {};
+        const printavoInvoiceId = metadata.printavo_invoice_id;
+
+        console.log('Invoice payment failed:', invoice.id);
+
+        await supabase
+          .from('stripe_invoices')
+          .update({
+            status: 'payment_failed',
+          })
+          .eq('stripe_invoice_id', invoice.id);
+
+        if (printavoInvoiceId) {
+          await supabase
+            .from('billing_queue')
+            .update({
+              payment_status: 'failed',
+            })
+            .eq('printavo_invoice_id', printavoInvoiceId);
+        }
+
+        await supabase
+          .from('stripe_webhook_events')
+          .update({
+            processed: true,
+            processed_at: new Date().toISOString(),
+          })
+          .eq('stripe_event_id', event.id);
+
+        break;
+      }
+
       default:
         console.log('Unhandled event type:', event.type);
         await supabase
