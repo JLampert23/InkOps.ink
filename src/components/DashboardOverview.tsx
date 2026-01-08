@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { TrendingUp, DollarSign, FileText, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { TrendingUp, DollarSign, FileText, AlertCircle, CheckCircle, Clock, Bug } from 'lucide-react';
 import { Invoice, PaymentWithInvoice } from '../types/printavo';
 import { calculateFinancialSummary, formatCurrency, formatPercentage } from '../utils/financial-aggregations';
 
@@ -13,10 +13,32 @@ interface DashboardOverviewProps {
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
 export function DashboardOverview({ invoices, payments, loading }: DashboardOverviewProps) {
+  const [testData, setTestData] = useState<any>(null);
+  const [testLoading, setTestLoading] = useState(false);
+
   const summary = useMemo(
     () => calculateFinancialSummary(invoices, payments),
     [invoices, payments]
   );
+
+  const runPrintavoTest = async () => {
+    setTestLoading(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-printavo`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const result = await response.json();
+      setTestData(result);
+    } catch (error) {
+      setTestData({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } finally {
+      setTestLoading(false);
+    }
+  };
 
   const statusData = useMemo(() => {
     return Object.entries(summary.revenueByStatus).map(([status, revenue]) => ({
@@ -42,6 +64,36 @@ export function DashboardOverview({ invoices, payments, loading }: DashboardOver
 
   return (
     <div className="space-y-6">
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Bug className="w-5 h-5 text-yellow-600" />
+          <span className="text-sm text-yellow-800 font-medium">Debug: Test Printavo Data Structure</span>
+        </div>
+        <button
+          onClick={runPrintavoTest}
+          disabled={testLoading}
+          className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50"
+        >
+          {testLoading ? 'Loading...' : 'Run Test'}
+        </button>
+      </div>
+
+      {testData && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Printavo API Response</h3>
+            <button
+              onClick={() => setTestData(null)}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              Close
+            </button>
+          </div>
+          <pre className="bg-gray-50 p-4 rounded overflow-auto max-h-96 text-xs">
+            {JSON.stringify(testData, null, 2)}
+          </pre>
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <StatCard
           title="Total Revenue"
