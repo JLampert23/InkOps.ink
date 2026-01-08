@@ -31,70 +31,40 @@ async function decryptToken(encryptedToken: string, supabaseUrl: string, service
   return data.result;
 }
 
-async function fetchAllStatuses(email: string, token: string): Promise<string[]> {
-  const statusNames = new Set<string>();
-  let hasNextPage = true;
-  let cursor: string | null = null;
-  let pageCount = 0;
-  const maxPages = 50;
-
-  while (hasNextPage && pageCount < maxPages) {
-    const query = `
-      query GetInvoicesForStatuses($after: String, $first: Int = 100) {
-        invoices(after: $after, first: $first) {
-          edges {
-            node {
-              id
-              status {
-                name
-              }
-            }
-          }
-          pageInfo {
-            hasNextPage
-            endCursor
-          }
-        }
+async function fetchInvoiceStatuses(email: string, token: string): Promise<string[]> {
+  const query = `
+    query GetInvoiceStatuses {
+      invoiceStatuses {
+        name
       }
-    `;
-
-    const response = await fetch(PRINTAVO_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        email,
-        token,
-      },
-      body: JSON.stringify({
-        query,
-        variables: { after: cursor },
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`API request failed with status ${response.status}`);
     }
+  `;
 
-    const data = await response.json();
+  const response = await fetch(PRINTAVO_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      email,
+      token,
+    },
+    body: JSON.stringify({
+      query,
+    }),
+  });
 
-    if (data.errors && data.errors.length > 0) {
-      throw new Error(`GraphQL errors: ${JSON.stringify(data.errors)}`);
-    }
-
-    const invoices = data.data?.invoices?.edges || [];
-    invoices.forEach((edge: any) => {
-      const statusName = edge?.node?.status?.name;
-      if (statusName) {
-        statusNames.add(statusName);
-      }
-    });
-
-    hasNextPage = data.data?.invoices?.pageInfo?.hasNextPage || false;
-    cursor = data.data?.invoices?.pageInfo?.endCursor || null;
-    pageCount++;
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(`API request failed with status ${response.status}: ${JSON.stringify(errorData)}`);
   }
 
-  return Array.from(statusNames).sort();
+  const data = await response.json();
+
+  if (data.errors && data.errors.length > 0) {
+    throw new Error(`GraphQL errors: ${JSON.stringify(data.errors)}`);
+  }
+
+  const statuses = data.data?.invoiceStatuses || [];
+  return statuses.map((s: any) => s.name).sort();
 }
 
 Deno.serve(async (req: Request) => {
@@ -139,7 +109,7 @@ Deno.serve(async (req: Request) => {
       supabaseServiceRoleKey
     );
 
-    const statuses = await fetchAllStatuses(printavoEmail, printavoToken);
+    const statuses = await fetchInvoiceStatuses(printavoEmail, printavoToken);
 
     return new Response(
       JSON.stringify({
