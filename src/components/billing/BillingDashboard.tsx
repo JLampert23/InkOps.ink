@@ -3,11 +3,13 @@ import { Receipt, CheckCircle, Clock, DollarSign } from 'lucide-react';
 import { BillingQueue } from './BillingQueue';
 import { PaidInvoices } from './PaidInvoices';
 import { SendInvoiceModal } from './SendInvoiceModal';
+import { InvoiceDetail } from './InvoiceDetail';
 import { BillingQueueItem } from '../../services/billing-service';
 
 export function BillingDashboard() {
   const [activeTab, setActiveTab] = useState<'queue' | 'paid'>('queue');
   const [selectedInvoice, setSelectedInvoice] = useState<BillingQueueItem | null>(null);
+  const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
 
   const handleSendInvoice = (item: BillingQueueItem) => {
     setSelectedInvoice(item);
@@ -20,6 +22,23 @@ export function BillingDashboard() {
   const handleSuccess = () => {
     window.location.reload();
   };
+
+  const handleViewInvoice = (printavoInvoiceId: string) => {
+    setViewingInvoiceId(printavoInvoiceId);
+  };
+
+  const handleBackToQueue = () => {
+    setViewingInvoiceId(null);
+  };
+
+  if (viewingInvoiceId) {
+    return (
+      <InvoiceDetail
+        invoiceId={viewingInvoiceId}
+        onBack={handleBackToQueue}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -60,9 +79,9 @@ export function BillingDashboard() {
 
         <div className="p-6">
           {activeTab === 'queue' && (
-            <BillingQueue onSendInvoice={handleSendInvoice} />
+            <BillingQueue onSendInvoice={handleSendInvoice} onViewInvoice={handleViewInvoice} />
           )}
-          {activeTab === 'paid' && <PaidInvoices />}
+          {activeTab === 'paid' && <PaidInvoices onViewInvoice={handleViewInvoice} />}
         </div>
       </div>
 

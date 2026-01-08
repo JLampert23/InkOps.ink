@@ -2,7 +2,11 @@ import { useState, useEffect } from 'react';
 import { CheckCircle, DollarSign, Calendar, CreditCard, Search, Download } from 'lucide-react';
 import { billingService, PaidInvoice } from '../../services/billing-service';
 
-export function PaidInvoices() {
+interface PaidInvoicesProps {
+  onViewInvoice?: (printavoInvoiceId: string) => void;
+}
+
+export function PaidInvoices({ onViewInvoice }: PaidInvoicesProps) {
   const [paidInvoices, setPaidInvoices] = useState<PaidInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -173,9 +177,12 @@ export function PaidInvoices() {
               {filteredInvoices.map((invoice) => (
                 <tr key={invoice.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
+                    <button
+                      onClick={() => onViewInvoice?.(invoice.printavoInvoiceId)}
+                      className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                    >
                       {invoice.printavoVisualId}
-                    </div>
+                    </button>
                   </td>
                   <td className="px-6 py-4">
                     <div className="text-sm font-medium text-gray-900">

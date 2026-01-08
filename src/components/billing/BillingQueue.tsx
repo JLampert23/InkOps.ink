@@ -15,9 +15,10 @@ import { billingService, BillingQueueItem } from '../../services/billing-service
 
 interface BillingQueueProps {
   onSendInvoice?: (item: BillingQueueItem) => void;
+  onViewInvoice?: (printavoInvoiceId: string) => void;
 }
 
-export function BillingQueue({ onSendInvoice }: BillingQueueProps) {
+export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps) {
   const [queueItems, setQueueItems] = useState<BillingQueueItem[]>([]);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -278,9 +279,12 @@ export function BillingQueue({ onSendInvoice }: BillingQueueProps) {
                     />
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
+                    <button
+                      onClick={() => onViewInvoice?.(item.printavoInvoiceId)}
+                      className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                    >
                       {item.printavoVisualId}
-                    </div>
+                    </button>
                     <div className="text-xs text-gray-500">
                       {item.printavoStatus}
                     </div>
