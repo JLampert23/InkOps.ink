@@ -178,6 +178,8 @@ export function AccountSettings() {
       });
 
       if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error('Printavo API error:', response.status, errorData);
         console.warn('Could not fetch statuses from Printavo API, falling back to local data');
         const { data, error } = await supabase
           .from('printavo_invoices_calculated')

@@ -9,54 +9,26 @@ const corsHeaders = {
 
 const PRINTAVO_API_URL = "https://www.printavo.com/api/v2";
 
-async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
-  const encoder = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(password),
-    'PBKDF2',
-    false,
-    ['deriveBits', 'deriveKey']
-  );
-
-  return crypto.subtle.deriveKey(
-    {
-      name: 'PBKDF2',
-      salt: salt,
-      iterations: 100000,
-      hash: 'SHA-256',
+async function decryptToken(encryptedToken: string, supabaseUrl: string, serviceRoleKey: string): Promise<string> {
+  const response = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${serviceRoleKey}`,
     },
-    keyMaterial,
-    { name: 'AES-GCM', length: 256 },
-    true,
-    ['encrypt', 'decrypt']
-  );
-}
+    body: JSON.stringify({
+      action: 'decrypt',
+      token: encryptedToken,
+    }),
+  });
 
-async function decryptToken(encryptedToken: string, encryptionKey: string): Promise<string> {
-  try {
-    const combined = new Uint8Array(
-      atob(encryptedToken).split('').map(c => c.charCodeAt(0))
-    );
-
-    const salt = combined.slice(0, 16);
-    const iv = combined.slice(16, 28);
-    const encryptedData = combined.slice(28);
-
-    const key = await deriveKey(encryptionKey, salt);
-
-    const decryptedData = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: iv },
-      key,
-      encryptedData
-    );
-
-    const decoder = new TextDecoder();
-    return decoder.decode(decryptedData);
-  } catch (error) {
-    console.error('Decryption error:', error);
-    throw new Error('Failed to decrypt token');
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(`Decryption failed: ${error.error || 'Unknown error'}`);
   }
+
+  const data = await response.json();
+  return data.result;
 }
 
 Deno.serve(async (req: Request) => {
@@ -70,11 +42,6 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
-
-    if (!encryptionKey) {
-      throw new Error('ENCRYPTION_KEY not configured');
-    }
 
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
@@ -90,7 +57,7 @@ Deno.serve(async (req: Request) => {
           message: "Please configure Printavo credentials in Account Settings",
         }),
         {
-          status: 500,
+          status: 400,
           headers: {
             ...corsHeaders,
             "Content-Type": "application/json",
@@ -100,7 +67,11 @@ Deno.serve(async (req: Request) => {
     }
 
     const printavoEmail = settings.printavo_username;
-    const printavoToken = await decryptToken(settings.printavo_api_token_encrypted, encryptionKey);
+    const printavoToken = await decryptToken(
+      settings.printavo_api_token_encrypted,
+      supabaseUrl,
+      supabaseServiceRoleKey
+    );
 
     const query = `
       query GetCurrentAccount {
