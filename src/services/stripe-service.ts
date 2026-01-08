@@ -393,14 +393,11 @@ export const stripeService = {
 
   async createStripeInvoiceWithMinimumDue(printavoInvoice: Invoice): Promise<StripeInvoice> {
     try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !session) {
-        throw new Error('You must be logged in to create invoices');
-      }
+      const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
 
-      await supabase.auth.refreshSession();
-      const { data: { session: refreshedSession } } = await supabase.auth.getSession();
-      const activeSession = refreshedSession || session;
+      if (refreshError || !refreshedSession) {
+        throw new Error('Unable to refresh authentication. Please log in again.');
+      }
 
       const { data: settings } = await supabase
         .from('company_settings')
@@ -418,7 +415,7 @@ export const stripeService = {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${activeSession.access_token}`,
+          'Authorization': `Bearer ${refreshedSession.access_token}`,
           'apikey': supabaseAnonKey,
         },
         body: JSON.stringify({

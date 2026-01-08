@@ -100,6 +100,7 @@ Deno.serve(async (req: Request) => {
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
+      console.error('Missing authorization header');
       return new Response(
         JSON.stringify({ error: 'Missing authorization header' }),
         {
@@ -110,18 +111,31 @@ Deno.serve(async (req: Request) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
+    console.log('Validating JWT token, length:', token.length);
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
     if (authError || !user) {
+      console.error('Auth validation failed:', {
+        error: authError?.message,
+        code: authError?.status,
+        hasUser: !!user
+      });
       return new Response(
-        JSON.stringify({ error: 'Invalid authentication token', details: authError?.message }),
+        JSON.stringify({
+          code: 401,
+          message: 'Invalid JWT',
+          details: authError?.message
+        }),
         {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
     }
+
+    console.log('User authenticated:', user.email);
 
     const { action, data } = await req.json();
     
