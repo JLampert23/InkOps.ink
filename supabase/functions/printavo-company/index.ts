@@ -31,6 +31,72 @@ async function decryptToken(encryptedToken: string, supabaseUrl: string, service
   return data.result;
 }
 
+async function fetchAllStatuses(email: string, token: string): Promise<string[]> {
+  const statusNames = new Set<string>();
+  let hasNextPage = true;
+  let cursor: string | null = null;
+  let pageCount = 0;
+  const maxPages = 50;
+
+  while (hasNextPage && pageCount < maxPages) {
+    const query = `
+      query GetInvoicesForStatuses($after: String, $first: Int = 100) {
+        invoices(after: $after, first: $first) {
+          edges {
+            node {
+              id
+              status {
+                name
+              }
+            }
+          }
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+        }
+      }
+    `;
+
+    const response = await fetch(PRINTAVO_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        email,
+        token,
+      },
+      body: JSON.stringify({
+        query,
+        variables: { after: cursor },
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API request failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.errors && data.errors.length > 0) {
+      throw new Error(`GraphQL errors: ${JSON.stringify(data.errors)}`);
+    }
+
+    const invoices = data.data?.invoices?.edges || [];
+    invoices.forEach((edge: any) => {
+      const statusName = edge?.node?.status?.name;
+      if (statusName) {
+        statusNames.add(statusName);
+      }
+    });
+
+    hasNextPage = data.data?.invoices?.pageInfo?.hasNextPage || false;
+    cursor = data.data?.invoices?.pageInfo?.endCursor || null;
+    pageCount++;
+  }
+
+  return Array.from(statusNames).sort();
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -73,90 +139,12 @@ Deno.serve(async (req: Request) => {
       supabaseServiceRoleKey
     );
 
-    const query = `
-      query GetInvoicesForStatuses($first: Int = 100) {
-        invoices(first: $first) {
-          edges {
-            node {
-              id
-              status {
-                name
-              }
-            }
-          }
-        }
-      }
-    `;
-
-    const response = await fetch(PRINTAVO_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        email: printavoEmail,
-        token: printavoToken,
-      },
-      body: JSON.stringify({
-        query,
-      }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error('Printavo API error:', {
-        status: response.status,
-        data,
-      });
-
-      return new Response(
-        JSON.stringify({
-          error: 'Printavo API request failed',
-          details: data,
-          status: response.status,
-        }),
-        {
-          status: response.status,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-    }
-
-    if (data.errors && data.errors.length > 0) {
-      console.error('GraphQL errors:', data.errors);
-      return new Response(
-        JSON.stringify({
-          error: 'GraphQL query failed',
-          details: data.errors,
-        }),
-        {
-          status: 400,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-    }
-
-    const invoices = data.data?.invoices?.edges || [];
-    const statusNames = new Set<string>();
-    
-    invoices.forEach((edge: any) => {
-      const statusName = edge?.node?.status?.name;
-      if (statusName) {
-        statusNames.add(statusName);
-      }
-    });
-
-    const uniqueStatuses = Array.from(statusNames).sort();
+    const statuses = await fetchAllStatuses(printavoEmail, printavoToken);
 
     return new Response(
       JSON.stringify({
         success: true,
-        statuses: uniqueStatuses,
+        statuses,
       }),
       {
         status: 200,
