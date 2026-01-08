@@ -36,7 +36,7 @@ type SettingsTab =
   | 'company-info'
   | 'printavo-integration' | 'square-integration' | 'resend-integration' | 'stripe-payments'
   | 'user-management'
-  | 'status-filters' | 'billing-status-filters'
+  | 'status-filters'
   | 'automated-reports' | 'workflow-setup' | 'automations';
 
 export function AccountSettings() {
@@ -1299,25 +1299,6 @@ export function AccountSettings() {
             </button>
           </div>
 
-          {/* Billing Status Filters */}
-          <div className="mb-2">
-            <button
-              onClick={() => setActiveTab('billing-status-filters')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
-                activeTab === 'billing-status-filters'
-                  ? 'bg-blue-50 text-blue-700 shadow-sm'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-              }`}
-            >
-              <Filter className={`w-4 h-4 flex-shrink-0 ${activeTab === 'billing-status-filters' ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
-              <div className="flex-1 text-left">
-                <div className={`font-medium text-sm ${activeTab === 'billing-status-filters' ? 'text-blue-700' : 'text-gray-700'}`}>
-                  Billing Filters
-                </div>
-              </div>
-              {activeTab === 'billing-status-filters' && <div className="w-1 h-6 bg-blue-600 rounded-full absolute right-0" />}
-            </button>
-          </div>
 
           {/* Automation Section - Collapsible */}
           <div className="mb-2">
@@ -2270,84 +2251,6 @@ export function AccountSettings() {
             </div>
           )}
 
-          {activeTab === 'billing-status-filters' && (
-            <div className="bg-white rounded-lg shadow p-6 space-y-6">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 mb-1">Billing & Payments Status Filters</h2>
-                <p className="text-sm text-gray-600">Select statuses to display in Billing & Payments section</p>
-              </div>
-
-              {loadingStatuses ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
-                </div>
-              ) : availableStatuses.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  No invoice statuses found. Configure your Printavo integration and test the connection to load available statuses.
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between mb-4">
-                    <p className="text-sm text-gray-600">
-                      {billingSelectedStatuses.length} of {availableStatuses.length} statuses selected
-                    </p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setBillingSelectedStatuses(availableStatuses)}
-                        className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-                      >
-                        Select All
-                      </button>
-                      <span className="text-gray-400">|</span>
-                      <button
-                        onClick={() => setBillingSelectedStatuses([])}
-                        className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-                      >
-                        Clear All
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4">
-                    {availableStatuses.map(status => (
-                      <label
-                        key={status}
-                        className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors border border-gray-200"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={billingSelectedStatuses.includes(status)}
-                          onChange={() => toggleBillingStatus(status)}
-                          className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                        />
-                        <span className="text-sm text-gray-900 break-words flex-1">{status}</span>
-                      </label>
-                    ))}
-                  </div>
-
-                  <div className="pt-4">
-                    <button
-                      onClick={saveBillingStatusPreferences}
-                      disabled={savingBillingStatuses}
-                      className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                    >
-                      {savingBillingStatuses ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="w-4 h-4" />
-                          Save Preferences
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
 
           {activeTab === 'automated-reports' && (
             <div className="bg-white rounded-lg shadow p-6">
@@ -2536,6 +2439,84 @@ export function AccountSettings() {
                         </div>
                       </div>
                     )}
+                  </>
+                )}
+              </div>
+
+              {/* Billing Status Filters Section */}
+              <div className="mt-8 pt-8 border-t border-gray-200">
+                <div className="mb-6">
+                  <h2 className="text-lg font-semibold text-gray-900 mb-1">Billing & Payments Status Filters</h2>
+                  <p className="text-sm text-gray-600">Select which invoice statuses to display in the Billing & Payments section</p>
+                </div>
+
+                {loadingStatuses ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+                  </div>
+                ) : availableStatuses.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    No invoice statuses found. Configure your Printavo integration and test the connection to load available statuses.
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-sm text-gray-600">
+                        {billingSelectedStatuses.length} of {availableStatuses.length} statuses selected
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setBillingSelectedStatuses(availableStatuses)}
+                          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                        >
+                          Select All
+                        </button>
+                        <span className="text-gray-400">|</span>
+                        <button
+                          onClick={() => setBillingSelectedStatuses([])}
+                          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                        >
+                          Clear All
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4">
+                      {availableStatuses.map(status => (
+                        <label
+                          key={status}
+                          className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors border border-gray-200"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={billingSelectedStatuses.includes(status)}
+                            onChange={() => toggleBillingStatus(status)}
+                            className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-gray-900 break-words flex-1">{status}</span>
+                        </label>
+                      ))}
+                    </div>
+
+                    <div className="pt-4">
+                      <button
+                        onClick={saveBillingStatusPreferences}
+                        disabled={savingBillingStatuses}
+                        className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                      >
+                        {savingBillingStatuses ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4" />
+                            Save Filter Preferences
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </>
                 )}
               </div>
