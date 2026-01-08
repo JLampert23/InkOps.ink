@@ -52,12 +52,87 @@ export interface PaidInvoice {
 }
 
 export const billingService = {
+  async triggerPrintavoSync(): Promise<{ syncId: string; status: string }> {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error('You must be logged in to sync');
+    }
+
+    const response = await fetch(`${supabaseUrl}/functions/v1/printavo-sync`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': supabaseAnonKey,
+      },
+      body: JSON.stringify({ mode: 'quick' }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to trigger Printavo sync');
+    }
+
+    return response.json();
+  },
+
+  async waitForPrintavoSync(syncId: string, maxWaitMs: number = 60000): Promise<boolean> {
+    const startTime = Date.now();
+    const pollInterval = 2000;
+
+    while (Date.now() - startTime < maxWaitMs) {
+      const { data: syncLog } = await supabase
+        .from('printavo_sync_log')
+        .select('status, error_message')
+        .eq('id', syncId)
+        .maybeSingle();
+
+      if (!syncLog) {
+        return false;
+      }
+
+      if (syncLog.status === 'completed') {
+        return true;
+      }
+
+      if (syncLog.status === 'failed') {
+        console.error('Printavo sync failed:', syncLog.error_message);
+        return false;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+    }
+
+    console.warn('Printavo sync timed out');
+    return false;
+  },
+
   async syncBillingQueue(selectedStatuses: string[]): Promise<void> {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         throw new Error('You must be logged in to sync billing queue');
       }
+
+      console.log('Step 1: Triggering Printavo sync to fetch latest data...');
+      try {
+        const syncResult = await this.triggerPrintavoSync();
+        console.log('Printavo sync started:', syncResult);
+
+        if (syncResult.syncId && syncResult.status === 'running') {
+          console.log('Waiting for Printavo sync to complete...');
+          const success = await this.waitForPrintavoSync(syncResult.syncId, 90000);
+          if (success) {
+            console.log('Printavo sync completed successfully');
+          } else {
+            console.warn('Printavo sync did not complete in time, proceeding with cached data');
+          }
+        }
+      } catch (syncError) {
+        console.warn('Printavo sync failed, proceeding with cached data:', syncError);
+      }
+
+      console.log('Step 2: Syncing billing queue from local cache...');
 
       const { data: settings } = await supabase
         .from('company_settings')
@@ -84,12 +159,16 @@ export const billingService = {
         return;
       }
 
+      console.log('Looking for invoices with statuses:', statusesToSync);
+
       const { data: invoices, error } = await supabase
         .from('printavo_invoices')
         .select('*')
         .in('status', statusesToSync);
 
       if (error) throw error;
+
+      console.log(`Found ${invoices?.length || 0} invoices matching billing statuses`);
 
       if (!invoices || invoices.length === 0) {
         console.log('No invoices found matching billing statuses');
@@ -136,6 +215,8 @@ export const billingService = {
             }]);
         }
       }
+
+      console.log('Billing queue sync completed');
     } catch (error) {
       console.error('Error syncing billing queue:', error);
       throw error;

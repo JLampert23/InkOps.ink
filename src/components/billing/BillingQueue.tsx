@@ -22,6 +22,7 @@ export function BillingQueue({ onSendInvoice }: BillingQueueProps) {
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<string>('');
   const [generatingLinks, setGeneratingLinks] = useState(false);
   const [sendingInvoices, setSendingInvoices] = useState(false);
 
@@ -43,14 +44,20 @@ export function BillingQueue({ onSendInvoice }: BillingQueueProps) {
 
   const handleSync = async () => {
     setSyncing(true);
+    setSyncStatus('Fetching latest data from Printavo...');
     try {
+      setSyncStatus('Syncing invoices from Printavo API (this may take up to 90 seconds)...');
       await billingService.syncBillingQueue([]);
+      setSyncStatus('Loading updated queue...');
       await loadQueue();
+      setSyncStatus('');
       alert('Billing queue synced successfully!');
     } catch (error: any) {
+      setSyncStatus('');
       alert(error.message || 'Failed to sync billing queue');
     } finally {
       setSyncing(false);
+      setSyncStatus('');
     }
   };
 
@@ -169,9 +176,19 @@ export function BillingQueue({ onSendInvoice }: BillingQueueProps) {
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-          Sync from Printavo
+          {syncing ? 'Syncing...' : 'Sync from Printavo'}
         </button>
       </div>
+
+      {syncing && syncStatus && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center gap-3">
+          <RefreshCw className="w-5 h-5 text-blue-600 animate-spin flex-shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-blue-900">{syncStatus}</p>
+            <p className="text-xs text-blue-700 mt-1">Please wait while we fetch the latest invoices from Printavo...</p>
+          </div>
+        </div>
+      )}
 
       {selectedItems.size > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
