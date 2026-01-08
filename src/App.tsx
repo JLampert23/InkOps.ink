@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { FileText, Users, RefreshCw, AlertCircle, DollarSign, TrendingUp, Download, Building2, Menu, X, LogOut, Loader2, BarChart3, Settings, CreditCard, Package } from 'lucide-react';
+import { FileText, Users, RefreshCw, AlertCircle, DollarSign, TrendingUp, Download, Building2, Menu, X, LogOut, Loader2, BarChart3, Settings, CreditCard, Package, ChevronDown, ChevronRight } from 'lucide-react';
 import { useSupabaseData } from './hooks/useSupabaseData';
 import { InvoiceExplorer } from './components/InvoiceExplorer';
 import { CustomerProfiles } from './components/CustomerProfiles';
@@ -25,6 +25,7 @@ interface CompanySettings {
 function AppContent() {
   const [activeTab, setActiveTab] = useState<Tab>('ar');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [printavoDashboardExpanded, setPrintavoDashboardExpanded] = useState(true);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const { invoices, payments, lineItems, loading, error, syncing, lastSyncTime, triggerSync } = useSupabaseData();
   const { signOut, user } = useAuth();
@@ -177,127 +178,146 @@ function AppContent() {
         </div>
 
         {/* Navigation */}
-        <nav className="p-4 space-y-4 overflow-y-auto pb-32" style={{ height: 'calc(100vh - 220px)' }}>
-          {/* Printavo Section */}
-          <div>
-            {sidebarOpen && (
-              <div className="px-2 mb-2">
-                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Printavo Data</h3>
-              </div>
-            )}
-            <div className="space-y-1">
-              {printavoNavItems.map(item => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setActiveTab(item.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
-                      isActive
-                        ? 'bg-blue-50 text-blue-700 shadow-sm'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                    }`}
-                    title={!sidebarOpen ? item.name : ''}
-                  >
-                    <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
-                    {sidebarOpen && (
-                      <div className="flex-1 text-left">
-                        <div className={`font-medium text-sm ${isActive ? 'text-blue-700' : ''}`}>
-                          {item.name}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-0.5">
-                          {item.description}
-                        </div>
+        <nav className="p-4 space-y-2 overflow-y-auto pb-32" style={{ height: 'calc(100vh - 220px)' }}>
+          {/* 1. PRODUCTION DASHBOARD - Top-level link */}
+          <div className="space-y-1">
+            {productionNavItems.map(item => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
+                    isActive
+                      ? 'bg-orange-50 text-orange-700 shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
+                  title={!sidebarOpen ? 'PRODUCTION DASHBOARD' : ''}
+                  aria-label="Production Dashboard"
+                >
+                  <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-orange-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                  {sidebarOpen && (
+                    <div className="flex-1 text-left">
+                      <div className={`font-bold text-sm uppercase tracking-wide ${isActive ? 'text-orange-700' : 'text-gray-900'}`}>
+                        Production Dashboard
                       </div>
-                    )}
-                    {isActive && <div className="w-1 h-8 bg-blue-600 rounded-full absolute right-0" />}
-                  </button>
-                );
-              })}
-            </div>
+                    </div>
+                  )}
+                  {isActive && <div className="w-1 h-8 bg-orange-600 rounded-full absolute right-0" />}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Square Section */}
+          {/* Separator */}
+          <div className="border-t border-gray-200 my-3" />
+
+          {/* 2. PRINTAVO DASHBOARD - Collapsible section */}
           <div>
-            {sidebarOpen && (
-              <div className="px-2 mb-2 pt-4 border-t border-gray-200">
-                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Square Data</h3>
+            {/* Printavo Dashboard Header - Collapsible trigger */}
+            <button
+              onClick={() => setPrintavoDashboardExpanded(!printavoDashboardExpanded)}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group text-gray-900 hover:bg-gray-50"
+              title={!sidebarOpen ? 'PRINTAVO DASHBOARD' : ''}
+              aria-label="Printavo Dashboard"
+              aria-expanded={printavoDashboardExpanded}
+              aria-controls="printavo-submenu"
+            >
+              <TrendingUp className="w-5 h-5 flex-shrink-0 text-gray-600 group-hover:text-gray-900" />
+              {sidebarOpen && (
+                <>
+                  <div className="flex-1 text-left">
+                    <div className="font-bold text-sm uppercase tracking-wide text-gray-900">
+                      Printavo Dashboard
+                    </div>
+                  </div>
+                  {printavoDashboardExpanded ? (
+                    <ChevronDown className="w-4 h-4 text-gray-500" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4 text-gray-500" />
+                  )}
+                </>
+              )}
+              {!sidebarOpen && (
+                printavoDashboardExpanded ? (
+                  <ChevronDown className="w-4 h-4 text-gray-500 absolute right-2" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 text-gray-500 absolute right-2" />
+                )
+              )}
+            </button>
+
+            {/* Printavo Dashboard Sub-items - Collapsible content */}
+            {printavoDashboardExpanded && (
+              <div
+                id="printavo-submenu"
+                className="mt-1 space-y-1 ml-2"
+                role="group"
+                aria-label="Printavo Dashboard submenu"
+              >
+                {printavoNavItems.map(item => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => setActiveTab(item.id)}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 group ${
+                        isActive
+                          ? 'bg-green-50 text-green-700 shadow-sm'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      }`}
+                      title={!sidebarOpen ? item.name : ''}
+                    >
+                      <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                      {sidebarOpen && (
+                        <div className="flex-1 text-left">
+                          <div className={`font-medium text-sm ${isActive ? 'text-green-700' : ''}`}>
+                            {item.name}
+                          </div>
+                        </div>
+                      )}
+                      {isActive && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
+                    </button>
+                  );
+                })}
               </div>
             )}
-            {!sidebarOpen && <div className="border-t border-gray-200 my-2" />}
-            <div className="space-y-1">
-              {squareNavItems.map(item => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setActiveTab(item.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
-                      isActive
-                        ? 'bg-green-50 text-green-700 shadow-sm'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                    }`}
-                    title={!sidebarOpen ? item.name : ''}
-                  >
-                    <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
-                    {sidebarOpen && (
-                      <div className="flex-1 text-left">
-                        <div className={`font-medium text-sm ${isActive ? 'text-green-700' : ''}`}>
-                          {item.name}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-0.5">
-                          {item.description}
-                        </div>
-                      </div>
-                    )}
-                    {isActive && <div className="w-1 h-8 bg-green-600 rounded-full absolute right-0" />}
-                  </button>
-                );
-              })}
-            </div>
           </div>
 
-          {/* Production Management Section */}
-          <div>
-            {sidebarOpen && (
-              <div className="px-2 mb-2 pt-4 border-t border-gray-200">
-                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Production</h3>
-              </div>
-            )}
-            {!sidebarOpen && <div className="border-t border-gray-200 my-2" />}
-            <div className="space-y-1">
-              {productionNavItems.map(item => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => setActiveTab(item.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
-                      isActive
-                        ? 'bg-orange-50 text-orange-700 shadow-sm'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                    }`}
-                    title={!sidebarOpen ? item.name : ''}
-                  >
-                    <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-orange-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
-                    {sidebarOpen && (
-                      <div className="flex-1 text-left">
-                        <div className={`font-medium text-sm ${isActive ? 'text-orange-700' : ''}`}>
-                          {item.name}
-                        </div>
-                        <div className="text-xs text-gray-500 mt-0.5">
-                          {item.description}
-                        </div>
+          {/* Separator */}
+          <div className="border-t border-gray-200 my-3" />
+
+          {/* 3. SQUARE DASHBOARD - Top-level link */}
+          <div className="space-y-1">
+            {squareNavItems.map(item => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
+                    isActive
+                      ? 'bg-green-50 text-green-700 shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
+                  title={!sidebarOpen ? 'SQUARE DASHBOARD' : ''}
+                  aria-label="Square Dashboard"
+                >
+                  <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                  {sidebarOpen && (
+                    <div className="flex-1 text-left">
+                      <div className={`font-bold text-sm uppercase tracking-wide ${isActive ? 'text-green-700' : 'text-gray-900'}`}>
+                        Square Dashboard
                       </div>
-                    )}
-                    {isActive && <div className="w-1 h-8 bg-orange-600 rounded-full absolute right-0" />}
-                  </button>
-                );
-              })}
-            </div>
+                    </div>
+                  )}
+                  {isActive && <div className="w-1 h-8 bg-green-600 rounded-full absolute right-0" />}
+                </button>
+              );
+            })}
           </div>
         </nav>
 
