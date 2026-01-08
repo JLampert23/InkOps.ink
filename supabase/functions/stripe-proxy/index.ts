@@ -263,28 +263,28 @@ Deno.serve(async (req: Request) => {
       
       case 'createRefund': {
         const { paymentId, amount, reason } = data;
-
+        
         const refundBody: any = {
           payment_intent: paymentId,
         };
-
+        
         if (amount) refundBody.amount = amount;
         if (reason) refundBody.reason = reason;
-
+        
         const refundResponse = await callStripeAPI(
           '/refunds',
           'POST',
           config.secretKey,
           refundBody
         );
-
+        
         if (!refundResponse.ok) {
           const error = await refundResponse.json();
           throw new Error(error.error?.message || 'Failed to create refund');
         }
-
+        
         const refund = await refundResponse.json();
-
+        
         return new Response(
           JSON.stringify(refund),
           {
@@ -293,172 +293,7 @@ Deno.serve(async (req: Request) => {
           }
         );
       }
-
-      case 'createInvoiceWithMinimumDue': {
-        const { totalAmount, minimumDue, currency, customerEmail, customerName, description, metadata } = data;
-
-        let customerId = null;
-
-        if (customerEmail) {
-          const customerSearchResponse = await callStripeAPI(
-            `/customers/search?query=email:'${customerEmail}'`,
-            'GET',
-            config.secretKey
-          );
-
-          if (customerSearchResponse.ok) {
-            const customerSearch = await customerSearchResponse.json();
-            if (customerSearch.data && customerSearch.data.length > 0) {
-              customerId = customerSearch.data[0].id;
-            }
-          }
-
-          if (!customerId) {
-            const customerBody: any = {
-              email: customerEmail,
-            };
-            if (customerName) customerBody.name = customerName;
-
-            const customerResponse = await callStripeAPI(
-              '/customers',
-              'POST',
-              config.secretKey,
-              customerBody
-            );
-
-            if (!customerResponse.ok) {
-              const error = await customerResponse.json();
-              throw new Error(error.error?.message || 'Failed to create customer');
-            }
-
-            const customer = await customerResponse.json();
-            customerId = customer.id;
-          }
-        }
-
-        const invoiceBody: any = {
-          auto_advance: false,
-          collection_method: 'send_invoice',
-          days_until_due: 30,
-        };
-
-        if (customerId) {
-          invoiceBody.customer = customerId;
-        }
-
-        if (metadata) {
-          Object.keys(metadata).forEach(key => {
-            invoiceBody[`metadata[${key}]`] = metadata[key];
-          });
-        }
-
-        const invoiceResponse = await callStripeAPI(
-          '/invoices',
-          'POST',
-          config.secretKey,
-          invoiceBody
-        );
-
-        if (!invoiceResponse.ok) {
-          const error = await invoiceResponse.json();
-          throw new Error(error.error?.message || 'Failed to create invoice');
-        }
-
-        const invoice = await invoiceResponse.json();
-
-        const invoiceItemBody: any = {
-          customer: customerId,
-          invoice: invoice.id,
-          amount: totalAmount,
-          currency: currency || 'usd',
-          description: description || 'Invoice Payment',
-        };
-
-        const itemResponse = await callStripeAPI(
-          '/invoiceitems',
-          'POST',
-          config.secretKey,
-          invoiceItemBody
-        );
-
-        if (!itemResponse.ok) {
-          const error = await itemResponse.json();
-          throw new Error(error.error?.message || 'Failed to add item to invoice');
-        }
-
-        const finalizeBody: any = {
-          auto_advance: true,
-        };
-
-        if (minimumDue && minimumDue > 0) {
-          finalizeBody.minimum_amount_due = minimumDue;
-        }
-
-        const finalizeResponse = await callStripeAPI(
-          `/invoices/${invoice.id}/finalize`,
-          'POST',
-          config.secretKey,
-          finalizeBody
-        );
-
-        if (!finalizeResponse.ok) {
-          const error = await finalizeResponse.json();
-          throw new Error(error.error?.message || 'Failed to finalize invoice');
-        }
-
-        const finalInvoice = await finalizeResponse.json();
-
-        return new Response(
-          JSON.stringify({
-            invoiceId: finalInvoice.id,
-            customerId: customerId,
-            hostedInvoiceUrl: finalInvoice.hosted_invoice_url,
-            invoicePdfUrl: finalInvoice.invoice_pdf,
-            status: finalInvoice.status,
-            amountDue: finalInvoice.amount_due,
-            amountPaid: finalInvoice.amount_paid,
-            minimumDue: finalInvoice.minimum_amount_due || minimumDue,
-          }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
-        );
-      }
-
-      case 'getInvoice': {
-        const { invoiceId } = data;
-
-        const invoiceResponse = await callStripeAPI(
-          `/invoices/${invoiceId}`,
-          'GET',
-          config.secretKey
-        );
-
-        if (!invoiceResponse.ok) {
-          const error = await invoiceResponse.json();
-          throw new Error(error.error?.message || 'Failed to fetch invoice');
-        }
-
-        const invoice = await invoiceResponse.json();
-
-        return new Response(
-          JSON.stringify({
-            invoiceId: invoice.id,
-            status: invoice.status,
-            amountDue: invoice.amount_due,
-            amountPaid: invoice.amount_paid,
-            amountRemaining: invoice.amount_remaining,
-            hostedInvoiceUrl: invoice.hosted_invoice_url,
-            invoicePdfUrl: invoice.invoice_pdf,
-          }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
-        );
-      }
-
+      
       default:
         return new Response(
           JSON.stringify({ error: 'Unknown action' }),
