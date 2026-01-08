@@ -61,19 +61,26 @@ export const billingService = {
 
       const { data: settings } = await supabase
         .from('company_settings')
-        .select('id, billing_selected_invoice_statuses')
+        .select('id')
         .maybeSingle();
 
       if (!settings) {
         throw new Error('Company settings not found');
       }
 
-      const statusesToSync = selectedStatuses.length > 0
-        ? selectedStatuses
-        : settings.billing_selected_invoice_statuses || [];
+      let statusesToSync = selectedStatuses;
 
       if (statusesToSync.length === 0) {
-        console.log('No statuses selected for billing queue');
+        const { data: billingStatuses } = await supabase
+          .from('printavo_statuses')
+          .select('name')
+          .eq('is_billing_eligible', true);
+
+        statusesToSync = (billingStatuses || []).map(s => s.name);
+      }
+
+      if (statusesToSync.length === 0) {
+        console.log('No statuses selected for billing queue. Please enable billing statuses in Settings.');
         return;
       }
 

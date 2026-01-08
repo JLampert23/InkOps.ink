@@ -9,6 +9,14 @@ const corsHeaders = {
 
 const PRINTAVO_API_URL = "https://www.printavo.com/api/v2";
 
+interface PrintavoStatus {
+  id: string;
+  name: string;
+  color: string | null;
+  position: number;
+  type: string | null;
+}
+
 async function decryptToken(encryptedToken: string, supabaseUrl: string, serviceRoleKey: string): Promise<string> {
   const response = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
     method: 'POST',
@@ -31,73 +39,75 @@ async function decryptToken(encryptedToken: string, supabaseUrl: string, service
   return data.result;
 }
 
-async function fetchInvoiceStatuses(email: string, token: string): Promise<string[]> {
-  const allStatuses = new Set<string>();
-  let hasNextPage = true;
-  let cursor = null;
-
-  while (hasNextPage) {
-    const query = `
-      query GetInvoiceStatuses($after: String) {
-        invoices(after: $after, first: 100) {
-          edges {
-            node {
-              status {
-                name
-              }
-            }
-          }
-          pageInfo {
-            hasNextPage
-            endCursor
-          }
+async function fetchAllStatuses(email: string, token: string): Promise<PrintavoStatus[]> {
+  const query = `
+    query GetAllStatuses {
+      statuses {
+        nodes {
+          id
+          name
+          color
+          position
+          type
         }
       }
-    `;
-
-    const response = await fetch(PRINTAVO_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        email,
-        token,
-      },
-      body: JSON.stringify({
-        query,
-        variables: {
-          after: cursor,
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`API request failed with status ${response.status}: ${JSON.stringify(errorData)}`);
     }
+  `;
 
-    const data = await response.json();
+  const response = await fetch(PRINTAVO_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      email,
+      token,
+    },
+    body: JSON.stringify({ query }),
+  });
 
-    if (data.errors && data.errors.length > 0) {
-      throw new Error(`GraphQL errors: ${JSON.stringify(data.errors)}`);
-    }
-
-    const invoices = data.data?.invoices?.edges || [];
-    invoices.forEach((edge: any) => {
-      const statusName = edge.node?.status?.name;
-      if (statusName) {
-        allStatuses.add(statusName);
-      }
-    });
-
-    hasNextPage = data.data?.invoices?.pageInfo?.hasNextPage || false;
-    cursor = data.data?.invoices?.pageInfo?.endCursor || null;
-
-    if (!hasNextPage || allStatuses.size > 50) {
-      break;
-    }
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Printavo API request failed: ${response.status} - ${errorText}`);
   }
 
-  return Array.from(allStatuses).sort();
+  const data = await response.json();
+
+  if (data.errors && data.errors.length > 0) {
+    throw new Error(`GraphQL errors: ${JSON.stringify(data.errors)}`);
+  }
+
+  return data.data?.statuses?.nodes || [];
+}
+
+async function syncStatusesToDatabase(
+  supabase: any,
+  statuses: PrintavoStatus[]
+): Promise<void> {
+  const { data: existingStatuses } = await supabase
+    .from('printavo_statuses')
+    .select('id, is_billing_eligible');
+
+  const existingMap = new Map(
+    (existingStatuses || []).map((s: any) => [s.id, s.is_billing_eligible])
+  );
+
+  for (const status of statuses) {
+    const existingBillingEligible = existingMap.get(status.id);
+    
+    await supabase
+      .from('printavo_statuses')
+      .upsert({
+        id: status.id,
+        name: status.name,
+        color: status.color,
+        position: status.position,
+        type: status.type,
+        is_billing_eligible: existingBillingEligible ?? false,
+        synced_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'id',
+      });
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -119,7 +129,21 @@ Deno.serve(async (req: Request) => {
       .select('printavo_username, printavo_api_token_encrypted')
       .maybeSingle();
 
-    if (settingsError || !settings || !settings.printavo_username || !settings.printavo_api_token_encrypted) {
+    if (settingsError) {
+      console.error('Settings error:', settingsError);
+      return new Response(
+        JSON.stringify({
+          error: "Failed to fetch company settings",
+          details: settingsError.message,
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    if (!settings || !settings.printavo_username || !settings.printavo_api_token_encrypted) {
       return new Response(
         JSON.stringify({
           error: "Printavo credentials not configured",
@@ -127,10 +151,7 @@ Deno.serve(async (req: Request) => {
         }),
         {
           status: 400,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
     }
@@ -142,19 +163,22 @@ Deno.serve(async (req: Request) => {
       supabaseServiceRoleKey
     );
 
-    const statuses = await fetchInvoiceStatuses(printavoEmail, printavoToken);
+    const statuses = await fetchAllStatuses(printavoEmail, printavoToken);
+
+    await syncStatusesToDatabase(supabase, statuses);
+
+    const statusNames = statuses.map(s => s.name).sort();
 
     return new Response(
       JSON.stringify({
         success: true,
-        statuses,
+        statuses: statusNames,
+        fullStatuses: statuses,
+        count: statuses.length,
       }),
       {
         status: 200,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
   } catch (error) {
@@ -162,13 +186,11 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         error: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
       }),
       {
         status: 500,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
   }

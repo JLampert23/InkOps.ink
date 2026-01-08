@@ -32,6 +32,15 @@ interface UserProfile {
   created_at: string;
 }
 
+interface PrintavoStatus {
+  id: string;
+  name: string;
+  color: string | null;
+  position: number;
+  type: string | null;
+  is_billing_eligible: boolean;
+}
+
 type SettingsTab =
   | 'company-info'
   | 'printavo-integration' | 'square-integration' | 'resend-integration' | 'stripe-payments'
@@ -105,10 +114,13 @@ export function AccountSettings() {
   const [billingSelectedStatuses, setBillingSelectedStatuses] = useState<string[]>([]);
   const [savingBillingStatuses, setSavingBillingStatuses] = useState(false);
 
+  const [fullStatuses, setFullStatuses] = useState<PrintavoStatus[]>([]);
+
   useEffect(() => {
     loadSettings();
     loadUsers();
     loadAvailableStatuses();
+    loadStatusesFromDatabase();
   }, []);
 
   const loadSettings = async () => {
@@ -239,6 +251,65 @@ export function AccountSettings() {
       return [];
     } finally {
       setLoadingStatuses(false);
+    }
+  };
+
+  const loadStatusesFromDatabase = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('printavo_statuses')
+        .select('*')
+        .order('position', { ascending: true });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        setFullStatuses(data);
+        const billingEligible = data
+          .filter(s => s.is_billing_eligible)
+          .map(s => s.name);
+        setBillingSelectedStatuses(billingEligible);
+        const allNames = data.map(s => s.name);
+        if (availableStatuses.length === 0) {
+          setAvailableStatuses(allNames);
+        }
+      }
+    } catch (err) {
+      console.error('Error loading statuses from database:', err);
+    }
+  };
+
+  const toggleBillingEligibility = async (statusId: string, currentValue: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('printavo_statuses')
+        .update({
+          is_billing_eligible: !currentValue,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', statusId);
+
+      if (error) throw error;
+
+      setFullStatuses(prev =>
+        prev.map(s =>
+          s.id === statusId
+            ? { ...s, is_billing_eligible: !currentValue }
+            : s
+        )
+      );
+
+      const statusName = fullStatuses.find(s => s.id === statusId)?.name;
+      if (statusName) {
+        if (!currentValue) {
+          setBillingSelectedStatuses(prev => [...prev, statusName]);
+        } else {
+          setBillingSelectedStatuses(prev => prev.filter(n => n !== statusName));
+        }
+      }
+    } catch (err) {
+      console.error('Error toggling billing eligibility:', err);
+      alert('Failed to update status. Please try again.');
     }
   };
 
@@ -1120,36 +1191,9 @@ export function AccountSettings() {
   const syncStatuses = async () => {
     try {
       setSyncingStatuses(true);
-      const statuses = await loadAvailableStatuses();
-
-      // Save the synced statuses to the database
-      const settingsData = {
-        available_invoice_statuses: statuses,
-      };
-
-      if (companySettings?.id) {
-        const { error } = await supabase
-          .from('company_settings')
-          .update(settingsData)
-          .eq('id', companySettings.id);
-
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from('company_settings')
-          .insert([{
-            company_name: companyName || '',
-            ...settingsData
-          }])
-          .select()
-          .single();
-
-        if (error) throw error;
-        setCompanySettings(data);
-      }
-
-      setAvailableStatuses(statuses);
-      alert(`Successfully synced ${statuses.length} statuses from Printavo!`);
+      await loadAvailableStatuses();
+      await loadStatusesFromDatabase();
+      alert(`Successfully synced statuses from Printavo!`);
     } catch (err) {
       console.error('Error syncing statuses:', err);
       alert('Failed to sync statuses. Please try again.');
@@ -2330,7 +2374,7 @@ export function AccountSettings() {
               <div className="flex items-start justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900 mb-1">Billing & Payments Status Filters</h2>
-                  <p className="text-sm text-gray-600">Select statuses to display in Billing & Payments section</p>
+                  <p className="text-sm text-gray-600">Select which statuses should appear in Billing Queue. Changes save automatically.</p>
                 </div>
                 <button
                   onClick={syncStatuses}
@@ -2345,7 +2389,7 @@ export function AccountSettings() {
                   ) : (
                     <>
                       <RefreshCw className="w-4 h-4" />
-                      Sync Statuses
+                      Sync from Printavo
                     </>
                   )}
                 </button>
@@ -2355,73 +2399,104 @@ export function AccountSettings() {
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
                 </div>
-              ) : availableStatuses.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  No invoice statuses found. Configure your Printavo integration and test the connection to load available statuses.
+              ) : fullStatuses.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 mb-4">No statuses found. Click "Sync from Printavo" to fetch all available statuses.</p>
                 </div>
               ) : (
                 <>
                   <div className="flex items-center justify-between mb-4">
                     <p className="text-sm text-gray-600">
-                      {billingSelectedStatuses.length} of {availableStatuses.length} statuses selected
+                      {fullStatuses.filter(s => s.is_billing_eligible).length} of {fullStatuses.length} statuses enabled for billing
                     </p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setBillingSelectedStatuses(availableStatuses)}
-                        className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-                      >
-                        Select All
-                      </button>
-                      <span className="text-gray-400">|</span>
-                      <button
-                        onClick={() => setBillingSelectedStatuses([])}
-                        className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-                      >
-                        Clear All
-                      </button>
+                  </div>
+
+                  {['Invoice', 'Quote'].map(statusType => {
+                    const typeStatuses = fullStatuses.filter(s => s.type === statusType);
+                    if (typeStatuses.length === 0) return null;
+                    return (
+                      <div key={statusType} className="mb-6">
+                        <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                          <Layers className="w-4 h-4" />
+                          {statusType} Statuses ({typeStatuses.length})
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {typeStatuses.map(status => (
+                            <button
+                              key={status.id}
+                              onClick={() => toggleBillingEligibility(status.id, status.is_billing_eligible)}
+                              className={`flex items-center gap-3 p-3 rounded-lg transition-all border ${
+                                status.is_billing_eligible
+                                  ? 'bg-blue-50 border-blue-300 hover:bg-blue-100'
+                                  : 'bg-white border-gray-200 hover:bg-gray-50'
+                              }`}
+                            >
+                              <div
+                                className="w-4 h-4 rounded-full flex-shrink-0 border border-gray-300"
+                                style={{ backgroundColor: status.color || '#9ca3af' }}
+                              />
+                              <span className={`text-sm flex-1 text-left ${status.is_billing_eligible ? 'text-blue-900 font-medium' : 'text-gray-700'}`}>
+                                {status.name}
+                              </span>
+                              <div className={`w-5 h-5 rounded flex items-center justify-center ${
+                                status.is_billing_eligible ? 'bg-blue-600' : 'bg-gray-200'
+                              }`}>
+                                {status.is_billing_eligible && (
+                                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {fullStatuses.filter(s => !s.type || (s.type !== 'Invoice' && s.type !== 'Quote')).length > 0 && (
+                    <div className="mb-6">
+                      <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                        <Layers className="w-4 h-4" />
+                        Other Statuses
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {fullStatuses.filter(s => !s.type || (s.type !== 'Invoice' && s.type !== 'Quote')).map(status => (
+                          <button
+                            key={status.id}
+                            onClick={() => toggleBillingEligibility(status.id, status.is_billing_eligible)}
+                            className={`flex items-center gap-3 p-3 rounded-lg transition-all border ${
+                              status.is_billing_eligible
+                                ? 'bg-blue-50 border-blue-300 hover:bg-blue-100'
+                                : 'bg-white border-gray-200 hover:bg-gray-50'
+                            }`}
+                          >
+                            <div
+                              className="w-4 h-4 rounded-full flex-shrink-0 border border-gray-300"
+                              style={{ backgroundColor: status.color || '#9ca3af' }}
+                            />
+                            <span className={`text-sm flex-1 text-left ${status.is_billing_eligible ? 'text-blue-900 font-medium' : 'text-gray-700'}`}>
+                              {status.name}
+                            </span>
+                            <div className={`w-5 h-5 rounded flex items-center justify-center ${
+                              status.is_billing_eligible ? 'bg-blue-600' : 'bg-gray-200'
+                            }`}>
+                              {status.is_billing_eligible && (
+                                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4">
-                    {availableStatuses.map(status => (
-                      <label
-                        key={status}
-                        className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors border border-gray-200"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={billingSelectedStatuses.includes(status)}
-                          onChange={() => toggleBillingStatus(status)}
-                          className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                        />
-                        <span className="text-sm text-gray-900 break-words flex-1">{status}</span>
-                      </label>
-                    ))}
-                  </div>
-
-                  <div className="pt-4">
-                    <button
-                      onClick={saveBillingStatusPreferences}
-                      disabled={savingBillingStatuses}
-                      className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                    >
-                      {savingBillingStatuses ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="w-4 h-4" />
-                          Save Preferences
-                        </>
-                      )}
-                    </button>
-                  </div>
+                  )}
                 </>
               )}
             </div>
           )}
+
 
           {activeTab === 'automated-reports' && (
             <div className="bg-white rounded-lg shadow p-6">
