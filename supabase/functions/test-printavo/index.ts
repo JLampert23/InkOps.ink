@@ -147,6 +147,46 @@ Deno.serve(async (req: Request) => {
                 createdAt
                 updatedAt
               }
+              lineItemGroups {
+                edges {
+                  node {
+                    id
+                    lineItems {
+                      edges {
+                        node {
+                          id
+                          description
+                          items
+                          price
+                          style {
+                            name
+                            number
+                          }
+                          color {
+                            name
+                          }
+                          sizeQuantities
+                          product {
+                            styleName
+                            styleNumber
+                            colorName
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              fees {
+                edges {
+                  node {
+                    id
+                    description
+                    amount
+                    taxable
+                  }
+                }
+              }
             }
           }
         }
@@ -173,6 +213,7 @@ Deno.serve(async (req: Request) => {
           success: false,
           error: "Printavo API authentication failed",
           printavoError: result.errors?.[0]?.message || "Unknown error",
+          fullErrors: result.errors,
           diagnostics,
         }),
         {
@@ -188,8 +229,9 @@ Deno.serve(async (req: Request) => {
         message: "Printavo credentials are valid!",
         invoiceCount: result.data?.invoices?.edges?.length || 0,
         sampleInvoice: result.data?.invoices?.edges?.[0]?.node || null,
+        fullResponse: result,
         diagnostics,
-      }),
+      }, null, 2),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
