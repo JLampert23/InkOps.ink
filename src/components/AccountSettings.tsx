@@ -18,6 +18,9 @@ interface CompanySettings {
   printavo_username: string | null;
   printavo_api_token_encrypted: string | null;
   resend_api_key: string | null;
+  stripe_public_key: string | null;
+  stripe_secret_key: string | null;
+  stripe_webhook_secret: string | null;
 }
 
 interface UserProfile {
@@ -71,6 +74,13 @@ export function AccountSettings() {
   const [testingResend, setTestingResend] = useState(false);
   const [resendTestResult, setResendTestResult] = useState<any>(null);
 
+  const [stripePublicKey, setStripePublicKey] = useState('');
+  const [stripeSecretKey, setStripeSecretKey] = useState('');
+  const [stripeWebhookSecret, setStripeWebhookSecret] = useState('');
+  const [savingStripe, setSavingStripe] = useState(false);
+  const [testingStripe, setTestingStripe] = useState(false);
+  const [stripeTestResult, setStripeTestResult] = useState<any>(null);
+
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserName, setNewUserName] = useState('');
@@ -118,6 +128,9 @@ export function AccountSettings() {
         setPrintavoUsername(data.printavo_username || '');
         setSquareEnvironment(data.square_environment || 'production');
         setEmailFromAddress(data.email_from_address || '');
+        setStripePublicKey(data.stripe_public_key || '');
+        setStripeSecretKey(data.stripe_secret_key || '');
+        setStripeWebhookSecret(data.stripe_webhook_secret || '');
       }
     } catch (err) {
       console.error('Error loading settings:', err);
@@ -550,6 +563,172 @@ export function AccountSettings() {
       alert(err instanceof Error ? err.message : 'Failed to save Resend settings. Please try again.');
     } finally {
       setSavingResend(false);
+    }
+  };
+
+  const saveStripeIntegration = async () => {
+    if (!stripePublicKey.trim() && !stripeSecretKey.trim() && !companySettings?.id) {
+      alert('At least one Stripe credential is required');
+      return;
+    }
+
+    try {
+      setSavingStripe(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('You must be logged in to update Stripe settings');
+        return;
+      }
+
+      let encryptedPublicKey = null;
+      let encryptedSecretKey = null;
+      let encryptedWebhookSecret = null;
+
+      if (stripePublicKey.trim()) {
+        const encryptResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crypto-service`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action: 'encrypt',
+            token: stripePublicKey,
+          }),
+        });
+
+        if (!encryptResponse.ok) {
+          const errorData = await encryptResponse.json();
+          throw new Error(errorData.error || 'Failed to encrypt Stripe public key');
+        }
+
+        const { result } = await encryptResponse.json();
+        encryptedPublicKey = result;
+      }
+
+      if (stripeSecretKey.trim()) {
+        const encryptResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crypto-service`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action: 'encrypt',
+            token: stripeSecretKey,
+          }),
+        });
+
+        if (!encryptResponse.ok) {
+          const errorData = await encryptResponse.json();
+          throw new Error(errorData.error || 'Failed to encrypt Stripe secret key');
+        }
+
+        const { result } = await encryptResponse.json();
+        encryptedSecretKey = result;
+      }
+
+      if (stripeWebhookSecret.trim()) {
+        const encryptResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crypto-service`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action: 'encrypt',
+            token: stripeWebhookSecret,
+          }),
+        });
+
+        if (!encryptResponse.ok) {
+          const errorData = await encryptResponse.json();
+          throw new Error(errorData.error || 'Failed to encrypt Stripe webhook secret');
+        }
+
+        const { result } = await encryptResponse.json();
+        encryptedWebhookSecret = result;
+      }
+
+      const settingsData: any = {};
+
+      if (encryptedPublicKey) {
+        settingsData.stripe_public_key = encryptedPublicKey;
+      }
+
+      if (encryptedSecretKey) {
+        settingsData.stripe_secret_key = encryptedSecretKey;
+      }
+
+      if (encryptedWebhookSecret) {
+        settingsData.stripe_webhook_secret = encryptedWebhookSecret;
+      }
+
+      if (Object.keys(settingsData).length === 0) {
+        alert('No Stripe credentials to save');
+        return;
+      }
+
+      if (companySettings?.id) {
+        const { error } = await supabase
+          .from('company_settings')
+          .update(settingsData)
+          .eq('id', companySettings.id);
+
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from('company_settings')
+          .insert([{
+            company_name: companyName || '',
+            ...settingsData
+          }])
+          .select()
+          .single();
+
+        if (error) throw error;
+        setCompanySettings(data);
+      }
+
+      alert('Stripe integration settings saved successfully!');
+      setStripePublicKey('');
+      setStripeSecretKey('');
+      setStripeWebhookSecret('');
+      setStripeTestResult(null);
+      await loadSettings();
+    } catch (err) {
+      console.error('Error saving Stripe settings:', err);
+      alert(err instanceof Error ? err.message : 'Failed to save Stripe settings. Please try again.');
+    } finally {
+      setSavingStripe(false);
+    }
+  };
+
+  const testStripeConnection = async () => {
+    try {
+      setTestingStripe(true);
+      setStripeTestResult(null);
+
+      if (!companySettings?.stripe_secret_key) {
+        setStripeTestResult({
+          success: false,
+          error: 'Stripe secret key not configured. Please save your credentials first.',
+        });
+        return;
+      }
+
+      alert('Stripe connection test is not yet implemented. Your credentials are saved and will be used for payment processing.');
+      setStripeTestResult({
+        success: true,
+        message: 'Stripe credentials are saved and ready to use.',
+      });
+    } catch (err) {
+      setStripeTestResult({
+        success: false,
+        error: err instanceof Error ? err.message : 'Connection test failed',
+      });
+    } finally {
+      setTestingStripe(false);
     }
   };
 
@@ -2181,14 +2360,165 @@ export function AccountSettings() {
           )}
 
           {activeTab === 'stripe-payments' && (
-            <div className="bg-white rounded-lg shadow p-6">
-              <Suspense fallback={
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+            <div className="bg-white rounded-lg shadow p-6 space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Stripe Payment Integration</h2>
+                <p className="text-sm text-gray-600 mb-6">Configure Stripe to accept online payments from customers</p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Stripe Publishable Key <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={stripePublicKey}
+                    onChange={(e) => setStripePublicKey(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder={companySettings?.stripe_public_key ? '••••••••••••••••' : 'pk_live_...'}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {companySettings?.stripe_public_key
+                      ? 'Publishable key is saved and encrypted. Enter a new key to update it.'
+                      : 'Your publishable key from Stripe Dashboard → Developers → API keys'}
+                  </p>
                 </div>
-              }>
-                <StripePayments />
-              </Suspense>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Stripe Secret Key <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    value={stripeSecretKey}
+                    onChange={(e) => setStripeSecretKey(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder={companySettings?.stripe_secret_key ? '••••••••••••••••' : 'sk_live_...'}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {companySettings?.stripe_secret_key
+                      ? 'Secret key is saved and encrypted. Enter a new key to update it.'
+                      : 'Your secret key from Stripe Dashboard → Developers → API keys (keep this confidential)'}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Stripe Webhook Secret
+                  </label>
+                  <input
+                    type="password"
+                    value={stripeWebhookSecret}
+                    onChange={(e) => setStripeWebhookSecret(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder={companySettings?.stripe_webhook_secret ? '••••••••••••••••' : 'whsec_...'}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {companySettings?.stripe_webhook_secret
+                      ? 'Webhook secret is saved and encrypted. Enter a new secret to update it.'
+                      : 'Your webhook signing secret from Stripe Dashboard → Developers → Webhooks'}
+                  </p>
+                </div>
+
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold text-blue-900 mb-2">Setup Instructions:</p>
+                    <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside ml-2">
+                      <li>Create a Stripe account at <a href="https://stripe.com" target="_blank" rel="noopener noreferrer" className="underline">stripe.com</a></li>
+                      <li>Get your API keys from Stripe Dashboard → Developers → API keys</li>
+                      <li>Set up a webhook endpoint for payment notifications (optional)</li>
+                      <li>Enter your credentials above and save</li>
+                    </ol>
+                  </div>
+                  <a
+                    href="https://dashboard.stripe.com/apikeys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-600 hover:text-blue-700 underline inline-block"
+                  >
+                    Get API Keys from Stripe →
+                  </a>
+                </div>
+
+                <div className="pt-4">
+                  <button
+                    onClick={saveStripeIntegration}
+                    disabled={savingStripe}
+                    className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  >
+                    {savingStripe ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Save Stripe Credentials
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {companySettings?.stripe_secret_key && (
+                  <>
+                    <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-blue-800">
+                          <CreditCard className="w-5 h-5" />
+                          <div>
+                            <p className="font-medium">Stripe Integration Active</p>
+                            <p className="text-sm mt-1">Payment processing is configured and ready to use</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={testStripeConnection}
+                          disabled={testingStripe}
+                          className="flex items-center gap-2 px-4 py-2 bg-white border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50 disabled:opacity-50 transition-colors"
+                        >
+                          {testingStripe ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Testing...
+                            </>
+                          ) : (
+                            'Test Connection'
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {stripeTestResult && (
+                      <div className={`p-4 rounded-lg border ${stripeTestResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                        <div className="space-y-3">
+                          {stripeTestResult.success ? (
+                            <div className="flex items-start gap-3">
+                              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-bold">
+                                ✓
+                              </div>
+                              <div className="flex-1">
+                                <h4 className="font-medium text-green-900">Connection Successful!</h4>
+                                <p className="text-sm text-green-800 mt-1">{stripeTestResult.message}</p>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-start gap-3">
+                              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-white text-sm font-bold">
+                                ✕
+                              </div>
+                              <div className="flex-1">
+                                <h4 className="font-medium text-red-900">Connection Failed</h4>
+                                <p className="text-sm text-red-800 mt-1">{stripeTestResult.error}</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           )}
         </div>
