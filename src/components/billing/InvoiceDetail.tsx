@@ -44,6 +44,8 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
   const [sendingInvoice, setSendingInvoice] = useState(false);
   const [markingPaid, setMarkingPaid] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [creatingStripeInvoice, setCreatingStripeInvoice] = useState(false);
+  const [stripeInvoiceUrl, setStripeInvoiceUrl] = useState<string | null>(null);
   const [notesExpanded, setNotesExpanded] = useState(true);
   const [mockupsExpanded, setMockupsExpanded] = useState(true);
   const [showSendModal, setShowSendModal] = useState(false);
@@ -87,6 +89,21 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
       alert(err.message || 'Failed to generate payment link');
     } finally {
       setGeneratingLink(false);
+    }
+  };
+
+  const handleCreateStripeInvoice = async () => {
+    if (!invoice?.billingQueueId) return;
+    setCreatingStripeInvoice(true);
+    try {
+      const url = await billingService.createStripeInvoice(invoice.billingQueueId);
+      setStripeInvoiceUrl(url);
+      await loadInvoice();
+      alert('Stripe invoice created successfully!');
+    } catch (err: any) {
+      alert(err.message || 'Failed to create Stripe invoice');
+    } finally {
+      setCreatingStripeInvoice(false);
     }
   };
 
@@ -693,6 +710,19 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                   </button>
 
                   <button
+                    onClick={handleCreateStripeInvoice}
+                    disabled={creatingStripeInvoice || !!invoice.stripeInvoice}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {creatingStripeInvoice ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <DollarSign className="w-4 h-4" />
+                    )}
+                    {invoice.stripeInvoice ? 'Stripe Invoice Created' : 'Create Stripe Invoice'}
+                  </button>
+
+                  <button
                     onClick={() => setShowSendModal(true)}
                     disabled={sendingInvoice || invoice.billingQueueStatus === 'paid'}
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -760,6 +790,64 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                   >
                     <ExternalLink className="w-4 h-4" />
                   </a>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Stripe Invoice */}
+          {invoice.stripeInvoice && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-gray-400" />
+                Stripe Invoice
+              </h2>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 p-3 bg-purple-50 rounded-lg">
+                  <CheckCircle className="w-5 h-5 text-purple-600 flex-shrink-0" />
+                  <div className="flex-1">
+                    <span className="text-sm font-medium text-purple-900 block">Invoice Created</span>
+                    <span className="text-xs text-purple-700">Minimum payment: ${invoice.stripeInvoice.minimumDueAmount.toFixed(2)}</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-gray-500">Total Amount</p>
+                    <p className="font-semibold text-gray-900">${invoice.stripeInvoice.totalAmount.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Amount Paid</p>
+                    <p className="font-semibold text-green-600">${invoice.stripeInvoice.amountPaid.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Remaining</p>
+                    <p className="font-semibold text-gray-900">${invoice.stripeInvoice.amountRemaining.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Status</p>
+                    <p className="font-semibold text-gray-900 capitalize">{invoice.stripeInvoice.status}</p>
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <a
+                    href={invoice.stripeInvoice.hostedInvoiceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    View Invoice
+                  </a>
+                  {invoice.stripeInvoice.invoicePdfUrl && (
+                    <a
+                      href={invoice.stripeInvoice.invoicePdfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 border border-purple-300 text-purple-700 rounded-lg hover:bg-purple-50 transition-colors text-sm"
+                    >
+                      <Download className="w-4 h-4" />
+                    </a>
+                  )}
                 </div>
               </div>
             </div>

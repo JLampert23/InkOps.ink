@@ -562,4 +562,67 @@ export const billingService = {
 
     return successCount;
   },
+
+  async createStripeInvoice(queueItemId: string): Promise<string> {
+    try {
+      const { data: queueItem, error: queueError } = await supabase
+        .from('billing_queue')
+        .select('*')
+        .eq('id', queueItemId)
+        .maybeSingle();
+
+      if (queueError || !queueItem) {
+        throw new Error('Billing queue item not found');
+      }
+
+      const { data: invoice, error: invoiceError } = await supabase
+        .from('printavo_invoices')
+        .select('*')
+        .eq('id', queueItem.printavo_invoice_id)
+        .maybeSingle();
+
+      if (invoiceError || !invoice) {
+        throw new Error('Printavo invoice not found');
+      }
+
+      const mappedInvoice: Invoice = {
+        id: invoice.id,
+        visualId: invoice.invoice_number,
+        total: parseFloat(invoice.total),
+        contact: {
+          fullName: invoice.customer_name,
+          email: invoice.customer_email,
+        },
+      } as Invoice;
+
+      const stripeInvoice = await stripeService.createStripeInvoiceWithMinimumDue(mappedInvoice);
+
+      await supabase
+        .from('billing_queue')
+        .update({
+          stripe_invoice_id: stripeInvoice.stripeInvoiceId,
+        })
+        .eq('id', queueItemId);
+
+      return stripeInvoice.hostedInvoiceUrl;
+    } catch (error) {
+      console.error('Error creating Stripe invoice:', error);
+      throw error;
+    }
+  },
+
+  async bulkCreateStripeInvoices(queueItemIds: string[]): Promise<number> {
+    let successCount = 0;
+
+    for (const id of queueItemIds) {
+      try {
+        await this.createStripeInvoice(id);
+        successCount++;
+      } catch (error) {
+        console.error(`Failed to create Stripe invoice for ${id}:`, error);
+      }
+    }
+
+    return successCount;
+  },
 };

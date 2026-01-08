@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase-client';
-import { stripeService, StripePaymentLink, StripePayment } from './stripe-service';
+import { stripeService, StripePaymentLink, StripePayment, StripeInvoice } from './stripe-service';
 import { CommunicationLog } from './billing-service';
 
 export interface InvoiceLineItem {
@@ -75,6 +75,7 @@ export interface InvoiceDetail {
   discounts: number;
 
   stripePaymentLink: StripePaymentLink | null;
+  stripeInvoice: StripeInvoice | null;
   stripePayments: StripePayment[];
   printavoPayments: PrintavoPayment[];
 
@@ -120,6 +121,7 @@ export const invoiceDetailService = {
         .maybeSingle();
 
       const stripePaymentLink = await stripeService.getPaymentLink(printavoInvoiceId);
+      const stripeInvoice = await stripeService.getStripeInvoice(printavoInvoiceId);
 
       const { data: stripePaymentsData } = await supabase
         .from('stripe_payments')
@@ -203,6 +205,7 @@ export const invoiceDetailService = {
         discounts: rawData.discount || 0,
 
         stripePaymentLink,
+        stripeInvoice,
         stripePayments: (stripePaymentsData || []).map((payment: any) => ({
           id: payment.id,
           printavoInvoiceId: payment.printavo_invoice_id,

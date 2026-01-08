@@ -31,6 +31,7 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
   const [generatingLinks, setGeneratingLinks] = useState(false);
   const [sendingInvoices, setSendingInvoices] = useState(false);
   const [downloadingPDF, setDownloadingPDF] = useState<string | null>(null);
+  const [creatingStripeInvoices, setCreatingStripeInvoices] = useState(false);
 
   useEffect(() => {
     loadQueue();
@@ -120,6 +121,25 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
       alert(error.message || 'Failed to send invoices');
     } finally {
       setSendingInvoices(false);
+    }
+  };
+
+  const handleCreateStripeInvoices = async () => {
+    if (selectedItems.size === 0) {
+      alert('Please select at least one invoice');
+      return;
+    }
+
+    setCreatingStripeInvoices(true);
+    try {
+      const count = await billingService.bulkCreateStripeInvoices(Array.from(selectedItems));
+      alert(`Created ${count} Stripe invoice(s) successfully`);
+      await loadQueue();
+      setSelectedItems(new Set());
+    } catch (error: any) {
+      alert(error.message || 'Failed to create Stripe invoices');
+    } finally {
+      setCreatingStripeInvoices(false);
     }
   };
 
@@ -228,6 +248,14 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
                 Generate Links
               </button>
               <button
+                onClick={handleCreateStripeInvoices}
+                disabled={creatingStripeInvoices}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-green-300 text-green-700 rounded-lg hover:bg-green-50 transition-colors disabled:opacity-50"
+              >
+                <DollarSign className="w-4 h-4" />
+                Create Stripe Invoices
+              </button>
+              <button
                 onClick={handleSendInvoices}
                 disabled={sendingInvoices}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
@@ -330,6 +358,12 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
                         <span className="inline-flex items-center gap-1 text-xs text-green-700">
                           <CheckCircle className="w-3 h-3" />
                           Link Created
+                        </span>
+                      )}
+                      {item.stripeInvoiceId && (
+                        <span className="inline-flex items-center gap-1 text-xs text-purple-700">
+                          <DollarSign className="w-3 h-3" />
+                          Stripe Invoice
                         </span>
                       )}
                       {item.sentAt && (
