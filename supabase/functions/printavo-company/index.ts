@@ -74,17 +74,15 @@ Deno.serve(async (req: Request) => {
     );
 
     const query = `
-      query GetCompanyInfo {
-        company {
-          id
-          name
-          subdomain
-          createdAt
-          visualStatuses {
-            id
-            name
-            color
-            position
+      query GetInvoicesForStatuses($first: Int = 100) {
+        invoices(first: $first) {
+          edges {
+            node {
+              id
+              status {
+                name
+              }
+            }
           }
         }
       }
@@ -143,10 +141,22 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const invoices = data.data?.invoices?.edges || [];
+    const statusNames = new Set<string>();
+    
+    invoices.forEach((edge: any) => {
+      const statusName = edge?.node?.status?.name;
+      if (statusName) {
+        statusNames.add(statusName);
+      }
+    });
+
+    const uniqueStatuses = Array.from(statusNames).sort();
+
     return new Response(
       JSON.stringify({
         success: true,
-        company: data.data?.company || null,
+        statuses: uniqueStatuses,
       }),
       {
         status: 200,

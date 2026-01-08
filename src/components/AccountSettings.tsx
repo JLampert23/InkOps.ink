@@ -193,10 +193,9 @@ export function AccountSettings() {
 
       const result = await response.json();
 
-      if (result.success && result.company?.visualStatuses) {
-        const statusNames = result.company.visualStatuses.map((status: any) => status.name).sort();
-        setAvailableStatuses(statusNames);
-        return statusNames;
+      if (result.success && result.statuses) {
+        setAvailableStatuses(result.statuses);
+        return result.statuses;
       } else {
         const { data, error } = await supabase
           .from('printavo_invoices_calculated')
