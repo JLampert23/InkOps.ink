@@ -36,7 +36,6 @@ async function fetchInvoiceStatuses(email: string, token: string): Promise<strin
   let hasNextPage = true;
   let cursor = null;
 
-  // Fetch invoices in batches to extract all unique statuses
   while (hasNextPage) {
     const query = `
       query GetInvoiceStatuses($after: String) {
@@ -93,7 +92,6 @@ async function fetchInvoiceStatuses(email: string, token: string): Promise<strin
     hasNextPage = data.data?.invoices?.pageInfo?.hasNextPage || false;
     cursor = data.data?.invoices?.pageInfo?.endCursor || null;
 
-    // Safety limit: stop after 10 pages (1000 invoices)
     if (!hasNextPage || allStatuses.size > 50) {
       break;
     }
