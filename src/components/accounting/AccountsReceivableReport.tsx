@@ -27,12 +27,11 @@ export default function AccountsReceivableReport() {
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState('all');
   const [selectedCustomer, setSelectedCustomer] = useState('all');
-  const [selectedStatus, setSelectedStatus] = useState('all');
   const [customers, setCustomers] = useState<string[]>([]);
 
   useEffect(() => {
     loadData();
-  }, [dateRange, selectedCustomer, selectedStatus]);
+  }, [dateRange, selectedCustomer]);
 
   const loadData = async () => {
     setLoading(true);
@@ -40,14 +39,12 @@ export default function AccountsReceivableReport() {
       let query = supabase
         .from('printavo_invoices')
         .select('*')
-        .in('status', ['Unpaid', 'Partially Paid']);
+        .eq('status_stage', 'accounts_receivable')
+        .gt('amount_outstanding', 0)
+        .order('due_date', { ascending: true });
 
       if (selectedCustomer !== 'all') {
         query = query.eq('customer_name', selectedCustomer);
-      }
-
-      if (selectedStatus !== 'all') {
-        query = query.eq('status', selectedStatus);
       }
 
       const { data, error } = await query;
@@ -57,7 +54,7 @@ export default function AccountsReceivableReport() {
       const processedInvoices: Invoice[] = (data || []).map((inv: any) => {
         const total = parseFloat(inv.total || 0);
         const amountPaid = parseFloat(inv.amount_paid || 0);
-        const balanceRemaining = total - amountPaid;
+        const balanceRemaining = parseFloat(inv.amount_outstanding || 0);
         const dueDate = new Date(inv.due_date);
         const today = new Date();
         const daysOverdue = Math.max(0, Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)));
@@ -186,15 +183,6 @@ export default function AccountsReceivableReport() {
             ))}
           </select>
 
-          <select
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-          >
-            <option value="all">All Statuses</option>
-            <option value="Unpaid">Unpaid</option>
-            <option value="Partially Paid">Partially Paid</option>
-          </select>
 
           <button
             onClick={exportToCSV}
@@ -216,10 +204,10 @@ export default function AccountsReceivableReport() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice Date</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Paid</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Balance</th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Aging</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total Amount</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount Paid</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Balance Remaining</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Aging Bucket</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
