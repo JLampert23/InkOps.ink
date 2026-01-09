@@ -335,12 +335,18 @@ export const invoiceDetailService = {
     const newAmountPaid = currentAmountPaid + amount;
     const newAmountOutstanding = Math.max(0, currentAmountOutstanding - amount);
 
+    const updateData: any = {
+      amount_paid: newAmountPaid.toString(),
+      amount_outstanding: newAmountOutstanding.toString(),
+    };
+
+    if (newAmountOutstanding === 0) {
+      updateData.status_stage = 'paid';
+    }
+
     await supabase
       .from('printavo_invoices')
-      .update({
-        amount_paid: newAmountPaid.toString(),
-        amount_outstanding: newAmountOutstanding.toString(),
-      })
+      .update(updateData)
       .eq('id', printavoInvoiceId);
 
     await supabase
