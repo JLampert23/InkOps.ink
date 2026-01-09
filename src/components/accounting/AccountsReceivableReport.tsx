@@ -40,8 +40,7 @@ export default function AccountsReceivableReport() {
       let query = supabase
         .from('printavo_invoices')
         .select('*')
-        .eq('status_stage', 'accounts_receivable')
-        .gt('amount_outstanding', 0);
+        .in('status', ['Unpaid', 'Partially Paid']);
 
       if (selectedCustomer !== 'all') {
         query = query.eq('customer_name', selectedCustomer);
@@ -58,8 +57,7 @@ export default function AccountsReceivableReport() {
       const processedInvoices: Invoice[] = (data || []).map((inv: any) => {
         const total = parseFloat(inv.total || 0);
         const amountPaid = parseFloat(inv.amount_paid || 0);
-        const amountOutstanding = parseFloat(inv.amount_outstanding || 0);
-        const balanceRemaining = amountOutstanding;
+        const balanceRemaining = total - amountPaid;
         const dueDate = new Date(inv.due_date);
         const today = new Date();
         const daysOverdue = Math.max(0, Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)));
@@ -70,7 +68,7 @@ export default function AccountsReceivableReport() {
         else if (daysOverdue > 30) agingBucket = '31-60';
 
         return {
-          invoice_id: inv.id,
+          invoice_id: inv.invoice_id,
           invoice_number: inv.invoice_number,
           customer_name: inv.customer_name,
           invoice_date: inv.invoice_date,

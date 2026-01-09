@@ -57,9 +57,9 @@ Deno.serve(async (req: Request) => {
       case 'payment_intent.succeeded': {
         const paymentIntent = event.data.object;
         const metadata = paymentIntent.metadata || {};
-
+        
         console.log('Payment succeeded:', paymentIntent.id);
-
+        
         await supabase.from('stripe_payments').insert([{
           company_id: companyId,
           printavo_invoice_id: metadata.printavo_invoice_id || null,
@@ -73,46 +73,67 @@ Deno.serve(async (req: Request) => {
           payment_method: paymentIntent.payment_method_types?.[0] || 'card',
           metadata: metadata,
         }]);
-
+        
         if (metadata.printavo_invoice_id) {
+          await supabase
+            .from('stripe_payment_links')
+            .update({
+              status: 'paid',
+              paid_at: new Date().toISOString(),
+            })
+            .eq('printavo_invoice_id', metadata.printavo_invoice_id);
+
           const { data: invoice } = await supabase
             .from('printavo_invoices')
             .select('*')
-            .eq('id', metadata.printavo_invoice_id)
+            .eq('invoice_id', metadata.printavo_invoice_id)
             .maybeSingle();
 
           if (invoice) {
             const currentPaid = parseFloat(invoice.amount_paid || 0);
-            const paymentAmount = paymentIntent.amount / 100;
-            const newPaid = currentPaid + paymentAmount;
+            const newPaid = currentPaid + (paymentIntent.amount / 100);
             const total = parseFloat(invoice.total || 0);
-            const amountOutstanding = total - newPaid;
-            const isPaid = amountOutstanding <= 0;
-
-            await supabase.from('payments').insert([{
-              company_id: companyId,
-              invoice_id: invoice.id,
-              customer_id: invoice.customer_id,
-              amount: paymentAmount,
-              payment_date: new Date().toISOString(),
-              payment_method: paymentIntent.payment_method_types?.[0] || 'card',
-              stripe_transaction_id: paymentIntent.latest_charge || null,
-              stripe_payment_intent_id: paymentIntent.id,
-              stripe_charge_id: paymentIntent.latest_charge || null,
-              receipt_url: null,
-              notes: 'Payment via Stripe payment intent',
-              metadata: metadata,
-            }]);
+            const balanceRemaining = total - newPaid;
 
             await supabase
               .from('printavo_invoices')
               .update({
                 amount_paid: newPaid,
-                amount_outstanding: amountOutstanding,
-                status_stage: isPaid ? 'paid' : 'accounts_receivable',
-                status: isPaid ? 'Paid' : 'Partially Paid',
+                balance_remaining: balanceRemaining,
+                status_stage: balanceRemaining <= 0 ? 'paid' : 'partial',
+                status: balanceRemaining <= 0 ? 'Paid' : 'Partially Paid',
               })
-              .eq('id', metadata.printavo_invoice_id);
+              .eq('invoice_id', metadata.printavo_invoice_id);
+          }
+
+          const { data: queueItem } = await supabase
+            .from('billing_queue')
+            .select('*')
+            .eq('printavo_invoice_id', metadata.printavo_invoice_id)
+            .maybeSingle();
+
+          if (queueItem) {
+            await supabase
+              .from('billing_queue')
+              .update({
+                payment_status: 'paid',
+              })
+              .eq('id', queueItem.id);
+
+            await supabase.from('paid_invoices').insert([{
+              company_id: companyId,
+              printavo_invoice_id: queueItem.printavo_invoice_id,
+              printavo_visual_id: queueItem.printavo_visual_id,
+              customer_name: queueItem.customer_name,
+              customer_email: queueItem.customer_email,
+              invoice_total: queueItem.invoice_total,
+              amount_paid: paymentIntent.amount / 100,
+              payment_date: new Date().toISOString(),
+              stripe_payment_intent_id: paymentIntent.id,
+              stripe_charge_id: paymentIntent.latest_charge || null,
+              payment_method: paymentIntent.payment_method_types?.[0] || 'card',
+              metadata: { payment_intent: paymentIntent },
+            }]);
           }
         }
 
@@ -123,7 +144,7 @@ Deno.serve(async (req: Request) => {
             processed_at: new Date().toISOString(),
           })
           .eq('stripe_event_id', event.id);
-
+        
         break;
       }
       
@@ -200,44 +221,65 @@ Deno.serve(async (req: Request) => {
           }]);
 
           if (metadata.printavo_invoice_id) {
+            await supabase
+              .from('stripe_payment_links')
+              .update({
+                status: 'paid',
+                paid_at: new Date().toISOString(),
+              })
+              .eq('printavo_invoice_id', metadata.printavo_invoice_id);
+
             const { data: invoice } = await supabase
               .from('printavo_invoices')
               .select('*')
-              .eq('id', metadata.printavo_invoice_id)
+              .eq('invoice_id', metadata.printavo_invoice_id)
               .maybeSingle();
 
             if (invoice) {
               const currentPaid = parseFloat(invoice.amount_paid || 0);
-              const paymentAmount = session.amount_total / 100;
-              const newPaid = currentPaid + paymentAmount;
+              const newPaid = currentPaid + (session.amount_total / 100);
               const total = parseFloat(invoice.total || 0);
-              const amountOutstanding = total - newPaid;
-              const isPaid = amountOutstanding <= 0;
-
-              await supabase.from('payments').insert([{
-                company_id: companyId,
-                invoice_id: invoice.id,
-                customer_id: invoice.customer_id,
-                amount: paymentAmount,
-                payment_date: new Date().toISOString(),
-                payment_method: 'card',
-                stripe_transaction_id: null,
-                stripe_payment_intent_id: session.payment_intent,
-                stripe_charge_id: null,
-                receipt_url: null,
-                notes: 'Payment via Stripe checkout session',
-                metadata: metadata,
-              }]);
+              const balanceRemaining = total - newPaid;
 
               await supabase
                 .from('printavo_invoices')
                 .update({
                   amount_paid: newPaid,
-                  amount_outstanding: amountOutstanding,
-                  status_stage: isPaid ? 'paid' : 'accounts_receivable',
-                  status: isPaid ? 'Paid' : 'Partially Paid',
+                  balance_remaining: balanceRemaining,
+                  status_stage: balanceRemaining <= 0 ? 'paid' : 'partial',
+                  status: balanceRemaining <= 0 ? 'Paid' : 'Partially Paid',
                 })
-                .eq('id', metadata.printavo_invoice_id);
+                .eq('invoice_id', metadata.printavo_invoice_id);
+            }
+
+            const { data: queueItem } = await supabase
+              .from('billing_queue')
+              .select('*')
+              .eq('printavo_invoice_id', metadata.printavo_invoice_id)
+              .maybeSingle();
+
+            if (queueItem) {
+              await supabase
+                .from('billing_queue')
+                .update({
+                  payment_status: 'paid',
+                })
+                .eq('id', queueItem.id);
+
+              await supabase.from('paid_invoices').insert([{
+                company_id: companyId,
+                printavo_invoice_id: queueItem.printavo_invoice_id,
+                printavo_visual_id: queueItem.printavo_visual_id,
+                customer_name: queueItem.customer_name,
+                customer_email: queueItem.customer_email,
+                invoice_total: queueItem.invoice_total,
+                amount_paid: session.amount_total / 100,
+                payment_date: new Date().toISOString(),
+                stripe_payment_intent_id: session.payment_intent,
+                stripe_charge_id: null,
+                payment_method: 'card',
+                metadata: { checkout_session: session },
+              }]);
             }
           }
         }
@@ -312,40 +354,62 @@ Deno.serve(async (req: Request) => {
           const { data: printavoInvoice } = await supabase
             .from('printavo_invoices')
             .select('*')
-            .eq('id', printavoInvoiceId)
+            .eq('invoice_id', printavoInvoiceId)
             .maybeSingle();
 
           if (printavoInvoice) {
             const total = parseFloat(printavoInvoice.total || 0);
-            const paymentAmount = amountPaid / 100;
-            const currentPaid = parseFloat(printavoInvoice.amount_paid || 0);
-            const newPaid = currentPaid + paymentAmount;
-            const amountOutstanding = total - newPaid;
-
-            await supabase.from('payments').insert([{
-              company_id: companyId,
-              invoice_id: printavoInvoice.id,
-              customer_id: printavoInvoice.customer_id,
-              amount: paymentAmount,
-              payment_date: new Date().toISOString(),
-              payment_method: 'card',
-              stripe_transaction_id: chargeId,
-              stripe_payment_intent_id: paymentIntentId,
-              stripe_charge_id: chargeId,
-              receipt_url: null,
-              notes: 'Payment via Stripe invoice',
-              metadata: metadata,
-            }]);
+            const newPaid = amountPaid / 100;
+            const balanceRemaining = total - newPaid;
 
             await supabase
               .from('printavo_invoices')
               .update({
                 amount_paid: newPaid,
-                amount_outstanding: amountOutstanding,
-                status_stage: isFullyPaid ? 'paid' : 'accounts_receivable',
+                balance_remaining: balanceRemaining,
+                status_stage: isFullyPaid ? 'paid' : 'partial',
                 status: isFullyPaid ? 'Paid' : 'Partially Paid',
               })
-              .eq('id', printavoInvoiceId);
+              .eq('invoice_id', printavoInvoiceId);
+          }
+
+          if (isFullyPaid) {
+            const { data: queueItem } = await supabase
+              .from('billing_queue')
+              .select('*')
+              .eq('printavo_invoice_id', printavoInvoiceId)
+              .maybeSingle();
+
+            if (queueItem) {
+              await supabase
+                .from('billing_queue')
+                .update({
+                  payment_status: 'paid',
+                })
+                .eq('id', queueItem.id);
+
+              await supabase.from('paid_invoices').insert([{
+                company_id: companyId,
+                printavo_invoice_id: queueItem.printavo_invoice_id,
+                printavo_visual_id: queueItem.printavo_visual_id,
+                customer_name: queueItem.customer_name,
+                customer_email: queueItem.customer_email,
+                invoice_total: queueItem.invoice_total,
+                amount_paid: amountPaid / 100,
+                payment_date: new Date().toISOString(),
+                stripe_payment_intent_id: paymentIntentId,
+                stripe_charge_id: chargeId,
+                payment_method: 'card',
+                metadata: { invoice: invoice },
+              }]);
+            }
+          } else {
+            await supabase
+              .from('billing_queue')
+              .update({
+                payment_status: 'partial',
+              })
+              .eq('printavo_invoice_id', printavoInvoiceId);
           }
         }
 

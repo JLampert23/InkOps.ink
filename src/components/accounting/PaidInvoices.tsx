@@ -55,7 +55,21 @@ export default function PaidInvoices() {
     try {
       let query = supabase
         .from('printavo_invoices')
-        .select('*')
+        .select(`
+          *,
+          stripe_invoices!inner (
+            stripe_invoice_id,
+            stripe_payments (
+              id,
+              payment_date,
+              amount,
+              payment_method,
+              stripe_charge_id,
+              stripe_payment_intent_id,
+              status
+            )
+          )
+        `)
         .eq('status_stage', 'paid')
         .gte('invoice_date', startDate)
         .lte('invoice_date', endDate)
@@ -69,35 +83,12 @@ export default function PaidInvoices() {
 
       if (error) throw error;
 
-      const invoiceIds = (data || []).map(inv => inv.id);
-
-      const { data: paymentsData } = await supabase
-        .from('payments')
-        .select('*')
-        .in('invoice_id', invoiceIds)
-        .order('payment_date', { ascending: true });
-
-      const paymentsByInvoice = new Map<string, Payment[]>();
-      (paymentsData || []).forEach((payment: any) => {
-        if (!paymentsByInvoice.has(payment.invoice_id)) {
-          paymentsByInvoice.set(payment.invoice_id, []);
-        }
-        paymentsByInvoice.get(payment.invoice_id)!.push({
-          id: payment.id,
-          payment_date: payment.payment_date,
-          amount: parseFloat(payment.amount || 0),
-          payment_method: payment.payment_method || 'N/A',
-          stripe_charge_id: payment.stripe_charge_id || '',
-          stripe_payment_intent_id: payment.stripe_payment_intent_id || '',
-        });
-      });
-
       let processedInvoices: PaidInvoice[] = (data || []).map((inv: any) => {
-        const payments = paymentsByInvoice.get(inv.id) || [];
+        const payments = inv.stripe_invoices?.stripe_payments || [];
         const lastPayment = payments.length > 0 ? payments[payments.length - 1] : null;
 
         return {
-          invoice_id: inv.id,
+          invoice_id: inv.invoice_id,
           invoice_number: inv.invoice_number,
           customer_name: inv.customer_name,
           customer_email: inv.customer_email || '',
@@ -107,9 +98,9 @@ export default function PaidInvoices() {
           amount_paid: parseFloat(inv.amount_paid || 0),
           payment_method: lastPayment?.payment_method || 'N/A',
           stripe_transaction_id: lastPayment?.stripe_charge_id || lastPayment?.stripe_payment_intent_id || 'N/A',
-          notes: '',
+          notes: inv.notes || '',
           status_stage: inv.status_stage,
-          payments: payments,
+          payments: payments.filter((p: any) => p.status === 'succeeded'),
         };
       });
 
