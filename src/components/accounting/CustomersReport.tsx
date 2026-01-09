@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Users, Download, Search, ChevronRight, Mail, Phone, DollarSign, Loader2, FileText, CreditCard } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format } from 'date-fns';
+import { InvoiceDetail } from '../billing/InvoiceDetail';
 
 interface Customer {
   id: string;
@@ -16,6 +17,7 @@ interface Customer {
 }
 
 interface CustomerDetail {
+  invoice_id: string;
   invoice_number: string;
   invoice_date: string;
   total: number;
@@ -30,6 +32,7 @@ export default function CustomersReport() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customerInvoices, setCustomerInvoices] = useState<CustomerDetail[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
 
   useEffect(() => {
     loadCustomers();
@@ -100,6 +103,7 @@ export default function CustomersReport() {
       if (error) throw error;
 
       const details: CustomerDetail[] = (data || []).map((inv: any) => ({
+        invoice_id: inv.id,
         invoice_number: inv.invoice_number,
         invoice_date: inv.invoice_date,
         total: parseFloat(inv.total || 0),
@@ -119,6 +123,14 @@ export default function CustomersReport() {
     customer.company_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     customer.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleViewInvoice = (invoiceId: string) => {
+    setViewingInvoiceId(invoiceId);
+  };
+
+  const handleBackToReport = () => {
+    setViewingInvoiceId(null);
+  };
 
   const exportToCSV = () => {
     const headers = ['Company Name', 'Contact Name', 'Email', 'Phone', 'Total Invoices', 'Total Billed', 'Total Paid', 'Outstanding Balance'];
@@ -141,6 +153,15 @@ export default function CustomersReport() {
     a.download = `customers-report-${format(new Date(), 'yyyy-MM-dd')}.csv`;
     a.click();
   };
+
+  if (viewingInvoiceId) {
+    return (
+      <InvoiceDetail
+        invoiceId={viewingInvoiceId}
+        onBack={handleBackToReport}
+      />
+    );
+  }
 
   if (loading) {
     return (
@@ -336,7 +357,14 @@ export default function CustomersReport() {
                     <tbody className="divide-y divide-gray-100">
                       {customerInvoices.map((inv) => (
                         <tr key={inv.invoice_number} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900">{inv.invoice_number}</td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => handleViewInvoice(inv.invoice_id)}
+                              className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                            >
+                              {inv.invoice_number}
+                            </button>
+                          </td>
                           <td className="px-4 py-3 text-sm text-gray-600">
                             {format(new Date(inv.invoice_date), 'MMM dd, yyyy')}
                           </td>
