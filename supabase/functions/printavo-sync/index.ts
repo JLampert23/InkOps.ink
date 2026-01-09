@@ -230,7 +230,6 @@ async function findOrCreateCustomer(
     return null;
   }
 
-  // Check if customer exists by email first
   let existingCustomer = null;
 
   if (customerEmail) {
@@ -242,7 +241,6 @@ async function findOrCreateCustomer(
     existingCustomer = data;
   }
 
-  // If not found by email, check by company name
   if (!existingCustomer && customerName) {
     const { data } = await supabase
       .from('customers')
@@ -252,12 +250,10 @@ async function findOrCreateCustomer(
     existingCustomer = data;
   }
 
-  // If customer exists, link invoice to them
   if (existingCustomer) {
     return existingCustomer.id;
   }
 
-  // Customer doesn't exist, create a new one with all available information
   const customerData: any = {
     company_name: customerName,
     contact_name: invoice.contact?.fullName,
@@ -267,7 +263,6 @@ async function findOrCreateCustomer(
     status: 'active',
   };
 
-  // Add billing address if available
   if (invoice.billingAddress) {
     customerData.billing_address_line1 = invoice.billingAddress.address1;
     customerData.billing_address_line2 = invoice.billingAddress.address2;
@@ -277,7 +272,6 @@ async function findOrCreateCustomer(
     customerData.billing_country = invoice.billingAddress.country || 'USA';
   }
 
-  // Add shipping address if available
   if (invoice.shippingAddress) {
     customerData.shipping_address_line1 = invoice.shippingAddress.address1;
     customerData.shipping_address_line2 = invoice.shippingAddress.address2;
@@ -307,6 +301,24 @@ async function syncInvoices(
   printavoEmail: string,
   printavoToken: string
 ) {
+  const { data: companySettings } = await supabase
+    .from('company_settings')
+    .select('id')
+    .maybeSingle();
+
+  if (!companySettings) {
+    console.error('Company settings not found');
+    return 0;
+  }
+
+  const { data: billingStatuses } = await supabase
+    .from('printavo_statuses')
+    .select('name')
+    .eq('is_billing_eligible', true);
+
+  const billingEligibleStatuses = (billingStatuses || []).map(s => s.name);
+  console.log('Billing eligible statuses:', billingEligibleStatuses);
+
   const invoicesQuery = `
     query GetInvoices($after: String, $first: Int = 7, $paymentStatus: OrderPaymentStatus) {
       invoices(after: $after, first: $first, paymentStatus: $paymentStatus) {
@@ -543,6 +555,45 @@ async function syncInvoices(
           raw_data: invoice,
         });
 
+        if (billingEligibleStatuses.includes(invoice.status?.name)) {
+          const { data: existingQueueItem } = await supabase
+            .from('billing_queue')
+            .select('id, payment_status')
+            .eq('printavo_invoice_id', invoice.id)
+            .maybeSingle();
+
+          if (existingQueueItem && existingQueueItem.payment_status !== 'paid') {
+            await supabase
+              .from('billing_queue')
+              .update({
+                printavo_status: invoice.status?.name,
+                customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName,
+                customer_email: invoice.contact?.email,
+                customer_company: invoice.contact?.customer?.companyName,
+                invoice_total: invoice.total || 0,
+                invoice_date: invoice.createdAt,
+                due_date: invoice.dueAt,
+              })
+              .eq('id', existingQueueItem.id);
+          } else if (!existingQueueItem) {
+            await supabase
+              .from('billing_queue')
+              .insert({
+                company_id: companySettings.id,
+                printavo_invoice_id: invoice.id,
+                printavo_visual_id: invoice.visualId,
+                printavo_status: invoice.status?.name,
+                customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName,
+                customer_email: invoice.contact?.email,
+                customer_company: invoice.contact?.customer?.companyName,
+                invoice_total: invoice.total || 0,
+                invoice_date: invoice.createdAt,
+                due_date: invoice.dueAt,
+                payment_status: 'unpaid',
+              });
+          }
+        }
+
         if (invoice.lineItemGroups?.edges) {
           for (const groupEdge of invoice.lineItemGroups.edges) {
             const group = groupEdge.node;
@@ -632,6 +683,45 @@ async function syncInvoices(
         updated_at: new Date().toISOString(),
         raw_data: invoice,
       });
+
+      if (billingEligibleStatuses.includes(invoice.status?.name)) {
+        const { data: existingQueueItem } = await supabase
+          .from('billing_queue')
+          .select('id, payment_status')
+          .eq('printavo_invoice_id', invoice.id)
+          .maybeSingle();
+
+        if (existingQueueItem && existingQueueItem.payment_status !== 'paid') {
+          await supabase
+            .from('billing_queue')
+            .update({
+              printavo_status: invoice.status?.name,
+              customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName,
+              customer_email: invoice.contact?.email,
+              customer_company: invoice.contact?.customer?.companyName,
+              invoice_total: invoice.total || 0,
+              invoice_date: invoice.createdAt,
+              due_date: invoice.dueAt,
+            })
+            .eq('id', existingQueueItem.id);
+        } else if (!existingQueueItem) {
+          await supabase
+            .from('billing_queue')
+            .insert({
+              company_id: companySettings.id,
+              printavo_invoice_id: invoice.id,
+              printavo_visual_id: invoice.visualId,
+              printavo_status: invoice.status?.name,
+              customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName,
+              customer_email: invoice.contact?.email,
+              customer_company: invoice.contact?.customer?.companyName,
+              invoice_total: invoice.total || 0,
+              invoice_date: invoice.createdAt,
+              due_date: invoice.dueAt,
+              payment_status: 'unpaid',
+            });
+        }
+      }
 
       if (invoice.lineItemGroups?.edges) {
         for (const groupEdge of invoice.lineItemGroups.edges) {
