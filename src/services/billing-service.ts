@@ -226,9 +226,23 @@ export const billingService = {
 
   async getBillingQueue(): Promise<BillingQueueItem[]> {
     try {
+      const { data: invoices, error: invoiceError } = await supabase
+        .from('printavo_invoices')
+        .select('id')
+        .eq('status_stage', 'billing_queue');
+
+      if (invoiceError) throw invoiceError;
+
+      const invoiceIds = (invoices || []).map(inv => inv.id);
+
+      if (invoiceIds.length === 0) {
+        return [];
+      }
+
       const { data, error } = await supabase
         .from('billing_queue')
         .select('*')
+        .in('printavo_invoice_id', invoiceIds)
         .neq('payment_status', 'paid')
         .order('created_at', { ascending: false });
 
@@ -395,6 +409,13 @@ export const billingService = {
           sent_method: 'email',
         })
         .eq('id', queueItemId);
+
+      await supabase
+        .from('printavo_invoices')
+        .update({
+          status_stage: 'accounts_receivable',
+        })
+        .eq('id', queueItem.printavo_invoice_id);
 
       await supabase
         .from('communication_logs')
@@ -626,6 +647,13 @@ export const billingService = {
           stripe_invoice_id: stripeInvoice.stripeInvoiceId,
         })
         .eq('id', queueItemId);
+
+      await supabase
+        .from('printavo_invoices')
+        .update({
+          status_stage: 'accounts_receivable',
+        })
+        .eq('id', queueItem.printavo_invoice_id);
 
       return stripeInvoice.hostedInvoiceUrl;
     } catch (error) {
