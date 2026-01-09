@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { Calendar, Download, Filter, TrendingUp, DollarSign, AlertCircle, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format } from 'date-fns';
+import { InvoiceDetail } from '../billing/InvoiceDetail';
 
 interface Invoice {
-  invoice_id: number;
+  invoice_id: string;
   invoice_number: string;
   customer_name: string;
   invoice_date: string;
@@ -28,6 +29,7 @@ export default function AccountsReceivableReport() {
   const [dateRange, setDateRange] = useState('all');
   const [selectedCustomer, setSelectedCustomer] = useState('all');
   const [customers, setCustomers] = useState<string[]>([]);
+  const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -65,7 +67,7 @@ export default function AccountsReceivableReport() {
         else if (daysOverdue > 30) agingBucket = '31-60';
 
         return {
-          invoice_id: inv.invoice_id,
+          invoice_id: inv.id,
           invoice_number: inv.invoice_number,
           customer_name: inv.customer_name,
           invoice_date: inv.invoice_date,
@@ -104,6 +106,14 @@ export default function AccountsReceivableReport() {
   const totalOutstanding = invoices.reduce((sum, inv) => sum + inv.balance_remaining, 0);
   const agingBuckets = calculateAgingBuckets();
 
+  const handleViewInvoice = (invoiceId: string) => {
+    setViewingInvoiceId(invoiceId);
+  };
+
+  const handleBackToReport = () => {
+    setViewingInvoiceId(null);
+  };
+
   const exportToCSV = () => {
     const headers = ['Invoice #', 'Customer', 'Invoice Date', 'Due Date', 'Total', 'Paid', 'Balance', 'Days Overdue', 'Aging Bucket'];
     const rows = invoices.map(inv => [
@@ -126,6 +136,15 @@ export default function AccountsReceivableReport() {
     a.download = `accounts-receivable-${format(new Date(), 'yyyy-MM-dd')}.csv`;
     a.click();
   };
+
+  if (viewingInvoiceId) {
+    return (
+      <InvoiceDetail
+        invoiceId={viewingInvoiceId}
+        onBack={handleBackToReport}
+      />
+    );
+  }
 
   if (loading) {
     return (
@@ -213,8 +232,13 @@ export default function AccountsReceivableReport() {
             <tbody className="divide-y divide-gray-200">
               {invoices.map((invoice) => (
                 <tr key={invoice.invoice_id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {invoice.invoice_number}
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <button
+                      onClick={() => handleViewInvoice(invoice.invoice_id)}
+                      className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                    >
+                      {invoice.invoice_number}
+                    </button>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {invoice.customer_name}
