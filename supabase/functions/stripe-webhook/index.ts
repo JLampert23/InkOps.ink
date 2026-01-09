@@ -83,6 +83,29 @@ Deno.serve(async (req: Request) => {
             })
             .eq('printavo_invoice_id', metadata.printavo_invoice_id);
 
+          const { data: invoice } = await supabase
+            .from('printavo_invoices')
+            .select('*')
+            .eq('invoice_id', metadata.printavo_invoice_id)
+            .maybeSingle();
+
+          if (invoice) {
+            const currentPaid = parseFloat(invoice.amount_paid || 0);
+            const newPaid = currentPaid + (paymentIntent.amount / 100);
+            const total = parseFloat(invoice.total || 0);
+            const balanceRemaining = total - newPaid;
+
+            await supabase
+              .from('printavo_invoices')
+              .update({
+                amount_paid: newPaid,
+                balance_remaining: balanceRemaining,
+                status_stage: balanceRemaining <= 0 ? 'paid' : 'partial',
+                status: balanceRemaining <= 0 ? 'Paid' : 'Partially Paid',
+              })
+              .eq('invoice_id', metadata.printavo_invoice_id);
+          }
+
           const { data: queueItem } = await supabase
             .from('billing_queue')
             .select('*')
@@ -206,6 +229,29 @@ Deno.serve(async (req: Request) => {
               })
               .eq('printavo_invoice_id', metadata.printavo_invoice_id);
 
+            const { data: invoice } = await supabase
+              .from('printavo_invoices')
+              .select('*')
+              .eq('invoice_id', metadata.printavo_invoice_id)
+              .maybeSingle();
+
+            if (invoice) {
+              const currentPaid = parseFloat(invoice.amount_paid || 0);
+              const newPaid = currentPaid + (session.amount_total / 100);
+              const total = parseFloat(invoice.total || 0);
+              const balanceRemaining = total - newPaid;
+
+              await supabase
+                .from('printavo_invoices')
+                .update({
+                  amount_paid: newPaid,
+                  balance_remaining: balanceRemaining,
+                  status_stage: balanceRemaining <= 0 ? 'paid' : 'partial',
+                  status: balanceRemaining <= 0 ? 'Paid' : 'Partially Paid',
+                })
+                .eq('invoice_id', metadata.printavo_invoice_id);
+            }
+
             const { data: queueItem } = await supabase
               .from('billing_queue')
               .select('*')
@@ -304,43 +350,67 @@ Deno.serve(async (req: Request) => {
           })
           .eq('id', stripeInvoice.id);
 
-        if (isFullyPaid && printavoInvoiceId) {
-          const { data: queueItem } = await supabase
-            .from('billing_queue')
+        if (printavoInvoiceId) {
+          const { data: printavoInvoice } = await supabase
+            .from('printavo_invoices')
             .select('*')
-            .eq('printavo_invoice_id', printavoInvoiceId)
+            .eq('invoice_id', printavoInvoiceId)
             .maybeSingle();
 
-          if (queueItem) {
+          if (printavoInvoice) {
+            const total = parseFloat(printavoInvoice.total || 0);
+            const newPaid = amountPaid / 100;
+            const balanceRemaining = total - newPaid;
+
+            await supabase
+              .from('printavo_invoices')
+              .update({
+                amount_paid: newPaid,
+                balance_remaining: balanceRemaining,
+                status_stage: isFullyPaid ? 'paid' : 'partial',
+                status: isFullyPaid ? 'Paid' : 'Partially Paid',
+              })
+              .eq('invoice_id', printavoInvoiceId);
+          }
+
+          if (isFullyPaid) {
+            const { data: queueItem } = await supabase
+              .from('billing_queue')
+              .select('*')
+              .eq('printavo_invoice_id', printavoInvoiceId)
+              .maybeSingle();
+
+            if (queueItem) {
+              await supabase
+                .from('billing_queue')
+                .update({
+                  payment_status: 'paid',
+                })
+                .eq('id', queueItem.id);
+
+              await supabase.from('paid_invoices').insert([{
+                company_id: companyId,
+                printavo_invoice_id: queueItem.printavo_invoice_id,
+                printavo_visual_id: queueItem.printavo_visual_id,
+                customer_name: queueItem.customer_name,
+                customer_email: queueItem.customer_email,
+                invoice_total: queueItem.invoice_total,
+                amount_paid: amountPaid / 100,
+                payment_date: new Date().toISOString(),
+                stripe_payment_intent_id: paymentIntentId,
+                stripe_charge_id: chargeId,
+                payment_method: 'card',
+                metadata: { invoice: invoice },
+              }]);
+            }
+          } else {
             await supabase
               .from('billing_queue')
               .update({
-                payment_status: 'paid',
+                payment_status: 'partial',
               })
-              .eq('id', queueItem.id);
-
-            await supabase.from('paid_invoices').insert([{
-              company_id: companyId,
-              printavo_invoice_id: queueItem.printavo_invoice_id,
-              printavo_visual_id: queueItem.printavo_visual_id,
-              customer_name: queueItem.customer_name,
-              customer_email: queueItem.customer_email,
-              invoice_total: queueItem.invoice_total,
-              amount_paid: amountPaid / 100,
-              payment_date: new Date().toISOString(),
-              stripe_payment_intent_id: paymentIntentId,
-              stripe_charge_id: chargeId,
-              payment_method: 'card',
-              metadata: { invoice: invoice },
-            }]);
+              .eq('printavo_invoice_id', printavoInvoiceId);
           }
-        } else if (printavoInvoiceId) {
-          await supabase
-            .from('billing_queue')
-            .update({
-              payment_status: 'partial',
-            })
-            .eq('printavo_invoice_id', printavoInvoiceId);
         }
 
         await supabase
