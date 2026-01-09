@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Calendar, Download, Filter, TrendingUp, DollarSign, AlertCircle, Loader2 } from 'lucide-react';
+import { Calendar, Download, Filter, TrendingUp, DollarSign, AlertCircle, Loader2, FileText, FileSpreadsheet, Settings } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format } from 'date-fns';
 import { InvoiceDetail } from '../billing/InvoiceDetail';
+import ARReportBuilderModal from './ARReportBuilderModal';
+import ARAutomationSettings from './ARAutomationSettings';
+import { exportARToPDF, exportARToCSV, downloadCSV, getDefaultARColumns } from '../../utils/ar-export';
 
 interface Invoice {
   invoice_id: string;
@@ -30,6 +33,9 @@ export default function AccountsReceivableReport() {
   const [selectedCustomer, setSelectedCustomer] = useState('all');
   const [customers, setCustomers] = useState<string[]>([]);
   const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
+  const [showReportBuilder, setShowReportBuilder] = useState(false);
+  const [showAutomationSettings, setShowAutomationSettings] = useState(false);
+  const [companyName, setCompanyName] = useState('Company Name');
 
   useEffect(() => {
     loadData();
@@ -38,6 +44,15 @@ export default function AccountsReceivableReport() {
   const loadData = async () => {
     setLoading(true);
     try {
+      const { data: settings } = await supabase
+        .from('company_settings')
+        .select('company_name')
+        .maybeSingle();
+
+      if (settings?.company_name) {
+        setCompanyName(settings.company_name);
+      }
+
       let query = supabase
         .from('printavo_invoices')
         .select('*')
@@ -114,27 +129,20 @@ export default function AccountsReceivableReport() {
     setViewingInvoiceId(null);
   };
 
-  const exportToCSV = () => {
-    const headers = ['Invoice #', 'Customer', 'Invoice Date', 'Due Date', 'Total', 'Paid', 'Balance', 'Days Overdue', 'Aging Bucket'];
-    const rows = invoices.map(inv => [
-      inv.invoice_number,
-      inv.customer_name,
-      inv.invoice_date,
-      inv.due_date,
-      inv.total.toFixed(2),
-      inv.amount_paid.toFixed(2),
-      inv.balance_remaining.toFixed(2),
-      inv.days_overdue,
-      inv.aging_bucket,
-    ]);
+  const handleExportPDF = async () => {
+    await exportARToPDF({
+      invoices,
+      columns: getDefaultARColumns(),
+      companyName,
+    });
+  };
 
-    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `accounts-receivable-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    a.click();
+  const handleExportCSV = () => {
+    const csvContent = exportARToCSV({
+      invoices,
+      columns: getDefaultARColumns(),
+    });
+    downloadCSV(csvContent);
   };
 
   if (viewingInvoiceId) {
@@ -194,7 +202,7 @@ export default function AccountsReceivableReport() {
           <select
             value={selectedCustomer}
             onChange={(e) => setSelectedCustomer(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">All Customers</option>
             {customers.map(customer => (
@@ -202,14 +210,39 @@ export default function AccountsReceivableReport() {
             ))}
           </select>
 
+          <div className="ml-auto flex items-center gap-3">
+            <button
+              onClick={() => setShowAutomationSettings(true)}
+              className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              <Settings className="w-4 h-4" />
+              Automation
+            </button>
 
-          <button
-            onClick={exportToCSV}
-            className="ml-auto flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-          >
-            <Download className="w-4 h-4" />
-            Export CSV
-          </button>
+            <button
+              onClick={() => setShowReportBuilder(true)}
+              className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              <FileText className="w-4 h-4" />
+              Report Builder
+            </button>
+
+            <button
+              onClick={handleExportPDF}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              <FileText className="w-4 h-4" />
+              Export PDF
+            </button>
+
+            <button
+              onClick={handleExportCSV}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Export CSV
+            </button>
+          </div>
         </div>
       </div>
 
@@ -282,6 +315,18 @@ export default function AccountsReceivableReport() {
           )}
         </div>
       </div>
+
+      <ARReportBuilderModal
+        isOpen={showReportBuilder}
+        onClose={() => setShowReportBuilder(false)}
+        onGenerate={() => {}}
+        invoices={invoices}
+      />
+
+      <ARAutomationSettings
+        isOpen={showAutomationSettings}
+        onClose={() => setShowAutomationSettings(false)}
+      />
     </div>
   );
 }
