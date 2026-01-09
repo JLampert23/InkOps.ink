@@ -305,6 +305,16 @@ export const invoiceDetailService = {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Not authenticated');
 
+    const { data: invoice } = await supabase
+      .from('printavo_invoices')
+      .select('*')
+      .eq('id', printavoInvoiceId)
+      .maybeSingle();
+
+    if (!invoice) {
+      throw new Error('Invoice not found');
+    }
+
     const { data: billingQueueItem } = await supabase
       .from('billing_queue')
       .select('*')
@@ -319,6 +329,29 @@ export const invoiceDetailService = {
       .from('company_settings')
       .select('id')
       .maybeSingle();
+
+    const currentAmountPaid = parseFloat(invoice.amount_paid || '0');
+    const currentAmountOutstanding = parseFloat(invoice.amount_outstanding || '0');
+    const newAmountPaid = currentAmountPaid + amount;
+    const newAmountOutstanding = Math.max(0, currentAmountOutstanding - amount);
+
+    await supabase
+      .from('printavo_invoices')
+      .update({
+        amount_paid: newAmountPaid.toString(),
+        amount_outstanding: newAmountOutstanding.toString(),
+      })
+      .eq('id', printavoInvoiceId);
+
+    await supabase
+      .from('printavo_payments')
+      .insert([{
+        invoice_id: printavoInvoiceId,
+        amount: amount.toString(),
+        payment_date: new Date().toISOString(),
+        payment_method: 'manual',
+        notes: 'Manual payment recorded by user',
+      }]);
 
     await supabase
       .from('paid_invoices')
