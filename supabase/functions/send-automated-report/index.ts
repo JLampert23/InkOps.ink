@@ -37,7 +37,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Get the automation rule
     const { data: rule, error: ruleError } = await supabase
       .from('automated_reports')
       .select('*')
@@ -58,71 +57,101 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Fetch report data
-    const { data: rawInvoices, error: invoicesError } = await supabase
-      .from('printavo_invoices_calculated')
-      .select('*')
-      .order('created_at', { ascending: false });
+    let openInvoices: any[] = [];
 
-    if (invoicesError) {
-      throw new Error(`Failed to fetch invoice data: ${invoicesError.message}`);
+    if (rule.report_type === 'accounts-receivable') {
+      const { data, error: invoicesError } = await supabase
+        .from('printavo_invoices')
+        .select('*')
+        .eq('status_stage', 'accounts_receivable')
+        .gt('amount_outstanding', 0)
+        .order('due_date', { ascending: true });
+
+      if (invoicesError) {
+        throw new Error(`Failed to fetch AR invoice data: ${invoicesError.message}`);
+      }
+
+      openInvoices = data || [];
+    } else {
+      const { data, error: invoicesError } = await supabase
+        .from('printavo_invoices_calculated')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (invoicesError) {
+        throw new Error(`Failed to fetch invoice data: ${invoicesError.message}`);
+      }
+
+      const invoices = data || [];
+
+      openInvoices = invoices.filter((inv: any) => {
+        const total = inv.total || 0;
+        const amountOutstanding = inv.amount_outstanding || 0;
+        const amountPaid = inv.amount_paid || 0;
+
+        if (total === 0) return false;
+
+        const status = inv.status?.toLowerCase() || '';
+        if (status.includes('dead')) return false;
+
+        const hasBalance = amountOutstanding > 0;
+        const notPaidInFull = inv.paid_in_full === false;
+        const hasTotalNotPaid = total > amountPaid;
+
+        return hasBalance || notPaidInFull || hasTotalNotPaid;
+      });
     }
 
-    const invoices = rawInvoices || [];
-
-    // Filter for open invoices
-    const openInvoices = invoices.filter((inv: any) => {
-      const total = inv.total || 0;
-      const amountOutstanding = inv.amount_outstanding || 0;
-      const amountPaid = inv.amount_paid || 0;
-
-      if (total === 0) return false;
-
-      const status = inv.status?.toLowerCase() || '';
-      if (status.includes('dead')) return false;
-
-      const hasBalance = amountOutstanding > 0;
-      const notPaidInFull = inv.paid_in_full === false;
-      const hasTotalNotPaid = total > amountPaid;
-
-      return hasBalance || notPaidInFull || hasTotalNotPaid;
-    });
-
-    // Build report data
     const reportData = {
       openInvoices: openInvoices.map((inv: any) => {
-        const invoiceDate = inv.invoice_at || inv.created_at;
+        let invoiceDate: string;
+        let dueDate: string | null;
+        let daysPastDue: number;
+        let bucket: string;
 
-        // Calculate days past due (from due date, not creation date) to match Printavo
-        const calculateDaysPastDue = () => {
-          if (!inv.due_at) {
-            // If no due date, calculate from invoice date
-            return Math.floor(
-              (Date.now() - new Date(invoiceDate).getTime()) / (1000 * 60 * 60 * 24)
-            );
-          }
-          const due = new Date(inv.due_at);
+        if (rule.report_type === 'accounts-receivable') {
+          invoiceDate = inv.invoice_date;
+          dueDate = inv.due_date;
+          const dueDateObj = new Date(inv.due_date);
           const today = new Date();
-          const diffTime = today.getTime() - due.getTime();
-          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-          return Math.max(0, diffDays);
-        };
+          const daysOverdue = Math.max(0, Math.floor((today.getTime() - dueDateObj.getTime()) / (1000 * 60 * 60 * 24)));
+          daysPastDue = daysOverdue;
 
-        const daysPastDue = calculateDaysPastDue();
+          if (daysOverdue > 90) bucket = '90+ days';
+          else if (daysOverdue > 60) bucket = '61-90 days';
+          else if (daysOverdue > 30) bucket = '31-60 days';
+          else bucket = '0-30 days';
+        } else {
+          invoiceDate = inv.invoice_at || inv.created_at;
 
-        // Bucket based on days past due, not days outstanding
-        let bucket = '';
-        if (daysPastDue <= 30) bucket = '0-30 days';
-        else if (daysPastDue <= 60) bucket = '31-60 days';
-        else if (daysPastDue <= 90) bucket = '61-90 days';
-        else if (daysPastDue <= 120) bucket = '91-120 days';
-        else bucket = '121+ days';
+          const calculateDaysPastDue = () => {
+            if (!inv.due_at) {
+              return Math.floor(
+                (Date.now() - new Date(invoiceDate).getTime()) / (1000 * 60 * 60 * 24)
+              );
+            }
+            const due = new Date(inv.due_at);
+            const today = new Date();
+            const diffTime = today.getTime() - due.getTime();
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            return Math.max(0, diffDays);
+          };
+
+          daysPastDue = calculateDaysPastDue();
+          dueDate = inv.due_at || null;
+
+          if (daysPastDue <= 30) bucket = '0-30 days';
+          else if (daysPastDue <= 60) bucket = '31-60 days';
+          else if (daysPastDue <= 90) bucket = '61-90 days';
+          else if (daysPastDue <= 120) bucket = '91-120 days';
+          else bucket = '121+ days';
+        }
 
         return {
           customer: inv.customer_name || 'Unknown',
           invoiceNumber: inv.invoice_number || '',
           invoiceDate: invoiceDate,
-          dueDate: inv.due_at || null,
+          dueDate: dueDate,
           total: inv.total || 0,
           outstanding: inv.amount_outstanding || 0,
           agingBucket: bucket,
@@ -136,7 +165,6 @@ Deno.serve(async (req: Request) => {
       ),
     };
 
-    // Generate attachments based on file formats
     const attachments: Array<{ filename: string; content: string; type?: string }> = [];
 
     if (rule.file_formats.includes('pdf')) {
@@ -157,13 +185,11 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Get company settings for email
     const { data: settings } = await supabase
       .from('company_settings')
       .select('email_from_address')
       .maybeSingle();
 
-    // Build email HTML
     const html = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
@@ -202,7 +228,6 @@ Deno.serve(async (req: Request) => {
       </div>
     `;
 
-    // Get Resend API key
     const { data: resendSettings } = await supabase
       .from('company_settings')
       .select('resend_api_key')
@@ -212,7 +237,6 @@ Deno.serve(async (req: Request) => {
       throw new Error('Resend API key not configured');
     }
 
-    // Decrypt the API key
     const cryptoResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
       method: 'POST',
       headers: {
@@ -231,7 +255,6 @@ Deno.serve(async (req: Request) => {
 
     const { result: RESEND_API_KEY } = await cryptoResponse.json();
 
-    // Send email directly via Resend
     const resendPayload: any = {
       from: settings?.email_from_address || 'noreply@toddssportinggoods.com',
       to: rule.email_recipients,
@@ -261,9 +284,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const resendResult = await resendResponse.json();
-    console.log('Email sent successfully:', resendResult);
 
-    // Update last_sent_at
     await supabase
       .from('automated_reports')
       .update({

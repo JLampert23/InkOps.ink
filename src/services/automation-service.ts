@@ -177,6 +177,73 @@ export class AutomationService {
   }
 
   private static async fetchReportData(reportType: string): Promise<any> {
+    if (reportType === 'accounts-receivable') {
+      const { data: rawInvoices, error } = await supabase
+        .from('printavo_invoices')
+        .select('*')
+        .eq('status_stage', 'accounts_receivable')
+        .gt('amount_outstanding', 0)
+        .order('due_date', { ascending: true });
+
+      if (error) {
+        throw new Error(`Failed to fetch AR invoice data: ${error.message}`);
+      }
+
+      const invoices = rawInvoices || [];
+
+      const formattedInvoices = invoices.map(inv => {
+        const total = parseFloat(inv.total || 0);
+        const amountPaid = parseFloat(inv.amount_paid || 0);
+        const balanceRemaining = parseFloat(inv.amount_outstanding || 0);
+        const dueDate = new Date(inv.due_date);
+        const today = new Date();
+        const daysOverdue = Math.max(0, Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)));
+
+        let agingBucket: string = '0-30 days';
+        if (daysOverdue > 90) agingBucket = '90+ days';
+        else if (daysOverdue > 60) agingBucket = '61-90 days';
+        else if (daysOverdue > 30) agingBucket = '31-60 days';
+
+        return {
+          customer: inv.customer_name || 'Unknown',
+          invoiceNumber: inv.invoice_number || '',
+          invoiceDate: inv.invoice_date,
+          dueDate: inv.due_date,
+          total: total,
+          outstanding: balanceRemaining,
+          agingBucket: agingBucket,
+          daysPastDue: daysOverdue,
+        };
+      });
+
+      const agingBuckets = [
+        { name: '0-30', label: '0-30 days', total: 0, count: 0 },
+        { name: '31-60', label: '31-60 days', total: 0, count: 0 },
+        { name: '61-90', label: '61-90 days', total: 0, count: 0 },
+        { name: '90+', label: '90+ days', total: 0, count: 0 },
+      ];
+
+      formattedInvoices.forEach(inv => {
+        const bucket = agingBuckets.find(b => b.label === inv.agingBucket);
+        if (bucket) {
+          bucket.total += inv.outstanding;
+          bucket.count++;
+        }
+      });
+
+      const totalOutstanding = formattedInvoices.reduce(
+        (sum, inv) => sum + inv.outstanding,
+        0
+      );
+
+      return {
+        openInvoices: formattedInvoices,
+        totalInvoices: formattedInvoices.length,
+        totalOutstanding,
+        agingBuckets: agingBuckets,
+      };
+    }
+
     const { data: rawInvoices, error } = await supabase
       .from('printavo_invoices_calculated')
       .select('*')
@@ -321,7 +388,10 @@ export class AutomationService {
     doc.setFontSize(18);
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
-    doc.text(`${reportType} Report`, 14, 9);
+    const reportTitle = reportType === 'accounts-receivable'
+      ? 'Accounts Receivable Report'
+      : `${reportType} Report`;
+    doc.text(reportTitle, 14, 9);
 
     yPosition = 25;
 
