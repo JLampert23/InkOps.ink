@@ -535,6 +535,14 @@ async function syncInvoices(
       for (const invoice of filteredInvoices) {
         const customerId = await findOrCreateCustomer(supabase, invoice);
 
+        const amountOutstanding = invoice.amountOutstanding || 0;
+        let statusStage = 'billing_queue';
+        if (amountOutstanding === 0 && invoice.paidInFull) {
+          statusStage = 'paid';
+        } else if (amountOutstanding > 0) {
+          statusStage = 'accounts_receivable';
+        }
+
         batchBuffer.push({
           id: invoice.id,
           invoice_number: invoice.visualId,
@@ -547,8 +555,9 @@ async function syncInvoices(
           tax: invoice.salesTaxAmount || 0,
           total: invoice.total || 0,
           amount_paid: invoice.amountPaid || 0,
-          amount_outstanding: invoice.amountOutstanding || 0,
+          amount_outstanding: amountOutstanding,
           status: invoice.status?.name,
+          status_stage: statusStage,
           invoice_date: invoice.createdAt,
           due_date: invoice.dueAt,
           updated_at: new Date().toISOString(),
@@ -664,6 +673,14 @@ async function syncInvoices(
     for (const invoice of recentInvoices) {
       const customerId = await findOrCreateCustomer(supabase, invoice);
 
+      const amountOutstanding = invoice.amountOutstanding || 0;
+      let statusStage = 'billing_queue';
+      if (amountOutstanding === 0 && invoice.paidInFull) {
+        statusStage = 'paid';
+      } else if (amountOutstanding > 0) {
+        statusStage = 'accounts_receivable';
+      }
+
       batchBuffer.push({
         id: invoice.id,
         invoice_number: invoice.visualId,
@@ -676,8 +693,9 @@ async function syncInvoices(
         tax: invoice.salesTaxAmount || 0,
         total: invoice.total || 0,
         amount_paid: invoice.amountPaid || 0,
-        amount_outstanding: invoice.amountOutstanding || 0,
+        amount_outstanding: amountOutstanding,
         status: invoice.status?.name,
+        status_stage: statusStage,
         invoice_date: invoice.createdAt,
         due_date: invoice.dueAt,
         updated_at: new Date().toISOString(),
