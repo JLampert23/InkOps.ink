@@ -39,8 +39,9 @@ export default function AccountsReceivableReport() {
       let query = supabase
         .from('printavo_invoices')
         .select('*')
+        .eq('status_stage', 'accounts_receivable')
         .gt('amount_outstanding', 0)
-        .order('date_sent', { ascending: true, nullsFirst: false });
+        .order('due_date', { ascending: true });
 
       if (selectedCustomer !== 'all') {
         query = query.eq('customer_name', selectedCustomer);
@@ -54,14 +55,9 @@ export default function AccountsReceivableReport() {
         const total = parseFloat(inv.total || 0);
         const amountPaid = parseFloat(inv.amount_paid || 0);
         const balanceRemaining = parseFloat(inv.amount_outstanding || 0);
-
+        const dueDate = new Date(inv.due_date);
         const today = new Date();
-        let daysOverdue = 0;
-
-        if (inv.date_sent) {
-          const sentDate = new Date(inv.date_sent);
-          daysOverdue = Math.max(0, Math.floor((today.getTime() - sentDate.getTime()) / (1000 * 60 * 60 * 24)));
-        }
+        const daysOverdue = Math.max(0, Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24)));
 
         let agingBucket: '0-30' | '31-60' | '61-90' | '90+' = '0-30';
         if (daysOverdue > 90) agingBucket = '90+';
@@ -257,7 +253,7 @@ export default function AccountsReceivableReport() {
             <div className="text-center py-12">
               <TrendingUp className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">No Outstanding Invoices</h3>
-              <p className="text-gray-600">All invoices with unpaid balances will appear here.</p>
+              <p className="text-gray-600">All invoices have been paid.</p>
             </div>
           )}
         </div>
