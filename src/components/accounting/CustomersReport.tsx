@@ -38,38 +38,34 @@ export default function CustomersReport() {
   const loadCustomers = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc('get_customers_with_stats');
+      const { data: customersData, error: customersError } = await supabase
+        .from('customers')
+        .select('*')
+        .order('company_name');
 
-      if (error) {
-        console.error('RPC error, falling back to direct query:', error);
+      if (customersError) throw customersError;
 
-        const { data: rawData, error: queryError } = await supabase
-          .from('customers')
-          .select(`
-            id,
-            company_name,
-            contact_name,
-            email,
-            phone,
-            printavo_invoices (
-              total,
-              amount_paid
-            )
-          `);
+      const customersWithStats = await Promise.all(
+        (customersData || []).map(async (customer: any) => {
+          const { data: invoices, error: invoicesError } = await supabase
+            .from('printavo_invoices')
+            .select('total, amount_paid')
+            .eq('customer_id', customer.id);
 
-        if (queryError) throw queryError;
+          if (invoicesError) {
+            console.error('Error loading invoices for customer:', invoicesError);
+            return null;
+          }
 
-        const processedCustomers = (rawData || []).map((customer: any) => {
-          const invoices = customer.printavo_invoices || [];
-          const totalInvoices = invoices.length;
-          const totalBilled = invoices.reduce((sum: number, inv: any) => sum + parseFloat(inv.total || 0), 0);
-          const totalPaid = invoices.reduce((sum: number, inv: any) => sum + parseFloat(inv.amount_paid || 0), 0);
+          const totalInvoices = invoices?.length || 0;
+          const totalBilled = invoices?.reduce((sum, inv) => sum + parseFloat(inv.total || 0), 0) || 0;
+          const totalPaid = invoices?.reduce((sum, inv) => sum + parseFloat(inv.amount_paid || 0), 0) || 0;
           const outstandingBalance = totalBilled - totalPaid;
 
           return {
             id: customer.id,
             company_name: customer.company_name,
-            contact_name: customer.contact_name || '',
+            contact_name: customer.contact_name,
             email: customer.email || '',
             phone: customer.phone || '',
             total_invoices: totalInvoices,
@@ -77,25 +73,13 @@ export default function CustomersReport() {
             total_paid: totalPaid,
             outstanding_balance: outstandingBalance,
           };
-        });
+        })
+      );
 
-        const sortedCustomers = processedCustomers.sort((a, b) => b.total_billed - a.total_billed);
-        setCustomers(sortedCustomers);
-      } else {
-        const processedCustomers = (data || []).map((row: any) => ({
-          id: row.customer_id,
-          company_name: row.company_name,
-          contact_name: row.contact_name || '',
-          email: row.email || '',
-          phone: row.phone || '',
-          total_invoices: parseInt(row.total_invoices || 0),
-          total_billed: parseFloat(row.total_billed || 0),
-          total_paid: parseFloat(row.total_paid || 0),
-          outstanding_balance: parseFloat(row.outstanding_balance || 0),
-        }));
+      const validCustomers = customersWithStats.filter(c => c !== null) as Customer[];
+      const sortedCustomers = validCustomers.sort((a, b) => b.total_billed - a.total_billed);
 
-        setCustomers(processedCustomers);
-      }
+      setCustomers(sortedCustomers);
     } catch (error) {
       console.error('Error loading customers:', error);
     } finally {
