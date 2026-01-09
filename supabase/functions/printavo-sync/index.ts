@@ -28,10 +28,27 @@ interface Invoice {
     id?: string;
     fullName?: string;
     email?: string;
+    phone?: string;
     customer?: {
       id?: string;
       companyName?: string;
     };
+  };
+  billingAddress?: {
+    address1?: string;
+    address2?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
+  };
+  shippingAddress?: {
+    address1?: string;
+    address2?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
   };
   subtotal?: number;
   salesTaxAmount?: number;
@@ -205,6 +222,7 @@ async function findOrCreateCustomer(
 ): Promise<string | null> {
   const customerName = invoice.contact?.customer?.companyName || invoice.contact?.fullName;
   const customerEmail = invoice.contact?.email;
+  const customerPhone = invoice.contact?.phone;
   const printavoCustomerId = invoice.contact?.customer?.id;
 
   if (!customerName) {
@@ -212,6 +230,7 @@ async function findOrCreateCustomer(
     return null;
   }
 
+  // Check if customer exists by email first
   let existingCustomer = null;
 
   if (customerEmail) {
@@ -223,6 +242,7 @@ async function findOrCreateCustomer(
     existingCustomer = data;
   }
 
+  // If not found by email, check by company name
   if (!existingCustomer && customerName) {
     const { data } = await supabase
       .from('customers')
@@ -232,19 +252,44 @@ async function findOrCreateCustomer(
     existingCustomer = data;
   }
 
+  // If customer exists, link invoice to them
   if (existingCustomer) {
     return existingCustomer.id;
   }
 
+  // Customer doesn't exist, create a new one with all available information
+  const customerData: any = {
+    company_name: customerName,
+    contact_name: invoice.contact?.fullName,
+    email: customerEmail,
+    phone: customerPhone,
+    printavo_customer_id: printavoCustomerId,
+    status: 'active',
+  };
+
+  // Add billing address if available
+  if (invoice.billingAddress) {
+    customerData.billing_address_line1 = invoice.billingAddress.address1;
+    customerData.billing_address_line2 = invoice.billingAddress.address2;
+    customerData.billing_city = invoice.billingAddress.city;
+    customerData.billing_state = invoice.billingAddress.state;
+    customerData.billing_zip = invoice.billingAddress.zip;
+    customerData.billing_country = invoice.billingAddress.country || 'USA';
+  }
+
+  // Add shipping address if available
+  if (invoice.shippingAddress) {
+    customerData.shipping_address_line1 = invoice.shippingAddress.address1;
+    customerData.shipping_address_line2 = invoice.shippingAddress.address2;
+    customerData.shipping_city = invoice.shippingAddress.city;
+    customerData.shipping_state = invoice.shippingAddress.state;
+    customerData.shipping_zip = invoice.shippingAddress.zip;
+    customerData.shipping_country = invoice.shippingAddress.country || 'USA';
+  }
+
   const { data: newCustomer, error } = await supabase
     .from('customers')
-    .insert({
-      company_name: customerName,
-      contact_name: invoice.contact?.fullName,
-      email: customerEmail,
-      printavo_customer_id: printavoCustomerId,
-      status: 'active',
-    })
+    .insert(customerData)
     .select('id')
     .single();
 
@@ -288,10 +333,27 @@ async function syncInvoices(
               id
               fullName
               email
+              phone
               customer {
                 id
                 companyName
               }
+            }
+            billingAddress {
+              address1
+              address2
+              city
+              state
+              zip
+              country
+            }
+            shippingAddress {
+              address1
+              address2
+              city
+              state
+              zip
+              country
             }
             lineItemGroups {
               edges {
@@ -356,10 +418,27 @@ async function syncInvoices(
               id
               fullName
               email
+              phone
               customer {
                 id
                 companyName
               }
+            }
+            billingAddress {
+              address1
+              address2
+              city
+              state
+              zip
+              country
+            }
+            shippingAddress {
+              address1
+              address2
+              city
+              state
+              zip
+              country
             }
             lineItemGroups {
               edges {
@@ -449,6 +528,7 @@ async function syncInvoices(
           invoice_number: invoice.visualId,
           customer_id: customerId,
           customer_email: invoice.contact?.email,
+          customer_phone: invoice.contact?.phone,
           customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName,
           customer_company: invoice.contact?.customer?.companyName,
           subtotal: invoice.subtotal || 0,
@@ -538,6 +618,7 @@ async function syncInvoices(
         invoice_number: invoice.visualId,
         customer_id: customerId,
         customer_email: invoice.contact?.email,
+        customer_phone: invoice.contact?.phone,
         customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName,
         customer_company: invoice.contact?.customer?.companyName,
         subtotal: invoice.subtotal || 0,
