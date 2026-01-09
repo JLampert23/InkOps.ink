@@ -28,10 +28,27 @@ interface Invoice {
     id?: string;
     fullName?: string;
     email?: string;
+    phone?: string;
     customer?: {
       id?: string;
       companyName?: string;
     };
+  };
+  billingAddress?: {
+    address?: string;
+    address2?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
+  };
+  shippingAddress?: {
+    address?: string;
+    address2?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
   };
   subtotal?: number;
   salesTaxAmount?: number;
@@ -205,6 +222,7 @@ async function findOrCreateCustomer(
 ): Promise<string | null> {
   const customerName = invoice.contact?.customer?.companyName || invoice.contact?.fullName;
   const customerEmail = invoice.contact?.email;
+  const customerPhone = invoice.contact?.phone;
   const printavoCustomerId = invoice.contact?.customer?.id;
 
   if (!customerName) {
@@ -236,13 +254,34 @@ async function findOrCreateCustomer(
     return existingCustomer.id;
   }
 
+  const billingAddress = invoice.billingAddress ? {
+    address: invoice.billingAddress.address || '',
+    address2: invoice.billingAddress.address2 || '',
+    city: invoice.billingAddress.city || '',
+    state: invoice.billingAddress.state || '',
+    zip: invoice.billingAddress.zip || '',
+    country: invoice.billingAddress.country || '',
+  } : {};
+
+  const shippingAddress = invoice.shippingAddress ? {
+    address: invoice.shippingAddress.address || '',
+    address2: invoice.shippingAddress.address2 || '',
+    city: invoice.shippingAddress.city || '',
+    state: invoice.shippingAddress.state || '',
+    zip: invoice.shippingAddress.zip || '',
+    country: invoice.shippingAddress.country || '',
+  } : {};
+
   const { data: newCustomer, error } = await supabase
     .from('customers')
     .insert({
       company_name: customerName,
       contact_name: invoice.contact?.fullName,
       email: customerEmail,
+      phone: customerPhone,
       printavo_customer_id: printavoCustomerId,
+      billing_address: billingAddress,
+      shipping_address: shippingAddress,
       status: 'active',
     })
     .select('id')
@@ -288,10 +327,27 @@ async function syncInvoices(
               id
               fullName
               email
+              phone
               customer {
                 id
                 companyName
               }
+            }
+            billingAddress {
+              address
+              address2
+              city
+              state
+              zip
+              country
+            }
+            shippingAddress {
+              address
+              address2
+              city
+              state
+              zip
+              country
             }
             lineItemGroups {
               edges {
@@ -356,10 +412,27 @@ async function syncInvoices(
               id
               fullName
               email
+              phone
               customer {
                 id
                 companyName
               }
+            }
+            billingAddress {
+              address
+              address2
+              city
+              state
+              zip
+              country
+            }
+            shippingAddress {
+              address
+              address2
+              city
+              state
+              zip
+              country
             }
             lineItemGroups {
               edges {
@@ -444,6 +517,26 @@ async function syncInvoices(
       for (const invoice of filteredInvoices) {
         const customerId = await findOrCreateCustomer(supabase, invoice);
 
+        const billingAddress = invoice.billingAddress ? {
+          address: invoice.billingAddress.address || '',
+          address2: invoice.billingAddress.address2 || '',
+          city: invoice.billingAddress.city || '',
+          state: invoice.billingAddress.state || '',
+          zip: invoice.billingAddress.zip || '',
+          country: invoice.billingAddress.country || '',
+        } : {};
+
+        const shippingAddress = invoice.shippingAddress ? {
+          address: invoice.shippingAddress.address || '',
+          address2: invoice.shippingAddress.address2 || '',
+          city: invoice.shippingAddress.city || '',
+          state: invoice.shippingAddress.state || '',
+          zip: invoice.shippingAddress.zip || '',
+          country: invoice.shippingAddress.country || '',
+        } : {};
+
+        const statusStage = invoice.amountOutstanding === 0 ? 'paid' : 'billing_queue';
+
         batchBuffer.push({
           id: invoice.id,
           invoice_number: invoice.visualId,
@@ -451,12 +544,16 @@ async function syncInvoices(
           customer_email: invoice.contact?.email,
           customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName,
           customer_company: invoice.contact?.customer?.companyName,
+          customer_phone: invoice.contact?.phone,
+          billing_address: billingAddress,
+          shipping_address: shippingAddress,
           subtotal: invoice.subtotal || 0,
           tax: invoice.salesTaxAmount || 0,
           total: invoice.total || 0,
           amount_paid: invoice.amountPaid || 0,
           amount_outstanding: invoice.amountOutstanding || 0,
           status: invoice.status?.name,
+          status_stage: statusStage,
           invoice_date: invoice.createdAt,
           due_date: invoice.dueAt,
           updated_at: new Date().toISOString(),
@@ -533,6 +630,26 @@ async function syncInvoices(
     for (const invoice of recentInvoices) {
       const customerId = await findOrCreateCustomer(supabase, invoice);
 
+      const billingAddress = invoice.billingAddress ? {
+        address: invoice.billingAddress.address || '',
+        address2: invoice.billingAddress.address2 || '',
+        city: invoice.billingAddress.city || '',
+        state: invoice.billingAddress.state || '',
+        zip: invoice.billingAddress.zip || '',
+        country: invoice.billingAddress.country || '',
+      } : {};
+
+      const shippingAddress = invoice.shippingAddress ? {
+        address: invoice.shippingAddress.address || '',
+        address2: invoice.shippingAddress.address2 || '',
+        city: invoice.shippingAddress.city || '',
+        state: invoice.shippingAddress.state || '',
+        zip: invoice.shippingAddress.zip || '',
+        country: invoice.shippingAddress.country || '',
+      } : {};
+
+      const statusStage = invoice.amountOutstanding === 0 ? 'paid' : 'billing_queue';
+
       batchBuffer.push({
         id: invoice.id,
         invoice_number: invoice.visualId,
@@ -540,12 +657,16 @@ async function syncInvoices(
         customer_email: invoice.contact?.email,
         customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName,
         customer_company: invoice.contact?.customer?.companyName,
+        customer_phone: invoice.contact?.phone,
+        billing_address: billingAddress,
+        shipping_address: shippingAddress,
         subtotal: invoice.subtotal || 0,
         tax: invoice.salesTaxAmount || 0,
         total: invoice.total || 0,
         amount_paid: invoice.amountPaid || 0,
         amount_outstanding: invoice.amountOutstanding || 0,
         status: invoice.status?.name,
+        status_stage: statusStage,
         invoice_date: invoice.createdAt,
         due_date: invoice.dueAt,
         updated_at: new Date().toISOString(),

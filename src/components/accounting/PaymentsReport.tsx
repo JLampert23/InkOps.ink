@@ -32,14 +32,15 @@ export default function PaymentsReport() {
     setLoading(true);
     try {
       let query = supabase
-        .from('stripe_payments')
+        .from('payments')
         .select(`
           *,
-          stripe_invoices (
+          printavo_invoices:invoice_id (
             invoice_number,
-            printavo_invoices (
-              customer_name
-            )
+            customer_name
+          ),
+          customers:customer_id (
+            company_name
           )
         `)
         .gte('payment_date', startDate)
@@ -53,12 +54,12 @@ export default function PaymentsReport() {
       const processedPayments: Payment[] = (data || []).map((payment: any) => ({
         id: payment.id,
         payment_date: payment.payment_date,
-        invoice_number: payment.stripe_invoices?.invoice_number || 'N/A',
-        customer_name: payment.stripe_invoices?.printavo_invoices?.customer_name || 'Unknown',
+        invoice_number: payment.printavo_invoices?.invoice_number || 'N/A',
+        customer_name: payment.printavo_invoices?.customer_name || payment.customers?.company_name || 'Unknown',
         amount: parseFloat(payment.amount || 0),
         payment_method: payment.payment_method || 'Card',
-        stripe_transaction_id: payment.stripe_charge_id || payment.stripe_payment_intent_id || 'N/A',
-        status: payment.status || 'succeeded',
+        stripe_transaction_id: payment.stripe_transaction_id || payment.stripe_payment_intent_id || 'N/A',
+        status: 'succeeded',
       }));
 
       let filtered = processedPayments;

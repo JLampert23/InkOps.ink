@@ -226,30 +226,30 @@ export const billingService = {
   async getBillingQueue(): Promise<BillingQueueItem[]> {
     try {
       const { data, error } = await supabase
-        .from('billing_queue')
+        .from('printavo_invoices')
         .select('*')
-        .neq('payment_status', 'paid')
+        .eq('status_stage', 'billing_queue')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
       return (data || []).map(item => ({
         id: item.id,
-        printavoInvoiceId: item.printavo_invoice_id,
-        printavoVisualId: item.printavo_visual_id,
-        printavoStatus: item.printavo_status,
+        printavoInvoiceId: item.id,
+        printavoVisualId: item.invoice_number,
+        printavoStatus: item.status,
         customerName: item.customer_name,
         customerEmail: item.customer_email,
         customerCompany: item.customer_company,
-        invoiceTotal: parseFloat(item.invoice_total),
+        invoiceTotal: parseFloat(item.total),
         invoiceDate: item.invoice_date,
         dueDate: item.due_date,
-        stripePaymentLinkId: item.stripe_payment_link_id,
-        stripeInvoiceId: item.stripe_invoice_id,
-        sentAt: item.sent_at,
-        sentMethod: item.sent_method,
-        paymentStatus: item.payment_status,
-        metadata: item.metadata,
+        stripePaymentLinkId: null,
+        stripeInvoiceId: null,
+        sentAt: item.date_sent,
+        sentMethod: null,
+        paymentStatus: item.amount_outstanding === 0 ? 'paid' : 'unpaid',
+        metadata: item.raw_data,
         createdAt: item.created_at,
         updatedAt: item.updated_at,
       }));
@@ -394,6 +394,15 @@ export const billingService = {
           sent_method: 'email',
         })
         .eq('id', queueItemId);
+
+      await supabase
+        .from('printavo_invoices')
+        .update({
+          status_stage: 'accounts_receivable',
+          date_sent: new Date().toISOString(),
+          payment_link: paymentUrl,
+        })
+        .eq('id', queueItem.printavo_invoice_id);
 
       await supabase
         .from('communication_logs')
@@ -603,6 +612,15 @@ export const billingService = {
           stripe_invoice_id: stripeInvoice.stripeInvoiceId,
         })
         .eq('id', queueItemId);
+
+      await supabase
+        .from('printavo_invoices')
+        .update({
+          status_stage: 'accounts_receivable',
+          date_sent: new Date().toISOString(),
+          payment_link: stripeInvoice.hostedInvoiceUrl,
+        })
+        .eq('id', queueItem.printavo_invoice_id);
 
       return stripeInvoice.hostedInvoiceUrl;
     } catch (error) {
