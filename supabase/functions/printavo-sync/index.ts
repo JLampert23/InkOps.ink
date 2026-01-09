@@ -199,6 +199,64 @@ async function fetchFromPrintavo(
   return result;
 }
 
+async function findOrCreateCustomer(
+  supabase: any,
+  invoice: Invoice
+): Promise<string | null> {
+  const customerName = invoice.contact?.customer?.companyName || invoice.contact?.fullName;
+  const customerEmail = invoice.contact?.email;
+  const printavoCustomerId = invoice.contact?.customer?.id;
+
+  if (!customerName) {
+    console.log('No customer name found for invoice', invoice.id);
+    return null;
+  }
+
+  let existingCustomer = null;
+
+  if (customerEmail) {
+    const { data } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('email', customerEmail)
+      .maybeSingle();
+    existingCustomer = data;
+  }
+
+  if (!existingCustomer && customerName) {
+    const { data } = await supabase
+      .from('customers')
+      .select('id')
+      .eq('company_name', customerName)
+      .maybeSingle();
+    existingCustomer = data;
+  }
+
+  if (existingCustomer) {
+    return existingCustomer.id;
+  }
+
+  const { data: newCustomer, error } = await supabase
+    .from('customers')
+    .insert({
+      company_name: customerName,
+      contact_name: invoice.contact?.fullName,
+      email: customerEmail,
+      printavo_customer_id: printavoCustomerId,
+      status: 'active',
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    console.error('Error creating customer:', error);
+    return null;
+  }
+
+  console.log('Created new customer:', customerName, 'with ID:', newCustomer.id);
+  return newCustomer.id;
+}
+
 async function syncInvoices(
   supabase: any,
   printavoEmail: string,
@@ -384,11 +442,14 @@ async function syncInvoices(
       );
 
       for (const invoice of filteredInvoices) {
+        const customerId = await findOrCreateCustomer(supabase, invoice);
+
         batchBuffer.push({
           id: invoice.id,
           invoice_number: invoice.visualId,
+          customer_id: customerId,
           customer_email: invoice.contact?.email,
-          customer_name: invoice.contact?.fullName,
+          customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName,
           customer_company: invoice.contact?.customer?.companyName,
           subtotal: invoice.subtotal || 0,
           tax: invoice.salesTaxAmount || 0,
@@ -470,11 +531,14 @@ async function syncInvoices(
     });
 
     for (const invoice of recentInvoices) {
+      const customerId = await findOrCreateCustomer(supabase, invoice);
+
       batchBuffer.push({
         id: invoice.id,
         invoice_number: invoice.visualId,
+        customer_id: customerId,
         customer_email: invoice.contact?.email,
-        customer_name: invoice.contact?.fullName,
+        customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName,
         customer_company: invoice.contact?.customer?.companyName,
         subtotal: invoice.subtotal || 0,
         tax: invoice.salesTaxAmount || 0,

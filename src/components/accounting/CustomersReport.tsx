@@ -4,7 +4,9 @@ import { supabase } from '../../lib/supabase-client';
 import { format } from 'date-fns';
 
 interface Customer {
-  customer_name: string;
+  id: string;
+  company_name: string;
+  contact_name: string;
   email: string;
   phone: string;
   total_invoices: number;
@@ -36,44 +38,48 @@ export default function CustomersReport() {
   const loadCustomers = async () => {
     setLoading(true);
     try {
-      const { data: invoices, error } = await supabase
-        .from('printavo_invoices')
-        .select('*');
+      const { data: customersData, error: customersError } = await supabase
+        .from('customers')
+        .select('*')
+        .order('company_name');
 
-      if (error) throw error;
+      if (customersError) throw customersError;
 
-      const customerMap = new Map<string, Customer>();
+      const customersWithStats = await Promise.all(
+        (customersData || []).map(async (customer: any) => {
+          const { data: invoices, error: invoicesError } = await supabase
+            .from('printavo_invoices')
+            .select('total, amount_paid')
+            .eq('customer_id', customer.id);
 
-      (invoices || []).forEach((inv: any) => {
-        const customerName = inv.customer_name;
-        const total = parseFloat(inv.total || 0);
-        const paid = parseFloat(inv.amount_paid || 0);
-        const outstanding = total - paid;
+          if (invoicesError) {
+            console.error('Error loading invoices for customer:', invoicesError);
+            return null;
+          }
 
-        if (!customerMap.has(customerName)) {
-          customerMap.set(customerName, {
-            customer_name: customerName,
-            email: inv.customer_email || '',
-            phone: inv.customer_phone || '',
-            total_invoices: 0,
-            total_billed: 0,
-            total_paid: 0,
-            outstanding_balance: 0,
-          });
-        }
+          const totalInvoices = invoices?.length || 0;
+          const totalBilled = invoices?.reduce((sum, inv) => sum + parseFloat(inv.total || 0), 0) || 0;
+          const totalPaid = invoices?.reduce((sum, inv) => sum + parseFloat(inv.amount_paid || 0), 0) || 0;
+          const outstandingBalance = totalBilled - totalPaid;
 
-        const customer = customerMap.get(customerName)!;
-        customer.total_invoices += 1;
-        customer.total_billed += total;
-        customer.total_paid += paid;
-        customer.outstanding_balance += outstanding;
-      });
-
-      const customerList = Array.from(customerMap.values()).sort((a, b) =>
-        b.total_billed - a.total_billed
+          return {
+            id: customer.id,
+            company_name: customer.company_name,
+            contact_name: customer.contact_name,
+            email: customer.email || '',
+            phone: customer.phone || '',
+            total_invoices: totalInvoices,
+            total_billed: totalBilled,
+            total_paid: totalPaid,
+            outstanding_balance: outstandingBalance,
+          };
+        })
       );
 
-      setCustomers(customerList);
+      const validCustomers = customersWithStats.filter(c => c !== null) as Customer[];
+      const sortedCustomers = validCustomers.sort((a, b) => b.total_billed - a.total_billed);
+
+      setCustomers(sortedCustomers);
     } catch (error) {
       console.error('Error loading customers:', error);
     } finally {
@@ -88,7 +94,7 @@ export default function CustomersReport() {
       const { data, error } = await supabase
         .from('printavo_invoices')
         .select('*')
-        .eq('customer_name', customer.customer_name)
+        .eq('customer_id', customer.id)
         .order('invoice_date', { ascending: false });
 
       if (error) throw error;
@@ -110,14 +116,15 @@ export default function CustomersReport() {
   };
 
   const filteredCustomers = customers.filter(customer =>
-    customer.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    customer.company_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     customer.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const exportToCSV = () => {
-    const headers = ['Customer Name', 'Email', 'Phone', 'Total Invoices', 'Total Billed', 'Total Paid', 'Outstanding Balance'];
+    const headers = ['Company Name', 'Contact Name', 'Email', 'Phone', 'Total Invoices', 'Total Billed', 'Total Paid', 'Outstanding Balance'];
     const rows = customers.map(cust => [
-      cust.customer_name,
+      cust.company_name,
+      cust.contact_name || '',
       cust.email,
       cust.phone,
       cust.total_invoices,
@@ -223,15 +230,18 @@ export default function CustomersReport() {
           <div className="overflow-y-auto" style={{ maxHeight: '600px' }}>
             {filteredCustomers.map((customer) => (
               <button
-                key={customer.customer_name}
+                key={customer.id}
                 onClick={() => loadCustomerDetails(customer)}
                 className={`w-full px-6 py-4 border-b border-gray-100 hover:bg-gray-50 transition-colors text-left ${
-                  selectedCustomer?.customer_name === customer.customer_name ? 'bg-green-50' : ''
+                  selectedCustomer?.id === customer.id ? 'bg-green-50' : ''
                 }`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <h4 className="font-semibold text-gray-900">{customer.customer_name}</h4>
+                    <h4 className="font-semibold text-gray-900">{customer.company_name}</h4>
+                    {customer.contact_name && (
+                      <p className="text-sm text-gray-500 mt-0.5">{customer.contact_name}</p>
+                    )}
                     <div className="mt-1 space-y-1">
                       {customer.email && (
                         <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -278,7 +288,10 @@ export default function CustomersReport() {
           {selectedCustomer ? (
             <>
               <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                <h3 className="text-lg font-semibold text-gray-900">{selectedCustomer.customer_name}</h3>
+                <h3 className="text-lg font-semibold text-gray-900">{selectedCustomer.company_name}</h3>
+                {selectedCustomer.contact_name && (
+                  <p className="text-sm text-gray-600 mt-1">{selectedCustomer.contact_name}</p>
+                )}
                 <div className="mt-2 grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-gray-600">Total Billed:</span>

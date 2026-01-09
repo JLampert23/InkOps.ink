@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { RefreshCw, AlertCircle, TrendingUp, Menu, X, LogOut, Loader2, Settings, CreditCard, Package, ChevronDown, ChevronUp, Send, Mail, Wallet, Users, CheckCircle } from 'lucide-react';
+import { RefreshCw, AlertCircle, TrendingUp, Menu, X, LogOut, Loader2, Settings, CreditCard, Package, ChevronDown, ChevronUp, Send, Mail, Wallet, Users } from 'lucide-react';
 import { AccountSettings } from './components/AccountSettings';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { EnhancedAuthScreen } from './components/EnhancedAuthScreen';
@@ -11,15 +11,13 @@ const BillingDashboard = lazy(() => import('./components/billing/BillingDashboar
 const AccountsReceivableReport = lazy(() => import('./components/accounting/AccountsReceivableReport'));
 const CustomersReport = lazy(() => import('./components/accounting/CustomersReport'));
 const PaymentsReport = lazy(() => import('./components/accounting/PaymentsReport'));
-const PaidInvoices = lazy(() => import('./components/accounting/PaidInvoices'));
 
 type Tab =
   | 'square' | 'production' | 'settings'
   | 'accounting-dashboard'
   | 'accounts-receivable'
   | 'customers'
-  | 'payments'
-  | 'paid-invoices';
+  | 'payments';
 
 interface CompanySettings {
   company_name: string;
@@ -96,12 +94,6 @@ function AppContent() {
       name: 'Accounts Receivable',
       icon: TrendingUp,
       description: 'Aging and outstanding invoices'
-    },
-    {
-      id: 'paid-invoices' as Tab,
-      name: 'Paid Invoices',
-      icon: CheckCircle,
-      description: 'Fully paid invoice history'
     },
     {
       id: 'customers' as Tab,
@@ -376,7 +368,6 @@ function AppContent() {
               <h2 className="text-2xl font-bold text-gray-900">
                 {activeTab === 'accounting-dashboard' ? 'ACCOUNTING' :
                  activeTab === 'accounts-receivable' ? 'Accounts Receivable' :
-                 activeTab === 'paid-invoices' ? 'Paid Invoices' :
                  activeTab === 'customers' ? 'Customers' :
                  activeTab === 'payments' ? 'Payments' :
                  [...accountingNavItems, ...squareNavItems, ...productionNavItems].find(item => item.id === activeTab)?.name ||
@@ -387,8 +378,6 @@ function AppContent() {
                   'Manage invoices, send payments, and track billing'
                 ) : activeTab === 'accounts-receivable' ? (
                   'Aging reports and outstanding invoices'
-                ) : activeTab === 'paid-invoices' ? (
-                  'Fully paid invoice history and custom reporting'
                 ) : activeTab === 'customers' ? (
                   'Customer billing summary and payment history'
                 ) : activeTab === 'payments' ? (
@@ -448,20 +437,6 @@ function AppContent() {
               </div>
             }>
               <AccountsReceivableReport />
-            </Suspense>
-          )}
-
-          {activeTab === 'paid-invoices' && (
-            <Suspense fallback={
-              <div className="bg-white rounded-lg shadow p-8">
-                <div className="text-center">
-                  <Loader2 className="w-12 h-12 text-green-600 animate-spin mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading Paid Invoices</h3>
-                  <p className="text-gray-600">Loading invoice history...</p>
-                </div>
-              </div>
-            }>
-              <PaidInvoices />
             </Suspense>
           )}
 
