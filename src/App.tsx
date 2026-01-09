@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { RefreshCw, AlertCircle, TrendingUp, Menu, X, LogOut, Loader2, Settings, CreditCard, Package, ChevronDown, ChevronUp, Send, Mail, Wallet } from 'lucide-react';
+import { RefreshCw, AlertCircle, TrendingUp, Menu, X, LogOut, Loader2, Settings, CreditCard, Package, ChevronDown, ChevronUp, Send, Mail, Wallet, Users } from 'lucide-react';
 import { AccountSettings } from './components/AccountSettings';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { EnhancedAuthScreen } from './components/EnhancedAuthScreen';
@@ -8,10 +8,16 @@ import { supabase } from './lib/supabase-client';
 const SquareData = lazy(() => import('./components/SquareData'));
 const ProductionManagement = lazy(() => import('./components/ProductionManagement').then(m => ({ default: m.ProductionManagement })));
 const BillingDashboard = lazy(() => import('./components/billing/BillingDashboard').then(m => ({ default: m.BillingDashboard })));
+const AccountsReceivableReport = lazy(() => import('./components/accounting/AccountsReceivableReport'));
+const CustomersReport = lazy(() => import('./components/accounting/CustomersReport'));
+const PaymentsReport = lazy(() => import('./components/accounting/PaymentsReport'));
 
 type Tab =
   | 'square' | 'production' | 'settings'
-  | 'billing-dashboard';
+  | 'accounting-dashboard'
+  | 'accounts-receivable'
+  | 'customers'
+  | 'payments';
 
 interface CompanySettings {
   company_name: string;
@@ -19,9 +25,9 @@ interface CompanySettings {
 }
 
 function AppContent() {
-  const [activeTab, setActiveTab] = useState<Tab>('billing-dashboard');
+  const [activeTab, setActiveTab] = useState<Tab>('accounting-dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [billingPaymentsExpanded, setBillingPaymentsExpanded] = useState(true);
+  const [accountingExpanded, setAccountingExpanded] = useState(true);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const { signOut, user } = useAuth();
 
@@ -76,12 +82,30 @@ function AppContent() {
     }
   }, [activeTab]);
 
-  const billingPaymentsNavItems = [
+  const accountingNavItems = [
     {
-      id: 'billing-dashboard' as Tab,
-      name: 'Billing Dashboard',
+      id: 'accounting-dashboard' as Tab,
+      name: 'Dashboard',
       icon: Wallet,
       description: 'Manage invoices and payments'
+    },
+    {
+      id: 'accounts-receivable' as Tab,
+      name: 'Accounts Receivable',
+      icon: TrendingUp,
+      description: 'Aging and outstanding invoices'
+    },
+    {
+      id: 'customers' as Tab,
+      name: 'Customers',
+      icon: Users,
+      description: 'Customer billing summary'
+    },
+    {
+      id: 'payments' as Tab,
+      name: 'Payments',
+      icon: CreditCard,
+      description: 'Payment history and tracking'
     },
   ];
 
@@ -153,26 +177,26 @@ function AppContent() {
         {/* Navigation */}
         <nav className="p-4 space-y-2 overflow-y-auto pb-32" style={{ height: 'calc(100vh - 220px)' }}>
 
-          {/* 1. BILLING & PAYMENTS - Collapsible section (NEW - AT TOP) */}
+          {/* 1. ACCOUNTING - Collapsible section (NEW - AT TOP) */}
           <div>
-            {/* Billing & Payments Header - Collapsible trigger */}
+            {/* Accounting Header - Collapsible trigger */}
             <button
-              onClick={() => setBillingPaymentsExpanded(!billingPaymentsExpanded)}
+              onClick={() => setAccountingExpanded(!accountingExpanded)}
               className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group text-gray-900 hover:bg-gray-50"
-              title={!sidebarOpen ? 'BILLING & PAYMENTS' : ''}
-              aria-label="Billing & Payments"
-              aria-expanded={billingPaymentsExpanded}
-              aria-controls="billing-payments-submenu"
+              title={!sidebarOpen ? 'ACCOUNTING' : ''}
+              aria-label="Accounting"
+              aria-expanded={accountingExpanded}
+              aria-controls="accounting-submenu"
             >
               <Wallet className="w-5 h-5 flex-shrink-0 text-gray-600 group-hover:text-gray-900" />
               {sidebarOpen && (
                 <>
                   <div className="flex-1 text-left">
                     <div className="font-bold text-sm uppercase tracking-wide text-gray-900">
-                      Billing & Payments
+                      Accounting
                     </div>
                   </div>
-                  {billingPaymentsExpanded ? (
+                  {accountingExpanded ? (
                     <ChevronDown className="w-4 h-4 text-gray-500 transition-transform duration-200" />
                   ) : (
                     <ChevronUp className="w-4 h-4 text-gray-500 transition-transform duration-200 rotate-180" />
@@ -180,7 +204,7 @@ function AppContent() {
                 </>
               )}
               {!sidebarOpen && (
-                billingPaymentsExpanded ? (
+                accountingExpanded ? (
                   <ChevronDown className="w-4 h-4 text-gray-500 absolute right-2" />
                 ) : (
                   <ChevronUp className="w-4 h-4 text-gray-500 absolute right-2 rotate-180" />
@@ -188,15 +212,15 @@ function AppContent() {
               )}
             </button>
 
-            {/* Billing & Payments Sub-items - Collapsible content with animation */}
-            {billingPaymentsExpanded && (
+            {/* Accounting Sub-items - Collapsible content with animation */}
+            {accountingExpanded && (
               <div
-                id="billing-payments-submenu"
+                id="accounting-submenu"
                 className="mt-1 space-y-1 ml-2 collapsible-section collapsible-section-enter"
                 role="group"
-                aria-label="Billing & Payments submenu"
+                aria-label="Accounting submenu"
               >
-                {billingPaymentsNavItems.map((item, index) => {
+                {accountingNavItems.map((item, index) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
                   return (
@@ -342,12 +366,22 @@ function AppContent() {
           <div className="h-full px-4 flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">
-                {[...billingPaymentsNavItems, ...squareNavItems, ...productionNavItems].find(item => item.id === activeTab)?.name ||
-                  (activeTab === 'settings' ? 'Account Settings' : 'Dashboard')}
+                {activeTab === 'accounting-dashboard' ? 'ACCOUNTING' :
+                 activeTab === 'accounts-receivable' ? 'Accounts Receivable' :
+                 activeTab === 'customers' ? 'Customers' :
+                 activeTab === 'payments' ? 'Payments' :
+                 [...accountingNavItems, ...squareNavItems, ...productionNavItems].find(item => item.id === activeTab)?.name ||
+                 (activeTab === 'settings' ? 'Account Settings' : 'Dashboard')}
               </h2>
               <p className="text-sm text-gray-500 mt-0.5">
-                {activeTab === 'billing-dashboard' ? (
+                {activeTab === 'accounting-dashboard' ? (
                   'Manage invoices, send payments, and track billing'
+                ) : activeTab === 'accounts-receivable' ? (
+                  'Aging reports and outstanding invoices'
+                ) : activeTab === 'customers' ? (
+                  'Customer billing summary and payment history'
+                ) : activeTab === 'payments' ? (
+                  'Payment history and Stripe transaction records'
                 ) : activeTab === 'square' ? (
                   'Square payment data and reports'
                 ) : activeTab === 'production' ? (
@@ -378,17 +412,59 @@ function AppContent() {
 
         {/* Content */}
         <main className="py-6 px-4">
-          {activeTab === 'billing-dashboard' && (
+          {activeTab === 'accounting-dashboard' && (
             <Suspense fallback={
               <div className="bg-white rounded-lg shadow p-8">
                 <div className="text-center">
                   <Loader2 className="w-12 h-12 text-green-600 animate-spin mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading Billing Dashboard</h3>
-                  <p className="text-gray-600">Initializing billing module...</p>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading Accounting Dashboard</h3>
+                  <p className="text-gray-600">Initializing accounting module...</p>
                 </div>
               </div>
             }>
               <BillingDashboard />
+            </Suspense>
+          )}
+
+          {activeTab === 'accounts-receivable' && (
+            <Suspense fallback={
+              <div className="bg-white rounded-lg shadow p-8">
+                <div className="text-center">
+                  <Loader2 className="w-12 h-12 text-green-600 animate-spin mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading Accounts Receivable</h3>
+                  <p className="text-gray-600">Loading aging reports...</p>
+                </div>
+              </div>
+            }>
+              <AccountsReceivableReport />
+            </Suspense>
+          )}
+
+          {activeTab === 'customers' && (
+            <Suspense fallback={
+              <div className="bg-white rounded-lg shadow p-8">
+                <div className="text-center">
+                  <Loader2 className="w-12 h-12 text-green-600 animate-spin mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading Customers Report</h3>
+                  <p className="text-gray-600">Loading customer data...</p>
+                </div>
+              </div>
+            }>
+              <CustomersReport />
+            </Suspense>
+          )}
+
+          {activeTab === 'payments' && (
+            <Suspense fallback={
+              <div className="bg-white rounded-lg shadow p-8">
+                <div className="text-center">
+                  <Loader2 className="w-12 h-12 text-green-600 animate-spin mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading Payments Report</h3>
+                  <p className="text-gray-600">Loading payment history...</p>
+                </div>
+              </div>
+            }>
+              <PaymentsReport />
             </Suspense>
           )}
 
