@@ -46,6 +46,7 @@ export interface PaidInvoice {
   customerEmail: string;
   invoiceTotal: number;
   amountPaid: number;
+  invoiceDate: string;
   paymentDate: string;
   stripePaymentIntentId: string;
   paymentMethod: string;
@@ -470,24 +471,46 @@ export const billingService = {
   async getPaidInvoices(): Promise<PaidInvoice[]> {
     try {
       const { data, error } = await supabase
-        .from('paid_invoices')
-        .select('*')
-        .order('payment_date', { ascending: false });
+        .from('printavo_invoices')
+        .select(`
+          id,
+          invoice_number,
+          customer_name,
+          customer_email,
+          total,
+          amount_paid,
+          invoice_date,
+          updated_at,
+          payments (
+            payment_date,
+            stripe_payment_intent_id,
+            payment_method
+          )
+        `)
+        .eq('status_stage', 'paid')
+        .order('updated_at', { ascending: false });
 
       if (error) throw error;
 
-      return (data || []).map(item => ({
-        id: item.id,
-        printavoInvoiceId: item.printavo_invoice_id,
-        printavoVisualId: item.printavo_visual_id,
-        customerName: item.customer_name,
-        customerEmail: item.customer_email,
-        invoiceTotal: parseFloat(item.invoice_total),
-        amountPaid: parseFloat(item.amount_paid),
-        paymentDate: item.payment_date,
-        stripePaymentIntentId: item.stripe_payment_intent_id,
-        paymentMethod: item.payment_method,
-      }));
+      return (data || []).map(item => {
+        const latestPayment = item.payments && item.payments.length > 0
+          ? item.payments[item.payments.length - 1]
+          : null;
+
+        return {
+          id: item.id,
+          printavoInvoiceId: item.id,
+          printavoVisualId: item.invoice_number,
+          customerName: item.customer_name,
+          customerEmail: item.customer_email,
+          invoiceTotal: parseFloat(item.total),
+          amountPaid: parseFloat(item.amount_paid),
+          invoiceDate: item.invoice_date,
+          paymentDate: latestPayment?.payment_date || item.updated_at,
+          stripePaymentIntentId: latestPayment?.stripe_payment_intent_id || '',
+          paymentMethod: latestPayment?.payment_method || 'card',
+        };
+      });
     } catch (error) {
       console.error('Error fetching paid invoices:', error);
       return [];

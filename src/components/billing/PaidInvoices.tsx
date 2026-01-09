@@ -160,7 +160,10 @@ export function PaidInvoices({ onViewInvoice }: PaidInvoicesProps) {
                   Customer
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Amount Paid
+                  Invoice Date
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Total Amount
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Payment Date
@@ -193,9 +196,14 @@ export function PaidInvoices({ onViewInvoice }: PaidInvoicesProps) {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center text-sm font-medium text-green-600">
-                      <DollarSign className="w-4 h-4 mr-1" />
-                      {invoice.amountPaid.toFixed(2)}
+                    <div className="text-sm text-gray-900">
+                      {new Date(invoice.invoiceDate).toLocaleDateString()}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center text-sm font-medium text-gray-900">
+                      <DollarSign className="w-4 h-4 mr-1 text-gray-400" />
+                      {invoice.invoiceTotal.toFixed(2)}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -214,7 +222,7 @@ export function PaidInvoices({ onViewInvoice }: PaidInvoicesProps) {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-xs text-gray-500 font-mono">
-                      {invoice.stripePaymentIntentId.slice(0, 20)}...
+                      {invoice.stripePaymentIntentId ? invoice.stripePaymentIntentId.slice(0, 20) + '...' : 'N/A'}
                     </div>
                   </td>
                 </tr>
