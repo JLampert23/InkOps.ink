@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, RefreshCw } from 'lucide-react';
+import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, RefreshCw, Bug } from 'lucide-react';
 import { supabase } from '../lib/supabase-client';
 import { useAuth } from '../contexts/AuthContext';
 import AutomatedReports from './automation/AutomatedReports';
@@ -72,6 +72,8 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
   const [savingIntegration, setSavingIntegration] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [testResult, setTestResult] = useState<any>(null);
+  const [testLoading, setTestLoading] = useState(false);
+  const [testData, setTestData] = useState<any>(null);
 
   const [squareAccessToken, setSquareAccessToken] = useState('');
   const [squareApplicationId, setSquareApplicationId] = useState('');
@@ -460,6 +462,26 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
       });
     } finally {
       setTestingConnection(false);
+    }
+  };
+
+  const runPrintavoTest = async () => {
+    setTestLoading(true);
+    setTestData(null);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-printavo`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      const result = await response.json();
+      setTestData(result);
+    } catch (error) {
+      setTestData({ error: error instanceof Error ? error.message : 'Unknown error' });
+    } finally {
+      setTestLoading(false);
     }
   };
 
@@ -1758,6 +1780,39 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
                             </pre>
                           </div>
                         </div>
+                      </div>
+                    )}
+
+                    <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Bug className="w-5 h-5 text-yellow-600" />
+                          <span className="text-sm text-yellow-800 font-medium">Debug: Test Printavo Data Structure</span>
+                        </div>
+                        <button
+                          onClick={runPrintavoTest}
+                          disabled={testLoading}
+                          className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50 transition-colors"
+                        >
+                          {testLoading ? 'Loading...' : 'Run Test'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {testData && (
+                      <div className="bg-white rounded-lg shadow p-6 border border-gray-200">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-semibold">Printavo API Response</h3>
+                          <button
+                            onClick={() => setTestData(null)}
+                            className="text-gray-500 hover:text-gray-700"
+                          >
+                            Close
+                          </button>
+                        </div>
+                        <pre className="bg-gray-50 p-4 rounded overflow-auto max-h-96 text-xs">
+                          {JSON.stringify(testData, null, 2)}
+                        </pre>
                       </div>
                     )}
                   </>

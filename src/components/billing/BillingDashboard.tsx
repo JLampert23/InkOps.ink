@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Receipt, CheckCircle, Clock, DollarSign, Bug } from 'lucide-react';
+import { Receipt, CheckCircle, Clock, DollarSign } from 'lucide-react';
 import { BillingQueue } from './BillingQueue';
 import { PaidInvoices } from './PaidInvoices';
 import { SendInvoiceModal } from './SendInvoiceModal';
@@ -10,8 +10,6 @@ export function BillingDashboard() {
   const [activeTab, setActiveTab] = useState<'queue' | 'paid'>('queue');
   const [selectedInvoice, setSelectedInvoice] = useState<BillingQueueItem | null>(null);
   const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
-  const [testData, setTestData] = useState<any>(null);
-  const [testLoading, setTestLoading] = useState(false);
 
   const handleSendInvoice = (item: BillingQueueItem) => {
     setSelectedInvoice(item);
@@ -33,25 +31,6 @@ export function BillingDashboard() {
     setViewingInvoiceId(null);
   };
 
-  const runPrintavoTest = async () => {
-    setTestLoading(true);
-    try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-printavo`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      const result = await response.json();
-      setTestData(result);
-    } catch (error) {
-      setTestData({ error: error instanceof Error ? error.message : 'Unknown error' });
-    } finally {
-      setTestLoading(false);
-    }
-  };
-
   if (viewingInvoiceId) {
     return (
       <InvoiceDetail
@@ -63,37 +42,6 @@ export function BillingDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Bug className="w-5 h-5 text-yellow-600" />
-          <span className="text-sm text-yellow-800 font-medium">Debug: Test Printavo Data Structure</span>
-        </div>
-        <button
-          onClick={runPrintavoTest}
-          disabled={testLoading}
-          className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50"
-        >
-          {testLoading ? 'Loading...' : 'Run Test'}
-        </button>
-      </div>
-
-      {testData && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Printavo API Response</h3>
-            <button
-              onClick={() => setTestData(null)}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              Close
-            </button>
-          </div>
-          <pre className="bg-gray-50 p-4 rounded overflow-auto max-h-96 text-xs">
-            {JSON.stringify(testData, null, 2)}
-          </pre>
-        </div>
-      )}
-
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Billing & Payments</h1>
         <p className="text-gray-600 mt-2">
