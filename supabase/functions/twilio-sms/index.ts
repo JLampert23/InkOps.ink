@@ -31,12 +31,19 @@ Deno.serve(async (req: Request) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const authHeader = req.headers.get("Authorization")!;
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+
+    // Use anon key to verify user JWT
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: { Authorization: authHeader },
+      },
+    });
+
+    const { data: { user }, error: userError } = await userClient.auth.getUser();
 
     if (userError || !user) {
       return new Response(
@@ -47,6 +54,9 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
+
+    // Use service role key for database operations
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { invoiceId, customerId, phoneNumber, messageBody }: SendSMSRequest = await req.json();
 
@@ -105,11 +115,11 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify({
         action: "decrypt",
-        data: settings.twilio_account_sid,
+        token: settings.twilio_account_sid,
       }),
     });
 
-    const accountSid = cryptoResponse.ok ? (await cryptoResponse.json()).decrypted : settings.twilio_account_sid;
+    const accountSid = cryptoResponse.ok ? (await cryptoResponse.json()).result : settings.twilio_account_sid;
 
     const tokenResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
       method: "POST",
@@ -119,11 +129,11 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify({
         action: "decrypt",
-        data: settings.twilio_auth_token,
+        token: settings.twilio_auth_token,
       }),
     });
 
-    const authToken = tokenResponse.ok ? (await tokenResponse.json()).decrypted : settings.twilio_auth_token;
+    const authToken = tokenResponse.ok ? (await tokenResponse.json()).result : settings.twilio_auth_token;
 
     // Send SMS via Twilio
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
