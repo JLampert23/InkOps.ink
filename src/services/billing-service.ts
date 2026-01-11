@@ -227,19 +227,30 @@ export const billingService = {
 
   async getBillingQueue(): Promise<BillingQueueItem[]> {
     try {
-      const { data, error } = await supabase
+      // First get billing queue items
+      const { data: queueData, error: queueError } = await supabase
         .from('billing_queue')
-        .select(`
-          *,
-          printavo_invoices(customer_id)
-        `)
+        .select('*')
         .is('sent_at', null)
         .neq('payment_status', 'paid')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (queueError) throw queueError;
+      if (!queueData) return [];
 
-      return (data || []).map(item => ({
+      // Get customer IDs from printavo_invoices in a separate query
+      const invoiceIds = queueData.map(item => item.printavo_invoice_id);
+      const { data: invoiceData } = await supabase
+        .from('printavo_invoices')
+        .select('id, customer_id')
+        .in('id', invoiceIds);
+
+      // Create a map of invoice ID to customer ID
+      const customerIdMap = new Map(
+        (invoiceData || []).map(inv => [inv.id, inv.customer_id])
+      );
+
+      return queueData.map(item => ({
         id: item.id,
         printavoInvoiceId: item.printavo_invoice_id,
         printavoVisualId: item.printavo_visual_id,
@@ -247,7 +258,7 @@ export const billingService = {
         customerName: item.customer_name,
         customerEmail: item.customer_email,
         customerCompany: item.customer_company,
-        customerId: (item.printavo_invoices as any)?.customer_id || undefined,
+        customerId: customerIdMap.get(item.printavo_invoice_id),
         invoiceTotal: parseFloat(item.invoice_total),
         invoiceDate: item.invoice_date,
         dueDate: item.due_date,
