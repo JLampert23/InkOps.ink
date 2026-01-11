@@ -47,6 +47,15 @@ export interface InvoiceFee {
   taxable: boolean;
 }
 
+export interface SMSLog {
+  id: string;
+  phoneNumber: string;
+  messageBody: string;
+  deliveryStatus: string;
+  errorMessage: string | null;
+  sentAt: string;
+}
+
 export interface InvoiceDetail {
   id: string;
   printavoInvoiceId: string;
@@ -80,6 +89,7 @@ export interface InvoiceDetail {
   printavoPayments: PrintavoPayment[];
 
   communicationLogs: CommunicationLog[];
+  smsLogs: SMSLog[];
 
   notes: string | null;
   internalNotes: string | null;
@@ -139,6 +149,12 @@ export const invoiceDetailService = {
         .from('communication_logs')
         .select('*')
         .eq('printavo_invoice_id', printavoInvoiceId)
+        .order('sent_at', { ascending: false });
+
+      const { data: smsLogsData } = await supabase
+        .from('sms_logs')
+        .select('*')
+        .eq('invoice_id', printavoInvoiceId)
         .order('sent_at', { ascending: false });
 
       const rawData = invoice.raw_data || {};
@@ -236,6 +252,15 @@ export const invoiceDetailService = {
           subject: log.subject,
           message: log.message,
           status: log.status,
+          sentAt: log.sent_at,
+        })),
+
+        smsLogs: (smsLogsData || []).map((log: any) => ({
+          id: log.id,
+          phoneNumber: log.phone_number,
+          messageBody: log.message_body,
+          deliveryStatus: log.delivery_status,
+          errorMessage: log.error_message,
           sentAt: log.sent_at,
         })),
 

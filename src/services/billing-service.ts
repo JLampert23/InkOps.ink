@@ -13,6 +13,7 @@ export interface BillingQueueItem {
   customerName: string;
   customerEmail: string;
   customerCompany: string;
+  customerId?: string;
   invoiceTotal: number;
   invoiceDate: string;
   dueDate: string;
@@ -228,7 +229,10 @@ export const billingService = {
     try {
       const { data, error } = await supabase
         .from('billing_queue')
-        .select('*')
+        .select(`
+          *,
+          printavo_invoices!inner(customer_id)
+        `)
         .is('sent_at', null)
         .neq('payment_status', 'paid')
         .order('created_at', { ascending: false });
@@ -243,6 +247,7 @@ export const billingService = {
         customerName: item.customer_name,
         customerEmail: item.customer_email,
         customerCompany: item.customer_company,
+        customerId: (item.printavo_invoices as any)?.customer_id || undefined,
         invoiceTotal: parseFloat(item.invoice_total),
         invoiceDate: item.invoice_date,
         dueDate: item.due_date,
@@ -650,5 +655,30 @@ export const billingService = {
     }
 
     return successCount;
+  },
+
+  async moveToAccountsReceivable(queueItemId: string): Promise<void> {
+    const { data: queueItem, error: queueError } = await supabase
+      .from('billing_queue')
+      .select('printavo_invoice_id')
+      .eq('id', queueItemId)
+      .maybeSingle();
+
+    if (queueError) throw queueError;
+    if (!queueItem) throw new Error('Queue item not found');
+
+    const { error: updateError } = await supabase
+      .from('printavo_invoices')
+      .update({ status_stage: 'accounts_receivable' })
+      .eq('id', queueItem.printavo_invoice_id);
+
+    if (updateError) throw updateError;
+
+    const { error: deleteError } = await supabase
+      .from('billing_queue')
+      .delete()
+      .eq('id', queueItemId);
+
+    if (deleteError) throw deleteError;
   },
 };

@@ -1,6 +1,8 @@
-import { useState } from 'react';
-import { X, Send, Copy, Loader2, CheckCircle, Mail } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Send, Copy, Loader2, CheckCircle, Mail, MessageSquare } from 'lucide-react';
 import { BillingQueueItem, billingService } from '../../services/billing-service';
+import { twilioService } from '../../services/twilio-service';
+import { supabase } from '../../lib/supabase-client';
 
 interface SendInvoiceModalProps {
   item: BillingQueueItem;
@@ -8,12 +10,56 @@ interface SendInvoiceModalProps {
   onSuccess: () => void;
 }
 
+type SendMethod = 'email' | 'sms' | 'both';
+
 export function SendInvoiceModal({ item, onClose, onSuccess }: SendInvoiceModalProps) {
   const [customMessage, setCustomMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [paymentLink, setPaymentLink] = useState('');
   const [generatingLink, setGeneratingLink] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [sendMethod, setSendMethod] = useState<SendMethod>('email');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [twilioEnabled, setTwilioEnabled] = useState(false);
+
+  useEffect(() => {
+    loadSettings();
+    loadCustomerPhone();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      const { data } = await supabase
+        .from('company_settings')
+        .select('twilio_enabled, default_send_method')
+        .maybeSingle();
+
+      if (data) {
+        setTwilioEnabled(data.twilio_enabled || false);
+        setSendMethod((data.default_send_method as SendMethod) || 'email');
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    }
+  };
+
+  const loadCustomerPhone = async () => {
+    if (!item.customerId) return;
+
+    try {
+      const { data } = await supabase
+        .from('customers')
+        .select('phone')
+        .eq('id', item.customerId)
+        .maybeSingle();
+
+      if (data?.phone) {
+        setCustomerPhone(data.phone);
+      }
+    } catch (error) {
+      console.error('Error loading customer phone:', error);
+    }
+  };
 
   const handleGenerateLink = async () => {
     setGeneratingLink(true);
@@ -43,11 +89,45 @@ export function SendInvoiceModal({ item, onClose, onSuccess }: SendInvoiceModalP
     }
   };
 
-  const handleSendEmail = async () => {
+  const handleSend = async () => {
     setSending(true);
     try {
-      await billingService.sendInvoiceEmail(item.id, customMessage);
-      alert('Invoice sent successfully!');
+      let link = paymentLink;
+      if (!link && !item.stripePaymentLinkId) {
+        link = await billingService.generatePaymentLink(item.id);
+        setPaymentLink(link);
+      } else if (!link) {
+        link = await billingService.generatePaymentLink(item.id);
+      }
+
+      const results: string[] = [];
+
+      if (sendMethod === 'email' || sendMethod === 'both') {
+        await billingService.sendInvoiceEmail(item.id, customMessage);
+        results.push('Email sent');
+      }
+
+      if ((sendMethod === 'sms' || sendMethod === 'both') && customerPhone) {
+        const smsResult = await twilioService.sendInvoiceSMS({
+          invoiceId: item.id,
+          customerId: item.customerId || '',
+          phoneNumber: twilioService.formatPhoneNumber(customerPhone),
+          customerName: item.customerName,
+          invoiceNumber: item.printavoVisualId,
+          amount: item.invoiceTotal,
+          paymentLink: link,
+        });
+
+        if (smsResult.success) {
+          results.push('Text message sent');
+        } else {
+          throw new Error(`SMS failed: ${smsResult.error}`);
+        }
+      }
+
+      await billingService.moveToAccountsReceivable(item.id);
+
+      alert(`Invoice sent successfully! ${results.join(' and ')}`);
       onSuccess();
       onClose();
     } catch (error: any) {
@@ -89,10 +169,72 @@ export function SendInvoiceModal({ item, onClose, onSuccess }: SendInvoiceModalP
               </div>
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wide">Email</p>
-                <p className="text-sm font-medium text-gray-900">{item.customerEmail}</p>
+                <p className="text-sm font-medium text-gray-900">{item.customerEmail || 'N/A'}</p>
               </div>
+              {twilioEnabled && (
+                <div className="col-span-2">
+                  <p className="text-xs text-gray-500 uppercase tracking-wide">Phone</p>
+                  <p className="text-sm font-medium text-gray-900">{customerPhone || 'Not available'}</p>
+                </div>
+              )}
             </div>
           </div>
+
+          {twilioEnabled && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Send Method
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  onClick={() => setSendMethod('email')}
+                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-colors ${
+                    sendMethod === 'email'
+                      ? 'border-blue-600 bg-blue-50 text-blue-700'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                  disabled={!item.customerEmail}
+                >
+                  <Mail className="w-4 h-4" />
+                  <span className="text-sm font-medium">Email</span>
+                </button>
+                <button
+                  onClick={() => setSendMethod('sms')}
+                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-colors ${
+                    sendMethod === 'sms'
+                      ? 'border-green-600 bg-green-50 text-green-700'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                  disabled={!customerPhone}
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  <span className="text-sm font-medium">Text</span>
+                </button>
+                <button
+                  onClick={() => setSendMethod('both')}
+                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-colors ${
+                    sendMethod === 'both'
+                      ? 'border-purple-600 bg-purple-50 text-purple-700'
+                      : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                  disabled={!item.customerEmail || !customerPhone}
+                >
+                  <div className="flex items-center gap-1">
+                    <Mail className="w-3.5 h-3.5" />
+                    <MessageSquare className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="text-sm font-medium">Both</span>
+                </button>
+              </div>
+              {(!item.customerEmail || !customerPhone) && (
+                <p className="text-xs text-amber-600 mt-2">
+                  {!item.customerEmail && !customerPhone && 'Email and phone number are required for sending'}
+                  {!item.customerEmail && customerPhone && 'Email is required for email sending'}
+                  {item.customerEmail && !customerPhone && 'Phone number is required for SMS sending'}
+                </p>
+              )}
+            </div>
+          )}
 
           {item.stripePaymentLinkId || paymentLink ? (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
@@ -192,9 +334,20 @@ export function SendInvoiceModal({ item, onClose, onSuccess }: SendInvoiceModalP
             )}
           </button>
           <button
-            onClick={handleSendEmail}
-            disabled={sending || !item.customerEmail}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+            onClick={handleSend}
+            disabled={
+              sending ||
+              (sendMethod === 'email' && !item.customerEmail) ||
+              (sendMethod === 'sms' && !customerPhone) ||
+              (sendMethod === 'both' && (!item.customerEmail || !customerPhone))
+            }
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50 ${
+              sendMethod === 'email'
+                ? 'bg-blue-600 hover:bg-blue-700'
+                : sendMethod === 'sms'
+                ? 'bg-green-600 hover:bg-green-700'
+                : 'bg-purple-600 hover:bg-purple-700'
+            }`}
           >
             {sending ? (
               <>
@@ -203,8 +356,24 @@ export function SendInvoiceModal({ item, onClose, onSuccess }: SendInvoiceModalP
               </>
             ) : (
               <>
-                <Mail className="w-4 h-4" />
-                Send Email
+                {sendMethod === 'email' && (
+                  <>
+                    <Mail className="w-4 h-4" />
+                    Send Email
+                  </>
+                )}
+                {sendMethod === 'sms' && (
+                  <>
+                    <MessageSquare className="w-4 h-4" />
+                    Send Text
+                  </>
+                )}
+                {sendMethod === 'both' && (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Send Both
+                  </>
+                )}
               </>
             )}
           </button>

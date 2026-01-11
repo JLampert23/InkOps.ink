@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, RefreshCw, Bug } from 'lucide-react';
+import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, RefreshCw, Bug, MessageSquare } from 'lucide-react';
 import { supabase } from '../lib/supabase-client';
 import { useAuth } from '../contexts/AuthContext';
 import AutomatedReports from './automation/AutomatedReports';
@@ -42,7 +42,7 @@ interface PrintavoStatus {
 
 type SettingsTab =
   | 'company-info'
-  | 'printavo-integration' | 'square-integration' | 'resend-integration' | 'stripe-payments'
+  | 'printavo-integration' | 'square-integration' | 'resend-integration' | 'twilio-integration' | 'stripe-payments'
   | 'user-management'
   | 'status-filters' | 'billing-status-filters'
   | 'automated-reports' | 'workflow-setup' | 'automations';
@@ -95,6 +95,16 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
   const [savingStripe, setSavingStripe] = useState(false);
   const [testingStripe, setTestingStripe] = useState(false);
   const [stripeTestResult, setStripeTestResult] = useState<any>(null);
+
+  const [twilioAccountSid, setTwilioAccountSid] = useState('');
+  const [twilioAuthToken, setTwilioAuthToken] = useState('');
+  const [twilioPhoneNumber, setTwilioPhoneNumber] = useState('');
+  const [twilioEnabled, setTwilioEnabled] = useState(false);
+  const [defaultSendMethod, setDefaultSendMethod] = useState('email');
+  const [smsMessageTemplate, setSmsMessageTemplate] = useState('Hi {CustomerName}, your invoice {InvoiceNumber} is ready. Amount Due: ${Amount}. Pay here: {PaymentLink}. Reply STOP to unsubscribe.');
+  const [savingTwilio, setSavingTwilio] = useState(false);
+  const [testingTwilio, setTestingTwilio] = useState(false);
+  const [twilioTestResult, setTwilioTestResult] = useState<any>(null);
 
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -154,6 +164,10 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
         setStripePublicKey(data.stripe_public_key || '');
         setStripeSecretKey(data.stripe_secret_key || '');
         setStripeWebhookSecret(data.stripe_webhook_secret || '');
+        setTwilioPhoneNumber(data.twilio_phone_number || '');
+        setTwilioEnabled(data.twilio_enabled || false);
+        setDefaultSendMethod(data.default_send_method || 'email');
+        setSmsMessageTemplate(data.sms_message_template || 'Hi {CustomerName}, your invoice {InvoiceNumber} is ready. Amount Due: ${Amount}. Pay here: {PaymentLink}. Reply STOP to unsubscribe.');
       }
     } catch (err) {
       console.error('Error loading settings:', err);
@@ -863,6 +877,195 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
     }
   };
 
+  const saveTwilioIntegration = async () => {
+    if (!twilioAccountSid.trim() && !twilioAuthToken.trim() && !companySettings?.id) {
+      alert('At least Twilio Account SID and Auth Token are required');
+      return;
+    }
+
+    try {
+      setSavingTwilio(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('You must be logged in to update Twilio settings');
+        return;
+      }
+
+      let encryptedAccountSid = null;
+      let encryptedAuthToken = null;
+
+      if (twilioAccountSid.trim()) {
+        const encryptResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crypto-service`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action: 'encrypt',
+            token: twilioAccountSid,
+          }),
+        });
+
+        if (!encryptResponse.ok) {
+          const errorData = await encryptResponse.json();
+          throw new Error(errorData.error || 'Failed to encrypt Twilio Account SID');
+        }
+
+        const { result } = await encryptResponse.json();
+        encryptedAccountSid = result;
+      }
+
+      if (twilioAuthToken.trim()) {
+        const encryptResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crypto-service`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action: 'encrypt',
+            token: twilioAuthToken,
+          }),
+        });
+
+        if (!encryptResponse.ok) {
+          const errorData = await encryptResponse.json();
+          throw new Error(errorData.error || 'Failed to encrypt Twilio Auth Token');
+        }
+
+        const { result } = await encryptResponse.json();
+        encryptedAuthToken = result;
+      }
+
+      const settingsData: any = {};
+
+      if (encryptedAccountSid) {
+        settingsData.twilio_account_sid = encryptedAccountSid;
+      }
+
+      if (encryptedAuthToken) {
+        settingsData.twilio_auth_token = encryptedAuthToken;
+      }
+
+      if (twilioPhoneNumber.trim()) {
+        settingsData.twilio_phone_number = twilioPhoneNumber;
+      }
+
+      settingsData.twilio_enabled = twilioEnabled;
+      settingsData.default_send_method = defaultSendMethod;
+      settingsData.sms_message_template = smsMessageTemplate;
+
+      if (Object.keys(settingsData).length === 0) {
+        alert('No Twilio settings to save');
+        return;
+      }
+
+      if (companySettings?.id) {
+        const { error } = await supabase
+          .from('company_settings')
+          .update(settingsData)
+          .eq('id', companySettings.id);
+
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from('company_settings')
+          .insert([{
+            company_name: companyName || '',
+            ...settingsData
+          }])
+          .select()
+          .single();
+
+        if (error) throw error;
+        setCompanySettings(data);
+      }
+
+      alert('Twilio integration settings saved successfully!');
+      setTwilioAccountSid('');
+      setTwilioAuthToken('');
+      setTwilioTestResult(null);
+      await loadSettings();
+    } catch (err) {
+      console.error('Error saving Twilio settings:', err);
+      alert(err instanceof Error ? err.message : 'Failed to save Twilio settings. Please try again.');
+    } finally {
+      setSavingTwilio(false);
+    }
+  };
+
+  const testTwilioConnection = async () => {
+    try {
+      setTestingTwilio(true);
+      setTwilioTestResult(null);
+
+      if (!companySettings?.twilio_account_sid || !companySettings?.twilio_auth_token) {
+        setTwilioTestResult({
+          success: false,
+          error: 'Twilio credentials not configured. Please save your credentials first.',
+        });
+        return;
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setTwilioTestResult({
+          success: false,
+          error: 'Authentication required',
+        });
+        return;
+      }
+
+      const testPhone = prompt('Enter a phone number to send a test SMS (E.164 format, e.g., +14155551234):');
+      if (!testPhone) {
+        setTwilioTestResult({
+          success: false,
+          error: 'Test cancelled',
+        });
+        return;
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/twilio-sms`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          invoiceId: 'test-invoice',
+          customerId: 'test-customer',
+          phoneNumber: testPhone,
+          messageBody: 'Test message from your Twilio integration. If you received this, your configuration is working!',
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setTwilioTestResult({
+          success: true,
+          message: 'Test SMS sent successfully!',
+          details: result,
+        });
+      } else {
+        setTwilioTestResult({
+          success: false,
+          error: result.error || 'Failed to send test SMS',
+          details: result,
+        });
+      }
+    } catch (err) {
+      console.error('Error testing Twilio:', err);
+      setTwilioTestResult({
+        success: false,
+        error: err instanceof Error ? err.message : 'Failed to test Twilio connection',
+      });
+    } finally {
+      setTestingTwilio(false);
+    }
+  };
+
   const testStripeConnection = async () => {
     try {
       setTestingStripe(true);
@@ -1415,6 +1618,24 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
                     </div>
                   </div>
                   {activeTab === 'resend-integration' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('twilio-integration')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'twilio-integration'
+                      ? 'bg-green-50 text-green-700 shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
+                  style={{ animationDelay: '50ms' }}
+                >
+                  <MessageSquare className={`w-4 h-4 flex-shrink-0 ${activeTab === 'twilio-integration' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'twilio-integration' ? 'text-green-700' : 'text-gray-700'}`}>
+                      Twilio SMS
+                    </div>
+                  </div>
+                  {activeTab === 'twilio-integration' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
                 </button>
 
                 <button
@@ -2155,6 +2376,223 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
                     See <code className="bg-white px-2 py-0.5 rounded">EMAIL_GUIDE.md</code> for usage examples
                   </p>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'twilio-integration' && (
+            <div className="bg-white rounded-lg shadow p-6 space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Twilio SMS Integration</h2>
+                <p className="text-sm text-gray-600 mb-6">Connect Twilio to send invoice notifications via text message</p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Twilio Account SID <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    value={twilioAccountSid}
+                    onChange={(e) => setTwilioAccountSid(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder={companySettings?.twilio_account_sid ? '••••••••••••••••' : 'Enter your Twilio Account SID'}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {companySettings?.twilio_account_sid
+                      ? 'Account SID is saved and encrypted. Enter a new value to update it.'
+                      : 'Found in your Twilio Console Dashboard'}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Twilio Auth Token <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    value={twilioAuthToken}
+                    onChange={(e) => setTwilioAuthToken(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder={companySettings?.twilio_auth_token ? '••••••••••••••••' : 'Enter your Twilio Auth Token'}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {companySettings?.twilio_auth_token
+                      ? 'Auth Token is saved and encrypted. Enter a new value to update it.'
+                      : 'Found in your Twilio Console Dashboard'}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Twilio Phone Number <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={twilioPhoneNumber}
+                    onChange={(e) => setTwilioPhoneNumber(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="+14155551234"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Your Twilio phone number in E.164 format (e.g., +14155551234)
+                  </p>
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={twilioEnabled}
+                      onChange={(e) => setTwilioEnabled(e.target.checked)}
+                      className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Enable SMS sending</span>
+                  </label>
+                  <p className="text-xs text-gray-500 mt-1 ml-6">
+                    When enabled, you can send invoices via text message
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Default Send Method
+                  </label>
+                  <select
+                    value={defaultSendMethod}
+                    onChange={(e) => setDefaultSendMethod(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  >
+                    <option value="email">Email Only</option>
+                    <option value="sms">Text Message Only</option>
+                    <option value="both">Both Email and Text</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Default method for sending invoices (can be changed per invoice)
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    SMS Message Template
+                  </label>
+                  <textarea
+                    value={smsMessageTemplate}
+                    onChange={(e) => setSmsMessageTemplate(e.target.value)}
+                    rows={4}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent font-mono text-sm"
+                    placeholder="Hi {CustomerName}, your invoice {InvoiceNumber} is ready..."
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Available placeholders: {'{CustomerName}'}, {'{InvoiceNumber}'}, {'{Amount}'}, {'{PaymentLink}'}
+                  </p>
+                </div>
+
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-900">
+                    <strong>Note:</strong> Make sure your Twilio account is active and has sufficient credits to send SMS messages. Standard SMS rates apply.
+                  </p>
+                  <a
+                    href="https://console.twilio.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-600 hover:text-blue-700 underline mt-2 inline-block"
+                  >
+                    Open Twilio Console →
+                  </a>
+                </div>
+
+                <div className="pt-4">
+                  <button
+                    onClick={saveTwilioIntegration}
+                    disabled={savingTwilio}
+                    className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                  >
+                    {savingTwilio ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Save Twilio Credentials
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {companySettings?.twilio_account_sid && (
+                  <>
+                    <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-green-800">
+                          <MessageSquare className="w-5 h-5" />
+                          <div>
+                            <p className="font-medium">Twilio Integration Active</p>
+                            <p className="text-sm mt-1">SMS sending is configured and ready to use</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={testTwilioConnection}
+                          disabled={testingTwilio}
+                          className="flex items-center gap-2 px-4 py-2 bg-white border border-green-300 text-green-700 rounded-lg hover:bg-green-50 disabled:opacity-50 transition-colors"
+                        >
+                          {testingTwilio ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Testing...
+                            </>
+                          ) : (
+                            'Test Connection'
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {twilioTestResult && (
+                      <div className={`p-4 rounded-lg border ${twilioTestResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                        <div className="space-y-3">
+                          {twilioTestResult.success ? (
+                            <>
+                              <div className="flex items-start gap-3">
+                                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-bold">
+                                  ✓
+                                </div>
+                                <div className="flex-1">
+                                  <h4 className="font-medium text-green-900">Connection Successful!</h4>
+                                  <p className="text-sm text-green-800 mt-1">{twilioTestResult.message}</p>
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex items-start gap-3">
+                                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-white text-sm font-bold">
+                                  ✕
+                                </div>
+                                <div className="flex-1">
+                                  <h4 className="font-medium text-red-900">Connection Failed</h4>
+                                  <p className="text-sm text-red-800 mt-1">{twilioTestResult.error}</p>
+                                </div>
+                              </div>
+                            </>
+                          )}
+
+                          {twilioTestResult.details && (
+                            <div className="mt-3 pt-3 border-t border-gray-200">
+                              <div className="text-xs font-medium text-gray-700 mb-2">Diagnostics:</div>
+                              <pre className="text-xs p-3 bg-white rounded border border-gray-300 overflow-x-auto max-h-96">
+                                {JSON.stringify(twilioTestResult.details, null, 2)}
+                              </pre>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           )}

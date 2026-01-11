@@ -948,20 +948,48 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
               <MessageSquare className="w-5 h-5 text-gray-400" />
               Communication Log
             </h2>
-            {invoice.communicationLogs.length > 0 ? (
+            {invoice.communicationLogs.length > 0 || invoice.smsLogs.length > 0 ? (
               <div className="space-y-3 max-h-64 overflow-y-auto">
                 {invoice.communicationLogs.map((log) => (
-                  <div key={log.id} className="p-3 bg-gray-50 rounded-lg">
+                  <div key={log.id} className="p-3 bg-blue-50 rounded-lg border border-blue-200">
                     <div className="flex items-start justify-between mb-1">
-                      <span className="text-sm font-medium text-gray-900">{log.subject}</span>
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-4 h-4 text-blue-600" />
+                        <span className="text-sm font-medium text-gray-900">{log.subject}</span>
+                      </div>
                       <span className={`text-xs px-2 py-0.5 rounded ${
                         log.status === 'sent' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
                       }`}>
                         {log.status}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-500">{log.recipient}</p>
-                    <p className="text-xs text-gray-400 mt-1">{formatDateTime(log.sentAt)}</p>
+                    <p className="text-xs text-gray-600 ml-6">{log.recipient}</p>
+                    <p className="text-xs text-gray-400 mt-1 ml-6">{formatDateTime(log.sentAt)}</p>
+                  </div>
+                ))}
+                {invoice.smsLogs.map((log) => (
+                  <div key={log.id} className="p-3 bg-green-50 rounded-lg border border-green-200">
+                    <div className="flex items-start justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <MessageSquare className="w-4 h-4 text-green-600" />
+                        <span className="text-sm font-medium text-gray-900">SMS Message</span>
+                      </div>
+                      <span className={`text-xs px-2 py-0.5 rounded ${
+                        log.deliveryStatus === 'sent' || log.deliveryStatus === 'delivered'
+                          ? 'bg-green-100 text-green-700'
+                          : log.deliveryStatus === 'failed'
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-gray-100 text-gray-700'
+                      }`}>
+                        {log.deliveryStatus}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-600 ml-6">{log.phoneNumber}</p>
+                    <p className="text-xs text-gray-500 mt-1 ml-6 italic">{log.messageBody}</p>
+                    {log.errorMessage && (
+                      <p className="text-xs text-red-600 mt-1 ml-6">Error: {log.errorMessage}</p>
+                    )}
+                    <p className="text-xs text-gray-400 mt-1 ml-6">{formatDateTime(log.sentAt)}</p>
                   </div>
                 ))}
               </div>
