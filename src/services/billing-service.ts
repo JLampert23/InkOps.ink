@@ -231,7 +231,7 @@ export const billingService = {
         .from('billing_queue')
         .select(`
           *,
-          printavo_invoices!inner(customer_id)
+          printavo_invoices(customer_id)
         `)
         .is('sent_at', null)
         .neq('payment_status', 'paid')
