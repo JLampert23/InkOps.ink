@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Calendar, Download, Filter, TrendingUp, DollarSign, AlertCircle, Loader2, FileText, FileSpreadsheet, Settings, Clock, Users } from 'lucide-react';
+import { Filter, TrendingUp, DollarSign, AlertCircle, Loader2, FileText, FileSpreadsheet, Settings } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format } from 'date-fns';
 import { InvoiceDetail } from '../billing/InvoiceDetail';
-import ARReportBuilderModal from './ARReportBuilderModal';
 import { exportARToPDF, exportARToCSV, downloadCSV, getDefaultARColumns } from '../../utils/ar-export';
 
 interface Invoice {
@@ -35,9 +34,9 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
   const [dateRange, setDateRange] = useState('all');
   const [selectedCustomer, setSelectedCustomer] = useState('all');
   const [selectedAgingBucket, setSelectedAgingBucket] = useState('all');
+  const [selectedReportType, setSelectedReportType] = useState('current');
   const [customers, setCustomers] = useState<string[]>([]);
   const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
-  const [showReportBuilder, setShowReportBuilder] = useState(false);
   const [companyName, setCompanyName] = useState('Company Name');
 
   useEffect(() => {
@@ -139,35 +138,26 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
     setViewingInvoiceId(null);
   };
 
-  const handleExportPDF = async () => {
-    await exportARToPDF({
-      invoices: filteredInvoices,
-      columns: getDefaultARColumns(),
-      companyName,
-    });
-  };
-
-  const handleExportCSV = () => {
-    const csvContent = exportARToCSV({
-      invoices: filteredInvoices,
-      columns: getDefaultARColumns(),
-    });
-    downloadCSV(csvContent);
-  };
-
-  const exportPrebuiltReport = async (reportType: string, format: 'pdf' | 'csv') => {
-    let reportInvoices = invoices;
+  const getReportData = () => {
+    let reportInvoices = filteredInvoices;
     let reportTitle = 'Accounts Receivable Report';
 
-    switch (reportType) {
+    switch (selectedReportType) {
+      case 'current':
+        reportTitle = 'Current View';
+        reportInvoices = filteredInvoices;
+        break;
       case 'full':
         reportTitle = 'Full Accounts Receivable Summary';
+        reportInvoices = invoices;
         break;
       case 'aging':
         reportTitle = 'Aging Report';
+        reportInvoices = invoices;
         break;
       case 'by-customer':
         reportTitle = 'Outstanding Invoices by Customer';
+        reportInvoices = invoices;
         break;
       case 'partial':
         reportTitle = 'Partially Paid Invoices';
@@ -179,20 +169,26 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
         break;
     }
 
-    if (format === 'pdf') {
-      await exportARToPDF({
-        invoices: reportInvoices,
-        columns: getDefaultARColumns(),
-        companyName,
-        reportTitle,
-      });
-    } else {
-      const csvContent = exportARToCSV({
-        invoices: reportInvoices,
-        columns: getDefaultARColumns(),
-      });
-      downloadCSV(csvContent, `${reportTitle.replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.csv`);
-    }
+    return { reportInvoices, reportTitle };
+  };
+
+  const handleExportPDF = async () => {
+    const { reportInvoices, reportTitle } = getReportData();
+    await exportARToPDF({
+      invoices: reportInvoices,
+      columns: getDefaultARColumns(),
+      companyName,
+      reportTitle,
+    });
+  };
+
+  const handleExportCSV = () => {
+    const { reportInvoices, reportTitle } = getReportData();
+    const csvContent = exportARToCSV({
+      invoices: reportInvoices,
+      columns: getDefaultARColumns(),
+    });
+    downloadCSV(csvContent, `${reportTitle.replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.csv`);
   };
 
   if (viewingInvoiceId) {
@@ -214,51 +210,6 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
 
   return (
     <div className="space-y-6">
-      {/* Prebuilt Reports Section */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">Prebuilt Reports</h3>
-            <p className="text-sm text-gray-600 mt-1">Quick access to common AR reports</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          {[
-            { type: 'full', title: 'Full AR Summary', icon: FileText },
-            { type: 'aging', title: 'Aging Report', icon: Clock },
-            { type: 'by-customer', title: 'By Customer', icon: Users },
-            { type: 'partial', title: 'Partially Paid', icon: DollarSign },
-            { type: 'overdue', title: 'Overdue Only', icon: AlertCircle },
-          ].map((report) => {
-            const Icon = report.icon;
-            return (
-              <div key={report.type} className="border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <Icon className="w-4 h-4 text-gray-600" />
-                  <h4 className="text-sm font-medium text-gray-900">{report.title}</h4>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => exportPrebuiltReport(report.type, 'pdf')}
-                    className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors"
-                  >
-                    <FileText className="w-3 h-3" />
-                    PDF
-                  </button>
-                  <button
-                    onClick={() => exportPrebuiltReport(report.type, 'csv')}
-                    className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
-                  >
-                    <FileSpreadsheet className="w-3 h-3" />
-                    CSV
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
       {/* Info Banner */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
         <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
@@ -328,6 +279,22 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
             <option value="90+">90+ Days</option>
           </select>
 
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-700">Report:</span>
+            <select
+              value={selectedReportType}
+              onChange={(e) => setSelectedReportType(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="current">Current View</option>
+              <option value="full">Full AR Summary</option>
+              <option value="aging">Aging Report</option>
+              <option value="by-customer">By Customer</option>
+              <option value="partial">Partially Paid</option>
+              <option value="overdue">Overdue Only</option>
+            </select>
+          </div>
+
           <div className="ml-auto flex items-center gap-3">
             <button
               onClick={() => onNavigateToSettings?.('automated-reports')}
@@ -335,14 +302,6 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
             >
               <Settings className="w-4 h-4" />
               Automations
-            </button>
-
-            <button
-              onClick={() => setShowReportBuilder(true)}
-              className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              <FileText className="w-4 h-4" />
-              Report Builder
             </button>
 
             <button
@@ -434,12 +393,6 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
         </div>
       </div>
 
-      <ARReportBuilderModal
-        isOpen={showReportBuilder}
-        onClose={() => setShowReportBuilder(false)}
-        onGenerate={() => {}}
-        invoices={filteredInvoices}
-      />
     </div>
   );
 }
