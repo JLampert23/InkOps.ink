@@ -238,49 +238,9 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
 
       {/* Filters and Export */}
       <div className="bg-white rounded-lg shadow p-6">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Filter className="w-5 h-5 text-gray-400" />
-            <span className="text-sm font-medium text-gray-700">Filters:</span>
-          </div>
-
-          <select
-            value={selectedCustomer}
-            onChange={(e) => setSelectedCustomer(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">All Customers</option>
-            {customers.map(customer => (
-              <option key={customer} value={customer}>{customer}</option>
-            ))}
-          </select>
-
-          <select
-            value={selectedAgingBucket}
-            onChange={(e) => setSelectedAgingBucket(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">All Aging Buckets</option>
-            <option value="0-30">0-30 Days</option>
-            <option value="31-60">31-60 Days</option>
-            <option value="61-90">61-90 Days</option>
-            <option value="90+">90+ Days</option>
-          </select>
-
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-700">Reports:</span>
-            <select
-              value={selectedReportType}
-              onChange={(e) => setSelectedReportType(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="open-invoices">Open Invoices Report</option>
-              <option value="aging">A/R Aging Report</option>
-              <option value="by-customer">Receivables by Customer</option>
-            </select>
-          </div>
-
-          <div className="ml-auto flex items-center gap-3">
+        <div className="space-y-4">
+          {/* Top Row: Automations and Filters */}
+          <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={() => onNavigateToSettings?.('automated-reports')}
               className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
@@ -288,6 +248,52 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
               <Settings className="w-4 h-4" />
               Automations
             </button>
+
+            <div className="h-6 w-px bg-gray-300"></div>
+
+            <div className="flex items-center gap-2">
+              <Filter className="w-5 h-5 text-gray-400" />
+              <span className="text-sm font-medium text-gray-700">Filters:</span>
+            </div>
+
+            <select
+              value={selectedCustomer}
+              onChange={(e) => setSelectedCustomer(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Customers</option>
+              {customers.map(customer => (
+                <option key={customer} value={customer}>{customer}</option>
+              ))}
+            </select>
+
+            <select
+              value={selectedAgingBucket}
+              onChange={(e) => setSelectedAgingBucket(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Aging Buckets</option>
+              <option value="0-30">0-30 Days</option>
+              <option value="31-60">31-60 Days</option>
+              <option value="61-90">61-90 Days</option>
+              <option value="90+">90+ Days</option>
+            </select>
+          </div>
+
+          {/* Bottom Row: Reports and Export Buttons */}
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-gray-700">Reports:</span>
+              <select
+                value={selectedReportType}
+                onChange={(e) => setSelectedReportType(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="open-invoices">Open Invoices Report</option>
+                <option value="aging">A/R Aging Report</option>
+                <option value="by-customer">Receivables by Customer</option>
+              </select>
+            </div>
 
             <button
               onClick={handleExportPDF}
