@@ -1,8 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Users, Download, Search, ChevronRight, Mail, Phone, DollarSign, Loader2, FileText, CreditCard } from 'lucide-react';
+import { Users, Search, ChevronRight, Mail, Phone, DollarSign, Loader2, FileText, CreditCard, FileSpreadsheet } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format } from 'date-fns';
 import { InvoiceDetail } from '../billing/InvoiceDetail';
+import {
+  exportCustomerListToPDF,
+  exportCustomerListToCSV,
+  exportPaymentHistoryToPDF,
+  exportPaymentHistoryToCSV,
+  downloadCSV,
+  PaymentHistoryItem,
+} from '../../utils/customer-export';
 
 interface Customer {
   id: string;
@@ -33,10 +41,28 @@ export default function CustomersReport() {
   const [customerInvoices, setCustomerInvoices] = useState<CustomerDetail[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
+  const [selectedReportType, setSelectedReportType] = useState('customer-list');
+  const [companyName, setCompanyName] = useState('Company Name');
 
   useEffect(() => {
     loadCustomers();
+    loadCompanySettings();
   }, []);
+
+  const loadCompanySettings = async () => {
+    try {
+      const { data: settings } = await supabase
+        .from('company_settings')
+        .select('company_name')
+        .single();
+
+      if (settings?.company_name) {
+        setCompanyName(settings.company_name);
+      }
+    } catch (error) {
+      console.error('Error loading company settings:', error);
+    }
+  };
 
   const loadCustomers = async () => {
     setLoading(true);
@@ -132,26 +158,50 @@ export default function CustomersReport() {
     setViewingInvoiceId(null);
   };
 
-  const exportToCSV = () => {
-    const headers = ['Company Name', 'Contact Name', 'Email', 'Phone', 'Total Invoices', 'Total Billed', 'Total Paid', 'Outstanding Balance'];
-    const rows = customers.map(cust => [
-      cust.company_name,
-      cust.contact_name || '',
-      cust.email,
-      cust.phone,
-      cust.total_invoices,
-      cust.total_billed.toFixed(2),
-      cust.total_paid.toFixed(2),
-      cust.outstanding_balance.toFixed(2),
-    ]);
+  const getPaymentHistoryData = async (): Promise<PaymentHistoryItem[]> => {
+    try {
+      const { data: invoices, error } = await supabase
+        .from('printavo_invoices')
+        .select('*')
+        .gt('amount_paid', 0)
+        .order('updated_at', { ascending: false });
 
-    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `customers-report-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    a.click();
+      if (error) throw error;
+
+      const paymentHistory: PaymentHistoryItem[] = (invoices || []).map((inv: any) => ({
+        customer_name: inv.customer_name || 'Unknown',
+        payment_date: inv.updated_at || inv.invoice_date,
+        payment_amount: parseFloat(inv.amount_paid || 0),
+        payment_method: 'Payment',
+        invoice_numbers: inv.invoice_number || '',
+        notes: inv.status === 'paid' ? 'Paid in full' : 'Partial payment',
+      }));
+
+      return paymentHistory;
+    } catch (error) {
+      console.error('Error loading payment history:', error);
+      return [];
+    }
+  };
+
+  const handleExportPDF = async () => {
+    if (selectedReportType === 'customer-list') {
+      await exportCustomerListToPDF(filteredCustomers, companyName);
+    } else if (selectedReportType === 'payment-history') {
+      const paymentHistory = await getPaymentHistoryData();
+      await exportPaymentHistoryToPDF(paymentHistory, companyName);
+    }
+  };
+
+  const handleExportCSV = async () => {
+    if (selectedReportType === 'customer-list') {
+      const csvContent = exportCustomerListToCSV(filteredCustomers);
+      downloadCSV(csvContent, `Customer_List_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    } else if (selectedReportType === 'payment-history') {
+      const paymentHistory = await getPaymentHistoryData();
+      const csvContent = exportPaymentHistoryToCSV(paymentHistory);
+      downloadCSV(csvContent, `Payment_History_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    }
   };
 
   if (viewingInvoiceId) {
@@ -232,11 +282,31 @@ export default function CustomersReport() {
             </div>
           </div>
 
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-700">Reports:</span>
+            <select
+              value={selectedReportType}
+              onChange={(e) => setSelectedReportType(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="customer-list">Customer List</option>
+              <option value="payment-history">Customer Payment History Report</option>
+            </select>
+          </div>
+
           <button
-            onClick={exportToCSV}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            onClick={handleExportPDF}
+            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
           >
-            <Download className="w-4 h-4" />
+            <FileText className="w-4 h-4" />
+            Export PDF
+          </button>
+
+          <button
+            onClick={handleExportCSV}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
             Export CSV
           </button>
         </div>

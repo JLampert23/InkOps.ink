@@ -34,7 +34,7 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
   const [dateRange, setDateRange] = useState('all');
   const [selectedCustomer, setSelectedCustomer] = useState('all');
   const [selectedAgingBucket, setSelectedAgingBucket] = useState('all');
-  const [selectedReportType, setSelectedReportType] = useState('current');
+  const [selectedReportType, setSelectedReportType] = useState('open-invoices');
   const [customers, setCustomers] = useState<string[]>([]);
   const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState('Company Name');
@@ -143,29 +143,17 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
     let reportTitle = 'Accounts Receivable Report';
 
     switch (selectedReportType) {
-      case 'current':
-        reportTitle = 'Current View';
-        reportInvoices = filteredInvoices;
-        break;
-      case 'full':
-        reportTitle = 'Full Accounts Receivable Summary';
-        reportInvoices = invoices;
+      case 'open-invoices':
+        reportTitle = 'Open Invoices Report';
+        reportInvoices = invoices.filter(inv => inv.balance_remaining > 0);
         break;
       case 'aging':
-        reportTitle = 'Aging Report';
-        reportInvoices = invoices;
+        reportTitle = 'A/R Aging Report';
+        reportInvoices = invoices.filter(inv => inv.balance_remaining > 0);
         break;
       case 'by-customer':
-        reportTitle = 'Outstanding Invoices by Customer';
-        reportInvoices = invoices;
-        break;
-      case 'partial':
-        reportTitle = 'Partially Paid Invoices';
-        reportInvoices = invoices.filter(inv => inv.amount_paid > 0 && inv.balance_remaining > 0);
-        break;
-      case 'overdue':
-        reportTitle = 'Overdue Invoices Only';
-        reportInvoices = invoices.filter(inv => inv.days_overdue > 0);
+        reportTitle = 'Receivables by Customer';
+        reportInvoices = invoices.filter(inv => inv.balance_remaining > 0);
         break;
     }
 
@@ -280,18 +268,15 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
           </select>
 
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-700">Report:</span>
+            <span className="text-sm font-medium text-gray-700">Reports:</span>
             <select
               value={selectedReportType}
               onChange={(e) => setSelectedReportType(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="current">Current View</option>
-              <option value="full">Full AR Summary</option>
-              <option value="aging">Aging Report</option>
-              <option value="by-customer">By Customer</option>
-              <option value="partial">Partially Paid</option>
-              <option value="overdue">Overdue Only</option>
+              <option value="open-invoices">Open Invoices Report</option>
+              <option value="aging">A/R Aging Report</option>
+              <option value="by-customer">Receivables by Customer</option>
             </select>
           </div>
 
