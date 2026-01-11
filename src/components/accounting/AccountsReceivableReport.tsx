@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Calendar, Download, Filter, TrendingUp, DollarSign, AlertCircle, Loader2, FileText, FileSpreadsheet, Settings } from 'lucide-react';
+import { Calendar, Download, Filter, TrendingUp, DollarSign, AlertCircle, Loader2, FileText, FileSpreadsheet, Settings, Clock, Users } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format } from 'date-fns';
 import { InvoiceDetail } from '../billing/InvoiceDetail';
 import ARReportBuilderModal from './ARReportBuilderModal';
-import ARAutomationSettings from './ARAutomationSettings';
 import { exportARToPDF, exportARToCSV, downloadCSV, getDefaultARColumns } from '../../utils/ar-export';
 
 interface Invoice {
@@ -26,15 +25,19 @@ interface AgingBucket {
   total: number;
 }
 
-export default function AccountsReceivableReport() {
+interface AccountsReceivableReportProps {
+  onNavigateToSettings?: (tab: string) => void;
+}
+
+export default function AccountsReceivableReport({ onNavigateToSettings }: AccountsReceivableReportProps) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState('all');
   const [selectedCustomer, setSelectedCustomer] = useState('all');
+  const [selectedAgingBucket, setSelectedAgingBucket] = useState('all');
   const [customers, setCustomers] = useState<string[]>([]);
   const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
   const [showReportBuilder, setShowReportBuilder] = useState(false);
-  const [showAutomationSettings, setShowAutomationSettings] = useState(false);
   const [companyName, setCompanyName] = useState('Company Name');
 
   useEffect(() => {
@@ -118,7 +121,14 @@ export default function AccountsReceivableReport() {
     });
   };
 
-  const totalOutstanding = invoices.reduce((sum, inv) => sum + inv.balance_remaining, 0);
+  const filteredInvoices = invoices.filter(inv => {
+    if (selectedAgingBucket !== 'all' && inv.aging_bucket !== selectedAgingBucket) {
+      return false;
+    }
+    return true;
+  });
+
+  const totalOutstanding = filteredInvoices.reduce((sum, inv) => sum + inv.balance_remaining, 0);
   const agingBuckets = calculateAgingBuckets();
 
   const handleViewInvoice = (invoiceId: string) => {
@@ -131,7 +141,7 @@ export default function AccountsReceivableReport() {
 
   const handleExportPDF = async () => {
     await exportARToPDF({
-      invoices,
+      invoices: filteredInvoices,
       columns: getDefaultARColumns(),
       companyName,
     });
@@ -139,10 +149,50 @@ export default function AccountsReceivableReport() {
 
   const handleExportCSV = () => {
     const csvContent = exportARToCSV({
-      invoices,
+      invoices: filteredInvoices,
       columns: getDefaultARColumns(),
     });
     downloadCSV(csvContent);
+  };
+
+  const exportPrebuiltReport = async (reportType: string, format: 'pdf' | 'csv') => {
+    let reportInvoices = invoices;
+    let reportTitle = 'Accounts Receivable Report';
+
+    switch (reportType) {
+      case 'full':
+        reportTitle = 'Full Accounts Receivable Summary';
+        break;
+      case 'aging':
+        reportTitle = 'Aging Report';
+        break;
+      case 'by-customer':
+        reportTitle = 'Outstanding Invoices by Customer';
+        break;
+      case 'partial':
+        reportTitle = 'Partially Paid Invoices';
+        reportInvoices = invoices.filter(inv => inv.amount_paid > 0 && inv.balance_remaining > 0);
+        break;
+      case 'overdue':
+        reportTitle = 'Overdue Invoices Only';
+        reportInvoices = invoices.filter(inv => inv.days_overdue > 0);
+        break;
+    }
+
+    if (format === 'pdf') {
+      await exportARToPDF({
+        invoices: reportInvoices,
+        columns: getDefaultARColumns(),
+        companyName,
+        reportTitle,
+      });
+    } else {
+      const csvContent = exportARToCSV({
+        invoices: reportInvoices,
+        columns: getDefaultARColumns(),
+      });
+      downloadCSV(csvContent, `${reportTitle.replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    }
   };
 
   if (viewingInvoiceId) {
@@ -164,6 +214,51 @@ export default function AccountsReceivableReport() {
 
   return (
     <div className="space-y-6">
+      {/* Prebuilt Reports Section */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Prebuilt Reports</h3>
+            <p className="text-sm text-gray-600 mt-1">Quick access to common AR reports</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          {[
+            { type: 'full', title: 'Full AR Summary', icon: FileText },
+            { type: 'aging', title: 'Aging Report', icon: Clock },
+            { type: 'by-customer', title: 'By Customer', icon: Users },
+            { type: 'partial', title: 'Partially Paid', icon: DollarSign },
+            { type: 'overdue', title: 'Overdue Only', icon: AlertCircle },
+          ].map((report) => {
+            const Icon = report.icon;
+            return (
+              <div key={report.type} className="border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Icon className="w-4 h-4 text-gray-600" />
+                  <h4 className="text-sm font-medium text-gray-900">{report.title}</h4>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => exportPrebuiltReport(report.type, 'pdf')}
+                    className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors"
+                  >
+                    <FileText className="w-3 h-3" />
+                    PDF
+                  </button>
+                  <button
+                    onClick={() => exportPrebuiltReport(report.type, 'csv')}
+                    className="flex-1 flex items-center justify-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
+                  >
+                    <FileSpreadsheet className="w-3 h-3" />
+                    CSV
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Info Banner */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
         <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
@@ -221,13 +316,25 @@ export default function AccountsReceivableReport() {
             ))}
           </select>
 
+          <select
+            value={selectedAgingBucket}
+            onChange={(e) => setSelectedAgingBucket(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">All Aging Buckets</option>
+            <option value="0-30">0-30 Days</option>
+            <option value="31-60">31-60 Days</option>
+            <option value="61-90">61-90 Days</option>
+            <option value="90+">90+ Days</option>
+          </select>
+
           <div className="ml-auto flex items-center gap-3">
             <button
-              onClick={() => setShowAutomationSettings(true)}
+              onClick={() => onNavigateToSettings?.('automated-reports')}
               className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
             >
               <Settings className="w-4 h-4" />
-              Automation
+              Automations
             </button>
 
             <button
@@ -274,7 +381,7 @@ export default function AccountsReceivableReport() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {invoices.map((invoice) => (
+              {filteredInvoices.map((invoice) => (
                 <tr key={invoice.invoice_id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <button
@@ -317,7 +424,7 @@ export default function AccountsReceivableReport() {
             </tbody>
           </table>
 
-          {invoices.length === 0 && (
+          {filteredInvoices.length === 0 && (
             <div className="text-center py-12">
               <TrendingUp className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">No Outstanding Invoices</h3>
@@ -331,12 +438,7 @@ export default function AccountsReceivableReport() {
         isOpen={showReportBuilder}
         onClose={() => setShowReportBuilder(false)}
         onGenerate={() => {}}
-        invoices={invoices}
-      />
-
-      <ARAutomationSettings
-        isOpen={showAutomationSettings}
-        onClose={() => setShowAutomationSettings(false)}
+        invoices={filteredInvoices}
       />
     </div>
   );

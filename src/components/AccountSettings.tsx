@@ -1500,7 +1500,7 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
             </button>
           </div>
 
-          {/* Automation Section - Collapsible */}
+          {/* Automations Section - Collapsible */}
           <div className="mb-2">
             <button
               onClick={() => setAutomationExpanded(!automationExpanded)}
@@ -1509,7 +1509,7 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
               <Zap className="w-4 h-4 flex-shrink-0 text-gray-600 group-hover:text-gray-900" />
               <div className="flex-1 text-left">
                 <div className="font-medium text-sm text-gray-900">
-                  Automation
+                  Automations
                 </div>
               </div>
               {automationExpanded ? (

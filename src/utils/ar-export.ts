@@ -21,6 +21,7 @@ export interface ARExportOptions {
   includeHeaders?: boolean;
   companyName?: string;
   logoUrl?: string;
+  reportTitle?: string;
 }
 
 export const AR_COLUMNS = {
@@ -91,7 +92,7 @@ export function downloadCSV(csvContent: string, filename: string = 'accounts-rec
 }
 
 export async function exportARToPDF(options: ARExportOptions): Promise<void> {
-  const { invoices, columns, companyName = 'Company Name' } = options;
+  const { invoices, columns, companyName = 'Company Name', reportTitle = 'Accounts Receivable Report' } = options;
 
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -99,7 +100,7 @@ export async function exportARToPDF(options: ARExportOptions): Promise<void> {
 
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
-  doc.text('Accounts Receivable Report', pageWidth / 2, yPosition, { align: 'center' });
+  doc.text(reportTitle, pageWidth / 2, yPosition, { align: 'center' });
 
   yPosition += 10;
   doc.setFontSize(10);

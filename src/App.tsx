@@ -29,6 +29,7 @@ function AppContent() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [accountingExpanded, setAccountingExpanded] = useState(true);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<string | undefined>(undefined);
   const { signOut, user } = useAuth();
 
   useEffect(() => {
@@ -436,7 +437,10 @@ function AppContent() {
                 </div>
               </div>
             }>
-              <AccountsReceivableReport />
+              <AccountsReceivableReport onNavigateToSettings={(tab) => {
+                setSettingsInitialTab(tab);
+                setActiveTab('settings');
+              }} />
             </Suspense>
           )}
 
@@ -497,7 +501,7 @@ function AppContent() {
           )}
 
           {activeTab === 'settings' && (
-            <AccountSettings />
+            <AccountSettings initialTab={settingsInitialTab as any} />
           )}
         </main>
       </div>
