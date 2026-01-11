@@ -33,7 +33,6 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState('all');
   const [selectedCustomer, setSelectedCustomer] = useState('all');
-  const [selectedAgingBucket, setSelectedAgingBucket] = useState('all');
   const [selectedReportType, setSelectedReportType] = useState('open-invoices');
   const [customers, setCustomers] = useState<string[]>([]);
   const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
@@ -120,12 +119,7 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
     });
   };
 
-  const filteredInvoices = invoices.filter(inv => {
-    if (selectedAgingBucket !== 'all' && inv.aging_bucket !== selectedAgingBucket) {
-      return false;
-    }
-    return true;
-  });
+  const filteredInvoices = invoices;
 
   const totalOutstanding = filteredInvoices.reduce((sum, inv) => sum + inv.balance_remaining, 0);
   const agingBuckets = calculateAgingBuckets();
@@ -147,9 +141,21 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
         reportTitle = 'Open Invoices Report';
         reportInvoices = invoices.filter(inv => inv.balance_remaining > 0);
         break;
-      case 'aging':
-        reportTitle = 'A/R Aging Report';
-        reportInvoices = invoices.filter(inv => inv.balance_remaining > 0);
+      case 'aging-0-30':
+        reportTitle = 'A/R Aging Report (0-30 Days)';
+        reportInvoices = invoices.filter(inv => inv.balance_remaining > 0 && inv.aging_bucket === '0-30');
+        break;
+      case 'aging-31-60':
+        reportTitle = 'A/R Aging Report (31-60 Days)';
+        reportInvoices = invoices.filter(inv => inv.balance_remaining > 0 && inv.aging_bucket === '31-60');
+        break;
+      case 'aging-61-90':
+        reportTitle = 'A/R Aging Report (61-90 Days)';
+        reportInvoices = invoices.filter(inv => inv.balance_remaining > 0 && inv.aging_bucket === '61-90');
+        break;
+      case 'aging-90-plus':
+        reportTitle = 'A/R Aging Report (90+ Days)';
+        reportInvoices = invoices.filter(inv => inv.balance_remaining > 0 && inv.aging_bucket === '90+');
         break;
       case 'by-customer':
         reportTitle = 'Receivables by Customer';
@@ -239,8 +245,26 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
       {/* Filters and Export */}
       <div className="bg-white rounded-lg shadow p-6">
         <div className="space-y-4">
-          {/* Top Row: Automations and Filters */}
-          <div className="flex flex-wrap items-center gap-3">
+          {/* Top Row: Filters and Automations */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Filter className="w-5 h-5 text-gray-400" />
+                <span className="text-sm font-medium text-gray-700">Filters:</span>
+              </div>
+
+              <select
+                value={selectedCustomer}
+                onChange={(e) => setSelectedCustomer(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">All Customers</option>
+                {customers.map(customer => (
+                  <option key={customer} value={customer}>{customer}</option>
+                ))}
+              </select>
+            </div>
+
             <button
               onClick={() => onNavigateToSettings?.('automated-reports')}
               className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
@@ -248,36 +272,6 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
               <Settings className="w-4 h-4" />
               Automations
             </button>
-
-            <div className="h-6 w-px bg-gray-300"></div>
-
-            <div className="flex items-center gap-2">
-              <Filter className="w-5 h-5 text-gray-400" />
-              <span className="text-sm font-medium text-gray-700">Filters:</span>
-            </div>
-
-            <select
-              value={selectedCustomer}
-              onChange={(e) => setSelectedCustomer(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Customers</option>
-              {customers.map(customer => (
-                <option key={customer} value={customer}>{customer}</option>
-              ))}
-            </select>
-
-            <select
-              value={selectedAgingBucket}
-              onChange={(e) => setSelectedAgingBucket(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Aging Buckets</option>
-              <option value="0-30">0-30 Days</option>
-              <option value="31-60">31-60 Days</option>
-              <option value="61-90">61-90 Days</option>
-              <option value="90+">90+ Days</option>
-            </select>
           </div>
 
           {/* Bottom Row: Reports and Export Buttons */}
@@ -290,7 +284,10 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
                 className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="open-invoices">Open Invoices Report</option>
-                <option value="aging">A/R Aging Report</option>
+                <option value="aging-0-30">A/R Aging Report (0-30 Days)</option>
+                <option value="aging-31-60">A/R Aging Report (31-60 Days)</option>
+                <option value="aging-61-90">A/R Aging Report (61-90 Days)</option>
+                <option value="aging-90-plus">A/R Aging Report (90+ Days)</option>
                 <option value="by-customer">Receivables by Customer</option>
               </select>
             </div>
