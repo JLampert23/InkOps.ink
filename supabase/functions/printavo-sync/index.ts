@@ -238,19 +238,99 @@ async function fetchFromPrintavo(
   return result;
 }
 
+async function fetchCustomerDetails(
+  printavoCustomerId: string,
+  printavoEmail: string,
+  printavoToken: string
+): Promise<any> {
+  const customerQuery = `
+    query GetCustomer($id: ID!) {
+      customer(id: $id) {
+        id
+        companyName
+        primaryContact {
+          firstName
+          lastName
+          email
+          phone
+        }
+        billingAddress {
+          address1
+          address2
+          city
+          state
+          postalCode
+          country
+        }
+        shippingAddress {
+          address1
+          address2
+          city
+          state
+          postalCode
+          country
+        }
+        contacts {
+          edges {
+            node {
+              id
+              fullName
+              email
+              phone
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  try {
+    const result = await fetchFromPrintavo(
+      customerQuery,
+      { id: printavoCustomerId },
+      printavoEmail,
+      printavoToken
+    );
+    return result.data?.customer || null;
+  } catch (error) {
+    console.error('Error fetching customer details:', error);
+    return null;
+  }
+}
+
 async function findOrCreateCustomer(
   supabase: any,
-  invoice: Invoice
-): Promise<string | null> {
+  invoice: Invoice,
+  printavoEmail: string,
+  printavoToken: string
+): Promise<{ id: string | null; details: any | null }> {
   const customerName = invoice.contact?.customer?.companyName || invoice.contact?.fullName;
   const customerEmail = invoice.contact?.email;
-  const customerPhone = invoice.contact?.customer?.primaryContact?.phone ||
+  let customerPhone = invoice.contact?.customer?.primaryContact?.phone ||
                        invoice.contact?.phone;
   const printavoCustomerId = invoice.contact?.customer?.id;
 
+  let customerDetails = null;
+  if (printavoCustomerId) {
+    customerDetails = await fetchCustomerDetails(printavoCustomerId, printavoEmail, printavoToken);
+    if (customerDetails) {
+      console.log('Fetched customer details from Printavo:', {
+        id: customerDetails.id,
+        name: customerDetails.companyName,
+        hasBilling: !!customerDetails.billingAddress,
+        hasShipping: !!customerDetails.shippingAddress,
+        primaryPhone: customerDetails.primaryContact?.phone,
+      });
+
+      if (!customerPhone && customerDetails.primaryContact?.phone) {
+        customerPhone = customerDetails.primaryContact.phone;
+      }
+    }
+  }
+
   if (!customerName) {
     console.log('No customer name found for invoice', invoice.id);
-    return null;
+    return { id: null, details: null };
   }
 
   let existingCustomer = null;
@@ -277,7 +357,7 @@ async function findOrCreateCustomer(
     const updateData: any = {};
     let hasUpdates = false;
 
-    const billingSource = invoice.contact?.customer?.billingAddress || invoice.billingAddress;
+    const billingSource = customerDetails?.billingAddress || invoice.contact?.customer?.billingAddress || invoice.billingAddress;
     if (billingSource && (billingSource.address1 || billingSource.city)) {
       if (billingSource.address1) { updateData.billing_address_line1 = billingSource.address1; hasUpdates = true; }
       if (billingSource.address2) { updateData.billing_address_line2 = billingSource.address2; hasUpdates = true; }
@@ -287,7 +367,7 @@ async function findOrCreateCustomer(
       if (billingSource.country) { updateData.billing_country = billingSource.country; hasUpdates = true; }
     }
 
-    const shippingSource = invoice.contact?.customer?.shippingAddress || invoice.shippingAddress;
+    const shippingSource = customerDetails?.shippingAddress || invoice.contact?.customer?.shippingAddress || invoice.shippingAddress;
     if (shippingSource && (shippingSource.address1 || shippingSource.city)) {
       if (shippingSource.address1) { updateData.shipping_address_line1 = shippingSource.address1; hasUpdates = true; }
       if (shippingSource.address2) { updateData.shipping_address_line2 = shippingSource.address2; hasUpdates = true; }
@@ -310,7 +390,7 @@ async function findOrCreateCustomer(
       console.log('Updated existing customer:', customerName, 'with new data');
     }
 
-    return existingCustomer.id;
+    return { id: existingCustomer.id, details: customerDetails };
   }
 
   const customerData: any = {
@@ -322,7 +402,7 @@ async function findOrCreateCustomer(
     status: 'active',
   };
 
-  const billingSource = invoice.contact?.customer?.billingAddress || invoice.billingAddress;
+  const billingSource = customerDetails?.billingAddress || invoice.contact?.customer?.billingAddress || invoice.billingAddress;
   if (billingSource && (billingSource.address1 || billingSource.city)) {
     customerData.billing_address_line1 = billingSource.address1;
     customerData.billing_address_line2 = billingSource.address2;
@@ -332,7 +412,7 @@ async function findOrCreateCustomer(
     customerData.billing_country = billingSource.country || 'USA';
   }
 
-  const shippingSource = invoice.contact?.customer?.shippingAddress || invoice.shippingAddress;
+  const shippingSource = customerDetails?.shippingAddress || invoice.contact?.customer?.shippingAddress || invoice.shippingAddress;
   if (shippingSource && (shippingSource.address1 || shippingSource.city)) {
     customerData.shipping_address_line1 = shippingSource.address1;
     customerData.shipping_address_line2 = shippingSource.address2;
@@ -350,11 +430,11 @@ async function findOrCreateCustomer(
 
   if (error) {
     console.error('Error creating customer:', error);
-    return null;
+    return { id: null, details: null };
   }
 
   console.log('Created new customer:', customerName, 'with ID:', newCustomer.id);
-  return newCustomer.id;
+  return { id: newCustomer.id, details: customerDetails };
 }
 
 async function syncInvoices(
@@ -648,7 +728,7 @@ async function syncInvoices(
           }, null, 2));
         }
 
-        const customerId = await findOrCreateCustomer(supabase, invoice);
+        const { id: customerId, details: customerDetails } = await findOrCreateCustomer(supabase, invoice, printavoEmail, printavoToken);
 
         const amountOutstanding = invoice.amountOutstanding || 0;
         let statusStage = 'billing_queue';
@@ -658,11 +738,12 @@ async function syncInvoices(
           statusStage = 'accounts_receivable';
         }
 
-        const phoneNumber = invoice.contact?.customer?.primaryContact?.phone ||
+        const phoneNumber = customerDetails?.primaryContact?.phone ||
+                           invoice.contact?.customer?.primaryContact?.phone ||
                            invoice.contact?.phone ||
                            '';
 
-        const billingSource = invoice.contact?.customer?.billingAddress || invoice.billingAddress;
+        const billingSource = customerDetails?.billingAddress || invoice.contact?.customer?.billingAddress || invoice.billingAddress;
         let billingAddress = null;
         if (billingSource && (billingSource.address1 || billingSource.city)) {
           billingAddress = {
@@ -675,7 +756,7 @@ async function syncInvoices(
           };
         }
 
-        const shippingSource = invoice.contact?.customer?.shippingAddress || invoice.shippingAddress;
+        const shippingSource = customerDetails?.shippingAddress || invoice.contact?.customer?.shippingAddress || invoice.shippingAddress;
         let shippingAddress = null;
         if (shippingSource && (shippingSource.address1 || shippingSource.city)) {
           shippingAddress = {
@@ -830,7 +911,7 @@ async function syncInvoices(
     });
 
     for (const invoice of recentInvoices) {
-      const customerId = await findOrCreateCustomer(supabase, invoice);
+      const { id: customerId, details: customerDetails } = await findOrCreateCustomer(supabase, invoice, printavoEmail, printavoToken);
 
       const amountOutstanding = invoice.amountOutstanding || 0;
       let statusStage = 'billing_queue';
@@ -840,11 +921,12 @@ async function syncInvoices(
         statusStage = 'accounts_receivable';
       }
 
-      const phoneNumber = invoice.contact?.customer?.primaryContact?.phone ||
+      const phoneNumber = customerDetails?.primaryContact?.phone ||
+                         invoice.contact?.customer?.primaryContact?.phone ||
                          invoice.contact?.phone ||
                          '';
 
-      const billingSource = invoice.contact?.customer?.billingAddress || invoice.billingAddress;
+      const billingSource = customerDetails?.billingAddress || invoice.contact?.customer?.billingAddress || invoice.billingAddress;
       let billingAddress = null;
       if (billingSource && (billingSource.address1 || billingSource.city)) {
         billingAddress = {
@@ -857,7 +939,7 @@ async function syncInvoices(
         };
       }
 
-      const shippingSource = invoice.contact?.customer?.shippingAddress || invoice.shippingAddress;
+      const shippingSource = customerDetails?.shippingAddress || invoice.contact?.customer?.shippingAddress || invoice.shippingAddress;
       let shippingAddress = null;
       if (shippingSource && (shippingSource.address1 || shippingSource.city)) {
         shippingAddress = {
