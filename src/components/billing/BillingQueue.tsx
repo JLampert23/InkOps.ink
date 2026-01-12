@@ -303,6 +303,12 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
                   Customer
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Phone
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Address
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Amount
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -344,6 +350,28 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
                     </div>
                     <div className="text-xs text-gray-500">
                       {item.customerEmail}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">
+                      {item.customerPhone || '-'}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-sm text-gray-900">
+                      {item.billingAddressLine1 ? (
+                        <>
+                          <div>{item.billingAddressLine1}</div>
+                          {item.billingAddressLine2 && <div>{item.billingAddressLine2}</div>}
+                          <div className="text-xs text-gray-500">
+                            {[item.billingCity, item.billingState, item.billingZip]
+                              .filter(Boolean)
+                              .join(', ')}
+                          </div>
+                        </>
+                      ) : (
+                        '-'
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

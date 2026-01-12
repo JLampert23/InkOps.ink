@@ -13,6 +13,7 @@ export interface BillingQueueItem {
   customerName: string;
   customerEmail: string;
   customerCompany: string;
+  customerPhone?: string;
   customerId?: string;
   invoiceTotal: number;
   invoiceDate: string;
@@ -25,6 +26,18 @@ export interface BillingQueueItem {
   metadata: any;
   createdAt: string;
   updatedAt: string;
+  billingAddressLine1?: string;
+  billingAddressLine2?: string;
+  billingCity?: string;
+  billingState?: string;
+  billingZip?: string;
+  billingCountry?: string;
+  shippingAddressLine1?: string;
+  shippingAddressLine2?: string;
+  shippingCity?: string;
+  shippingState?: string;
+  shippingZip?: string;
+  shippingCountry?: string;
 }
 
 export interface CommunicationLog {
@@ -238,39 +251,71 @@ export const billingService = {
       if (queueError) throw queueError;
       if (!queueData) return [];
 
-      // Get customer IDs from printavo_invoices in a separate query
+      // Get additional invoice details from printavo_invoices
       const invoiceIds = queueData.map(item => item.printavo_invoice_id);
       const { data: invoiceData } = await supabase
         .from('printavo_invoices')
-        .select('id, customer_id')
+        .select(`
+          id,
+          customer_id,
+          customer_phone,
+          billing_address_line1,
+          billing_address_line2,
+          billing_city,
+          billing_state,
+          billing_zip,
+          billing_country,
+          shipping_address_line1,
+          shipping_address_line2,
+          shipping_city,
+          shipping_state,
+          shipping_zip,
+          shipping_country
+        `)
         .in('id', invoiceIds);
 
-      // Create a map of invoice ID to customer ID
-      const customerIdMap = new Map(
-        (invoiceData || []).map(inv => [inv.id, inv.customer_id])
+      // Create a map of invoice ID to invoice data
+      const invoiceDataMap = new Map(
+        (invoiceData || []).map(inv => [inv.id, inv])
       );
 
-      return queueData.map(item => ({
-        id: item.id,
-        printavoInvoiceId: item.printavo_invoice_id,
-        printavoVisualId: item.printavo_visual_id,
-        printavoStatus: item.printavo_status,
-        customerName: item.customer_name,
-        customerEmail: item.customer_email,
-        customerCompany: item.customer_company,
-        customerId: customerIdMap.get(item.printavo_invoice_id),
-        invoiceTotal: parseFloat(item.invoice_total),
-        invoiceDate: item.invoice_date,
-        dueDate: item.due_date,
-        stripePaymentLinkId: item.stripe_payment_link_id,
-        stripeInvoiceId: item.stripe_invoice_id,
-        sentAt: item.sent_at,
-        sentMethod: item.sent_method,
-        paymentStatus: item.payment_status,
-        metadata: item.metadata,
-        createdAt: item.created_at,
-        updatedAt: item.updated_at,
-      }));
+      return queueData.map(item => {
+        const invoiceDetails = invoiceDataMap.get(item.printavo_invoice_id);
+        return {
+          id: item.id,
+          printavoInvoiceId: item.printavo_invoice_id,
+          printavoVisualId: item.printavo_visual_id,
+          printavoStatus: item.printavo_status,
+          customerName: item.customer_name,
+          customerEmail: item.customer_email,
+          customerCompany: item.customer_company,
+          customerPhone: invoiceDetails?.customer_phone,
+          customerId: invoiceDetails?.customer_id,
+          invoiceTotal: parseFloat(item.invoice_total),
+          invoiceDate: item.invoice_date,
+          dueDate: item.due_date,
+          stripePaymentLinkId: item.stripe_payment_link_id,
+          stripeInvoiceId: item.stripe_invoice_id,
+          sentAt: item.sent_at,
+          sentMethod: item.sent_method,
+          paymentStatus: item.payment_status,
+          metadata: item.metadata,
+          createdAt: item.created_at,
+          updatedAt: item.updated_at,
+          billingAddressLine1: invoiceDetails?.billing_address_line1,
+          billingAddressLine2: invoiceDetails?.billing_address_line2,
+          billingCity: invoiceDetails?.billing_city,
+          billingState: invoiceDetails?.billing_state,
+          billingZip: invoiceDetails?.billing_zip,
+          billingCountry: invoiceDetails?.billing_country,
+          shippingAddressLine1: invoiceDetails?.shipping_address_line1,
+          shippingAddressLine2: invoiceDetails?.shipping_address_line2,
+          shippingCity: invoiceDetails?.shipping_city,
+          shippingState: invoiceDetails?.shipping_state,
+          shippingZip: invoiceDetails?.shipping_zip,
+          shippingCountry: invoiceDetails?.shipping_country,
+        };
+      });
     } catch (error) {
       console.error('Error fetching billing queue:', error);
       return [];
