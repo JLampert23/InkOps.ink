@@ -159,9 +159,9 @@ function AppContent() {
       )}
 
       {/* Sidebar */}
-      <aside className={`fixed top-0 left-0 h-full bg-white border-r border-gray-200 shadow-xl transition-all duration-300 z-30 w-64
+      <aside className={`fixed top-0 left-0 h-full bg-white border-r border-gray-200 shadow-xl transition-all duration-300 z-30 w-56
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-        lg:w-auto ${sidebarOpen ? 'lg:w-64' : 'lg:w-20'}
+        lg:w-auto ${sidebarOpen ? 'lg:w-56' : 'lg:w-20'}
       `}>
         {/* Logo/Brand */}
         <div className="h-20 border-b border-gray-200 flex items-center justify-center px-4 bg-gradient-to-r from-blue-600 to-blue-700">
@@ -310,8 +310,8 @@ function AppContent() {
                   <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-orange-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
                   {sidebarOpen && (
                     <div className="flex-1 text-left">
-                      <div className={`font-bold text-sm uppercase tracking-wide ${isActive ? 'text-orange-700' : 'text-gray-900'}`}>
-                        Production Dashboard
+                      <div className={`font-bold text-xs uppercase tracking-wide leading-tight ${isActive ? 'text-orange-700' : 'text-gray-900'}`}>
+                        Production<br />Dashboard
                       </div>
                     </div>
                   )}
@@ -347,8 +347,8 @@ function AppContent() {
                   <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
                   {sidebarOpen && (
                     <div className="flex-1 text-left">
-                      <div className={`font-bold text-sm uppercase tracking-wide ${isActive ? 'text-green-700' : 'text-gray-900'}`}>
-                        Square Dashboard
+                      <div className={`font-bold text-xs uppercase tracking-wide leading-tight ${isActive ? 'text-green-700' : 'text-gray-900'}`}>
+                        Square<br />Dashboard
                       </div>
                     </div>
                   )}
@@ -402,7 +402,7 @@ function AppContent() {
       </aside>
 
       {/* Main Content Area */}
-      <div className={`transition-all duration-300 lg:ml-20 ${sidebarOpen ? 'lg:ml-64' : 'lg:ml-20'}`}>
+      <div className={`transition-all duration-300 lg:ml-20 ${sidebarOpen ? 'lg:ml-56' : 'lg:ml-20'}`}>
         {/* Top Bar */}
         <header className="h-20 bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm">
           <div className="h-full px-4 flex items-center justify-between gap-4">
