@@ -125,6 +125,8 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
   const [loadingStatuses, setLoadingStatuses] = useState(false);
   const [savingStatuses, setSavingStatuses] = useState(false);
   const [syncingStatuses, setSyncingStatuses] = useState(false);
+  const [syncingPrintavoData, setSyncingPrintavoData] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const [billingSelectedStatuses, setBillingSelectedStatuses] = useState<string[]>([]);
   const [savingBillingStatuses, setSavingBillingStatuses] = useState(false);
@@ -1516,6 +1518,44 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
     }
   };
 
+  const syncPrintavoData = async () => {
+    try {
+      setSyncingPrintavoData(true);
+      setSyncResult(null);
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/printavo-sync`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ mode: 'quick' }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to start sync');
+      }
+
+      setSyncResult({
+        success: true,
+        message: 'Sync started successfully! This may take a few minutes. Your data will be updated in the background.',
+      });
+    } catch (err) {
+      console.error('Error syncing Printavo data:', err);
+      setSyncResult({
+        success: false,
+        message: err instanceof Error ? err.message : 'Failed to sync data',
+      });
+    } finally {
+      setSyncingPrintavoData(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -1962,22 +2002,49 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
                             <p className="text-sm mt-1">Connected as: {companySettings.printavo_username}</p>
                           </div>
                         </div>
-                        <button
-                          onClick={testPrintavoConnection}
-                          disabled={testingConnection}
-                          className="flex items-center gap-2 px-4 py-2 bg-white border border-green-300 text-green-700 rounded-lg hover:bg-green-50 disabled:opacity-50 transition-colors"
-                        >
-                          {testingConnection ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Testing...
-                            </>
-                          ) : (
-                            'Test Connection'
-                          )}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={syncPrintavoData}
+                            disabled={syncingPrintavoData}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                          >
+                            {syncingPrintavoData ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Syncing...
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw className="w-4 h-4" />
+                                Sync Now
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={testPrintavoConnection}
+                            disabled={testingConnection}
+                            className="flex items-center gap-2 px-4 py-2 bg-white border border-green-300 text-green-700 rounded-lg hover:bg-green-50 disabled:opacity-50 transition-colors"
+                          >
+                            {testingConnection ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Testing...
+                              </>
+                            ) : (
+                              'Test Connection'
+                            )}
+                          </button>
+                        </div>
                       </div>
                     </div>
+
+                    {syncResult && (
+                      <div className={`mt-4 p-4 rounded-lg border ${syncResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                        <p className={`text-sm ${syncResult.success ? 'text-green-800' : 'text-red-800'}`}>
+                          {syncResult.message}
+                        </p>
+                      </div>
+                    )}
 
                     {testResult && (
                       <div className={`p-4 rounded-lg border ${testResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
