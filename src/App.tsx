@@ -26,11 +26,25 @@ interface CompanySettings {
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState<Tab>('accounting-dashboard');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [accountingExpanded, setAccountingExpanded] = useState(true);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [settingsInitialTab, setSettingsInitialTab] = useState<string | undefined>(undefined);
   const { signOut, user } = useAuth();
+
+  useEffect(() => {
+    const checkScreenSize = () => {
+      if (window.innerWidth >= 1024) {
+        setSidebarOpen(true);
+      } else {
+        setSidebarOpen(false);
+      }
+    };
+
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
 
   useEffect(() => {
     const loadCompanySettings = async () => {
@@ -128,12 +142,27 @@ function AppContent() {
     },
   ];
 
+  const closeSidebarOnMobile = () => {
+    if (window.innerWidth < 1024) {
+      setSidebarOpen(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Mobile backdrop overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className={`fixed top-0 left-0 h-full bg-white border-r border-gray-200 shadow-xl transition-all duration-300 z-30 ${
-        sidebarOpen ? 'w-64' : 'w-20'
-      }`}>
+      <aside className={`fixed top-0 left-0 h-full bg-white border-r border-gray-200 shadow-xl transition-all duration-300 z-30 w-64
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        lg:w-auto ${sidebarOpen ? 'lg:w-64' : 'lg:w-20'}
+      `}>
         {/* Logo/Brand */}
         <div className="h-20 border-b border-gray-200 flex items-center justify-center px-4 bg-gradient-to-r from-blue-600 to-blue-700">
           {sidebarOpen ? (
@@ -227,7 +256,10 @@ function AppContent() {
                   return (
                     <button
                       key={item.id}
-                      onClick={() => setActiveTab(item.id)}
+                      onClick={() => {
+                        setActiveTab(item.id);
+                        closeSidebarOnMobile();
+                      }}
                       className={`collapsible-item w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 group ${
                         isActive
                           ? 'bg-green-50 text-green-700 shadow-sm'
@@ -263,7 +295,10 @@ function AppContent() {
               return (
                 <button
                   key={item.id}
-                  onClick={() => setActiveTab(item.id)}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    closeSidebarOnMobile();
+                  }}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
                     isActive
                       ? 'bg-orange-50 text-orange-700 shadow-sm'
@@ -297,7 +332,10 @@ function AppContent() {
               return (
                 <button
                   key={item.id}
-                  onClick={() => setActiveTab(item.id)}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    closeSidebarOnMobile();
+                  }}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
                     isActive
                       ? 'bg-green-50 text-green-700 shadow-sm'
@@ -328,7 +366,10 @@ function AppContent() {
               <p className="text-xs text-gray-500">Signed in as</p>
               <p className="text-sm font-medium text-gray-900 truncate">{user.email}</p>
               <button
-                onClick={() => setActiveTab('settings')}
+                onClick={() => {
+                  setActiveTab('settings');
+                  closeSidebarOnMobile();
+                }}
                 className="mt-2 w-full flex items-center gap-2 text-xs text-blue-600 hover:text-blue-800 transition-colors"
               >
                 <Settings className="w-3 h-3" />
@@ -361,12 +402,21 @@ function AppContent() {
       </aside>
 
       {/* Main Content Area */}
-      <div className={`transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-20'}`}>
+      <div className={`transition-all duration-300 lg:ml-20 ${sidebarOpen ? 'lg:ml-64' : 'lg:ml-20'}`}>
         {/* Top Bar */}
         <header className="h-20 bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm">
-          <div className="h-full px-4 flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">
+          <div className="h-full px-4 flex items-center justify-between gap-4">
+            {/* Mobile menu button */}
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="lg:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="Toggle menu"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+
+            <div className="flex-1 min-w-0">
+              <h2 className="text-xl md:text-2xl font-bold text-gray-900 truncate">
                 {activeTab === 'accounting-dashboard' ? 'ACCOUNTING' :
                  activeTab === 'accounts-receivable' ? 'Accounts Receivable' :
                  activeTab === 'customers' ? 'Customers' :
@@ -374,7 +424,7 @@ function AppContent() {
                  [...accountingNavItems, ...squareNavItems, ...productionNavItems].find(item => item.id === activeTab)?.name ||
                  (activeTab === 'settings' ? 'Account Settings' : 'Dashboard')}
               </h2>
-              <p className="text-sm text-gray-500 mt-0.5">
+              <p className="text-xs md:text-sm text-gray-500 mt-0.5 truncate">
                 {activeTab === 'accounting-dashboard' ? (
                   'Manage invoices, send payments, and track billing'
                 ) : activeTab === 'accounts-receivable' ? (
@@ -394,17 +444,19 @@ function AppContent() {
                 )}
               </p>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="hidden md:flex items-center gap-4">
               {activeTab === 'square' && (
-                <div className="text-sm text-gray-600 flex items-center gap-2 bg-green-50 px-4 py-2 rounded-lg border border-green-200">
-                  <div className="w-2 h-2 bg-green-500 rounded-full" />
-                  <span>Square data is fetched in real-time. Use "Fetch Data" buttons in each module.</span>
+                <div className="text-xs lg:text-sm text-gray-600 flex items-center gap-2 bg-green-50 px-3 lg:px-4 py-2 rounded-lg border border-green-200">
+                  <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0" />
+                  <span className="hidden xl:inline">Square data is fetched in real-time. Use "Fetch Data" buttons in each module.</span>
+                  <span className="xl:hidden">Real-time Square data</span>
                 </div>
               )}
               {activeTab === 'production' && (
-                <div className="text-sm text-gray-600 flex items-center gap-2 bg-orange-50 px-4 py-2 rounded-lg border border-orange-200">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full" />
-                  <span>Production workflows use placeholder data. Connect your systems in Settings.</span>
+                <div className="text-xs lg:text-sm text-gray-600 flex items-center gap-2 bg-orange-50 px-3 lg:px-4 py-2 rounded-lg border border-orange-200">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full flex-shrink-0" />
+                  <span className="hidden xl:inline">Production workflows use placeholder data. Connect your systems in Settings.</span>
+                  <span className="xl:hidden">Placeholder data</span>
                 </div>
               )}
             </div>
@@ -412,7 +464,7 @@ function AppContent() {
         </header>
 
         {/* Content */}
-        <main className="py-6 px-4">
+        <main className="py-4 px-3 sm:py-6 sm:px-4">
           {activeTab === 'accounting-dashboard' && (
             <Suspense fallback={
               <div className="bg-white rounded-lg shadow p-8">
