@@ -1040,7 +1040,16 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
         }),
       });
 
-      const result = await response.json();
+      let result;
+      try {
+        const text = await response.text();
+        console.log('Twilio test response status:', response.status);
+        console.log('Twilio test response text:', text);
+        result = text ? JSON.parse(text) : {};
+      } catch (parseError) {
+        console.error('Failed to parse response:', parseError);
+        result = { error: `Server returned invalid response (Status: ${response.status})` };
+      }
 
       if (response.ok) {
         setTwilioTestResult({
@@ -1051,7 +1060,7 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
       } else {
         setTwilioTestResult({
           success: false,
-          error: result.error || 'Failed to send test SMS',
+          error: result.error || `Failed to send test SMS (Status: ${response.status})`,
           details: result,
         });
       }
@@ -1060,6 +1069,7 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
       setTwilioTestResult({
         success: false,
         error: err instanceof Error ? err.message : 'Failed to test Twilio connection',
+        details: err,
       });
     } finally {
       setTestingTwilio(false);
