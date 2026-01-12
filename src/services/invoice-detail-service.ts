@@ -172,17 +172,24 @@ export const invoiceDetailService = {
 
       const statusInfo = await this.getStatusInfo(invoice.status);
 
-      // Extract addresses - prioritize invoice fields, fallback to raw_data
-      let billingAddress = invoice.billing_address;
-      let shippingAddress = invoice.shipping_address;
+      // Extract addresses from individual fields first, then fallback to JSON fields and raw_data
+      const billingAddress: InvoiceAddress = {
+        line1: invoice.billing_address_line1 || invoice.billing_address?.line1 || customer.billingAddress?.address1 || rawData.billingAddress?.address1 || null,
+        line2: invoice.billing_address_line2 || invoice.billing_address?.line2 || customer.billingAddress?.address2 || rawData.billingAddress?.address2 || null,
+        city: invoice.billing_city || invoice.billing_address?.city || customer.billingAddress?.city || rawData.billingAddress?.city || null,
+        state: invoice.billing_state || invoice.billing_address?.state || customer.billingAddress?.state || rawData.billingAddress?.state || null,
+        zip: invoice.billing_zip || invoice.billing_address?.zip || customer.billingAddress?.postalCode || rawData.billingAddress?.zip || null,
+        country: invoice.billing_country || invoice.billing_address?.country || customer.billingAddress?.country || rawData.billingAddress?.country || null,
+      };
 
-      // Fallback to raw_data if invoice fields are empty
-      if (!billingAddress || !this.hasAddress(billingAddress)) {
-        billingAddress = this.extractAddress(customer.billingAddress || rawData.billingAddress);
-      }
-      if (!shippingAddress || !this.hasAddress(shippingAddress)) {
-        shippingAddress = this.extractAddress(customer.shippingAddress || rawData.shippingAddress);
-      }
+      const shippingAddress: InvoiceAddress = {
+        line1: invoice.shipping_address_line1 || invoice.shipping_address?.line1 || customer.shippingAddress?.address1 || rawData.shippingAddress?.address1 || null,
+        line2: invoice.shipping_address_line2 || invoice.shipping_address?.line2 || customer.shippingAddress?.address2 || rawData.shippingAddress?.address2 || null,
+        city: invoice.shipping_city || invoice.shipping_address?.city || customer.shippingAddress?.city || rawData.shippingAddress?.city || null,
+        state: invoice.shipping_state || invoice.shipping_address?.state || customer.shippingAddress?.state || rawData.shippingAddress?.state || null,
+        zip: invoice.shipping_zip || invoice.shipping_address?.zip || customer.shippingAddress?.postalCode || rawData.shippingAddress?.zip || null,
+        country: invoice.shipping_country || invoice.shipping_address?.country || customer.shippingAddress?.country || rawData.shippingAddress?.country || null,
+      };
 
       return {
         id: invoice.id,

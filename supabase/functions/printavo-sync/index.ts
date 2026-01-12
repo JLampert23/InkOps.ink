@@ -29,24 +29,31 @@ interface Invoice {
     fullName?: string;
     email?: string;
     phone?: string;
-    phoneNumber?: string;
-    address1?: string;
-    address2?: string;
-    city?: string;
-    state?: string;
-    zip?: string;
-    country?: string;
     customer?: {
       id?: string;
       companyName?: string;
-      phone?: string;
-      phoneNumber?: string;
-      address1?: string;
-      address2?: string;
-      city?: string;
-      state?: string;
-      zip?: string;
-      country?: string;
+      primaryContact?: {
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+        phone?: string;
+      };
+      billingAddress?: {
+        address1?: string;
+        address2?: string;
+        city?: string;
+        state?: string;
+        postalCode?: string;
+        country?: string;
+      };
+      shippingAddress?: {
+        address1?: string;
+        address2?: string;
+        city?: string;
+        state?: string;
+        postalCode?: string;
+        country?: string;
+      };
     };
   };
   billingAddress?: {
@@ -237,10 +244,8 @@ async function findOrCreateCustomer(
 ): Promise<string | null> {
   const customerName = invoice.contact?.customer?.companyName || invoice.contact?.fullName;
   const customerEmail = invoice.contact?.email;
-  const customerPhone = invoice.contact?.phone ||
-                       invoice.contact?.phoneNumber ||
-                       invoice.contact?.customer?.phone ||
-                       invoice.contact?.customer?.phoneNumber;
+  const customerPhone = invoice.contact?.customer?.primaryContact?.phone ||
+                       invoice.contact?.phone;
   const printavoCustomerId = invoice.contact?.customer?.id;
 
   if (!customerName) {
@@ -272,24 +277,24 @@ async function findOrCreateCustomer(
     const updateData: any = {};
     let hasUpdates = false;
 
-    const billingSource = invoice.billingAddress || invoice.contact?.customer || invoice.contact;
+    const billingSource = invoice.contact?.customer?.billingAddress || invoice.billingAddress;
     if (billingSource && (billingSource.address1 || billingSource.city)) {
       if (billingSource.address1) { updateData.billing_address_line1 = billingSource.address1; hasUpdates = true; }
       if (billingSource.address2) { updateData.billing_address_line2 = billingSource.address2; hasUpdates = true; }
       if (billingSource.city) { updateData.billing_city = billingSource.city; hasUpdates = true; }
       if (billingSource.state) { updateData.billing_state = billingSource.state; hasUpdates = true; }
-      if (billingSource.zip) { updateData.billing_zip = billingSource.zip; hasUpdates = true; }
+      if (billingSource.postalCode) { updateData.billing_zip = billingSource.postalCode; hasUpdates = true; }
       if (billingSource.country) { updateData.billing_country = billingSource.country; hasUpdates = true; }
     }
 
-    if (invoice.shippingAddress && (invoice.shippingAddress.address1 || invoice.shippingAddress.city)) {
-      const shippingAddr = invoice.shippingAddress;
-      if (shippingAddr.address1) { updateData.shipping_address_line1 = shippingAddr.address1; hasUpdates = true; }
-      if (shippingAddr.address2) { updateData.shipping_address_line2 = shippingAddr.address2; hasUpdates = true; }
-      if (shippingAddr.city) { updateData.shipping_city = shippingAddr.city; hasUpdates = true; }
-      if (shippingAddr.state) { updateData.shipping_state = shippingAddr.state; hasUpdates = true; }
-      if (shippingAddr.zip) { updateData.shipping_zip = shippingAddr.zip; hasUpdates = true; }
-      if (shippingAddr.country) { updateData.shipping_country = shippingAddr.country; hasUpdates = true; }
+    const shippingSource = invoice.contact?.customer?.shippingAddress || invoice.shippingAddress;
+    if (shippingSource && (shippingSource.address1 || shippingSource.city)) {
+      if (shippingSource.address1) { updateData.shipping_address_line1 = shippingSource.address1; hasUpdates = true; }
+      if (shippingSource.address2) { updateData.shipping_address_line2 = shippingSource.address2; hasUpdates = true; }
+      if (shippingSource.city) { updateData.shipping_city = shippingSource.city; hasUpdates = true; }
+      if (shippingSource.state) { updateData.shipping_state = shippingSource.state; hasUpdates = true; }
+      if (shippingSource.postalCode) { updateData.shipping_zip = shippingSource.postalCode; hasUpdates = true; }
+      if (shippingSource.country) { updateData.shipping_country = shippingSource.country; hasUpdates = true; }
     }
 
     if (customerEmail) { updateData.email = customerEmail; hasUpdates = true; }
@@ -317,23 +322,24 @@ async function findOrCreateCustomer(
     status: 'active',
   };
 
-  const billingSource = invoice.billingAddress || invoice.contact?.customer || invoice.contact;
+  const billingSource = invoice.contact?.customer?.billingAddress || invoice.billingAddress;
   if (billingSource && (billingSource.address1 || billingSource.city)) {
     customerData.billing_address_line1 = billingSource.address1;
     customerData.billing_address_line2 = billingSource.address2;
     customerData.billing_city = billingSource.city;
     customerData.billing_state = billingSource.state;
-    customerData.billing_zip = billingSource.zip;
+    customerData.billing_zip = billingSource.postalCode;
     customerData.billing_country = billingSource.country || 'USA';
   }
 
-  if (invoice.shippingAddress && (invoice.shippingAddress.address1 || invoice.shippingAddress.city)) {
-    customerData.shipping_address_line1 = invoice.shippingAddress.address1;
-    customerData.shipping_address_line2 = invoice.shippingAddress.address2;
-    customerData.shipping_city = invoice.shippingAddress.city;
-    customerData.shipping_state = invoice.shippingAddress.state;
-    customerData.shipping_zip = invoice.shippingAddress.zip;
-    customerData.shipping_country = invoice.shippingAddress.country || 'USA';
+  const shippingSource = invoice.contact?.customer?.shippingAddress || invoice.shippingAddress;
+  if (shippingSource && (shippingSource.address1 || shippingSource.city)) {
+    customerData.shipping_address_line1 = shippingSource.address1;
+    customerData.shipping_address_line2 = shippingSource.address2;
+    customerData.shipping_city = shippingSource.city;
+    customerData.shipping_state = shippingSource.state;
+    customerData.shipping_zip = shippingSource.postalCode;
+    customerData.shipping_country = shippingSource.country || 'USA';
   }
 
   const { data: newCustomer, error } = await supabase
@@ -401,24 +407,31 @@ async function syncInvoices(
               fullName
               email
               phone
-              phoneNumber
-              address1
-              address2
-              city
-              state
-              zip
-              country
               customer {
                 id
                 companyName
-                phone
-                phoneNumber
-                address1
-                address2
-                city
-                state
-                zip
-                country
+                primaryContact {
+                  firstName
+                  lastName
+                  email
+                  phone
+                }
+                billingAddress {
+                  address1
+                  address2
+                  city
+                  state
+                  postalCode
+                  country
+                }
+                shippingAddress {
+                  address1
+                  address2
+                  city
+                  state
+                  postalCode
+                  country
+                }
               }
             }
             billingAddress {
@@ -501,24 +514,31 @@ async function syncInvoices(
               fullName
               email
               phone
-              phoneNumber
-              address1
-              address2
-              city
-              state
-              zip
-              country
               customer {
                 id
                 companyName
-                phone
-                phoneNumber
-                address1
-                address2
-                city
-                state
-                zip
-                country
+                primaryContact {
+                  firstName
+                  lastName
+                  email
+                  phone
+                }
+                billingAddress {
+                  address1
+                  address2
+                  city
+                  state
+                  postalCode
+                  country
+                }
+                shippingAddress {
+                  address1
+                  address2
+                  city
+                  state
+                  postalCode
+                  country
+                }
               }
             }
             billingAddress {
@@ -628,51 +648,33 @@ async function syncInvoices(
           statusStage = 'accounts_receivable';
         }
 
-        const phoneNumber = invoice.contact?.phone ||
-                           invoice.contact?.phoneNumber ||
-                           invoice.contact?.customer?.phone ||
-                           invoice.contact?.customer?.phoneNumber ||
+        const phoneNumber = invoice.contact?.customer?.primaryContact?.phone ||
+                           invoice.contact?.phone ||
                            '';
 
+        const billingSource = invoice.contact?.customer?.billingAddress || invoice.billingAddress;
         let billingAddress = null;
-        if (invoice.billingAddress?.address1 || invoice.billingAddress?.city) {
+        if (billingSource && (billingSource.address1 || billingSource.city)) {
           billingAddress = {
-            line1: invoice.billingAddress.address1 || '',
-            line2: invoice.billingAddress.address2 || '',
-            city: invoice.billingAddress.city || '',
-            state: invoice.billingAddress.state || '',
-            zip: invoice.billingAddress.zip || '',
-            country: invoice.billingAddress.country || 'USA',
-          };
-        } else if (invoice.contact?.customer?.address1 || invoice.contact?.customer?.city) {
-          billingAddress = {
-            line1: invoice.contact.customer.address1 || '',
-            line2: invoice.contact.customer.address2 || '',
-            city: invoice.contact.customer.city || '',
-            state: invoice.contact.customer.state || '',
-            zip: invoice.contact.customer.zip || '',
-            country: invoice.contact.customer.country || 'USA',
-          };
-        } else if (invoice.contact?.address1 || invoice.contact?.city) {
-          billingAddress = {
-            line1: invoice.contact.address1 || '',
-            line2: invoice.contact.address2 || '',
-            city: invoice.contact.city || '',
-            state: invoice.contact.state || '',
-            zip: invoice.contact.zip || '',
-            country: invoice.contact.country || 'USA',
+            line1: billingSource.address1 || '',
+            line2: billingSource.address2 || '',
+            city: billingSource.city || '',
+            state: billingSource.state || '',
+            zip: billingSource.postalCode || '',
+            country: billingSource.country || 'USA',
           };
         }
 
+        const shippingSource = invoice.contact?.customer?.shippingAddress || invoice.shippingAddress;
         let shippingAddress = null;
-        if (invoice.shippingAddress?.address1 || invoice.shippingAddress?.city) {
+        if (shippingSource && (shippingSource.address1 || shippingSource.city)) {
           shippingAddress = {
-            line1: invoice.shippingAddress.address1 || '',
-            line2: invoice.shippingAddress.address2 || '',
-            city: invoice.shippingAddress.city || '',
-            state: invoice.shippingAddress.state || '',
-            zip: invoice.shippingAddress.zip || '',
-            country: invoice.shippingAddress.country || 'USA',
+            line1: shippingSource.address1 || '',
+            line2: shippingSource.address2 || '',
+            city: shippingSource.city || '',
+            state: shippingSource.state || '',
+            zip: shippingSource.postalCode || '',
+            country: shippingSource.country || 'USA',
           };
         }
 
@@ -685,7 +687,19 @@ async function syncInvoices(
           customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName || '',
           customer_company: invoice.contact?.customer?.companyName || '',
           billing_address: billingAddress,
+          billing_address_line1: billingAddress?.line1 || null,
+          billing_address_line2: billingAddress?.line2 || null,
+          billing_city: billingAddress?.city || null,
+          billing_state: billingAddress?.state || null,
+          billing_zip: billingAddress?.zip || null,
+          billing_country: billingAddress?.country || null,
           shipping_address: shippingAddress,
+          shipping_address_line1: shippingAddress?.line1 || null,
+          shipping_address_line2: shippingAddress?.line2 || null,
+          shipping_city: shippingAddress?.city || null,
+          shipping_state: shippingAddress?.state || null,
+          shipping_zip: shippingAddress?.zip || null,
+          shipping_country: shippingAddress?.country || null,
           subtotal: invoice.subtotal || 0,
           tax: invoice.salesTaxAmount || 0,
           total: invoice.total || 0,
@@ -816,51 +830,33 @@ async function syncInvoices(
         statusStage = 'accounts_receivable';
       }
 
-      const phoneNumber = invoice.contact?.phone ||
-                         invoice.contact?.phoneNumber ||
-                         invoice.contact?.customer?.phone ||
-                         invoice.contact?.customer?.phoneNumber ||
+      const phoneNumber = invoice.contact?.customer?.primaryContact?.phone ||
+                         invoice.contact?.phone ||
                          '';
 
+      const billingSource = invoice.contact?.customer?.billingAddress || invoice.billingAddress;
       let billingAddress = null;
-      if (invoice.billingAddress?.address1 || invoice.billingAddress?.city) {
+      if (billingSource && (billingSource.address1 || billingSource.city)) {
         billingAddress = {
-          line1: invoice.billingAddress.address1 || '',
-          line2: invoice.billingAddress.address2 || '',
-          city: invoice.billingAddress.city || '',
-          state: invoice.billingAddress.state || '',
-          zip: invoice.billingAddress.zip || '',
-          country: invoice.billingAddress.country || 'USA',
-        };
-      } else if (invoice.contact?.customer?.address1 || invoice.contact?.customer?.city) {
-        billingAddress = {
-          line1: invoice.contact.customer.address1 || '',
-          line2: invoice.contact.customer.address2 || '',
-          city: invoice.contact.customer.city || '',
-          state: invoice.contact.customer.state || '',
-          zip: invoice.contact.customer.zip || '',
-          country: invoice.contact.customer.country || 'USA',
-        };
-      } else if (invoice.contact?.address1 || invoice.contact?.city) {
-        billingAddress = {
-          line1: invoice.contact.address1 || '',
-          line2: invoice.contact.address2 || '',
-          city: invoice.contact.city || '',
-          state: invoice.contact.state || '',
-          zip: invoice.contact.zip || '',
-          country: invoice.contact.country || 'USA',
+          line1: billingSource.address1 || '',
+          line2: billingSource.address2 || '',
+          city: billingSource.city || '',
+          state: billingSource.state || '',
+          zip: billingSource.postalCode || '',
+          country: billingSource.country || 'USA',
         };
       }
 
+      const shippingSource = invoice.contact?.customer?.shippingAddress || invoice.shippingAddress;
       let shippingAddress = null;
-      if (invoice.shippingAddress?.address1 || invoice.shippingAddress?.city) {
+      if (shippingSource && (shippingSource.address1 || shippingSource.city)) {
         shippingAddress = {
-          line1: invoice.shippingAddress.address1 || '',
-          line2: invoice.shippingAddress.address2 || '',
-          city: invoice.shippingAddress.city || '',
-          state: invoice.shippingAddress.state || '',
-          zip: invoice.shippingAddress.zip || '',
-          country: invoice.shippingAddress.country || 'USA',
+          line1: shippingSource.address1 || '',
+          line2: shippingSource.address2 || '',
+          city: shippingSource.city || '',
+          state: shippingSource.state || '',
+          zip: shippingSource.postalCode || '',
+          country: shippingSource.country || 'USA',
         };
       }
 
@@ -873,7 +869,19 @@ async function syncInvoices(
         customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName || '',
         customer_company: invoice.contact?.customer?.companyName || '',
         billing_address: billingAddress,
+        billing_address_line1: billingAddress?.line1 || null,
+        billing_address_line2: billingAddress?.line2 || null,
+        billing_city: billingAddress?.city || null,
+        billing_state: billingAddress?.state || null,
+        billing_zip: billingAddress?.zip || null,
+        billing_country: billingAddress?.country || null,
         shipping_address: shippingAddress,
+        shipping_address_line1: shippingAddress?.line1 || null,
+        shipping_address_line2: shippingAddress?.line2 || null,
+        shipping_city: shippingAddress?.city || null,
+        shipping_state: shippingAddress?.state || null,
+        shipping_zip: shippingAddress?.zip || null,
+        shipping_country: shippingAddress?.country || null,
         subtotal: invoice.subtotal || 0,
         tax: invoice.salesTaxAmount || 0,
         total: invoice.total || 0,
