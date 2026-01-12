@@ -43,7 +43,7 @@ interface Invoice {
         address2?: string;
         city?: string;
         state?: string;
-        postalCode?: string;
+        zip?: string;
         country?: string;
       };
       shippingAddress?: {
@@ -51,7 +51,7 @@ interface Invoice {
         address2?: string;
         city?: string;
         state?: string;
-        postalCode?: string;
+        zip?: string;
         country?: string;
       };
     };
@@ -61,7 +61,7 @@ interface Invoice {
     address2?: string;
     city?: string;
     state?: string;
-    zip?: string;
+    postalCode?: string;
     country?: string;
   };
   shippingAddress?: {
@@ -69,7 +69,7 @@ interface Invoice {
     address2?: string;
     city?: string;
     state?: string;
-    zip?: string;
+    postalCode?: string;
     country?: string;
   };
   subtotal?: number;
@@ -259,7 +259,7 @@ async function fetchCustomerDetails(
           address2
           city
           state
-          postalCode
+          zip
           country
         }
         shippingAddress {
@@ -267,7 +267,7 @@ async function fetchCustomerDetails(
           address2
           city
           state
-          postalCode
+          zip
           country
         }
         contacts {
@@ -357,26 +357,42 @@ async function findOrCreateCustomer(
     const updateData: any = {};
     let hasUpdates = false;
 
-    const billingSource = customerDetails?.billingAddress || invoice.contact?.customer?.billingAddress || invoice.billingAddress;
-    if (billingSource && (billingSource.address1 || billingSource.city)) {
-      if (billingSource.address1) { updateData.billing_address_line1 = billingSource.address1; hasUpdates = true; }
-      if (billingSource.address2) { updateData.billing_address_line2 = billingSource.address2; hasUpdates = true; }
-      if (billingSource.city) { updateData.billing_city = billingSource.city; hasUpdates = true; }
-      if (billingSource.state) { updateData.billing_state = billingSource.state; hasUpdates = true; }
-      const billingZip = (billingSource as any).postalCode || (billingSource as any).zip;
-      if (billingZip) { updateData.billing_zip = billingZip; hasUpdates = true; }
-      if (billingSource.country) { updateData.billing_country = billingSource.country; hasUpdates = true; }
+    const billingFromCustomer = customerDetails?.billingAddress || invoice.contact?.customer?.billingAddress;
+    const billingFromInvoice = invoice.billingAddress;
+
+    if (billingFromCustomer && (billingFromCustomer.address1 || billingFromCustomer.city)) {
+      if (billingFromCustomer.address1) { updateData.billing_address_line1 = billingFromCustomer.address1; hasUpdates = true; }
+      if (billingFromCustomer.address2) { updateData.billing_address_line2 = billingFromCustomer.address2; hasUpdates = true; }
+      if (billingFromCustomer.city) { updateData.billing_city = billingFromCustomer.city; hasUpdates = true; }
+      if (billingFromCustomer.state) { updateData.billing_state = billingFromCustomer.state; hasUpdates = true; }
+      if (billingFromCustomer.zip) { updateData.billing_zip = billingFromCustomer.zip; hasUpdates = true; }
+      if (billingFromCustomer.country) { updateData.billing_country = billingFromCustomer.country; hasUpdates = true; }
+    } else if (billingFromInvoice && (billingFromInvoice.address1 || billingFromInvoice.city)) {
+      if (billingFromInvoice.address1) { updateData.billing_address_line1 = billingFromInvoice.address1; hasUpdates = true; }
+      if (billingFromInvoice.address2) { updateData.billing_address_line2 = billingFromInvoice.address2; hasUpdates = true; }
+      if (billingFromInvoice.city) { updateData.billing_city = billingFromInvoice.city; hasUpdates = true; }
+      if (billingFromInvoice.state) { updateData.billing_state = billingFromInvoice.state; hasUpdates = true; }
+      if (billingFromInvoice.postalCode) { updateData.billing_zip = billingFromInvoice.postalCode; hasUpdates = true; }
+      if (billingFromInvoice.country) { updateData.billing_country = billingFromInvoice.country; hasUpdates = true; }
     }
 
-    const shippingSource = customerDetails?.shippingAddress || invoice.contact?.customer?.shippingAddress || invoice.shippingAddress;
-    if (shippingSource && (shippingSource.address1 || shippingSource.city)) {
-      if (shippingSource.address1) { updateData.shipping_address_line1 = shippingSource.address1; hasUpdates = true; }
-      if (shippingSource.address2) { updateData.shipping_address_line2 = shippingSource.address2; hasUpdates = true; }
-      if (shippingSource.city) { updateData.shipping_city = shippingSource.city; hasUpdates = true; }
-      if (shippingSource.state) { updateData.shipping_state = shippingSource.state; hasUpdates = true; }
-      const shippingZip = (shippingSource as any).postalCode || (shippingSource as any).zip;
-      if (shippingZip) { updateData.shipping_zip = shippingZip; hasUpdates = true; }
-      if (shippingSource.country) { updateData.shipping_country = shippingSource.country; hasUpdates = true; }
+    const shippingFromCustomer = customerDetails?.shippingAddress || invoice.contact?.customer?.shippingAddress;
+    const shippingFromInvoice = invoice.shippingAddress;
+
+    if (shippingFromCustomer && (shippingFromCustomer.address1 || shippingFromCustomer.city)) {
+      if (shippingFromCustomer.address1) { updateData.shipping_address_line1 = shippingFromCustomer.address1; hasUpdates = true; }
+      if (shippingFromCustomer.address2) { updateData.shipping_address_line2 = shippingFromCustomer.address2; hasUpdates = true; }
+      if (shippingFromCustomer.city) { updateData.shipping_city = shippingFromCustomer.city; hasUpdates = true; }
+      if (shippingFromCustomer.state) { updateData.shipping_state = shippingFromCustomer.state; hasUpdates = true; }
+      if (shippingFromCustomer.zip) { updateData.shipping_zip = shippingFromCustomer.zip; hasUpdates = true; }
+      if (shippingFromCustomer.country) { updateData.shipping_country = shippingFromCustomer.country; hasUpdates = true; }
+    } else if (shippingFromInvoice && (shippingFromInvoice.address1 || shippingFromInvoice.city)) {
+      if (shippingFromInvoice.address1) { updateData.shipping_address_line1 = shippingFromInvoice.address1; hasUpdates = true; }
+      if (shippingFromInvoice.address2) { updateData.shipping_address_line2 = shippingFromInvoice.address2; hasUpdates = true; }
+      if (shippingFromInvoice.city) { updateData.shipping_city = shippingFromInvoice.city; hasUpdates = true; }
+      if (shippingFromInvoice.state) { updateData.shipping_state = shippingFromInvoice.state; hasUpdates = true; }
+      if (shippingFromInvoice.postalCode) { updateData.shipping_zip = shippingFromInvoice.postalCode; hasUpdates = true; }
+      if (shippingFromInvoice.country) { updateData.shipping_country = shippingFromInvoice.country; hasUpdates = true; }
     }
 
     if (customerEmail) { updateData.email = customerEmail; hasUpdates = true; }
@@ -404,24 +420,42 @@ async function findOrCreateCustomer(
     status: 'active',
   };
 
-  const billingSource = customerDetails?.billingAddress || invoice.contact?.customer?.billingAddress || invoice.billingAddress;
-  if (billingSource && (billingSource.address1 || billingSource.city)) {
-    customerData.billing_address_line1 = billingSource.address1;
-    customerData.billing_address_line2 = billingSource.address2;
-    customerData.billing_city = billingSource.city;
-    customerData.billing_state = billingSource.state;
-    customerData.billing_zip = (billingSource as any).postalCode || (billingSource as any).zip;
-    customerData.billing_country = billingSource.country || 'USA';
+  const billingFromCustomer = customerDetails?.billingAddress || invoice.contact?.customer?.billingAddress;
+  const billingFromInvoice = invoice.billingAddress;
+
+  if (billingFromCustomer && (billingFromCustomer.address1 || billingFromCustomer.city)) {
+    customerData.billing_address_line1 = billingFromCustomer.address1;
+    customerData.billing_address_line2 = billingFromCustomer.address2;
+    customerData.billing_city = billingFromCustomer.city;
+    customerData.billing_state = billingFromCustomer.state;
+    customerData.billing_zip = billingFromCustomer.zip;
+    customerData.billing_country = billingFromCustomer.country || 'USA';
+  } else if (billingFromInvoice && (billingFromInvoice.address1 || billingFromInvoice.city)) {
+    customerData.billing_address_line1 = billingFromInvoice.address1;
+    customerData.billing_address_line2 = billingFromInvoice.address2;
+    customerData.billing_city = billingFromInvoice.city;
+    customerData.billing_state = billingFromInvoice.state;
+    customerData.billing_zip = billingFromInvoice.postalCode;
+    customerData.billing_country = billingFromInvoice.country || 'USA';
   }
 
-  const shippingSource = customerDetails?.shippingAddress || invoice.contact?.customer?.shippingAddress || invoice.shippingAddress;
-  if (shippingSource && (shippingSource.address1 || shippingSource.city)) {
-    customerData.shipping_address_line1 = shippingSource.address1;
-    customerData.shipping_address_line2 = shippingSource.address2;
-    customerData.shipping_city = shippingSource.city;
-    customerData.shipping_state = shippingSource.state;
-    customerData.shipping_zip = (shippingSource as any).postalCode || (shippingSource as any).zip;
-    customerData.shipping_country = shippingSource.country || 'USA';
+  const shippingFromCustomer = customerDetails?.shippingAddress || invoice.contact?.customer?.shippingAddress;
+  const shippingFromInvoice = invoice.shippingAddress;
+
+  if (shippingFromCustomer && (shippingFromCustomer.address1 || shippingFromCustomer.city)) {
+    customerData.shipping_address_line1 = shippingFromCustomer.address1;
+    customerData.shipping_address_line2 = shippingFromCustomer.address2;
+    customerData.shipping_city = shippingFromCustomer.city;
+    customerData.shipping_state = shippingFromCustomer.state;
+    customerData.shipping_zip = shippingFromCustomer.zip;
+    customerData.shipping_country = shippingFromCustomer.country || 'USA';
+  } else if (shippingFromInvoice && (shippingFromInvoice.address1 || shippingFromInvoice.city)) {
+    customerData.shipping_address_line1 = shippingFromInvoice.address1;
+    customerData.shipping_address_line2 = shippingFromInvoice.address2;
+    customerData.shipping_city = shippingFromInvoice.city;
+    customerData.shipping_state = shippingFromInvoice.state;
+    customerData.shipping_zip = shippingFromInvoice.postalCode;
+    customerData.shipping_country = shippingFromInvoice.country || 'USA';
   }
 
   const { data: newCustomer, error } = await supabase
@@ -503,7 +537,7 @@ async function syncInvoices(
                   address2
                   city
                   state
-                  postalCode
+                  zip
                   country
                 }
                 shippingAddress {
@@ -511,7 +545,7 @@ async function syncInvoices(
                   address2
                   city
                   state
-                  postalCode
+                  zip
                   country
                 }
               }
@@ -521,7 +555,7 @@ async function syncInvoices(
               address2
               city
               state
-              zip
+              postalCode
               country
             }
             shippingAddress {
@@ -529,7 +563,7 @@ async function syncInvoices(
               address2
               city
               state
-              zip
+              postalCode
               country
             }
             lineItemGroups {
@@ -610,7 +644,7 @@ async function syncInvoices(
                   address2
                   city
                   state
-                  postalCode
+                  zip
                   country
                 }
                 shippingAddress {
@@ -618,7 +652,7 @@ async function syncInvoices(
                   address2
                   city
                   state
-                  postalCode
+                  zip
                   country
                 }
               }
@@ -628,7 +662,7 @@ async function syncInvoices(
               address2
               city
               state
-              zip
+              postalCode
               country
             }
             shippingAddress {
@@ -636,7 +670,7 @@ async function syncInvoices(
               address2
               city
               state
-              zip
+              postalCode
               country
             }
             lineItemGroups {
@@ -745,29 +779,51 @@ async function syncInvoices(
                            invoice.contact?.phone ||
                            '';
 
-        const billingSource = customerDetails?.billingAddress || invoice.contact?.customer?.billingAddress || invoice.billingAddress;
+        const billingFromCustomer = customerDetails?.billingAddress || invoice.contact?.customer?.billingAddress;
+        const billingFromInvoice = invoice.billingAddress;
         let billingAddress = null;
-        if (billingSource && (billingSource.address1 || billingSource.city)) {
+
+        if (billingFromCustomer && (billingFromCustomer.address1 || billingFromCustomer.city)) {
           billingAddress = {
-            line1: billingSource.address1 || '',
-            line2: billingSource.address2 || '',
-            city: billingSource.city || '',
-            state: billingSource.state || '',
-            zip: (billingSource as any).postalCode || (billingSource as any).zip || '',
-            country: billingSource.country || 'USA',
+            line1: billingFromCustomer.address1 || '',
+            line2: billingFromCustomer.address2 || '',
+            city: billingFromCustomer.city || '',
+            state: billingFromCustomer.state || '',
+            zip: billingFromCustomer.zip || '',
+            country: billingFromCustomer.country || 'USA',
+          };
+        } else if (billingFromInvoice && (billingFromInvoice.address1 || billingFromInvoice.city)) {
+          billingAddress = {
+            line1: billingFromInvoice.address1 || '',
+            line2: billingFromInvoice.address2 || '',
+            city: billingFromInvoice.city || '',
+            state: billingFromInvoice.state || '',
+            zip: billingFromInvoice.postalCode || '',
+            country: billingFromInvoice.country || 'USA',
           };
         }
 
-        const shippingSource = customerDetails?.shippingAddress || invoice.contact?.customer?.shippingAddress || invoice.shippingAddress;
+        const shippingFromCustomer = customerDetails?.shippingAddress || invoice.contact?.customer?.shippingAddress;
+        const shippingFromInvoice = invoice.shippingAddress;
         let shippingAddress = null;
-        if (shippingSource && (shippingSource.address1 || shippingSource.city)) {
+
+        if (shippingFromCustomer && (shippingFromCustomer.address1 || shippingFromCustomer.city)) {
           shippingAddress = {
-            line1: shippingSource.address1 || '',
-            line2: shippingSource.address2 || '',
-            city: shippingSource.city || '',
-            state: shippingSource.state || '',
-            zip: (shippingSource as any).postalCode || (shippingSource as any).zip || '',
-            country: shippingSource.country || 'USA',
+            line1: shippingFromCustomer.address1 || '',
+            line2: shippingFromCustomer.address2 || '',
+            city: shippingFromCustomer.city || '',
+            state: shippingFromCustomer.state || '',
+            zip: shippingFromCustomer.zip || '',
+            country: shippingFromCustomer.country || 'USA',
+          };
+        } else if (shippingFromInvoice && (shippingFromInvoice.address1 || shippingFromInvoice.city)) {
+          shippingAddress = {
+            line1: shippingFromInvoice.address1 || '',
+            line2: shippingFromInvoice.address2 || '',
+            city: shippingFromInvoice.city || '',
+            state: shippingFromInvoice.state || '',
+            zip: shippingFromInvoice.postalCode || '',
+            country: shippingFromInvoice.country || 'USA',
           };
         }
 
@@ -928,29 +984,51 @@ async function syncInvoices(
                          invoice.contact?.phone ||
                          '';
 
-      const billingSource = customerDetails?.billingAddress || invoice.contact?.customer?.billingAddress || invoice.billingAddress;
+      const billingFromCustomer = customerDetails?.billingAddress || invoice.contact?.customer?.billingAddress;
+      const billingFromInvoice = invoice.billingAddress;
       let billingAddress = null;
-      if (billingSource && (billingSource.address1 || billingSource.city)) {
+
+      if (billingFromCustomer && (billingFromCustomer.address1 || billingFromCustomer.city)) {
         billingAddress = {
-          line1: billingSource.address1 || '',
-          line2: billingSource.address2 || '',
-          city: billingSource.city || '',
-          state: billingSource.state || '',
-          zip: (billingSource as any).postalCode || (billingSource as any).zip || '',
-          country: billingSource.country || 'USA',
+          line1: billingFromCustomer.address1 || '',
+          line2: billingFromCustomer.address2 || '',
+          city: billingFromCustomer.city || '',
+          state: billingFromCustomer.state || '',
+          zip: billingFromCustomer.zip || '',
+          country: billingFromCustomer.country || 'USA',
+        };
+      } else if (billingFromInvoice && (billingFromInvoice.address1 || billingFromInvoice.city)) {
+        billingAddress = {
+          line1: billingFromInvoice.address1 || '',
+          line2: billingFromInvoice.address2 || '',
+          city: billingFromInvoice.city || '',
+          state: billingFromInvoice.state || '',
+          zip: billingFromInvoice.postalCode || '',
+          country: billingFromInvoice.country || 'USA',
         };
       }
 
-      const shippingSource = customerDetails?.shippingAddress || invoice.contact?.customer?.shippingAddress || invoice.shippingAddress;
+      const shippingFromCustomer = customerDetails?.shippingAddress || invoice.contact?.customer?.shippingAddress;
+      const shippingFromInvoice = invoice.shippingAddress;
       let shippingAddress = null;
-      if (shippingSource && (shippingSource.address1 || shippingSource.city)) {
+
+      if (shippingFromCustomer && (shippingFromCustomer.address1 || shippingFromCustomer.city)) {
         shippingAddress = {
-          line1: shippingSource.address1 || '',
-          line2: shippingSource.address2 || '',
-          city: shippingSource.city || '',
-          state: shippingSource.state || '',
-          zip: (shippingSource as any).postalCode || (shippingSource as any).zip || '',
-          country: shippingSource.country || 'USA',
+          line1: shippingFromCustomer.address1 || '',
+          line2: shippingFromCustomer.address2 || '',
+          city: shippingFromCustomer.city || '',
+          state: shippingFromCustomer.state || '',
+          zip: shippingFromCustomer.zip || '',
+          country: shippingFromCustomer.country || 'USA',
+        };
+      } else if (shippingFromInvoice && (shippingFromInvoice.address1 || shippingFromInvoice.city)) {
+        shippingAddress = {
+          line1: shippingFromInvoice.address1 || '',
+          line2: shippingFromInvoice.address2 || '',
+          city: shippingFromInvoice.city || '',
+          state: shippingFromInvoice.state || '',
+          zip: shippingFromInvoice.postalCode || '',
+          country: shippingFromInvoice.country || 'USA',
         };
       }
 
