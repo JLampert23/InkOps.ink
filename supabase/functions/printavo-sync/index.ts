@@ -306,11 +306,11 @@ async function findOrCreateCustomer(
 ): Promise<{ id: string | null; details: any | null }> {
   const customerName = invoice.contact?.customer?.companyName || invoice.contact?.fullName;
   const customerEmail = invoice.contact?.email;
-  let customerPhone = invoice.contact?.customer?.primaryContact?.phone ||
-                       invoice.contact?.phone;
   const printavoCustomerId = invoice.contact?.customer?.id;
 
   let customerDetails = null;
+  let customerPhone = null;
+
   if (printavoCustomerId) {
     customerDetails = await fetchCustomerDetails(printavoCustomerId, printavoEmail, printavoToken);
     if (customerDetails) {
@@ -322,10 +322,12 @@ async function findOrCreateCustomer(
         primaryPhone: customerDetails.primaryContact?.phone,
       });
 
-      if (!customerPhone && customerDetails.primaryContact?.phone) {
-        customerPhone = customerDetails.primaryContact.phone;
-      }
+      customerPhone = customerDetails.primaryContact?.phone;
     }
+  }
+
+  if (!customerPhone) {
+    customerPhone = invoice.contact?.customer?.primaryContact?.phone;
   }
 
   if (!customerName) {
@@ -776,7 +778,6 @@ async function syncInvoices(
 
         const phoneNumber = customerDetails?.primaryContact?.phone ||
                            invoice.contact?.customer?.primaryContact?.phone ||
-                           invoice.contact?.phone ||
                            '';
 
         const billingFromCustomer = customerDetails?.billingAddress || invoice.contact?.customer?.billingAddress;
@@ -981,7 +982,6 @@ async function syncInvoices(
 
       const phoneNumber = customerDetails?.primaryContact?.phone ||
                          invoice.contact?.customer?.primaryContact?.phone ||
-                         invoice.contact?.phone ||
                          '';
 
       const billingFromCustomer = customerDetails?.billingAddress || invoice.contact?.customer?.billingAddress;
