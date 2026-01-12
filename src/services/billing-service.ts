@@ -2,9 +2,6 @@ import { supabase } from '../lib/supabase-client';
 import { stripeService } from './stripe-service';
 import { Invoice } from '../types/printavo';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
 export interface BillingQueueItem {
   id: string;
   printavoInvoiceId: string;
@@ -68,27 +65,15 @@ export interface PaidInvoice {
 
 export const billingService = {
   async triggerPrintavoSync(): Promise<{ syncId: string; status: string }> {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      throw new Error('You must be logged in to sync');
-    }
-
-    const response = await fetch(`${supabaseUrl}/functions/v1/printavo-sync`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-        'apikey': supabaseAnonKey,
-      },
-      body: JSON.stringify({ mode: 'quick' }),
+    const { data, error } = await supabase.functions.invoke('printavo-sync', {
+      body: { mode: 'quick' },
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to trigger Printavo sync');
+    if (error) {
+      throw new Error(error.message || 'Failed to trigger Printavo sync');
     }
 
-    return response.json();
+    return data;
   },
 
   async waitForPrintavoSync(syncId: string, maxWaitMs: number = 60000): Promise<boolean> {
