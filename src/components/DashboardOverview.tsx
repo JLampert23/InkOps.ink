@@ -41,8 +41,8 @@ export function DashboardOverview({ invoices, payments, loading }: DashboardOver
   }
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="space-y-4 lg:space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
         <StatCard
           title="Total Revenue"
           value={formatCurrency(summary.totalRevenue)}
@@ -87,9 +87,9 @@ export function DashboardOverview({ invoices, payments, loading }: DashboardOver
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">Monthly Revenue Trend</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+        <div className="bg-white rounded-lg shadow p-4 lg:p-6">
+          <h3 className="text-base lg:text-lg font-semibold mb-4">Monthly Revenue Trend</h3>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={summary.monthlyRevenue}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -102,8 +102,8 @@ export function DashboardOverview({ invoices, payments, loading }: DashboardOver
           </ResponsiveContainer>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">Revenue by Status</h3>
+        <div className="bg-white rounded-lg shadow p-4 lg:p-6">
+          <h3 className="text-base lg:text-lg font-semibold mb-4">Revenue by Status</h3>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
@@ -125,8 +125,8 @@ export function DashboardOverview({ invoices, payments, loading }: DashboardOver
           </ResponsiveContainer>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">Payments by Method</h3>
+        <div className="bg-white rounded-lg shadow p-4 lg:p-6">
+          <h3 className="text-base lg:text-lg font-semibold mb-4">Payments by Method</h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={paymentMethodData}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -139,8 +139,8 @@ export function DashboardOverview({ invoices, payments, loading }: DashboardOver
           </ResponsiveContainer>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">Monthly Invoice Count</h3>
+        <div className="bg-white rounded-lg shadow p-4 lg:p-6">
+          <h3 className="text-base lg:text-lg font-semibold mb-4">Monthly Invoice Count</h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={summary.monthlyRevenue}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -176,7 +176,7 @@ function StatCard({ title, value, icon, trend, color }: StatCardProps) {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <div className="bg-white rounded-lg shadow p-4 lg:p-6">
       <div className="flex items-center justify-between">
         <div className="flex-1">
           <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>

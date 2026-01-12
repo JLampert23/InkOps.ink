@@ -243,11 +243,11 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
       </div>
 
       {/* Filters and Export */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white rounded-lg shadow p-4 lg:p-6">
         <div className="space-y-4">
           {/* Top Row: Filters and Automations */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto">
               <div className="flex items-center gap-2">
                 <Filter className="w-5 h-5 text-gray-400" />
                 <span className="text-sm font-medium text-gray-700">Filters:</span>

@@ -246,65 +246,68 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 lg:space-y-6">
       {/* Sticky Header */}
-      <div className="bg-white sticky top-0 z-10 -mx-4 px-4 py-4 border-b border-gray-200 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+      <div className="bg-white sticky top-0 z-10 -mx-3 sm:-mx-4 px-3 sm:px-4 py-4 border-b border-gray-200 shadow-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={onBack}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
             >
               <ArrowLeft className="w-5 h-5 text-gray-600" />
             </button>
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-gray-900">
+            <div className="min-w-0">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <h1 className="text-xl lg:text-2xl font-bold text-gray-900 truncate">
                   Invoice #{invoice.visualId}
                 </h1>
-                {getStatusBadge(invoice.status, invoice.statusColor)}
-                {getPaymentStatusBadge(invoice.billingQueueStatus)}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {getStatusBadge(invoice.status, invoice.statusColor)}
+                  {getPaymentStatusBadge(invoice.billingQueueStatus)}
+                </div>
               </div>
-              <p className="text-sm text-gray-500 mt-1">
+              <p className="text-xs sm:text-sm text-gray-500 mt-1 truncate">
                 Printavo ID: {invoice.printavoInvoiceId}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 lg:gap-3 flex-wrap">
             <button
               onClick={handleSync}
               disabled={syncing}
-              className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 whitespace-nowrap"
             >
               <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-              Sync
+              <span className="hidden sm:inline">Sync</span>
             </button>
             <button
               onClick={() => invoice && generateInvoicePDF(invoice)}
-              className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap"
             >
               <Download className="w-4 h-4" />
-              Download PDF
+              <span className="hidden sm:inline">Download PDF</span>
             </button>
             <a
               href={`https://www.printavo.com/invoices/${invoice.printavoInvoiceId}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap"
             >
               <ExternalLink className="w-4 h-4" />
-              View in Printavo
+              <span className="hidden lg:inline">View in Printavo</span>
+              <span className="lg:hidden hidden sm:inline">Printavo</span>
             </a>
           </div>
         </div>
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
         {/* Left Column - Invoice Details */}
-        <div className="col-span-8 space-y-6">
+        <div className="lg:col-span-8 space-y-4 lg:space-y-6">
           {/* Customer & Invoice Meta */}
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
             {/* Customer Information */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -404,7 +407,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
 
           {/* Addresses */}
           {(invoiceDetailService.hasAddress(invoice.billingAddress) || invoiceDetailService.hasAddress(invoice.shippingAddress)) && (
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
               {invoiceDetailService.hasAddress(invoice.billingAddress) && (
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                   <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
@@ -665,7 +668,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
               </button>
               {mockupsExpanded && (
                 <div className="p-6">
-                  <div className="grid grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     {invoice.mockups.map((url, index) => (
                       <a
                         key={index}
@@ -689,7 +692,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
         </div>
 
         {/* Right Column - Payment & Actions */}
-        <div className="col-span-4 space-y-6">
+        <div className="lg:col-span-4 space-y-4 lg:space-y-6">
           {/* Actions Panel */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Actions</h2>
