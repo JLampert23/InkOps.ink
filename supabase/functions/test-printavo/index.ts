@@ -133,46 +133,39 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const url = new URL(req.url);
+    const customerId = url.searchParams.get('customer_id') || '8455168';
+
     const testQuery = `
-      query TestAuth {
-        invoices(first: 1) {
-          edges {
-            node {
-              id
-              visualId
-              createdAt
-              invoiceAt
-              dueAt
-              timestamps {
-                createdAt
-                updatedAt
-              }
-              lineItemGroups {
-                edges {
-                  node {
-                    id
-                    lineItems {
-                      edges {
-                        node {
-                          id
-                          description
-                          items
-                          price
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-              fees {
-                edges {
-                  node {
-                    id
-                    description
-                    amount
-                    taxable
-                  }
-                }
+      query TestCustomer($id: ID!) {
+        customer(id: $id) {
+          id
+          companyName
+          billingAddress {
+            address1
+            address2
+            city
+            state
+            postalCode
+            country
+          }
+          shippingAddress {
+            address1
+            address2
+            city
+            state
+            postalCode
+            country
+          }
+          contacts {
+            edges {
+              node {
+                id
+                fullName
+                firstName
+                lastName
+                email
+                phone
               }
             }
           }
@@ -187,7 +180,10 @@ Deno.serve(async (req: Request) => {
         email: settings.printavo_username,
         token: decryptedToken,
       },
-      body: JSON.stringify({ query: testQuery }),
+      body: JSON.stringify({
+        query: testQuery,
+        variables: { id: customerId }
+      }),
     });
 
     diagnostics.printavoResponseStatus = response.status;
@@ -213,9 +209,14 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         success: true,
-        message: "Printavo credentials are valid!",
-        invoiceCount: result.data?.invoices?.edges?.length || 0,
-        sampleInvoice: result.data?.invoices?.edges?.[0]?.node || null,
+        message: `Data for customer ID ${customerId}`,
+        customer: result.data?.customer || null,
+        billingAddress: result.data?.customer?.billingAddress || null,
+        shippingAddress: result.data?.customer?.shippingAddress || null,
+        contacts: result.data?.customer?.contacts?.edges?.map((e: any) => e.node) || [],
+        hasBillingAddress: !!(result.data?.customer?.billingAddress?.address1 || result.data?.customer?.billingAddress?.city),
+        hasShippingAddress: !!(result.data?.customer?.shippingAddress?.address1 || result.data?.customer?.shippingAddress?.city),
+        hasPhone: result.data?.customer?.contacts?.edges?.some((e: any) => e.node?.phone) || false,
         fullResponse: result,
         diagnostics,
       }, null, 2),
