@@ -251,14 +251,27 @@ export const billingService = {
       if (queueError) throw queueError;
       if (!queueData) return [];
 
-      // Get additional invoice details from printavo_invoices
+      // Get customer IDs from invoices, then fetch customer data
       const invoiceIds = queueData.map(item => item.printavo_invoice_id);
       const { data: invoiceData } = await supabase
         .from('printavo_invoices')
+        .select('id, customer_id')
+        .in('id', invoiceIds);
+
+      // Create a map of invoice ID to customer ID
+      const invoiceToCustomerMap = new Map(
+        (invoiceData || []).map(inv => [inv.id, inv.customer_id])
+      );
+
+      // Get unique customer IDs
+      const customerIds = [...new Set(invoiceData?.map(inv => inv.customer_id).filter(Boolean) || [])];
+
+      // Fetch customer data
+      const { data: customerData } = await supabase
+        .from('customers')
         .select(`
           id,
-          customer_id,
-          customer_phone,
+          phone,
           billing_address_line1,
           billing_address_line2,
           billing_city,
@@ -272,15 +285,17 @@ export const billingService = {
           shipping_zip,
           shipping_country
         `)
-        .in('id', invoiceIds);
+        .in('id', customerIds);
 
-      // Create a map of invoice ID to invoice data
-      const invoiceDataMap = new Map(
-        (invoiceData || []).map(inv => [inv.id, inv])
+      // Create a map of customer ID to customer data
+      const customerDataMap = new Map(
+        (customerData || []).map(cust => [cust.id, cust])
       );
 
       return queueData.map(item => {
-        const invoiceDetails = invoiceDataMap.get(item.printavo_invoice_id);
+        const customerId = invoiceToCustomerMap.get(item.printavo_invoice_id);
+        const customer = customerId ? customerDataMap.get(customerId) : null;
+
         return {
           id: item.id,
           printavoInvoiceId: item.printavo_invoice_id,
@@ -289,8 +304,8 @@ export const billingService = {
           customerName: item.customer_name,
           customerEmail: item.customer_email,
           customerCompany: item.customer_company,
-          customerPhone: invoiceDetails?.customer_phone,
-          customerId: invoiceDetails?.customer_id,
+          customerPhone: customer?.phone,
+          customerId: customerId,
           invoiceTotal: parseFloat(item.invoice_total),
           invoiceDate: item.invoice_date,
           dueDate: item.due_date,
@@ -302,18 +317,18 @@ export const billingService = {
           metadata: item.metadata,
           createdAt: item.created_at,
           updatedAt: item.updated_at,
-          billingAddressLine1: invoiceDetails?.billing_address_line1,
-          billingAddressLine2: invoiceDetails?.billing_address_line2,
-          billingCity: invoiceDetails?.billing_city,
-          billingState: invoiceDetails?.billing_state,
-          billingZip: invoiceDetails?.billing_zip,
-          billingCountry: invoiceDetails?.billing_country,
-          shippingAddressLine1: invoiceDetails?.shipping_address_line1,
-          shippingAddressLine2: invoiceDetails?.shipping_address_line2,
-          shippingCity: invoiceDetails?.shipping_city,
-          shippingState: invoiceDetails?.shipping_state,
-          shippingZip: invoiceDetails?.shipping_zip,
-          shippingCountry: invoiceDetails?.shipping_country,
+          billingAddressLine1: customer?.billing_address_line1,
+          billingAddressLine2: customer?.billing_address_line2,
+          billingCity: customer?.billing_city,
+          billingState: customer?.billing_state,
+          billingZip: customer?.billing_zip,
+          billingCountry: customer?.billing_country,
+          shippingAddressLine1: customer?.shipping_address_line1,
+          shippingAddressLine2: customer?.shipping_address_line2,
+          shippingCity: customer?.shipping_city,
+          shippingState: customer?.shipping_state,
+          shippingZip: customer?.shipping_zip,
+          shippingCountry: customer?.shipping_country,
         };
       });
     } catch (error) {
