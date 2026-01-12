@@ -171,19 +171,19 @@ async function decryptToken(encryptedToken: string, encryptionKey: string): Prom
     const combined = new Uint8Array(
       atob(encryptedToken).split('').map(c => c.charCodeAt(0))
     );
-    
+
     const salt = combined.slice(0, 16);
     const iv = combined.slice(16, 28);
     const encryptedData = combined.slice(28);
-    
+
     const key = await deriveKey(encryptionKey, salt);
-    
+
     const decryptedData = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv: iv },
       key,
       encryptedData
     );
-    
+
     const decoder = new TextDecoder();
     return decoder.decode(decryptedData);
   } catch (error) {
@@ -638,6 +638,16 @@ async function syncInvoices(
       );
 
       for (const invoice of filteredInvoices) {
+        if (filteredInvoices.indexOf(invoice) === 0) {
+          console.log('Sample invoice structure:', JSON.stringify({
+            id: invoice.id,
+            visualId: invoice.visualId,
+            contact: invoice.contact,
+            billingAddress: invoice.billingAddress,
+            shippingAddress: invoice.shippingAddress,
+          }, null, 2));
+        }
+
         const customerId = await findOrCreateCustomer(supabase, invoice);
 
         const amountOutstanding = invoice.amountOutstanding || 0;
@@ -1149,7 +1159,7 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
-    
+
     if (!encryptionKey) {
       throw new Error('ENCRYPTION_KEY not configured');
     }
