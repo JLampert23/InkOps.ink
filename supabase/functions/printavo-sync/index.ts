@@ -304,34 +304,35 @@ async function findOrCreateCustomer(
   printavoEmail: string,
   printavoToken: string
 ): Promise<{ id: string | null; details: any | null }> {
-  const customerName = invoice.contact?.customer?.companyName || invoice.contact?.fullName;
-  const customerEmail = invoice.contact?.email;
   const printavoCustomerId = invoice.contact?.customer?.id;
 
-  let customerDetails = null;
-  let customerPhone = null;
-
-  if (printavoCustomerId) {
-    customerDetails = await fetchCustomerDetails(printavoCustomerId, printavoEmail, printavoToken);
-    if (customerDetails) {
-      console.log('Fetched customer details from Printavo:', {
-        id: customerDetails.id,
-        name: customerDetails.companyName,
-        hasBilling: !!customerDetails.billingAddress,
-        hasShipping: !!customerDetails.shippingAddress,
-        primaryPhone: customerDetails.primaryContact?.phone,
-      });
-
-      customerPhone = customerDetails.primaryContact?.phone;
-    }
+  if (!printavoCustomerId) {
+    console.log('No customer ID found for invoice', invoice.id);
+    return { id: null, details: null };
   }
 
-  if (!customerPhone) {
-    customerPhone = invoice.contact?.customer?.primaryContact?.phone;
+  const customerDetails = await fetchCustomerDetails(printavoCustomerId, printavoEmail, printavoToken);
+
+  if (!customerDetails) {
+    console.log('Failed to fetch customer details for ID', printavoCustomerId);
+    return { id: null, details: null };
   }
+
+  console.log('Fetched customer details from Printavo:', {
+    id: customerDetails.id,
+    companyName: customerDetails.companyName,
+    email: customerDetails.primaryContact?.email,
+    phone: customerDetails.primaryContact?.phone,
+    hasBilling: !!customerDetails.billingAddress,
+    hasShipping: !!customerDetails.shippingAddress,
+  });
+
+  const customerName = customerDetails.companyName;
+  const customerEmail = customerDetails.primaryContact?.email;
+  const customerPhone = customerDetails.primaryContact?.phone;
 
   if (!customerName) {
-    console.log('No customer name found for invoice', invoice.id);
+    console.log('No customer name found for customer ID', printavoCustomerId);
     return { id: null, details: null };
   }
 
@@ -399,7 +400,13 @@ async function findOrCreateCustomer(
 
     if (customerEmail) { updateData.email = customerEmail; hasUpdates = true; }
     if (customerPhone) { updateData.phone = customerPhone; hasUpdates = true; }
-    if (invoice.contact?.fullName) { updateData.contact_name = invoice.contact.fullName; hasUpdates = true; }
+    if (customerDetails?.primaryContact) {
+      const contactName = [
+        customerDetails.primaryContact.firstName,
+        customerDetails.primaryContact.lastName
+      ].filter(Boolean).join(' ');
+      if (contactName) { updateData.contact_name = contactName; hasUpdates = true; }
+    }
     if (printavoCustomerId) { updateData.printavo_customer_id = printavoCustomerId; hasUpdates = true; }
 
     if (hasUpdates) {
@@ -413,9 +420,16 @@ async function findOrCreateCustomer(
     return { id: existingCustomer.id, details: customerDetails };
   }
 
+  const contactName = customerDetails?.primaryContact
+    ? [
+        customerDetails.primaryContact.firstName,
+        customerDetails.primaryContact.lastName
+      ].filter(Boolean).join(' ')
+    : null;
+
   const customerData: any = {
     company_name: customerName,
-    contact_name: invoice.contact?.fullName,
+    contact_name: contactName,
     email: customerEmail,
     phone: customerPhone,
     printavo_customer_id: printavoCustomerId,
@@ -832,10 +846,10 @@ async function syncInvoices(
           id: invoice.id,
           invoice_number: invoice.visualId,
           customer_id: customerId,
-          customer_email: invoice.contact?.email || '',
+          customer_email: customerDetails?.primaryContact?.email || '',
           customer_phone: phoneNumber,
-          customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName || '',
-          customer_company: invoice.contact?.customer?.companyName || '',
+          customer_name: customerDetails?.companyName || '',
+          customer_company: customerDetails?.companyName || '',
           billing_address: billingAddress,
           billing_address_line1: billingAddress?.line1 || null,
           billing_address_line2: billingAddress?.line2 || null,
@@ -875,9 +889,9 @@ async function syncInvoices(
               .from('billing_queue')
               .update({
                 printavo_status: invoice.status?.name,
-                customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName,
-                customer_email: invoice.contact?.email,
-                customer_company: invoice.contact?.customer?.companyName,
+                customer_name: customerDetails?.companyName,
+                customer_email: customerDetails?.primaryContact?.email,
+                customer_company: customerDetails?.companyName,
                 invoice_total: invoice.total || 0,
                 invoice_date: invoice.createdAt,
                 due_date: invoice.dueAt,
@@ -891,9 +905,9 @@ async function syncInvoices(
                 printavo_invoice_id: invoice.id,
                 printavo_visual_id: invoice.visualId,
                 printavo_status: invoice.status?.name,
-                customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName,
-                customer_email: invoice.contact?.email,
-                customer_company: invoice.contact?.customer?.companyName,
+                customer_name: customerDetails?.companyName,
+                customer_email: customerDetails?.primaryContact?.email,
+                customer_company: customerDetails?.companyName,
                 invoice_total: invoice.total || 0,
                 invoice_date: invoice.createdAt,
                 due_date: invoice.dueAt,
@@ -1036,10 +1050,10 @@ async function syncInvoices(
         id: invoice.id,
         invoice_number: invoice.visualId,
         customer_id: customerId,
-        customer_email: invoice.contact?.email || '',
+        customer_email: customerDetails?.primaryContact?.email || '',
         customer_phone: phoneNumber,
-        customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName || '',
-        customer_company: invoice.contact?.customer?.companyName || '',
+        customer_name: customerDetails?.companyName || '',
+        customer_company: customerDetails?.companyName || '',
         billing_address: billingAddress,
         billing_address_line1: billingAddress?.line1 || null,
         billing_address_line2: billingAddress?.line2 || null,
@@ -1079,9 +1093,9 @@ async function syncInvoices(
             .from('billing_queue')
             .update({
               printavo_status: invoice.status?.name,
-              customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName,
-              customer_email: invoice.contact?.email,
-              customer_company: invoice.contact?.customer?.companyName,
+              customer_name: customerDetails?.companyName,
+              customer_email: customerDetails?.primaryContact?.email,
+              customer_company: customerDetails?.companyName,
               invoice_total: invoice.total || 0,
               invoice_date: invoice.createdAt,
               due_date: invoice.dueAt,
@@ -1095,9 +1109,9 @@ async function syncInvoices(
               printavo_invoice_id: invoice.id,
               printavo_visual_id: invoice.visualId,
               printavo_status: invoice.status?.name,
-              customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName,
-              customer_email: invoice.contact?.email,
-              customer_company: invoice.contact?.customer?.companyName,
+              customer_name: customerDetails?.companyName,
+              customer_email: customerDetails?.primaryContact?.email,
+              customer_company: customerDetails?.companyName,
               invoice_total: invoice.total || 0,
               invoice_date: invoice.createdAt,
               due_date: invoice.dueAt,
