@@ -30,6 +30,7 @@ import { invoiceDetailService, InvoiceDetail as InvoiceDetailType } from '../../
 import { billingService } from '../../services/billing-service';
 import { stripeService } from '../../services/stripe-service';
 import { generateInvoicePDF } from '../../utils/invoice-pdf-export';
+import { supabase } from '../../lib/supabase-client';
 
 interface InvoiceDetailProps {
   invoiceId: string;
@@ -50,10 +51,25 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
   const [mockupsExpanded, setMockupsExpanded] = useState(true);
   const [showSendModal, setShowSendModal] = useState(false);
   const [customMessage, setCustomMessage] = useState('');
+  const [sendMethod, setSendMethod] = useState<'email' | 'sms' | 'both'>('email');
+  const [customerPhone, setCustomerPhone] = useState<string | null>(null);
+  const [twilioEnabled, setTwilioEnabled] = useState(false);
 
   useEffect(() => {
     loadInvoice();
+    loadSettings();
   }, [invoiceId]);
+
+  const loadSettings = async () => {
+    try {
+      const { data } = await supabase.from('company_settings').select('twilio_enabled').maybeSingle();
+      if (data) {
+        setTwilioEnabled(data.twilio_enabled || false);
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    }
+  };
 
   const loadInvoice = async () => {
     setLoading(true);
@@ -68,6 +84,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
         console.log('Fees:', data.fees);
         console.log('Raw Data:', data.rawData);
         setInvoice(data);
+        setCustomerPhone(data.contact.phone);
       }
     } catch (err) {
       setError('Failed to load invoice');
@@ -111,11 +128,18 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
     if (!invoice?.billingQueueId) return;
     setSendingInvoice(true);
     try {
-      await billingService.sendInvoiceEmail(invoice.billingQueueId, customMessage || undefined);
+      const sendSMS = sendMethod === 'sms' || sendMethod === 'both';
+      const result = await billingService.sendInvoiceEmail(invoice.billingQueueId, customMessage || undefined, sendSMS);
+
       await loadInvoice();
       setShowSendModal(false);
       setCustomMessage('');
-      alert('Invoice sent successfully!');
+
+      const results: string[] = [];
+      if (result.emailSent) results.push('Email sent');
+      if (result.smsSent) results.push('Text message sent');
+
+      alert(`Invoice sent successfully! ${results.join(' and ')}`);
     } catch (err: any) {
       alert(err.message || 'Failed to send invoice');
     } finally {
@@ -1007,16 +1031,95 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
       {showSendModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div className="px-6 py-4 border-b border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">Send Invoice</h3>
+              <button
+                onClick={() => {
+                  setShowSendModal(false);
+                  setCustomMessage('');
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Recipient
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Recipient Information
                 </label>
-                <p className="text-gray-900">{invoice.contact.email}</p>
+                <div className="space-y-1 text-sm">
+                  {invoice.contact.email && (
+                    <div className="flex items-center gap-2 text-gray-700">
+                      <Mail className="w-4 h-4 text-gray-400" />
+                      <span>{invoice.contact.email}</span>
+                    </div>
+                  )}
+                  {customerPhone && twilioEnabled && (
+                    <div className="flex items-center gap-2 text-gray-700">
+                      <Phone className="w-4 h-4 text-gray-400" />
+                      <span>{customerPhone}</span>
+                    </div>
+                  )}
+                </div>
               </div>
+
+              {twilioEnabled && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Send Method
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      onClick={() => setSendMethod('email')}
+                      className={`flex items-center justify-center gap-2 px-3 py-3 rounded-lg border-2 transition-colors ${
+                        sendMethod === 'email'
+                          ? 'border-blue-600 bg-blue-50 text-blue-700'
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                      disabled={!invoice.contact.email}
+                    >
+                      <Mail className="w-4 h-4" />
+                      <span className="text-xs font-medium">Email</span>
+                    </button>
+                    <button
+                      onClick={() => setSendMethod('sms')}
+                      className={`flex items-center justify-center gap-2 px-3 py-3 rounded-lg border-2 transition-colors ${
+                        sendMethod === 'sms'
+                          ? 'border-green-600 bg-green-50 text-green-700'
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                      disabled={!customerPhone}
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      <span className="text-xs font-medium">Text</span>
+                    </button>
+                    <button
+                      onClick={() => setSendMethod('both')}
+                      className={`flex items-center justify-center gap-2 px-3 py-3 rounded-lg border-2 transition-colors ${
+                        sendMethod === 'both'
+                          ? 'border-purple-600 bg-purple-50 text-purple-700'
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                      disabled={!invoice.contact.email || !customerPhone}
+                    >
+                      <div className="flex items-center gap-1">
+                        <Mail className="w-3 h-3" />
+                        <MessageSquare className="w-3 h-3" />
+                      </div>
+                      <span className="text-xs font-medium">Both</span>
+                    </button>
+                  </div>
+                  {(!invoice.contact.email || !customerPhone) && (
+                    <p className="text-xs text-amber-600 mt-2">
+                      {!invoice.contact.email && !customerPhone && 'Email and phone number are required'}
+                      {!invoice.contact.email && customerPhone && 'Email is required for email sending'}
+                      {invoice.contact.email && !customerPhone && 'Phone number is required for SMS sending'}
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Custom Message (optional)
@@ -1025,7 +1128,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                   value={customMessage}
                   onChange={(e) => setCustomMessage(e.target.value)}
                   rows={4}
-                  placeholder="Add a personal message to include in the email..."
+                  placeholder="Add a personal message to include..."
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
@@ -1042,15 +1145,38 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
               </button>
               <button
                 onClick={handleSendInvoice}
-                disabled={sendingInvoice}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                disabled={
+                  sendingInvoice ||
+                  (sendMethod === 'email' && !invoice.contact.email) ||
+                  (sendMethod === 'sms' && !customerPhone) ||
+                  (sendMethod === 'both' && (!invoice.contact.email || !customerPhone))
+                }
+                className={`flex items-center gap-2 px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50 ${
+                  sendMethod === 'email'
+                    ? 'bg-blue-600 hover:bg-blue-700'
+                    : sendMethod === 'sms'
+                    ? 'bg-green-600 hover:bg-green-700'
+                    : 'bg-purple-600 hover:bg-purple-700'
+                }`}
               >
                 {sendingInvoice ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
+                ) : sendMethod === 'email' ? (
+                  <>
+                    <Mail className="w-4 h-4" />
+                    Send Email
+                  </>
+                ) : sendMethod === 'sms' ? (
+                  <>
+                    <MessageSquare className="w-4 h-4" />
+                    Send Text
+                  </>
                 ) : (
-                  <Send className="w-4 h-4" />
+                  <>
+                    <Send className="w-4 h-4" />
+                    Send Both
+                  </>
                 )}
-                Send Invoice
               </button>
             </div>
           </div>

@@ -145,6 +145,24 @@ export function generateInvoicePDF(
   }
   if (invoice.contact.phone) {
     doc.text(invoice.contact.phone, col1X, billToY);
+    billToY += 5;
+  }
+
+  if (invoice.billingAddress && (invoice.billingAddress.line1 || invoice.billingAddress.city)) {
+    const addressLines: string[] = [];
+    if (invoice.billingAddress.line1) addressLines.push(invoice.billingAddress.line1);
+    if (invoice.billingAddress.line2) addressLines.push(invoice.billingAddress.line2);
+
+    const cityStateZip: string[] = [];
+    if (invoice.billingAddress.city) cityStateZip.push(invoice.billingAddress.city);
+    if (invoice.billingAddress.state) cityStateZip.push(invoice.billingAddress.state);
+    if (invoice.billingAddress.zip) cityStateZip.push(invoice.billingAddress.zip);
+    if (cityStateZip.length > 0) addressLines.push(cityStateZip.join(', '));
+
+    addressLines.forEach((line) => {
+      doc.text(line, col1X, billToY);
+      billToY += 5;
+    });
   }
 
   doc.setFontSize(10);
@@ -178,6 +196,47 @@ export function generateInvoicePDF(
   });
 
   yPosition = 105;
+
+  const hasShippingAddress = invoice.shippingAddress && (invoice.shippingAddress.line1 || invoice.shippingAddress.city);
+  const shippingDifferentFromBilling = hasShippingAddress && (
+    invoice.shippingAddress.line1 !== invoice.billingAddress?.line1 ||
+    invoice.shippingAddress.city !== invoice.billingAddress?.city ||
+    invoice.shippingAddress.state !== invoice.billingAddress?.state
+  );
+
+  if (shippingDifferentFromBilling) {
+    doc.setFillColor(249, 250, 251);
+    doc.rect(margin, yPosition, pageWidth - margin * 2, 35, 'F');
+    doc.setDrawColor(229, 231, 235);
+    doc.rect(margin, yPosition, pageWidth - margin * 2, 35, 'S');
+
+    doc.setFontSize(10);
+    doc.setTextColor(107, 114, 128);
+    doc.setFont('helvetica', 'bold');
+    doc.text('SHIP TO:', margin + 5, yPosition + 8);
+
+    doc.setTextColor(31, 41, 55);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+
+    let shipToY = yPosition + 15;
+    const shippingLines: string[] = [];
+    if (invoice.shippingAddress.line1) shippingLines.push(invoice.shippingAddress.line1);
+    if (invoice.shippingAddress.line2) shippingLines.push(invoice.shippingAddress.line2);
+
+    const shipCityStateZip: string[] = [];
+    if (invoice.shippingAddress.city) shipCityStateZip.push(invoice.shippingAddress.city);
+    if (invoice.shippingAddress.state) shipCityStateZip.push(invoice.shippingAddress.state);
+    if (invoice.shippingAddress.zip) shipCityStateZip.push(invoice.shippingAddress.zip);
+    if (shipCityStateZip.length > 0) shippingLines.push(shipCityStateZip.join(', '));
+
+    shippingLines.forEach((line) => {
+      doc.text(line, margin + 5, shipToY);
+      shipToY += 5;
+    });
+
+    yPosition += 40;
+  }
 
   const lineItemsData = invoice.lineItems.map((item) => {
     const parsed = parseLineItemDescription(item.description, (item as any).rawData);

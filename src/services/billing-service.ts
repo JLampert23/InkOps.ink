@@ -325,7 +325,7 @@ export const billingService = {
     }
   },
 
-  async sendInvoiceEmail(queueItemId: string, customMessage?: string): Promise<void> {
+  async sendInvoiceEmail(queueItemId: string, customMessage?: string, sendSMS: boolean = false): Promise<{ emailSent: boolean; smsSent: boolean }> {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -342,7 +342,7 @@ export const billingService = {
         throw new Error('Billing queue item not found');
       }
 
-      if (!queueItem.customer_email) {
+      if (!queueItem.customer_email && !sendSMS) {
         throw new Error('Customer email not found');
       }
 
@@ -365,68 +365,112 @@ export const billingService = {
 
       const paymentUrl = linkData?.stripe_payment_link_url || '';
 
-      const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': supabaseAnonKey,
-        },
-        body: JSON.stringify({
-          to: queueItem.customer_email,
-          subject: `Invoice ${queueItem.printavo_visual_id} - Payment Required`,
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2>Invoice ${queueItem.printavo_visual_id}</h2>
-              <p>Dear ${queueItem.customer_name},</p>
-              ${customMessage ? `<p>${customMessage}</p>` : ''}
-              <p>Your invoice is ready for payment.</p>
-              <div style="background: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 8px;">
-                <p><strong>Invoice Number:</strong> ${queueItem.printavo_visual_id}</p>
-                <p><strong>Amount Due:</strong> $${parseFloat(queueItem.invoice_total).toFixed(2)}</p>
-                <p><strong>Due Date:</strong> ${queueItem.due_date ? new Date(queueItem.due_date).toLocaleDateString() : 'Upon receipt'}</p>
-              </div>
-              <p style="margin: 30px 0;">
-                <a href="${paymentUrl}"
-                   style="background: #0066ff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                  Pay Invoice Now
-                </a>
-              </p>
-              <p style="color: #666; font-size: 14px;">
-                If you have any questions, please don't hesitate to contact us.
-              </p>
-            </div>
-          `,
-        }),
-      });
+      let emailSent = false;
+      let smsSent = false;
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to send email');
+      if (queueItem.customer_email) {
+        const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': supabaseAnonKey,
+          },
+          body: JSON.stringify({
+            to: queueItem.customer_email,
+            subject: `Invoice ${queueItem.printavo_visual_id} - Payment Required`,
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2>Invoice ${queueItem.printavo_visual_id}</h2>
+                <p>Dear ${queueItem.customer_name},</p>
+                ${customMessage ? `<p>${customMessage}</p>` : ''}
+                <p>Your invoice is ready for payment.</p>
+                <div style="background: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 8px;">
+                  <p><strong>Invoice Number:</strong> ${queueItem.printavo_visual_id}</p>
+                  <p><strong>Amount Due:</strong> $${parseFloat(queueItem.invoice_total).toFixed(2)}</p>
+                  <p><strong>Due Date:</strong> ${queueItem.due_date ? new Date(queueItem.due_date).toLocaleDateString() : 'Upon receipt'}</p>
+                </div>
+                <p style="margin: 30px 0;">
+                  <a href="${paymentUrl}"
+                     style="background: #0066ff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                    Pay Invoice Now
+                  </a>
+                </p>
+                <p style="color: #666; font-size: 14px;">
+                  If you have any questions, please don't hesitate to contact us.
+                </p>
+              </div>
+            `,
+          }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to send email');
+        }
+
+        emailSent = true;
+
+        await supabase
+          .from('communication_logs')
+          .insert([{
+            printavo_invoice_id: queueItem.printavo_invoice_id,
+            communication_type: 'invoice',
+            method: 'email',
+            recipient: queueItem.customer_email,
+            subject: `Invoice ${queueItem.printavo_visual_id} - Payment Required`,
+            message: customMessage || 'Invoice sent with payment link',
+            status: 'sent',
+            sent_by: session.user.id,
+          }]);
       }
 
-      await supabase
-        .from('billing_queue')
-        .update({
-          sent_at: new Date().toISOString(),
-          sent_method: 'email',
-        })
-        .eq('id', queueItemId);
+      if (sendSMS) {
+        const { data: invoice } = await supabase
+          .from('printavo_invoices')
+          .select('customer_id')
+          .eq('id', queueItem.printavo_invoice_id)
+          .maybeSingle();
 
-      await supabase
-        .from('communication_logs')
-        .insert([{
-          printavo_invoice_id: queueItem.printavo_invoice_id,
-          communication_type: 'invoice',
-          method: 'email',
-          recipient: queueItem.customer_email,
-          subject: `Invoice ${queueItem.printavo_visual_id} - Payment Required`,
-          message: customMessage || 'Invoice sent with payment link',
-          status: 'sent',
-          sent_by: session.user.id,
-        }]);
+        if (invoice?.customer_id) {
+          const { data: customer } = await supabase
+            .from('customers')
+            .select('phone')
+            .eq('id', invoice.customer_id)
+            .maybeSingle();
+
+          if (customer?.phone) {
+            const { twilioService } = await import('./twilio-service');
+            const smsResult = await twilioService.sendInvoiceSMS({
+              invoiceId: queueItem.printavo_invoice_id,
+              customerId: invoice.customer_id,
+              phoneNumber: twilioService.formatPhoneNumber(customer.phone),
+              customerName: queueItem.customer_name,
+              invoiceNumber: queueItem.printavo_visual_id,
+              amount: parseFloat(queueItem.invoice_total),
+              paymentLink: paymentUrl,
+            });
+
+            smsSent = smsResult.success;
+          }
+        }
+      }
+
+      const sentMethod = emailSent && smsSent ? 'email_and_sms' : emailSent ? 'email' : smsSent ? 'sms' : null;
+
+      if (sentMethod) {
+        await supabase
+          .from('billing_queue')
+          .update({
+            sent_at: new Date().toISOString(),
+            sent_method: sentMethod,
+          })
+          .eq('id', queueItemId);
+      }
+
+      return { emailSent, smsSent };
     } catch (error) {
-      console.error('Error sending invoice email:', error);
+      console.error('Error sending invoice:', error);
       throw error;
     }
   },
