@@ -43,7 +43,7 @@ interface Invoice {
         address2?: string;
         city?: string;
         state?: string;
-        zip?: string;
+        postalCode?: string;
         country?: string;
       };
       shippingAddress?: {
@@ -51,7 +51,7 @@ interface Invoice {
         address2?: string;
         city?: string;
         state?: string;
-        zip?: string;
+        postalCode?: string;
         country?: string;
       };
     };
@@ -61,7 +61,7 @@ interface Invoice {
     address2?: string;
     city?: string;
     state?: string;
-    postalCode?: string;
+    zip?: string;
     country?: string;
   };
   shippingAddress?: {
@@ -69,7 +69,7 @@ interface Invoice {
     address2?: string;
     city?: string;
     state?: string;
-    postalCode?: string;
+    zip?: string;
     country?: string;
   };
   subtotal?: number;
@@ -259,7 +259,7 @@ async function fetchCustomerDetails(
           address2
           city
           state
-          zip
+          postalCode
           country
         }
         shippingAddress {
@@ -267,7 +267,7 @@ async function fetchCustomerDetails(
           address2
           city
           state
-          zip
+          postalCode
           country
         }
         contacts {
@@ -363,7 +363,7 @@ async function findOrCreateCustomer(
       if (billingSource.address2) { updateData.billing_address_line2 = billingSource.address2; hasUpdates = true; }
       if (billingSource.city) { updateData.billing_city = billingSource.city; hasUpdates = true; }
       if (billingSource.state) { updateData.billing_state = billingSource.state; hasUpdates = true; }
-      const billingZip = billingSource.zip || billingSource.postalCode;
+      const billingZip = (billingSource as any).postalCode || (billingSource as any).zip;
       if (billingZip) { updateData.billing_zip = billingZip; hasUpdates = true; }
       if (billingSource.country) { updateData.billing_country = billingSource.country; hasUpdates = true; }
     }
@@ -374,7 +374,7 @@ async function findOrCreateCustomer(
       if (shippingSource.address2) { updateData.shipping_address_line2 = shippingSource.address2; hasUpdates = true; }
       if (shippingSource.city) { updateData.shipping_city = shippingSource.city; hasUpdates = true; }
       if (shippingSource.state) { updateData.shipping_state = shippingSource.state; hasUpdates = true; }
-      const shippingZip = shippingSource.zip || shippingSource.postalCode;
+      const shippingZip = (shippingSource as any).postalCode || (shippingSource as any).zip;
       if (shippingZip) { updateData.shipping_zip = shippingZip; hasUpdates = true; }
       if (shippingSource.country) { updateData.shipping_country = shippingSource.country; hasUpdates = true; }
     }
@@ -410,7 +410,7 @@ async function findOrCreateCustomer(
     customerData.billing_address_line2 = billingSource.address2;
     customerData.billing_city = billingSource.city;
     customerData.billing_state = billingSource.state;
-    customerData.billing_zip = billingSource.zip || billingSource.postalCode;
+    customerData.billing_zip = (billingSource as any).postalCode || (billingSource as any).zip;
     customerData.billing_country = billingSource.country || 'USA';
   }
 
@@ -420,7 +420,7 @@ async function findOrCreateCustomer(
     customerData.shipping_address_line2 = shippingSource.address2;
     customerData.shipping_city = shippingSource.city;
     customerData.shipping_state = shippingSource.state;
-    customerData.shipping_zip = shippingSource.zip || shippingSource.postalCode;
+    customerData.shipping_zip = (shippingSource as any).postalCode || (shippingSource as any).zip;
     customerData.shipping_country = shippingSource.country || 'USA';
   }
 
@@ -503,7 +503,7 @@ async function syncInvoices(
                   address2
                   city
                   state
-                  zip
+                  postalCode
                   country
                 }
                 shippingAddress {
@@ -511,7 +511,7 @@ async function syncInvoices(
                   address2
                   city
                   state
-                  zip
+                  postalCode
                   country
                 }
               }
@@ -521,7 +521,7 @@ async function syncInvoices(
               address2
               city
               state
-              postalCode
+              zip
               country
             }
             shippingAddress {
@@ -529,7 +529,7 @@ async function syncInvoices(
               address2
               city
               state
-              postalCode
+              zip
               country
             }
             lineItemGroups {
@@ -610,7 +610,7 @@ async function syncInvoices(
                   address2
                   city
                   state
-                  zip
+                  postalCode
                   country
                 }
                 shippingAddress {
@@ -618,7 +618,7 @@ async function syncInvoices(
                   address2
                   city
                   state
-                  zip
+                  postalCode
                   country
                 }
               }
@@ -628,7 +628,7 @@ async function syncInvoices(
               address2
               city
               state
-              postalCode
+              zip
               country
             }
             shippingAddress {
@@ -636,7 +636,7 @@ async function syncInvoices(
               address2
               city
               state
-              postalCode
+              zip
               country
             }
             lineItemGroups {
@@ -753,7 +753,7 @@ async function syncInvoices(
             line2: billingSource.address2 || '',
             city: billingSource.city || '',
             state: billingSource.state || '',
-            zip: billingSource.zip || billingSource.postalCode || '',
+            zip: (billingSource as any).postalCode || (billingSource as any).zip || '',
             country: billingSource.country || 'USA',
           };
         }
@@ -766,7 +766,7 @@ async function syncInvoices(
             line2: shippingSource.address2 || '',
             city: shippingSource.city || '',
             state: shippingSource.state || '',
-            zip: shippingSource.zip || shippingSource.postalCode || '',
+            zip: (shippingSource as any).postalCode || (shippingSource as any).zip || '',
             country: shippingSource.country || 'USA',
           };
         }
@@ -936,7 +936,7 @@ async function syncInvoices(
           line2: billingSource.address2 || '',
           city: billingSource.city || '',
           state: billingSource.state || '',
-          zip: billingSource.zip || billingSource.postalCode || '',
+          zip: (billingSource as any).postalCode || (billingSource as any).zip || '',
           country: billingSource.country || 'USA',
         };
       }
@@ -949,7 +949,7 @@ async function syncInvoices(
           line2: shippingSource.address2 || '',
           city: shippingSource.city || '',
           state: shippingSource.state || '',
-          zip: shippingSource.zip || shippingSource.postalCode || '',
+          zip: (shippingSource as any).postalCode || (shippingSource as any).zip || '',
           country: shippingSource.country || 'USA',
         };
       }
