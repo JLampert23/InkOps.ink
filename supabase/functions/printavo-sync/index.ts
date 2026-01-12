@@ -23,12 +23,54 @@ interface GraphQLRequest {
 interface Invoice {
   id: string;
   visualId?: string;
-  customerId?: string;
   status?: { name?: string };
   contact?: {
     id?: string;
     fullName?: string;
     email?: string;
+    phone?: string;
+    customer?: {
+      id?: string;
+      companyName?: string;
+      primaryContact?: {
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+        phone?: string;
+      };
+      billingAddress?: {
+        address1?: string;
+        address2?: string;
+        city?: string;
+        state?: string;
+        postalCode?: string;
+        country?: string;
+      };
+      shippingAddress?: {
+        address1?: string;
+        address2?: string;
+        city?: string;
+        state?: string;
+        postalCode?: string;
+        country?: string;
+      };
+    };
+  };
+  billingAddress?: {
+    address1?: string;
+    address2?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
+  };
+  shippingAddress?: {
+    address1?: string;
+    address2?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    country?: string;
   };
   subtotal?: number;
   salesTaxAmount?: number;
@@ -196,10 +238,6 @@ async function fetchFromPrintavo(
   return result;
 }
 
-/**
- * Fetches complete customer details from Printavo API.
- * This is the ONLY source of customer contact information including phone numbers and addresses.
- */
 async function fetchCustomerDetails(
   printavoCustomerId: string,
   printavoEmail: string,
@@ -210,9 +248,6 @@ async function fetchCustomerDetails(
       customer(id: $id) {
         id
         companyName
-        publicUrl
-        salesTax
-        taxExempt
         primaryContact {
           firstName
           lastName
@@ -235,6 +270,16 @@ async function fetchCustomerDetails(
           postalCode
           country
         }
+        contacts {
+          edges {
+            node {
+              id
+              fullName
+              email
+              phone
+            }
+          }
+        }
       }
     }
   `;
@@ -248,73 +293,49 @@ async function fetchCustomerDetails(
     );
     return result.data?.customer || null;
   } catch (error) {
-    console.error('Error fetching customer details for ID', printavoCustomerId, ':', error);
+    console.error('Error fetching customer details:', error);
     return null;
   }
 }
 
-/**
- * Finds or creates a customer record based on Printavo customer data.
- * IMPORTANT: All customer contact data comes from the Customer object, NOT from the invoice.
- * The invoice only provides invoice.customerId which we use to fetch the full customer record.
- */
 async function findOrCreateCustomer(
   supabase: any,
   invoice: Invoice,
   printavoEmail: string,
   printavoToken: string
 ): Promise<{ id: string | null; details: any | null }> {
-  // Step 1: Get customer ID from invoice (this is the ONLY reliable field)
-  const printavoCustomerId = invoice.customerId;
+  const customerName = invoice.contact?.customer?.companyName || invoice.contact?.fullName;
+  const customerEmail = invoice.contact?.email;
+  let customerPhone = invoice.contact?.customer?.primaryContact?.phone ||
+                       invoice.contact?.phone;
+  const printavoCustomerId = invoice.contact?.customer?.id;
 
-  if (!printavoCustomerId) {
-    console.log('No customerId found on invoice', invoice.id);
+  let customerDetails = null;
+  if (printavoCustomerId) {
+    customerDetails = await fetchCustomerDetails(printavoCustomerId, printavoEmail, printavoToken);
+    if (customerDetails) {
+      console.log('Fetched customer details from Printavo:', {
+        id: customerDetails.id,
+        name: customerDetails.companyName,
+        hasBilling: !!customerDetails.billingAddress,
+        hasShipping: !!customerDetails.shippingAddress,
+        primaryPhone: customerDetails.primaryContact?.phone,
+      });
+
+      if (!customerPhone && customerDetails.primaryContact?.phone) {
+        customerPhone = customerDetails.primaryContact.phone;
+      }
+    }
+  }
+
+  if (!customerName) {
+    console.log('No customer name found for invoice', invoice.id);
     return { id: null, details: null };
   }
 
-  // Step 2: Fetch complete customer details from Printavo Customer object
-  const customerDetails = await fetchCustomerDetails(printavoCustomerId, printavoEmail, printavoToken);
-
-  if (!customerDetails) {
-    console.error('Failed to fetch customer details for customerId:', printavoCustomerId);
-    return { id: null, details: null };
-  }
-
-  console.log('Fetched customer details from Printavo:', {
-    id: customerDetails.id,
-    companyName: customerDetails.companyName,
-    hasBilling: !!customerDetails.billingAddress,
-    hasShipping: !!customerDetails.shippingAddress,
-    primaryPhone: customerDetails.primaryContact?.phone,
-  });
-
-  // Step 3: Extract all customer fields from Customer object
-  const companyName = customerDetails.companyName || '';
-  const primaryContact = customerDetails.primaryContact || {};
-  const contactName = primaryContact.firstName && primaryContact.lastName
-    ? `${primaryContact.firstName} ${primaryContact.lastName}`.trim()
-    : invoice.contact?.fullName || '';
-  const customerEmail = primaryContact.email || invoice.contact?.email || '';
-  const customerPhone = primaryContact.phone || '';
-
-  if (!companyName && !contactName) {
-    console.log('No customer name found for customerId:', printavoCustomerId);
-    return { id: null, details: null };
-  }
-
-  // Step 4: Check if customer already exists in local database
   let existingCustomer = null;
 
-  // Try to find by Printavo customer ID first (most reliable)
-  const { data: customerByPrintavoId } = await supabase
-    .from('customers')
-    .select('id')
-    .eq('printavo_customer_id', printavoCustomerId)
-    .maybeSingle();
-  existingCustomer = customerByPrintavoId;
-
-  // Fallback: try by email if not found by Printavo ID
-  if (!existingCustomer && customerEmail) {
+  if (customerEmail) {
     const { data } = await supabase
       .from('customers')
       .select('id')
@@ -323,89 +344,84 @@ async function findOrCreateCustomer(
     existingCustomer = data;
   }
 
-  // Fallback: try by company name
-  if (!existingCustomer && companyName) {
+  if (!existingCustomer && customerName) {
     const { data } = await supabase
       .from('customers')
       .select('id')
-      .eq('company_name', companyName)
+      .eq('company_name', customerName)
       .maybeSingle();
     existingCustomer = data;
   }
 
-  // Step 5: Update existing customer with latest data from Printavo
   if (existingCustomer) {
-    const updateData: any = {
-      printavo_customer_id: printavoCustomerId,
-    };
+    const updateData: any = {};
+    let hasUpdates = false;
 
-    // Update company and contact info
-    if (companyName) updateData.company_name = companyName;
-    if (contactName) updateData.contact_name = contactName;
-    if (customerEmail) updateData.email = customerEmail;
-    if (customerPhone) updateData.phone = customerPhone;
-
-    // Update billing address from Customer object
-    if (customerDetails.billingAddress) {
-      const billing = customerDetails.billingAddress;
-      if (billing.address1) updateData.billing_address_line1 = billing.address1;
-      if (billing.address2) updateData.billing_address_line2 = billing.address2;
-      if (billing.city) updateData.billing_city = billing.city;
-      if (billing.state) updateData.billing_state = billing.state;
-      if (billing.postalCode) updateData.billing_zip = billing.postalCode;
-      if (billing.country) updateData.billing_country = billing.country;
+    const billingSource = customerDetails?.billingAddress || invoice.contact?.customer?.billingAddress || invoice.billingAddress;
+    if (billingSource && (billingSource.address1 || billingSource.city)) {
+      if (billingSource.address1) { updateData.billing_address_line1 = billingSource.address1; hasUpdates = true; }
+      if (billingSource.address2) { updateData.billing_address_line2 = billingSource.address2; hasUpdates = true; }
+      if (billingSource.city) { updateData.billing_city = billingSource.city; hasUpdates = true; }
+      if (billingSource.state) { updateData.billing_state = billingSource.state; hasUpdates = true; }
+      const billingZip = (billingSource as any).postalCode || (billingSource as any).zip;
+      if (billingZip) { updateData.billing_zip = billingZip; hasUpdates = true; }
+      if (billingSource.country) { updateData.billing_country = billingSource.country; hasUpdates = true; }
     }
 
-    // Update shipping address from Customer object
-    if (customerDetails.shippingAddress) {
-      const shipping = customerDetails.shippingAddress;
-      if (shipping.address1) updateData.shipping_address_line1 = shipping.address1;
-      if (shipping.address2) updateData.shipping_address_line2 = shipping.address2;
-      if (shipping.city) updateData.shipping_city = shipping.city;
-      if (shipping.state) updateData.shipping_state = shipping.state;
-      if (shipping.postalCode) updateData.shipping_zip = shipping.postalCode;
-      if (shipping.country) updateData.shipping_country = shipping.country;
+    const shippingSource = customerDetails?.shippingAddress || invoice.contact?.customer?.shippingAddress || invoice.shippingAddress;
+    if (shippingSource && (shippingSource.address1 || shippingSource.city)) {
+      if (shippingSource.address1) { updateData.shipping_address_line1 = shippingSource.address1; hasUpdates = true; }
+      if (shippingSource.address2) { updateData.shipping_address_line2 = shippingSource.address2; hasUpdates = true; }
+      if (shippingSource.city) { updateData.shipping_city = shippingSource.city; hasUpdates = true; }
+      if (shippingSource.state) { updateData.shipping_state = shippingSource.state; hasUpdates = true; }
+      const shippingZip = (shippingSource as any).postalCode || (shippingSource as any).zip;
+      if (shippingZip) { updateData.shipping_zip = shippingZip; hasUpdates = true; }
+      if (shippingSource.country) { updateData.shipping_country = shippingSource.country; hasUpdates = true; }
     }
 
-    await supabase
-      .from('customers')
-      .update(updateData)
-      .eq('id', existingCustomer.id);
+    if (customerEmail) { updateData.email = customerEmail; hasUpdates = true; }
+    if (customerPhone) { updateData.phone = customerPhone; hasUpdates = true; }
+    if (invoice.contact?.fullName) { updateData.contact_name = invoice.contact.fullName; hasUpdates = true; }
+    if (printavoCustomerId) { updateData.printavo_customer_id = printavoCustomerId; hasUpdates = true; }
 
-    console.log('Updated existing customer:', companyName || contactName);
+    if (hasUpdates) {
+      await supabase
+        .from('customers')
+        .update(updateData)
+        .eq('id', existingCustomer.id);
+      console.log('Updated existing customer:', customerName, 'with new data');
+    }
+
     return { id: existingCustomer.id, details: customerDetails };
   }
 
-  // Step 6: Create new customer with all data from Customer object
   const customerData: any = {
-    printavo_customer_id: printavoCustomerId,
-    company_name: companyName,
-    contact_name: contactName,
+    company_name: customerName,
+    contact_name: invoice.contact?.fullName,
     email: customerEmail,
     phone: customerPhone,
+    printavo_customer_id: printavoCustomerId,
     status: 'active',
   };
 
-  // Add billing address from Customer object
-  if (customerDetails.billingAddress) {
-    const billing = customerDetails.billingAddress;
-    customerData.billing_address_line1 = billing.address1 || '';
-    customerData.billing_address_line2 = billing.address2 || '';
-    customerData.billing_city = billing.city || '';
-    customerData.billing_state = billing.state || '';
-    customerData.billing_zip = billing.postalCode || '';
-    customerData.billing_country = billing.country || 'USA';
+  const billingSource = customerDetails?.billingAddress || invoice.contact?.customer?.billingAddress || invoice.billingAddress;
+  if (billingSource && (billingSource.address1 || billingSource.city)) {
+    customerData.billing_address_line1 = billingSource.address1;
+    customerData.billing_address_line2 = billingSource.address2;
+    customerData.billing_city = billingSource.city;
+    customerData.billing_state = billingSource.state;
+    customerData.billing_zip = (billingSource as any).postalCode || (billingSource as any).zip;
+    customerData.billing_country = billingSource.country || 'USA';
   }
 
-  // Add shipping address from Customer object
-  if (customerDetails.shippingAddress) {
-    const shipping = customerDetails.shippingAddress;
-    customerData.shipping_address_line1 = shipping.address1 || '';
-    customerData.shipping_address_line2 = shipping.address2 || '';
-    customerData.shipping_city = shipping.city || '';
-    customerData.shipping_state = shipping.state || '';
-    customerData.shipping_zip = shipping.postalCode || '';
-    customerData.shipping_country = shipping.country || 'USA';
+  const shippingSource = customerDetails?.shippingAddress || invoice.contact?.customer?.shippingAddress || invoice.shippingAddress;
+  if (shippingSource && (shippingSource.address1 || shippingSource.city)) {
+    customerData.shipping_address_line1 = shippingSource.address1;
+    customerData.shipping_address_line2 = shippingSource.address2;
+    customerData.shipping_city = shippingSource.city;
+    customerData.shipping_state = shippingSource.state;
+    customerData.shipping_zip = (shippingSource as any).postalCode || (shippingSource as any).zip;
+    customerData.shipping_country = shippingSource.country || 'USA';
   }
 
   const { data: newCustomer, error } = await supabase
@@ -419,7 +435,7 @@ async function findOrCreateCustomer(
     return { id: null, details: null };
   }
 
-  console.log('Created new customer:', companyName || contactName, 'with ID:', newCustomer.id);
+  console.log('Created new customer:', customerName, 'with ID:', newCustomer.id);
   return { id: newCustomer.id, details: customerDetails };
 }
 
@@ -446,8 +462,6 @@ async function syncInvoices(
   const billingEligibleStatuses = (billingStatuses || []).map(s => s.name);
   console.log('Billing eligible statuses:', billingEligibleStatuses);
 
-  // Invoice query - only fetches invoice fields and customerId
-  // All customer contact data will be fetched separately using the Customer object
   const invoicesQuery = `
     query GetInvoices($after: String, $first: Int = 7, $paymentStatus: OrderPaymentStatus) {
       invoices(after: $after, first: $first, paymentStatus: $paymentStatus) {
@@ -455,7 +469,6 @@ async function syncInvoices(
           node {
             id
             visualId
-            customerId
             status {
               name
             }
@@ -475,6 +488,49 @@ async function syncInvoices(
               id
               fullName
               email
+              phone
+              customer {
+                id
+                companyName
+                primaryContact {
+                  firstName
+                  lastName
+                  email
+                  phone
+                }
+                billingAddress {
+                  address1
+                  address2
+                  city
+                  state
+                  postalCode
+                  country
+                }
+                shippingAddress {
+                  address1
+                  address2
+                  city
+                  state
+                  postalCode
+                  country
+                }
+              }
+            }
+            billingAddress {
+              address1
+              address2
+              city
+              state
+              zip
+              country
+            }
+            shippingAddress {
+              address1
+              address2
+              city
+              state
+              zip
+              country
             }
             lineItemGroups {
               edges {
@@ -513,8 +569,6 @@ async function syncInvoices(
     }
   `;
 
-  // Recent invoices query - only fetches invoice fields and customerId
-  // All customer contact data will be fetched separately using the Customer object
   const recentInvoicesQuery = `
     query GetRecentInvoices($after: String, $first: Int = 7) {
       invoices(after: $after, first: $first, sortDescending: true) {
@@ -522,7 +576,6 @@ async function syncInvoices(
           node {
             id
             visualId
-            customerId
             status {
               name
             }
@@ -542,6 +595,49 @@ async function syncInvoices(
               id
               fullName
               email
+              phone
+              customer {
+                id
+                companyName
+                primaryContact {
+                  firstName
+                  lastName
+                  email
+                  phone
+                }
+                billingAddress {
+                  address1
+                  address2
+                  city
+                  state
+                  postalCode
+                  country
+                }
+                shippingAddress {
+                  address1
+                  address2
+                  city
+                  state
+                  postalCode
+                  country
+                }
+              }
+            }
+            billingAddress {
+              address1
+              address2
+              city
+              state
+              zip
+              country
+            }
+            shippingAddress {
+              address1
+              address2
+              city
+              state
+              zip
+              country
             }
             lineItemGroups {
               edges {
@@ -628,12 +724,12 @@ async function syncInvoices(
           console.log('Sample invoice structure:', JSON.stringify({
             id: invoice.id,
             visualId: invoice.visualId,
-            customerId: invoice.customerId,
             contact: invoice.contact,
+            billingAddress: invoice.billingAddress,
+            shippingAddress: invoice.shippingAddress,
           }, null, 2));
         }
 
-        // Fetch customer details using customerId - this is the source of ALL customer contact data
         const { id: customerId, details: customerDetails } = await findOrCreateCustomer(supabase, invoice, printavoEmail, printavoToken);
 
         const amountOutstanding = invoice.amountOutstanding || 0;
@@ -644,56 +740,45 @@ async function syncInvoices(
           statusStage = 'accounts_receivable';
         }
 
-        // Extract customer data from Customer object (stored in customerDetails)
-        const primaryContact = customerDetails?.primaryContact || {};
-        const customerName = customerDetails?.companyName ||
-                            (primaryContact.firstName && primaryContact.lastName
-                              ? `${primaryContact.firstName} ${primaryContact.lastName}`.trim()
-                              : invoice.contact?.fullName) || '';
-        const customerEmail = primaryContact.email || invoice.contact?.email || '';
-        const customerPhone = primaryContact.phone || '';
+        const phoneNumber = customerDetails?.primaryContact?.phone ||
+                           invoice.contact?.customer?.primaryContact?.phone ||
+                           invoice.contact?.phone ||
+                           '';
 
-        // Extract billing address from Customer object
+        const billingSource = customerDetails?.billingAddress || invoice.contact?.customer?.billingAddress || invoice.billingAddress;
         let billingAddress = null;
-        if (customerDetails?.billingAddress) {
-          const billing = customerDetails.billingAddress;
-          if (billing.address1 || billing.city) {
-            billingAddress = {
-              line1: billing.address1 || '',
-              line2: billing.address2 || '',
-              city: billing.city || '',
-              state: billing.state || '',
-              zip: billing.postalCode || '',
-              country: billing.country || 'USA',
-            };
-          }
+        if (billingSource && (billingSource.address1 || billingSource.city)) {
+          billingAddress = {
+            line1: billingSource.address1 || '',
+            line2: billingSource.address2 || '',
+            city: billingSource.city || '',
+            state: billingSource.state || '',
+            zip: (billingSource as any).postalCode || (billingSource as any).zip || '',
+            country: billingSource.country || 'USA',
+          };
         }
 
-        // Extract shipping address from Customer object
+        const shippingSource = customerDetails?.shippingAddress || invoice.contact?.customer?.shippingAddress || invoice.shippingAddress;
         let shippingAddress = null;
-        if (customerDetails?.shippingAddress) {
-          const shipping = customerDetails.shippingAddress;
-          if (shipping.address1 || shipping.city) {
-            shippingAddress = {
-              line1: shipping.address1 || '',
-              line2: shipping.address2 || '',
-              city: shipping.city || '',
-              state: shipping.state || '',
-              zip: shipping.postalCode || '',
-              country: shipping.country || 'USA',
-            };
-          }
+        if (shippingSource && (shippingSource.address1 || shippingSource.city)) {
+          shippingAddress = {
+            line1: shippingSource.address1 || '',
+            line2: shippingSource.address2 || '',
+            city: shippingSource.city || '',
+            state: shippingSource.state || '',
+            zip: (shippingSource as any).postalCode || (shippingSource as any).zip || '',
+            country: shippingSource.country || 'USA',
+          };
         }
 
-        // Store invoice with complete customer snapshot
         batchBuffer.push({
           id: invoice.id,
           invoice_number: invoice.visualId,
           customer_id: customerId,
-          customer_email: customerEmail,
-          customer_phone: customerPhone,
-          customer_name: customerName,
-          customer_company: customerDetails?.companyName || '',
+          customer_email: invoice.contact?.email || '',
+          customer_phone: phoneNumber,
+          customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName || '',
+          customer_company: invoice.contact?.customer?.companyName || '',
           billing_address: billingAddress,
           billing_address_line1: billingAddress?.line1 || null,
           billing_address_line2: billingAddress?.line2 || null,
@@ -721,7 +806,6 @@ async function syncInvoices(
           raw_data: invoice,
         });
 
-        // Update billing queue if this invoice is billing-eligible
         if (billingEligibleStatuses.includes(invoice.status?.name)) {
           const { data: existingQueueItem } = await supabase
             .from('billing_queue')
@@ -734,9 +818,9 @@ async function syncInvoices(
               .from('billing_queue')
               .update({
                 printavo_status: invoice.status?.name,
-                customer_name: customerName,
-                customer_email: customerEmail,
-                customer_company: customerDetails?.companyName || '',
+                customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName,
+                customer_email: invoice.contact?.email,
+                customer_company: invoice.contact?.customer?.companyName,
                 invoice_total: invoice.total || 0,
                 invoice_date: invoice.createdAt,
                 due_date: invoice.dueAt,
@@ -750,9 +834,9 @@ async function syncInvoices(
                 printavo_invoice_id: invoice.id,
                 printavo_visual_id: invoice.visualId,
                 printavo_status: invoice.status?.name,
-                customer_name: customerName,
-                customer_email: customerEmail,
-                customer_company: customerDetails?.companyName || '',
+                customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName,
+                customer_email: invoice.contact?.email,
+                customer_company: invoice.contact?.customer?.companyName,
                 invoice_total: invoice.total || 0,
                 invoice_date: invoice.createdAt,
                 due_date: invoice.dueAt,
@@ -829,7 +913,6 @@ async function syncInvoices(
     });
 
     for (const invoice of recentInvoices) {
-      // Fetch customer details using customerId - this is the source of ALL customer contact data
       const { id: customerId, details: customerDetails } = await findOrCreateCustomer(supabase, invoice, printavoEmail, printavoToken);
 
       const amountOutstanding = invoice.amountOutstanding || 0;
@@ -840,56 +923,45 @@ async function syncInvoices(
         statusStage = 'accounts_receivable';
       }
 
-      // Extract customer data from Customer object (stored in customerDetails)
-      const primaryContact = customerDetails?.primaryContact || {};
-      const customerName = customerDetails?.companyName ||
-                          (primaryContact.firstName && primaryContact.lastName
-                            ? `${primaryContact.firstName} ${primaryContact.lastName}`.trim()
-                            : invoice.contact?.fullName) || '';
-      const customerEmail = primaryContact.email || invoice.contact?.email || '';
-      const customerPhone = primaryContact.phone || '';
+      const phoneNumber = customerDetails?.primaryContact?.phone ||
+                         invoice.contact?.customer?.primaryContact?.phone ||
+                         invoice.contact?.phone ||
+                         '';
 
-      // Extract billing address from Customer object
+      const billingSource = customerDetails?.billingAddress || invoice.contact?.customer?.billingAddress || invoice.billingAddress;
       let billingAddress = null;
-      if (customerDetails?.billingAddress) {
-        const billing = customerDetails.billingAddress;
-        if (billing.address1 || billing.city) {
-          billingAddress = {
-            line1: billing.address1 || '',
-            line2: billing.address2 || '',
-            city: billing.city || '',
-            state: billing.state || '',
-            zip: billing.postalCode || '',
-            country: billing.country || 'USA',
-          };
-        }
+      if (billingSource && (billingSource.address1 || billingSource.city)) {
+        billingAddress = {
+          line1: billingSource.address1 || '',
+          line2: billingSource.address2 || '',
+          city: billingSource.city || '',
+          state: billingSource.state || '',
+          zip: (billingSource as any).postalCode || (billingSource as any).zip || '',
+          country: billingSource.country || 'USA',
+        };
       }
 
-      // Extract shipping address from Customer object
+      const shippingSource = customerDetails?.shippingAddress || invoice.contact?.customer?.shippingAddress || invoice.shippingAddress;
       let shippingAddress = null;
-      if (customerDetails?.shippingAddress) {
-        const shipping = customerDetails.shippingAddress;
-        if (shipping.address1 || shipping.city) {
-          shippingAddress = {
-            line1: shipping.address1 || '',
-            line2: shipping.address2 || '',
-            city: shipping.city || '',
-            state: shipping.state || '',
-            zip: shipping.postalCode || '',
-            country: shipping.country || 'USA',
-          };
-        }
+      if (shippingSource && (shippingSource.address1 || shippingSource.city)) {
+        shippingAddress = {
+          line1: shippingSource.address1 || '',
+          line2: shippingSource.address2 || '',
+          city: shippingSource.city || '',
+          state: shippingSource.state || '',
+          zip: (shippingSource as any).postalCode || (shippingSource as any).zip || '',
+          country: shippingSource.country || 'USA',
+        };
       }
 
-      // Store invoice with complete customer snapshot
       batchBuffer.push({
         id: invoice.id,
         invoice_number: invoice.visualId,
         customer_id: customerId,
-        customer_email: customerEmail,
-        customer_phone: customerPhone,
-        customer_name: customerName,
-        customer_company: customerDetails?.companyName || '',
+        customer_email: invoice.contact?.email || '',
+        customer_phone: phoneNumber,
+        customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName || '',
+        customer_company: invoice.contact?.customer?.companyName || '',
         billing_address: billingAddress,
         billing_address_line1: billingAddress?.line1 || null,
         billing_address_line2: billingAddress?.line2 || null,
@@ -917,7 +989,6 @@ async function syncInvoices(
         raw_data: invoice,
       });
 
-      // Update billing queue if this invoice is billing-eligible
       if (billingEligibleStatuses.includes(invoice.status?.name)) {
         const { data: existingQueueItem } = await supabase
           .from('billing_queue')
@@ -930,9 +1001,9 @@ async function syncInvoices(
             .from('billing_queue')
             .update({
               printavo_status: invoice.status?.name,
-              customer_name: customerName,
-              customer_email: customerEmail,
-              customer_company: customerDetails?.companyName || '',
+              customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName,
+              customer_email: invoice.contact?.email,
+              customer_company: invoice.contact?.customer?.companyName,
               invoice_total: invoice.total || 0,
               invoice_date: invoice.createdAt,
               due_date: invoice.dueAt,
@@ -946,9 +1017,9 @@ async function syncInvoices(
               printavo_invoice_id: invoice.id,
               printavo_visual_id: invoice.visualId,
               printavo_status: invoice.status?.name,
-              customer_name: customerName,
-              customer_email: customerEmail,
-              customer_company: customerDetails?.companyName || '',
+              customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName,
+              customer_email: invoice.contact?.email,
+              customer_company: invoice.contact?.customer?.companyName,
               invoice_total: invoice.total || 0,
               invoice_date: invoice.createdAt,
               due_date: invoice.dueAt,
