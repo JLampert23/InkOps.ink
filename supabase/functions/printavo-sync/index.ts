@@ -251,6 +251,46 @@ async function findOrCreateCustomer(
   }
 
   if (existingCustomer) {
+    // Update existing customer with any missing fields
+    const updateData: any = {};
+    let hasUpdates = false;
+
+    // Prepare address data if available
+    if (invoice.billingAddress) {
+      const billingAddr = invoice.billingAddress;
+      if (billingAddr.address1) { updateData.billing_address_line1 = billingAddr.address1; hasUpdates = true; }
+      if (billingAddr.address2) { updateData.billing_address_line2 = billingAddr.address2; hasUpdates = true; }
+      if (billingAddr.city) { updateData.billing_city = billingAddr.city; hasUpdates = true; }
+      if (billingAddr.state) { updateData.billing_state = billingAddr.state; hasUpdates = true; }
+      if (billingAddr.zip) { updateData.billing_zip = billingAddr.zip; hasUpdates = true; }
+      if (billingAddr.country) { updateData.billing_country = billingAddr.country; hasUpdates = true; }
+    }
+
+    if (invoice.shippingAddress) {
+      const shippingAddr = invoice.shippingAddress;
+      if (shippingAddr.address1) { updateData.shipping_address_line1 = shippingAddr.address1; hasUpdates = true; }
+      if (shippingAddr.address2) { updateData.shipping_address_line2 = shippingAddr.address2; hasUpdates = true; }
+      if (shippingAddr.city) { updateData.shipping_city = shippingAddr.city; hasUpdates = true; }
+      if (shippingAddr.state) { updateData.shipping_state = shippingAddr.state; hasUpdates = true; }
+      if (shippingAddr.zip) { updateData.shipping_zip = shippingAddr.zip; hasUpdates = true; }
+      if (shippingAddr.country) { updateData.shipping_country = shippingAddr.country; hasUpdates = true; }
+    }
+
+    // Update contact info if available
+    if (customerEmail) { updateData.email = customerEmail; hasUpdates = true; }
+    if (customerPhone) { updateData.phone = customerPhone; hasUpdates = true; }
+    if (invoice.contact?.fullName) { updateData.contact_name = invoice.contact.fullName; hasUpdates = true; }
+    if (printavoCustomerId) { updateData.printavo_customer_id = printavoCustomerId; hasUpdates = true; }
+
+    // Only update if we have new data
+    if (hasUpdates) {
+      await supabase
+        .from('customers')
+        .update(updateData)
+        .eq('id', existingCustomer.id);
+      console.log('Updated existing customer:', customerName, 'with new data');
+    }
+
     return existingCustomer.id;
   }
 
@@ -543,14 +583,36 @@ async function syncInvoices(
           statusStage = 'accounts_receivable';
         }
 
+        // Extract billing address
+        const billingAddress = invoice.billingAddress ? {
+          line1: invoice.billingAddress.address1 || '',
+          line2: invoice.billingAddress.address2 || '',
+          city: invoice.billingAddress.city || '',
+          state: invoice.billingAddress.state || '',
+          zip: invoice.billingAddress.zip || '',
+          country: invoice.billingAddress.country || 'USA',
+        } : null;
+
+        // Extract shipping address
+        const shippingAddress = invoice.shippingAddress ? {
+          line1: invoice.shippingAddress.address1 || '',
+          line2: invoice.shippingAddress.address2 || '',
+          city: invoice.shippingAddress.city || '',
+          state: invoice.shippingAddress.state || '',
+          zip: invoice.shippingAddress.zip || '',
+          country: invoice.shippingAddress.country || 'USA',
+        } : null;
+
         batchBuffer.push({
           id: invoice.id,
           invoice_number: invoice.visualId,
           customer_id: customerId,
-          customer_email: invoice.contact?.email,
-          customer_phone: invoice.contact?.phone,
-          customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName,
-          customer_company: invoice.contact?.customer?.companyName,
+          customer_email: invoice.contact?.email || '',
+          customer_phone: invoice.contact?.phone || '',
+          customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName || '',
+          customer_company: invoice.contact?.customer?.companyName || '',
+          billing_address: billingAddress,
+          shipping_address: shippingAddress,
           subtotal: invoice.subtotal || 0,
           tax: invoice.salesTaxAmount || 0,
           total: invoice.total || 0,
@@ -681,14 +743,36 @@ async function syncInvoices(
         statusStage = 'accounts_receivable';
       }
 
+      // Extract billing address
+      const billingAddress = invoice.billingAddress ? {
+        line1: invoice.billingAddress.address1 || '',
+        line2: invoice.billingAddress.address2 || '',
+        city: invoice.billingAddress.city || '',
+        state: invoice.billingAddress.state || '',
+        zip: invoice.billingAddress.zip || '',
+        country: invoice.billingAddress.country || 'USA',
+      } : null;
+
+      // Extract shipping address
+      const shippingAddress = invoice.shippingAddress ? {
+        line1: invoice.shippingAddress.address1 || '',
+        line2: invoice.shippingAddress.address2 || '',
+        city: invoice.shippingAddress.city || '',
+        state: invoice.shippingAddress.state || '',
+        zip: invoice.shippingAddress.zip || '',
+        country: invoice.shippingAddress.country || 'USA',
+      } : null;
+
       batchBuffer.push({
         id: invoice.id,
         invoice_number: invoice.visualId,
         customer_id: customerId,
-        customer_email: invoice.contact?.email,
-        customer_phone: invoice.contact?.phone,
-        customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName,
-        customer_company: invoice.contact?.customer?.companyName,
+        customer_email: invoice.contact?.email || '',
+        customer_phone: invoice.contact?.phone || '',
+        customer_name: invoice.contact?.fullName || invoice.contact?.customer?.companyName || '',
+        customer_company: invoice.contact?.customer?.companyName || '',
+        billing_address: billingAddress,
+        shipping_address: shippingAddress,
         subtotal: invoice.subtotal || 0,
         tax: invoice.salesTaxAmount || 0,
         total: invoice.total || 0,

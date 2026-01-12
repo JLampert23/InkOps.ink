@@ -172,6 +172,18 @@ export const invoiceDetailService = {
 
       const statusInfo = await this.getStatusInfo(invoice.status);
 
+      // Extract addresses - prioritize invoice fields, fallback to raw_data
+      let billingAddress = invoice.billing_address;
+      let shippingAddress = invoice.shipping_address;
+
+      // Fallback to raw_data if invoice fields are empty
+      if (!billingAddress || !this.hasAddress(billingAddress)) {
+        billingAddress = this.extractAddress(customer.billingAddress || rawData.billingAddress);
+      }
+      if (!shippingAddress || !this.hasAddress(shippingAddress)) {
+        shippingAddress = this.extractAddress(customer.shippingAddress || rawData.shippingAddress);
+      }
+
       return {
         id: invoice.id,
         printavoInvoiceId: invoice.id,
@@ -182,12 +194,12 @@ export const invoiceDetailService = {
         contact: {
           name: invoice.customer_name || contact.fullName || '',
           email: invoice.customer_email || contact.email || '',
-          phone: contact.phone || null,
+          phone: invoice.customer_phone || contact.phone || null,
           company: invoice.customer_company || customer.companyName || null,
         },
 
-        billingAddress: this.extractAddress(customer.billingAddress),
-        shippingAddress: this.extractAddress(customer.shippingAddress),
+        billingAddress: billingAddress,
+        shippingAddress: shippingAddress,
 
         invoiceDate: invoice.invoice_date || rawData.invoiceAt || rawData.createdAt,
         dueDate: invoice.due_date || rawData.paymentDueAt,

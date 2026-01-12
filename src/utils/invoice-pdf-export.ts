@@ -135,19 +135,19 @@ export function generateInvoicePDF(
   doc.setFontSize(9);
   let billToY = yPosition + 21;
 
+  // Always show company, email, and phone (with placeholder if missing)
   if (invoice.contact.company) {
     doc.text(invoice.contact.company, col1X, billToY);
     billToY += 5;
   }
-  if (invoice.contact.email) {
-    doc.text(invoice.contact.email, col1X, billToY);
-    billToY += 5;
-  }
-  if (invoice.contact.phone) {
-    doc.text(invoice.contact.phone, col1X, billToY);
-    billToY += 5;
-  }
 
+  doc.text(invoice.contact.email || '—', col1X, billToY);
+  billToY += 5;
+
+  doc.text(invoice.contact.phone || '—', col1X, billToY);
+  billToY += 5;
+
+  // Always show billing address section (with placeholder if missing)
   if (invoice.billingAddress && (invoice.billingAddress.line1 || invoice.billingAddress.city)) {
     const addressLines: string[] = [];
     if (invoice.billingAddress.line1) addressLines.push(invoice.billingAddress.line1);
@@ -163,6 +163,12 @@ export function generateInvoicePDF(
       doc.text(line, col1X, billToY);
       billToY += 5;
     });
+  } else {
+    // Show placeholder if no address available
+    doc.setTextColor(156, 163, 175);
+    doc.text('—', col1X, billToY);
+    doc.setTextColor(31, 41, 55);
+    billToY += 5;
   }
 
   doc.setFontSize(10);
