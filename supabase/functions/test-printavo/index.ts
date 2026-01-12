@@ -134,44 +134,70 @@ Deno.serve(async (req: Request) => {
     }
 
     const url = new URL(req.url);
+    const testType = url.searchParams.get('test') || 'customer';
     const customerId = url.searchParams.get('customer_id') || '8455168';
 
-    const testQuery = `
-      query TestCustomer($id: ID!) {
-        customer(id: $id) {
-          id
-          companyName
-          billingAddress {
-            address1
-            address2
-            city
-            state
-            postalCode
-            country
-          }
-          shippingAddress {
-            address1
-            address2
-            city
-            state
-            postalCode
-            country
-          }
-          contacts {
+    let testQuery = '';
+    let variables: any = {};
+
+    if (testType === 'invoice') {
+      testQuery = `
+        query TestInvoice {
+          invoices(first: 1) {
             edges {
               node {
                 id
-                fullName
-                firstName
-                lastName
-                email
-                phone
+                visualId
+                billingAddress {
+                  address1
+                  city
+                  state
+                  zip
+                }
               }
             }
           }
         }
-      }
-    `;
+      `;
+    } else {
+      testQuery = `
+        query TestCustomer($id: ID!) {
+          customer(id: $id) {
+            id
+            companyName
+            billingAddress {
+              address1
+              address2
+              city
+              state
+              postalCode
+              country
+            }
+            shippingAddress {
+              address1
+              address2
+              city
+              state
+              postalCode
+              country
+            }
+            contacts {
+              edges {
+                node {
+                  id
+                  fullName
+                  firstName
+                  lastName
+                  email
+                  phone
+                }
+              }
+            }
+          }
+        }
+      `;
+      variables = { id: customerId };
+    }
 
     const response = await fetch("https://www.printavo.com/api/v2", {
       method: "POST",
@@ -182,7 +208,7 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify({
         query: testQuery,
-        variables: { id: customerId }
+        variables
       }),
     });
 
@@ -206,20 +232,31 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const responseData: any = {
+      success: true,
+      testType,
+      fullResponse: result,
+      diagnostics,
+    };
+
+    if (testType === 'invoice') {
+      const invoice = result.data?.invoices?.edges?.[0]?.node;
+      responseData.message = 'Invoice address test';
+      responseData.invoice = invoice;
+      responseData.billingAddress = invoice?.billingAddress;
+    } else {
+      responseData.message = `Data for customer ID ${customerId}`;
+      responseData.customer = result.data?.customer || null;
+      responseData.billingAddress = result.data?.customer?.billingAddress || null;
+      responseData.shippingAddress = result.data?.customer?.shippingAddress || null;
+      responseData.contacts = result.data?.customer?.contacts?.edges?.map((e: any) => e.node) || [];
+      responseData.hasBillingAddress = !!(result.data?.customer?.billingAddress?.address1 || result.data?.customer?.billingAddress?.city);
+      responseData.hasShippingAddress = !!(result.data?.customer?.shippingAddress?.address1 || result.data?.customer?.shippingAddress?.city);
+      responseData.hasPhone = result.data?.customer?.contacts?.edges?.some((e: any) => e.node?.phone) || false;
+    }
+
     return new Response(
-      JSON.stringify({
-        success: true,
-        message: `Data for customer ID ${customerId}`,
-        customer: result.data?.customer || null,
-        billingAddress: result.data?.customer?.billingAddress || null,
-        shippingAddress: result.data?.customer?.shippingAddress || null,
-        contacts: result.data?.customer?.contacts?.edges?.map((e: any) => e.node) || [],
-        hasBillingAddress: !!(result.data?.customer?.billingAddress?.address1 || result.data?.customer?.billingAddress?.city),
-        hasShippingAddress: !!(result.data?.customer?.shippingAddress?.address1 || result.data?.customer?.shippingAddress?.city),
-        hasPhone: result.data?.customer?.contacts?.edges?.some((e: any) => e.node?.phone) || false,
-        fullResponse: result,
-        diagnostics,
-      }, null, 2),
+      JSON.stringify(responseData, null, 2),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
