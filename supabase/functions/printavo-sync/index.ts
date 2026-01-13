@@ -106,7 +106,7 @@ Deno.serve(async (req: Request) => {
               createdAt
               dueAt
               nickname
-              productionNotes
+              productionNote
               visualStatus
               customer {
                 id
@@ -210,7 +210,7 @@ Deno.serve(async (req: Request) => {
           due_date: invoice.dueAt,
           order_date: invoice.createdAt,
           nickname: invoice.nickname,
-          production_notes: invoice.productionNotes,
+          production_notes: invoice.productionNote,
           visual_status: invoice.visualStatus,
           customer_id: invoice.customer?.id,
           customer_name: invoice.customer?.companyName,
