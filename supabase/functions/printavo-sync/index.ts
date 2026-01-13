@@ -259,7 +259,6 @@ async function fetchCustomerDetails(
           address2
           city
           state
-          postalCode
           country
         }
         shippingAddress {
@@ -267,7 +266,6 @@ async function fetchCustomerDetails(
           address2
           city
           state
-          postalCode
           country
         }
         contacts {
@@ -368,14 +366,12 @@ async function findOrCreateCustomer(
       if (billingFromCustomer.address2) { updateData.billing_address_line2 = billingFromCustomer.address2; hasUpdates = true; }
       if (billingFromCustomer.city) { updateData.billing_city = billingFromCustomer.city; hasUpdates = true; }
       if (billingFromCustomer.state) { updateData.billing_state = billingFromCustomer.state; hasUpdates = true; }
-      if (billingFromCustomer.postalCode) { updateData.billing_zip = billingFromCustomer.postalCode; hasUpdates = true; }
       if (billingFromCustomer.country) { updateData.billing_country = billingFromCustomer.country; hasUpdates = true; }
     } else if (billingFromInvoice && (billingFromInvoice.address1 || billingFromInvoice.city)) {
       if (billingFromInvoice.address1) { updateData.billing_address_line1 = billingFromInvoice.address1; hasUpdates = true; }
       if (billingFromInvoice.address2) { updateData.billing_address_line2 = billingFromInvoice.address2; hasUpdates = true; }
       if (billingFromInvoice.city) { updateData.billing_city = billingFromInvoice.city; hasUpdates = true; }
       if (billingFromInvoice.state) { updateData.billing_state = billingFromInvoice.state; hasUpdates = true; }
-      if (billingFromInvoice.zip) { updateData.billing_zip = billingFromInvoice.zip; hasUpdates = true; }
       if (billingFromInvoice.country) { updateData.billing_country = billingFromInvoice.country; hasUpdates = true; }
     }
 
@@ -387,14 +383,12 @@ async function findOrCreateCustomer(
       if (shippingFromCustomer.address2) { updateData.shipping_address_line2 = shippingFromCustomer.address2; hasUpdates = true; }
       if (shippingFromCustomer.city) { updateData.shipping_city = shippingFromCustomer.city; hasUpdates = true; }
       if (shippingFromCustomer.state) { updateData.shipping_state = shippingFromCustomer.state; hasUpdates = true; }
-      if (shippingFromCustomer.postalCode) { updateData.shipping_zip = shippingFromCustomer.postalCode; hasUpdates = true; }
       if (shippingFromCustomer.country) { updateData.shipping_country = shippingFromCustomer.country; hasUpdates = true; }
     } else if (shippingFromInvoice && (shippingFromInvoice.address1 || shippingFromInvoice.city)) {
       if (shippingFromInvoice.address1) { updateData.shipping_address_line1 = shippingFromInvoice.address1; hasUpdates = true; }
       if (shippingFromInvoice.address2) { updateData.shipping_address_line2 = shippingFromInvoice.address2; hasUpdates = true; }
       if (shippingFromInvoice.city) { updateData.shipping_city = shippingFromInvoice.city; hasUpdates = true; }
       if (shippingFromInvoice.state) { updateData.shipping_state = shippingFromInvoice.state; hasUpdates = true; }
-      if (shippingFromInvoice.zip) { updateData.shipping_zip = shippingFromInvoice.zip; hasUpdates = true; }
       if (shippingFromInvoice.country) { updateData.shipping_country = shippingFromInvoice.country; hasUpdates = true; }
     }
 
@@ -444,14 +438,14 @@ async function findOrCreateCustomer(
     customerData.billing_address_line2 = billingFromCustomer.address2;
     customerData.billing_city = billingFromCustomer.city;
     customerData.billing_state = billingFromCustomer.state;
-    customerData.billing_zip = billingFromCustomer.postalCode;
+    customerData.billing_zip = null;
     customerData.billing_country = billingFromCustomer.country || 'USA';
   } else if (billingFromInvoice && (billingFromInvoice.address1 || billingFromInvoice.city)) {
     customerData.billing_address_line1 = billingFromInvoice.address1;
     customerData.billing_address_line2 = billingFromInvoice.address2;
     customerData.billing_city = billingFromInvoice.city;
     customerData.billing_state = billingFromInvoice.state;
-    customerData.billing_zip = billingFromInvoice.zip;
+    customerData.billing_zip = null;
     customerData.billing_country = billingFromInvoice.country || 'USA';
   }
 
@@ -463,14 +457,14 @@ async function findOrCreateCustomer(
     customerData.shipping_address_line2 = shippingFromCustomer.address2;
     customerData.shipping_city = shippingFromCustomer.city;
     customerData.shipping_state = shippingFromCustomer.state;
-    customerData.shipping_zip = shippingFromCustomer.postalCode;
+    customerData.shipping_zip = null;
     customerData.shipping_country = shippingFromCustomer.country || 'USA';
   } else if (shippingFromInvoice && (shippingFromInvoice.address1 || shippingFromInvoice.city)) {
     customerData.shipping_address_line1 = shippingFromInvoice.address1;
     customerData.shipping_address_line2 = shippingFromInvoice.address2;
     customerData.shipping_city = shippingFromInvoice.city;
     customerData.shipping_state = shippingFromInvoice.state;
-    customerData.shipping_zip = shippingFromInvoice.zip;
+    customerData.shipping_zip = null;
     customerData.shipping_country = shippingFromInvoice.country || 'USA';
   }
 
@@ -553,7 +547,6 @@ async function syncInvoices(
                   address2
                   city
                   state
-                  postalCode
                   country
                 }
                 shippingAddress {
@@ -561,7 +554,6 @@ async function syncInvoices(
                   address2
                   city
                   state
-                  postalCode
                   country
                 }
               }
@@ -571,7 +563,6 @@ async function syncInvoices(
               address2
               city
               state
-              zip
               country
             }
             shippingAddress {
@@ -579,7 +570,6 @@ async function syncInvoices(
               address2
               city
               state
-              zip
               country
             }
             lineItemGroups {
@@ -660,7 +650,6 @@ async function syncInvoices(
                   address2
                   city
                   state
-                  postalCode
                   country
                 }
                 shippingAddress {
@@ -668,7 +657,6 @@ async function syncInvoices(
                   address2
                   city
                   state
-                  postalCode
                   country
                 }
               }
@@ -678,7 +666,6 @@ async function syncInvoices(
               address2
               city
               state
-              zip
               country
             }
             shippingAddress {
@@ -686,7 +673,6 @@ async function syncInvoices(
               address2
               city
               state
-              zip
               country
             }
             lineItemGroups {
@@ -804,7 +790,7 @@ async function syncInvoices(
             line2: billingFromCustomer.address2 || '',
             city: billingFromCustomer.city || '',
             state: billingFromCustomer.state || '',
-            zip: billingFromCustomer.postalCode || '',
+            zip: '',
             country: billingFromCustomer.country || 'USA',
           };
         } else if (billingFromInvoice && (billingFromInvoice.address1 || billingFromInvoice.city)) {
@@ -813,7 +799,7 @@ async function syncInvoices(
             line2: billingFromInvoice.address2 || '',
             city: billingFromInvoice.city || '',
             state: billingFromInvoice.state || '',
-            zip: billingFromInvoice.zip || '',
+            zip: '',
             country: billingFromInvoice.country || 'USA',
           };
         }
@@ -828,7 +814,7 @@ async function syncInvoices(
             line2: shippingFromCustomer.address2 || '',
             city: shippingFromCustomer.city || '',
             state: shippingFromCustomer.state || '',
-            zip: shippingFromCustomer.postalCode || '',
+            zip: '',
             country: shippingFromCustomer.country || 'USA',
           };
         } else if (shippingFromInvoice && (shippingFromInvoice.address1 || shippingFromInvoice.city)) {
@@ -837,7 +823,7 @@ async function syncInvoices(
             line2: shippingFromInvoice.address2 || '',
             city: shippingFromInvoice.city || '',
             state: shippingFromInvoice.state || '',
-            zip: shippingFromInvoice.zip || '',
+            zip: '',
             country: shippingFromInvoice.country || 'USA',
           };
         }
@@ -1008,7 +994,7 @@ async function syncInvoices(
           line2: billingFromCustomer.address2 || '',
           city: billingFromCustomer.city || '',
           state: billingFromCustomer.state || '',
-          zip: billingFromCustomer.postalCode || '',
+          zip: '',
           country: billingFromCustomer.country || 'USA',
         };
       } else if (billingFromInvoice && (billingFromInvoice.address1 || billingFromInvoice.city)) {
@@ -1017,7 +1003,7 @@ async function syncInvoices(
           line2: billingFromInvoice.address2 || '',
           city: billingFromInvoice.city || '',
           state: billingFromInvoice.state || '',
-          zip: billingFromInvoice.zip || '',
+          zip: '',
           country: billingFromInvoice.country || 'USA',
         };
       }
@@ -1032,7 +1018,7 @@ async function syncInvoices(
           line2: shippingFromCustomer.address2 || '',
           city: shippingFromCustomer.city || '',
           state: shippingFromCustomer.state || '',
-          zip: shippingFromCustomer.postalCode || '',
+          zip: '',
           country: shippingFromCustomer.country || 'USA',
         };
       } else if (shippingFromInvoice && (shippingFromInvoice.address1 || shippingFromInvoice.city)) {
@@ -1041,7 +1027,7 @@ async function syncInvoices(
           line2: shippingFromInvoice.address2 || '',
           city: shippingFromInvoice.city || '',
           state: shippingFromInvoice.state || '',
-          zip: shippingFromInvoice.zip || '',
+          zip: '',
           country: shippingFromInvoice.country || 'USA',
         };
       }
