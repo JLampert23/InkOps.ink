@@ -214,7 +214,33 @@ export const invoiceDetailService = {
         customerPO: rawData.customerPurchaseOrder || rawData.poNumber || null,
 
         lineItems: (lineItems || []).map((item: any) => {
-          const parsed = this.parseLineItemDetails(item.description, item.raw_data);
+          // Use already-extracted data from database, fallback to parsing if not available
+          let style = item.extracted_style || '-';
+          let color = item.extracted_color || '-';
+          let sizes = '-';
+
+          // Format sizes from JSONB object
+          if (item.extracted_sizes && typeof item.extracted_sizes === 'object' && Object.keys(item.extracted_sizes).length > 0) {
+            const sizeOrder = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
+            const entries = Object.entries(item.extracted_sizes).sort((a: any, b: any) => {
+              const aIndex = sizeOrder.indexOf(a[0]);
+              const bIndex = sizeOrder.indexOf(b[0]);
+              if (aIndex === -1 && bIndex === -1) return a[0].localeCompare(b[0]);
+              if (aIndex === -1) return 1;
+              if (bIndex === -1) return -1;
+              return aIndex - bIndex;
+            });
+            sizes = entries.map(([size, qty]) => `${size}:${qty}`).join(', ');
+          }
+
+          // If extracted data is not available, fall back to parsing
+          if ((style === '-' || color === '-') && !item.extracted_style) {
+            const parsed = this.parseLineItemDetails(item.description, item.raw_data);
+            style = parsed.style;
+            color = parsed.color;
+            if (sizes === '-') sizes = parsed.sizes;
+          }
+
           return {
             id: item.id,
             description: item.description || 'Line Item',
@@ -222,9 +248,9 @@ export const invoiceDetailService = {
             unitPrice: parseFloat(item.unit_price) || 0,
             totalPrice: parseFloat(item.total_price) || 0,
             lineItemGroupId: item.line_item_group_id,
-            style: parsed.style,
-            color: parsed.color,
-            sizes: parsed.sizes,
+            style,
+            color,
+            sizes,
             rawData: item.raw_data,
           };
         }),
