@@ -121,7 +121,7 @@ export const billingService = {
 
         if (syncResult.syncId && syncResult.status === 'running') {
           console.log('Waiting for Printavo sync to complete...');
-          const success = await this.waitForPrintavoSync(syncResult.syncId, 90000);
+          const success = await this.waitForPrintavoSync(syncResult.syncId, 300000);
           if (success) {
             console.log('Printavo sync completed successfully');
           } else {
