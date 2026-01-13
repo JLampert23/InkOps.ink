@@ -14,6 +14,14 @@ const BATCH_SIZE = 50;
 const MAX_RETRIES = 3;
 const MIN_INVOICE_DATE = "2025-01-01T00:00:00Z";
 
+interface GarmentMetadata {
+  extractedStyle: string | null;
+  extractedColor: string | null;
+  extractedSizes: Record<string, number> | null;
+  extractedSKU: string | null;
+  extractedNotes: string | null;
+}
+
 interface GraphQLRequest {
   query: string;
   variables?: Record<string, unknown>;
@@ -92,6 +100,7 @@ interface Invoice {
           edges: Array<{
             node: {
               id: string;
+              name?: string;
               description?: string;
               items?: number;
               price?: number;
@@ -140,6 +149,130 @@ interface PaymentsResponse {
 
 async function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseGarmentMetadata(description: string | null | undefined, name: string | null | undefined): GarmentMetadata {
+  if (!description) {
+    return {
+      extractedStyle: null,
+      extractedColor: null,
+      extractedSizes: null,
+      extractedSKU: null,
+      extractedNotes: null,
+    };
+  }
+
+  const text = description;
+  let extractedStyle: string | null = null;
+  let extractedColor: string | null = null;
+  let extractedSizes: Record<string, number> | null = null;
+  let extractedSKU: string | null = null;
+  let remainingText = text;
+
+  // Extract SKU patterns: "SKU: 12345", "Item #BC3001", "SKU#12345"
+  const skuPatterns = [
+    /SKU[:\s#]+([A-Z0-9-]+)/i,
+    /Item\s*#\s*([A-Z0-9-]+)/i,
+    /Product\s*#\s*([A-Z0-9-]+)/i,
+  ];
+  for (const pattern of skuPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      extractedSKU = match[1].trim();
+      remainingText = remainingText.replace(match[0], '');
+      break;
+    }
+  }
+
+  // Extract style numbers - look for common garment codes
+  const stylePatterns = [
+    // Brand + Model: "Gildan 5000", "Bella Canvas 3001"
+    /(Gildan|Bella\s*Canvas|Next\s*Level|Hanes|Port\s*Authority|Comfort\s*Colors)\s+([A-Z0-9]+)/i,
+    // Standalone codes: "BC3001", "NL6210", "18000", "5000"
+    /\b([A-Z]{2,}\d{3,})\b/,
+    /\b(\d{4,5})\b/,
+    // Codes with hyphens: "BC-3001", "NL-6210"
+    /\b([A-Z]{2,}-\d{3,})\b/,
+  ];
+  for (const pattern of stylePatterns) {
+    const match = remainingText.match(pattern);
+    if (match) {
+      extractedStyle = match[0].trim();
+      remainingText = remainingText.replace(match[0], '');
+      break;
+    }
+  }
+
+  // Extract colors - common apparel colors
+  const colorPatterns = [
+    // Multi-word colors first
+    /\b(Heather\s+(?:Navy|Grey|Gray|Blue|Red|Green|Black|Charcoal|Maroon|Purple|Cardinal))\b/i,
+    /\b(Sport\s+(?:Grey|Gray))\b/i,
+    /\b(Dark\s+(?:Chocolate|Heather|Grey|Gray|Green|Blue))\b/i,
+    /\b(Military\s+Green)\b/i,
+    /\b(Vintage\s+(?:Black|Navy|Red))\b/i,
+    /\b(Light\s+(?:Blue|Pink|Grey|Gray))\b/i,
+    // Single-word colors
+    /\b(Black|White|Navy|Red|Royal|Grey|Gray|Green|Blue|Pink|Purple|Orange|Yellow|Maroon|Cardinal|Charcoal|Tan|Sand|Olive|Kelly|Sapphire|Gold|Silver)\b/i,
+  ];
+  for (const pattern of colorPatterns) {
+    const match = remainingText.match(pattern);
+    if (match) {
+      extractedColor = match[1].trim();
+      remainingText = remainingText.replace(match[0], '');
+      break;
+    }
+  }
+
+  // Extract size breakdowns - various formats
+  const sizeBreakdowns: Record<string, number> = {};
+  const sizePatterns = [
+    // Format: S-5, M-12, L-8, XL-3
+    /\b([A-Z]{1,3})-(\d+)\b/g,
+    // Format: S(5), M(12), L(8)
+    /\b([A-Z]{1,3})\((\d+)\)/g,
+    // Format: Small 5, Medium 12, Large 8
+    /\b(Small|Medium|Large|XSmall|XLarge|XXLarge|XXXLarge)\s+(\d+)\b/gi,
+  ];
+
+  for (const pattern of sizePatterns) {
+    const matches = [...remainingText.matchAll(pattern)];
+    for (const match of matches) {
+      const size = match[1].trim().toUpperCase();
+      const quantity = parseInt(match[2]);
+
+      // Normalize size names
+      const normalizedSize = size
+        .replace(/XSMALL/i, 'XS')
+        .replace(/SMALL/i, 'S')
+        .replace(/MEDIUM/i, 'M')
+        .replace(/LARGE/i, 'L')
+        .replace(/XLARGE/i, 'XL')
+        .replace(/XXLARGE/i, '2XL')
+        .replace(/XXXLARGE/i, '3XL');
+
+      sizeBreakdowns[normalizedSize] = quantity;
+      remainingText = remainingText.replace(match[0], '');
+    }
+  }
+
+  if (Object.keys(sizeBreakdowns).length > 0) {
+    extractedSizes = sizeBreakdowns;
+  }
+
+  // Clean up remaining text for notes
+  const extractedNotes = remainingText
+    .replace(/\s+/g, ' ')
+    .replace(/[,;]+\s*/g, ', ')
+    .trim() || null;
+
+  return {
+    extractedStyle,
+    extractedColor,
+    extractedSizes,
+    extractedSKU,
+    extractedNotes,
+  };
 }
 
 async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
@@ -596,6 +729,7 @@ async function syncInvoices(
                     edges {
                       node {
                         id
+                        name
                         description
                         items
                         price
@@ -699,6 +833,7 @@ async function syncInvoices(
                     edges {
                       node {
                         id
+                        name
                         description
                         items
                         price
@@ -924,6 +1059,8 @@ async function syncInvoices(
             if (group.lineItems?.edges) {
               for (const itemEdge of group.lineItems.edges) {
                 const lineItem = itemEdge.node;
+                const garmentData = parseGarmentMetadata(lineItem.description, lineItem.name);
+
                 lineItemsBatchBuffer.push({
                   id: lineItem.id,
                   invoice_id: invoice.id,
@@ -932,6 +1069,12 @@ async function syncInvoices(
                   quantity: lineItem.items || 0,
                   unit_price: lineItem.price || 0,
                   total_price: (lineItem.items || 0) * (lineItem.price || 0),
+                  extracted_style: garmentData.extractedStyle,
+                  extracted_color: garmentData.extractedColor,
+                  extracted_sizes: garmentData.extractedSizes,
+                  extracted_sku: garmentData.extractedSKU,
+                  extraction_notes: garmentData.extractedNotes,
+                  parsed_at: new Date().toISOString(),
                   updated_at: new Date().toISOString(),
                   raw_data: lineItem,
                 });
@@ -1128,6 +1271,8 @@ async function syncInvoices(
           if (group.lineItems?.edges) {
             for (const itemEdge of group.lineItems.edges) {
               const lineItem = itemEdge.node;
+              const garmentData = parseGarmentMetadata(lineItem.description, lineItem.name);
+
               lineItemsBatchBuffer.push({
                 id: lineItem.id,
                 invoice_id: invoice.id,
@@ -1136,6 +1281,12 @@ async function syncInvoices(
                 quantity: lineItem.items || 0,
                 unit_price: lineItem.price || 0,
                 total_price: (lineItem.items || 0) * (lineItem.price || 0),
+                extracted_style: garmentData.extractedStyle,
+                extracted_color: garmentData.extractedColor,
+                extracted_sizes: garmentData.extractedSizes,
+                extracted_sku: garmentData.extractedSKU,
+                extraction_notes: garmentData.extractedNotes,
+                parsed_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
                 raw_data: lineItem,
               });
