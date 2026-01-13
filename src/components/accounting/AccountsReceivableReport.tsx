@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Filter, TrendingUp, DollarSign, AlertCircle, Loader2, FileText, FileSpreadsheet, Settings } from 'lucide-react';
+import { Filter, TrendingUp, DollarSign, AlertCircle, Loader2, FileText, FileSpreadsheet, Settings, Package, Palette } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format } from 'date-fns';
 import { InvoiceDetail } from '../billing/InvoiceDetail';
 import { exportARToPDF, exportARToCSV, downloadCSV, getDefaultARColumns } from '../../utils/ar-export';
+import { garmentAggregationService, GarmentSummary } from '../../services/garment-aggregation-service';
 
 interface Invoice {
   invoice_id: string;
@@ -38,6 +39,7 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
   const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState('Company Name');
   const [hasNoEligibleStatuses, setHasNoEligibleStatuses] = useState(false);
+  const [garmentSummaries, setGarmentSummaries] = useState<Map<string, GarmentSummary>>(new Map());
 
   useEffect(() => {
     loadData();
@@ -117,6 +119,10 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
 
       const uniqueCustomers = Array.from(new Set(processedInvoices.map(inv => inv.customer_name)));
       setCustomers(uniqueCustomers.sort());
+
+      const invoiceIds = processedInvoices.map(inv => inv.invoice_id);
+      const summaries = await garmentAggregationService.getMultipleInvoiceGarmentSummaries(invoiceIds);
+      setGarmentSummaries(summaries);
     } catch (error) {
       console.error('Error loading AR data:', error);
     } finally {
@@ -355,6 +361,7 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice #</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Garments</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice Date</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total Amount</th>
@@ -376,6 +383,39 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {invoice.customer_name}
+                  </td>
+                  <td className="px-6 py-4">
+                    {(() => {
+                      const summary = garmentSummaries.get(invoice.invoice_id);
+                      if (!summary || (summary.styles.length === 0 && summary.colors.length === 0)) {
+                        return <span className="text-xs text-gray-400">-</span>;
+                      }
+                      return (
+                        <div className="text-xs space-y-1">
+                          {summary.topStyle && (
+                            <div className="flex items-center gap-1 text-gray-700">
+                              <Package className="w-3 h-3 text-blue-600" />
+                              <span className="font-medium">{summary.topStyle}</span>
+                              {summary.styles.length > 1 && (
+                                <span className="text-gray-400">+{summary.styles.length - 1}</span>
+                              )}
+                            </div>
+                          )}
+                          {summary.topColor && (
+                            <div className="flex items-center gap-1 text-gray-700">
+                              <Palette className="w-3 h-3 text-purple-600" />
+                              <span>{summary.topColor}</span>
+                              {summary.colors.length > 1 && (
+                                <span className="text-gray-400">+{summary.colors.length - 1}</span>
+                              )}
+                            </div>
+                          )}
+                          {summary.totalItems > 0 && (
+                            <div className="text-gray-500">{summary.totalItems} items</div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                     {format(new Date(invoice.invoice_date), 'MMM dd, yyyy')}
