@@ -9,7 +9,7 @@ const corsHeaders = {
 
 const PRINTAVO_API_URL = "https://www.printavo.com/api/v2";
 const DELAY_BETWEEN_REQUESTS = 50;
-const PAGE_SIZE = 7;
+const PAGE_SIZE = 3; // Reduced from 7 to stay under GraphQL complexity limit with sizes field
 const BATCH_SIZE = 50;
 const MAX_RETRIES = 3;
 const MIN_INVOICE_DATE = "2025-01-01T00:00:00Z";
@@ -657,7 +657,7 @@ async function syncInvoices(
   const customerCache = new Map<string, { id: string | null; details: any | null }>();
 
   const invoicesQuery = `
-    query GetInvoices($after: String, $first: Int = 7, $paymentStatus: OrderPaymentStatus) {
+    query GetInvoices($after: String, $first: Int = 3, $paymentStatus: OrderPaymentStatus) {
       invoices(after: $after, first: $first, paymentStatus: $paymentStatus) {
         edges {
           node {
@@ -765,7 +765,7 @@ async function syncInvoices(
   `;
 
   const recentInvoicesQuery = `
-    query GetRecentInvoices($after: String, $first: Int = 7) {
+    query GetRecentInvoices($after: String, $first: Int = 3) {
       invoices(after: $after, first: $first, sortDescending: true) {
         edges {
           node {
@@ -1376,7 +1376,7 @@ async function syncPayments(
   printavoToken: string
 ) {
   const paymentsQuery = `
-    query GetPayments($after: String, $first: Int = 7) {
+    query GetPayments($after: String, $first: Int = 3) {
       transactions(after: $after, first: $first) {
         edges {
           node {
