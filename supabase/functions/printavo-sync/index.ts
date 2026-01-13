@@ -12,7 +12,6 @@ const DELAY_BETWEEN_REQUESTS = 50;
 const PAGE_SIZE = 3;
 const BATCH_SIZE = 50;
 const MAX_RETRIES = 3;
-const MIN_INVOICE_DATE = "2025-01-01T00:00:00Z";
 
 interface GarmentMetadata {
   extractedStyle: string | null;
@@ -790,10 +789,22 @@ async function syncInvoices(
 
     const invoices = result.data.invoices.edges.map((edge) => edge.node);
 
+    console.log(`Page ${pageCount + 1}: Retrieved ${invoices.length} invoices from API`);
+    if (invoices.length > 0) {
+      console.log('Sample statuses from this page:', invoices.slice(0, 5).map(inv => ({
+        id: inv.visualId,
+        status: inv.status?.name,
+        statusUpper: inv.status?.name?.toUpperCase()
+      })));
+    }
+
     const filteredInvoices = invoices.filter(invoice => {
-      const statusMatch = invoice.status?.name && ALLOWED_STATUSES.includes(invoice.status.name.toUpperCase());
-      const dateMatch = invoice.createdAt && new Date(invoice.createdAt) >= new Date(MIN_INVOICE_DATE);
-      return statusMatch && dateMatch;
+      const statusName = invoice.status?.name;
+      const isMatch = statusName && ALLOWED_STATUSES.includes(statusName.toUpperCase());
+      if (statusName && !isMatch) {
+        console.log(`Rejected invoice ${invoice.visualId}: status "${statusName}" (uppercase: "${statusName.toUpperCase()}") not in allowed list`);
+      }
+      return isMatch;
     });
 
     for (const invoice of filteredInvoices) {
