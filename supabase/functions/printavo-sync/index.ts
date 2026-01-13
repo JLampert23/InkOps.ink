@@ -765,7 +765,7 @@ async function syncInvoices(
     }
   };
 
-  const ALLOWED_STATUSES = ['Billing Test Status', 'Sent to Accounting'];
+  const ALLOWED_STATUSES = ['BILLING TEST STATUS', 'SENT TO ACCOUNTING'];
 
   console.log(`Syncing invoices with statuses: ${ALLOWED_STATUSES.join(', ')}...`);
 
@@ -791,7 +791,7 @@ async function syncInvoices(
     const invoices = result.data.invoices.edges.map((edge) => edge.node);
 
     const filteredInvoices = invoices.filter(invoice => {
-      const statusMatch = invoice.status?.name && ALLOWED_STATUSES.includes(invoice.status.name);
+      const statusMatch = invoice.status?.name && ALLOWED_STATUSES.includes(invoice.status.name.toUpperCase());
       const dateMatch = invoice.createdAt && new Date(invoice.createdAt) >= new Date(MIN_INVOICE_DATE);
       return statusMatch && dateMatch;
     });
