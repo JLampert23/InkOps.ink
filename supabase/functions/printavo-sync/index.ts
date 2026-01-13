@@ -118,7 +118,6 @@ Deno.serve(async (req: Request) => {
                   address2
                   city
                   state
-                  zip
                   country
                 }
               }
