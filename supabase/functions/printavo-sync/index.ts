@@ -105,7 +105,6 @@ Deno.serve(async (req: Request) => {
               amountPaid
               createdAt
               dueAt
-              orderedAt
               nickname
               productionNotes
               visualStatus
@@ -210,7 +209,7 @@ Deno.serve(async (req: Request) => {
           amount_paid: parseFloat(invoice.amountPaid) || 0,
           created_at: invoice.createdAt,
           due_date: invoice.dueAt,
-          order_date: invoice.orderedAt,
+          order_date: invoice.createdAt,
           nickname: invoice.nickname,
           production_notes: invoice.productionNotes,
           visual_status: invoice.visualStatus,
