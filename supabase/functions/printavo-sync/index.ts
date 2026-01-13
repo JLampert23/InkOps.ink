@@ -300,7 +300,8 @@ async function findOrCreateCustomer(
   supabase: any,
   invoice: Invoice,
   printavoEmail: string,
-  printavoToken: string
+  printavoToken: string,
+  customerCache: Map<string, { id: string | null; details: any | null }>
 ): Promise<{ id: string | null; details: any | null }> {
   const printavoCustomerId = invoice.contact?.customer?.id;
 
@@ -309,11 +310,18 @@ async function findOrCreateCustomer(
     return { id: null, details: null };
   }
 
+  if (customerCache.has(printavoCustomerId)) {
+    console.log('Using cached customer data for ID', printavoCustomerId);
+    return customerCache.get(printavoCustomerId)!;
+  }
+
   const customerDetails = await fetchCustomerDetails(printavoCustomerId, printavoEmail, printavoToken);
 
   if (!customerDetails) {
     console.log('Failed to fetch customer details for ID', printavoCustomerId);
-    return { id: null, details: null };
+    const result = { id: null, details: null };
+    customerCache.set(printavoCustomerId, result);
+    return result;
   }
 
   console.log('Fetched customer details from Printavo:', {
@@ -411,7 +419,9 @@ async function findOrCreateCustomer(
       console.log('Updated existing customer:', customerName, 'with new data');
     }
 
-    return { id: existingCustomer.id, details: customerDetails };
+    const result = { id: existingCustomer.id, details: customerDetails };
+    customerCache.set(printavoCustomerId, result);
+    return result;
   }
 
   const contactName = customerDetails?.primaryContact
@@ -476,11 +486,15 @@ async function findOrCreateCustomer(
 
   if (error) {
     console.error('Error creating customer:', error);
-    return { id: null, details: null };
+    const result = { id: null, details: null };
+    customerCache.set(printavoCustomerId, result);
+    return result;
   }
 
   console.log('Created new customer:', customerName, 'with ID:', newCustomer.id);
-  return { id: newCustomer.id, details: customerDetails };
+  const result = { id: newCustomer.id, details: customerDetails };
+  customerCache.set(printavoCustomerId, result);
+  return result;
 }
 
 async function syncInvoices(
@@ -505,6 +519,8 @@ async function syncInvoices(
 
   const billingEligibleStatuses = (billingStatuses || []).map(s => s.name);
   console.log('Billing eligible statuses:', billingEligibleStatuses);
+
+  const customerCache = new Map<string, { id: string | null; details: any | null }>();
 
   const invoicesQuery = `
     query GetInvoices($after: String, $first: Int = 7, $paymentStatus: OrderPaymentStatus) {
@@ -766,7 +782,7 @@ async function syncInvoices(
           }, null, 2));
         }
 
-        const { id: customerId, details: customerDetails } = await findOrCreateCustomer(supabase, invoice, printavoEmail, printavoToken);
+        const { id: customerId, details: customerDetails } = await findOrCreateCustomer(supabase, invoice, printavoEmail, printavoToken, customerCache);
 
         const amountOutstanding = invoice.amountOutstanding || 0;
         let statusStage = 'billing_queue';
@@ -970,7 +986,7 @@ async function syncInvoices(
     });
 
     for (const invoice of recentInvoices) {
-      const { id: customerId, details: customerDetails } = await findOrCreateCustomer(supabase, invoice, printavoEmail, printavoToken);
+      const { id: customerId, details: customerDetails } = await findOrCreateCustomer(supabase, invoice, printavoEmail, printavoToken, customerCache);
 
       const amountOutstanding = invoice.amountOutstanding || 0;
       let statusStage = 'billing_queue';
