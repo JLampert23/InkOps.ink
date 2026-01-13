@@ -213,20 +213,58 @@ Deno.serve(async (req: Request) => {
     });
 
     diagnostics.printavoResponseStatus = response.status;
+
+    // Handle rate limiting (429)
+    if (response.status === 429) {
+      const retryAfter = response.headers.get('Retry-After') || 'unknown';
+      diagnostics.retryAfter = retryAfter;
+
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Rate limit exceeded",
+          printavoError: `Printavo API rate limit exceeded. Please wait before trying again.${retryAfter !== 'unknown' ? ` Retry after: ${retryAfter} seconds` : ''}`,
+          diagnostics,
+        }),
+        {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     const result = await response.json();
     diagnostics.printavoResponseHasErrors = !!result.errors;
 
     if (!response.ok || result.errors) {
+      let errorMessage = "Unknown error";
+
+      // Try to extract a meaningful error message
+      if (result.errors && Array.isArray(result.errors) && result.errors.length > 0) {
+        errorMessage = result.errors[0].message;
+      } else if (result.error) {
+        errorMessage = result.error;
+      } else if (result.message) {
+        errorMessage = result.message;
+      }
+
+      // Map HTTP status codes to friendly messages
+      if (response.status === 401) {
+        errorMessage = "Invalid Printavo credentials. Please check your username and API token.";
+      } else if (response.status === 403) {
+        errorMessage = "Access denied. Please check your Printavo API token permissions.";
+      }
+
       return new Response(
         JSON.stringify({
           success: false,
           error: "Printavo API authentication failed",
-          printavoError: result.errors?.[0]?.message || "Unknown error",
+          printavoError: errorMessage,
           fullErrors: result.errors,
           diagnostics,
         }),
         {
-          status: 400,
+          status: response.status === 401 || response.status === 403 ? response.status : 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );

@@ -2047,10 +2047,26 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
                     )}
 
                     {testResult && (
-                      <div className={`p-4 rounded-lg border ${testResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                      <div className={`p-4 rounded-lg border ${
+                        testResult.success
+                          ? 'bg-green-50 border-green-200'
+                          : testResult.error === 'Rate limit exceeded'
+                            ? 'bg-yellow-50 border-yellow-200'
+                            : 'bg-red-50 border-red-200'
+                      }`}>
                         <div className="space-y-3">
-                          <div className={`font-medium text-lg ${testResult.success ? 'text-green-800' : 'text-red-800'}`}>
-                            {testResult.success ? '✓ Connection Successful!' : '✗ Connection Failed'}
+                          <div className={`font-medium text-lg ${
+                            testResult.success
+                              ? 'text-green-800'
+                              : testResult.error === 'Rate limit exceeded'
+                                ? 'text-yellow-800'
+                                : 'text-red-800'
+                          }`}>
+                            {testResult.success
+                              ? '✓ Connection Successful!'
+                              : testResult.error === 'Rate limit exceeded'
+                                ? '⚠ Rate Limit Exceeded'
+                                : '✗ Connection Failed'}
                           </div>
 
                           {testResult.success && testResult.company && (
@@ -2059,13 +2075,25 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
                             </div>
                           )}
 
-                          {testResult.error && (
+                          {testResult.error === 'Rate limit exceeded' && (
+                            <div className="text-sm text-yellow-800 space-y-2">
+                              <p className="font-medium">
+                                {testResult.printavoError || 'Too many requests to Printavo API. Please wait a moment before testing again.'}
+                              </p>
+                              <p className="text-xs">
+                                Your credentials may be correct, but Printavo is temporarily limiting API requests.
+                                Wait 30-60 seconds and try again.
+                              </p>
+                            </div>
+                          )}
+
+                          {testResult.error && testResult.error !== 'Rate limit exceeded' && (
                             <div className="text-sm text-red-700 font-medium">
                               Error: {testResult.error}
                             </div>
                           )}
 
-                          {testResult.printavoError && (
+                          {testResult.printavoError && testResult.error !== 'Rate limit exceeded' && (
                             <div className="text-sm text-red-700 font-medium">
                               Printavo Error: {testResult.printavoError}
                             </div>
