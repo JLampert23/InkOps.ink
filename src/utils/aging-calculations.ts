@@ -176,13 +176,13 @@ export function calculateCustomerAging(invoices: Invoice[]): CustomerAging[] {
     customer.invoiceCount++;
     customer.oldestInvoiceAge = Math.max(customer.oldestInvoiceAge, daysPastDue);
 
-    if (daysPastDue <= 30) {
+    if (daysPastDue <= 0) {
       customer.current += balance;
-    } else if (daysPastDue <= 60) {
+    } else if (daysPastDue <= 30) {
       customer.days1to30 += balance;
-    } else if (daysPastDue <= 90) {
+    } else if (daysPastDue <= 60) {
       customer.days31to60 += balance;
-    } else if (daysPastDue <= 120) {
+    } else if (daysPastDue <= 90) {
       customer.days61to90 += balance;
     } else {
       customer.days90Plus += balance;
