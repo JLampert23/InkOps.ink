@@ -9,7 +9,7 @@ const corsHeaders = {
 
 const PRINTAVO_API_URL = "https://www.printavo.com/api/v2";
 const DELAY_BETWEEN_REQUESTS = 50;
-const PAGE_SIZE = 3; // Reduced from 7 to stay under GraphQL complexity limit with sizes field
+const PAGE_SIZE = 3;
 const BATCH_SIZE = 50;
 const MAX_RETRIES = 3;
 const MIN_INVOICE_DATE = "2025-01-01T00:00:00Z";
@@ -170,7 +170,6 @@ function parseGarmentMetadata(description: string | null | undefined, name: stri
   let extractedSKU: string | null = null;
   let remainingText = text;
 
-  // Extract SKU patterns: "SKU: 12345", "Item #BC3001", "SKU#12345"
   const skuPatterns = [
     /SKU[:\s#]+([A-Z0-9-]+)/i,
     /Item\s*#\s*([A-Z0-9-]+)/i,
@@ -185,14 +184,10 @@ function parseGarmentMetadata(description: string | null | undefined, name: stri
     }
   }
 
-  // Extract style numbers - look for common garment codes
   const stylePatterns = [
-    // Brand + Model: "Gildan 5000", "Bella Canvas 3001"
     /(Gildan|Bella\s*Canvas|Next\s*Level|Hanes|Port\s*Authority|Comfort\s*Colors)\s+([A-Z0-9]+)/i,
-    // Standalone codes: "BC3001", "NL6210", "18000", "5000"
     /\b([A-Z]{2,}\d{3,})\b/,
     /\b(\d{4,5})\b/,
-    // Codes with hyphens: "BC-3001", "NL-6210"
     /\b([A-Z]{2,}-\d{3,})\b/,
   ];
   for (const pattern of stylePatterns) {
@@ -204,16 +199,13 @@ function parseGarmentMetadata(description: string | null | undefined, name: stri
     }
   }
 
-  // Extract colors - common apparel colors
   const colorPatterns = [
-    // Multi-word colors first
     /\b(Heather\s+(?:Navy|Grey|Gray|Blue|Red|Green|Black|Charcoal|Maroon|Purple|Cardinal))\b/i,
     /\b(Sport\s+(?:Grey|Gray))\b/i,
     /\b(Dark\s+(?:Chocolate|Heather|Grey|Gray|Green|Blue))\b/i,
     /\b(Military\s+Green)\b/i,
     /\b(Vintage\s+(?:Black|Navy|Red))\b/i,
     /\b(Light\s+(?:Blue|Pink|Grey|Gray))\b/i,
-    // Single-word colors
     /\b(Black|White|Navy|Red|Royal|Grey|Gray|Green|Blue|Pink|Purple|Orange|Yellow|Maroon|Cardinal|Charcoal|Tan|Sand|Olive|Kelly|Sapphire|Gold|Silver)\b/i,
   ];
   for (const pattern of colorPatterns) {
@@ -225,14 +217,10 @@ function parseGarmentMetadata(description: string | null | undefined, name: stri
     }
   }
 
-  // Extract size breakdowns - various formats
   const sizeBreakdowns: Record<string, number> = {};
   const sizePatterns = [
-    // Format: S-5, M-12, L-8, XL-3
     /\b([A-Z]{1,3})-(\d+)\b/g,
-    // Format: S(5), M(12), L(8)
     /\b([A-Z]{1,3})\((\d+)\)/g,
-    // Format: Small 5, Medium 12, Large 8
     /\b(Small|Medium|Large|XSmall|XLarge|XXLarge|XXXLarge)\s+(\d+)\b/gi,
   ];
 
@@ -242,7 +230,6 @@ function parseGarmentMetadata(description: string | null | undefined, name: stri
       const size = match[1].trim().toUpperCase();
       const quantity = parseInt(match[2]);
 
-      // Normalize size names
       const normalizedSize = size
         .replace(/XSMALL/i, 'XS')
         .replace(/SMALL/i, 'S')
@@ -261,7 +248,6 @@ function parseGarmentMetadata(description: string | null | undefined, name: stri
     extractedSizes = sizeBreakdowns;
   }
 
-  // Clean up remaining text for notes
   const extractedNotes = remainingText
     .replace(/\s+/g, ' ')
     .replace(/[,;]+\s*/g, ', ')
@@ -656,114 +642,6 @@ async function syncInvoices(
 
   const customerCache = new Map<string, { id: string | null; details: any | null }>();
 
-  const invoicesQuery = `
-    query GetInvoices($after: String, $first: Int = 3, $paymentStatus: OrderPaymentStatus) {
-      invoices(after: $after, first: $first, paymentStatus: $paymentStatus) {
-        edges {
-          node {
-            id
-            visualId
-            status {
-              name
-            }
-            createdAt
-            dueAt
-            total
-            subtotal
-            salesTaxAmount
-            paidInFull
-            amountPaid
-            amountOutstanding
-            timestamps {
-              createdAt
-              updatedAt
-            }
-            contact {
-              id
-              fullName
-              email
-              phone
-              customer {
-                id
-                companyName
-                primaryContact {
-                  firstName
-                  lastName
-                  email
-                  phone
-                }
-                billingAddress {
-                  address1
-                  address2
-                  city
-                  state
-                  country
-                }
-                shippingAddress {
-                  address1
-                  address2
-                  city
-                  state
-                  country
-                }
-              }
-            }
-            billingAddress {
-              address1
-              address2
-              city
-              state
-              country
-            }
-            shippingAddress {
-              address1
-              address2
-              city
-              state
-              country
-            }
-            lineItemGroups {
-              edges {
-                node {
-                  id
-                  lineItems {
-                    edges {
-                      node {
-                        id
-                        description
-                        items
-                        price
-                        color
-                        sizes {
-                          count
-                          size
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-            fees {
-              edges {
-                node {
-                  id
-                  description
-                  amount
-                  taxable
-                }
-              }
-            }
-          }
-        }
-        pageInfo {
-          hasNextPage
-          endCursor
-        }
-      }
-    }
-  `;
-
   const recentInvoicesQuery = `
     query GetRecentInvoices($after: String, $first: Int = 3) {
       invoices(after: $after, first: $first, sortDescending: true) {
@@ -887,35 +765,38 @@ async function syncInvoices(
     }
   };
 
-  console.log(`Syncing unpaid and partially paid invoices...`);
-  for (const paymentStatus of ['UNPAID', 'PARTIAL_PAYMENT']) {
-    let hasNextPage = true;
-    let after: string | null = null;
-    let pageCount = 0;
+  const ALLOWED_STATUSES = ['Billing Test Status', 'Sent to Accounting'];
 
-    console.log(`Syncing ${paymentStatus} invoices...`);
+  console.log(`Syncing invoices with statuses: ${ALLOWED_STATUSES.join(', ')}...`);
 
-    while (hasNextPage) {
-      await delay(DELAY_BETWEEN_REQUESTS);
+  let hasNextPage = true;
+  let after: string | null = null;
+  let pageCount = 0;
 
-      const result: InvoicesResponse = await fetchFromPrintavo(
-        invoicesQuery,
-        { after, first: PAGE_SIZE, paymentStatus },
-        printavoEmail,
-        printavoToken
-      );
+  while (hasNextPage) {
+    await delay(DELAY_BETWEEN_REQUESTS);
 
-      if (!result.data?.invoices?.edges) {
-        console.log('No invoices data returned from API');
-        break;
-      }
+    const result: InvoicesResponse = await fetchFromPrintavo(
+      recentInvoicesQuery,
+      { after, first: PAGE_SIZE },
+      printavoEmail,
+      printavoToken
+    );
 
-      const invoices = result.data.invoices.edges.map((edge) => edge.node);
-      const filteredInvoices = invoices.filter(invoice =>
-        invoice.createdAt && new Date(invoice.createdAt) >= new Date(MIN_INVOICE_DATE)
-      );
+    if (!result.data?.invoices?.edges) {
+      console.log('No invoices data returned from API');
+      break;
+    }
 
-      for (const invoice of filteredInvoices) {
+    const invoices = result.data.invoices.edges.map((edge) => edge.node);
+
+    const filteredInvoices = invoices.filter(invoice => {
+      const statusMatch = invoice.status?.name && ALLOWED_STATUSES.includes(invoice.status.name);
+      const dateMatch = invoice.createdAt && new Date(invoice.createdAt) >= new Date(MIN_INVOICE_DATE);
+      return statusMatch && dateMatch;
+    });
+
+    for (const invoice of filteredInvoices) {
         if (filteredInvoices.indexOf(invoice) === 0) {
           console.log('Sample invoice structure:', JSON.stringify({
             id: invoice.id,
@@ -1070,16 +951,13 @@ async function syncInvoices(
                 const lineItem = itemEdge.node;
                 const garmentData = parseGarmentMetadata(lineItem.description, null);
 
-                // Use the actual color field from Printavo if available
                 const extractedColor = lineItem.color || garmentData.extractedColor;
 
-                // Parse the sizes array from Printavo
                 let extractedSizes = garmentData.extractedSizes;
                 if (lineItem.sizes && Array.isArray(lineItem.sizes) && lineItem.sizes.length > 0) {
                   const parsedSizes: Record<string, number> = {};
                   for (const sizeItem of lineItem.sizes) {
                     if (sizeItem && sizeItem.count && sizeItem.count > 0) {
-                      // Convert size enum to friendly name: "size_xs" -> "XS", "size_yxs" -> "YXS"
                       const sizeName = sizeItem.size
                         .replace(/^size_/, '')
                         .replace(/^y/, 'Y')
@@ -1120,251 +998,17 @@ async function syncInvoices(
       }
 
       totalInvoices += filteredInvoices.length;
-      console.log(`${paymentStatus} - Page ${pageCount + 1}: Found ${invoices.length} invoices, filtered to ${filteredInvoices.length} after ${MIN_INVOICE_DATE}`);
+      console.log(`Page ${pageCount + 1}: Found ${invoices.length} invoices, ${filteredInvoices.length} matched allowed statuses`);
 
       hasNextPage = result.data.invoices.pageInfo.hasNextPage;
       after = result.data.invoices.pageInfo.endCursor;
       pageCount++;
 
-      if (invoices.length === 0) {
+      if (filteredInvoices.length === 0 && invoices.length === 0) {
+        console.log('No more invoices to process, stopping sync');
         break;
       }
     }
-  }
-
-  await flushBatch();
-
-  console.log(`Syncing all invoices from ${MIN_INVOICE_DATE} forward...`);
-  let hasNextPage = true;
-  let after: string | null = null;
-  let pageCount = 0;
-
-  while (hasNextPage) {
-    await delay(DELAY_BETWEEN_REQUESTS);
-
-    const result: InvoicesResponse = await fetchFromPrintavo(
-      recentInvoicesQuery,
-      { after, first: PAGE_SIZE },
-      printavoEmail,
-      printavoToken
-    );
-
-    if (!result.data?.invoices?.edges) {
-      console.log('No invoices data returned from API');
-      break;
-    }
-
-    const invoices = result.data.invoices.edges.map((edge) => edge.node);
-    const recentInvoices = invoices.filter(invoice => {
-      return invoice.createdAt && new Date(invoice.createdAt) >= new Date(MIN_INVOICE_DATE);
-    });
-
-    for (const invoice of recentInvoices) {
-      const { id: customerId, details: customerDetails } = await findOrCreateCustomer(supabase, invoice, printavoEmail, printavoToken, customerCache);
-
-      const amountOutstanding = invoice.amountOutstanding || 0;
-      let statusStage = 'billing_queue';
-      if (amountOutstanding === 0 && invoice.paidInFull) {
-        statusStage = 'paid';
-      } else if (amountOutstanding > 0) {
-        statusStage = 'accounts_receivable';
-      }
-
-      const phoneNumber = customerDetails?.primaryContact?.phone ||
-                         invoice.contact?.customer?.primaryContact?.phone ||
-                         '';
-
-      const billingFromCustomer = customerDetails?.billingAddress || invoice.contact?.customer?.billingAddress;
-      const billingFromInvoice = invoice.billingAddress;
-      let billingAddress = null;
-
-      if (billingFromCustomer && (billingFromCustomer.address1 || billingFromCustomer.city)) {
-        billingAddress = {
-          line1: billingFromCustomer.address1 || '',
-          line2: billingFromCustomer.address2 || '',
-          city: billingFromCustomer.city || '',
-          state: billingFromCustomer.state || '',
-          zip: '',
-          country: billingFromCustomer.country || 'USA',
-        };
-      } else if (billingFromInvoice && (billingFromInvoice.address1 || billingFromInvoice.city)) {
-        billingAddress = {
-          line1: billingFromInvoice.address1 || '',
-          line2: billingFromInvoice.address2 || '',
-          city: billingFromInvoice.city || '',
-          state: billingFromInvoice.state || '',
-          zip: '',
-          country: billingFromInvoice.country || 'USA',
-        };
-      }
-
-      const shippingFromCustomer = customerDetails?.shippingAddress || invoice.contact?.customer?.shippingAddress;
-      const shippingFromInvoice = invoice.shippingAddress;
-      let shippingAddress = null;
-
-      if (shippingFromCustomer && (shippingFromCustomer.address1 || shippingFromCustomer.city)) {
-        shippingAddress = {
-          line1: shippingFromCustomer.address1 || '',
-          line2: shippingFromCustomer.address2 || '',
-          city: shippingFromCustomer.city || '',
-          state: shippingFromCustomer.state || '',
-          zip: '',
-          country: shippingFromCustomer.country || 'USA',
-        };
-      } else if (shippingFromInvoice && (shippingFromInvoice.address1 || shippingFromInvoice.city)) {
-        shippingAddress = {
-          line1: shippingFromInvoice.address1 || '',
-          line2: shippingFromInvoice.address2 || '',
-          city: shippingFromInvoice.city || '',
-          state: shippingFromInvoice.state || '',
-          zip: '',
-          country: shippingFromInvoice.country || 'USA',
-        };
-      }
-
-      batchBuffer.push({
-        id: invoice.id,
-        invoice_number: invoice.visualId,
-        customer_id: customerId,
-        customer_email: customerDetails?.primaryContact?.email || '',
-        customer_phone: phoneNumber,
-        customer_name: customerDetails?.companyName || '',
-        customer_company: customerDetails?.companyName || '',
-        billing_address: billingAddress,
-        billing_address_line1: billingAddress?.line1 || null,
-        billing_address_line2: billingAddress?.line2 || null,
-        billing_city: billingAddress?.city || null,
-        billing_state: billingAddress?.state || null,
-        billing_zip: billingAddress?.zip || null,
-        billing_country: billingAddress?.country || null,
-        shipping_address: shippingAddress,
-        shipping_address_line1: shippingAddress?.line1 || null,
-        shipping_address_line2: shippingAddress?.line2 || null,
-        shipping_city: shippingAddress?.city || null,
-        shipping_state: shippingAddress?.state || null,
-        shipping_zip: shippingAddress?.zip || null,
-        shipping_country: shippingAddress?.country || null,
-        subtotal: invoice.subtotal || 0,
-        tax: invoice.salesTaxAmount || 0,
-        total: invoice.total || 0,
-        amount_paid: invoice.amountPaid || 0,
-        amount_outstanding: amountOutstanding,
-        status: invoice.status?.name,
-        status_stage: statusStage,
-        invoice_date: invoice.createdAt,
-        due_date: invoice.dueAt,
-        updated_at: new Date().toISOString(),
-        raw_data: invoice,
-      });
-
-      if (billingEligibleStatuses.includes(invoice.status?.name)) {
-        const { data: existingQueueItem } = await supabase
-          .from('billing_queue')
-          .select('id, payment_status')
-          .eq('printavo_invoice_id', invoice.id)
-          .maybeSingle();
-
-        if (existingQueueItem && existingQueueItem.payment_status !== 'paid') {
-          await supabase
-            .from('billing_queue')
-            .update({
-              printavo_status: invoice.status?.name,
-              customer_name: customerDetails?.companyName,
-              customer_email: customerDetails?.primaryContact?.email,
-              customer_company: customerDetails?.companyName,
-              invoice_total: invoice.total || 0,
-              invoice_date: invoice.createdAt,
-              due_date: invoice.dueAt,
-            })
-            .eq('id', existingQueueItem.id);
-        } else if (!existingQueueItem) {
-          await supabase
-            .from('billing_queue')
-            .insert({
-              company_id: companySettings.id,
-              printavo_invoice_id: invoice.id,
-              printavo_visual_id: invoice.visualId,
-              printavo_status: invoice.status?.name,
-              customer_name: customerDetails?.companyName,
-              customer_email: customerDetails?.primaryContact?.email,
-              customer_company: customerDetails?.companyName,
-              invoice_total: invoice.total || 0,
-              invoice_date: invoice.createdAt,
-              due_date: invoice.dueAt,
-              payment_status: 'unpaid',
-            });
-        }
-      }
-
-      if (invoice.lineItemGroups?.edges) {
-        for (const groupEdge of invoice.lineItemGroups.edges) {
-          const group = groupEdge.node;
-          if (group.lineItems?.edges) {
-            for (const itemEdge of group.lineItems.edges) {
-              const lineItem = itemEdge.node;
-              const garmentData = parseGarmentMetadata(lineItem.description, null);
-
-              // Use the actual color field from Printavo if available
-              const extractedColor = lineItem.color || garmentData.extractedColor;
-
-              // Parse the sizes array from Printavo
-              let extractedSizes = garmentData.extractedSizes;
-              if (lineItem.sizes && Array.isArray(lineItem.sizes) && lineItem.sizes.length > 0) {
-                const parsedSizes: Record<string, number> = {};
-                for (const sizeItem of lineItem.sizes) {
-                  if (sizeItem && sizeItem.count && sizeItem.count > 0) {
-                    // Convert size enum to friendly name: "size_xs" -> "XS", "size_yxs" -> "YXS"
-                    const sizeName = sizeItem.size
-                      .replace(/^size_/, '')
-                      .replace(/^y/, 'Y')
-                      .toUpperCase();
-                    parsedSizes[sizeName] = sizeItem.count;
-                  }
-                }
-                if (Object.keys(parsedSizes).length > 0) {
-                  extractedSizes = parsedSizes;
-                }
-              }
-
-              lineItemsBatchBuffer.push({
-                id: lineItem.id,
-                invoice_id: invoice.id,
-                line_item_group_id: group.id,
-                description: lineItem.description,
-                quantity: lineItem.items || 0,
-                unit_price: lineItem.price || 0,
-                total_price: (lineItem.items || 0) * (lineItem.price || 0),
-                extracted_style: garmentData.extractedStyle,
-                extracted_color: extractedColor,
-                extracted_sizes: extractedSizes,
-                extracted_sku: garmentData.extractedSKU,
-                extraction_notes: garmentData.extractedNotes,
-                parsed_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-                raw_data: lineItem,
-              });
-            }
-          }
-        }
-      }
-
-      if (batchBuffer.length >= BATCH_SIZE || lineItemsBatchBuffer.length >= BATCH_SIZE * 5) {
-        await flushBatch();
-      }
-    }
-
-    totalInvoices += recentInvoices.length;
-    console.log(`All invoices - Page ${pageCount + 1}: Found ${invoices.length} invoices, ${recentInvoices.length} after ${MIN_INVOICE_DATE}`);
-
-    if (recentInvoices.length === 0 || invoices.length === 0) {
-      console.log(`Reached invoices before ${MIN_INVOICE_DATE}, stopping sync`);
-      break;
-    }
-
-    hasNextPage = result.data.invoices.pageInfo.hasNextPage;
-    after = result.data.invoices.pageInfo.endCursor;
-    pageCount++;
-  }
 
   await flushBatch();
   return totalInvoices;
