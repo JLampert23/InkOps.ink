@@ -103,6 +103,8 @@ interface Invoice {
               description?: string;
               items?: number;
               price?: number;
+              color?: string;
+              sizes?: Array<{ count: number | null; size: string }>;
             };
           }>;
         };
@@ -731,6 +733,11 @@ async function syncInvoices(
                         description
                         items
                         price
+                        color
+                        sizes {
+                          count
+                          size
+                        }
                       }
                     }
                   }
@@ -834,6 +841,11 @@ async function syncInvoices(
                         description
                         items
                         price
+                        color
+                        sizes {
+                          count
+                          size
+                        }
                       }
                     }
                   }
@@ -1058,6 +1070,28 @@ async function syncInvoices(
                 const lineItem = itemEdge.node;
                 const garmentData = parseGarmentMetadata(lineItem.description, null);
 
+                // Use the actual color field from Printavo if available
+                const extractedColor = lineItem.color || garmentData.extractedColor;
+
+                // Parse the sizes array from Printavo
+                let extractedSizes = garmentData.extractedSizes;
+                if (lineItem.sizes && Array.isArray(lineItem.sizes) && lineItem.sizes.length > 0) {
+                  const parsedSizes: Record<string, number> = {};
+                  for (const sizeItem of lineItem.sizes) {
+                    if (sizeItem && sizeItem.count && sizeItem.count > 0) {
+                      // Convert size enum to friendly name: "size_xs" -> "XS", "size_yxs" -> "YXS"
+                      const sizeName = sizeItem.size
+                        .replace(/^size_/, '')
+                        .replace(/^y/, 'Y')
+                        .toUpperCase();
+                      parsedSizes[sizeName] = sizeItem.count;
+                    }
+                  }
+                  if (Object.keys(parsedSizes).length > 0) {
+                    extractedSizes = parsedSizes;
+                  }
+                }
+
                 lineItemsBatchBuffer.push({
                   id: lineItem.id,
                   invoice_id: invoice.id,
@@ -1067,8 +1101,8 @@ async function syncInvoices(
                   unit_price: lineItem.price || 0,
                   total_price: (lineItem.items || 0) * (lineItem.price || 0),
                   extracted_style: garmentData.extractedStyle,
-                  extracted_color: garmentData.extractedColor,
-                  extracted_sizes: garmentData.extractedSizes,
+                  extracted_color: extractedColor,
+                  extracted_sizes: extractedSizes,
                   extracted_sku: garmentData.extractedSKU,
                   extraction_notes: garmentData.extractedNotes,
                   parsed_at: new Date().toISOString(),
@@ -1270,6 +1304,28 @@ async function syncInvoices(
               const lineItem = itemEdge.node;
               const garmentData = parseGarmentMetadata(lineItem.description, null);
 
+              // Use the actual color field from Printavo if available
+              const extractedColor = lineItem.color || garmentData.extractedColor;
+
+              // Parse the sizes array from Printavo
+              let extractedSizes = garmentData.extractedSizes;
+              if (lineItem.sizes && Array.isArray(lineItem.sizes) && lineItem.sizes.length > 0) {
+                const parsedSizes: Record<string, number> = {};
+                for (const sizeItem of lineItem.sizes) {
+                  if (sizeItem && sizeItem.count && sizeItem.count > 0) {
+                    // Convert size enum to friendly name: "size_xs" -> "XS", "size_yxs" -> "YXS"
+                    const sizeName = sizeItem.size
+                      .replace(/^size_/, '')
+                      .replace(/^y/, 'Y')
+                      .toUpperCase();
+                    parsedSizes[sizeName] = sizeItem.count;
+                  }
+                }
+                if (Object.keys(parsedSizes).length > 0) {
+                  extractedSizes = parsedSizes;
+                }
+              }
+
               lineItemsBatchBuffer.push({
                 id: lineItem.id,
                 invoice_id: invoice.id,
@@ -1279,8 +1335,8 @@ async function syncInvoices(
                 unit_price: lineItem.price || 0,
                 total_price: (lineItem.items || 0) * (lineItem.price || 0),
                 extracted_style: garmentData.extractedStyle,
-                extracted_color: garmentData.extractedColor,
-                extracted_sizes: garmentData.extractedSizes,
+                extracted_color: extractedColor,
+                extracted_sizes: extractedSizes,
                 extracted_sku: garmentData.extractedSKU,
                 extraction_notes: garmentData.extractedNotes,
                 parsed_at: new Date().toISOString(),
