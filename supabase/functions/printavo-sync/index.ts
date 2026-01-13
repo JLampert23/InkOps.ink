@@ -100,7 +100,6 @@ interface Invoice {
           edges: Array<{
             node: {
               id: string;
-              name?: string;
               description?: string;
               items?: number;
               price?: number;
@@ -729,7 +728,6 @@ async function syncInvoices(
                     edges {
                       node {
                         id
-                        name
                         description
                         items
                         price
@@ -833,7 +831,6 @@ async function syncInvoices(
                     edges {
                       node {
                         id
-                        name
                         description
                         items
                         price
@@ -1059,7 +1056,7 @@ async function syncInvoices(
             if (group.lineItems?.edges) {
               for (const itemEdge of group.lineItems.edges) {
                 const lineItem = itemEdge.node;
-                const garmentData = parseGarmentMetadata(lineItem.description, lineItem.name);
+                const garmentData = parseGarmentMetadata(lineItem.description, null);
 
                 lineItemsBatchBuffer.push({
                   id: lineItem.id,
@@ -1271,7 +1268,7 @@ async function syncInvoices(
           if (group.lineItems?.edges) {
             for (const itemEdge of group.lineItems.edges) {
               const lineItem = itemEdge.node;
-              const garmentData = parseGarmentMetadata(lineItem.description, lineItem.name);
+              const garmentData = parseGarmentMetadata(lineItem.description, null);
 
               lineItemsBatchBuffer.push({
                 id: lineItem.id,
