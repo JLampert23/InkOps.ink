@@ -214,7 +214,29 @@ export const invoiceDetailService = {
         customerPO: rawData.customerPurchaseOrder || rawData.poNumber || null,
 
         lineItems: (lineItems || []).map((item: any) => {
-          const parsed = this.parseLineItemDetails(item.description, item.raw_data);
+          // Use extracted fields from database if available, otherwise parse from description
+          const hasExtractedData = item.extracted_style || item.extracted_color || item.extracted_sizes;
+
+          let style = item.extracted_style || '-';
+          let color = item.extracted_color || '-';
+          let sizes = '-';
+
+          // Format extracted sizes object into display string
+          if (item.extracted_sizes && typeof item.extracted_sizes === 'object') {
+            const sizeEntries = Object.entries(item.extracted_sizes)
+              .filter(([_, qty]) => qty && Number(qty) > 0)
+              .map(([size, qty]) => `${size}:${qty}`);
+            sizes = sizeEntries.join(', ') || '-';
+          }
+
+          // Fallback to parsing if no extracted data
+          if (!hasExtractedData) {
+            const parsed = this.parseLineItemDetails(item.description, item.raw_data);
+            style = parsed.style;
+            color = parsed.color;
+            sizes = parsed.sizes;
+          }
+
           return {
             id: item.id,
             description: item.description || 'Line Item',
@@ -222,9 +244,9 @@ export const invoiceDetailService = {
             unitPrice: parseFloat(item.unit_price) || 0,
             totalPrice: parseFloat(item.total_price) || 0,
             lineItemGroupId: item.line_item_group_id,
-            style: parsed.style,
-            color: parsed.color,
-            sizes: parsed.sizes,
+            style,
+            color,
+            sizes,
             rawData: item.raw_data,
           };
         }),
