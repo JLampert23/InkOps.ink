@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { parseGarmentDescription } from "../shared/garment-parser.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -924,6 +925,9 @@ async function syncInvoices(
             if (group.lineItems?.edges) {
               for (const itemEdge of group.lineItems.edges) {
                 const lineItem = itemEdge.node;
+
+                const parsedData = parseGarmentDescription(lineItem.description || '');
+
                 lineItemsBatchBuffer.push({
                   id: lineItem.id,
                   invoice_id: invoice.id,
@@ -932,6 +936,12 @@ async function syncInvoices(
                   quantity: lineItem.items || 0,
                   unit_price: lineItem.price || 0,
                   total_price: (lineItem.items || 0) * (lineItem.price || 0),
+                  extracted_style: parsedData.style,
+                  extracted_color: parsedData.color,
+                  extracted_sizes: parsedData.sizes,
+                  extracted_sku: parsedData.sku,
+                  extraction_notes: parsedData.notes.join('; '),
+                  parsed_at: new Date().toISOString(),
                   updated_at: new Date().toISOString(),
                   raw_data: lineItem,
                 });
@@ -1128,6 +1138,9 @@ async function syncInvoices(
           if (group.lineItems?.edges) {
             for (const itemEdge of group.lineItems.edges) {
               const lineItem = itemEdge.node;
+
+              const parsedData = parseGarmentDescription(lineItem.description || '');
+
               lineItemsBatchBuffer.push({
                 id: lineItem.id,
                 invoice_id: invoice.id,
@@ -1136,6 +1149,12 @@ async function syncInvoices(
                 quantity: lineItem.items || 0,
                 unit_price: lineItem.price || 0,
                 total_price: (lineItem.items || 0) * (lineItem.price || 0),
+                extracted_style: parsedData.style,
+                extracted_color: parsedData.color,
+                extracted_sizes: parsedData.sizes,
+                extracted_sku: parsedData.sku,
+                extraction_notes: parsedData.notes.join('; '),
+                parsed_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
                 raw_data: lineItem,
               });
