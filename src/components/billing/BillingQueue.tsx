@@ -12,13 +12,10 @@ import {
   DollarSign,
   Download,
   Loader2,
-  Package,
-  Palette,
 } from 'lucide-react';
 import { billingService, BillingQueueItem } from '../../services/billing-service';
 import { invoiceDetailService } from '../../services/invoice-detail-service';
 import { generateInvoicePDF } from '../../utils/invoice-pdf-export';
-import { garmentAggregationService, GarmentSummary } from '../../services/garment-aggregation-service';
 
 interface BillingQueueProps {
   onSendInvoice?: (item: BillingQueueItem) => void;
@@ -35,7 +32,6 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
   const [sendingInvoices, setSendingInvoices] = useState(false);
   const [downloadingPDF, setDownloadingPDF] = useState<string | null>(null);
   const [creatingStripeInvoices, setCreatingStripeInvoices] = useState(false);
-  const [garmentSummaries, setGarmentSummaries] = useState<Map<string, GarmentSummary>>(new Map());
 
   useEffect(() => {
     loadQueue();
@@ -46,10 +42,6 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
     try {
       const items = await billingService.getBillingQueue();
       setQueueItems(items);
-
-      const invoiceIds = items.map(item => item.printavoInvoiceId);
-      const summaries = await garmentAggregationService.getMultipleInvoiceGarmentSummaries(invoiceIds);
-      setGarmentSummaries(summaries);
     } catch (error) {
       console.error('Error loading billing queue:', error);
     } finally {
@@ -311,9 +303,6 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
                   Customer
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Garments
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Phone
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -362,39 +351,6 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
                     <div className="text-xs text-gray-500">
                       {item.customerEmail}
                     </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    {(() => {
-                      const summary = garmentSummaries.get(item.printavoInvoiceId);
-                      if (!summary || (summary.styles.length === 0 && summary.colors.length === 0)) {
-                        return <span className="text-xs text-gray-400">-</span>;
-                      }
-                      return (
-                        <div className="text-xs space-y-1">
-                          {summary.topStyle && (
-                            <div className="flex items-center gap-1 text-gray-700">
-                              <Package className="w-3 h-3 text-blue-600" />
-                              <span className="font-medium">{summary.topStyle}</span>
-                              {summary.styles.length > 1 && (
-                                <span className="text-gray-400">+{summary.styles.length - 1}</span>
-                              )}
-                            </div>
-                          )}
-                          {summary.topColor && (
-                            <div className="flex items-center gap-1 text-gray-700">
-                              <Palette className="w-3 h-3 text-purple-600" />
-                              <span>{summary.topColor}</span>
-                              {summary.colors.length > 1 && (
-                                <span className="text-gray-400">+{summary.colors.length - 1}</span>
-                              )}
-                            </div>
-                          )}
-                          {summary.totalItems > 0 && (
-                            <div className="text-gray-500">{summary.totalItems} items</div>
-                          )}
-                        </div>
-                      );
-                    })()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">

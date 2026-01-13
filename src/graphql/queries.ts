@@ -30,17 +30,6 @@ export const GET_INVOICES = gql`
               companyName
             }
           }
-          lineItems {
-            edges {
-              node {
-                id
-                name
-                description
-                quantity
-                price
-              }
-            }
-          }
         }
       }
       pageInfo {

@@ -31,7 +31,6 @@ import { billingService } from '../../services/billing-service';
 import { stripeService } from '../../services/stripe-service';
 import { generateInvoicePDF } from '../../utils/invoice-pdf-export';
 import { supabase } from '../../lib/supabase-client';
-import { LineItemsViewer } from '../LineItemsViewer';
 
 interface InvoiceDetailProps {
   invoiceId: string;
@@ -969,9 +968,6 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
               <p className="text-center text-gray-500 py-4">No payments recorded</p>
             )}
           </div>
-
-          {/* Line Items & Garment Details */}
-          <LineItemsViewer invoiceId={invoice.printavoInvoiceId} />
 
           {/* Communication Log */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
