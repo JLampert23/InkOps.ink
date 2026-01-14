@@ -101,6 +101,10 @@ export interface InvoiceDetail {
   sentAt: string | null;
   sentMethod: string | null;
 
+  isFinanciallyLocked: boolean;
+  lockedAt: string | null;
+  lockedBy: string | null;
+
   rawData: any;
 }
 
@@ -314,6 +318,10 @@ export const invoiceDetailService = {
         billingQueueStatus: billingQueueItem?.payment_status || 'not_in_queue',
         sentAt: billingQueueItem?.sent_at || null,
         sentMethod: billingQueueItem?.sent_method || null,
+
+        isFinanciallyLocked: invoice.is_financially_locked || false,
+        lockedAt: invoice.locked_at || null,
+        lockedBy: invoice.locked_by || null,
 
         rawData,
       };

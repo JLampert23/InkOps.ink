@@ -771,11 +771,21 @@ async function syncInvoices(
   let totalInvoices = 0;
   let batchBuffer: any[] = [];
   let lineItemsBatchBuffer: any[] = [];
+  let lockedInvoicesBuffer: any[] = [];
 
   const flushBatch = async () => {
     if (batchBuffer.length > 0) {
       await supabase.from("printavo_invoices").upsert(batchBuffer, { onConflict: "id" });
       batchBuffer = [];
+    }
+    if (lockedInvoicesBuffer.length > 0) {
+      for (const update of lockedInvoicesBuffer) {
+        await supabase
+          .from("printavo_invoices")
+          .update(update.data)
+          .eq("id", update.id);
+      }
+      lockedInvoicesBuffer = [];
     }
     if (lineItemsBatchBuffer.length > 0) {
       await supabase.from("printavo_line_items").upsert(lineItemsBatchBuffer, { onConflict: "id" });
@@ -901,45 +911,89 @@ async function syncInvoices(
 
         let customerName = customerDetails?.companyName || '';
         if (!customerName || customerName.trim() === '') {
-          customerName = invoice.contact?.fullName || 
+          customerName = invoice.contact?.fullName ||
                         [customerDetails?.primaryContact?.firstName, customerDetails?.primaryContact?.lastName]
                           .filter(Boolean).join(' ') || '';
         }
 
-        batchBuffer.push({
-          id: invoice.id,
-          invoice_number: invoice.visualId,
-          customer_id: customerId,
-          customer_email: customerDetails?.primaryContact?.email || '',
-          customer_phone: phoneNumber,
-          customer_name: customerName || '',
-          customer_company: customerName || '',
-          billing_address: billingAddress,
-          billing_address_line1: billingAddress?.line1 || null,
-          billing_address_line2: billingAddress?.line2 || null,
-          billing_city: billingAddress?.city || null,
-          billing_state: billingAddress?.state || null,
-          billing_zip: billingAddress?.zip || null,
-          billing_country: billingAddress?.country || null,
-          shipping_address: shippingAddress,
-          shipping_address_line1: shippingAddress?.line1 || null,
-          shipping_address_line2: shippingAddress?.line2 || null,
-          shipping_city: shippingAddress?.city || null,
-          shipping_state: shippingAddress?.state || null,
-          shipping_zip: shippingAddress?.zip || null,
-          shipping_country: shippingAddress?.country || null,
-          subtotal: invoice.subtotal || 0,
-          tax: invoice.salesTaxAmount || 0,
-          total: invoice.total || 0,
-          amount_paid: invoice.amountPaid || 0,
-          amount_outstanding: amountOutstanding,
-          status: invoice.status?.name,
-          status_stage: statusStage,
-          invoice_date: invoice.createdAt,
-          due_date: invoice.dueAt,
-          updated_at: new Date().toISOString(),
-          raw_data: invoice,
-        });
+        const { data: existingInvoice } = await supabase
+          .from('printavo_invoices')
+          .select('id, is_financially_locked, amount_paid, status, status_stage, balance_remaining')
+          .eq('id', invoice.id)
+          .maybeSingle();
+
+        if (existingInvoice?.is_financially_locked) {
+          console.log(`Invoice ${invoice.visualId} is financially locked - updating safe fields only`);
+
+          lockedInvoicesBuffer.push({
+            id: invoice.id,
+            data: {
+              invoice_number: invoice.visualId,
+              customer_id: customerId,
+              customer_email: customerDetails?.primaryContact?.email || '',
+              customer_phone: phoneNumber,
+              customer_name: customerName || '',
+              customer_company: customerName || '',
+              billing_address: billingAddress,
+              billing_address_line1: billingAddress?.line1 || null,
+              billing_address_line2: billingAddress?.line2 || null,
+              billing_city: billingAddress?.city || null,
+              billing_state: billingAddress?.state || null,
+              billing_zip: billingAddress?.zip || null,
+              billing_country: billingAddress?.country || null,
+              shipping_address: shippingAddress,
+              shipping_address_line1: shippingAddress?.line1 || null,
+              shipping_address_line2: shippingAddress?.line2 || null,
+              shipping_city: shippingAddress?.city || null,
+              shipping_state: shippingAddress?.state || null,
+              shipping_zip: shippingAddress?.zip || null,
+              shipping_country: shippingAddress?.country || null,
+              subtotal: invoice.subtotal || 0,
+              tax: invoice.salesTaxAmount || 0,
+              total: invoice.total || 0,
+              invoice_date: invoice.createdAt,
+              due_date: invoice.dueAt,
+              updated_at: new Date().toISOString(),
+              raw_data: invoice,
+            }
+          });
+        } else {
+          batchBuffer.push({
+            id: invoice.id,
+            invoice_number: invoice.visualId,
+            customer_id: customerId,
+            customer_email: customerDetails?.primaryContact?.email || '',
+            customer_phone: phoneNumber,
+            customer_name: customerName || '',
+            customer_company: customerName || '',
+            billing_address: billingAddress,
+            billing_address_line1: billingAddress?.line1 || null,
+            billing_address_line2: billingAddress?.line2 || null,
+            billing_city: billingAddress?.city || null,
+            billing_state: billingAddress?.state || null,
+            billing_zip: billingAddress?.zip || null,
+            billing_country: billingAddress?.country || null,
+            shipping_address: shippingAddress,
+            shipping_address_line1: shippingAddress?.line1 || null,
+            shipping_address_line2: shippingAddress?.line2 || null,
+            shipping_city: shippingAddress?.city || null,
+            shipping_state: shippingAddress?.state || null,
+            shipping_zip: shippingAddress?.zip || null,
+            shipping_country: shippingAddress?.country || null,
+            subtotal: invoice.subtotal || 0,
+            tax: invoice.salesTaxAmount || 0,
+            total: invoice.total || 0,
+            amount_paid: invoice.amountPaid || 0,
+            amount_outstanding: amountOutstanding,
+            balance_remaining: amountOutstanding,
+            status: invoice.status?.name,
+            status_stage: statusStage,
+            invoice_date: invoice.createdAt,
+            due_date: invoice.dueAt,
+            updated_at: new Date().toISOString(),
+            raw_data: invoice,
+          });
+        }
 
         if (billingEligibleStatuses.includes(invoice.status?.name)) {
           const { data: existingQueueItem } = await supabase

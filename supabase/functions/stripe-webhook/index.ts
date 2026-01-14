@@ -94,15 +94,25 @@ Deno.serve(async (req: Request) => {
             const newPaid = currentPaid + (paymentIntent.amount / 100);
             const total = parseFloat(invoice.total || 0);
             const balanceRemaining = total - newPaid;
+            const isFullyPaid = balanceRemaining <= 0;
+
+            const updateData: any = {
+              amount_paid: newPaid,
+              balance_remaining: balanceRemaining,
+              status_stage: isFullyPaid ? 'paid' : 'partial',
+              status: isFullyPaid ? 'Paid' : 'Partially Paid',
+            };
+
+            if (isFullyPaid) {
+              updateData.is_financially_locked = true;
+              updateData.locked_at = new Date().toISOString();
+              updateData.locked_by = 'stripe';
+              console.log(`Locking invoice ${metadata.printavo_invoice_id} - paid in full`);
+            }
 
             await supabase
               .from('printavo_invoices')
-              .update({
-                amount_paid: newPaid,
-                balance_remaining: balanceRemaining,
-                status_stage: balanceRemaining <= 0 ? 'paid' : 'partial',
-                status: balanceRemaining <= 0 ? 'Paid' : 'Partially Paid',
-              })
+              .update(updateData)
               .eq('invoice_id', metadata.printavo_invoice_id);
           }
 
@@ -240,15 +250,25 @@ Deno.serve(async (req: Request) => {
               const newPaid = currentPaid + (session.amount_total / 100);
               const total = parseFloat(invoice.total || 0);
               const balanceRemaining = total - newPaid;
+              const isFullyPaid = balanceRemaining <= 0;
+
+              const updateData: any = {
+                amount_paid: newPaid,
+                balance_remaining: balanceRemaining,
+                status_stage: isFullyPaid ? 'paid' : 'partial',
+                status: isFullyPaid ? 'Paid' : 'Partially Paid',
+              };
+
+              if (isFullyPaid) {
+                updateData.is_financially_locked = true;
+                updateData.locked_at = new Date().toISOString();
+                updateData.locked_by = 'stripe';
+                console.log(`Locking invoice ${metadata.printavo_invoice_id} - paid in full`);
+              }
 
               await supabase
                 .from('printavo_invoices')
-                .update({
-                  amount_paid: newPaid,
-                  balance_remaining: balanceRemaining,
-                  status_stage: balanceRemaining <= 0 ? 'paid' : 'partial',
-                  status: balanceRemaining <= 0 ? 'Paid' : 'Partially Paid',
-                })
+                .update(updateData)
                 .eq('invoice_id', metadata.printavo_invoice_id);
             }
 
@@ -362,14 +382,23 @@ Deno.serve(async (req: Request) => {
             const newPaid = amountPaid / 100;
             const balanceRemaining = total - newPaid;
 
+            const updateData: any = {
+              amount_paid: newPaid,
+              balance_remaining: balanceRemaining,
+              status_stage: isFullyPaid ? 'paid' : 'partial',
+              status: isFullyPaid ? 'Paid' : 'Partially Paid',
+            };
+
+            if (isFullyPaid) {
+              updateData.is_financially_locked = true;
+              updateData.locked_at = new Date().toISOString();
+              updateData.locked_by = 'stripe';
+              console.log(`Locking invoice ${printavoInvoiceId} - paid in full`);
+            }
+
             await supabase
               .from('printavo_invoices')
-              .update({
-                amount_paid: newPaid,
-                balance_remaining: balanceRemaining,
-                status_stage: isFullyPaid ? 'paid' : 'partial',
-                status: isFullyPaid ? 'Paid' : 'Partially Paid',
-              })
+              .update(updateData)
               .eq('invoice_id', printavoInvoiceId);
           }
 

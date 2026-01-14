@@ -54,6 +54,8 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
   const [sendMethod, setSendMethod] = useState<'email' | 'sms' | 'both'>('email');
   const [customerPhone, setCustomerPhone] = useState<string | null>(null);
   const [twilioEnabled, setTwilioEnabled] = useState(false);
+  const [unlocking, setUnlocking] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
     loadInvoice();
@@ -65,6 +67,18 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
       const { data } = await supabase.from('company_settings').select('twilio_enabled').maybeSingle();
       if (data) {
         setTwilioEnabled(data.twilio_enabled || false);
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('role')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (profile) {
+          setUserRole(profile.role);
+        }
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -91,6 +105,52 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUnlockInvoice = async () => {
+    if (!invoice || !invoice.isFinanciallyLocked) return;
+
+    const reason = prompt('Please provide a reason for unlocking this invoice:');
+    if (!reason) return;
+
+    setUnlocking(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/unlock-invoice`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            invoiceId: invoice.id,
+            reason: reason,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to unlock invoice');
+      }
+
+      const result = await response.json();
+      console.log('Invoice unlocked:', result);
+
+      await loadInvoice();
+      alert('Invoice unlocked successfully!');
+    } catch (err) {
+      console.error('Error unlocking invoice:', err);
+      alert(err instanceof Error ? err.message : 'Failed to unlock invoice');
+    } finally {
+      setUnlocking(false);
     }
   };
 
@@ -289,6 +349,12 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                 <div className="flex items-center gap-2 flex-wrap">
                   {getStatusBadge(invoice.status, invoice.statusColor)}
                   {getPaymentStatusBadge(invoice.billingQueueStatus)}
+                  {invoice.isFinanciallyLocked && (
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full border border-yellow-200">
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      <span>Financially Locked</span>
+                    </div>
+                  )}
                 </div>
               </div>
               <p className="text-xs sm:text-sm text-gray-500 mt-1 truncate">
@@ -305,6 +371,16 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
               <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Sync</span>
             </button>
+            {invoice.isFinanciallyLocked && userRole === 'admin' && (
+              <button
+                onClick={handleUnlockInvoice}
+                disabled={unlocking}
+                className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-white bg-yellow-600 border border-yellow-700 rounded-lg hover:bg-yellow-700 transition-colors disabled:opacity-50 whitespace-nowrap"
+              >
+                <AlertCircle className={`w-4 h-4 ${unlocking ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">{unlocking ? 'Unlocking...' : 'Unlock'}</span>
+              </button>
+            )}
             <button
               onClick={() => invoice && generateInvoicePDF(invoice)}
               className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap"
