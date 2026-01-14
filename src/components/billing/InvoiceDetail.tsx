@@ -168,8 +168,12 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
 
       const result = await response.json();
 
+      console.log('Unlock response:', { status: response.status, result });
+
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to unlock invoice');
+        const errorMsg = result.error || result.message || 'Failed to unlock invoice';
+        console.error('Unlock failed:', errorMsg, result);
+        throw new Error(errorMsg);
       }
 
       await loadInvoice();
