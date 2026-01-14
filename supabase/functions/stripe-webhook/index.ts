@@ -86,7 +86,7 @@ Deno.serve(async (req: Request) => {
           const { data: invoice } = await supabase
             .from('printavo_invoices')
             .select('*')
-            .eq('invoice_id', metadata.printavo_invoice_id)
+            .eq('id', metadata.printavo_invoice_id)
             .maybeSingle();
 
           if (invoice) {
@@ -113,7 +113,7 @@ Deno.serve(async (req: Request) => {
             await supabase
               .from('printavo_invoices')
               .update(updateData)
-              .eq('invoice_id', metadata.printavo_invoice_id);
+              .eq('id', metadata.printavo_invoice_id);
           }
 
           const { data: queueItem } = await supabase
@@ -242,7 +242,7 @@ Deno.serve(async (req: Request) => {
             const { data: invoice } = await supabase
               .from('printavo_invoices')
               .select('*')
-              .eq('invoice_id', metadata.printavo_invoice_id)
+              .eq('id', metadata.printavo_invoice_id)
               .maybeSingle();
 
             if (invoice) {
@@ -269,7 +269,7 @@ Deno.serve(async (req: Request) => {
               await supabase
                 .from('printavo_invoices')
                 .update(updateData)
-                .eq('invoice_id', metadata.printavo_invoice_id);
+                .eq('id', metadata.printavo_invoice_id);
             }
 
             const { data: queueItem } = await supabase
@@ -374,7 +374,7 @@ Deno.serve(async (req: Request) => {
           const { data: printavoInvoice } = await supabase
             .from('printavo_invoices')
             .select('*')
-            .eq('invoice_id', printavoInvoiceId)
+            .eq('id', printavoInvoiceId)
             .maybeSingle();
 
           if (printavoInvoice) {
@@ -399,7 +399,7 @@ Deno.serve(async (req: Request) => {
             await supabase
               .from('printavo_invoices')
               .update(updateData)
-              .eq('invoice_id', printavoInvoiceId);
+              .eq('id', printavoInvoiceId);
           }
 
           if (isFullyPaid) {
