@@ -108,6 +108,40 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
     }
   };
 
+  const handleLockInvoice = async () => {
+    if (!invoice || invoice.isFinanciallyLocked) return;
+
+    const reason = prompt('Please provide a reason for locking this invoice:');
+    if (!reason) return;
+
+    setUnlocking(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('printavo_invoices')
+        .update({
+          is_financially_locked: true,
+          locked_at: new Date().toISOString(),
+          locked_by: user.email,
+        })
+        .eq('id', invoice.id);
+
+      if (error) throw error;
+
+      console.log(`Invoice ${invoice.invoiceNumber} locked by ${user.email}. Reason: ${reason}`);
+
+      await loadInvoice();
+      alert('Invoice locked successfully!');
+    } catch (err) {
+      console.error('Error locking invoice:', err);
+      alert(err instanceof Error ? err.message : 'Failed to lock invoice');
+    } finally {
+      setUnlocking(false);
+    }
+  };
+
   const handleUnlockInvoice = async () => {
     if (!invoice || !invoice.isFinanciallyLocked) return;
 
@@ -356,15 +390,26 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
               <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Sync</span>
             </button>
-            {invoice.isFinanciallyLocked && userRole === 'admin' && (
-              <button
-                onClick={handleUnlockInvoice}
-                disabled={unlocking}
-                className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-white bg-yellow-600 border border-yellow-700 rounded-lg hover:bg-yellow-700 transition-colors disabled:opacity-50 whitespace-nowrap"
-              >
-                <AlertCircle className={`w-4 h-4 ${unlocking ? 'animate-spin' : ''}`} />
-                <span className="hidden sm:inline">{unlocking ? 'Unlocking...' : 'Unlock'}</span>
-              </button>
+            {userRole === 'admin' && (
+              invoice.isFinanciallyLocked ? (
+                <button
+                  onClick={handleUnlockInvoice}
+                  disabled={unlocking}
+                  className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-white bg-yellow-600 border border-yellow-700 rounded-lg hover:bg-yellow-700 transition-colors disabled:opacity-50 whitespace-nowrap"
+                >
+                  <AlertCircle className={`w-4 h-4 ${unlocking ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline">{unlocking ? 'Unlocking...' : 'Unlock'}</span>
+                </button>
+              ) : (
+                <button
+                  onClick={handleLockInvoice}
+                  disabled={unlocking}
+                  className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 whitespace-nowrap"
+                >
+                  <AlertCircle className={`w-4 h-4 ${unlocking ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline">{unlocking ? 'Locking...' : 'Lock'}</span>
+                </button>
+              )
             )}
             <button
               onClick={() => invoice && generateInvoicePDF(invoice)}
