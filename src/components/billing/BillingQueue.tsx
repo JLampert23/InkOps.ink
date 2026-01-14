@@ -26,8 +26,6 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
   const [queueItems, setQueueItems] = useState<BillingQueueItem[]>([]);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<string>('');
   const [generatingLinks, setGeneratingLinks] = useState(false);
   const [sendingInvoices, setSendingInvoices] = useState(false);
   const [downloadingPDF, setDownloadingPDF] = useState<string | null>(null);
@@ -46,25 +44,6 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
       console.error('Error loading billing queue:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSync = async () => {
-    setSyncing(true);
-    setSyncStatus('Fetching latest data from Printavo...');
-    try {
-      setSyncStatus('Syncing invoices from Printavo API (this may take up to 90 seconds)...');
-      await billingService.syncBillingQueue([]);
-      setSyncStatus('Loading updated queue...');
-      await loadQueue();
-      setSyncStatus('');
-      alert('Billing queue synced successfully!');
-    } catch (error: any) {
-      setSyncStatus('');
-      alert(error.message || 'Failed to sync billing queue');
-    } finally {
-      setSyncing(false);
-      setSyncStatus('');
     }
   };
 
@@ -212,25 +191,7 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
             Invoices ready for billing ({queueItems.length} total)
           </p>
         </div>
-        <button
-          onClick={handleSync}
-          disabled={syncing}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-          {syncing ? 'Syncing...' : 'Sync from Printavo'}
-        </button>
       </div>
-
-      {syncing && syncStatus && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center gap-3">
-          <RefreshCw className="w-5 h-5 text-blue-600 animate-spin flex-shrink-0" />
-          <div>
-            <p className="text-sm font-medium text-blue-900">{syncStatus}</p>
-            <p className="text-xs text-blue-700 mt-1">Please wait while we fetch the latest invoices from Printavo...</p>
-          </div>
-        </div>
-      )}
 
       {selectedItems.size > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -272,16 +233,9 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
           <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No invoices in queue</h3>
-          <p className="text-gray-600 mb-4">
-            Sync from Printavo to populate the billing queue
+          <p className="text-gray-600">
+            Use the "Sync from Printavo" button in the sidebar to populate the billing queue
           </p>
-          <button
-            onClick={handleSync}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Sync Now
-          </button>
         </div>
       ) : (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
