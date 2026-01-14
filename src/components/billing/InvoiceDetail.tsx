@@ -31,6 +31,7 @@ import { billingService } from '../../services/billing-service';
 import { stripeService } from '../../services/stripe-service';
 import { generateInvoicePDF } from '../../utils/invoice-pdf-export';
 import { supabase } from '../../lib/supabase-client';
+import { ManualPaymentModal } from './ManualPaymentModal';
 
 interface InvoiceDetailProps {
   invoiceId: string;
@@ -56,6 +57,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
   const [twilioEnabled, setTwilioEnabled] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   useEffect(() => {
     loadInvoice();
@@ -239,20 +241,15 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
     }
   };
 
-  const handleMarkAsPaid = async () => {
+  const handleMarkAsPaid = () => {
     if (!invoice) return;
-    if (!confirm(`Mark invoice ${invoice.visualId} as paid for $${invoice.amountOutstanding.toFixed(2)}?`)) return;
+    setShowPaymentModal(true);
+  };
 
-    setMarkingPaid(true);
-    try {
-      await invoiceDetailService.markAsPaidManual(invoice.printavoInvoiceId, invoice.amountOutstanding);
-      await loadInvoice();
-      alert('Invoice marked as paid!');
-    } catch (err: any) {
-      alert(err.message || 'Failed to mark as paid');
-    } finally {
-      setMarkingPaid(false);
-    }
+  const handlePaymentSuccess = async () => {
+    setShowPaymentModal(false);
+    await loadInvoice();
+    alert('Payment recorded successfully!');
   };
 
   const handleSync = async () => {
@@ -879,15 +876,11 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
 
                   <button
                     onClick={handleMarkAsPaid}
-                    disabled={markingPaid || invoice.billingQueueStatus === 'paid'}
+                    disabled={invoice.billingQueueStatus === 'paid' || invoice.amountOutstanding <= 0}
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {markingPaid ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <CheckCircle className="w-4 h-4" />
-                    )}
-                    Mark as Paid (Manual)
+                    <CheckCircle className="w-4 h-4" />
+                    Record Manual Payment
                   </button>
                 </>
               )}
@@ -1060,6 +1053,40 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
               </div>
             )}
 
+            {/* Manual Payments */}
+            {invoice.manualPayments.length > 0 && (
+              <div className="mb-4">
+                <p className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-1">
+                  <DollarSign className="w-3.5 h-3.5" />
+                  Manual Payments
+                </p>
+                <div className="space-y-2">
+                  {invoice.manualPayments.map((payment) => (
+                    <div
+                      key={payment.id}
+                      className="flex items-start justify-between p-3 bg-green-50 rounded-lg border border-green-200"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-sm font-semibold text-gray-900">${payment.amount.toFixed(2)}</p>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                            {payment.paymentMethod || payment.paymentType}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600">{formatDateTime(payment.paymentDate)}</p>
+                        {payment.checkNumber && (
+                          <p className="text-xs text-gray-600 mt-1">Check #{payment.checkNumber}</p>
+                        )}
+                        {payment.notes && (
+                          <p className="text-xs text-gray-500 mt-1 italic">{payment.notes}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Printavo Payments */}
             {invoice.printavoPayments.length > 0 && (
               <div>
@@ -1083,7 +1110,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
               </div>
             )}
 
-            {invoice.stripePayments.length === 0 && invoice.printavoPayments.length === 0 && (
+            {invoice.stripePayments.length === 0 && invoice.printavoPayments.length === 0 && invoice.manualPayments.length === 0 && (
               <p className="text-center text-gray-500 py-4">No payments recorded</p>
             )}
           </div>
@@ -1300,6 +1327,18 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Manual Payment Modal */}
+      {showPaymentModal && invoice && (
+        <ManualPaymentModal
+          invoiceId={invoice.id}
+          invoiceNumber={invoice.visualId}
+          invoiceTotal={invoice.total}
+          invoiceBalance={invoice.amountOutstanding}
+          onClose={() => setShowPaymentModal(false)}
+          onSuccess={handlePaymentSuccess}
+        />
       )}
     </div>
   );

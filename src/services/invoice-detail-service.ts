@@ -39,6 +39,18 @@ export interface PrintavoPayment {
   notes: string | null;
 }
 
+export interface ManualPayment {
+  id: string;
+  amount: number;
+  paymentDate: string;
+  paymentType: string;
+  paymentMethod: string | null;
+  checkNumber: string | null;
+  notes: string | null;
+  createdBy: string | null;
+  createdAt: string;
+}
+
 export interface InvoiceFee {
   id: string;
   name: string;
@@ -87,6 +99,7 @@ export interface InvoiceDetail {
   stripeInvoice: StripeInvoice | null;
   stripePayments: StripePayment[];
   printavoPayments: PrintavoPayment[];
+  manualPayments: ManualPayment[];
 
   communicationLogs: CommunicationLog[];
   smsLogs: SMSLog[];
@@ -147,6 +160,13 @@ export const invoiceDetailService = {
         .from('printavo_payments')
         .select('*')
         .eq('invoice_id', printavoInvoiceId)
+        .order('payment_date', { ascending: false });
+
+      const { data: manualPaymentsData } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('invoice_id', printavoInvoiceId)
+        .eq('source', 'manual')
         .order('payment_date', { ascending: false });
 
       const { data: communicationLogsData } = await supabase
@@ -286,6 +306,18 @@ export const invoiceDetailService = {
           paymentDate: payment.payment_date,
           paymentMethod: payment.payment_method,
           notes: payment.notes,
+        })),
+
+        manualPayments: (manualPaymentsData || []).map((payment: any) => ({
+          id: payment.id,
+          amount: parseFloat(payment.amount) || 0,
+          paymentDate: payment.payment_date,
+          paymentType: payment.payment_type,
+          paymentMethod: payment.payment_method,
+          checkNumber: payment.check_number,
+          notes: payment.notes,
+          createdBy: payment.created_by,
+          createdAt: payment.created_at,
         })),
 
         communicationLogs: (communicationLogsData || []).map((log: any) => ({
