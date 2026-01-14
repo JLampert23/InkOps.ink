@@ -899,14 +899,21 @@ async function syncInvoices(
           };
         }
 
+        let customerName = customerDetails?.companyName || '';
+        if (!customerName || customerName.trim() === '') {
+          customerName = invoice.contact?.fullName || 
+                        [customerDetails?.primaryContact?.firstName, customerDetails?.primaryContact?.lastName]
+                          .filter(Boolean).join(' ') || '';
+        }
+
         batchBuffer.push({
           id: invoice.id,
           invoice_number: invoice.visualId,
           customer_id: customerId,
           customer_email: customerDetails?.primaryContact?.email || '',
           customer_phone: phoneNumber,
-          customer_name: customerDetails?.companyName || '',
-          customer_company: customerDetails?.companyName || '',
+          customer_name: customerName || '',
+          customer_company: customerName || '',
           billing_address: billingAddress,
           billing_address_line1: billingAddress?.line1 || null,
           billing_address_line2: billingAddress?.line2 || null,
@@ -946,9 +953,9 @@ async function syncInvoices(
               .from('billing_queue')
               .update({
                 printavo_status: invoice.status?.name,
-                customer_name: customerDetails?.companyName,
+                customer_name: customerName,
                 customer_email: customerDetails?.primaryContact?.email,
-                customer_company: customerDetails?.companyName,
+                customer_company: customerName,
                 invoice_total: invoice.total || 0,
                 invoice_date: invoice.createdAt,
                 due_date: invoice.dueAt,
@@ -962,9 +969,9 @@ async function syncInvoices(
                 printavo_invoice_id: invoice.id,
                 printavo_visual_id: invoice.visualId,
                 printavo_status: invoice.status?.name,
-                customer_name: customerDetails?.companyName,
+                customer_name: customerName,
                 customer_email: customerDetails?.primaryContact?.email,
-                customer_company: customerDetails?.companyName,
+                customer_company: customerName,
                 invoice_total: invoice.total || 0,
                 invoice_date: invoice.createdAt,
                 due_date: invoice.dueAt,
