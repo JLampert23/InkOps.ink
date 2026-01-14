@@ -387,10 +387,6 @@ export const invoiceDetailService = {
       .eq('printavo_invoice_id', printavoInvoiceId)
       .maybeSingle();
 
-    if (!billingQueueItem) {
-      throw new Error('Invoice not found in billing queue');
-    }
-
     const { data: settings } = await supabase
       .from('company_settings')
       .select('id')
@@ -425,25 +421,29 @@ export const invoiceDetailService = {
         notes: 'Manual payment recorded by user',
       }]);
 
-    await supabase
-      .from('paid_invoices')
-      .insert([{
-        company_id: settings?.id,
-        printavo_invoice_id: printavoInvoiceId,
-        printavo_visual_id: billingQueueItem.printavo_visual_id,
-        customer_name: billingQueueItem.customer_name,
-        customer_email: billingQueueItem.customer_email,
-        invoice_total: billingQueueItem.invoice_total,
-        amount_paid: amount,
-        payment_date: new Date().toISOString(),
-        payment_method: 'manual',
-        metadata: { marked_by: session.user.id, marked_at: new Date().toISOString() },
-      }]);
+    if (newAmountOutstanding === 0) {
+      await supabase
+        .from('paid_invoices')
+        .insert([{
+          company_id: settings?.id,
+          printavo_invoice_id: printavoInvoiceId,
+          printavo_visual_id: invoice.invoice_number,
+          customer_name: invoice.customer_name,
+          customer_email: invoice.customer_email,
+          invoice_total: invoice.total,
+          amount_paid: newAmountPaid,
+          payment_date: new Date().toISOString(),
+          payment_method: 'manual',
+          metadata: { marked_by: session.user.id, marked_at: new Date().toISOString() },
+        }]);
+    }
 
-    await supabase
-      .from('billing_queue')
-      .update({ payment_status: 'paid' })
-      .eq('id', billingQueueItem.id);
+    if (billingQueueItem) {
+      await supabase
+        .from('billing_queue')
+        .update({ payment_status: 'paid' })
+        .eq('id', billingQueueItem.id);
+    }
 
     await supabase
       .from('communication_logs')
@@ -451,7 +451,7 @@ export const invoiceDetailService = {
         printavo_invoice_id: printavoInvoiceId,
         communication_type: 'payment',
         method: 'manual',
-        recipient: billingQueueItem.customer_email || 'N/A',
+        recipient: invoice.customer_email || 'N/A',
         subject: 'Manual Payment Recorded',
         message: `Payment of $${amount.toFixed(2)} recorded manually`,
         status: 'completed',
