@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase-client';
+import { supabase, supabaseUrl, supabaseAnonKey } from '../lib/supabase-client';
 import { stripeService } from './stripe-service';
 import { Invoice } from '../types/printavo';
 
