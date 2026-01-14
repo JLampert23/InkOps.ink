@@ -111,8 +111,9 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
   const handleLockInvoice = async () => {
     if (!invoice || invoice.isFinanciallyLocked) return;
 
-    const reason = prompt('Please provide a reason for locking this invoice:');
-    if (!reason) return;
+    if (!confirm('Are you sure you want to lock this invoice? Locked invoices cannot be modified without unlocking them first.')) {
+      return;
+    }
 
     setUnlocking(true);
     try {
@@ -130,7 +131,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
 
       if (error) throw error;
 
-      console.log(`Invoice ${invoice.invoiceNumber} locked by ${user.email}. Reason: ${reason}`);
+      console.log(`Invoice ${invoice.invoiceNumber} locked by ${user.email}`);
 
       await loadInvoice();
       alert('Invoice locked successfully!');
@@ -145,23 +146,31 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
   const handleUnlockInvoice = async () => {
     if (!invoice || !invoice.isFinanciallyLocked) return;
 
-    const reason = prompt('Please provide a reason for unlocking this invoice:');
-    if (!reason) return;
+    const pin = prompt('Please enter your unlock PIN:');
+    if (!pin) return;
 
     setUnlocking(true);
     try {
-      const { error } = await supabase
-        .from('printavo_invoices')
-        .update({
-          is_financially_locked: false,
-          locked_at: null,
-          locked_by: null,
-        })
-        .eq('id', invoice.id);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
 
-      if (error) throw error;
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/unlock-invoice`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          invoiceId: invoice.id,
+          pin: pin,
+        }),
+      });
 
-      console.log(`Invoice ${invoice.invoiceNumber} unlocked. Reason: ${reason}`);
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to unlock invoice');
+      }
 
       await loadInvoice();
       alert('Invoice unlocked successfully!');

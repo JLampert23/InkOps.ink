@@ -65,11 +65,21 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { invoiceId, reason } = await req.json();
+    const { invoiceId, pin } = await req.json();
 
     if (!invoiceId) {
       return new Response(
         JSON.stringify({ error: "Missing invoiceId" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    if (!pin) {
+      return new Response(
+        JSON.stringify({ error: "Missing PIN" }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -106,6 +116,38 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const { data: userProfile } = await supabaseAuth
+      .from("user_profiles")
+      .select("unlock_pin_hash")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (!userProfile || !userProfile.unlock_pin_hash) {
+      return new Response(
+        JSON.stringify({ error: "No PIN set. Please set a PIN in Account Settings > Security." }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const encoder = new TextEncoder();
+    const data = encoder.encode(pin);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const pinHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+    if (pinHash !== userProfile.unlock_pin_hash) {
+      return new Response(
+        JSON.stringify({ error: "Incorrect PIN" }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     const { error: updateError } = await supabaseAuth
       .from("printavo_invoices")
       .update({
@@ -126,7 +168,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    console.log(`Invoice ${invoice.invoice_number} unlocked by admin ${user.email}. Reason: ${reason || 'No reason provided'}`);
+    console.log(`Invoice ${invoice.invoice_number} unlocked by ${user.email} with PIN verification`);
 
     return new Response(
       JSON.stringify({
@@ -138,8 +180,7 @@ Deno.serve(async (req: Request) => {
           was_locked_by: invoice.locked_by,
           was_locked_at: invoice.locked_at,
           unlocked_by: user.email,
-          unlocked_at: new Date().toISOString(),
-          reason: reason || 'No reason provided'
+          unlocked_at: new Date().toISOString()
         }
       }),
       {

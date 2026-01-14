@@ -43,7 +43,7 @@ interface PrintavoStatus {
 type SettingsTab =
   | 'company-info'
   | 'printavo-integration' | 'square-integration' | 'resend-integration' | 'twilio-integration' | 'stripe-payments'
-  | 'user-management'
+  | 'user-management' | 'user-security'
   | 'status-filters' | 'billing-status-filters'
   | 'automated-reports' | 'workflow-setup' | 'automations';
 
@@ -136,6 +136,13 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
   const [savingBillingFilters, setSavingBillingFilters] = useState(false);
   const [billingFiltersSaveMessage, setBillingFiltersSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  const [unlockPin, setUnlockPin] = useState('');
+  const [unlockPinConfirm, setUnlockPinConfirm] = useState('');
+  const [currentPin, setCurrentPin] = useState('');
+  const [hasExistingPin, setHasExistingPin] = useState(false);
+  const [savingPin, setSavingPin] = useState(false);
+  const [pinSaveMessage, setPinSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   useEffect(() => {
     loadSettings();
     loadUsers();
@@ -191,9 +198,80 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
       const currentProfile = data?.find(u => u.id === user?.id);
       if (currentProfile) {
         setCurrentUserProfile(currentProfile);
+        setHasExistingPin(!!currentProfile.unlock_pin_hash);
       }
     } catch (err) {
       console.error('Error loading users:', err);
+    }
+  };
+
+  const hashPin = async (pin: string): Promise<string> => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(pin);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  };
+
+  const saveUnlockPin = async () => {
+    if (!user) return;
+
+    if (!unlockPin || unlockPin.length < 4) {
+      setPinSaveMessage({ type: 'error', text: 'PIN must be at least 4 characters' });
+      return;
+    }
+
+    if (unlockPin !== unlockPinConfirm) {
+      setPinSaveMessage({ type: 'error', text: 'PINs do not match' });
+      return;
+    }
+
+    if (hasExistingPin && !currentPin) {
+      setPinSaveMessage({ type: 'error', text: 'Please enter your current PIN to change it' });
+      return;
+    }
+
+    setSavingPin(true);
+    setPinSaveMessage(null);
+
+    try {
+      if (hasExistingPin) {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('unlock_pin_hash')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (profile) {
+          const currentPinHash = await hashPin(currentPin);
+          if (currentPinHash !== profile.unlock_pin_hash) {
+            setPinSaveMessage({ type: 'error', text: 'Current PIN is incorrect' });
+            setSavingPin(false);
+            return;
+          }
+        }
+      }
+
+      const pinHash = await hashPin(unlockPin);
+
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ unlock_pin_hash: pinHash })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      setPinSaveMessage({ type: 'success', text: hasExistingPin ? 'PIN updated successfully' : 'PIN set successfully' });
+      setUnlockPin('');
+      setUnlockPinConfirm('');
+      setCurrentPin('');
+      setHasExistingPin(true);
+      await loadUsers();
+    } catch (err) {
+      console.error('Error saving PIN:', err);
+      setPinSaveMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to save PIN' });
+    } finally {
+      setSavingPin(false);
     }
   };
 
@@ -1731,6 +1809,26 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
             </div>
           )}
 
+          {/* Security */}
+          <div className="mb-2">
+            <button
+              onClick={() => setActiveTab('user-security')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
+                activeTab === 'user-security'
+                  ? 'bg-blue-50 text-blue-700 shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+            >
+              <Key className={`w-4 h-4 flex-shrink-0 ${activeTab === 'user-security' ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+              <div className="flex-1 text-left">
+                <div className={`font-medium text-sm ${activeTab === 'user-security' ? 'text-blue-700' : 'text-gray-700'}`}>
+                  Security
+                </div>
+              </div>
+              {activeTab === 'user-security' && <div className="w-1 h-6 bg-blue-600 rounded-full absolute right-0" />}
+            </button>
+          </div>
+
           {/* Status Filters */}
           <div className="mb-2">
             <button
@@ -2944,6 +3042,105 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
                     </div>
                   ))
                 )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'user-security' && (
+            <div className="bg-white rounded-lg shadow p-6 space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-1">Security Settings</h2>
+                <p className="text-sm text-gray-600">Manage your unlock PIN for financially locked invoices</p>
+              </div>
+
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h3 className="font-medium text-gray-900 mb-3">Unlock PIN</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  {hasExistingPin
+                    ? 'You have set an unlock PIN. Enter your current PIN to change it.'
+                    : 'Set a PIN to unlock financially locked invoices. Minimum 4 characters.'}
+                </p>
+
+                <div className="space-y-4">
+                  {hasExistingPin && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Current PIN
+                      </label>
+                      <input
+                        type="password"
+                        value={currentPin}
+                        onChange={(e) => setCurrentPin(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Enter current PIN"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {hasExistingPin ? 'New PIN' : 'PIN'}
+                    </label>
+                    <input
+                      type="password"
+                      value={unlockPin}
+                      onChange={(e) => setUnlockPin(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Enter PIN (min 4 characters)"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Confirm {hasExistingPin ? 'New ' : ''}PIN
+                    </label>
+                    <input
+                      type="password"
+                      value={unlockPinConfirm}
+                      onChange={(e) => setUnlockPinConfirm(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Confirm PIN"
+                    />
+                  </div>
+
+                  {pinSaveMessage && (
+                    <div className={`p-3 rounded-lg ${
+                      pinSaveMessage.type === 'success'
+                        ? 'bg-green-50 text-green-800 border border-green-200'
+                        : 'bg-red-50 text-red-800 border border-red-200'
+                    }`}>
+                      {pinSaveMessage.text}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={saveUnlockPin}
+                    disabled={savingPin}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  >
+                    {savingPin ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        {hasExistingPin ? 'Update PIN' : 'Set PIN'}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <h4 className="font-medium text-gray-900 mb-2">About Unlock PINs</h4>
+                <ul className="text-sm text-gray-600 space-y-2">
+                  <li>PINs are used to unlock financially locked invoices</li>
+                  <li>Each user sets their own unique PIN</li>
+                  <li>PINs are encrypted and stored securely</li>
+                  <li>Only users with the correct PIN can unlock invoices</li>
+                </ul>
               </div>
             </div>
           )}
