@@ -568,6 +568,15 @@ export const billingService = {
           payment_status: 'paid',
         })
         .eq('id', queueItemId);
+
+      await supabase
+        .from('printavo_invoices')
+        .update({
+          amount_outstanding: 0,
+          amount_paid: queueItem.invoice_total,
+          status_stage: 'paid',
+        })
+        .eq('id', queueItem.printavo_invoice_id);
     } catch (error) {
       console.error('Error marking as paid:', error);
       throw error;
