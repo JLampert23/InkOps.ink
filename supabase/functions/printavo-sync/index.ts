@@ -462,13 +462,22 @@ async function findOrCreateCustomer(
     hasShipping: !!customerDetails.shippingAddress,
   });
 
-  const customerName = customerDetails.companyName;
+  let customerName = customerDetails.companyName;
   const customerEmail = customerDetails.primaryContact?.email;
   const customerPhone = customerDetails.primaryContact?.phone;
 
-  if (!customerName) {
-    console.log('No customer name found for customer ID', printavoCustomerId);
-    return { id: null, details: null };
+  if (!customerName || customerName.trim() === '') {
+    const fallbackName = invoice.contact?.fullName ||
+                        [customerDetails.primaryContact?.firstName, customerDetails.primaryContact?.lastName]
+                          .filter(Boolean).join(' ');
+
+    if (!fallbackName) {
+      console.log('No customer name or contact name found for customer ID', printavoCustomerId);
+      return { id: null, details: null };
+    }
+
+    customerName = fallbackName;
+    console.log('Using contact name as fallback:', customerName);
   }
 
   let existingCustomer = null;
