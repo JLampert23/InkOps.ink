@@ -4,6 +4,7 @@ import { AccountSettings } from './components/AccountSettings';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { EnhancedAuthScreen } from './components/EnhancedAuthScreen';
 import { supabase } from './lib/supabase-client';
+import { billingService } from './services/billing-service';
 
 const SquareData = lazy(() => import('./components/SquareData'));
 const ProductionManagement = lazy(() => import('./components/ProductionManagement').then(m => ({ default: m.ProductionManagement })));
@@ -30,6 +31,7 @@ function AppContent() {
   const [accountingExpanded, setAccountingExpanded] = useState(true);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [settingsInitialTab, setSettingsInitialTab] = useState<string | undefined>(undefined);
+  const [syncing, setSyncing] = useState(false);
   const { signOut, user } = useAuth();
 
   useEffect(() => {
@@ -145,6 +147,18 @@ function AppContent() {
   const closeSidebarOnMobile = () => {
     if (window.innerWidth < 1024) {
       setSidebarOpen(false);
+    }
+  };
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      await billingService.syncBillingQueue([]);
+      alert('Sync completed successfully!');
+    } catch (error: any) {
+      alert(error.message || 'Failed to sync from Printavo');
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -377,6 +391,15 @@ function AppContent() {
               </button>
             </div>
           )}
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+            title={!sidebarOpen ? 'Sync from Printavo' : ''}
+          >
+            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+            {sidebarOpen && <span className="text-sm font-medium">{syncing ? 'Syncing...' : 'Sync from Printavo'}</span>}
+          </button>
           <button
             onClick={() => signOut()}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
