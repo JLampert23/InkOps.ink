@@ -12,6 +12,15 @@ export function PaidInvoices({ onViewInvoice }: PaidInvoicesProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('all');
 
+  const formatPaymentMethod = (method: string | null): string => {
+    if (!method) return 'N/A';
+    const normalized = method.toLowerCase();
+    if (normalized === 'manual') return 'Manual';
+    if (normalized === 'card') return 'Card';
+    if (normalized === 'ach' || normalized === 'check') return 'Check/ACH';
+    return method;
+  };
+
   useEffect(() => {
     loadPaidInvoices();
   }, []);
@@ -215,8 +224,8 @@ export function PaidInvoices({ onViewInvoice }: PaidInvoicesProps) {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-1">
                       <CreditCard className="w-4 h-4 text-gray-400" />
-                      <span className="text-sm text-gray-900 capitalize">
-                        {invoice.paymentMethod}
+                      <span className="text-sm text-gray-900">
+                        {formatPaymentMethod(invoice.paymentMethod)}
                       </span>
                     </div>
                   </td>

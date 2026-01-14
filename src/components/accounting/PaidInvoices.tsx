@@ -46,6 +46,15 @@ export default function PaidInvoices() {
   const [customers, setCustomers] = useState<string[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
 
+  const formatPaymentMethod = (method: string | null): string => {
+    if (!method) return 'N/A';
+    const normalized = method.toLowerCase();
+    if (normalized === 'manual') return 'Manual';
+    if (normalized === 'card') return 'Card';
+    if (normalized === 'ach' || normalized === 'check') return 'Check/ACH';
+    return method;
+  };
+
   useEffect(() => {
     loadPaidInvoices();
   }, [startDate, endDate, selectedCustomer, selectedMethod, minAmount, maxAmount]);
@@ -260,7 +269,7 @@ export default function PaidInvoices() {
               >
                 <option value="all">All Methods</option>
                 {paymentMethods.map(method => (
-                  <option key={method} value={method}>{method}</option>
+                  <option key={method} value={method}>{formatPaymentMethod(method)}</option>
                 ))}
               </select>
             </div>
@@ -352,7 +361,7 @@ export default function PaidInvoices() {
                       ${invoice.amount_paid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {invoice.payment_method}
+                      {formatPaymentMethod(invoice.payment_method)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <button
@@ -381,7 +390,7 @@ export default function PaidInvoices() {
                                         {format(new Date(payment.payment_date), 'MMM dd, yyyy')}
                                       </div>
                                       <div className="text-xs text-gray-500">
-                                        {payment.payment_method} • {payment.stripe_charge_id || payment.stripe_payment_intent_id}
+                                        {formatPaymentMethod(payment.payment_method)} • {payment.stripe_charge_id || payment.stripe_payment_intent_id}
                                       </div>
                                     </div>
                                   </div>
