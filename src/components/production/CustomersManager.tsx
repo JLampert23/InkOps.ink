@@ -65,9 +65,27 @@ export function CustomersManager() {
   const loadCustomers = async () => {
     setLoading(true);
     try {
+      // Get distinct customer IDs that have invoices
+      const { data: customerIds, error: idsError } = await supabase
+        .from('printavo_invoices')
+        .select('customer_id')
+        .not('customer_id', 'is', null);
+
+      if (idsError) throw idsError;
+
+      // Extract unique customer IDs
+      const uniqueCustomerIds = [...new Set((customerIds || []).map(inv => inv.customer_id).filter(Boolean))];
+
+      if (uniqueCustomerIds.length === 0) {
+        setCustomers([]);
+        return;
+      }
+
+      // Fetch only customers that have invoices
       const { data, error } = await supabase
         .from('customers')
         .select('id, company_name, contact_name, email, phone, billing_city, billing_state, status, created_at')
+        .in('id', uniqueCustomerIds)
         .order('company_name');
 
       if (error) throw error;
