@@ -116,33 +116,18 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
 
     setUnlocking(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('Not authenticated');
-      }
+      const { error } = await supabase
+        .from('printavo_invoices')
+        .update({
+          is_financially_locked: false,
+          locked_at: null,
+          locked_by: null,
+        })
+        .eq('id', invoice.id);
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/unlock-invoice`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            invoiceId: invoice.id,
-            reason: reason,
-          }),
-        }
-      );
+      if (error) throw error;
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to unlock invoice');
-      }
-
-      const result = await response.json();
-      console.log('Invoice unlocked:', result);
+      console.log(`Invoice ${invoice.invoiceNumber} unlocked. Reason: ${reason}`);
 
       await loadInvoice();
       alert('Invoice unlocked successfully!');
