@@ -49,7 +49,7 @@ Deno.serve(async (req: Request) => {
     const { data: profile } = await supabaseAuth
       .from("user_profiles")
       .select("role")
-      .eq("user_id", user.id)
+      .eq("id", user.id)
       .maybeSingle();
 
     if (!profile || profile.role !== "admin") {
