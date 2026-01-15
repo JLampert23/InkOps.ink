@@ -25,6 +25,8 @@ import {
   ChevronDown,
   ChevronUp,
   AlertCircle,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 import { invoiceDetailService, InvoiceDetail as InvoiceDetailType } from '../../services/invoice-detail-service';
 import { billingService } from '../../services/billing-service';
@@ -377,12 +379,28 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                 </h1>
                 <div className="flex items-center gap-2 flex-wrap">
                   {getStatusBadge(invoice.status, invoice.statusColor)}
-                  {getPaymentStatusBadge(invoice.billingQueueStatus)}
-                  {invoice.isFinanciallyLocked && (
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full border border-yellow-200">
-                      <AlertCircle className="w-3.5 h-3.5" />
-                      <span>Financially Locked</span>
-                    </div>
+                  {(userRole === 'admin' || userRole === 'super_admin') && (
+                    invoice.isFinanciallyLocked ? (
+                      <button
+                        onClick={handleUnlockInvoice}
+                        disabled={unlocking}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full border border-yellow-200 hover:bg-yellow-200 transition-colors disabled:opacity-50"
+                        title="Click to unlock invoice"
+                      >
+                        <Lock className="w-3.5 h-3.5" />
+                        <span>{unlocking ? 'Unlocking...' : 'Locked'}</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleLockInvoice}
+                        disabled={unlocking}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-full border border-gray-300 hover:bg-gray-200 transition-colors disabled:opacity-50"
+                        title="Click to lock invoice"
+                      >
+                        <Unlock className="w-3.5 h-3.5" />
+                        <span>{unlocking ? 'Locking...' : 'Unlocked'}</span>
+                      </button>
+                    )
                   )}
                 </div>
               </div>
@@ -400,27 +418,6 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
               <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Sync</span>
             </button>
-            {(userRole === 'admin' || userRole === 'super_admin') && (
-              invoice.isFinanciallyLocked ? (
-                <button
-                  onClick={handleUnlockInvoice}
-                  disabled={unlocking}
-                  className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-white bg-yellow-600 border border-yellow-700 rounded-lg hover:bg-yellow-700 transition-colors disabled:opacity-50 whitespace-nowrap"
-                >
-                  <AlertCircle className={`w-4 h-4 ${unlocking ? 'animate-spin' : ''}`} />
-                  <span className="hidden sm:inline">{unlocking ? 'Unlocking...' : 'Unlock'}</span>
-                </button>
-              ) : (
-                <button
-                  onClick={handleLockInvoice}
-                  disabled={unlocking}
-                  className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 whitespace-nowrap"
-                >
-                  <AlertCircle className={`w-4 h-4 ${unlocking ? 'animate-spin' : ''}`} />
-                  <span className="hidden sm:inline">{unlocking ? 'Locking...' : 'Lock'}</span>
-                </button>
-              )
-            )}
             <button
               onClick={() => invoice && generateInvoicePDF(invoice)}
               className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap"
