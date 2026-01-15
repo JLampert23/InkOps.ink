@@ -676,7 +676,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setLogoFile(null);
       setPrimaryLogoFile(null);
       setSecondaryLogoFile(null);
-      await fetchCompanySettings();
+      await loadSettings();
     } catch (err) {
       console.error('Error saving company settings:', err);
       alert('Failed to save company settings. Please try again.');
