@@ -186,6 +186,8 @@ Deno.serve(async (req: Request) => {
       refundData.reason = reason;
     }
 
+    console.log('Attempting Stripe refund with data:', refundData);
+
     const stripeResponse = await fetch('https://api.stripe.com/v1/refunds', {
       method: 'POST',
       headers: {
@@ -195,13 +197,24 @@ Deno.serve(async (req: Request) => {
       body: new URLSearchParams(refundData).toString(),
     });
 
+    console.log('Stripe API response status:', stripeResponse.status);
+
     if (!stripeResponse.ok) {
       const errorData = await stripeResponse.json();
-      console.error('Stripe refund error:', errorData);
+      console.error('Stripe refund error - Full details:', JSON.stringify(errorData, null, 2));
+      console.error('Payment data:', JSON.stringify({
+        payment_id: payment.id,
+        stripe_payment_intent_id: payment.stripe_payment_intent_id,
+        stripe_charge_id: payment.stripe_charge_id,
+        amount: payment.amount,
+      }, null, 2));
+
       return new Response(
         JSON.stringify({
           error: "Stripe refund failed",
-          details: errorData.error?.message || 'Unknown error'
+          details: errorData.error?.message || 'Unknown error',
+          stripe_error_type: errorData.error?.type,
+          stripe_error_code: errorData.error?.code,
         }),
         {
           status: 500,
