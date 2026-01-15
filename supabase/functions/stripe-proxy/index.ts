@@ -158,6 +158,8 @@ Deno.serve(async (req: Request) => {
     
     switch (action) {
       case 'testConnection': {
+        console.log('Testing Stripe connection, key starts with:', config.secretKey.substring(0, 8));
+
         const balanceResponse = await callStripeAPI(
           '/balance',
           'GET',
@@ -166,10 +168,13 @@ Deno.serve(async (req: Request) => {
 
         if (!balanceResponse.ok) {
           const error = await balanceResponse.json();
+          console.error('Stripe API error:', error);
           return new Response(
             JSON.stringify({
               success: false,
-              error: error.error?.message || 'Failed to connect to Stripe'
+              error: error.error?.message || 'Failed to connect to Stripe',
+              details: error.error?.type || 'unknown_error',
+              statusCode: balanceResponse.status
             }),
             {
               status: 400,
