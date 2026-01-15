@@ -109,7 +109,16 @@ export default function UnifiedPaymentsReport() {
 
     if (!confirmRefund) return;
 
-    const reason = prompt('Refund reason (optional):');
+    const reason = prompt(
+      'Select refund reason:\n\n1. requested_by_customer (default)\n2. duplicate\n3. fraudulent\n\nEnter 1, 2, or 3 (or press Cancel to use default):'
+    );
+
+    let refundReason = 'requested_by_customer';
+    if (reason === '2') {
+      refundReason = 'duplicate';
+    } else if (reason === '3') {
+      refundReason = 'fraudulent';
+    }
 
     setRefunding(paymentId);
     try {
@@ -132,7 +141,7 @@ export default function UnifiedPaymentsReport() {
         },
         body: JSON.stringify({
           paymentId,
-          reason: reason || undefined,
+          reason: refundReason,
         }),
       });
 

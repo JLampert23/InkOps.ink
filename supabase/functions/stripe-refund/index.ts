@@ -196,8 +196,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (reason) {
+    // Validate reason - Stripe only accepts: duplicate, fraudulent, or requested_by_customer
+    const validReasons = ['duplicate', 'fraudulent', 'requested_by_customer'];
+    if (reason && validReasons.includes(reason)) {
       refundData.reason = reason;
+    } else {
+      // Default to requested_by_customer if no valid reason provided
+      refundData.reason = 'requested_by_customer';
     }
 
     console.log('Attempting Stripe refund with data:', refundData);
