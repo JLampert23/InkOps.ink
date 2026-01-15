@@ -110,13 +110,13 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserName, setNewUserName] = useState('');
-  const [newUserRole, setNewUserRole] = useState('user');
+  const [newUserRole, setNewUserRole] = useState('admin');
   const [addingUser, setAddingUser] = useState(false);
 
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editingUserEmail, setEditingUserEmail] = useState('');
   const [editingUserName, setEditingUserName] = useState('');
-  const [editingUserRole, setEditingUserRole] = useState('user');
+  const [editingUserRole, setEditingUserRole] = useState('admin');
   const [editingUserPassword, setEditingUserPassword] = useState('');
   const [editingUserPasswordConfirm, setEditingUserPasswordConfirm] = useState('');
   const [updatingUser, setUpdatingUser] = useState(false);
@@ -1660,7 +1660,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     );
   }
 
-  const isAdmin = currentUserProfile?.role === 'admin';
+  const isAdmin = currentUserProfile?.role === 'admin' || currentUserProfile?.role === 'super_admin';
 
   return (
     <div className="flex h-full">
@@ -2873,9 +2873,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         onChange={(e) => setNewUserRole(e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       >
+                        <option value="super_admin">Super Admin</option>
                         <option value="admin">Admin</option>
-                        <option value="user">User</option>
-                        <option value="viewer">Viewer</option>
                       </select>
                     </div>
                     <div className="flex gap-2">
@@ -2953,9 +2952,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                                 onChange={(e) => setEditingUserRole(e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                               >
+                                <option value="super_admin">Super Admin</option>
                                 <option value="admin">Admin</option>
-                                <option value="user">User</option>
-                                <option value="viewer">Viewer</option>
                               </select>
                             </div>
                             <div className="border-t border-gray-200 pt-3">
@@ -3036,8 +3034,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           <div className="flex items-center gap-3">
                             <div className="flex items-center gap-2 px-3 py-1 bg-gray-100 rounded-full">
                               <Shield className="w-3 h-3 text-gray-600" />
-                              <span className="text-xs font-medium text-gray-700 capitalize">
-                                {userProfile.role}
+                              <span className="text-xs font-medium text-gray-700">
+                                {userProfile.role === 'super_admin' ? 'Super Admin' : 'Admin'}
                               </span>
                             </div>
                             <button
