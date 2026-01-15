@@ -145,36 +145,26 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: roleData, error: roleError } = await supabase
-      .rpc('get_user_role', { user_id: user.id });
-
-    if (roleError || roleData !== 'super_admin') {
-      return new Response(
-        JSON.stringify({ error: "Access denied. Super Admin role required." }),
-        {
-          status: 403,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
-    if (false) {
-      return new Response(
-        JSON.stringify({
-          code: 401,
-          message: 'Invalid JWT',
-          details: authError?.message
-        }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
     console.log('User authenticated:', user.email);
 
     const { action, data } = await req.json();
+
+    const adminOnlyActions = ['testConnection', 'getBalance', 'createRefund'];
+
+    if (adminOnlyActions.includes(action)) {
+      const { data: roleData, error: roleError } = await supabase
+        .rpc('get_user_role', { user_id: user.id });
+
+      if (roleError || roleData !== 'super_admin') {
+        return new Response(
+          JSON.stringify({ error: "Access denied. Super Admin role required." }),
+          {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+    }
 
     // getStripeConfig() will throw an error if config is not available
     const config = await getStripeConfig();
