@@ -424,22 +424,36 @@ Deno.serve(async (req: Request) => {
             })
             .eq('id', existingPayment.id);
 
-          // Update invoice balance
+          // Recalculate invoice balance based on all payments
           if (existingPayment.invoice_id) {
+            const { data: payments } = await supabase
+              .from('payments')
+              .select('amount, status, refund_amount')
+              .eq('invoice_id', existingPayment.invoice_id);
+
             const { data: invoice } = await supabase
               .from('printavo_invoices')
-              .select('*')
+              .select('total')
               .eq('id', existingPayment.invoice_id)
               .maybeSingle();
 
-            if (invoice) {
-              const newAmountPaid = (invoice.amount_paid || 0) - refundAmount;
-              const newBalance = invoice.total - newAmountPaid;
+            if (invoice && payments) {
+              // Only count successful payments + partial refunds (minus their refund amount)
+              const totalPaid = payments.reduce((sum, p) => {
+                if (p.status === 'successful') {
+                  return sum + parseFloat(p.amount);
+                } else if (p.status === 'partial_refund') {
+                  return sum + (parseFloat(p.amount) - parseFloat(p.refund_amount || 0));
+                }
+                return sum;
+              }, 0);
+
+              const newBalance = parseFloat(invoice.total) - totalPaid;
 
               await supabase
                 .from('printavo_invoices')
                 .update({
-                  amount_paid: newAmountPaid,
+                  amount_paid: totalPaid,
                   balance_remaining: newBalance,
                   amount_outstanding: newBalance,
                 })
