@@ -195,6 +195,26 @@ Deno.serve(async (req: Request) => {
         .eq("printavo_invoice_id", invoiceId);
     }
 
+    await supabaseAuth.from('communication_logs').insert([{
+      company_id: companySettings.id,
+      printavo_invoice_id: invoiceId,
+      communication_type: 'payment',
+      method: 'manual',
+      recipient: user.email,
+      subject: `Manual Payment Recorded - Invoice #${invoice.invoice_number}`,
+      message: `Payment of $${amount.toFixed(2)} recorded via ${paymentTypeMap[paymentType] || paymentType}${checkNumber ? ` (Check #${checkNumber})` : ''}`,
+      status: 'completed',
+      metadata: {
+        payment_id: payment.id,
+        payment_type: paymentType,
+        payment_method: paymentTypeMap[paymentType] || paymentType,
+        check_number: checkNumber || null,
+        amount: amount,
+        recorded_by: user.email,
+      },
+      sent_by: user.id,
+    }]);
+
     console.log(`Manual payment of $${amount} recorded for invoice ${invoice.invoice_number} by ${user.email}`);
 
     return new Response(

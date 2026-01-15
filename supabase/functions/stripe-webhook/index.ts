@@ -266,6 +266,23 @@ Deno.serve(async (req: Request) => {
               payment_method: paymentIntent.payment_method_types?.[0] || 'card',
               metadata: { payment_intent: paymentIntent },
             }]);
+
+            await supabase.from('communication_logs').insert([{
+              company_id: companyId,
+              printavo_invoice_id: queueItem.printavo_invoice_id,
+              communication_type: 'payment',
+              method: 'stripe',
+              recipient: queueItem.customer_email || 'unknown',
+              subject: `Payment Received - Invoice #${queueItem.printavo_visual_id}`,
+              message: `Payment of $${(paymentIntent.amount / 100).toFixed(2)} received via Stripe`,
+              status: 'completed',
+              metadata: {
+                stripe_payment_intent_id: paymentIntent.id,
+                stripe_charge_id: paymentIntent.latest_charge,
+                amount: paymentIntent.amount / 100,
+                payment_method: paymentIntent.payment_method_types?.[0] || 'card',
+              },
+            }]);
           }
         }
 
@@ -422,6 +439,23 @@ Deno.serve(async (req: Request) => {
                 payment_method: 'card',
                 metadata: { checkout_session: session },
               }]);
+
+              await supabase.from('communication_logs').insert([{
+                company_id: companyId,
+                printavo_invoice_id: queueItem.printavo_invoice_id,
+                communication_type: 'payment',
+                method: 'stripe',
+                recipient: queueItem.customer_email || 'unknown',
+                subject: `Payment Received - Invoice #${queueItem.printavo_visual_id}`,
+                message: `Payment of $${(session.amount_total / 100).toFixed(2)} received via Stripe`,
+                status: 'completed',
+                metadata: {
+                  stripe_payment_intent_id: session.payment_intent,
+                  stripe_session_id: session.id,
+                  amount: session.amount_total / 100,
+                  payment_method: 'card',
+                },
+              }]);
             }
           }
         }
@@ -553,6 +587,24 @@ Deno.serve(async (req: Request) => {
                 stripe_charge_id: chargeId,
                 payment_method: 'card',
                 metadata: { invoice: invoice },
+              }]);
+
+              await supabase.from('communication_logs').insert([{
+                company_id: companyId,
+                printavo_invoice_id: queueItem.printavo_invoice_id,
+                communication_type: 'payment',
+                method: 'stripe',
+                recipient: queueItem.customer_email || 'unknown',
+                subject: `Payment Received - Invoice #${queueItem.printavo_visual_id}`,
+                message: `Payment of $${(amountPaid / 100).toFixed(2)} received via Stripe`,
+                status: 'completed',
+                metadata: {
+                  stripe_payment_intent_id: paymentIntentId,
+                  stripe_charge_id: chargeId,
+                  stripe_invoice_id: invoice.id,
+                  amount: amountPaid / 100,
+                  payment_method: 'card',
+                },
               }]);
             }
           } else {
