@@ -279,21 +279,6 @@ Deno.serve(async (req: Request) => {
               })
               .eq('id', queueItem.id);
 
-            await supabase.from('paid_invoices').insert([{
-              company_id: companyId,
-              printavo_invoice_id: queueItem.printavo_invoice_id,
-              printavo_visual_id: queueItem.printavo_visual_id,
-              customer_name: queueItem.customer_name,
-              customer_email: queueItem.customer_email,
-              invoice_total: queueItem.invoice_total,
-              amount_paid: paymentIntent.amount / 100,
-              payment_date: new Date().toISOString(),
-              stripe_payment_intent_id: paymentIntent.id,
-              stripe_charge_id: paymentIntent.latest_charge || null,
-              payment_method: paymentIntent.payment_method_types?.[0] || 'card',
-              metadata: { payment_intent: paymentIntent },
-            }]);
-
             await supabase.from('communication_logs').insert([{
               company_id: companyId,
               printavo_invoice_id: queueItem.printavo_invoice_id,
@@ -550,21 +535,6 @@ Deno.serve(async (req: Request) => {
                 })
                 .eq('id', queueItem.id);
 
-              await supabase.from('paid_invoices').insert([{
-                company_id: companyId,
-                printavo_invoice_id: queueItem.printavo_invoice_id,
-                printavo_visual_id: queueItem.printavo_visual_id,
-                customer_name: queueItem.customer_name,
-                customer_email: queueItem.customer_email,
-                invoice_total: queueItem.invoice_total,
-                amount_paid: session.amount_total / 100,
-                payment_date: new Date().toISOString(),
-                stripe_payment_intent_id: session.payment_intent,
-                stripe_charge_id: null,
-                payment_method: 'card',
-                metadata: { checkout_session: session },
-              }]);
-
               await supabase.from('communication_logs').insert([{
                 company_id: companyId,
                 printavo_invoice_id: queueItem.printavo_invoice_id,
@@ -724,21 +694,6 @@ Deno.serve(async (req: Request) => {
                   payment_status: 'paid',
                 })
                 .eq('id', queueItem.id);
-
-              await supabase.from('paid_invoices').insert([{
-                company_id: companyId,
-                printavo_invoice_id: queueItem.printavo_invoice_id,
-                printavo_visual_id: queueItem.printavo_visual_id,
-                customer_name: queueItem.customer_name,
-                customer_email: queueItem.customer_email,
-                invoice_total: queueItem.invoice_total,
-                amount_paid: amountPaid / 100,
-                payment_date: new Date().toISOString(),
-                stripe_payment_intent_id: paymentIntentId,
-                stripe_charge_id: chargeId,
-                payment_method: 'card',
-                metadata: { invoice: invoice },
-              }]);
 
               await supabase.from('communication_logs').insert([{
                 company_id: companyId,
