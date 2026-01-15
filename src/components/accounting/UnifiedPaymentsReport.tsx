@@ -11,6 +11,7 @@ interface Payment {
   invoice_number: string;
   customer_name: string;
   amount: number;
+  refund_amount: number;
   payment_method: string;
   source: string;
   stripe_transaction_id: string | null;
@@ -63,6 +64,7 @@ export default function UnifiedPaymentsReport() {
         invoice_number: payment.printavo_invoices?.invoice_number || 'N/A',
         customer_name: payment.printavo_invoices?.customer_name || 'Unknown',
         amount: parseFloat(payment.amount || 0),
+        refund_amount: parseFloat(payment.refund_amount || 0),
         payment_method: payment.payment_method || payment.source || 'Unknown',
         source: payment.source || 'manual',
         stripe_transaction_id: payment.stripe_transaction_id || payment.stripe_charge_id || null,
@@ -306,12 +308,14 @@ export default function UnifiedPaymentsReport() {
 
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600">Refunded</span>
-            <RotateCcw className="w-5 h-5 text-gray-600" />
+            <span className="text-sm font-medium text-gray-600">Total Refunded</span>
+            <RotateCcw className="w-5 h-5 text-red-600" />
           </div>
-          <div className="text-2xl font-bold text-gray-900">{refundedPayments.length}</div>
+          <div className="text-2xl font-bold text-red-600">
+            ${refundedPayments.reduce((sum, p) => sum + p.refund_amount, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
           <div className="text-xs text-gray-500 mt-1">
-            ${refundedPayments.reduce((sum, p) => sum + p.amount, 0).toFixed(2)}
+            {refundedPayments.length} {refundedPayments.length === 1 ? 'refund' : 'refunds'}
           </div>
         </div>
       </div>
