@@ -137,6 +137,29 @@ Deno.serve(async (req: Request) => {
         hasUser: !!user
       });
       return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    const { data: roleData, error: roleError } = await supabase
+      .rpc('get_user_role', { user_id: user.id });
+
+    if (roleError || roleData !== 'super_admin') {
+      return new Response(
+        JSON.stringify({ error: "Access denied. Super Admin role required." }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    if (false) {
+      return new Response(
         JSON.stringify({
           code: 401,
           message: 'Invalid JWT',

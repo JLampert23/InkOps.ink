@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { EnhancedAuthScreen } from './components/EnhancedAuthScreen';
 import { supabase } from './lib/supabase-client';
 import { billingService } from './services/billing-service';
+import { useRBAC } from './hooks/useRBAC';
 
 const SquareData = lazy(() => import('./components/SquareData'));
 const ProductionManagement = lazy(() => import('./components/ProductionManagement').then(m => ({ default: m.ProductionManagement })));
@@ -33,6 +34,7 @@ function AppContent() {
   const [settingsInitialTab, setSettingsInitialTab] = useState<string | undefined>(undefined);
   const [syncing, setSyncing] = useState(false);
   const { signOut, user } = useAuth();
+  const { userProfile, canAccessIntegrations } = useRBAC();
 
   useEffect(() => {
     const checkScreenSize = () => {
@@ -576,7 +578,10 @@ function AppContent() {
           )}
 
           {activeTab === 'settings' && (
-            <AccountSettings initialTab={settingsInitialTab as any} />
+            <AccountSettings
+              initialTab={settingsInitialTab as any}
+              canAccessIntegrations={canAccessIntegrations}
+            />
           )}
         </main>
       </div>

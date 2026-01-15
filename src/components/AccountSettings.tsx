@@ -49,9 +49,10 @@ type SettingsTab =
 
 interface AccountSettingsProps {
   initialTab?: SettingsTab;
+  canAccessIntegrations?: boolean;
 }
 
-export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
+export function AccountSettings({ initialTab, canAccessIntegrations = true }: AccountSettingsProps = {}) {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab || 'company-info');
   const [loading, setLoading] = useState(true);
@@ -149,6 +150,20 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
     loadAvailableStatuses();
     loadStatusesFromDatabase();
   }, []);
+
+  useEffect(() => {
+    const integrationTabs: SettingsTab[] = [
+      'printavo-integration',
+      'square-integration',
+      'resend-integration',
+      'twilio-integration',
+      'stripe-payments'
+    ];
+
+    if (!canAccessIntegrations && integrationTabs.includes(activeTab)) {
+      setActiveTab('company-info');
+    }
+  }, [activeTab, canAccessIntegrations]);
 
   const loadSettings = async () => {
     try {
@@ -1677,118 +1692,120 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
             </button>
           </div>
 
-          {/* Integrations Section - Collapsible */}
-          <div className="mb-2">
-            <button
-              onClick={() => setIntegrationsExpanded(!integrationsExpanded)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 hover:bg-gray-50"
-            >
-              <LinkIcon className="w-4 h-4 flex-shrink-0 text-gray-600 group-hover:text-gray-900" />
-              <div className="flex-1 text-left">
-                <div className="font-medium text-sm text-gray-900">
-                  Integrations
+          {/* Integrations Section - Collapsible (Super Admin only) */}
+          {canAccessIntegrations && (
+            <div className="mb-2">
+              <button
+                onClick={() => setIntegrationsExpanded(!integrationsExpanded)}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 hover:bg-gray-50"
+              >
+                <LinkIcon className="w-4 h-4 flex-shrink-0 text-gray-600 group-hover:text-gray-900" />
+                <div className="flex-1 text-left">
+                  <div className="font-medium text-sm text-gray-900">
+                    Integrations
+                  </div>
                 </div>
-              </div>
-              {integrationsExpanded ? (
-                <ChevronDown className="w-4 h-4 text-gray-500 transition-transform duration-200" />
-              ) : (
-                <ChevronUp className="w-4 h-4 text-gray-500 transition-transform duration-200 rotate-180" />
+                {integrationsExpanded ? (
+                  <ChevronDown className="w-4 h-4 text-gray-500 transition-transform duration-200" />
+                ) : (
+                  <ChevronUp className="w-4 h-4 text-gray-500 transition-transform duration-200 rotate-180" />
+                )}
+              </button>
+
+              {integrationsExpanded && (
+                <div className="mt-1 ml-2 space-y-1 collapsible-section collapsible-section-enter">
+                  <button
+                    onClick={() => setActiveTab('printavo-integration')}
+                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                      activeTab === 'printavo-integration'
+                        ? 'bg-green-50 text-green-700 shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                  >
+                    <Key className={`w-4 h-4 flex-shrink-0 ${activeTab === 'printavo-integration' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                    <div className="flex-1 text-left">
+                      <div className={`font-medium text-sm ${activeTab === 'printavo-integration' ? 'text-green-700' : 'text-gray-700'}`}>
+                        Printavo
+                      </div>
+                    </div>
+                    {activeTab === 'printavo-integration' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('square-integration')}
+                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                      activeTab === 'square-integration'
+                        ? 'bg-green-50 text-green-700 shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                    style={{ animationDelay: '20ms' }}
+                  >
+                    <CreditCard className={`w-4 h-4 flex-shrink-0 ${activeTab === 'square-integration' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                    <div className="flex-1 text-left">
+                      <div className={`font-medium text-sm ${activeTab === 'square-integration' ? 'text-green-700' : 'text-gray-700'}`}>
+                        Square
+                      </div>
+                    </div>
+                    {activeTab === 'square-integration' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('resend-integration')}
+                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                      activeTab === 'resend-integration'
+                        ? 'bg-green-50 text-green-700 shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                    style={{ animationDelay: '40ms' }}
+                  >
+                    <SettingsIcon className={`w-4 h-4 flex-shrink-0 ${activeTab === 'resend-integration' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                    <div className="flex-1 text-left">
+                      <div className={`font-medium text-sm ${activeTab === 'resend-integration' ? 'text-green-700' : 'text-gray-700'}`}>
+                        Resend Email
+                      </div>
+                    </div>
+                    {activeTab === 'resend-integration' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('twilio-integration')}
+                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                      activeTab === 'twilio-integration'
+                        ? 'bg-green-50 text-green-700 shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                    style={{ animationDelay: '50ms' }}
+                  >
+                    <MessageSquare className={`w-4 h-4 flex-shrink-0 ${activeTab === 'twilio-integration' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                    <div className="flex-1 text-left">
+                      <div className={`font-medium text-sm ${activeTab === 'twilio-integration' ? 'text-green-700' : 'text-gray-700'}`}>
+                        Twilio SMS
+                      </div>
+                    </div>
+                    {activeTab === 'twilio-integration' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('stripe-payments')}
+                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                      activeTab === 'stripe-payments'
+                        ? 'bg-green-50 text-green-700 shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    }`}
+                    style={{ animationDelay: '60ms' }}
+                  >
+                    <CreditCard className={`w-4 h-4 flex-shrink-0 ${activeTab === 'stripe-payments' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                    <div className="flex-1 text-left">
+                      <div className={`font-medium text-sm ${activeTab === 'stripe-payments' ? 'text-green-700' : 'text-gray-700'}`}>
+                        Stripe
+                      </div>
+                    </div>
+                    {activeTab === 'stripe-payments' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
+                  </button>
+                </div>
               )}
-            </button>
-
-            {integrationsExpanded && (
-              <div className="mt-1 ml-2 space-y-1 collapsible-section collapsible-section-enter">
-                <button
-                  onClick={() => setActiveTab('printavo-integration')}
-                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
-                    activeTab === 'printavo-integration'
-                      ? 'bg-green-50 text-green-700 shadow-sm'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                >
-                  <Key className={`w-4 h-4 flex-shrink-0 ${activeTab === 'printavo-integration' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
-                  <div className="flex-1 text-left">
-                    <div className={`font-medium text-sm ${activeTab === 'printavo-integration' ? 'text-green-700' : 'text-gray-700'}`}>
-                      Printavo
-                    </div>
-                  </div>
-                  {activeTab === 'printavo-integration' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('square-integration')}
-                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
-                    activeTab === 'square-integration'
-                      ? 'bg-green-50 text-green-700 shadow-sm'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                  style={{ animationDelay: '20ms' }}
-                >
-                  <CreditCard className={`w-4 h-4 flex-shrink-0 ${activeTab === 'square-integration' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
-                  <div className="flex-1 text-left">
-                    <div className={`font-medium text-sm ${activeTab === 'square-integration' ? 'text-green-700' : 'text-gray-700'}`}>
-                      Square
-                    </div>
-                  </div>
-                  {activeTab === 'square-integration' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('resend-integration')}
-                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
-                    activeTab === 'resend-integration'
-                      ? 'bg-green-50 text-green-700 shadow-sm'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                  style={{ animationDelay: '40ms' }}
-                >
-                  <SettingsIcon className={`w-4 h-4 flex-shrink-0 ${activeTab === 'resend-integration' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
-                  <div className="flex-1 text-left">
-                    <div className={`font-medium text-sm ${activeTab === 'resend-integration' ? 'text-green-700' : 'text-gray-700'}`}>
-                      Resend Email
-                    </div>
-                  </div>
-                  {activeTab === 'resend-integration' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('twilio-integration')}
-                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
-                    activeTab === 'twilio-integration'
-                      ? 'bg-green-50 text-green-700 shadow-sm'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                  style={{ animationDelay: '50ms' }}
-                >
-                  <MessageSquare className={`w-4 h-4 flex-shrink-0 ${activeTab === 'twilio-integration' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
-                  <div className="flex-1 text-left">
-                    <div className={`font-medium text-sm ${activeTab === 'twilio-integration' ? 'text-green-700' : 'text-gray-700'}`}>
-                      Twilio SMS
-                    </div>
-                  </div>
-                  {activeTab === 'twilio-integration' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('stripe-payments')}
-                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
-                    activeTab === 'stripe-payments'
-                      ? 'bg-green-50 text-green-700 shadow-sm'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                  style={{ animationDelay: '60ms' }}
-                >
-                  <CreditCard className={`w-4 h-4 flex-shrink-0 ${activeTab === 'stripe-payments' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
-                  <div className="flex-1 text-left">
-                    <div className={`font-medium text-sm ${activeTab === 'stripe-payments' ? 'text-green-700' : 'text-gray-700'}`}>
-                      Stripe
-                    </div>
-                  </div>
-                  {activeTab === 'stripe-payments' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
-                </button>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* User Management (Admin only) */}
           {isAdmin && (
@@ -2032,7 +2049,7 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
             </div>
           )}
 
-          {activeTab === 'printavo-integration' && (
+          {activeTab === 'printavo-integration' && canAccessIntegrations && (
             <div className="bg-white rounded-lg shadow p-6 space-y-6">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Printavo Integration</h2>
@@ -2248,7 +2265,7 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
             </div>
           )}
 
-          {activeTab === 'square-integration' && (
+          {activeTab === 'square-integration' && canAccessIntegrations && (
             <div className="bg-white rounded-lg shadow p-6 space-y-6">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Square Integration</h2>
@@ -2421,7 +2438,7 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
             </div>
           )}
 
-          {activeTab === 'resend-integration' && (
+          {activeTab === 'resend-integration' && canAccessIntegrations && (
             <div className="bg-white rounded-lg shadow p-6 space-y-6">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Resend Email Integration</h2>
@@ -2586,7 +2603,7 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
             </div>
           )}
 
-          {activeTab === 'twilio-integration' && (
+          {activeTab === 'twilio-integration' && canAccessIntegrations && (
             <div className="bg-white rounded-lg shadow p-6 space-y-6">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Twilio SMS Integration</h2>
@@ -3450,7 +3467,7 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
             </div>
           )}
 
-          {activeTab === 'stripe-payments' && (
+          {activeTab === 'stripe-payments' && canAccessIntegrations && (
             <div className="bg-white rounded-lg shadow p-6 space-y-6">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Stripe Payment Integration</h2>

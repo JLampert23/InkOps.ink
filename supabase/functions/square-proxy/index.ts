@@ -54,6 +54,22 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+    const { data: roleData, error: roleError } = await supabaseAdmin
+      .rpc('get_user_role', { user_id: user.id });
+
+    if (roleError || roleData !== 'super_admin') {
+      return new Response(
+        JSON.stringify({ error: "Access denied. Super Admin role required." }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     const { data: settings, error: settingsError } = await supabase
       .from('company_settings')
       .select('square_access_token, square_environment, square_location_id')
