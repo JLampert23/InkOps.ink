@@ -114,34 +114,63 @@ export default function UnifiedPaymentsReport() {
     setRefunding(paymentId);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-refund`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            paymentId,
-            reason,
-          }),
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || result.details || 'Failed to process refund');
+      if (!session) {
+        console.error('No session found');
+        throw new Error('Not authenticated');
       }
 
-      alert('Refund processed successfully!');
+      console.log('Calling stripe-refund function for payment:', paymentId);
+
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/stripe-refund`;
+      console.log('Function URL:', url);
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          paymentId,
+          reason: reason || undefined,
+        }),
+      });
+
+      console.log('Response status:', response.status);
+
+      let result;
+      try {
+        result = await response.json();
+        console.log('Response data:', result);
+      } catch (e) {
+        console.error('Failed to parse response as JSON:', e);
+        throw new Error('Invalid response from server');
+      }
+
+      if (!response.ok) {
+        const errorMessage = result.error || result.details || 'Failed to process refund';
+        console.error('Refund failed:', errorMessage, result);
+        throw new Error(errorMessage);
+      }
+
+      console.log('Refund successful:', result);
       await loadPayments();
+
+      // Show success message using a custom notification instead of alert
+      const successDiv = document.createElement('div');
+      successDiv.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+      successDiv.textContent = result.message || 'Refund processed successfully!';
+      document.body.appendChild(successDiv);
+      setTimeout(() => successDiv.remove(), 5000);
     } catch (err) {
       console.error('Error processing refund:', err);
-      alert(err instanceof Error ? err.message : 'Failed to process refund');
+
+      // Show error message using a custom notification instead of alert
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+      errorDiv.textContent = err instanceof Error ? err.message : 'Failed to process refund';
+      document.body.appendChild(errorDiv);
+      setTimeout(() => errorDiv.remove(), 5000);
     } finally {
       setRefunding(null);
     }
