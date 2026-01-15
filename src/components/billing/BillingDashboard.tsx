@@ -6,8 +6,12 @@ import { SendInvoiceModal } from './SendInvoiceModal';
 import { InvoiceDetail } from './InvoiceDetail';
 import { BillingQueueItem } from '../../services/billing-service';
 
-export function BillingDashboard() {
-  const [activeTab, setActiveTab] = useState<'queue' | 'paid'>('queue');
+interface BillingDashboardProps {
+  initialTab?: 'queue' | 'paid';
+}
+
+export function BillingDashboard({ initialTab = 'queue' }: BillingDashboardProps = {}) {
+  const [activeTab, setActiveTab] = useState<'queue' | 'paid'>(initialTab);
   const [selectedInvoice, setSelectedInvoice] = useState<BillingQueueItem | null>(null);
   const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
 

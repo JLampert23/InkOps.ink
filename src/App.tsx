@@ -11,7 +11,6 @@ const SquareData = lazy(() => import('./components/SquareData'));
 const ProductionManagement = lazy(() => import('./components/ProductionManagement').then(m => ({ default: m.ProductionManagement })));
 const BillingDashboard = lazy(() => import('./components/billing/BillingDashboard').then(m => ({ default: m.BillingDashboard })));
 const AccountsReceivableReport = lazy(() => import('./components/accounting/AccountsReceivableReport'));
-const PaidInvoices = lazy(() => import('./components/accounting/PaidInvoices'));
 const CustomersReport = lazy(() => import('./components/accounting/CustomersReport'));
 const PaymentsReport = lazy(() => import('./components/accounting/PaymentsReport'));
 
@@ -542,7 +541,7 @@ function AppContent() {
                 </div>
               </div>
             }>
-              <PaidInvoices />
+              <BillingDashboard initialTab="paid" />
             </Suspense>
           )}
 
