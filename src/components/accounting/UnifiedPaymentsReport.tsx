@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { CreditCard, Download, Filter, Calendar, DollarSign, Loader2, TrendingUp, RotateCcw, Eye } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { InvoiceDetail } from '../billing/InvoiceDetail';
 
 interface Payment {
   id: string;
@@ -29,6 +30,7 @@ export default function UnifiedPaymentsReport() {
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [customers, setCustomers] = useState<string[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
+  const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
 
   useEffect(() => {
     loadPayments();
@@ -146,8 +148,11 @@ export default function UnifiedPaymentsReport() {
   };
 
   const handleViewInvoice = (invoiceId: string) => {
-    // Navigate to invoice detail - this would be implemented based on your routing
-    window.location.hash = `#/billing/invoice/${invoiceId}`;
+    setViewingInvoiceId(invoiceId);
+  };
+
+  const handleBackToPayments = () => {
+    setViewingInvoiceId(null);
   };
 
   const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
@@ -204,6 +209,15 @@ export default function UnifiedPaymentsReport() {
       <div className="flex items-center justify-center py-12">
         <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
       </div>
+    );
+  }
+
+  if (viewingInvoiceId) {
+    return (
+      <InvoiceDetail
+        invoiceId={viewingInvoiceId}
+        onBack={handleBackToPayments}
+      />
     );
   }
 
