@@ -166,14 +166,24 @@ Deno.serve(async (req: Request) => {
 
     const newAmountPaid = (invoice.amount_paid || 0) + amount;
     const newBalance = invoice.total - newAmountPaid;
+    const isFullyPaid = newBalance <= 0;
+
+    const invoiceUpdate: any = {
+      amount_paid: newAmountPaid,
+      balance_remaining: newBalance,
+      amount_outstanding: newBalance,
+    };
+
+    if (isFullyPaid) {
+      invoiceUpdate.status = 'PAID';
+      invoiceUpdate.is_financially_locked = true;
+      invoiceUpdate.locked_at = new Date().toISOString();
+      invoiceUpdate.locked_by = user.email;
+    }
 
     const { error: updateError } = await supabaseAuth
       .from("printavo_invoices")
-      .update({
-        amount_paid: newAmountPaid,
-        balance_remaining: newBalance,
-        amount_outstanding: newBalance,
-      })
+      .update(invoiceUpdate)
       .eq("id", invoiceId);
 
     if (updateError) {
@@ -188,7 +198,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (newBalance <= 0) {
+    if (isFullyPaid) {
       await supabaseAuth
         .from("billing_queue")
         .update({ payment_status: 'paid' })
@@ -237,12 +247,12 @@ Deno.serve(async (req: Request) => {
         .eq('id', stripeInvoice.id);
     }
 
-    console.log(`Manual payment of $${amount} recorded for invoice ${invoice.invoice_number} by ${user.email}`);
+    console.log(`Manual payment of $${amount} recorded for invoice ${invoice.invoice_number} by ${user.email}${isFullyPaid ? ' - Invoice marked as PAID and locked' : ''}`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Payment of $${amount.toFixed(2)} recorded successfully`,
+        message: `Payment of $${amount.toFixed(2)} recorded successfully${isFullyPaid ? '. Invoice marked as PAID and locked.' : ''}`,
         payment: {
           id: payment.id,
           amount: payment.amount,
@@ -256,7 +266,8 @@ Deno.serve(async (req: Request) => {
           previous_balance: invoice.balance_remaining,
           new_balance: newBalance,
           amount_paid: newAmountPaid,
-          is_paid: newBalance <= 0,
+          is_paid: isFullyPaid,
+          is_locked: isFullyPaid,
         },
       }),
       {
