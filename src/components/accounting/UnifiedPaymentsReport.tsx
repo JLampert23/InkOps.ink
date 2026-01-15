@@ -114,10 +114,16 @@ export default function UnifiedPaymentsReport() {
     );
 
     let refundReason = 'requested_by_customer';
-    if (reason === '2') {
+    if (reason === '1') {
+      refundReason = 'requested_by_customer';
+    } else if (reason === '2') {
       refundReason = 'duplicate';
     } else if (reason === '3') {
       refundReason = 'fraudulent';
+    } else if (reason !== null && reason.trim() !== '') {
+      // User entered something invalid
+      alert('Invalid selection. Using default: requested_by_customer');
+      refundReason = 'requested_by_customer';
     }
 
     setRefunding(paymentId);

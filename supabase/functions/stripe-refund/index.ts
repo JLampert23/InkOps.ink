@@ -245,7 +245,9 @@ Deno.serve(async (req: Request) => {
     const refund = await stripeResponse.json();
     console.log('Stripe refund successful:', refund.id);
 
-    // Update payment record
+    // Update payment record - DO NOT update invoice balance here
+    // The Stripe webhook (charge.refunded) will handle invoice balance updates
+    // to avoid double-processing the refund
     await supabaseAuth
       .from('payments')
       .update({
@@ -262,52 +264,6 @@ Deno.serve(async (req: Request) => {
         updated_at: new Date().toISOString(),
       })
       .eq('id', paymentId);
-
-    // Update invoice balance
-    if (payment.invoice_id) {
-      const { data: invoice } = await supabaseAuth
-        .from('printavo_invoices')
-        .select('*')
-        .eq('id', payment.invoice_id)
-        .maybeSingle();
-
-      if (invoice) {
-        const refundAmount = refund.amount / 100;
-        const newAmountPaid = (invoice.amount_paid || 0) - refundAmount;
-        const newBalance = invoice.total - newAmountPaid;
-
-        await supabaseAuth
-          .from('printavo_invoices')
-          .update({
-            amount_paid: newAmountPaid,
-            balance_remaining: newBalance,
-            amount_outstanding: newBalance,
-          })
-          .eq('id', payment.invoice_id);
-
-        // Update Stripe invoice if exists
-        const { data: stripeInvoice } = await supabaseAuth
-          .from('stripe_invoices')
-          .select('*')
-          .eq('printavo_invoice_id', payment.invoice_id)
-          .maybeSingle();
-
-        if (stripeInvoice) {
-          const stripeNewAmountPaid = (stripeInvoice.amount_paid || 0) - refundAmount;
-          const stripeNewAmountRemaining = stripeInvoice.total_amount - stripeNewAmountPaid;
-
-          await supabaseAuth
-            .from('stripe_invoices')
-            .update({
-              amount_paid: stripeNewAmountPaid,
-              amount_remaining: stripeNewAmountRemaining,
-              status: stripeNewAmountRemaining > 0 ? 'open' : 'paid',
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', stripeInvoice.id);
-        }
-      }
-    }
 
     // Log communication
     const { data: companySettings } = await supabaseAuth
