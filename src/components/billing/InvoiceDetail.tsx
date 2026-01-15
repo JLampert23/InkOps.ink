@@ -60,6 +60,14 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
   const [unlocking, setUnlocking] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [companySettings, setCompanySettings] = useState<{
+    company_name: string | null;
+    company_address: string | null;
+    company_phone: string | null;
+    company_email: string | null;
+    company_website: string | null;
+    invoice_terms: string | null;
+  } | null>(null);
 
   useEffect(() => {
     loadInvoice();
@@ -68,9 +76,20 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
 
   const loadSettings = async () => {
     try {
-      const { data } = await supabase.from('company_settings').select('twilio_enabled').maybeSingle();
+      const { data } = await supabase
+        .from('company_settings')
+        .select('twilio_enabled, company_name, company_address, company_phone, company_email, company_website, invoice_terms')
+        .maybeSingle();
       if (data) {
         setTwilioEnabled(data.twilio_enabled || false);
+        setCompanySettings({
+          company_name: data.company_name,
+          company_address: data.company_address,
+          company_phone: data.company_phone,
+          company_email: data.company_email,
+          company_website: data.company_website,
+          invoice_terms: data.invoice_terms,
+        });
       }
 
       const { data: { user } } = await supabase.auth.getUser();
@@ -419,7 +438,14 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
               <span className="hidden sm:inline">Sync</span>
             </button>
             <button
-              onClick={() => invoice && generateInvoicePDF(invoice)}
+              onClick={() => invoice && generateInvoicePDF(invoice, {
+                companyName: companySettings?.company_name || undefined,
+                companyAddress: companySettings?.company_address || undefined,
+                companyPhone: companySettings?.company_phone || undefined,
+                companyEmail: companySettings?.company_email || undefined,
+                companyWebsite: companySettings?.company_website || undefined,
+                invoiceTerms: companySettings?.invoice_terms || undefined,
+              })}
               className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap"
             >
               <Download className="w-4 h-4" />
