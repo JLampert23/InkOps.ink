@@ -291,16 +291,18 @@ Deno.serve(async (req: Request) => {
               .maybeSingle();
 
             if (stripeInvoice) {
-              const newAmountPaid = (stripeInvoice.amount_paid || 0) + (paymentIntent.amount / 100);
-              const newAmountRemaining = stripeInvoice.total_amount - newAmountPaid;
+              const paymentAmountDollars = paymentIntent.amount / 100;
+              const totalAmountDollars = parseFloat(stripeInvoice.total_amount);
+              const newAmountPaid = parseFloat(stripeInvoice.amount_paid || 0) + paymentAmountDollars;
+              const newAmountRemaining = totalAmountDollars - newAmountPaid;
 
               await supabase
                 .from('stripe_invoices')
                 .update({
                   amount_paid: newAmountPaid,
-                  amount_remaining: newAmountRemaining,
-                  status: newAmountRemaining <= 0 ? 'paid' : 'open',
-                  paid_at: newAmountRemaining <= 0 ? new Date().toISOString() : stripeInvoice.paid_at,
+                  amount_remaining: Math.max(0, newAmountRemaining),
+                  status: newAmountRemaining <= 0.01 ? 'paid' : 'open',
+                  paid_at: newAmountRemaining <= 0.01 ? new Date().toISOString() : stripeInvoice.paid_at,
                   updated_at: new Date().toISOString(),
                 })
                 .eq('id', stripeInvoice.id);
@@ -486,16 +488,18 @@ Deno.serve(async (req: Request) => {
                 .maybeSingle();
 
               if (stripeInvoice) {
-                const newAmountPaid = (stripeInvoice.amount_paid || 0) + (session.amount_total / 100);
-                const newAmountRemaining = stripeInvoice.total_amount - newAmountPaid;
+                const paymentAmountDollars = session.amount_total / 100;
+                const totalAmountDollars = parseFloat(stripeInvoice.total_amount);
+                const newAmountPaid = parseFloat(stripeInvoice.amount_paid || 0) + paymentAmountDollars;
+                const newAmountRemaining = totalAmountDollars - newAmountPaid;
 
                 await supabase
                   .from('stripe_invoices')
                   .update({
                     amount_paid: newAmountPaid,
-                    amount_remaining: newAmountRemaining,
-                    status: newAmountRemaining <= 0 ? 'paid' : 'open',
-                    paid_at: newAmountRemaining <= 0 ? new Date().toISOString() : stripeInvoice.paid_at,
+                    amount_remaining: Math.max(0, newAmountRemaining),
+                    status: newAmountRemaining <= 0.01 ? 'paid' : 'open',
+                    paid_at: newAmountRemaining <= 0.01 ? new Date().toISOString() : stripeInvoice.paid_at,
                     updated_at: new Date().toISOString(),
                   })
                   .eq('id', stripeInvoice.id);
@@ -558,14 +562,16 @@ Deno.serve(async (req: Request) => {
           }]);
         }
 
+        const amountPaidDollars = amountPaid / 100;
+        const amountRemainingDollars = amountRemaining / 100;
         const isFullyPaid = amountRemaining === 0 || invoice.status === 'paid';
 
         await supabase
           .from('stripe_invoices')
           .update({
             status: invoice.status,
-            amount_paid: amountPaid,
-            amount_remaining: amountRemaining,
+            amount_paid: amountPaidDollars,
+            amount_remaining: amountRemainingDollars,
             paid_at: isFullyPaid ? new Date().toISOString() : null,
           })
           .eq('id', stripeInvoice.id);
@@ -652,23 +658,23 @@ Deno.serve(async (req: Request) => {
               }]);
             }
 
-            const { data: stripeInvoice } = await supabase
+            const { data: stripeInvoiceRecord } = await supabase
               .from('stripe_invoices')
               .select('*')
               .eq('stripe_invoice_id', invoice.id)
               .maybeSingle();
 
-            if (stripeInvoice) {
+            if (stripeInvoiceRecord) {
               await supabase
                 .from('stripe_invoices')
                 .update({
-                  amount_paid: amountPaid / 100,
-                  amount_remaining: (invoice.amount_due || 0) / 100,
+                  amount_paid: amountPaidDollars,
+                  amount_remaining: amountRemainingDollars,
                   status: isFullyPaid ? 'paid' : 'open',
-                  paid_at: isFullyPaid ? new Date().toISOString() : stripeInvoice.paid_at,
+                  paid_at: isFullyPaid ? new Date().toISOString() : stripeInvoiceRecord.paid_at,
                   updated_at: new Date().toISOString(),
                 })
-                .eq('id', stripeInvoice.id);
+                .eq('id', stripeInvoiceRecord.id);
             }
           } else {
             await supabase
