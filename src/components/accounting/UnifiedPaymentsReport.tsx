@@ -41,7 +41,7 @@ export default function UnifiedPaymentsReport() {
         .from('payments')
         .select(`
           *,
-          printavo_invoices (
+          printavo_invoices!invoice_id (
             invoice_number,
             customer_name
           )
