@@ -308,14 +308,12 @@ export default function UnifiedPaymentsReport() {
 
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600">Total Refunded</span>
+            <span className="text-sm font-medium text-gray-600">Refunded</span>
             <RotateCcw className="w-5 h-5 text-red-600" />
           </div>
-          <div className="text-2xl font-bold text-red-600">
+          <div className="text-2xl font-bold text-gray-900">{refundedPayments.length}</div>
+          <div className="text-xs text-red-600 font-semibold mt-1">
             ${refundedPayments.reduce((sum, p) => sum + p.refund_amount, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </div>
-          <div className="text-xs text-gray-500 mt-1">
-            {refundedPayments.length} {refundedPayments.length === 1 ? 'refund' : 'refunds'}
           </div>
         </div>
       </div>
