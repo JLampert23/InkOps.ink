@@ -400,7 +400,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
               <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Sync</span>
             </button>
-            {userRole === 'admin' && (
+            {(userRole === 'admin' || userRole === 'super_admin') && (
               invoice.isFinanciallyLocked ? (
                 <button
                   onClick={handleUnlockInvoice}
