@@ -152,17 +152,9 @@ Deno.serve(async (req: Request) => {
     console.log('User authenticated:', user.email);
 
     const { action, data } = await req.json();
-    
+
+    // getStripeConfig() will throw an error if config is not available
     const config = await getStripeConfig();
-    if (!config) {
-      return new Response(
-        JSON.stringify({ error: 'Stripe is not configured' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
     
     switch (action) {
       case 'testConnection': {
