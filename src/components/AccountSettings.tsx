@@ -1192,8 +1192,10 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
       });
 
       const result = await response.json();
+      console.log('Stripe test response:', { status: response.status, result });
 
       if (!response.ok) {
+        console.error('Stripe test failed:', result);
         setStripeTestResult({
           success: false,
           error: result.error || 'Failed to test Stripe connection',
@@ -1201,6 +1203,7 @@ export function AccountSettings({ initialTab }: AccountSettingsProps = {}) {
         return;
       }
 
+      console.log('Stripe test successful:', result);
       setStripeTestResult(result);
     } catch (err) {
       setStripeTestResult({
