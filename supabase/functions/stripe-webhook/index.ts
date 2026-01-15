@@ -10,6 +10,113 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
+async function verifyStripeSignature(
+  payload: string,
+  signature: string,
+  secret: string
+): Promise<boolean> {
+  try {
+    const signatureParts = signature.split(',').reduce((acc, part) => {
+      const [key, value] = part.split('=');
+      if (key === 't') acc.timestamp = value;
+      if (key === 'v1') acc.signatures.push(value);
+      return acc;
+    }, { timestamp: '', signatures: [] as string[] });
+
+    if (!signatureParts.timestamp || signatureParts.signatures.length === 0) {
+      console.error('Invalid signature format');
+      return false;
+    }
+
+    const signedPayload = `${signatureParts.timestamp}.${payload}`;
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+
+    const signature_bytes = await crypto.subtle.sign(
+      'HMAC',
+      key,
+      encoder.encode(signedPayload)
+    );
+
+    const expectedSignature = Array.from(new Uint8Array(signature_bytes))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+
+    const isValid = signatureParts.signatures.some(sig => sig === expectedSignature);
+
+    if (!isValid) {
+      console.error('Signature mismatch');
+      return false;
+    }
+
+    const timestamp = parseInt(signatureParts.timestamp, 10);
+    const currentTime = Math.floor(Date.now() / 1000);
+    const tolerance = 300;
+
+    if (currentTime - timestamp > tolerance) {
+      console.error('Timestamp too old');
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Signature verification error:', error);
+    return false;
+  }
+}
+
+async function getWebhookSecret(): Promise<string> {
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  const { data, error } = await supabase
+    .from('company_settings')
+    .select('stripe_webhook_secret')
+    .maybeSingle();
+
+  if (error) {
+    console.error('Database error fetching webhook secret:', error);
+    throw new Error(`Database error: ${error.message}`);
+  }
+
+  if (!data?.stripe_webhook_secret) {
+    console.error('No webhook secret found in database');
+    throw new Error('Stripe webhook secret not configured. Please add it in Settings.');
+  }
+
+  console.log('Attempting to decrypt webhook secret...');
+  const decryptResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${supabaseServiceKey}`,
+    },
+    body: JSON.stringify({
+      action: 'decrypt',
+      token: data.stripe_webhook_secret,
+    }),
+  });
+
+  if (!decryptResponse.ok) {
+    const errorText = await decryptResponse.text();
+    console.error('Decryption failed:', errorText);
+    throw new Error(`Failed to decrypt webhook secret: ${errorText}`);
+  }
+
+  const decryptResult = await decryptResponse.json();
+  if (!decryptResult.success || !decryptResult.result) {
+    console.error('Decryption returned invalid result:', decryptResult);
+    throw new Error('Decryption failed: Invalid response from crypto service');
+  }
+
+  return decryptResult.result;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -17,13 +124,13 @@ Deno.serve(async (req: Request) => {
       headers: corsHeaders,
     });
   }
-  
+
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    
+
     const rawBody = await req.text();
     const signature = req.headers.get('stripe-signature');
-    
+
     if (!signature) {
       console.error('No Stripe signature found');
       return new Response(
@@ -34,7 +141,21 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
-    
+
+    const webhookSecret = await getWebhookSecret();
+    const isValid = await verifyStripeSignature(rawBody, signature, webhookSecret);
+
+    if (!isValid) {
+      console.error('Invalid webhook signature');
+      return new Response(
+        JSON.stringify({ error: 'Invalid signature' }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     const event = JSON.parse(rawBody);
     console.log('Webhook event received:', event.type);
     
