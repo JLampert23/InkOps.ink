@@ -12,6 +12,11 @@ interface CompanySettings {
   id: string;
   company_name: string;
   logo_url: string | null;
+  company_address: string | null;
+  company_phone: string | null;
+  company_email: string | null;
+  company_logo_primary_url: string | null;
+  company_logo_secondary_url: string | null;
   available_invoice_statuses: string[];
   selected_invoice_statuses: string[];
   billing_selected_invoice_statuses: string[];
@@ -64,8 +69,15 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [automationExpanded, setAutomationExpanded] = useState(false);
 
   const [companyName, setCompanyName] = useState('');
+  const [companyAddress, setCompanyAddress] = useState('');
+  const [companyPhone, setCompanyPhone] = useState('');
+  const [companyEmail, setCompanyEmail] = useState('');
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [primaryLogoFile, setPrimaryLogoFile] = useState<File | null>(null);
+  const [primaryLogoPreview, setPrimaryLogoPreview] = useState<string | null>(null);
+  const [secondaryLogoFile, setSecondaryLogoFile] = useState<File | null>(null);
+  const [secondaryLogoPreview, setSecondaryLogoPreview] = useState<string | null>(null);
   const [savingCompany, setSavingCompany] = useState(false);
 
   const [printavoUsername, setPrintavoUsername] = useState('');
@@ -178,7 +190,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       if (data) {
         setCompanySettings(data);
         setCompanyName(data.company_name);
+        setCompanyAddress(data.company_address || '');
+        setCompanyPhone(data.company_phone || '');
+        setCompanyEmail(data.company_email || '');
         setLogoPreview(data.logo_url);
+        setPrimaryLogoPreview(data.company_logo_primary_url);
+        setSecondaryLogoPreview(data.company_logo_secondary_url);
         setAvailableStatuses(data.available_invoice_statuses || []);
         setSelectedStatuses(data.selected_invoice_statuses || []);
         setBillingSelectedStatuses(data.billing_selected_invoice_statuses || []);
@@ -487,6 +504,58 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     }
   };
 
+  const handlePrimaryLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
+      if (!validTypes.includes(file.type)) {
+        alert('Please upload a PNG, JPG, or SVG file.');
+        return;
+      }
+      if (file.size > 5242880) {
+        alert('File size must be less than 5MB.');
+        return;
+      }
+      setPrimaryLogoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPrimaryLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSecondaryLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
+      if (!validTypes.includes(file.type)) {
+        alert('Please upload a PNG, JPG, or SVG file.');
+        return;
+      }
+      if (file.size > 5242880) {
+        alert('File size must be less than 5MB.');
+        return;
+      }
+      setSecondaryLogoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSecondaryLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removePrimaryLogo = () => {
+    setPrimaryLogoFile(null);
+    setPrimaryLogoPreview(null);
+  };
+
+  const removeSecondaryLogo = () => {
+    setSecondaryLogoFile(null);
+    setSecondaryLogoPreview(null);
+  };
+
   const uploadLogo = async () => {
     if (!logoFile) return null;
 
@@ -508,6 +577,21 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   };
 
   const saveCompanySettings = async () => {
+    if (!isAdmin) {
+      alert('Access Denied: Only Admins and Super Admins can edit Company Settings.');
+      return;
+    }
+
+    if (!companyName.trim()) {
+      alert('Company Name is required.');
+      return;
+    }
+
+    if (companyEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(companyEmail)) {
+      alert('Please enter a valid email address.');
+      return;
+    }
+
     try {
       setSavingCompany(true);
 
@@ -516,9 +600,58 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         logoUrl = await uploadLogo();
       }
 
+      let primaryLogoUrl = companySettings?.company_logo_primary_url;
+      if (primaryLogoFile) {
+        const timestamp = Date.now();
+        const fileName = `primary-${timestamp}-${primaryLogoFile.name}`;
+        const filePath = `${companySettings?.id || 'temp'}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('company-logos')
+          .upload(filePath, primaryLogoFile, {
+            cacheControl: '3600',
+            upsert: true,
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('company-logos')
+          .getPublicUrl(filePath);
+
+        primaryLogoUrl = publicUrl;
+      }
+
+      let secondaryLogoUrl = companySettings?.company_logo_secondary_url;
+      if (secondaryLogoFile) {
+        const timestamp = Date.now();
+        const fileName = `secondary-${timestamp}-${secondaryLogoFile.name}`;
+        const filePath = `${companySettings?.id || 'temp'}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('company-logos')
+          .upload(filePath, secondaryLogoFile, {
+            cacheControl: '3600',
+            upsert: true,
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('company-logos')
+          .getPublicUrl(filePath);
+
+        secondaryLogoUrl = publicUrl;
+      }
+
       const settingsData = {
         company_name: companyName,
+        company_address: companyAddress || null,
+        company_phone: companyPhone || null,
+        company_email: companyEmail || null,
         logo_url: logoUrl,
+        company_logo_primary_url: primaryLogoUrl,
+        company_logo_secondary_url: secondaryLogoUrl,
       };
 
       if (companySettings?.id) {
@@ -541,6 +674,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
       alert('Company settings saved successfully!');
       setLogoFile(null);
+      setPrimaryLogoFile(null);
+      setSecondaryLogoFile(null);
+      await fetchCompanySettings();
     } catch (err) {
       console.error('Error saving company settings:', err);
       alert('Failed to save company settings. Please try again.');
@@ -1974,77 +2110,228 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           {activeTab === 'company-info' && (
             <div className="bg-white rounded-lg shadow p-6 space-y-6">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Company Information</h2>
-                <p className="text-sm text-gray-600 mb-6">Manage your company details</p>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Company Settings</h2>
+                <p className="text-sm text-gray-600 mb-6">Manage your company information and branding</p>
+                {!isAdmin && (
+                  <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
+                    Access Denied: Only Admins and Super Admins can edit Company Settings.
+                  </div>
+                )}
               </div>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Company Name
-                  </label>
-                  <input
-                    type="text"
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter company name"
-                  />
-                </div>
+              <div className="space-y-6">
+                <div className="border-b border-gray-200 pb-6">
+                  <h3 className="text-md font-semibold text-gray-800 mb-4">Company Information</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Company Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={companyName}
+                        onChange={(e) => setCompanyName(e.target.value)}
+                        disabled={!isAdmin}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder="Enter company name"
+                        required
+                      />
+                    </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Company Logo
-                  </label>
-                  <div className="flex items-start gap-4">
-                    {logoPreview && (
-                      <div className="w-32 h-32 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center flex-shrink-0">
-                        <img
-                          src={logoPreview}
-                          alt="Company logo"
-                          className="max-w-full max-h-full object-contain"
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Company Address
+                      </label>
+                      <textarea
+                        value={companyAddress}
+                        onChange={(e) => setCompanyAddress(e.target.value)}
+                        disabled={!isAdmin}
+                        rows={3}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        placeholder="Enter company address&#10;Street Address&#10;City, State ZIP"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Company Phone
+                        </label>
+                        <input
+                          type="tel"
+                          value={companyPhone}
+                          onChange={(e) => setCompanyPhone(e.target.value)}
+                          disabled={!isAdmin}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          placeholder="(555) 123-4567"
                         />
                       </div>
-                    )}
-                    <div className="flex-1">
-                      <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors cursor-pointer">
-                        <Upload className="w-5 h-5 text-gray-600" />
-                        <span className="text-sm font-medium text-gray-700">
-                          {logoFile ? logoFile.name : 'Upload Logo'}
-                        </span>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Company Email
+                        </label>
                         <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleLogoChange}
-                          className="hidden"
+                          type="email"
+                          value={companyEmail}
+                          onChange={(e) => setCompanyEmail(e.target.value)}
+                          disabled={!isAdmin}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          placeholder="info@company.com"
                         />
-                      </label>
-                      <p className="text-xs text-gray-500 mt-2">
-                        Recommended: Square image, at least 200x200px
-                      </p>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-4">
-                  <button
-                    onClick={saveCompanySettings}
-                    disabled={savingCompany}
-                    className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                  >
-                    {savingCompany ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4" />
-                        Save Changes
-                      </>
-                    )}
-                  </button>
+                <div className="border-b border-gray-200 pb-6">
+                  <h3 className="text-md font-semibold text-gray-800 mb-4">Company Branding</h3>
+                  <div className="space-y-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        Primary Logo
+                      </label>
+                      <p className="text-xs text-gray-500 mb-3">
+                        Used for invoice PDFs, emails, and customer-facing branding
+                      </p>
+                      {primaryLogoPreview ? (
+                        <div className="space-y-3">
+                          <div className="w-64 h-48 border-2 border-gray-300 rounded-lg overflow-hidden bg-white flex items-center justify-center p-4">
+                            <img
+                              src={primaryLogoPreview}
+                              alt="Primary logo"
+                              className="max-w-full max-h-full object-contain"
+                            />
+                          </div>
+                          {isAdmin && (
+                            <div className="flex gap-2">
+                              <label className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer text-sm">
+                                <Edit className="w-4 h-4" />
+                                Replace Logo
+                                <input
+                                  type="file"
+                                  accept="image/png,image/jpeg,image/jpg,image/svg+xml"
+                                  onChange={handlePrimaryLogoChange}
+                                  className="hidden"
+                                />
+                              </label>
+                              <button
+                                onClick={removePrimaryLogo}
+                                className="flex items-center gap-2 px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors text-sm"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                Remove Logo
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <label className={`flex flex-col items-center justify-center gap-3 px-6 py-8 border-2 border-dashed border-gray-300 rounded-lg transition-colors ${isAdmin ? 'hover:border-blue-500 hover:bg-blue-50 cursor-pointer' : 'bg-gray-50 cursor-not-allowed'}`}>
+                          <Upload className="w-8 h-8 text-gray-400" />
+                          <div className="text-center">
+                            <span className="text-sm font-medium text-gray-700">
+                              {isAdmin ? 'Click to upload primary logo' : 'No primary logo uploaded'}
+                            </span>
+                            <p className="text-xs text-gray-500 mt-1">
+                              PNG, JPG, or SVG (max 5MB)
+                            </p>
+                          </div>
+                          {isAdmin && (
+                            <input
+                              type="file"
+                              accept="image/png,image/jpeg,image/jpg,image/svg+xml"
+                              onChange={handlePrimaryLogoChange}
+                              className="hidden"
+                            />
+                          )}
+                        </label>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        Secondary Logo
+                      </label>
+                      <p className="text-xs text-gray-500 mb-3">
+                        Used for dark mode, alternate layouts, or watermarking
+                      </p>
+                      {secondaryLogoPreview ? (
+                        <div className="space-y-3">
+                          <div className="w-64 h-48 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-900 flex items-center justify-center p-4">
+                            <img
+                              src={secondaryLogoPreview}
+                              alt="Secondary logo"
+                              className="max-w-full max-h-full object-contain"
+                            />
+                          </div>
+                          {isAdmin && (
+                            <div className="flex gap-2">
+                              <label className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer text-sm">
+                                <Edit className="w-4 h-4" />
+                                Replace Logo
+                                <input
+                                  type="file"
+                                  accept="image/png,image/jpeg,image/jpg,image/svg+xml"
+                                  onChange={handleSecondaryLogoChange}
+                                  className="hidden"
+                                />
+                              </label>
+                              <button
+                                onClick={removeSecondaryLogo}
+                                className="flex items-center gap-2 px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors text-sm"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                Remove Logo
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <label className={`flex flex-col items-center justify-center gap-3 px-6 py-8 border-2 border-dashed border-gray-300 rounded-lg transition-colors ${isAdmin ? 'hover:border-blue-500 hover:bg-blue-50 cursor-pointer' : 'bg-gray-50 cursor-not-allowed'}`}>
+                          <Upload className="w-8 h-8 text-gray-400" />
+                          <div className="text-center">
+                            <span className="text-sm font-medium text-gray-700">
+                              {isAdmin ? 'Click to upload secondary logo' : 'No secondary logo uploaded'}
+                            </span>
+                            <p className="text-xs text-gray-500 mt-1">
+                              PNG, JPG, or SVG (max 5MB)
+                            </p>
+                          </div>
+                          {isAdmin && (
+                            <input
+                              type="file"
+                              accept="image/png,image/jpeg,image/jpg,image/svg+xml"
+                              onChange={handleSecondaryLogoChange}
+                              className="hidden"
+                            />
+                          )}
+                        </label>
+                      )}
+                    </div>
+                  </div>
                 </div>
+
+                {isAdmin && (
+                  <div className="pt-4">
+                    <button
+                      onClick={saveCompanySettings}
+                      disabled={savingCompany}
+                      className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                    >
+                      {savingCompany ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4" />
+                          Save Changes
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
