@@ -219,6 +219,7 @@ Deno.serve(async (req: Request) => {
 
             const updateData: any = {
               amount_paid: newPaid,
+              amount_outstanding: balanceRemaining,
               balance_remaining: balanceRemaining,
               status_stage: isFullyPaid ? 'paid' : 'partial',
               status: isFullyPaid ? 'Paid' : 'Partially Paid',
@@ -505,6 +506,7 @@ Deno.serve(async (req: Request) => {
 
             const updateData: any = {
               amount_paid: newPaid,
+              amount_outstanding: balanceRemaining,
               balance_remaining: balanceRemaining,
               status_stage: isFullyPaid ? 'paid' : 'partial',
               status: isFullyPaid ? 'Paid' : 'Partially Paid',
