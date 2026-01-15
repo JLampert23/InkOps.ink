@@ -12,7 +12,7 @@ const ProductionManagement = lazy(() => import('./components/ProductionManagemen
 const BillingDashboard = lazy(() => import('./components/billing/BillingDashboard').then(m => ({ default: m.BillingDashboard })));
 const AccountsReceivableReport = lazy(() => import('./components/accounting/AccountsReceivableReport'));
 const CustomersReport = lazy(() => import('./components/accounting/CustomersReport'));
-const PaymentsReport = lazy(() => import('./components/accounting/PaymentsReport'));
+const PaymentsReport = lazy(() => import('./components/accounting/UnifiedPaymentsReport'));
 
 type Tab =
   | 'square' | 'production' | 'settings'

@@ -194,6 +194,33 @@ Deno.serve(async (req: Request) => {
           payment_method: paymentIntent.payment_method_types?.[0] || 'card',
           metadata: metadata,
         }]);
+
+        // Log to unified payments table
+        const { data: invoiceData } = await supabase
+          .from('printavo_invoices')
+          .select('customer_id')
+          .eq('id', metadata.printavo_invoice_id)
+          .maybeSingle();
+
+        await supabase.from('payments').insert([{
+          company_id: companyId,
+          invoice_id: metadata.printavo_invoice_id || null,
+          customer_id: invoiceData?.customer_id || null,
+          amount: paymentIntent.amount / 100,
+          payment_date: new Date().toISOString(),
+          payment_method: 'Stripe',
+          payment_type: 'stripe',
+          stripe_transaction_id: paymentIntent.latest_charge || paymentIntent.id,
+          stripe_payment_intent_id: paymentIntent.id,
+          stripe_charge_id: paymentIntent.latest_charge || null,
+          status: 'successful',
+          source: 'stripe',
+          metadata: {
+            customer_email: metadata.customer_email,
+            customer_name: metadata.customer_name,
+            payment_method_type: paymentIntent.payment_method_types?.[0] || 'card',
+          },
+        }]);
         
         if (metadata.printavo_invoice_id) {
           await supabase
@@ -324,9 +351,9 @@ Deno.serve(async (req: Request) => {
       case 'payment_intent.payment_failed': {
         const paymentIntent = event.data.object;
         const metadata = paymentIntent.metadata || {};
-        
+
         console.log('Payment failed:', paymentIntent.id);
-        
+
         await supabase.from('stripe_payments').insert([{
           company_id: companyId,
           printavo_invoice_id: metadata.printavo_invoice_id || null,
@@ -338,6 +365,32 @@ Deno.serve(async (req: Request) => {
           customer_name: metadata.customer_name || null,
           payment_method: paymentIntent.payment_method_types?.[0] || 'card',
           metadata: metadata,
+        }]);
+
+        // Log to unified payments table
+        const { data: invoiceData } = await supabase
+          .from('printavo_invoices')
+          .select('customer_id')
+          .eq('id', metadata.printavo_invoice_id)
+          .maybeSingle();
+
+        await supabase.from('payments').insert([{
+          company_id: companyId,
+          invoice_id: metadata.printavo_invoice_id || null,
+          customer_id: invoiceData?.customer_id || null,
+          amount: paymentIntent.amount / 100,
+          payment_date: new Date().toISOString(),
+          payment_method: 'Stripe',
+          payment_type: 'stripe',
+          stripe_transaction_id: paymentIntent.id,
+          stripe_payment_intent_id: paymentIntent.id,
+          status: 'failed',
+          source: 'stripe',
+          metadata: {
+            customer_email: metadata.customer_email,
+            customer_name: metadata.customer_name,
+            error_message: paymentIntent.last_payment_error?.message || 'Payment failed',
+          },
         }]);
         
         await supabase
@@ -354,14 +407,62 @@ Deno.serve(async (req: Request) => {
       case 'charge.refunded': {
         const charge = event.data.object;
         const paymentIntentId = charge.payment_intent;
-        
-        console.log('Charge refunded:', charge.id);
-        
+        const refundAmount = charge.amount_refunded / 100;
+        const isFullRefund = charge.refunded;
+
+        console.log('Charge refunded:', charge.id, 'Amount:', refundAmount);
+
         await supabase
           .from('stripe_payments')
           .update({ status: 'refunded' })
           .eq('stripe_payment_intent_id', paymentIntentId);
-        
+
+        // Update unified payments table
+        const { data: existingPayment } = await supabase
+          .from('payments')
+          .select('*')
+          .eq('stripe_payment_intent_id', paymentIntentId)
+          .maybeSingle();
+
+        if (existingPayment) {
+          await supabase
+            .from('payments')
+            .update({
+              status: isFullRefund ? 'refunded' : 'partial_refund',
+              refund_amount: refundAmount,
+              refunded_at: new Date().toISOString(),
+              metadata: {
+                ...existingPayment.metadata,
+                refund_id: charge.refunds?.data?.[0]?.id,
+                refund_reason: charge.refunds?.data?.[0]?.reason,
+              },
+            })
+            .eq('id', existingPayment.id);
+
+          // Update invoice balance
+          if (existingPayment.invoice_id) {
+            const { data: invoice } = await supabase
+              .from('printavo_invoices')
+              .select('*')
+              .eq('id', existingPayment.invoice_id)
+              .maybeSingle();
+
+            if (invoice) {
+              const newAmountPaid = (invoice.amount_paid || 0) - refundAmount;
+              const newBalance = invoice.total - newAmountPaid;
+
+              await supabase
+                .from('printavo_invoices')
+                .update({
+                  amount_paid: newAmountPaid,
+                  balance_remaining: newBalance,
+                  amount_outstanding: newBalance,
+                })
+                .eq('id', existingPayment.invoice_id);
+            }
+          }
+        }
+
         await supabase
           .from('stripe_webhook_events')
           .update({
@@ -369,7 +470,7 @@ Deno.serve(async (req: Request) => {
             processed_at: new Date().toISOString(),
           })
           .eq('stripe_event_id', event.id);
-        
+
         break;
       }
       
