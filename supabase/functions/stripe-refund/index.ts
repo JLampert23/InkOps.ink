@@ -166,10 +166,21 @@ Deno.serve(async (req: Request) => {
     const stripeSecretKey = await getStripeKey();
 
     // Create refund via Stripe API
-    const chargeId = payment.stripe_charge_id || payment.stripe_payment_intent_id;
-    const refundData: any = {
-      charge: chargeId,
-    };
+    const refundData: any = {};
+
+    if (payment.stripe_payment_intent_id) {
+      refundData.payment_intent = payment.stripe_payment_intent_id;
+    } else if (payment.stripe_charge_id) {
+      refundData.charge = payment.stripe_charge_id;
+    } else {
+      return new Response(
+        JSON.stringify({ error: "No valid Stripe transaction ID found" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
 
     if (reason) {
       refundData.reason = reason;
