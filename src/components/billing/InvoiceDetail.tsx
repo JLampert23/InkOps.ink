@@ -384,7 +384,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                       <button
                         onClick={handleUnlockInvoice}
                         disabled={unlocking}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full border border-yellow-200 hover:bg-yellow-200 transition-colors disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-100 text-red-800 text-xs font-medium rounded-full border border-red-200 hover:bg-red-200 transition-colors disabled:opacity-50"
                         title="Click to unlock invoice"
                       >
                         <Lock className="w-3.5 h-3.5" />
@@ -394,7 +394,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                       <button
                         onClick={handleLockInvoice}
                         disabled={unlocking}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded-full border border-gray-300 hover:bg-gray-200 transition-colors disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full border border-green-200 hover:bg-green-200 transition-colors disabled:opacity-50"
                         title="Click to lock invoice"
                       >
                         <Unlock className="w-3.5 h-3.5" />
