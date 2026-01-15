@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { RefreshCw, AlertCircle, TrendingUp, Menu, X, LogOut, Loader2, Settings, CreditCard, Package, ChevronDown, ChevronUp, Send, Mail, Wallet, Users } from 'lucide-react';
+import { RefreshCw, AlertCircle, TrendingUp, Menu, X, LogOut, Loader2, Settings, CreditCard, Package, ChevronDown, ChevronUp, Send, Mail, Wallet, Users, CheckCircle } from 'lucide-react';
 import { AccountSettings } from './components/AccountSettings';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { EnhancedAuthScreen } from './components/EnhancedAuthScreen';
@@ -11,6 +11,7 @@ const SquareData = lazy(() => import('./components/SquareData'));
 const ProductionManagement = lazy(() => import('./components/ProductionManagement').then(m => ({ default: m.ProductionManagement })));
 const BillingDashboard = lazy(() => import('./components/billing/BillingDashboard').then(m => ({ default: m.BillingDashboard })));
 const AccountsReceivableReport = lazy(() => import('./components/accounting/AccountsReceivableReport'));
+const PaidInvoices = lazy(() => import('./components/accounting/PaidInvoices'));
 const CustomersReport = lazy(() => import('./components/accounting/CustomersReport'));
 const PaymentsReport = lazy(() => import('./components/accounting/PaymentsReport'));
 
@@ -18,6 +19,7 @@ type Tab =
   | 'square' | 'production' | 'settings'
   | 'accounting-dashboard'
   | 'accounts-receivable'
+  | 'paid-invoices'
   | 'customers'
   | 'payments';
 
@@ -104,7 +106,7 @@ function AppContent() {
   const accountingNavItems = [
     {
       id: 'accounting-dashboard' as Tab,
-      name: 'Dashboard',
+      name: 'Billing Queue',
       icon: Wallet,
       description: 'Manage invoices and payments'
     },
@@ -113,6 +115,12 @@ function AppContent() {
       name: 'Accounts Receivable',
       icon: TrendingUp,
       description: 'Aging and outstanding invoices'
+    },
+    {
+      id: 'paid-invoices' as Tab,
+      name: 'Paid Invoices',
+      icon: CheckCircle,
+      description: 'View completed and paid invoices'
     },
     {
       id: 'customers' as Tab,
@@ -442,8 +450,9 @@ function AppContent() {
 
             <div className="flex-1 min-w-0">
               <h2 className="text-xl md:text-2xl font-bold text-gray-900 truncate">
-                {activeTab === 'accounting-dashboard' ? 'ACCOUNTING' :
+                {activeTab === 'accounting-dashboard' ? 'Billing Queue' :
                  activeTab === 'accounts-receivable' ? 'Accounts Receivable' :
+                 activeTab === 'paid-invoices' ? 'Paid Invoices' :
                  activeTab === 'customers' ? 'Customers' :
                  activeTab === 'payments' ? 'Payments' :
                  [...accountingNavItems, ...squareNavItems, ...productionNavItems].find(item => item.id === activeTab)?.name ||
@@ -454,6 +463,8 @@ function AppContent() {
                   'Manage invoices, send payments, and track billing'
                 ) : activeTab === 'accounts-receivable' ? (
                   'Aging reports and outstanding invoices'
+                ) : activeTab === 'paid-invoices' ? (
+                  'View completed and paid invoices'
                 ) : activeTab === 'customers' ? (
                   'Customer billing summary and payment history'
                 ) : activeTab === 'payments' ? (
@@ -518,6 +529,20 @@ function AppContent() {
                 setSettingsInitialTab(tab);
                 setActiveTab('settings');
               }} />
+            </Suspense>
+          )}
+
+          {activeTab === 'paid-invoices' && (
+            <Suspense fallback={
+              <div className="bg-white rounded-lg shadow p-8">
+                <div className="text-center">
+                  <Loader2 className="w-12 h-12 text-green-600 animate-spin mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading Paid Invoices</h3>
+                  <p className="text-gray-600">Loading paid invoice data...</p>
+                </div>
+              </div>
+            }>
+              <PaidInvoices />
             </Suspense>
           )}
 
