@@ -479,6 +479,33 @@ Deno.serve(async (req: Request) => {
             metadata: metadata,
           }]);
 
+          const { data: invoiceData } = await supabase
+            .from('printavo_invoices')
+            .select('customer_id')
+            .eq('id', metadata.printavo_invoice_id)
+            .maybeSingle();
+
+          await supabase.from('payments').insert([{
+            company_id: companyId,
+            invoice_id: metadata.printavo_invoice_id || null,
+            customer_id: invoiceData?.customer_id || null,
+            amount: session.amount_total / 100,
+            payment_date: new Date().toISOString(),
+            payment_method: 'Stripe',
+            payment_type: 'stripe',
+            stripe_transaction_id: session.payment_intent || session.id,
+            stripe_payment_intent_id: session.payment_intent,
+            stripe_charge_id: null,
+            status: 'successful',
+            source: 'stripe',
+            metadata: {
+              customer_email: session.customer_details?.email || metadata.customer_email,
+              customer_name: session.customer_details?.name || metadata.customer_name,
+              payment_method_type: 'card',
+              checkout_session_id: session.id,
+            },
+          }]);
+
           if (metadata.printavo_invoice_id) {
             await supabase
               .from('stripe_payment_links')
