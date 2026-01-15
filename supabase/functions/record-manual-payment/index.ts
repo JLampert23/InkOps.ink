@@ -215,6 +215,28 @@ Deno.serve(async (req: Request) => {
       sent_by: user.id,
     }]);
 
+    const { data: stripeInvoice } = await supabaseAuth
+      .from('stripe_invoices')
+      .select('*')
+      .eq('printavo_invoice_id', invoiceId)
+      .maybeSingle();
+
+    if (stripeInvoice) {
+      const stripeNewAmountPaid = (stripeInvoice.amount_paid || 0) + amount;
+      const stripeNewAmountRemaining = stripeInvoice.total_amount - stripeNewAmountPaid;
+
+      await supabaseAuth
+        .from('stripe_invoices')
+        .update({
+          amount_paid: stripeNewAmountPaid,
+          amount_remaining: stripeNewAmountRemaining,
+          status: stripeNewAmountRemaining <= 0 ? 'paid' : 'open',
+          paid_at: stripeNewAmountRemaining <= 0 ? new Date().toISOString() : stripeInvoice.paid_at,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', stripeInvoice.id);
+    }
+
     console.log(`Manual payment of $${amount} recorded for invoice ${invoice.invoice_number} by ${user.email}`);
 
     return new Response(

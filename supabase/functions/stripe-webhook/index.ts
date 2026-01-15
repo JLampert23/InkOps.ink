@@ -283,6 +283,28 @@ Deno.serve(async (req: Request) => {
                 payment_method: paymentIntent.payment_method_types?.[0] || 'card',
               },
             }]);
+
+            const { data: stripeInvoice } = await supabase
+              .from('stripe_invoices')
+              .select('*')
+              .eq('printavo_invoice_id', queueItem.printavo_invoice_id)
+              .maybeSingle();
+
+            if (stripeInvoice) {
+              const newAmountPaid = (stripeInvoice.amount_paid || 0) + (paymentIntent.amount / 100);
+              const newAmountRemaining = stripeInvoice.total_amount - newAmountPaid;
+
+              await supabase
+                .from('stripe_invoices')
+                .update({
+                  amount_paid: newAmountPaid,
+                  amount_remaining: newAmountRemaining,
+                  status: newAmountRemaining <= 0 ? 'paid' : 'open',
+                  paid_at: newAmountRemaining <= 0 ? new Date().toISOString() : stripeInvoice.paid_at,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', stripeInvoice.id);
+            }
           }
         }
 
@@ -456,6 +478,28 @@ Deno.serve(async (req: Request) => {
                   payment_method: 'card',
                 },
               }]);
+
+              const { data: stripeInvoice } = await supabase
+                .from('stripe_invoices')
+                .select('*')
+                .eq('printavo_invoice_id', queueItem.printavo_invoice_id)
+                .maybeSingle();
+
+              if (stripeInvoice) {
+                const newAmountPaid = (stripeInvoice.amount_paid || 0) + (session.amount_total / 100);
+                const newAmountRemaining = stripeInvoice.total_amount - newAmountPaid;
+
+                await supabase
+                  .from('stripe_invoices')
+                  .update({
+                    amount_paid: newAmountPaid,
+                    amount_remaining: newAmountRemaining,
+                    status: newAmountRemaining <= 0 ? 'paid' : 'open',
+                    paid_at: newAmountRemaining <= 0 ? new Date().toISOString() : stripeInvoice.paid_at,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', stripeInvoice.id);
+              }
             }
           }
         }
@@ -606,6 +650,25 @@ Deno.serve(async (req: Request) => {
                   payment_method: 'card',
                 },
               }]);
+            }
+
+            const { data: stripeInvoice } = await supabase
+              .from('stripe_invoices')
+              .select('*')
+              .eq('stripe_invoice_id', invoice.id)
+              .maybeSingle();
+
+            if (stripeInvoice) {
+              await supabase
+                .from('stripe_invoices')
+                .update({
+                  amount_paid: amountPaid / 100,
+                  amount_remaining: (invoice.amount_due || 0) / 100,
+                  status: isFullyPaid ? 'paid' : 'open',
+                  paid_at: isFullyPaid ? new Date().toISOString() : stripeInvoice.paid_at,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', stripeInvoice.id);
             }
           } else {
             await supabase
