@@ -2,6 +2,7 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, RefreshCw, Bug, MessageSquare } from 'lucide-react';
 import { supabase } from '../lib/supabase-client';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotification } from '../contexts/NotificationContext';
 import AutomatedReports from './automation/AutomatedReports';
 
 const WorkflowCustomization = lazy(() => import('./production/WorkflowCustomization').then(m => ({ default: m.WorkflowCustomization })));
@@ -59,6 +60,7 @@ interface AccountSettingsProps {
 
 export function AccountSettings({ initialTab, canAccessIntegrations = true }: AccountSettingsProps = {}) {
   const { user } = useAuth();
+  const { showNotification, confirm } = useNotification();
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab || 'company-info');
   const [loading, setLoading] = useState(true);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
@@ -509,11 +511,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     if (file) {
       const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
       if (!validTypes.includes(file.type)) {
-        alert('Please upload a PNG, JPG, or SVG file.');
+        showNotification('error', 'Invalid file type', 'Please upload a PNG, JPG, or SVG file.');
         return;
       }
       if (file.size > 5242880) {
-        alert('File size must be less than 5MB.');
+        showNotification('error', 'File too large', 'File size must be less than 5MB.');
         return;
       }
       setPrimaryLogoFile(file);
@@ -530,11 +532,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     if (file) {
       const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
       if (!validTypes.includes(file.type)) {
-        alert('Please upload a PNG, JPG, or SVG file.');
+        showNotification('error', 'Invalid file type', 'Please upload a PNG, JPG, or SVG file.');
         return;
       }
       if (file.size > 5242880) {
-        alert('File size must be less than 5MB.');
+        showNotification('error', 'File too large', 'File size must be less than 5MB.');
         return;
       }
       setSecondaryLogoFile(file);
@@ -578,17 +580,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   const saveCompanySettings = async () => {
     if (!isAdmin) {
-      alert('Access Denied: Only Admins and Super Admins can edit Company Settings.');
+      showNotification('error', 'Access Denied', 'Only Admins and Super Admins can edit Company Settings.');
       return;
     }
 
     if (!companyName.trim()) {
-      alert('Company Name is required.');
+      showNotification('warning', 'Company Name Required', 'Please enter your company name.');
       return;
     }
 
     if (companyEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(companyEmail)) {
-      alert('Please enter a valid email address.');
+      showNotification('warning', 'Invalid Email', 'Please enter a valid email address.');
       return;
     }
 
@@ -672,14 +674,14 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setCompanySettings(data);
       }
 
-      alert('Company settings saved successfully!');
+      showNotification('success', 'Settings Saved', 'Company settings have been updated successfully!');
       setLogoFile(null);
       setPrimaryLogoFile(null);
       setSecondaryLogoFile(null);
       await loadSettings();
     } catch (err) {
       console.error('Error saving company settings:', err);
-      alert('Failed to save company settings. Please try again.');
+      showNotification('error', 'Save Failed', 'Failed to save company settings. Please try again.');
     } finally {
       setSavingCompany(false);
     }
@@ -732,12 +734,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   const saveIntegration = async () => {
     if (!printavoUsername.trim()) {
-      alert('Printavo username/email is required');
+      showNotification('warning', 'Username Required', 'Printavo username/email is required');
       return;
     }
 
     if (!printavoToken.trim()) {
-      alert('Printavo API token is required');
+      showNotification('warning', 'API Token Required', 'Printavo API token is required');
       return;
     }
 
@@ -745,7 +747,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setSavingIntegration(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        alert('You must be logged in to update integration settings');
+        showNotification('error', 'Not Authenticated', 'You must be logged in to update integration settings');
         return;
       }
 
@@ -795,14 +797,14 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setCompanySettings(data);
       }
 
-      alert('Printavo integration settings saved successfully!');
+      showNotification('success', 'Printavo Connected', 'Integration settings have been saved successfully!');
       setPrintavoToken('');
       setTestResult(null);
       await loadSettings();
       await loadAvailableStatuses();
     } catch (err) {
       console.error('Error saving integration settings:', err);
-      alert(err instanceof Error ? err.message : 'Failed to save integration settings. Please try again.');
+      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save integration settings. Please try again.');
     } finally {
       setSavingIntegration(false);
     }
@@ -810,7 +812,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   const saveSquareIntegration = async () => {
     if (!squareAccessToken.trim() && !companySettings?.id) {
-      alert('Square Access Token is required');
+      showNotification('warning', 'Token Required', 'Square Access Token is required');
       return;
     }
 
@@ -818,7 +820,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setSavingSquare(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        alert('You must be logged in to update Square settings');
+        showNotification('error', 'Not Authenticated', 'You must be logged in to update Square settings');
         return;
       }
 
@@ -877,13 +879,13 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setCompanySettings(data);
       }
 
-      alert('Square integration settings saved successfully!');
+      showNotification('success', 'Square Connected', 'Integration settings have been saved successfully!');
       setSquareAccessToken('');
       setSquareTestResult(null);
       await loadSettings();
     } catch (err) {
       console.error('Error saving Square settings:', err);
-      alert(err instanceof Error ? err.message : 'Failed to save Square settings. Please try again.');
+      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save Square settings. Please try again.');
     } finally {
       setSavingSquare(false);
     }
@@ -891,7 +893,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   const saveResendIntegration = async () => {
     if (!resendApiKey.trim() && !companySettings?.id) {
-      alert('Resend API Key is required');
+      showNotification('warning', 'API Key Required', 'Resend API Key is required');
       return;
     }
 
@@ -899,7 +901,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setSavingResend(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        alert('You must be logged in to update Resend settings');
+        showNotification('error', 'Not Authenticated', 'You must be logged in to update Resend settings');
         return;
       }
 
@@ -958,13 +960,13 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setCompanySettings(data);
       }
 
-      alert('Resend integration settings saved successfully!');
+      showNotification('success', 'Resend Connected', 'Integration settings have been saved successfully!');
       setResendApiKey('');
       setResendTestResult(null);
       await loadSettings();
     } catch (err) {
       console.error('Error saving Resend settings:', err);
-      alert(err instanceof Error ? err.message : 'Failed to save Resend settings. Please try again.');
+      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save Resend settings. Please try again.');
     } finally {
       setSavingResend(false);
     }
@@ -972,7 +974,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   const saveStripeIntegration = async () => {
     if (!stripePublicKey.trim() && !stripeSecretKey.trim() && !companySettings?.id) {
-      alert('At least one Stripe credential is required');
+      showNotification('warning', 'Credentials Required', 'At least one Stripe credential is required');
       return;
     }
 
@@ -980,7 +982,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setSavingStripe(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        alert('You must be logged in to update Stripe settings');
+        showNotification('error', 'Not Authenticated', 'You must be logged in to update Stripe settings');
         return;
       }
 
@@ -1069,7 +1071,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       }
 
       if (Object.keys(settingsData).length === 0) {
-        alert('No Stripe credentials to save');
+        showNotification('warning', 'No Credentials', 'No Stripe credentials to save');
         return;
       }
 
@@ -1094,7 +1096,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setCompanySettings(data);
       }
 
-      alert('Stripe integration settings saved successfully!');
+      showNotification('success', 'Stripe Connected', 'Integration settings have been saved successfully!');
       setStripePublicKey('');
       setStripeSecretKey('');
       setStripeWebhookSecret('');
@@ -1102,7 +1104,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       await loadSettings();
     } catch (err) {
       console.error('Error saving Stripe settings:', err);
-      alert(err instanceof Error ? err.message : 'Failed to save Stripe settings. Please try again.');
+      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save Stripe settings. Please try again.');
     } finally {
       setSavingStripe(false);
     }
@@ -1110,7 +1112,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   const saveTwilioIntegration = async () => {
     if (!twilioAccountSid.trim() && !twilioAuthToken.trim() && !companySettings?.id) {
-      alert('At least Twilio Account SID and Auth Token are required');
+      showNotification('warning', 'Credentials Required', 'At least Twilio Account SID and Auth Token are required');
       return;
     }
 
@@ -1118,7 +1120,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setSavingTwilio(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        alert('You must be logged in to update Twilio settings');
+        showNotification('error', 'Not Authenticated', 'You must be logged in to update Twilio settings');
         return;
       }
 
@@ -1188,7 +1190,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       settingsData.sms_message_template = smsMessageTemplate;
 
       if (Object.keys(settingsData).length === 0) {
-        alert('No Twilio settings to save');
+        showNotification('warning', 'No Settings', 'No Twilio settings to save');
         return;
       }
 
@@ -1213,14 +1215,14 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setCompanySettings(data);
       }
 
-      alert('Twilio integration settings saved successfully!');
+      showNotification('success', 'Twilio Connected', 'Integration settings have been saved successfully!');
       setTwilioAccountSid('');
       setTwilioAuthToken('');
       setTwilioTestResult(null);
       await loadSettings();
     } catch (err) {
       console.error('Error saving Twilio settings:', err);
-      alert(err instanceof Error ? err.message : 'Failed to save Twilio settings. Please try again.');
+      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save Twilio settings. Please try again.');
     } finally {
       setSavingTwilio(false);
     }
@@ -1485,7 +1487,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   const addUser = async () => {
     if (!newUserEmail.trim()) {
-      alert('Email is required');
+      showNotification('warning', 'Email Required', 'Email is required');
       return;
     }
 
@@ -1493,7 +1495,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setAddingUser(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        alert('You must be logged in to add users');
+        showNotification('error', 'Not Authenticated', 'You must be logged in to add users');
         return;
       }
 
@@ -1523,7 +1525,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         throw new Error(errorData.error || 'Failed to create user');
       }
 
-      alert('User added successfully! They will receive an email to set their password.');
+      showNotification('success', 'User Added', 'User added successfully! They will receive an email to set their password.');
       setShowAddUser(false);
       setNewUserEmail('');
       setNewUserName('');
@@ -1531,7 +1533,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       loadUsers();
     } catch (err) {
       console.error('Error adding user:', err);
-      alert(err instanceof Error ? err.message : 'Failed to add user. Please try again.');
+      showNotification('error', 'Add User Failed', err instanceof Error ? err.message : 'Failed to add user. Please try again.');
     } finally {
       setAddingUser(false);
     }
@@ -1557,17 +1559,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   const updateUser = async (userId: string) => {
     if (!editingUserEmail.trim()) {
-      alert('Email is required');
+      showNotification('warning', 'Email Required', 'Email is required');
       return;
     }
 
     if (editingUserPassword || editingUserPasswordConfirm) {
       if (editingUserPassword !== editingUserPasswordConfirm) {
-        alert('Passwords do not match');
+        showNotification('warning', 'Password Mismatch', 'Passwords do not match');
         return;
       }
       if (editingUserPassword.length < 6) {
-        alert('Password must be at least 6 characters');
+        showNotification('warning', 'Password Too Short', 'Password must be at least 6 characters');
         return;
       }
     }
@@ -1576,7 +1578,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setUpdatingUser(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        alert('You must be logged in to update users');
+        showNotification('error', 'Not Authenticated', 'You must be logged in to update users');
         return;
       }
 
@@ -1613,12 +1615,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         throw new Error(errorData.error || 'Failed to update user');
       }
 
-      alert('User updated successfully!');
+      showNotification('success', 'User Updated', 'User updated successfully!');
       cancelEditUser();
       loadUsers();
     } catch (err) {
       console.error('Error updating user:', err);
-      alert(err instanceof Error ? err.message : 'Failed to update user. Please try again.');
+      showNotification('error', 'Update Failed', err instanceof Error ? err.message : 'Failed to update user. Please try again.');
     } finally {
       setUpdatingUser(false);
     }
@@ -1635,11 +1637,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
       if (error) throw error;
 
-      alert('User removed successfully!');
+      showNotification('success', 'User Removed', 'User removed successfully!');
       loadUsers();
     } catch (err) {
       console.error('Error deleting user:', err);
-      alert('Failed to remove user. Please try again.');
+      showNotification('error', 'Remove Failed', 'Failed to remove user. Please try again.');
     }
   };
 
@@ -1681,10 +1683,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setCompanySettings(data);
       }
 
-      alert('Status preferences saved successfully!');
+      showNotification('success', 'Status Preferences Saved', 'Status preferences saved successfully!');
     } catch (err) {
       console.error('Error saving status preferences:', err);
-      alert('Failed to save status preferences. Please try again.');
+      showNotification('error', 'Save Failed', 'Failed to save status preferences. Please try again.');
     } finally {
       setSavingStatuses(false);
     }
@@ -1727,10 +1729,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setCompanySettings(data);
       }
 
-      alert('Billing status preferences saved successfully!');
+      showNotification('success', 'Billing Status Saved', 'Billing status preferences saved successfully!');
     } catch (err) {
       console.error('Error saving billing status preferences:', err);
-      alert('Failed to save billing status preferences. Please try again.');
+      showNotification('error', 'Save Failed', 'Failed to save billing status preferences. Please try again.');
     } finally {
       setSavingBillingStatuses(false);
     }
@@ -1741,10 +1743,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setSyncingStatuses(true);
       await loadAvailableStatuses();
       await loadStatusesFromDatabase();
-      alert(`Successfully synced statuses from Printavo!`);
+      showNotification('success', 'Statuses Synced', 'Successfully synced statuses from Printavo!');
     } catch (err) {
       console.error('Error syncing statuses:', err);
-      alert('Failed to sync statuses. Please try again.');
+      showNotification('error', 'Sync Failed', 'Failed to sync statuses. Please try again.');
     } finally {
       setSyncingStatuses(false);
     }

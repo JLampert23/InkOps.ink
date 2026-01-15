@@ -2,6 +2,7 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import { RefreshCw, AlertCircle, TrendingUp, Menu, X, LogOut, Loader2, Settings, CreditCard, Package, ChevronDown, ChevronUp, Send, Mail, Wallet, Users, CheckCircle } from 'lucide-react';
 import { AccountSettings } from './components/AccountSettings';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { NotificationProvider, useNotification } from './contexts/NotificationContext';
 import { EnhancedAuthScreen } from './components/EnhancedAuthScreen';
 import { supabase } from './lib/supabase-client';
 import { billingService } from './services/billing-service';
@@ -36,6 +37,7 @@ function AppContent() {
   const [syncing, setSyncing] = useState(false);
   const { signOut, user } = useAuth();
   const { userProfile, canAccessIntegrations } = useRBAC();
+  const { showNotification } = useNotification();
 
   useEffect(() => {
     const checkScreenSize = () => {
@@ -163,9 +165,9 @@ function AppContent() {
     setSyncing(true);
     try {
       await billingService.syncBillingQueue([]);
-      alert('Sync completed successfully!');
+      showNotification('success', 'Sync completed successfully!', 'Data has been refreshed from Printavo');
     } catch (error: any) {
-      alert(error.message || 'Failed to sync from Printavo');
+      showNotification('error', 'Sync failed', error.message || 'Failed to sync from Printavo');
     } finally {
       setSyncing(false);
     }
@@ -616,7 +618,9 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <AuthenticatedApp />
+      <NotificationProvider>
+        <AuthenticatedApp />
+      </NotificationProvider>
     </AuthProvider>
   );
 }
