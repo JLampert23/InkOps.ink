@@ -192,7 +192,7 @@ export default function UnifiedPaymentsReport() {
         throw new Error('Not authenticated');
       }
 
-      const { error } = await supabase
+      const { error: paymentError } = await supabase
         .from('payments')
         .insert({
           invoice_id: payment.invoice_id,
@@ -206,9 +206,21 @@ export default function UnifiedPaymentsReport() {
           notes: 'Manual payment reversal'
         });
 
-      if (error) throw error;
+      if (paymentError) throw paymentError;
 
-      showNotification('success', 'Payment Reversed', 'Manual payment has been reversed successfully.');
+      const { error: invoiceError } = await supabase
+        .from('printavo_invoices')
+        .update({
+          status_stage: 'accounts_receivable',
+          is_financially_locked: false,
+          locked_at: null,
+          locked_by: null
+        })
+        .eq('id', payment.invoice_id);
+
+      if (invoiceError) throw invoiceError;
+
+      showNotification('success', 'Payment Reversed', 'Manual payment has been reversed and invoice moved back to Accounts Receivable.');
       await loadPayments();
     } catch (err) {
       console.error('Error reversing payment:', err);
