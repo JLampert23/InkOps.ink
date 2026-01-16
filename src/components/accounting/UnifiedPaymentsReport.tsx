@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { CreditCard, Download, Filter, Calendar, DollarSign, Loader2, TrendingUp, RotateCcw, Eye } from 'lucide-react';
+import { CreditCard, Download, Filter, Calendar, DollarSign, Loader2, TrendingUp, RotateCcw, Eye, Undo2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { InvoiceDetail } from '../billing/InvoiceDetail';
+import { useNotification } from '../../contexts/NotificationContext';
 
 interface Payment {
   id: string;
@@ -21,6 +22,7 @@ interface Payment {
 }
 
 export default function UnifiedPaymentsReport() {
+  const { showNotification, confirm } = useNotification();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refunding, setRefunding] = useState<string | null>(null);
@@ -105,28 +107,17 @@ export default function UnifiedPaymentsReport() {
     const payment = payments.find(p => p.id === paymentId);
     if (!payment) return;
 
-    const confirmRefund = confirm(
-      `Are you sure you want to refund $${payment.amount.toFixed(2)} to ${payment.customer_name}?\n\nThis action cannot be undone.`
-    );
+    const confirmRefund = await confirm({
+      title: 'Refund Payment',
+      message: `Are you sure you want to refund $${payment.amount.toFixed(2)} to ${payment.customer_name}? This action cannot be undone.`,
+      confirmText: 'Refund',
+      cancelText: 'Cancel',
+      type: 'warning'
+    });
 
     if (!confirmRefund) return;
 
-    const reason = prompt(
-      'Select refund reason:\n\n1. requested_by_customer (default)\n2. duplicate\n3. fraudulent\n\nEnter 1, 2, or 3 (or press Cancel to use default):'
-    );
-
-    let refundReason = 'requested_by_customer';
-    if (reason === '1') {
-      refundReason = 'requested_by_customer';
-    } else if (reason === '2') {
-      refundReason = 'duplicate';
-    } else if (reason === '3') {
-      refundReason = 'fraudulent';
-    } else if (reason !== null && reason.trim() !== '') {
-      // User entered something invalid
-      alert('Invalid selection. Using default: requested_by_customer');
-      refundReason = 'requested_by_customer';
-    }
+    const refundReason = 'requested_by_customer';
 
     setRefunding(paymentId);
     try {
@@ -172,25 +163,30 @@ export default function UnifiedPaymentsReport() {
 
       console.log('Refund successful:', result);
       await loadPayments();
-
-      // Show success message using a custom notification instead of alert
-      const successDiv = document.createElement('div');
-      successDiv.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
-      successDiv.textContent = result.message || 'Refund processed successfully!';
-      document.body.appendChild(successDiv);
-      setTimeout(() => successDiv.remove(), 5000);
+      showNotification('success', 'Refund Processed', result.message || 'Refund processed successfully!');
     } catch (err) {
       console.error('Error processing refund:', err);
-
-      // Show error message using a custom notification instead of alert
-      const errorDiv = document.createElement('div');
-      errorDiv.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
-      errorDiv.textContent = err instanceof Error ? err.message : 'Failed to process refund';
-      document.body.appendChild(errorDiv);
-      setTimeout(() => errorDiv.remove(), 5000);
+      showNotification('error', 'Refund Failed', err instanceof Error ? err.message : 'Failed to process refund');
     } finally {
       setRefunding(null);
     }
+  };
+
+  const handleReversePayment = async (paymentId: string) => {
+    const payment = payments.find(p => p.id === paymentId);
+    if (!payment) return;
+
+    const confirmed = await confirm({
+      title: 'Reverse Manual Payment',
+      message: 'Are you sure you want to reverse this manual payment? This will restore the invoice balance and move it back to Accounts Receivable.',
+      confirmText: 'Confirm',
+      cancelText: 'Cancel',
+      type: 'warning'
+    });
+
+    if (!confirmed) return;
+
+    showNotification('info', 'Reversal logic not yet implemented', 'Payment reversal functionality will be implemented soon.');
   };
 
   const handleViewInvoice = (invoiceId: string) => {
@@ -441,7 +437,7 @@ export default function UnifiedPaymentsReport() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transaction ID</th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Refund</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -497,6 +493,14 @@ export default function UnifiedPaymentsReport() {
                             Refund
                           </>
                         )}
+                      </button>
+                    ) : payment.source === 'manual' && payment.status === 'successful' ? (
+                      <button
+                        onClick={() => handleReversePayment(payment.id)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-600 text-white text-xs font-medium rounded-lg hover:bg-orange-700 transition-colors"
+                      >
+                        <Undo2 className="w-3.5 h-3.5" />
+                        Reverse
                       </button>
                     ) : (
                       <span className="text-xs text-gray-400">
