@@ -186,7 +186,34 @@ export default function UnifiedPaymentsReport() {
 
     if (!confirmed) return;
 
-    showNotification('info', 'Reversal logic not yet implemented', 'Payment reversal functionality will be implemented soon.');
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('Not authenticated');
+      }
+
+      const { error } = await supabase
+        .from('payments')
+        .insert({
+          invoice_id: payment.invoice_id,
+          amount: -Math.abs(payment.amount),
+          payment_method: 'manual',
+          source: 'manual',
+          status: 'reversed',
+          transaction_id: paymentId,
+          payment_date: new Date().toISOString(),
+          created_by: user.id,
+          notes: 'Manual payment reversal'
+        });
+
+      if (error) throw error;
+
+      showNotification('success', 'Payment Reversed', 'Manual payment has been reversed successfully.');
+      await loadPayments();
+    } catch (err) {
+      console.error('Error reversing payment:', err);
+      showNotification('error', 'Reversal Failed', err instanceof Error ? err.message : 'Failed to reverse payment');
+    }
   };
 
   const handleViewInvoice = (invoiceId: string) => {
@@ -237,6 +264,7 @@ export default function UnifiedPaymentsReport() {
       refunded: 'bg-gray-100 text-gray-800',
       partial_refund: 'bg-yellow-100 text-yellow-800',
       pending: 'bg-blue-100 text-blue-800',
+      reversed: 'bg-orange-100 text-orange-800',
     };
 
     return (
@@ -382,6 +410,7 @@ export default function UnifiedPaymentsReport() {
                 <option value="successful">Successful</option>
                 <option value="failed">Failed</option>
                 <option value="refunded">Refunded</option>
+                <option value="reversed">Reversed</option>
                 <option value="pending">Pending</option>
               </select>
             </div>
