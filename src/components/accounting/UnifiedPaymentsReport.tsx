@@ -21,6 +21,7 @@ interface Payment {
   status: string;
   notes: string | null;
   metadata: any;
+  has_been_reversed?: boolean;
 }
 
 export default function UnifiedPaymentsReport() {
@@ -67,23 +68,31 @@ export default function UnifiedPaymentsReport() {
 
       if (error) throw error;
 
-      const processedPayments: Payment[] = (data || []).map((payment: any) => ({
-        id: payment.id,
-        company_id: payment.company_id,
-        payment_date: payment.payment_date,
-        invoice_id: payment.invoice_id,
-        invoice_number: payment.printavo_invoices?.invoice_number || 'N/A',
-        customer_name: payment.printavo_invoices?.customer_name || 'Unknown',
-        amount: parseFloat(payment.amount || 0),
-        refund_amount: parseFloat(payment.refund_amount || 0),
-        payment_method: payment.payment_method || payment.source || 'Unknown',
-        source: payment.source || 'manual',
-        stripe_transaction_id: payment.stripe_transaction_id || payment.stripe_charge_id || null,
-        check_number: payment.check_number || null,
-        status: payment.status || 'successful',
-        notes: payment.notes || null,
-        metadata: payment.metadata || null,
-      }));
+      const processedPayments: Payment[] = (data || []).map((payment: any) => {
+        const hasBeenReversed = (data || []).some((p: any) =>
+          p.status === 'reversed' &&
+          p.metadata?.original_payment_id === payment.id
+        );
+
+        return {
+          id: payment.id,
+          company_id: payment.company_id,
+          payment_date: payment.payment_date,
+          invoice_id: payment.invoice_id,
+          invoice_number: payment.printavo_invoices?.invoice_number || 'N/A',
+          customer_name: payment.printavo_invoices?.customer_name || 'Unknown',
+          amount: parseFloat(payment.amount || 0),
+          refund_amount: parseFloat(payment.refund_amount || 0),
+          payment_method: payment.payment_method || payment.source || 'Unknown',
+          source: payment.source || 'manual',
+          stripe_transaction_id: payment.stripe_transaction_id || payment.stripe_charge_id || null,
+          check_number: payment.check_number || null,
+          status: payment.status || 'successful',
+          notes: payment.notes || null,
+          metadata: payment.metadata || null,
+          has_been_reversed: hasBeenReversed,
+        };
+      });
 
       let filtered = processedPayments;
 
@@ -185,6 +194,11 @@ export default function UnifiedPaymentsReport() {
   const handleReversePayment = async (paymentId: string) => {
     const payment = payments.find(p => p.id === paymentId);
     if (!payment) return;
+
+    if (payment.has_been_reversed) {
+      showNotification('error', 'Already Reversed', 'This payment has already been reversed.');
+      return;
+    }
 
     const confirmed = await confirm({
       title: 'Reverse Manual Payment',
@@ -560,13 +574,17 @@ export default function UnifiedPaymentsReport() {
                         )}
                       </button>
                     ) : payment.source === 'manual' && payment.status === 'successful' ? (
-                      <button
-                        onClick={() => handleReversePayment(payment.id)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-600 text-white text-xs font-medium rounded-lg hover:bg-orange-700 transition-colors"
-                      >
-                        <Undo2 className="w-3.5 h-3.5" />
-                        Reverse
-                      </button>
+                      payment.has_been_reversed ? (
+                        <span className="text-xs text-gray-400 italic">Already Reversed</span>
+                      ) : (
+                        <button
+                          onClick={() => handleReversePayment(payment.id)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-600 text-white text-xs font-medium rounded-lg hover:bg-orange-700 transition-colors"
+                        >
+                          <Undo2 className="w-3.5 h-3.5" />
+                          Reverse
+                        </button>
+                      )
                     ) : payment.status === 'reversed' ? (
                       <span className="text-xs text-gray-400"></span>
                     ) : (
