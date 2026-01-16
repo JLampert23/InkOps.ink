@@ -208,10 +208,10 @@ export default function UnifiedPaymentsReport() {
           payment_method: 'manual',
           source: 'manual',
           status: 'reversed',
-          transaction_id: paymentId,
           payment_date: new Date().toISOString(),
           created_by: user.id,
-          notes: 'Manual payment reversal'
+          notes: 'Manual payment reversal',
+          metadata: { original_payment_id: paymentId }
         });
 
       if (paymentError) throw paymentError;
