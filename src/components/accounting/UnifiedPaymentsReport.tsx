@@ -7,6 +7,7 @@ import { useNotification } from '../../contexts/NotificationContext';
 
 interface Payment {
   id: string;
+  company_id: string;
   payment_date: string;
   invoice_id: string;
   invoice_number: string;
@@ -68,6 +69,7 @@ export default function UnifiedPaymentsReport() {
 
       const processedPayments: Payment[] = (data || []).map((payment: any) => ({
         id: payment.id,
+        company_id: payment.company_id,
         payment_date: payment.payment_date,
         invoice_id: payment.invoice_id,
         invoice_number: payment.printavo_invoices?.invoice_number || 'N/A',
@@ -203,6 +205,7 @@ export default function UnifiedPaymentsReport() {
       const { error: paymentError } = await supabase
         .from('payments')
         .insert({
+          company_id: payment.company_id,
           invoice_id: payment.invoice_id,
           amount: -Math.abs(payment.amount),
           payment_method: 'manual',
