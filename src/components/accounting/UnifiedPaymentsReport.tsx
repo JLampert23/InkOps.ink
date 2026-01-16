@@ -219,6 +219,10 @@ export default function UnifiedPaymentsReport() {
 
       if (paymentError) throw paymentError;
 
+      // Recalculate invoice balances to reflect the reversed payment
+      const { error: recalcError } = await supabase.rpc('recalculate_invoice_balances');
+      if (recalcError) throw recalcError;
+
       const { error: invoiceError } = await supabase
         .from('printavo_invoices')
         .update({
