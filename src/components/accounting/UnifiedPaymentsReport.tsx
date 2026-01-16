@@ -219,14 +219,14 @@ export default function UnifiedPaymentsReport() {
 
       if (paymentError) throw paymentError;
 
-      // Recalculate invoice balances to reflect the reversed payment
+      // Recalculate invoice balances and status_stage to reflect the reversed payment
       const { error: recalcError } = await supabase.rpc('recalculate_invoice_balances');
       if (recalcError) throw recalcError;
 
+      // Unlock the invoice (status_stage is handled by recalculation function)
       const { error: invoiceError } = await supabase
         .from('printavo_invoices')
         .update({
-          status_stage: 'accounts_receivable',
           is_financially_locked: false,
           locked_at: null,
           locked_by: null
@@ -235,7 +235,7 @@ export default function UnifiedPaymentsReport() {
 
       if (invoiceError) throw invoiceError;
 
-      showNotification('success', 'Payment Reversed', 'Manual payment has been reversed and invoice moved back to Accounts Receivable.');
+      showNotification('success', 'Payment Reversed', 'Manual payment has been reversed and invoice balance updated.');
       await loadPayments();
     } catch (err) {
       console.error('Error reversing payment:', err);
