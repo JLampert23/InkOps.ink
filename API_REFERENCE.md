@@ -1,6 +1,6 @@
 # Printavo API v2 - GraphQL Reference
 
-This document provides examples of GraphQL queries used in the Printavo Financial Dashboard and expected response formats.
+This document provides examples of GraphQL queries used in InkOps and expected response formats.
 
 ## API Endpoint
 
@@ -22,7 +22,7 @@ POST https://www.printavo.com/api/v2
 
 - **10 requests per 5 seconds** per user/IP
 - Exceeded limits return HTTP 429 (Too Many Requests)
-- The dashboard implements automatic throttling to stay within limits
+- InkOps implements automatic throttling to stay within limits
 
 ---
 

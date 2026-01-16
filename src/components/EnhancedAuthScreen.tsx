@@ -101,8 +101,8 @@ export function EnhancedAuthScreen() {
               {isForgotPassword
                 ? 'Enter your email to receive a password reset link'
                 : isSignUp
-                ? 'Set up your Printavo Financial Dashboard'
-                : 'Sign in to your financial dashboard'}
+                ? 'Set up your InkOps account'
+                : 'Sign in to InkOps'}
             </p>
           </div>
 

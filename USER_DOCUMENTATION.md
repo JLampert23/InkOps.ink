@@ -1,4 +1,4 @@
-# Printavo Financial Dashboard - User Documentation
+# InkOps - User Documentation
 
 **Version 1.0** | Last Updated: January 2026
 
@@ -1686,4 +1686,4 @@ For sales inquiries:
 
 **End of Documentation**
 
-Thank you for using Printavo Financial Dashboard. We hope this documentation helps you get the most out of the application. If you have suggestions for improving this documentation, please contact support.
+Thank you for using InkOps. We hope this documentation helps you get the most out of the application. If you have suggestions for improving this documentation, please contact support.

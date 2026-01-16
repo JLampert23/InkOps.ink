@@ -7,7 +7,7 @@
     - Defaults to empty array to maintain existing behavior
 
   2. Purpose
-    - Enable independent filtering for Printavo Dashboard and Billing & Payments sections
+    - Enable independent filtering for Production Dashboard and Billing & Payments sections
     - Each section can now have its own set of visible invoice statuses
 */
 

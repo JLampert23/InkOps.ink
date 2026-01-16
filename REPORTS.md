@@ -1,6 +1,6 @@
 # Financial Reports System
 
-A comprehensive reporting system for the Printavo Financial Dashboard with four production-ready reports, modular architecture, and extensive export capabilities.
+A comprehensive reporting system for InkOps with four production-ready reports, modular architecture, and extensive export capabilities.
 
 ## Overview
 

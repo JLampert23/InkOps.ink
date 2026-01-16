@@ -1,8 +1,8 @@
-# Printavo Financial Dashboard - Complete Project Summary
+# InkOps - Complete Project Summary
 
 ## Overview
 
-A production-ready, full-featured financial analytics dashboard that integrates with the Printavo API v2 (GraphQL). This application provides comprehensive financial reporting, customer insights, and business intelligence for Printavo users.
+A production-ready, full-featured financial operations platform that integrates with the Printavo API v2 (GraphQL). InkOps provides comprehensive financial reporting, customer insights, and business intelligence for screen printing and apparel decoration businesses.
 
 ## What Has Been Built
 

@@ -1,6 +1,6 @@
-# Printavo Financial Dashboard - Setup Guide
+# InkOps - Setup Guide
 
-This guide will walk you through setting up the Printavo Financial Dashboard from scratch.
+This guide will walk you through setting up InkOps from scratch.
 
 ## Step 1: Get Your Printavo API Credentials
 
@@ -313,4 +313,4 @@ Once your dashboard is running:
 5. ✅ Customize the dashboard to your needs
 6. ✅ Share with your team or deploy to production
 
-Enjoy your new Printavo Financial Dashboard!
+Enjoy your new InkOps platform!

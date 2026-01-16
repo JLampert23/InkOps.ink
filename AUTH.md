@@ -2,7 +2,7 @@
 
 ## Overview
 
-This application implements a complete **multi-tenant authentication system** for the Printavo Financial Dashboard. Each company can sign up with their own account, store their Printavo API credentials securely, and access their financial data in complete isolation from other companies.
+This application implements a complete **multi-tenant authentication system** for InkOps. Each company can sign up with their own account, store their Printavo API credentials securely, and access their financial data in complete isolation from other companies.
 
 ---
 

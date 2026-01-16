@@ -1,6 +1,6 @@
-# Printavo Financial Dashboard
+# InkOps
 
-A production-grade web application that connects to the Printavo API v2 (GraphQL) and displays comprehensive financial data in a clean, filterable, customizable dashboard.
+A production-grade financial operations platform for screen printing and apparel decoration businesses. InkOps connects to the Printavo API v2 (GraphQL) and displays comprehensive financial data in a clean, filterable, customizable dashboard.
 
 ## Features
 
@@ -32,7 +32,7 @@ A production-grade web application that connects to the Printavo API v2 (GraphQL
 ## Project Structure
 
 ```
-printavo-financial-dashboard/
+inkops/
 ├── src/
 │   ├── components/           # React components
 │   │   ├── DashboardOverview.tsx    # Financial KPIs and charts

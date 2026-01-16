@@ -2,7 +2,7 @@
 
 ## What Was Built
 
-A complete, production-ready **multi-tenant authentication system** for the Printavo Financial Dashboard that allows companies to:
+A complete, production-ready **multi-tenant authentication system** for InkOps that allows companies to:
 1. Sign up with their own account
 2. Securely store their Printavo API credentials (encrypted)
 3. Access their financial data in complete isolation from other companies
@@ -416,4 +416,4 @@ This implementation provides a **complete, production-ready multi-tenant authent
 - Type-safe TypeScript implementation
 - Following all security best practices
 
-The system is ready to use and can handle multiple companies signing up and using the Printavo Financial Dashboard independently and securely.
+The system is ready to use and can handle multiple companies signing up and using InkOps independently and securely.
