@@ -17,9 +17,9 @@ interface Payment {
   source: string;
   stripe_transaction_id: string | null;
   check_number: string | null;
-  transaction_id: string | null;
   status: string;
   notes: string | null;
+  metadata: any;
 }
 
 export default function UnifiedPaymentsReport() {
@@ -35,6 +35,12 @@ export default function UnifiedPaymentsReport() {
   const [customers, setCustomers] = useState<string[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
   const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
+
+  const getOriginalPaymentId = (payment: Payment): string | null => {
+    if (payment.status !== 'reversed') return null;
+    if (payment.metadata?.original_payment_id) return payment.metadata.original_payment_id;
+    return null;
+  };
 
   useEffect(() => {
     loadPayments();
@@ -72,9 +78,9 @@ export default function UnifiedPaymentsReport() {
         source: payment.source || 'manual',
         stripe_transaction_id: payment.stripe_transaction_id || payment.stripe_charge_id || null,
         check_number: payment.check_number || null,
-        transaction_id: payment.transaction_id || null,
         status: payment.status || 'successful',
         notes: payment.notes || null,
+        metadata: payment.metadata || null,
       }));
 
       let filtered = processedPayments;
@@ -251,18 +257,21 @@ export default function UnifiedPaymentsReport() {
 
   const exportToCSV = () => {
     const headers = ['Payment Date', 'Invoice #', 'Customer', 'Amount', 'Method', 'Transaction ID', 'Status', 'Notes'];
-    const rows = payments.map(p => [
-      format(new Date(p.payment_date), 'yyyy-MM-dd'),
-      p.invoice_number,
-      p.customer_name,
-      p.amount.toFixed(2),
-      p.source,
-      p.status === 'reversed' && p.transaction_id
-        ? `Reversal of ${p.transaction_id}`
-        : p.stripe_transaction_id || p.check_number || 'N/A',
-      p.status,
-      p.notes || '',
-    ]);
+    const rows = payments.map(p => {
+      const originalPaymentId = getOriginalPaymentId(p);
+      return [
+        format(new Date(p.payment_date), 'yyyy-MM-dd'),
+        p.invoice_number,
+        p.customer_name,
+        p.amount.toFixed(2),
+        p.source,
+        p.status === 'reversed' && originalPaymentId
+          ? `Reversal of ${originalPaymentId}`
+          : p.stripe_transaction_id || p.check_number || 'N/A',
+        p.status,
+        p.notes || '',
+      ];
+    });
 
     const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -517,8 +526,8 @@ export default function UnifiedPaymentsReport() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-mono max-w-xs truncate">
-                    {payment.status === 'reversed' && payment.transaction_id
-                      ? `Reversal of ${payment.transaction_id}`
+                    {payment.status === 'reversed' && getOriginalPaymentId(payment)
+                      ? `Reversal of ${getOriginalPaymentId(payment)}`
                       : payment.stripe_transaction_id || payment.check_number || 'N/A'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
