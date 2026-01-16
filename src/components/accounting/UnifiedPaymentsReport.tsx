@@ -17,6 +17,7 @@ interface Payment {
   source: string;
   stripe_transaction_id: string | null;
   check_number: string | null;
+  transaction_id: string | null;
   status: string;
   notes: string | null;
 }
@@ -71,6 +72,7 @@ export default function UnifiedPaymentsReport() {
         source: payment.source || 'manual',
         stripe_transaction_id: payment.stripe_transaction_id || payment.stripe_charge_id || null,
         check_number: payment.check_number || null,
+        transaction_id: payment.transaction_id || null,
         status: payment.status || 'successful',
         notes: payment.notes || null,
       }));
@@ -255,7 +257,9 @@ export default function UnifiedPaymentsReport() {
       p.customer_name,
       p.amount.toFixed(2),
       p.source,
-      p.stripe_transaction_id || p.check_number || 'N/A',
+      p.status === 'reversed' && p.transaction_id
+        ? `Reversal of ${p.transaction_id}`
+        : p.stripe_transaction_id || p.check_number || 'N/A',
       p.status,
       p.notes || '',
     ]);
@@ -500,8 +504,10 @@ export default function UnifiedPaymentsReport() {
                       <span className="text-gray-500">{payment.invoice_number}</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-semibold text-gray-900">
-                    ${payment.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-semibold ${
+                    payment.amount < 0 ? 'text-red-600' : 'text-gray-900'
+                  }`}>
+                    {payment.amount < 0 ? '-' : ''}${Math.abs(payment.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -511,7 +517,9 @@ export default function UnifiedPaymentsReport() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-mono max-w-xs truncate">
-                    {payment.stripe_transaction_id || payment.check_number || 'N/A'}
+                    {payment.status === 'reversed' && payment.transaction_id
+                      ? `Reversal of ${payment.transaction_id}`
+                      : payment.stripe_transaction_id || payment.check_number || 'N/A'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     {getStatusBadge(payment.status)}
@@ -543,6 +551,8 @@ export default function UnifiedPaymentsReport() {
                         <Undo2 className="w-3.5 h-3.5" />
                         Reverse
                       </button>
+                    ) : payment.status === 'reversed' ? (
+                      <span className="text-xs text-gray-400"></span>
                     ) : (
                       <span className="text-xs text-gray-400">
                         {payment.status === 'refunded' ? 'Refunded' : 'N/A'}
