@@ -436,9 +436,9 @@ function AppContent() {
       </aside>
 
       {/* Main Content Area */}
-      <div className={`transition-all duration-300 lg:ml-20 ${sidebarOpen ? 'lg:ml-56' : 'lg:ml-20'}`}>
+      <div className={`transition-all duration-300 lg:ml-20 ${sidebarOpen ? 'lg:ml-56' : 'lg:ml-20'} ${activeTab === 'settings' ? 'flex flex-col h-screen' : ''}`}>
         {/* Top Bar */}
-        <header className="h-20 bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm">
+        <header className={`h-20 bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm ${activeTab === 'settings' ? 'flex-shrink-0' : ''}`}>
           <div className="h-full px-4 flex items-center justify-between gap-4">
             {/* Mobile menu button */}
             <button
@@ -501,7 +501,7 @@ function AppContent() {
         </header>
 
         {/* Content */}
-        <main className="py-4 px-3 sm:py-6 sm:px-4">
+        <main className={activeTab === 'settings' ? 'flex-1 overflow-hidden' : 'py-4 px-3 sm:py-6 sm:px-4'}>
           {activeTab === 'accounting-dashboard' && (
             <Suspense fallback={
               <div className="bg-white rounded-lg shadow p-8">
