@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, RefreshCw, Bug, MessageSquare } from 'lucide-react';
+import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, RefreshCw, Bug, MessageSquare, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../lib/supabase-client';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
@@ -84,6 +84,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   const [printavoUsername, setPrintavoUsername] = useState('');
   const [printavoToken, setPrintavoToken] = useState('');
+  const [showPrintavoToken, setShowPrintavoToken] = useState(false);
   const [savingIntegration, setSavingIntegration] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [testResult, setTestResult] = useState<any>(null);
@@ -91,6 +92,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [testData, setTestData] = useState<any>(null);
 
   const [squareAccessToken, setSquareAccessToken] = useState('');
+  const [showSquareToken, setShowSquareToken] = useState(false);
   const [squareApplicationId, setSquareApplicationId] = useState('');
   const [squareLocationId, setSquareLocationId] = useState('');
   const [squareEnvironment, setSquareEnvironment] = useState('production');
@@ -99,20 +101,26 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [squareTestResult, setSquareTestResult] = useState<any>(null);
 
   const [resendApiKey, setResendApiKey] = useState('');
+  const [showResendKey, setShowResendKey] = useState(false);
   const [emailFromAddress, setEmailFromAddress] = useState('');
   const [savingResend, setSavingResend] = useState(false);
   const [testingResend, setTestingResend] = useState(false);
   const [resendTestResult, setResendTestResult] = useState<any>(null);
 
   const [stripePublicKey, setStripePublicKey] = useState('');
+  const [showStripePublicKey, setShowStripePublicKey] = useState(false);
   const [stripeSecretKey, setStripeSecretKey] = useState('');
+  const [showStripeSecretKey, setShowStripeSecretKey] = useState(false);
   const [stripeWebhookSecret, setStripeWebhookSecret] = useState('');
+  const [showStripeWebhookSecret, setShowStripeWebhookSecret] = useState(false);
   const [savingStripe, setSavingStripe] = useState(false);
   const [testingStripe, setTestingStripe] = useState(false);
   const [stripeTestResult, setStripeTestResult] = useState<any>(null);
 
   const [twilioAccountSid, setTwilioAccountSid] = useState('');
+  const [showTwilioSid, setShowTwilioSid] = useState(false);
   const [twilioAuthToken, setTwilioAuthToken] = useState('');
+  const [showTwilioToken, setShowTwilioToken] = useState(false);
   const [twilioPhoneNumber, setTwilioPhoneNumber] = useState('');
   const [twilioEnabled, setTwilioEnabled] = useState(false);
   const [defaultSendMethod, setDefaultSendMethod] = useState('email');
@@ -2392,13 +2400,23 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Printavo API Token
                   </label>
-                  <input
-                    type="password"
-                    value={printavoToken}
-                    onChange={(e) => setPrintavoToken(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder={companySettings?.printavo_api_token_encrypted ? '••••••••••••••••' : 'Enter your API token'}
-                  />
+                  <div className="relative">
+                    <input
+                      type={showPrintavoToken ? 'text' : 'password'}
+                      value={printavoToken}
+                      onChange={(e) => setPrintavoToken(e.target.value)}
+                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder={companySettings?.printavo_api_token_encrypted ? '••••••••••••••••' : 'Enter your API token'}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPrintavoToken(!showPrintavoToken)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      tabIndex={-1}
+                    >
+                      {showPrintavoToken ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
                   <p className="text-xs text-gray-500 mt-1">
                     {companySettings?.printavo_api_token_encrypted
                       ? 'Token is saved and encrypted. Enter a new token to update it.'
@@ -2594,13 +2612,23 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Square Access Token <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="password"
-                    value={squareAccessToken}
-                    onChange={(e) => setSquareAccessToken(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    placeholder={companySettings?.square_access_token ? '••••••••••••••••' : 'Enter your Square access token'}
-                  />
+                  <div className="relative">
+                    <input
+                      type={showSquareToken ? 'text' : 'password'}
+                      value={squareAccessToken}
+                      onChange={(e) => setSquareAccessToken(e.target.value)}
+                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      placeholder={companySettings?.square_access_token ? '••••••••••••••••' : 'Enter your Square access token'}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSquareToken(!showSquareToken)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      tabIndex={-1}
+                    >
+                      {showSquareToken ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
                   <p className="text-xs text-gray-500 mt-1">
                     {companySettings?.square_access_token
                       ? 'Token is saved and encrypted. Enter a new token to update it.'
@@ -2767,13 +2795,23 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Resend API Key <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="password"
-                    value={resendApiKey}
-                    onChange={(e) => setResendApiKey(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    placeholder={companySettings?.resend_api_key ? '••••••••••••••••' : 'Enter your Resend API key'}
-                  />
+                  <div className="relative">
+                    <input
+                      type={showResendKey ? 'text' : 'password'}
+                      value={resendApiKey}
+                      onChange={(e) => setResendApiKey(e.target.value)}
+                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      placeholder={companySettings?.resend_api_key ? '••••••••••••••••' : 'Enter your Resend API key'}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowResendKey(!showResendKey)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      tabIndex={-1}
+                    >
+                      {showResendKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
                   <p className="text-xs text-gray-500 mt-1">
                     {companySettings?.resend_api_key
                       ? 'API key is saved and encrypted. Enter a new key to update it.'
@@ -2932,13 +2970,23 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Twilio Account SID <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="password"
-                    value={twilioAccountSid}
-                    onChange={(e) => setTwilioAccountSid(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    placeholder={companySettings?.twilio_account_sid ? '••••••••••••••••' : 'Enter your Twilio Account SID'}
-                  />
+                  <div className="relative">
+                    <input
+                      type={showTwilioSid ? 'text' : 'password'}
+                      value={twilioAccountSid}
+                      onChange={(e) => setTwilioAccountSid(e.target.value)}
+                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      placeholder={companySettings?.twilio_account_sid ? '••••••••••••••••' : 'Enter your Twilio Account SID'}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowTwilioSid(!showTwilioSid)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      tabIndex={-1}
+                    >
+                      {showTwilioSid ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
                   <p className="text-xs text-gray-500 mt-1">
                     {companySettings?.twilio_account_sid
                       ? 'Account SID is saved and encrypted. Enter a new value to update it.'
@@ -2950,13 +2998,23 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Twilio Auth Token <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="password"
-                    value={twilioAuthToken}
-                    onChange={(e) => setTwilioAuthToken(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    placeholder={companySettings?.twilio_auth_token ? '••••••••••••••••' : 'Enter your Twilio Auth Token'}
-                  />
+                  <div className="relative">
+                    <input
+                      type={showTwilioToken ? 'text' : 'password'}
+                      value={twilioAuthToken}
+                      onChange={(e) => setTwilioAuthToken(e.target.value)}
+                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      placeholder={companySettings?.twilio_auth_token ? '••••••••••••••••' : 'Enter your Twilio Auth Token'}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowTwilioToken(!showTwilioToken)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      tabIndex={-1}
+                    >
+                      {showTwilioToken ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
                   <p className="text-xs text-gray-500 mt-1">
                     {companySettings?.twilio_auth_token
                       ? 'Auth Token is saved and encrypted. Enter a new value to update it.'
@@ -3812,13 +3870,23 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Stripe Secret Key <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="password"
-                    value={stripeSecretKey}
-                    onChange={(e) => setStripeSecretKey(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder={companySettings?.stripe_secret_key ? '••••••••••••••••' : 'sk_live_...'}
-                  />
+                  <div className="relative">
+                    <input
+                      type={showStripeSecretKey ? 'text' : 'password'}
+                      value={stripeSecretKey}
+                      onChange={(e) => setStripeSecretKey(e.target.value)}
+                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder={companySettings?.stripe_secret_key ? '••••••••••••••••' : 'sk_live_...'}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowStripeSecretKey(!showStripeSecretKey)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      tabIndex={-1}
+                    >
+                      {showStripeSecretKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
                   <p className="text-xs text-gray-500 mt-1">
                     {companySettings?.stripe_secret_key
                       ? 'Secret key is saved and encrypted. Enter a new key to update it.'
@@ -3830,13 +3898,23 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Stripe Webhook Secret
                   </label>
-                  <input
-                    type="password"
-                    value={stripeWebhookSecret}
-                    onChange={(e) => setStripeWebhookSecret(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder={companySettings?.stripe_webhook_secret ? '••••••••••••••••' : 'whsec_...'}
-                  />
+                  <div className="relative">
+                    <input
+                      type={showStripeWebhookSecret ? 'text' : 'password'}
+                      value={stripeWebhookSecret}
+                      onChange={(e) => setStripeWebhookSecret(e.target.value)}
+                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder={companySettings?.stripe_webhook_secret ? '••••••••••••••••' : 'whsec_...'}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowStripeWebhookSecret(!showStripeWebhookSecret)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      tabIndex={-1}
+                    >
+                      {showStripeWebhookSecret ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
                   <p className="text-xs text-gray-500 mt-1">
                     {companySettings?.stripe_webhook_secret
                       ? 'Webhook secret is saved and encrypted. Enter a new secret to update it.'

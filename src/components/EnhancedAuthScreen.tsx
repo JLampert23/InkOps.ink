@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Lock, Mail, AlertCircle, Loader2, Building2, User, Key } from 'lucide-react';
+import { Lock, Mail, AlertCircle, Loader2, Building2, Eye, EyeOff } from 'lucide-react';
 
 export function EnhancedAuthScreen() {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -8,8 +8,7 @@ export function EnhancedAuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [companyName, setCompanyName] = useState('');
-  const [printavoUsername, setPrintavoUsername] = useState('');
-  const [printavoApiToken, setPrintavoApiToken] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -47,30 +46,16 @@ export function EnhancedAuthScreen() {
           return;
         }
 
-        if (!printavoUsername.trim()) {
-          setError('Printavo username is required');
-          setLoading(false);
-          return;
-        }
-
-        if (!printavoApiToken.trim()) {
-          setError('Printavo API token is required');
-          setLoading(false);
-          return;
-        }
-
         const { error } = await signUpWithCompany({
           email,
           password,
           companyName: companyName.trim(),
-          printavoUsername: printavoUsername.trim(),
-          printavoApiToken: printavoApiToken.trim(),
         });
 
         if (error) {
           setError(error.message);
         } else {
-          setSuccessMessage('Company account created successfully!');
+          setSuccessMessage('Company account created successfully! Please sign in to set up your integrations.');
         }
       } else {
         const { error } = await signIn(email, password);
@@ -168,69 +153,28 @@ export function EnhancedAuthScreen() {
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
                     id="password"
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    className="w-full pl-11 pr-11 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     placeholder={isSignUp ? 'At least 6 characters' : 'Enter your password'}
                     minLength={6}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-5 h-5" />
+                    ) : (
+                      <Eye className="w-5 h-5" />
+                    )}
+                  </button>
                 </div>
               </div>
-            )}
-
-            {isSignUp && !isForgotPassword && (
-              <>
-                <div className="border-t border-gray-200 pt-5">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    <Key className="w-4 h-4 text-blue-600" />
-                    Printavo API Credentials
-                  </h3>
-                  <p className="text-xs text-gray-600 mb-4">
-                    Your Printavo credentials are encrypted and stored securely. They're used to sync your financial data.
-                  </p>
-                </div>
-
-                <div>
-                  <label htmlFor="printavoUsername" className="block text-sm font-medium text-gray-700 mb-2">
-                    Printavo Username (Email)
-                  </label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input
-                      id="printavoUsername"
-                      type="email"
-                      required={isSignUp}
-                      value={printavoUsername}
-                      onChange={(e) => setPrintavoUsername(e.target.value)}
-                      className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="your-printavo-email@company.com"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label htmlFor="printavoApiToken" className="block text-sm font-medium text-gray-700 mb-2">
-                    Printavo API Token
-                  </label>
-                  <div className="relative">
-                    <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input
-                      id="printavoApiToken"
-                      type="password"
-                      required={isSignUp}
-                      value={printavoApiToken}
-                      onChange={(e) => setPrintavoApiToken(e.target.value)}
-                      className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                      placeholder="Enter your Printavo API token"
-                    />
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1.5">
-                    Find your API token in Printavo under Settings → API Settings
-                  </p>
-                </div>
-              </>
             )}
 
             <button
@@ -279,8 +223,6 @@ export function EnhancedAuthScreen() {
                 setError(null);
                 setSuccessMessage(null);
                 setCompanyName('');
-                setPrintavoUsername('');
-                setPrintavoApiToken('');
               }}
               className="text-sm text-slate-600 hover:text-slate-900 transition-colors"
             >

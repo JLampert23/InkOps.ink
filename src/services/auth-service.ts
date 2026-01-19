@@ -5,8 +5,8 @@ export interface CompanySignupData {
   companyName: string;
   email: string;
   password: string;
-  printavoUsername: string;
-  printavoApiToken: string;
+  printavoUsername?: string;
+  printavoApiToken?: string;
 }
 
 export interface CompanySettings {
@@ -36,26 +36,47 @@ export async function signUpCompany(data: CompanySignupData): Promise<{ error: E
       return { error: new Error('User creation failed') };
     }
 
-    const { data: { session } } = await supabase.auth.getSession();
+    const userId = authData.user.id;
 
-    if (!session) {
-      return { error: new Error('Failed to create session') };
+    const companyData: {
+      company_name: string;
+      owner_id: string;
+      printavo_username?: string;
+      printavo_api_token_encrypted?: string;
+      encryption_key_version?: string;
+    } = {
+      company_name: companyName,
+      owner_id: userId,
+    };
+
+    if (printavoUsername && printavoApiToken) {
+      const encryptedToken = await encryptToken(printavoApiToken);
+      companyData.printavo_username = printavoUsername;
+      companyData.printavo_api_token_encrypted = encryptedToken;
+      companyData.encryption_key_version = 'v1';
     }
 
-    const encryptedToken = await encryptToken(printavoApiToken);
-
-    const { error: settingsError } = await supabase
+    const { data: companySettings, error: settingsError } = await supabase
       .from('company_settings')
+      .insert(companyData)
+      .select()
+      .single();
+
+    if (settingsError || !companySettings) {
+      return { error: new Error(`Failed to save company settings: ${settingsError?.message || 'Unknown error'}`) };
+    }
+
+    const { error: profileError } = await supabase
+      .from('user_profiles')
       .insert({
-        company_name: companyName,
-        printavo_username: printavoUsername,
-        printavo_api_token_encrypted: encryptedToken,
-        encryption_key_version: 'v1',
+        id: userId,
+        email: email,
+        company_id: companySettings.id,
+        role: 'super_admin',
       });
 
-    if (settingsError) {
-      await supabase.auth.admin.deleteUser(authData.user.id);
-      return { error: new Error(`Failed to save company settings: ${settingsError.message}`) };
+    if (profileError) {
+      return { error: new Error(`Failed to create user profile: ${profileError.message}`) };
     }
 
     return { error: null };
