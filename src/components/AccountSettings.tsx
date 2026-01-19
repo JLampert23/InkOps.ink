@@ -745,6 +745,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
     try {
       setSavingIntegration(true);
+
+      if (!import.meta.env.VITE_SUPABASE_URL) {
+        showNotification('error', 'Configuration Error', 'VITE_SUPABASE_URL environment variable is not set. Please configure it in your Vercel project settings.');
+        return;
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         showNotification('error', 'Not Authenticated', 'You must be logged in to update integration settings');
@@ -818,6 +824,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
     try {
       setSavingSquare(true);
+
+      if (!import.meta.env.VITE_SUPABASE_URL) {
+        showNotification('error', 'Configuration Error', 'VITE_SUPABASE_URL environment variable is not set. Please configure it in your Vercel project settings.');
+        return;
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         showNotification('error', 'Not Authenticated', 'You must be logged in to update Square settings');
@@ -899,6 +911,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
     try {
       setSavingResend(true);
+
+      if (!import.meta.env.VITE_SUPABASE_URL) {
+        showNotification('error', 'Configuration Error', 'VITE_SUPABASE_URL environment variable is not set. Please configure it in your Vercel project settings.');
+        return;
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         showNotification('error', 'Not Authenticated', 'You must be logged in to update Resend settings');
@@ -979,6 +997,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     }
 
     try {
+      if (!import.meta.env.VITE_SUPABASE_URL) {
+        showNotification('error', 'Configuration Error', 'VITE_SUPABASE_URL environment variable is not set. Please configure it in your Vercel project settings.');
+        return;
+      }
       setSavingStripe(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -1118,6 +1140,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
     try {
       setSavingTwilio(true);
+
+      if (!import.meta.env.VITE_SUPABASE_URL) {
+        showNotification('error', 'Configuration Error', 'VITE_SUPABASE_URL environment variable is not set. Please configure it in your Vercel project settings.');
+        return;
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         showNotification('error', 'Not Authenticated', 'You must be logged in to update Twilio settings');
