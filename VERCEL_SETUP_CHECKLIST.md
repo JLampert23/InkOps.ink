@@ -8,13 +8,10 @@ You're getting an error when trying to save API tokens because the environment v
 
 ### Step 1: Get Your Supabase Credentials
 
-1. Go to https://supabase.com and log in
-2. Select your InkOps project
-3. Click the **Settings** icon (gear) in the left sidebar
-4. Click **API**
-5. Copy these two values:
-   - **Project URL** (looks like: `https://xxxxx.supabase.co`)
-   - **anon public** key (under "Project API keys")
+1. Go to https://supabase.com/dashboard/project/rhetupzcrsufhiruacoo/settings/api
+2. Copy these two values:
+   - **Project URL**: `https://rhetupzcrsufhiruacoo.supabase.co`
+   - **anon public** key (under "Project API keys" - it's a long JWT token starting with `eyJ...`)
 
 ### Step 2: Add Environment Variables to Vercel
 
@@ -26,12 +23,12 @@ You're getting an error when trying to save API tokens because the environment v
 
    **Variable 1:**
    - Name: `VITE_SUPABASE_URL`
-   - Value: `https://xxxxx.supabase.co` (your Project URL from Step 1)
+   - Value: `https://rhetupzcrsufhiruacoo.supabase.co`
    - Environment: Select all (Production, Preview, Development)
 
    **Variable 2:**
    - Name: `VITE_SUPABASE_ANON_KEY`
-   - Value: `eyJhbGc...` (your anon key from Step 1)
+   - Value: `eyJhbGc...` (copy the full anon key from Step 1)
    - Environment: Select all (Production, Preview, Development)
 
 6. Click **Save** for each variable

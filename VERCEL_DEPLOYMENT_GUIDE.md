@@ -30,7 +30,7 @@ Before deploying, you **must** configure environment variables in Vercel. Withou
 
 **Example:**
 ```
-VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_URL=https://rhetupzcrsufhiruacoo.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
@@ -136,12 +136,11 @@ Your current workflow (GitHub Desktop → Push → Auto-deploy) is correct. Just
 
 ## Getting Your Supabase Credentials
 
-1. Log in to https://supabase.com
-2. Select your project
-3. Go to **Settings** (gear icon in sidebar)
-4. Click **API**
-5. Copy:
-   - **Project URL** → Use as `VITE_SUPABASE_URL`
+**Quick Link:** https://supabase.com/dashboard/project/rhetupzcrsufhiruacoo/settings/api
+
+1. Go to the link above (you may need to log in)
+2. Copy these values:
+   - **Project URL**: `https://rhetupzcrsufhiruacoo.supabase.co` → Use as `VITE_SUPABASE_URL`
    - **Project API keys** → `anon` `public` → Use as `VITE_SUPABASE_ANON_KEY`
 
 ## Security Notes
