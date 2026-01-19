@@ -200,15 +200,15 @@ function AppContent() {
                 />
               </div>
             ) : (
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
+              <div className="flex items-center gap-3 min-w-0 w-full">
+                <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm flex-shrink-0">
                   <TrendingUp className="w-6 h-6 text-white" />
                 </div>
-                <div>
-                  <h1 className="text-white font-bold text-lg">
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-white font-bold text-lg truncate">
                     {companySettings?.company_name || 'Printavo'}
                   </h1>
-                  <p className="text-blue-100 text-xs">Financial Dashboard</p>
+                  <p className="text-blue-100 text-xs truncate">Financial Dashboard</p>
                 </div>
               </div>
             )
@@ -387,9 +387,9 @@ function AppContent() {
         {/* User & Controls */}
         <div className="absolute bottom-4 left-0 right-0 px-4 space-y-2">
           {sidebarOpen && user && (
-            <div className="px-4 py-3 bg-gray-50 rounded-lg mb-2">
+            <div className="px-4 py-3 bg-gray-50 rounded-lg mb-2 min-w-0">
               <p className="text-xs text-gray-500">Signed in as</p>
-              <p className="text-sm font-medium text-gray-900 truncate">{user.email}</p>
+              <p className="text-sm font-medium text-gray-900 truncate" title={user.email}>{user.email}</p>
               <button
                 onClick={() => {
                   setActiveTab('settings');
@@ -397,8 +397,8 @@ function AppContent() {
                 }}
                 className="mt-2 w-full flex items-center gap-2 text-xs text-blue-600 hover:text-blue-800 transition-colors"
               >
-                <Settings className="w-3 h-3" />
-                Account Settings
+                <Settings className="w-3 h-3 flex-shrink-0" />
+                <span className="truncate">Account Settings</span>
               </button>
             </div>
           )}
