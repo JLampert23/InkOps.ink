@@ -51,22 +51,10 @@ export default function CustomersReport() {
 
   const loadCompanySettings = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (!profile?.company_id) return;
-
       const { data: settings } = await supabase
         .from('company_settings')
         .select('company_name')
-        .eq('id', profile.company_id)
-        .maybeSingle();
+        .single();
 
       if (settings?.company_name) {
         setCompanyName(settings.company_name);

@@ -76,21 +76,9 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
 
   const loadSettings = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (!profile?.company_id) return;
-
       const { data } = await supabase
         .from('company_settings')
         .select('twilio_enabled, company_name, company_address, company_phone, company_email, company_website, invoice_terms')
-        .eq('id', profile.company_id)
         .maybeSingle();
       if (data) {
         setTwilioEnabled(data.twilio_enabled || false);
@@ -104,15 +92,15 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
         });
       }
 
-      // Reuse the user variable we already fetched above
-      if (user && profile) {
-        const { data: roleProfile } = await supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
           .from('user_profiles')
           .select('role')
           .eq('id', user.id)
           .maybeSingle();
-        if (roleProfile) {
-          setUserRole(roleProfile.role);
+        if (profile) {
+          setUserRole(profile.role);
         }
       }
     } catch (error) {
