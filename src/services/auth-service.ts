@@ -90,9 +90,23 @@ export async function signUpCompany(data: CompanySignupData): Promise<{ error: E
 
 export async function getCompanySettings(): Promise<CompanySettings | null> {
   try {
+    // First get the user's company_id from their profile
+    const { data: profile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('company_id')
+      .eq('id', (await supabase.auth.getUser()).data.user?.id)
+      .maybeSingle();
+
+    if (profileError || !profile?.company_id) {
+      console.error('Error fetching user profile:', profileError);
+      return null;
+    }
+
+    // Then fetch the company settings
     const { data, error } = await supabase
       .from('company_settings')
       .select('*')
+      .eq('id', profile.company_id)
       .maybeSingle();
 
     if (error) {
