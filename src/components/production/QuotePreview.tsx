@@ -24,12 +24,22 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
   const loadQuoteData = async () => {
     setLoading(true);
     try {
+      // Get user's company_id first
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: profile } = user
+        ? await supabase.from('user_profiles').select('company_id').eq('id', user.id).maybeSingle()
+        : { data: null };
+
+      const companySettingsPromise = profile?.company_id
+        ? supabase.from('company_settings').select('*').eq('id', profile.company_id).maybeSingle()
+        : Promise.resolve({ data: null });
+
       const [quoteRes, itemsRes, imprintsRes, feesRes, settingsRes] = await Promise.all([
         supabase.from('quotes').select('*').eq('id', quoteId).single(),
         supabase.from('quote_items').select('*').eq('quote_id', quoteId).order('sort_order'),
         supabase.from('quote_imprints').select('*').eq('quote_id', quoteId).order('sort_order'),
         supabase.from('quote_fees').select('*').eq('quote_id', quoteId).order('sort_order'),
-        supabase.from('company_settings').select('*').maybeSingle(),
+        companySettingsPromise,
       ]);
 
       if (quoteRes.data) setQuote(quoteRes.data);

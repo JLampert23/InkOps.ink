@@ -55,17 +55,21 @@ export default function ARAutomationSettings({ isOpen, onClose }: ARAutomationSe
 
   const loadAutomations = async () => {
     try {
-      const { data: settings } = await supabase
-        .from('company_settings')
-        .select('id')
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user.id)
         .maybeSingle();
 
-      if (!settings) return;
+      if (!profile?.company_id) return;
 
       const { data, error } = await supabase
         .from('ar_report_automations')
         .select('*')
-        .eq('company_id', settings.id)
+        .eq('company_id', profile.company_id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -77,9 +81,21 @@ export default function ARAutomationSettings({ isOpen, onClose }: ARAutomationSe
 
   const loadLogs = async () => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!profile?.company_id) return;
+
       const { data: settings } = await supabase
         .from('company_settings')
         .select('id')
+        .eq('id', profile.company_id)
         .maybeSingle();
 
       if (!settings) return;

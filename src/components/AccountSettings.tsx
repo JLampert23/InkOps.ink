@@ -190,9 +190,29 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const loadSettings = async () => {
     try {
       setLoading(true);
+
+      // Get user's company_id first
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!profile?.company_id) {
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('company_settings')
         .select('*')
+        .eq('id', profile.company_id)
         .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;

@@ -110,9 +110,21 @@ export function QuoteBuilder({ quoteId, onSave, onCancel }: QuoteBuilderProps) {
   }, [items, fees, tax]);
 
   const loadCompanySettings = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('company_id')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (!profile?.company_id) return;
+
     const { data } = await supabase
       .from('company_settings')
       .select('*')
+      .eq('id', profile.company_id)
       .maybeSingle();
     setCompanySettings(data);
   };

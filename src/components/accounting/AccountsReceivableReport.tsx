@@ -46,13 +46,25 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
   const loadData = async () => {
     setLoading(true);
     try {
-      const { data: settings } = await supabase
-        .from('company_settings')
-        .select('company_name')
-        .maybeSingle();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('company_id')
+          .eq('id', user.id)
+          .maybeSingle();
 
-      if (settings?.company_name) {
-        setCompanyName(settings.company_name);
+        if (profile?.company_id) {
+          const { data: settings } = await supabase
+            .from('company_settings')
+            .select('company_name')
+            .eq('id', profile.company_id)
+            .maybeSingle();
+
+          if (settings?.company_name) {
+            setCompanyName(settings.company_name);
+          }
+        }
       }
 
       const { data: billingStatuses } = await supabase

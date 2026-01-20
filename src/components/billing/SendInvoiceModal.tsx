@@ -29,9 +29,21 @@ export function SendInvoiceModal({ item, onClose, onSuccess }: SendInvoiceModalP
 
   const loadSettings = async () => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!profile?.company_id) return;
+
       const { data } = await supabase
         .from('company_settings')
         .select('twilio_enabled, default_send_method')
+        .eq('id', profile.company_id)
         .maybeSingle();
 
       if (data) {
