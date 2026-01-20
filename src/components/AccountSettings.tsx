@@ -674,7 +674,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       } else {
         const { data, error } = await supabase
           .from('company_settings')
-          .insert([settingsData])
+          .insert([{
+            ...settingsData,
+            owner_id: user.id
+          }])
           .select()
           .single();
 
@@ -802,6 +805,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           .from('company_settings')
           .insert([{
             company_name: companyName || '',
+            owner_id: user.id,
             ...settingsData
           }])
           .select()
@@ -890,6 +894,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           .from('company_settings')
           .insert([{
             company_name: companyName || '',
+            owner_id: user.id,
             ...settingsData
           }])
           .select()
@@ -977,6 +982,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           .from('company_settings')
           .insert([{
             company_name: companyName || '',
+            owner_id: user.id,
             ...settingsData
           }])
           .select()
@@ -1117,6 +1123,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           .from('company_settings')
           .insert([{
             company_name: companyName || '',
+            owner_id: user.id,
             ...settingsData
           }])
           .select()
@@ -1242,6 +1249,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           .from('company_settings')
           .insert([{
             company_name: companyName || '',
+            owner_id: user.id,
             ...settingsData
           }])
           .select()
@@ -1710,6 +1718,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           .from('company_settings')
           .insert([{
             company_name: companyName || '',
+            owner_id: user.id,
             ...settingsData
           }])
           .select()
@@ -1756,6 +1765,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           .from('company_settings')
           .insert([{
             company_name: companyName || '',
+            owner_id: user.id,
             ...settingsData
           }])
           .select()
