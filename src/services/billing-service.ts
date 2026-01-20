@@ -65,8 +65,17 @@ export interface PaidInvoice {
 
 export const billingService = {
   async triggerPrintavoSync(): Promise<{ syncId: string; status: string }> {
+    // Get the current session to ensure we have a valid auth token
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error('You must be logged in to trigger sync');
+    }
+
     const { data, error } = await supabase.functions.invoke('printavo-sync', {
       body: { mode: 'quick' },
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
     });
 
     if (error) {
