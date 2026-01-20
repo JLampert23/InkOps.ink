@@ -1281,11 +1281,54 @@ Deno.serve(async (req: Request) => {
       throw new Error('ENCRYPTION_KEY not configured');
     }
 
+    // Get the user's JWT token from the Authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create a client with the user's token to get their company_id
+    const userToken = authHeader.replace('Bearer ', '');
+    const userSupabase = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    // Get the user's profile to find their company_id
+    const { data: { user } } = await userSupabase.auth.getUser();
+    if (!user) {
+      return new Response(
+        JSON.stringify({ error: 'User not authenticated' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { data: userProfile, error: profileError } = await userSupabase
+      .from('user_profiles')
+      .select('company_id')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profileError || !userProfile?.company_id) {
+      console.error('Failed to get user company_id:', profileError);
+      return new Response(
+        JSON.stringify({ error: 'User company not found' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const companyId = userProfile.company_id;
+    console.log('User company_id:', companyId);
+
+    // Now use service role client for the actual sync operations
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { data: settings, error: settingsError } = await supabase
       .from('company_settings')
-      .select('printavo_username, printavo_api_token_encrypted')
+      .select('id, printavo_username, printavo_api_token_encrypted')
+      .eq('id', companyId)
       .maybeSingle();
 
     if (settingsError || !settings || !settings.printavo_username || !settings.printavo_api_token_encrypted) {
