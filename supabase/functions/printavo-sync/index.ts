@@ -1304,12 +1304,12 @@ Deno.serve(async (req: Request) => {
       },
     });
 
-    // Get the user using the token
-    const { data: { user }, error: userError } = await userSupabase.auth.getUser(userToken);
+    // Get the user using the token from headers
+    const { data: { user }, error: userError } = await userSupabase.auth.getUser();
     if (userError || !user) {
       console.error('Auth error:', userError);
       return new Response(
-        JSON.stringify({ error: 'User not authenticated' }),
+        JSON.stringify({ error: 'User not authenticated', details: userError?.message }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
