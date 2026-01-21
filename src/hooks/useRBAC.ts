@@ -64,5 +64,6 @@ export function useRBAC() {
     isAdmin,
     hasPermission,
     canAccessIntegrations: permissions?.canAccessIntegrations || false,
+    refreshProfile: loadUserProfile,
   };
 }

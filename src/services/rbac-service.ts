@@ -4,6 +4,7 @@ import { UserRole, UserProfile, RBACPermissions, ROLE_PERMISSIONS } from '../typ
 export class RBACService {
   static async getUserProfile(userId: string): Promise<UserProfile | null> {
     try {
+      console.log('Fetching user profile from database for user ID:', userId);
       const { data, error } = await supabase
         .from('user_profiles')
         .select('*')
@@ -12,9 +13,11 @@ export class RBACService {
 
       if (error) {
         console.error('Error fetching user profile:', error);
+        console.error('Error details:', JSON.stringify(error));
         return null;
       }
 
+      console.log('Profile data from DB:', data);
       return data;
     } catch (error) {
       console.error('Error in getUserProfile:', error);
@@ -24,13 +27,22 @@ export class RBACService {
 
   static async getCurrentUserProfile(): Promise<UserProfile | null> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-      if (!user) {
+      if (userError) {
+        console.error('Error getting user:', userError);
         return null;
       }
 
-      return this.getUserProfile(user.id);
+      if (!user) {
+        console.log('No user logged in');
+        return null;
+      }
+
+      console.log('Fetching profile for user:', user.id, user.email);
+      const profile = await this.getUserProfile(user.id);
+      console.log('User profile loaded:', profile);
+      return profile;
     } catch (error) {
       console.error('Error in getCurrentUserProfile:', error);
       return null;
