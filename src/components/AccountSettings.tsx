@@ -2269,7 +2269,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   <h3 className="text-md font-semibold text-gray-800 dark:text-gray-100 mb-4">Company Branding</h3>
                   <div className="space-y-6">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                         Primary Logo
                       </label>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
@@ -2277,7 +2277,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       </p>
                       {primaryLogoPreview ? (
                         <div className="space-y-3">
-                          <div className="w-64 h-48 border-2 border-gray-300 rounded-lg overflow-hidden bg-white flex items-center justify-center p-4">
+                          <div className="w-64 h-48 border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-white dark:bg-slate-700 flex items-center justify-center p-4">
                             <img
                               src={primaryLogoPreview}
                               alt="Primary logo"
@@ -2286,7 +2286,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           </div>
                           {isAdmin && (
                             <div className="flex gap-2">
-                              <label className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer text-sm">
+                              <label className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors cursor-pointer text-sm">
                                 <Edit className="w-4 h-4" />
                                 Replace Logo
                                 <input
@@ -2298,7 +2298,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                               </label>
                               <button
                                 onClick={removePrimaryLogo}
-                                className="flex items-center gap-2 px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors text-sm"
+                                className="flex items-center gap-2 px-4 py-2 border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 dark:bg-slate-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm"
                               >
                                 <Trash2 className="w-4 h-4" />
                                 Remove Logo
@@ -2307,13 +2307,13 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           )}
                         </div>
                       ) : (
-                        <label className={`flex flex-col items-center justify-center gap-3 px-6 py-8 border-2 border-dashed border-gray-300 rounded-lg transition-colors ${isAdmin ? 'hover:border-blue-500 hover:bg-blue-50 cursor-pointer' : 'bg-gray-50 cursor-not-allowed'}`}>
-                          <Upload className="w-8 h-8 text-gray-400" />
+                        <label className={`flex flex-col items-center justify-center gap-3 px-6 py-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg transition-colors ${isAdmin ? 'hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer' : 'bg-gray-50 dark:bg-slate-800 cursor-not-allowed'}`}>
+                          <Upload className="w-8 h-8 text-gray-400 dark:text-gray-500" />
                           <div className="text-center">
-                            <span className="text-sm font-medium text-gray-700">
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                               {isAdmin ? 'Click to upload primary logo' : 'No primary logo uploaded'}
                             </span>
-                            <p className="text-xs text-gray-500 mt-1">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                               PNG, JPG, or SVG (max 5MB)
                             </p>
                           </div>
@@ -2330,7 +2330,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                         Secondary Logo
                       </label>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
@@ -2338,7 +2338,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       </p>
                       {secondaryLogoPreview ? (
                         <div className="space-y-3">
-                          <div className="w-64 h-48 border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-900 flex items-center justify-center p-4">
+                          <div className="w-64 h-48 border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-white dark:bg-slate-700 flex items-center justify-center p-4">
                             <img
                               src={secondaryLogoPreview}
                               alt="Secondary logo"
@@ -2347,7 +2347,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           </div>
                           {isAdmin && (
                             <div className="flex gap-2">
-                              <label className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer text-sm">
+                              <label className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors cursor-pointer text-sm">
                                 <Edit className="w-4 h-4" />
                                 Replace Logo
                                 <input
@@ -2359,7 +2359,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                               </label>
                               <button
                                 onClick={removeSecondaryLogo}
-                                className="flex items-center gap-2 px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors text-sm"
+                                className="flex items-center gap-2 px-4 py-2 border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 dark:bg-slate-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm"
                               >
                                 <Trash2 className="w-4 h-4" />
                                 Remove Logo
@@ -2368,13 +2368,13 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           )}
                         </div>
                       ) : (
-                        <label className={`flex flex-col items-center justify-center gap-3 px-6 py-8 border-2 border-dashed border-gray-300 rounded-lg transition-colors ${isAdmin ? 'hover:border-blue-500 hover:bg-blue-50 cursor-pointer' : 'bg-gray-50 cursor-not-allowed'}`}>
-                          <Upload className="w-8 h-8 text-gray-400" />
+                        <label className={`flex flex-col items-center justify-center gap-3 px-6 py-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg transition-colors ${isAdmin ? 'hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer' : 'bg-gray-50 dark:bg-slate-800 cursor-not-allowed'}`}>
+                          <Upload className="w-8 h-8 text-gray-400 dark:text-gray-500" />
                           <div className="text-center">
-                            <span className="text-sm font-medium text-gray-700">
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                               {isAdmin ? 'Click to upload secondary logo' : 'No secondary logo uploaded'}
                             </span>
-                            <p className="text-xs text-gray-500 mt-1">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                               PNG, JPG, or SVG (max 5MB)
                             </p>
                           </div>
@@ -2397,7 +2397,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     <button
                       onClick={saveCompanySettings}
                       disabled={savingCompany}
-                      className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                      className="flex items-center gap-2 px-6 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 transition-colors"
                     >
                       {savingCompany ? (
                         <>
