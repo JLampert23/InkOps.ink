@@ -1872,7 +1872,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-500 animate-spin" />
+        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
       </div>
     );
   }
@@ -1882,10 +1882,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   return (
     <div className="flex h-full">
       {/* Left Sidebar Navigation */}
-      <div className="w-64 bg-white dark:bg-slate-800 border-r border-gray-200 dark:border-slate-700 overflow-y-auto flex-shrink-0">
+      <div className="w-64 bg-white border-r border-gray-200 overflow-y-auto flex-shrink-0">
         <div className="p-4">
-          <h1 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Account Settings</h1>
-          <p className="text-xs text-gray-600 dark:text-gray-400">Manage your account</p>
+          <h1 className="text-lg font-bold text-gray-900 mb-1">Account Settings</h1>
+          <p className="text-xs text-gray-600">Manage your account</p>
         </div>
 
         <nav className="px-2 pb-4">
@@ -1895,17 +1895,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               onClick={() => setActiveTab('company-info')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
                 activeTab === 'company-info'
-                  ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  ? 'bg-blue-50 text-blue-700 shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
               }`}
             >
-              <Building2 className={`w-4 h-4 flex-shrink-0 ${activeTab === 'company-info' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+              <Building2 className={`w-4 h-4 flex-shrink-0 ${activeTab === 'company-info' ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
               <div className="flex-1 text-left">
-                <div className={`font-medium text-sm ${activeTab === 'company-info' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                <div className={`font-medium text-sm ${activeTab === 'company-info' ? 'text-blue-700' : 'text-gray-700'}`}>
                   Company Settings
                 </div>
               </div>
-              {activeTab === 'company-info' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+              {activeTab === 'company-info' && <div className="w-1 h-6 bg-blue-600 rounded-full absolute right-0" />}
             </button>
           </div>
 
@@ -1914,18 +1914,18 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             <div className="mb-2">
               <button
                 onClick={() => setIntegrationsExpanded(!integrationsExpanded)}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-slate-700/50"
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 hover:bg-gray-50"
               >
-                <LinkIcon className="w-4 h-4 flex-shrink-0 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
+                <LinkIcon className="w-4 h-4 flex-shrink-0 text-gray-600 group-hover:text-gray-900" />
                 <div className="flex-1 text-left">
-                  <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                  <div className="font-medium text-sm text-gray-900">
                     Integrations
                   </div>
                 </div>
                 {integrationsExpanded ? (
-                  <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200" />
+                  <ChevronDown className="w-4 h-4 text-gray-500 transition-transform duration-200" />
                 ) : (
-                  <ChevronUp className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200 rotate-180" />
+                  <ChevronUp className="w-4 h-4 text-gray-500 transition-transform duration-200 rotate-180" />
                 )}
               </button>
 
@@ -1935,89 +1935,89 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     onClick={() => setActiveTab('printavo-integration')}
                     className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
                       activeTab === 'printavo-integration'
-                        ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
-                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                        ? 'bg-green-50 text-green-700 shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }`}
                   >
-                    <Key className={`w-4 h-4 flex-shrink-0 ${activeTab === 'printavo-integration' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                    <Key className={`w-4 h-4 flex-shrink-0 ${activeTab === 'printavo-integration' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
                     <div className="flex-1 text-left">
-                      <div className={`font-medium text-sm ${activeTab === 'printavo-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      <div className={`font-medium text-sm ${activeTab === 'printavo-integration' ? 'text-green-700' : 'text-gray-700'}`}>
                         Printavo
                       </div>
                     </div>
-                    {activeTab === 'printavo-integration' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                    {activeTab === 'printavo-integration' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
                   </button>
 
                   <button
                     onClick={() => setActiveTab('square-integration')}
                     className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
                       activeTab === 'square-integration'
-                        ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
-                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                        ? 'bg-green-50 text-green-700 shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }`}
                     style={{ animationDelay: '20ms' }}
                   >
-                    <CreditCard className={`w-4 h-4 flex-shrink-0 ${activeTab === 'square-integration' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                    <CreditCard className={`w-4 h-4 flex-shrink-0 ${activeTab === 'square-integration' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
                     <div className="flex-1 text-left">
-                      <div className={`font-medium text-sm ${activeTab === 'square-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      <div className={`font-medium text-sm ${activeTab === 'square-integration' ? 'text-green-700' : 'text-gray-700'}`}>
                         Square
                       </div>
                     </div>
-                    {activeTab === 'square-integration' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                    {activeTab === 'square-integration' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
                   </button>
 
                   <button
                     onClick={() => setActiveTab('resend-integration')}
                     className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
                       activeTab === 'resend-integration'
-                        ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
-                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                        ? 'bg-green-50 text-green-700 shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }`}
                     style={{ animationDelay: '40ms' }}
                   >
-                    <SettingsIcon className={`w-4 h-4 flex-shrink-0 ${activeTab === 'resend-integration' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                    <SettingsIcon className={`w-4 h-4 flex-shrink-0 ${activeTab === 'resend-integration' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
                     <div className="flex-1 text-left">
-                      <div className={`font-medium text-sm ${activeTab === 'resend-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      <div className={`font-medium text-sm ${activeTab === 'resend-integration' ? 'text-green-700' : 'text-gray-700'}`}>
                         Resend Email
                       </div>
                     </div>
-                    {activeTab === 'resend-integration' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                    {activeTab === 'resend-integration' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
                   </button>
 
                   <button
                     onClick={() => setActiveTab('twilio-integration')}
                     className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
                       activeTab === 'twilio-integration'
-                        ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
-                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                        ? 'bg-green-50 text-green-700 shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }`}
                     style={{ animationDelay: '50ms' }}
                   >
-                    <MessageSquare className={`w-4 h-4 flex-shrink-0 ${activeTab === 'twilio-integration' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                    <MessageSquare className={`w-4 h-4 flex-shrink-0 ${activeTab === 'twilio-integration' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
                     <div className="flex-1 text-left">
-                      <div className={`font-medium text-sm ${activeTab === 'twilio-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      <div className={`font-medium text-sm ${activeTab === 'twilio-integration' ? 'text-green-700' : 'text-gray-700'}`}>
                         Twilio SMS
                       </div>
                     </div>
-                    {activeTab === 'twilio-integration' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                    {activeTab === 'twilio-integration' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
                   </button>
 
                   <button
                     onClick={() => setActiveTab('stripe-payments')}
                     className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
                       activeTab === 'stripe-payments'
-                        ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
-                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                        ? 'bg-green-50 text-green-700 shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                     }`}
                     style={{ animationDelay: '60ms' }}
                   >
-                    <CreditCard className={`w-4 h-4 flex-shrink-0 ${activeTab === 'stripe-payments' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                    <CreditCard className={`w-4 h-4 flex-shrink-0 ${activeTab === 'stripe-payments' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
                     <div className="flex-1 text-left">
-                      <div className={`font-medium text-sm ${activeTab === 'stripe-payments' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      <div className={`font-medium text-sm ${activeTab === 'stripe-payments' ? 'text-green-700' : 'text-gray-700'}`}>
                         Stripe
                       </div>
                     </div>
-                    {activeTab === 'stripe-payments' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                    {activeTab === 'stripe-payments' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
                   </button>
                 </div>
               )}
@@ -2052,17 +2052,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               onClick={() => setActiveTab('user-security')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
                 activeTab === 'user-security'
-                  ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  ? 'bg-blue-50 text-blue-700 shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
               }`}
             >
-              <Key className={`w-4 h-4 flex-shrink-0 ${activeTab === 'user-security' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+              <Key className={`w-4 h-4 flex-shrink-0 ${activeTab === 'user-security' ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
               <div className="flex-1 text-left">
-                <div className={`font-medium text-sm ${activeTab === 'user-security' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                <div className={`font-medium text-sm ${activeTab === 'user-security' ? 'text-blue-700' : 'text-gray-700'}`}>
                   Security
                 </div>
               </div>
-              {activeTab === 'user-security' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+              {activeTab === 'user-security' && <div className="w-1 h-6 bg-blue-600 rounded-full absolute right-0" />}
             </button>
           </div>
 
@@ -2072,17 +2072,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               onClick={() => setActiveTab('status-filters')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
                 activeTab === 'status-filters'
-                  ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  ? 'bg-blue-50 text-blue-700 shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
               }`}
             >
-              <Filter className={`w-4 h-4 flex-shrink-0 ${activeTab === 'status-filters' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+              <Filter className={`w-4 h-4 flex-shrink-0 ${activeTab === 'status-filters' ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
               <div className="flex-1 text-left">
-                <div className={`font-medium text-sm ${activeTab === 'status-filters' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                <div className={`font-medium text-sm ${activeTab === 'status-filters' ? 'text-blue-700' : 'text-gray-700'}`}>
                   Dashboard Filters
                 </div>
               </div>
-              {activeTab === 'status-filters' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+              {activeTab === 'status-filters' && <div className="w-1 h-6 bg-blue-600 rounded-full absolute right-0" />}
             </button>
           </div>
 
@@ -2092,17 +2092,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               onClick={() => setActiveTab('billing-status-filters')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
                 activeTab === 'billing-status-filters'
-                  ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  ? 'bg-blue-50 text-blue-700 shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
               }`}
             >
-              <Filter className={`w-4 h-4 flex-shrink-0 ${activeTab === 'billing-status-filters' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+              <Filter className={`w-4 h-4 flex-shrink-0 ${activeTab === 'billing-status-filters' ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
               <div className="flex-1 text-left">
-                <div className={`font-medium text-sm ${activeTab === 'billing-status-filters' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                <div className={`font-medium text-sm ${activeTab === 'billing-status-filters' ? 'text-blue-700' : 'text-gray-700'}`}>
                   Billing Filters
                 </div>
               </div>
-              {activeTab === 'billing-status-filters' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+              {activeTab === 'billing-status-filters' && <div className="w-1 h-6 bg-blue-600 rounded-full absolute right-0" />}
             </button>
           </div>
 
@@ -2110,18 +2110,18 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           <div className="mb-2">
             <button
               onClick={() => setAutomationExpanded(!automationExpanded)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-slate-700/50"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 hover:bg-gray-50"
             >
-              <Zap className="w-4 h-4 flex-shrink-0 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
+              <Zap className="w-4 h-4 flex-shrink-0 text-gray-600 group-hover:text-gray-900" />
               <div className="flex-1 text-left">
-                <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                <div className="font-medium text-sm text-gray-900">
                   Automations
                 </div>
               </div>
               {automationExpanded ? (
-                <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200" />
+                <ChevronDown className="w-4 h-4 text-gray-500 transition-transform duration-200" />
               ) : (
-                <ChevronUp className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200 rotate-180" />
+                <ChevronUp className="w-4 h-4 text-gray-500 transition-transform duration-200 rotate-180" />
               )}
             </button>
 
@@ -2131,25 +2131,25 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   onClick={() => setActiveTab('automated-reports')}
                   className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
                     activeTab === 'automated-reports'
-                      ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                      ? 'bg-green-50 text-green-700 shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                   }`}
                 >
-                  <Clock className={`w-4 h-4 flex-shrink-0 ${activeTab === 'automated-reports' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <Clock className={`w-4 h-4 flex-shrink-0 ${activeTab === 'automated-reports' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
                   <div className="flex-1 text-left">
-                    <div className={`font-medium text-sm ${activeTab === 'automated-reports' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                    <div className={`font-medium text-sm ${activeTab === 'automated-reports' ? 'text-green-700' : 'text-gray-700'}`}>
                       Automated Reports
                     </div>
                   </div>
-                  {activeTab === 'automated-reports' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                  {activeTab === 'automated-reports' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
                 </button>
 
                 <button
                   onClick={() => setActiveTab('workflow-setup')}
                   className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
                     activeTab === 'workflow-setup'
-                      ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                      ? 'bg-green-50 text-green-700 shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                   }`}
                   style={{ animationDelay: '20ms' }}
                 >
@@ -2166,8 +2166,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   onClick={() => setActiveTab('automations')}
                   className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
                     activeTab === 'automations'
-                      ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                      ? 'bg-green-50 text-green-700 shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                   }`}
                   style={{ animationDelay: '40ms' }}
                 >
@@ -2186,26 +2186,26 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-slate-900">
+      <div className="flex-1 overflow-y-auto bg-gray-50">
         <div className="p-8 max-w-4xl mx-auto">
           {activeTab === 'company-info' && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
+            <div className="bg-white rounded-lg shadow p-6 space-y-6">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Company Settings</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Manage your company information and branding</p>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Company Settings</h2>
+                <p className="text-sm text-gray-600 mb-6">Manage your company information and branding</p>
                 {!isAdmin && (
-                  <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-800 dark:text-amber-200 text-sm">
+                  <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
                     Access Denied: Only Admins and Super Admins can edit Company Settings.
                   </div>
                 )}
               </div>
 
               <div className="space-y-6">
-                <div className="border-b border-gray-200 dark:border-slate-700 pb-6">
-                  <h3 className="text-md font-semibold text-gray-800 dark:text-gray-100 mb-4">Company Information</h3>
+                <div className="border-b border-gray-200 pb-6">
+                  <h3 className="text-md font-semibold text-gray-800 mb-4">Company Information</h3>
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
                         Company Name <span className="text-red-500">*</span>
                       </label>
                       <input
@@ -2213,14 +2213,14 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         value={companyName}
                         onChange={(e) => setCompanyName(e.target.value)}
                         disabled={!isAdmin}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-slate-800 disabled:cursor-not-allowed"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder="Enter company name"
                         required
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
                         Company Address
                       </label>
                       <textarea
@@ -2228,14 +2228,14 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         onChange={(e) => setCompanyAddress(e.target.value)}
                         disabled={!isAdmin}
                         rows={3}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-slate-800 disabled:cursor-not-allowed"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                         placeholder="Enter company address&#10;Street Address&#10;City, State ZIP"
                       />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                           Company Phone
                         </label>
                         <input
@@ -2243,13 +2243,13 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           value={companyPhone}
                           onChange={(e) => setCompanyPhone(e.target.value)}
                           disabled={!isAdmin}
-                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-slate-800 disabled:cursor-not-allowed"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                           placeholder="(555) 123-4567"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                           Company Email
                         </label>
                         <input
@@ -2257,7 +2257,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           value={companyEmail}
                           onChange={(e) => setCompanyEmail(e.target.value)}
                           disabled={!isAdmin}
-                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-slate-800 disabled:cursor-not-allowed"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                           placeholder="info@company.com"
                         />
                       </div>
@@ -2265,14 +2265,14 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   </div>
                 </div>
 
-                <div className="border-b border-gray-200 dark:border-slate-700 pb-6">
-                  <h3 className="text-md font-semibold text-gray-800 dark:text-gray-100 mb-4">Company Branding</h3>
+                <div className="border-b border-gray-200 pb-6">
+                  <h3 className="text-md font-semibold text-gray-800 mb-4">Company Branding</h3>
                   <div className="space-y-6">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-3">
                         Primary Logo
                       </label>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                      <p className="text-xs text-gray-500 mb-3">
                         Used for invoice PDFs, emails, and customer-facing branding
                       </p>
                       {primaryLogoPreview ? (
@@ -2333,7 +2333,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       <label className="block text-sm font-medium text-gray-700 mb-3">
                         Secondary Logo
                       </label>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                      <p className="text-xs text-gray-500 mb-3">
                         Used for dark mode, alternate layouts, or watermarking
                       </p>
                       {secondaryLogoPreview ? (
@@ -2418,10 +2418,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           )}
 
           {activeTab === 'printavo-integration' && canAccessIntegrations && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
+            <div className="bg-white rounded-lg shadow p-6 space-y-6">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Printavo Integration</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Connect your Printavo account to sync data</p>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Printavo Integration</h2>
+                <p className="text-sm text-gray-600 mb-6">Connect your Printavo account to sync data</p>
               </div>
 
               <div className="space-y-4">
@@ -2644,10 +2644,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           )}
 
           {activeTab === 'square-integration' && canAccessIntegrations && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
+            <div className="bg-white rounded-lg shadow p-6 space-y-6">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Square Integration</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Connect your Square account to access payment data</p>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Square Integration</h2>
+                <p className="text-sm text-gray-600 mb-6">Connect your Square account to access payment data</p>
               </div>
 
               <div className="space-y-4">
@@ -2827,10 +2827,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           )}
 
           {activeTab === 'resend-integration' && canAccessIntegrations && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
+            <div className="bg-white rounded-lg shadow p-6 space-y-6">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Resend Email Integration</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Connect Resend to send transactional emails</p>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Resend Email Integration</h2>
+                <p className="text-sm text-gray-600 mb-6">Connect Resend to send transactional emails</p>
               </div>
 
               <div className="space-y-4">
@@ -3002,10 +3002,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           )}
 
           {activeTab === 'twilio-integration' && canAccessIntegrations && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
+            <div className="bg-white rounded-lg shadow p-6 space-y-6">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Twilio SMS Integration</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Connect Twilio to send invoice notifications via text message</p>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Twilio SMS Integration</h2>
+                <p className="text-sm text-gray-600 mb-6">Connect Twilio to send invoice notifications via text message</p>
               </div>
 
               <div className="space-y-4">
@@ -3239,7 +3239,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           )}
 
           {activeTab === 'user-management' && isAdmin && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
+            <div className="bg-white rounded-lg shadow p-6 space-y-6">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900 mb-1">User Management</h2>
@@ -3483,7 +3483,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           )}
 
           {activeTab === 'user-security' && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
+            <div className="bg-white rounded-lg shadow p-6 space-y-6">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 mb-1">Security Settings</h2>
                 <p className="text-sm text-gray-600">Manage your unlock PIN for financially locked invoices</p>
@@ -3582,7 +3582,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           )}
 
           {activeTab === 'status-filters' && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
+            <div className="bg-white rounded-lg shadow p-6 space-y-6">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 mb-1">Printavo Dashboard Status Filters</h2>
                 <p className="text-sm text-gray-600">Select statuses to display in Printavo Dashboard section</p>
@@ -3661,7 +3661,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           )}
 
           {activeTab === 'billing-status-filters' && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
+            <div className="bg-white rounded-lg shadow p-6 space-y-6">
               <div className="flex items-start justify-between">
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900 mb-1">Billing & Payments Status Filters</h2>
@@ -3884,10 +3884,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           )}
 
           {activeTab === 'stripe-payments' && canAccessIntegrations && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
+            <div className="bg-white rounded-lg shadow p-6 space-y-6">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Stripe Payment Integration</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Configure Stripe to accept online payments from customers</p>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Stripe Payment Integration</h2>
+                <p className="text-sm text-gray-600 mb-6">Configure Stripe to accept online payments from customers</p>
               </div>
 
               <div className="space-y-4">
