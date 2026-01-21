@@ -49,7 +49,7 @@ Deno.serve(async (req: Request) => {
 
     const supabaseAuth = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    const { invoiceId, paymentType, amount, checkNumber, notes, paymentDate } = await req.json();
+    const { invoiceId, paymentType, amount, checkNumber, notes, paymentDate, customerId } = await req.json();
 
     if (!invoiceId) {
       return new Response(
@@ -129,7 +129,77 @@ Deno.serve(async (req: Request) => {
       'cash': 'Cash',
       'debit_credit': 'Debit/Credit Card',
       'check_ach': 'Check/ACH',
+      'fundraising_credit': 'Fundraising Credit',
     };
+
+    // Handle fundraising credit payment
+    if (paymentType === 'fundraising_credit') {
+      if (!customerId) {
+        return new Response(
+          JSON.stringify({ error: "Customer ID required for fundraising credit payment" }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      // Calculate available fundraising credit
+      const { data: credits, error: creditsError } = await supabaseAuth
+        .from("customer_fundraising_credits")
+        .select("amount")
+        .eq("customer_id", customerId)
+        .eq("company_id", companySettings.id);
+
+      if (creditsError) {
+        return new Response(
+          JSON.stringify({ error: "Failed to fetch fundraising credits" }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      const totalCredit = credits?.reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0) || 0;
+
+      if (amount > totalCredit) {
+        return new Response(
+          JSON.stringify({
+            error: "Insufficient fundraising credit",
+            available: totalCredit,
+            requested: amount
+          }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      // Deduct from fundraising credit by creating a negative entry
+      const { error: deductError } = await supabaseAuth
+        .from("customer_fundraising_credits")
+        .insert({
+          customer_id: customerId,
+          company_id: companySettings.id,
+          date: paymentDate || new Date().toISOString().split('T')[0],
+          store_name: 'Credit Applied',
+          batch_number: `INV-${invoice.invoice_number}`,
+          amount: -amount, // Negative amount to deduct
+        });
+
+      if (deductError) {
+        console.error("Error deducting fundraising credit:", deductError);
+        return new Response(
+          JSON.stringify({ error: "Failed to deduct fundraising credit" }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
 
     const { data: payment, error: paymentError } = await supabaseAuth
       .from("payments")

@@ -1359,6 +1359,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
           invoiceNumber={invoice.visualId}
           invoiceTotal={invoice.total}
           invoiceBalance={invoice.amountOutstanding}
+          customerId={invoice.customerId || undefined}
           onClose={() => setShowPaymentModal(false)}
           onSuccess={handlePaymentSuccess}
         />

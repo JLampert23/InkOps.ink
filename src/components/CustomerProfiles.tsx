@@ -1,9 +1,10 @@
-import { useState, useMemo } from 'react';
-import { Search, User, DollarSign, FileText, AlertCircle, ExternalLink } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Search, User, DollarSign, FileText, AlertCircle, ExternalLink, Plus, Edit2, Trash2, Save, X, Gift } from 'lucide-react';
 import { Invoice } from '../types/printavo';
 import { formatCurrency, calculateCustomerLifetimeValue, calculateCustomerOutstandingBalance } from '../utils/financial-aggregations';
 import { format, parseISO } from 'date-fns';
 import { getPrintavoInvoiceUrl } from '../utils/printavo-links';
+import { supabase } from '../lib/supabase-client';
 
 interface CustomerProfile {
   id: string;
@@ -18,6 +19,17 @@ interface CustomerProfile {
 interface CustomerProfilesProps {
   invoices: Invoice[];
   loading?: boolean;
+}
+
+interface FundraisingCredit {
+  id: string;
+  customer_id: string;
+  date: string;
+  store_name: string;
+  batch_number: string;
+  amount: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export function CustomerProfiles({ invoices, loading }: CustomerProfilesProps) {
@@ -179,6 +191,152 @@ interface CustomerDetailProps {
 }
 
 function CustomerDetail({ customer }: CustomerDetailProps) {
+  const [fundraisingCredits, setFundraisingCredits] = useState<FundraisingCredit[]>([]);
+  const [isAddingCredit, setIsAddingCredit] = useState(false);
+  const [editingCreditId, setEditingCreditId] = useState<string | null>(null);
+  const [newCredit, setNewCredit] = useState({
+    date: format(new Date(), 'yyyy-MM-dd'),
+    store_name: '',
+    batch_number: '',
+    amount: ''
+  });
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Fetch company ID
+  useEffect(() => {
+    async function fetchCompanyId() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase
+          .from('user_profiles')
+          .select('company_id')
+          .eq('id', user.id)
+          .single();
+
+        if (data) {
+          setCompanyId(data.company_id);
+        }
+      }
+    }
+    fetchCompanyId();
+  }, []);
+
+  // Fetch fundraising credits
+  useEffect(() => {
+    async function fetchFundraisingCredits() {
+      if (!companyId) return;
+
+      const { data, error } = await supabase
+        .from('customer_fundraising_credits')
+        .select('*')
+        .eq('customer_id', customer.id)
+        .eq('company_id', companyId)
+        .order('date', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching fundraising credits:', error);
+      } else {
+        setFundraisingCredits(data || []);
+      }
+    }
+
+    if (customer.id && companyId) {
+      fetchFundraisingCredits();
+    }
+  }, [customer.id, companyId]);
+
+  const totalFundraisingCredits = useMemo(() => {
+    return fundraisingCredits.reduce((sum, credit) => sum + parseFloat(credit.amount.toString()), 0);
+  }, [fundraisingCredits]);
+
+  const handleAddCredit = async () => {
+    if (!companyId || !newCredit.date || !newCredit.store_name || !newCredit.batch_number || !newCredit.amount) {
+      alert('Please fill in all fields');
+      return;
+    }
+
+    const amount = parseFloat(newCredit.amount);
+    if (isNaN(amount) || amount < 0) {
+      alert('Please enter a valid amount');
+      return;
+    }
+
+    setLoading(true);
+
+    const { data, error } = await supabase
+      .from('customer_fundraising_credits')
+      .insert([{
+        customer_id: customer.id,
+        company_id: companyId,
+        date: newCredit.date,
+        store_name: newCredit.store_name,
+        batch_number: newCredit.batch_number,
+        amount: amount
+      }])
+      .select()
+      .single();
+
+    setLoading(false);
+
+    if (error) {
+      console.error('Error adding fundraising credit:', error);
+      alert('Failed to add fundraising credit');
+    } else {
+      setFundraisingCredits([data, ...fundraisingCredits]);
+      setNewCredit({
+        date: format(new Date(), 'yyyy-MM-dd'),
+        store_name: '',
+        batch_number: '',
+        amount: ''
+      });
+      setIsAddingCredit(false);
+    }
+  };
+
+  const handleUpdateCredit = async (creditId: string, updates: Partial<FundraisingCredit>) => {
+    setLoading(true);
+
+    const { data, error } = await supabase
+      .from('customer_fundraising_credits')
+      .update(updates)
+      .eq('id', creditId)
+      .select()
+      .single();
+
+    setLoading(false);
+
+    if (error) {
+      console.error('Error updating fundraising credit:', error);
+      alert('Failed to update fundraising credit');
+    } else {
+      setFundraisingCredits(fundraisingCredits.map(c => c.id === creditId ? data : c));
+      setEditingCreditId(null);
+    }
+  };
+
+  const handleDeleteCredit = async (creditId: string) => {
+    if (!confirm('Are you sure you want to delete this fundraising credit entry?')) {
+      return;
+    }
+
+    setLoading(true);
+
+    const { error } = await supabase
+      .from('customer_fundraising_credits')
+      .delete()
+      .eq('id', creditId);
+
+    setLoading(false);
+
+    if (error) {
+      console.error('Error deleting fundraising credit:', error);
+      alert('Failed to delete fundraising credit');
+    } else {
+      setFundraisingCredits(fundraisingCredits.filter(c => c.id !== creditId));
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-lg shadow p-6">
@@ -219,6 +377,143 @@ function CustomerDetail({ customer }: CustomerDetailProps) {
               {customer.totalInvoices}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Fundraising Credits Section */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Gift className="w-5 h-5 text-purple-600" />
+            <h3 className="text-lg font-semibold">Fundraising Credits</h3>
+          </div>
+          <button
+            onClick={() => setIsAddingCredit(true)}
+            className="flex items-center gap-2 px-3 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add Credit
+          </button>
+        </div>
+
+        <div className="p-4">
+          {isAddingCredit && (
+            <div className="mb-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
+              <div className="grid grid-cols-4 gap-3 mb-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
+                  <input
+                    type="date"
+                    value={newCredit.date}
+                    onChange={(e) => setNewCredit({ ...newCredit, date: e.target.value })}
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Store Name / Number</label>
+                  <input
+                    type="text"
+                    value={newCredit.store_name}
+                    onChange={(e) => setNewCredit({ ...newCredit, store_name: e.target.value })}
+                    placeholder="Store name"
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Batch Number</label>
+                  <input
+                    type="text"
+                    value={newCredit.batch_number}
+                    onChange={(e) => setNewCredit({ ...newCredit, batch_number: e.target.value })}
+                    placeholder="Batch #"
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Amount</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={newCredit.amount}
+                    onChange={(e) => setNewCredit({ ...newCredit, amount: e.target.value })}
+                    placeholder="0.00"
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleAddCredit}
+                  disabled={loading}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4" />
+                  Save
+                </button>
+                <button
+                  onClick={() => {
+                    setIsAddingCredit(false);
+                    setNewCredit({
+                      date: format(new Date(), 'yyyy-MM-dd'),
+                      store_name: '',
+                      batch_number: '',
+                      amount: ''
+                    });
+                  }}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {fundraisingCredits.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No fundraising credits recorded
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left text-xs font-semibold text-gray-600 pb-2">Date</th>
+                      <th className="text-left text-xs font-semibold text-gray-600 pb-2">Store Name / Number</th>
+                      <th className="text-left text-xs font-semibold text-gray-600 pb-2">Batch Number</th>
+                      <th className="text-right text-xs font-semibold text-gray-600 pb-2">Amount</th>
+                      <th className="text-right text-xs font-semibold text-gray-600 pb-2">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {fundraisingCredits.map((credit) => (
+                      <FundraisingCreditRow
+                        key={credit.id}
+                        credit={credit}
+                        isEditing={editingCreditId === credit.id}
+                        onEdit={() => setEditingCreditId(credit.id)}
+                        onSave={(updates) => handleUpdateCredit(credit.id, updates)}
+                        onCancel={() => setEditingCreditId(null)}
+                        onDelete={() => handleDeleteCredit(credit.id)}
+                        loading={loading}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-gray-200 flex justify-end">
+                <div className="text-right">
+                  <div className="text-sm text-gray-600 mb-1">Total Fundraising Credits</div>
+                  <div className="text-2xl font-bold text-purple-600">
+                    {formatCurrency(totalFundraisingCredits)}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -275,5 +570,141 @@ function CustomerDetail({ customer }: CustomerDetailProps) {
         </div>
       </div>
     </div>
+  );
+}
+
+interface FundraisingCreditRowProps {
+  credit: FundraisingCredit;
+  isEditing: boolean;
+  onEdit: () => void;
+  onSave: (updates: Partial<FundraisingCredit>) => void;
+  onCancel: () => void;
+  onDelete: () => void;
+  loading: boolean;
+}
+
+function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onDelete, loading }: FundraisingCreditRowProps) {
+  const [editValues, setEditValues] = useState({
+    date: credit.date,
+    store_name: credit.store_name,
+    batch_number: credit.batch_number,
+    amount: credit.amount.toString()
+  });
+
+  useEffect(() => {
+    if (isEditing) {
+      setEditValues({
+        date: credit.date,
+        store_name: credit.store_name,
+        batch_number: credit.batch_number,
+        amount: credit.amount.toString()
+      });
+    }
+  }, [isEditing, credit]);
+
+  const handleSave = () => {
+    const amount = parseFloat(editValues.amount);
+    if (isNaN(amount) || amount < 0) {
+      alert('Please enter a valid amount');
+      return;
+    }
+
+    onSave({
+      date: editValues.date,
+      store_name: editValues.store_name,
+      batch_number: editValues.batch_number,
+      amount: amount
+    });
+  };
+
+  if (isEditing) {
+    return (
+      <tr className="bg-purple-50">
+        <td className="py-2">
+          <input
+            type="date"
+            value={editValues.date}
+            onChange={(e) => setEditValues({ ...editValues, date: e.target.value })}
+            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          />
+        </td>
+        <td className="py-2">
+          <input
+            type="text"
+            value={editValues.store_name}
+            onChange={(e) => setEditValues({ ...editValues, store_name: e.target.value })}
+            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          />
+        </td>
+        <td className="py-2">
+          <input
+            type="text"
+            value={editValues.batch_number}
+            onChange={(e) => setEditValues({ ...editValues, batch_number: e.target.value })}
+            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          />
+        </td>
+        <td className="py-2">
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={editValues.amount}
+            onChange={(e) => setEditValues({ ...editValues, amount: e.target.value })}
+            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent text-right"
+          />
+        </td>
+        <td className="py-2">
+          <div className="flex items-center justify-end gap-1">
+            <button
+              onClick={handleSave}
+              disabled={loading}
+              className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
+              title="Save"
+            >
+              <Save className="w-4 h-4" />
+            </button>
+            <button
+              onClick={onCancel}
+              className="p-1 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+              title="Cancel"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </td>
+      </tr>
+    );
+  }
+
+  return (
+    <tr className="hover:bg-gray-50">
+      <td className="py-3 text-sm text-gray-900">
+        {format(parseISO(credit.date), 'MMM d, yyyy')}
+      </td>
+      <td className="py-3 text-sm text-gray-900">{credit.store_name}</td>
+      <td className="py-3 text-sm text-gray-900">{credit.batch_number}</td>
+      <td className="py-3 text-sm text-gray-900 text-right font-medium">
+        {formatCurrency(parseFloat(credit.amount.toString()))}
+      </td>
+      <td className="py-3">
+        <div className="flex items-center justify-end gap-1">
+          <button
+            onClick={onEdit}
+            className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+            title="Edit"
+          >
+            <Edit2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={onDelete}
+            className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+            title="Delete"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      </td>
+    </tr>
   );
 }

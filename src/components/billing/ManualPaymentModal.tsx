@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { XCircle, DollarSign, Calendar, FileText, CheckCircle, Loader2, AlertCircle } from 'lucide-react';
+import { XCircle, DollarSign, Calendar, FileText, CheckCircle, Loader2, AlertCircle, Gift } from 'lucide-react';
+import { supabase } from '../../lib/supabase-client';
 
 interface ManualPaymentModalProps {
   invoiceId: string;
   invoiceNumber: string;
   invoiceTotal: number;
   invoiceBalance: number;
+  customerId?: string;
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -15,6 +17,7 @@ export function ManualPaymentModal({
   invoiceNumber,
   invoiceTotal,
   invoiceBalance,
+  customerId,
   onClose,
   onSuccess,
 }: ManualPaymentModalProps) {
@@ -28,10 +31,50 @@ export function ManualPaymentModal({
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [allowOverpayment] = useState(false);
+  const [availableFundraisingCredit, setAvailableFundraisingCredit] = useState<number>(0);
+  const [loadingCredit, setLoadingCredit] = useState(false);
 
   useEffect(() => {
     setAmount(invoiceBalance.toFixed(2));
   }, [invoiceBalance]);
+
+  // Fetch available fundraising credit
+  useEffect(() => {
+    async function fetchFundraisingCredit() {
+      if (!customerId) return;
+
+      setLoadingCredit(true);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('company_id')
+          .eq('id', user.id)
+          .single();
+
+        if (!profile) return;
+
+        const { data: credits } = await supabase
+          .from('customer_fundraising_credits')
+          .select('amount')
+          .eq('customer_id', customerId)
+          .eq('company_id', profile.company_id);
+
+        if (credits) {
+          const total = credits.reduce((sum, credit) => sum + parseFloat(credit.amount.toString()), 0);
+          setAvailableFundraisingCredit(total);
+        }
+      } catch (error) {
+        console.error('Error fetching fundraising credit:', error);
+      } finally {
+        setLoadingCredit(false);
+      }
+    }
+
+    fetchFundraisingCredit();
+  }, [customerId]);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -47,6 +90,12 @@ export function ManualPaymentModal({
       newErrors.amount = 'Amount must be greater than 0';
     } else if (!allowOverpayment && amountNum > invoiceBalance) {
       newErrors.amount = `Amount cannot exceed invoice balance of $${invoiceBalance.toFixed(2)}`;
+    }
+
+    if (paymentType === 'fundraising_credit') {
+      if (amountNum > availableFundraisingCredit) {
+        newErrors.amount = `Amount cannot exceed available fundraising credit of $${availableFundraisingCredit.toFixed(2)}`;
+      }
     }
 
     if (paymentType === 'check_ach' && !checkNumber.trim()) {
@@ -77,6 +126,7 @@ export function ManualPaymentModal({
           checkNumber: checkNumber.trim() || null,
           notes: notes.trim() || null,
           paymentDate,
+          customerId: customerId || null,
         }),
       });
 
@@ -104,6 +154,11 @@ export function ManualPaymentModal({
         setErrors(newErrors);
       }
     }
+  };
+
+  const fillMaxFundraisingCredit = () => {
+    const maxApplicable = Math.min(availableFundraisingCredit, invoiceBalance);
+    setAmount(maxApplicable.toFixed(2));
   };
 
   return (
@@ -153,7 +208,7 @@ export function ManualPaymentModal({
             <label className="block text-sm font-semibold text-gray-900 mb-2">
               Payment Type <span className="text-red-500">*</span>
             </label>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => {
@@ -214,6 +269,28 @@ export function ManualPaymentModal({
                 <FileText className="w-6 h-6 mx-auto mb-1" />
                 <p className="text-sm font-medium">Check/ACH</p>
               </button>
+              {customerId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPaymentType('fundraising_credit');
+                    if (errors.paymentType) {
+                      const newErrors = { ...errors };
+                      delete newErrors.paymentType;
+                      setErrors(newErrors);
+                    }
+                  }}
+                  disabled={submitting || loadingCredit || availableFundraisingCredit === 0}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    paymentType === 'fundraising_credit'
+                      ? 'border-pink-600 bg-pink-50 text-pink-900'
+                      : 'border-gray-300 hover:border-gray-400 text-gray-700'
+                  } ${submitting || loadingCredit || availableFundraisingCredit === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <Gift className="w-6 h-6 mx-auto mb-1" />
+                  <p className="text-sm font-medium">Fundraising</p>
+                </button>
+              )}
             </div>
             {errors.paymentType && (
               <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
@@ -222,6 +299,25 @@ export function ManualPaymentModal({
               </p>
             )}
           </div>
+
+          {paymentType === 'fundraising_credit' && (
+            <div className="bg-pink-50 border border-pink-200 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-semibold text-pink-900">Available Fundraising Credit</h4>
+                <p className="text-lg font-bold text-pink-900">${availableFundraisingCredit.toFixed(2)}</p>
+              </div>
+              <p className="text-xs text-pink-700 mb-2">
+                This will deduct the payment amount from the customer's fundraising credit balance.
+              </p>
+              <button
+                type="button"
+                onClick={fillMaxFundraisingCredit}
+                className="text-xs text-pink-700 hover:text-pink-900 underline"
+              >
+                Apply maximum available credit
+              </button>
+            </div>
+          )}
 
           <div>
             <label htmlFor="amount" className="block text-sm font-semibold text-gray-900 mb-2">

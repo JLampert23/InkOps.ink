@@ -83,6 +83,7 @@ export interface InvoiceDetail {
   dueDate: string | null;
   productionDueDate: string | null;
   customerPO: string | null;
+  customerId: string | null;
 
   lineItems: InvoiceLineItem[];
   fees: InvoiceFee[];
@@ -236,6 +237,7 @@ export const invoiceDetailService = {
         dueDate: invoice.due_date || rawData.paymentDueAt,
         productionDueDate: rawData.dueAt || null,
         customerPO: rawData.customerPurchaseOrder || rawData.poNumber || null,
+        customerId: invoice.customer_id || customer.id || null,
 
         lineItems: (lineItems || []).map((item: any) => {
           // Use extracted fields from database if available, otherwise parse from description
