@@ -15,6 +15,11 @@
   body {
     overflow-x: hidden;
   }
+
+  /* Dark mode defaults */
+  .dark {
+    color-scheme: dark;
+  }
 }
 
 @layer components {

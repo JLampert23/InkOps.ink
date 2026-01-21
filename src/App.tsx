@@ -1,8 +1,9 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { RefreshCw, AlertCircle, TrendingUp, Menu, X, LogOut, Loader2, Settings, CreditCard, Package, ChevronDown, ChevronUp, Send, Mail, Wallet, Users, CheckCircle } from 'lucide-react';
+import { RefreshCw, AlertCircle, TrendingUp, Menu, X, LogOut, Loader2, Settings, CreditCard, Package, ChevronDown, ChevronUp, Send, Mail, Wallet, Users, CheckCircle, Sun, Moon } from 'lucide-react';
 import { AccountSettings } from './components/AccountSettings';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider, useNotification } from './contexts/NotificationContext';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { EnhancedAuthScreen } from './components/EnhancedAuthScreen';
 import { supabase } from './lib/supabase-client';
 import { billingService } from './services/billing-service';
@@ -38,6 +39,7 @@ function AppContent() {
   const { signOut, user } = useAuth();
   const { userProfile, canAccessIntegrations } = useRBAC();
   const { showNotification } = useNotification();
+  const { darkMode, toggleDarkMode } = useTheme();
 
   useEffect(() => {
     const checkScreenSize = () => {
@@ -174,7 +176,7 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 transition-colors">
       {/* Mobile backdrop overlay */}
       {sidebarOpen && (
         <div
@@ -184,12 +186,12 @@ function AppContent() {
       )}
 
       {/* Sidebar */}
-      <aside className={`fixed top-0 left-0 h-full bg-white border-r border-gray-200 shadow-xl transition-all duration-300 z-30 w-56
+      <aside className={`fixed top-0 left-0 h-full bg-white dark:bg-[#1a2744] border-r border-gray-200 dark:border-slate-700 shadow-xl transition-all duration-300 z-30 w-56
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         lg:w-auto ${sidebarOpen ? 'lg:w-56' : 'lg:w-20'}
       `}>
         {/* Logo/Brand */}
-        <div className="h-20 border-b border-gray-200 flex items-center justify-center px-4 bg-gradient-to-r from-blue-600 to-blue-700">
+        <div className="h-20 border-b border-gray-200 dark:border-slate-700 flex items-center justify-center px-4 bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-700 dark:to-blue-800">
           {sidebarOpen ? (
             companySettings?.logo_url ? (
               <div className="flex items-center justify-center w-full h-full py-1.5">
@@ -237,32 +239,32 @@ function AppContent() {
             {/* Accounting Header - Collapsible trigger */}
             <button
               onClick={() => setAccountingExpanded(!accountingExpanded)}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group text-gray-900 hover:bg-gray-50"
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-slate-700/50"
               title={!sidebarOpen ? 'ACCOUNTING' : ''}
               aria-label="Accounting"
               aria-expanded={accountingExpanded}
               aria-controls="accounting-submenu"
             >
-              <Wallet className="w-5 h-5 flex-shrink-0 text-gray-600 group-hover:text-gray-900" />
+              <Wallet className="w-5 h-5 flex-shrink-0 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
               {sidebarOpen && (
                 <>
                   <div className="flex-1 text-left">
-                    <div className="font-bold text-sm uppercase tracking-wide text-gray-900">
+                    <div className="font-bold text-sm uppercase tracking-wide text-gray-900 dark:text-gray-100">
                       Accounting
                     </div>
                   </div>
                   {accountingExpanded ? (
-                    <ChevronDown className="w-4 h-4 text-gray-500 transition-transform duration-200" />
+                    <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200" />
                   ) : (
-                    <ChevronUp className="w-4 h-4 text-gray-500 transition-transform duration-200 rotate-180" />
+                    <ChevronUp className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200 rotate-180" />
                   )}
                 </>
               )}
               {!sidebarOpen && (
                 accountingExpanded ? (
-                  <ChevronDown className="w-4 h-4 text-gray-500 absolute right-2" />
+                  <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400 absolute right-2" />
                 ) : (
-                  <ChevronUp className="w-4 h-4 text-gray-500 absolute right-2 rotate-180" />
+                  <ChevronUp className="w-4 h-4 text-gray-500 dark:text-gray-400 absolute right-2 rotate-180" />
                 )
               )}
             </button>
@@ -287,21 +289,21 @@ function AppContent() {
                       }}
                       className={`collapsible-item w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 group ${
                         isActive
-                          ? 'bg-green-50 text-green-700 shadow-sm'
-                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                          ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
+                          : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
                       }`}
                       title={!sidebarOpen ? item.name : ''}
                       style={{ animationDelay: `${index * 20}ms` }}
                     >
-                      <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                      <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                       {sidebarOpen && (
                         <div className="flex-1 text-left">
-                          <div className={`font-medium text-sm ${isActive ? 'text-green-700' : 'text-gray-700'}`}>
+                          <div className={`font-medium text-sm ${isActive ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                             {item.name}
                           </div>
                         </div>
                       )}
-                      {isActive && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
+                      {isActive && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
                     </button>
                   );
                 })}
@@ -310,7 +312,7 @@ function AppContent() {
           </div>
 
           {/* Separator */}
-          <div className="border-t border-gray-200 my-3" />
+          <div className="border-t border-gray-200 dark:border-slate-700 my-3" />
 
           {/* 2. PRODUCTION DASHBOARD - Top-level link */}
           <div className="space-y-1">
@@ -326,28 +328,28 @@ function AppContent() {
                   }}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
                     isActive
-                      ? 'bg-orange-50 text-orange-700 shadow-sm'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      ? 'bg-orange-50 dark:bg-blue-600/20 text-orange-700 dark:text-blue-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
                   }`}
                   title={!sidebarOpen ? 'PRODUCTION DASHBOARD' : ''}
                   aria-label="Production Dashboard"
                 >
-                  <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-orange-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                  <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-orange-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                   {sidebarOpen && (
                     <div className="flex-1 text-left">
-                      <div className={`font-bold text-xs uppercase tracking-wide leading-tight ${isActive ? 'text-orange-700' : 'text-gray-900'}`}>
+                      <div className={`font-bold text-xs uppercase tracking-wide leading-tight ${isActive ? 'text-orange-700 dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'}`}>
                         Production<br />Dashboard
                       </div>
                     </div>
                   )}
-                  {isActive && <div className="w-1 h-8 bg-orange-600 rounded-full absolute right-0" />}
+                  {isActive && <div className="w-1 h-8 bg-orange-600 dark:bg-blue-500 rounded-full absolute right-0" />}
                 </button>
               );
             })}
           </div>
 
           {/* Separator */}
-          <div className="border-t border-gray-200 my-3" />
+          <div className="border-t border-gray-200 dark:border-slate-700 my-3" />
 
           {/* 3. SQUARE DASHBOARD - Top-level link */}
           <div className="space-y-1">
@@ -363,21 +365,21 @@ function AppContent() {
                   }}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
                     isActive
-                      ? 'bg-green-50 text-green-700 shadow-sm'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
                   }`}
                   title={!sidebarOpen ? 'SQUARE DASHBOARD' : ''}
                   aria-label="Square Dashboard"
                 >
-                  <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                  <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                   {sidebarOpen && (
                     <div className="flex-1 text-left">
-                      <div className={`font-bold text-xs uppercase tracking-wide leading-tight ${isActive ? 'text-green-700' : 'text-gray-900'}`}>
+                      <div className={`font-bold text-xs uppercase tracking-wide leading-tight ${isActive ? 'text-green-700 dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'}`}>
                         Square<br />Dashboard
                       </div>
                     </div>
                   )}
-                  {isActive && <div className="w-1 h-8 bg-green-600 rounded-full absolute right-0" />}
+                  {isActive && <div className="w-1 h-8 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
                 </button>
               );
             })}
@@ -387,15 +389,15 @@ function AppContent() {
         {/* User & Controls */}
         <div className="absolute bottom-4 left-0 right-0 px-4 space-y-2">
           {sidebarOpen && user && (
-            <div className="px-4 py-3 bg-gray-50 rounded-lg mb-2 min-w-0">
-              <p className="text-xs text-gray-500">Signed in as</p>
-              <p className="text-sm font-medium text-gray-900 truncate" title={user.email}>{user.email}</p>
+            <div className="px-4 py-3 bg-gray-50 dark:bg-slate-700/50 rounded-lg mb-2 min-w-0">
+              <p className="text-xs text-gray-500 dark:text-gray-400">Signed in as</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate" title={user.email}>{user.email}</p>
               <button
                 onClick={() => {
                   setActiveTab('settings');
                   closeSidebarOnMobile();
                 }}
-                className="mt-2 w-full flex items-center gap-2 text-xs text-blue-600 hover:text-blue-800 transition-colors"
+                className="mt-2 w-full flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
               >
                 <Settings className="w-3 h-3 flex-shrink-0" />
                 <span className="truncate">Account Settings</span>
@@ -405,7 +407,7 @@ function AppContent() {
           <button
             onClick={handleSync}
             disabled={syncing}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50"
             title={!sidebarOpen ? 'Sync from Printavo' : ''}
           >
             <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
@@ -413,7 +415,7 @@ function AppContent() {
           </button>
           <button
             onClick={() => signOut()}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
             title={!sidebarOpen ? 'Sign Out' : ''}
           >
             <LogOut className="w-4 h-4" />
@@ -421,7 +423,7 @@ function AppContent() {
           </button>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
           >
             {sidebarOpen ? (
               <>
@@ -438,19 +440,19 @@ function AppContent() {
       {/* Main Content Area */}
       <div className={`transition-all duration-300 lg:ml-20 ${sidebarOpen ? 'lg:ml-56' : 'lg:ml-20'} ${activeTab === 'settings' ? 'flex flex-col h-screen' : ''}`}>
         {/* Top Bar */}
-        <header className={`h-20 bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm ${activeTab === 'settings' ? 'flex-shrink-0' : ''}`}>
+        <header className={`h-20 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 sticky top-0 z-20 shadow-sm ${activeTab === 'settings' ? 'flex-shrink-0' : ''}`}>
           <div className="h-full px-4 flex items-center justify-between gap-4">
             {/* Mobile menu button */}
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="lg:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              className="lg:hidden p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
               aria-label="Toggle menu"
             >
               <Menu className="w-6 h-6" />
             </button>
 
             <div className="flex-1 min-w-0">
-              <h2 className="text-xl md:text-2xl font-bold text-gray-900 truncate">
+              <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate">
                 {activeTab === 'accounting-dashboard' ? 'Billing Queue' :
                  activeTab === 'accounts-receivable' ? 'Accounts Receivable' :
                  activeTab === 'paid-invoices' ? 'Paid Invoices' :
@@ -459,7 +461,7 @@ function AppContent() {
                  [...accountingNavItems, ...squareNavItems, ...productionNavItems].find(item => item.id === activeTab)?.name ||
                  (activeTab === 'settings' ? 'Account Settings' : 'Dashboard')}
               </h2>
-              <p className="text-xs md:text-sm text-gray-500 mt-0.5 truncate">
+              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mt-0.5 truncate">
                 {activeTab === 'accounting-dashboard' ? (
                   'Manage invoices, send payments, and track billing'
                 ) : activeTab === 'accounts-receivable' ? (
@@ -482,15 +484,27 @@ function AppContent() {
               </p>
             </div>
             <div className="hidden md:flex items-center gap-4">
+              <button
+                onClick={toggleDarkMode}
+                className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                aria-label="Toggle dark mode"
+                title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+              >
+                {darkMode ? (
+                  <Sun className="w-5 h-5" />
+                ) : (
+                  <Moon className="w-5 h-5" />
+                )}
+              </button>
               {activeTab === 'square' && (
-                <div className="text-xs lg:text-sm text-gray-600 flex items-center gap-2 bg-green-50 px-3 lg:px-4 py-2 rounded-lg border border-green-200">
+                <div className="text-xs lg:text-sm text-gray-600 dark:text-gray-300 flex items-center gap-2 bg-green-50 dark:bg-green-900/20 px-3 lg:px-4 py-2 rounded-lg border border-green-200 dark:border-green-700">
                   <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0" />
                   <span className="hidden xl:inline">Square data is fetched in real-time. Use "Fetch Data" buttons in each module.</span>
                   <span className="xl:hidden">Real-time Square data</span>
                 </div>
               )}
               {activeTab === 'production' && (
-                <div className="text-xs lg:text-sm text-gray-600 flex items-center gap-2 bg-orange-50 px-3 lg:px-4 py-2 rounded-lg border border-orange-200">
+                <div className="text-xs lg:text-sm text-gray-600 dark:text-gray-300 flex items-center gap-2 bg-orange-50 dark:bg-orange-900/20 px-3 lg:px-4 py-2 rounded-lg border border-orange-200 dark:border-orange-700">
                   <div className="w-2 h-2 bg-orange-500 rounded-full flex-shrink-0" />
                   <span className="hidden xl:inline">Production workflows use placeholder data. Connect your systems in Settings.</span>
                   <span className="xl:hidden">Placeholder data</span>
@@ -504,11 +518,11 @@ function AppContent() {
         <main className={activeTab === 'settings' ? 'flex-1 overflow-hidden' : 'py-4 px-3 sm:py-6 sm:px-4'}>
           {activeTab === 'accounting-dashboard' && (
             <Suspense fallback={
-              <div className="bg-white rounded-lg shadow p-8">
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-8">
                 <div className="text-center">
-                  <Loader2 className="w-12 h-12 text-green-600 animate-spin mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading Accounting Dashboard</h3>
-                  <p className="text-gray-600">Initializing accounting module...</p>
+                  <Loader2 className="w-12 h-12 text-green-600 dark:text-blue-500 animate-spin mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Loading Accounting Dashboard</h3>
+                  <p className="text-gray-600 dark:text-gray-400">Initializing accounting module...</p>
                 </div>
               </div>
             }>
@@ -518,11 +532,11 @@ function AppContent() {
 
           {activeTab === 'accounts-receivable' && (
             <Suspense fallback={
-              <div className="bg-white rounded-lg shadow p-8">
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-8">
                 <div className="text-center">
-                  <Loader2 className="w-12 h-12 text-green-600 animate-spin mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading Accounts Receivable</h3>
-                  <p className="text-gray-600">Loading aging reports...</p>
+                  <Loader2 className="w-12 h-12 text-green-600 dark:text-blue-500 animate-spin mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Loading Accounts Receivable</h3>
+                  <p className="text-gray-600 dark:text-gray-400">Loading aging reports...</p>
                 </div>
               </div>
             }>
@@ -535,11 +549,11 @@ function AppContent() {
 
           {activeTab === 'paid-invoices' && (
             <Suspense fallback={
-              <div className="bg-white rounded-lg shadow p-8">
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-8">
                 <div className="text-center">
-                  <Loader2 className="w-12 h-12 text-green-600 animate-spin mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading Paid Invoices</h3>
-                  <p className="text-gray-600">Loading paid invoice data...</p>
+                  <Loader2 className="w-12 h-12 text-green-600 dark:text-blue-500 animate-spin mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Loading Paid Invoices</h3>
+                  <p className="text-gray-600 dark:text-gray-400">Loading paid invoice data...</p>
                 </div>
               </div>
             }>
@@ -549,11 +563,11 @@ function AppContent() {
 
           {activeTab === 'customers' && (
             <Suspense fallback={
-              <div className="bg-white rounded-lg shadow p-8">
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-8">
                 <div className="text-center">
-                  <Loader2 className="w-12 h-12 text-green-600 animate-spin mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading Customers Report</h3>
-                  <p className="text-gray-600">Loading customer data...</p>
+                  <Loader2 className="w-12 h-12 text-green-600 dark:text-blue-500 animate-spin mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Loading Customers Report</h3>
+                  <p className="text-gray-600 dark:text-gray-400">Loading customer data...</p>
                 </div>
               </div>
             }>
@@ -563,11 +577,11 @@ function AppContent() {
 
           {activeTab === 'payments' && (
             <Suspense fallback={
-              <div className="bg-white rounded-lg shadow p-8">
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-8">
                 <div className="text-center">
-                  <Loader2 className="w-12 h-12 text-green-600 animate-spin mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading Payments Report</h3>
-                  <p className="text-gray-600">Loading payment history...</p>
+                  <Loader2 className="w-12 h-12 text-green-600 dark:text-blue-500 animate-spin mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Loading Payments Report</h3>
+                  <p className="text-gray-600 dark:text-gray-400">Loading payment history...</p>
                 </div>
               </div>
             }>
@@ -577,11 +591,11 @@ function AppContent() {
 
           {activeTab === 'square' && (
             <Suspense fallback={
-              <div className="bg-white rounded-lg shadow p-8">
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-8">
                 <div className="text-center">
-                  <Loader2 className="w-12 h-12 text-green-600 animate-spin mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading Square Data</h3>
-                  <p className="text-gray-600">Initializing Square data module...</p>
+                  <Loader2 className="w-12 h-12 text-green-600 dark:text-blue-500 animate-spin mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Loading Square Data</h3>
+                  <p className="text-gray-600 dark:text-gray-400">Initializing Square data module...</p>
                 </div>
               </div>
             }>
@@ -591,11 +605,11 @@ function AppContent() {
 
           {activeTab === 'production' && (
             <Suspense fallback={
-              <div className="bg-white rounded-lg shadow p-8">
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-8">
                 <div className="text-center">
-                  <Loader2 className="w-12 h-12 text-orange-600 animate-spin mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading Production Management</h3>
-                  <p className="text-gray-600">Initializing production module...</p>
+                  <Loader2 className="w-12 h-12 text-orange-600 dark:text-blue-500 animate-spin mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Loading Production Management</h3>
+                  <p className="text-gray-600 dark:text-gray-400">Initializing production module...</p>
                 </div>
               </div>
             }>
@@ -618,9 +632,11 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <NotificationProvider>
-        <AuthenticatedApp />
-      </NotificationProvider>
+      <ThemeProvider>
+        <NotificationProvider>
+          <AuthenticatedApp />
+        </NotificationProvider>
+      </ThemeProvider>
     </AuthProvider>
   );
 }
@@ -630,10 +646,10 @@ function AuthenticatedApp() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading...</p>
+          <Loader2 className="w-12 h-12 text-blue-600 dark:text-blue-500 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
         </div>
       </div>
     );
