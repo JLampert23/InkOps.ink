@@ -703,10 +703,21 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setTestingConnection(true);
       setTestResult(null);
 
+      // Get the current session to include auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setTestResult({
+          success: false,
+          error: 'You must be logged in to test the connection',
+        });
+        return;
+      }
+
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-printavo`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
         },
       });
 
