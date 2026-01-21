@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Search, ChevronRight, Mail, Phone, DollarSign, Loader2, FileText, CreditCard, FileSpreadsheet } from 'lucide-react';
+import { Users, Search, ChevronRight, Mail, Phone, DollarSign, Loader2, FileText, CreditCard, FileSpreadsheet, Gift, Plus, Save, X, Edit2, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format } from 'date-fns';
 import { InvoiceDetail } from '../billing/InvoiceDetail';
@@ -33,6 +33,17 @@ interface CustomerDetail {
   status: string;
 }
 
+interface FundraisingCredit {
+  id: string;
+  customer_id: string;
+  date: string;
+  store_name: string;
+  batch_number: string;
+  amount: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export default function CustomersReport() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,11 +54,61 @@ export default function CustomersReport() {
   const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
   const [selectedReportType, setSelectedReportType] = useState('customer-list');
   const [companyName, setCompanyName] = useState('Company Name');
+  const [fundraisingCredits, setFundraisingCredits] = useState<FundraisingCredit[]>([]);
+  const [isAddingCredit, setIsAddingCredit] = useState(false);
+  const [editingCreditId, setEditingCreditId] = useState<string | null>(null);
+  const [newCredit, setNewCredit] = useState({
+    date: format(new Date(), 'yyyy-MM-dd'),
+    store_name: '',
+    batch_number: '',
+    amount: ''
+  });
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [savingCredit, setSavingCredit] = useState(false);
 
   useEffect(() => {
     loadCustomers();
     loadCompanySettings();
+    fetchCompanyId();
   }, []);
+
+  useEffect(() => {
+    if (selectedCustomer?.id && companyId) {
+      fetchFundraisingCredits();
+    }
+  }, [selectedCustomer?.id, companyId]);
+
+  const fetchCompanyId = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .single();
+
+      if (data) {
+        setCompanyId(data.company_id);
+      }
+    }
+  };
+
+  const fetchFundraisingCredits = async () => {
+    if (!companyId || !selectedCustomer) return;
+
+    const { data, error } = await supabase
+      .from('customer_fundraising_credits')
+      .select('*')
+      .eq('customer_id', selectedCustomer.id)
+      .eq('company_id', companyId)
+      .order('date', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching fundraising credits:', error);
+    } else {
+      setFundraisingCredits(data || []);
+    }
+  };
 
   const loadCompanySettings = async () => {
     try {
@@ -119,6 +180,8 @@ export default function CustomersReport() {
   const loadCustomerDetails = async (customer: Customer) => {
     setSelectedCustomer(customer);
     setLoadingDetails(true);
+    setIsAddingCredit(false);
+    setEditingCreditId(null);
     try {
       const { data, error } = await supabase
         .from('printavo_invoices')
@@ -142,6 +205,93 @@ export default function CustomersReport() {
       console.error('Error loading customer details:', error);
     } finally {
       setLoadingDetails(false);
+    }
+  };
+
+  const handleAddCredit = async () => {
+    if (!companyId || !selectedCustomer || !newCredit.date || !newCredit.store_name || !newCredit.batch_number || !newCredit.amount) {
+      alert('Please fill in all fields');
+      return;
+    }
+
+    const amount = parseFloat(newCredit.amount);
+    if (isNaN(amount)) {
+      alert('Please enter a valid amount');
+      return;
+    }
+
+    setSavingCredit(true);
+
+    const { data, error } = await supabase
+      .from('customer_fundraising_credits')
+      .insert([{
+        customer_id: selectedCustomer.id,
+        company_id: companyId,
+        date: newCredit.date,
+        store_name: newCredit.store_name,
+        batch_number: newCredit.batch_number,
+        amount: amount
+      }])
+      .select()
+      .single();
+
+    setSavingCredit(false);
+
+    if (error) {
+      console.error('Error adding fundraising credit:', error);
+      alert('Failed to add fundraising credit');
+    } else {
+      setFundraisingCredits([data, ...fundraisingCredits]);
+      setNewCredit({
+        date: format(new Date(), 'yyyy-MM-dd'),
+        store_name: '',
+        batch_number: '',
+        amount: ''
+      });
+      setIsAddingCredit(false);
+    }
+  };
+
+  const handleUpdateCredit = async (creditId: string, updates: Partial<FundraisingCredit>) => {
+    setSavingCredit(true);
+
+    const { data, error } = await supabase
+      .from('customer_fundraising_credits')
+      .update(updates)
+      .eq('id', creditId)
+      .select()
+      .single();
+
+    setSavingCredit(false);
+
+    if (error) {
+      console.error('Error updating fundraising credit:', error);
+      alert('Failed to update fundraising credit');
+    } else {
+      setFundraisingCredits(fundraisingCredits.map(c => c.id === creditId ? data : c));
+      setEditingCreditId(null);
+    }
+  };
+
+  const handleDeleteCredit = async (creditId: string) => {
+    if (!confirm('Are you sure you want to delete this fundraising credit entry?')) {
+      return;
+    }
+
+    setSavingCredit(true);
+
+    const { error } = await supabase
+      .from('customer_fundraising_credits')
+      .delete()
+      .eq('id', creditId);
+
+    setSavingCredit(false);
+
+    if (error) {
+      console.error('Error deleting fundraising credit:', error);
+      alert('Failed to delete fundraising credit');
+    } else {
+      setFundraisingCredits(fundraisingCredits.filter(c => c.id !== creditId));
     }
   };
 
@@ -409,53 +559,189 @@ export default function CustomersReport() {
                 </div>
               </div>
 
-              {loadingDetails ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
+              <div className="overflow-y-auto" style={{ maxHeight: '520px' }}>
+                {/* Fundraising Credits Section */}
+                <div className="border-b border-gray-200">
+                  <div className="px-4 py-3 bg-gray-50 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Gift className="w-5 h-5 text-blue-600" />
+                      <h4 className="font-semibold text-gray-900">Fundraising Credits</h4>
+                      {fundraisingCredits.length > 0 && (
+                        <span className="text-sm text-gray-500">
+                          (${fundraisingCredits.reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setIsAddingCredit(!isAddingCredit)}
+                      className="flex items-center gap-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add
+                    </button>
+                  </div>
+
+                  <div className="px-4 py-3">
+                    {isAddingCredit && (
+                      <div className="mb-3 p-3 bg-blue-50 rounded border border-blue-200">
+                        <div className="grid grid-cols-4 gap-2 mb-2">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
+                            <input
+                              type="date"
+                              value={newCredit.date}
+                              onChange={(e) => setNewCredit({ ...newCredit, date: e.target.value })}
+                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Store Name</label>
+                            <input
+                              type="text"
+                              value={newCredit.store_name}
+                              onChange={(e) => setNewCredit({ ...newCredit, store_name: e.target.value })}
+                              placeholder="Store"
+                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Batch #</label>
+                            <input
+                              type="text"
+                              value={newCredit.batch_number}
+                              onChange={(e) => setNewCredit({ ...newCredit, batch_number: e.target.value })}
+                              placeholder="Batch"
+                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Amount</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={newCredit.amount}
+                              onChange={(e) => setNewCredit({ ...newCredit, amount: e.target.value })}
+                              placeholder="0.00"
+                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleAddCredit}
+                            disabled={savingCredit}
+                            className="flex items-center gap-1 px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:opacity-50"
+                          >
+                            <Save className="w-3 h-3" />
+                            Save
+                          </button>
+                          <button
+                            onClick={() => {
+                              setIsAddingCredit(false);
+                              setNewCredit({
+                                date: format(new Date(), 'yyyy-MM-dd'),
+                                store_name: '',
+                                batch_number: '',
+                                amount: ''
+                              });
+                            }}
+                            className="flex items-center gap-1 px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                          >
+                            <X className="w-3 h-3" />
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {fundraisingCredits.length === 0 ? (
+                      <div className="text-center py-4 text-sm text-gray-500">
+                        No fundraising credits recorded
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="border-b border-gray-200">
+                            <tr>
+                              <th className="text-left text-xs font-semibold text-gray-600 pb-2">Date</th>
+                              <th className="text-left text-xs font-semibold text-gray-600 pb-2">Store</th>
+                              <th className="text-left text-xs font-semibold text-gray-600 pb-2">Batch</th>
+                              <th className="text-right text-xs font-semibold text-gray-600 pb-2">Amount</th>
+                              <th className="text-right text-xs font-semibold text-gray-600 pb-2">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {fundraisingCredits.map((credit) => (
+                              <FundraisingCreditRow
+                                key={credit.id}
+                                credit={credit}
+                                isEditing={editingCreditId === credit.id}
+                                onEdit={() => setEditingCreditId(credit.id)}
+                                onSave={(updates) => handleUpdateCredit(credit.id, updates)}
+                                onCancel={() => setEditingCreditId(null)}
+                                onDelete={() => handleDeleteCredit(credit.id)}
+                                loading={savingCredit}
+                              />
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              ) : (
-                <div className="overflow-y-auto" style={{ maxHeight: '520px' }}>
-                  <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Invoice #</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
-                        <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {customerInvoices.map((inv) => (
-                        <tr key={inv.invoice_number} className="hover:bg-gray-50">
-                          <td className="px-4 py-3">
-                            <button
-                              onClick={() => handleViewInvoice(inv.invoice_id)}
-                              className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
-                            >
-                              {inv.invoice_number}
-                            </button>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-600">
-                            {format(new Date(inv.invoice_date), 'MMM dd, yyyy')}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-right text-gray-900">
-                            ${inv.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              inv.status === 'Paid' ? 'bg-green-100 text-green-800' :
-                              inv.status === 'Partially Paid' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-red-100 text-red-800'
-                            }`}>
-                              {inv.status}
-                            </span>
-                          </td>
+
+                {/* Invoice History */}
+                {loadingDetails ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
+                  </div>
+                ) : (
+                  <div>
+                    <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+                      <h4 className="font-semibold text-gray-900">Invoice History</h4>
+                    </div>
+                    <table className="w-full">
+                      <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Invoice #</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {customerInvoices.map((inv) => (
+                          <tr key={inv.invoice_number} className="hover:bg-gray-50">
+                            <td className="px-4 py-3">
+                              <button
+                                onClick={() => handleViewInvoice(inv.invoice_id)}
+                                className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                              >
+                                {inv.invoice_number}
+                              </button>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-600">
+                              {format(new Date(inv.invoice_date), 'MMM dd, yyyy')}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-right text-gray-900">
+                              ${inv.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                inv.status === 'Paid' ? 'bg-green-100 text-green-800' :
+                                inv.status === 'Partially Paid' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-red-100 text-red-800'
+                              }`}>
+                                {inv.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </>
           ) : (
             <div className="flex items-center justify-center py-12">
@@ -469,5 +755,140 @@ export default function CustomersReport() {
         </div>
       </div>
     </div>
+  );
+}
+
+interface FundraisingCreditRowProps {
+  credit: FundraisingCredit;
+  isEditing: boolean;
+  onEdit: () => void;
+  onSave: (updates: Partial<FundraisingCredit>) => void;
+  onCancel: () => void;
+  onDelete: () => void;
+  loading: boolean;
+}
+
+function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onDelete, loading }: FundraisingCreditRowProps) {
+  const [editValues, setEditValues] = useState({
+    date: credit.date,
+    store_name: credit.store_name,
+    batch_number: credit.batch_number,
+    amount: credit.amount.toString()
+  });
+
+  useEffect(() => {
+    if (isEditing) {
+      setEditValues({
+        date: credit.date,
+        store_name: credit.store_name,
+        batch_number: credit.batch_number,
+        amount: credit.amount.toString()
+      });
+    }
+  }, [isEditing, credit]);
+
+  const handleSave = () => {
+    const amount = parseFloat(editValues.amount);
+    if (isNaN(amount)) {
+      alert('Please enter a valid amount');
+      return;
+    }
+
+    onSave({
+      date: editValues.date,
+      store_name: editValues.store_name,
+      batch_number: editValues.batch_number,
+      amount: amount
+    });
+  };
+
+  if (isEditing) {
+    return (
+      <tr className="bg-blue-50">
+        <td className="py-2">
+          <input
+            type="date"
+            value={editValues.date}
+            onChange={(e) => setEditValues({ ...editValues, date: e.target.value })}
+            className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </td>
+        <td className="py-2">
+          <input
+            type="text"
+            value={editValues.store_name}
+            onChange={(e) => setEditValues({ ...editValues, store_name: e.target.value })}
+            className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </td>
+        <td className="py-2">
+          <input
+            type="text"
+            value={editValues.batch_number}
+            onChange={(e) => setEditValues({ ...editValues, batch_number: e.target.value })}
+            className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </td>
+        <td className="py-2">
+          <input
+            type="number"
+            step="0.01"
+            value={editValues.amount}
+            onChange={(e) => setEditValues({ ...editValues, amount: e.target.value })}
+            className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-right"
+          />
+        </td>
+        <td className="py-2">
+          <div className="flex items-center justify-end gap-1">
+            <button
+              onClick={handleSave}
+              disabled={loading}
+              className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
+              title="Save"
+            >
+              <Save className="w-3 h-3" />
+            </button>
+            <button
+              onClick={onCancel}
+              className="p-1 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+              title="Cancel"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        </td>
+      </tr>
+    );
+  }
+
+  return (
+    <tr className="hover:bg-gray-50">
+      <td className="py-2 text-xs text-gray-900">
+        {format(new Date(credit.date), 'MMM d, yyyy')}
+      </td>
+      <td className="py-2 text-xs text-gray-900">{credit.store_name}</td>
+      <td className="py-2 text-xs text-gray-900">{credit.batch_number}</td>
+      <td className="py-2 text-xs text-gray-900 text-right font-medium">
+        ${parseFloat(credit.amount.toString()).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      </td>
+      <td className="py-2">
+        <div className="flex items-center justify-end gap-1">
+          <button
+            onClick={onEdit}
+            className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+            title="Edit"
+          >
+            <Edit2 className="w-3 h-3" />
+          </button>
+          <button
+            onClick={onDelete}
+            className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+            title="Delete"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        </div>
+      </td>
+    </tr>
   );
 }
