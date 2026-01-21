@@ -323,7 +323,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        throw new Error('No active session');
+        // Session not ready yet, silently skip
+        return [];
       }
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/printavo-company`, {
