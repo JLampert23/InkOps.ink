@@ -703,26 +703,20 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setTestingConnection(true);
       setTestResult(null);
 
-      // Get the current session to include auth token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      // Use supabase.functions.invoke which handles auth automatically
+      const { data, error } = await supabase.functions.invoke('test-printavo', {
+        body: {},
+      });
+
+      if (error) {
         setTestResult({
           success: false,
-          error: 'You must be logged in to test the connection',
+          error: error.message || 'Failed to test connection',
         });
         return;
       }
 
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-printavo`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-      });
-
-      const result = await response.json();
-      setTestResult(result);
+      setTestResult(data);
     } catch (err) {
       console.error('Error testing connection:', err);
       setTestResult({
@@ -738,15 +732,20 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     setTestLoading(true);
     setTestData(null);
     try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-printavo`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json'
-        }
+      // Use supabase.functions.invoke which handles auth automatically
+      const { data, error } = await supabase.functions.invoke('test-printavo', {
+        body: {},
       });
-      const result = await response.json();
-      setTestData(result);
+
+      if (error) {
+        setTestData({
+          success: false,
+          error: error.message || 'Failed to test connection'
+        });
+        return;
+      }
+
+      setTestData(data);
     } catch (error) {
       setTestData({ error: error instanceof Error ? error.message : 'Unknown error' });
     } finally {
