@@ -703,20 +703,30 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setTestingConnection(true);
       setTestResult(null);
 
-      // Use supabase.functions.invoke which handles auth automatically
-      const { data, error } = await supabase.functions.invoke('test-printavo', {
-        body: {},
-      });
-
-      if (error) {
+      // Get session to check auth
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
         setTestResult({
           success: false,
-          error: error.message || 'Failed to test connection',
+          error: 'You must be logged in to test the connection',
         });
         return;
       }
 
-      setTestResult(data);
+      // Call the edge function with manual fetch to get full error details
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-printavo`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({}),
+      });
+
+      const result = await response.json();
+
+      // Show full response including error details
+      setTestResult(result);
     } catch (err) {
       console.error('Error testing connection:', err);
       setTestResult({
@@ -732,20 +742,27 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     setTestLoading(true);
     setTestData(null);
     try {
-      // Use supabase.functions.invoke which handles auth automatically
-      const { data, error } = await supabase.functions.invoke('test-printavo', {
-        body: {},
-      });
-
-      if (error) {
+      // Get session for auth
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
         setTestData({
           success: false,
-          error: error.message || 'Failed to test connection'
+          error: 'You must be logged in to run this test'
         });
         return;
       }
 
-      setTestData(data);
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-printavo`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({}),
+      });
+
+      const result = await response.json();
+      setTestData(result);
     } catch (error) {
       setTestData({ error: error instanceof Error ? error.message : 'Unknown error' });
     } finally {
