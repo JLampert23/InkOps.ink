@@ -218,12 +218,17 @@ Deno.serve(async (req: Request) => {
           customer(id: $id) {
             id
             companyName
+            primaryContact {
+              firstName
+              lastName
+              email
+              phone
+            }
             billingAddress {
               address1
               address2
               city
               state
-              zip
               country
             }
             shippingAddress {
@@ -231,7 +236,6 @@ Deno.serve(async (req: Request) => {
               address2
               city
               state
-              zip
               country
             }
             contacts {
