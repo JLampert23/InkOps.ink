@@ -71,11 +71,9 @@ export const billingService = {
       throw new Error('You must be logged in to trigger sync');
     }
 
+    // The supabase client automatically includes the auth token, no need to manually set it
     const { data, error } = await supabase.functions.invoke('printavo-sync', {
       body: { mode: 'quick' },
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-      },
     });
 
     if (error) {

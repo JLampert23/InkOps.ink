@@ -1275,6 +1275,7 @@ Deno.serve(async (req: Request) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
 
     if (!encryptionKey) {
@@ -1290,22 +1291,34 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Create a client with the user's token to get their company_id
+    // Create a client with the user's token
     const userToken = authHeader.replace('Bearer ', '');
-    const userSupabase = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } }
+    const userSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+      },
+      global: {
+        headers: {
+          Authorization: authHeader,
+        },
+      },
     });
 
-    // Get the user's profile to find their company_id
-    const { data: { user } } = await userSupabase.auth.getUser();
-    if (!user) {
+    // Get the user using the token
+    const { data: { user }, error: userError } = await userSupabase.auth.getUser(userToken);
+    if (userError || !user) {
+      console.error('Auth error:', userError);
       return new Response(
         JSON.stringify({ error: 'User not authenticated' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const { data: userProfile, error: profileError } = await userSupabase
+    console.log('Authenticated user:', user.id);
+
+    // Get the user's company_id using service role to bypass RLS
+    const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
+    const { data: userProfile, error: profileError } = await serviceSupabase
       .from('user_profiles')
       .select('company_id')
       .eq('id', user.id)
@@ -1322,8 +1335,8 @@ Deno.serve(async (req: Request) => {
     const companyId = userProfile.company_id;
     console.log('User company_id:', companyId);
 
-    // Now use service role client for the actual sync operations
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Use service role client for the actual sync operations
+    const supabase = serviceSupabase;
 
     const { data: settings, error: settingsError } = await supabase
       .from('company_settings')
