@@ -223,7 +223,7 @@ Deno.serve(async (req: Request) => {
               address2
               city
               state
-              postalCode
+              zip
               country
             }
             shippingAddress {
@@ -231,7 +231,7 @@ Deno.serve(async (req: Request) => {
               address2
               city
               state
-              postalCode
+              zip
               country
             }
             contacts {
