@@ -63,6 +63,7 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
 
     const diagnostics: any = {
@@ -85,11 +86,63 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Get the user's JWT token from the Authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Missing authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    const { data: settings, error: settingsError } = await supabase
+    // Create a client with the user's token to verify auth
+    const userSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+      },
+      global: {
+        headers: {
+          Authorization: authHeader,
+        },
+      },
+    });
+
+    // Get the user using the token from headers
+    const { data: { user }, error: userError } = await userSupabase.auth.getUser();
+    if (userError || !user) {
+      console.error('Auth error:', userError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'User not authenticated', details: userError?.message }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    diagnostics.userId = user.id;
+
+    // Use service role client to get user's company_id
+    const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
+    const { data: userProfile, error: profileError } = await serviceSupabase
+      .from('user_profiles')
+      .select('company_id')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profileError || !userProfile?.company_id) {
+      console.error('Failed to get user company_id:', profileError);
+      return new Response(
+        JSON.stringify({ success: false, error: 'User company not found' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const companyId = userProfile.company_id;
+    diagnostics.companyId = companyId;
+
+    // Now get company_settings for this specific company
+    const { data: settings, error: settingsError } = await serviceSupabase
       .from('company_settings')
       .select('printavo_username, printavo_api_token_encrypted')
+      .eq('id', companyId)
       .maybeSingle();
 
     diagnostics.settingsFound = !!settings;
