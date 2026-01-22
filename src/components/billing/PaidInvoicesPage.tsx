@@ -2,7 +2,11 @@ import { useState } from 'react';
 import { PaidInvoices } from './PaidInvoices';
 import { InvoiceDetail } from './InvoiceDetail';
 
-export function PaidInvoicesPage() {
+interface PaidInvoicesPageProps {
+  onNavigateToCustomer?: (customerEmail: string, customerName: string) => void;
+}
+
+export function PaidInvoicesPage({ onNavigateToCustomer }: PaidInvoicesPageProps = {}) {
   const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
 
   const handleViewInvoice = (printavoInvoiceId: string) => {
@@ -18,6 +22,7 @@ export function PaidInvoicesPage() {
       <InvoiceDetail
         invoiceId={viewingInvoiceId}
         onBack={handleBackToList}
+        onNavigateToCustomer={onNavigateToCustomer}
       />
     );
   }

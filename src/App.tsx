@@ -37,6 +37,7 @@ function AppContent() {
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [settingsInitialTab, setSettingsInitialTab] = useState<string | undefined>(undefined);
   const [syncing, setSyncing] = useState(false);
+  const [customerSearchTerm, setCustomerSearchTerm] = useState<string>('');
   const { signOut, user } = useAuth();
   const { userProfile, canAccessIntegrations } = useRBAC();
   const { showNotification } = useNotification();
@@ -174,6 +175,13 @@ function AppContent() {
     } finally {
       setSyncing(false);
     }
+  };
+
+  const handleNavigateToCustomer = (customerEmail: string, customerName: string) => {
+    setCustomerSearchTerm(customerEmail || customerName);
+    setActiveTab('customers');
+    setAccountingExpanded(true);
+    setSidebarOpen(false);
   };
 
   return (
@@ -527,7 +535,7 @@ function AppContent() {
                 </div>
               </div>
             }>
-              <BillingDashboard />
+              <BillingDashboard onNavigateToCustomer={handleNavigateToCustomer} />
             </Suspense>
           )}
 
@@ -541,10 +549,13 @@ function AppContent() {
                 </div>
               </div>
             }>
-              <AccountsReceivableReport onNavigateToSettings={(tab) => {
-                setSettingsInitialTab(tab);
-                setActiveTab('settings');
-              }} />
+              <AccountsReceivableReport
+                onNavigateToSettings={(tab) => {
+                  setSettingsInitialTab(tab);
+                  setActiveTab('settings');
+                }}
+                onNavigateToCustomer={handleNavigateToCustomer}
+              />
             </Suspense>
           )}
 
@@ -558,7 +569,7 @@ function AppContent() {
                 </div>
               </div>
             }>
-              <PaidInvoicesPage />
+              <PaidInvoicesPage onNavigateToCustomer={handleNavigateToCustomer} />
             </Suspense>
           )}
 
@@ -572,7 +583,7 @@ function AppContent() {
                 </div>
               </div>
             }>
-              <CustomersReport />
+              <CustomersReport initialSearchTerm={customerSearchTerm} />
             </Suspense>
           )}
 
@@ -586,7 +597,7 @@ function AppContent() {
                 </div>
               </div>
             }>
-              <PaymentsReport />
+              <PaymentsReport onNavigateToCustomer={handleNavigateToCustomer} />
             </Suspense>
           )}
 

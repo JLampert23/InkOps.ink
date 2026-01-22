@@ -24,7 +24,11 @@ interface Payment {
   has_been_reversed?: boolean;
 }
 
-export default function UnifiedPaymentsReport() {
+interface UnifiedPaymentsReportProps {
+  onNavigateToCustomer?: (customerEmail: string, customerName: string) => void;
+}
+
+export default function UnifiedPaymentsReport({ onNavigateToCustomer }: UnifiedPaymentsReportProps = {}) {
   const { showNotification, confirm } = useNotification();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -333,6 +337,7 @@ export default function UnifiedPaymentsReport() {
       <InvoiceDetail
         invoiceId={viewingInvoiceId}
         onBack={handleBackToPayments}
+        onNavigateToCustomer={onNavigateToCustomer}
       />
     );
   }

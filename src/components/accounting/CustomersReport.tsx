@@ -46,11 +46,15 @@ interface FundraisingCredit {
   updated_at: string;
 }
 
-export default function CustomersReport() {
+interface CustomersReportProps {
+  initialSearchTerm?: string;
+}
+
+export default function CustomersReport({ initialSearchTerm }: CustomersReportProps = {}) {
   const { showNotification } = useNotification();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(initialSearchTerm || '');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customerInvoices, setCustomerInvoices] = useState<CustomerDetail[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(false);

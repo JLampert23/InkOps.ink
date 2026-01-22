@@ -26,9 +26,10 @@ interface AgingBucket {
 
 interface AccountsReceivableReportProps {
   onNavigateToSettings?: (tab: string) => void;
+  onNavigateToCustomer?: (customerEmail: string, customerName: string) => void;
 }
 
-export default function AccountsReceivableReport({ onNavigateToSettings }: AccountsReceivableReportProps) {
+export default function AccountsReceivableReport({ onNavigateToSettings, onNavigateToCustomer }: AccountsReceivableReportProps) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState('all');
@@ -192,6 +193,7 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
       <InvoiceDetail
         invoiceId={viewingInvoiceId}
         onBack={handleBackToReport}
+        onNavigateToCustomer={onNavigateToCustomer}
       />
     );
   }

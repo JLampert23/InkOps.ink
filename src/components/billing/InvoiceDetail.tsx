@@ -39,9 +39,10 @@ import { ManualPaymentModal } from './ManualPaymentModal';
 interface InvoiceDetailProps {
   invoiceId: string;
   onBack: () => void;
+  onNavigateToCustomer?: (customerEmail: string, customerName: string) => void;
 }
 
-export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
+export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: InvoiceDetailProps) {
   const [invoice, setInvoice] = useState<InvoiceDetailType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -509,7 +510,16 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
               <div className="space-y-4">
                 <div>
                   <p className="text-sm text-gray-500 dark:text-gray-400">Customer Name</p>
-                  <p className="font-medium text-gray-900 dark:text-white">{invoice.contact.name || 'N/A'}</p>
+                  {onNavigateToCustomer ? (
+                    <button
+                      onClick={() => onNavigateToCustomer(invoice.contact.email, invoice.contact.name)}
+                      className="font-medium text-blue-600 dark:text-blue-500 hover:text-blue-800 dark:hover:text-blue-400 hover:underline transition-colors text-left"
+                    >
+                      {invoice.contact.name || 'N/A'}
+                    </button>
+                  ) : (
+                    <p className="font-medium text-gray-900 dark:text-white">{invoice.contact.name || 'N/A'}</p>
+                  )}
                 </div>
                 {invoice.contact.company && (
                   <div>
@@ -517,7 +527,16 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                       <Building2 className="w-3.5 h-3.5" />
                       Company
                     </p>
-                    <p className="font-medium text-gray-900 dark:text-white">{invoice.contact.company}</p>
+                    {onNavigateToCustomer ? (
+                      <button
+                        onClick={() => onNavigateToCustomer(invoice.contact.email, invoice.contact.company || '')}
+                        className="font-medium text-blue-600 dark:text-blue-500 hover:text-blue-800 dark:hover:text-blue-400 hover:underline transition-colors text-left"
+                      >
+                        {invoice.contact.company}
+                      </button>
+                    ) : (
+                      <p className="font-medium text-gray-900 dark:text-white">{invoice.contact.company}</p>
+                    )}
                   </div>
                 )}
                 <div>

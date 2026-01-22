@@ -5,7 +5,11 @@ import { SendInvoiceModal } from './SendInvoiceModal';
 import { InvoiceDetail } from './InvoiceDetail';
 import { BillingQueueItem } from '../../services/billing-service';
 
-export function BillingDashboard() {
+interface BillingDashboardProps {
+  onNavigateToCustomer?: (customerEmail: string, customerName: string) => void;
+}
+
+export function BillingDashboard({ onNavigateToCustomer }: BillingDashboardProps = {}) {
   const [selectedInvoice, setSelectedInvoice] = useState<BillingQueueItem | null>(null);
   const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -36,6 +40,7 @@ export function BillingDashboard() {
       <InvoiceDetail
         invoiceId={viewingInvoiceId}
         onBack={handleBackToQueue}
+        onNavigateToCustomer={onNavigateToCustomer}
       />
     );
   }
