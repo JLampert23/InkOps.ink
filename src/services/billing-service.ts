@@ -3,29 +3,16 @@ import { stripeService } from './stripe-service';
 import { Invoice } from '../types/printavo';
 
 async function getValidSession() {
-  const { data: { session }, error } = await supabase.auth.getSession();
+  // Always refresh to get the latest token
+  const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
 
-  if (error) {
-    throw new Error('Authentication error. Please log out and log back in.');
+  if (refreshError) {
+    console.error('Session refresh failed:', refreshError);
+    throw new Error('Your session has expired. Please log out and log back in.');
   }
 
   if (!session) {
-    throw new Error('No active session found. Please log in.');
-  }
-
-  const expiresAt = session.expires_at || 0;
-  const now = Math.floor(Date.now() / 1000);
-  const timeUntilExpiry = expiresAt - now;
-
-  if (timeUntilExpiry < 60) {
-    console.log('Token expiring soon, refreshing...');
-    const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
-
-    if (refreshError || !newSession) {
-      throw new Error('Session expired. Please log out and log back in.');
-    }
-
-    return newSession;
+    throw new Error('No active session found. Please log out and log back in.');
   }
 
   return session;

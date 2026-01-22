@@ -6,31 +6,20 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 async function getValidSession() {
-  const { data: { session }, error } = await supabase.auth.getSession();
+  // Always refresh to get the latest token
+  console.log('Refreshing session to get fresh token...');
+  const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
 
-  if (error) {
-    throw new Error('Authentication error. Please log out and log back in.');
+  if (refreshError) {
+    console.error('Session refresh failed:', refreshError);
+    throw new Error('Your session has expired. Please log out and log back in.');
   }
 
   if (!session) {
-    throw new Error('No active session found. Please log in.');
+    throw new Error('No active session found. Please log out and log back in.');
   }
 
-  const expiresAt = session.expires_at || 0;
-  const now = Math.floor(Date.now() / 1000);
-  const timeUntilExpiry = expiresAt - now;
-
-  if (timeUntilExpiry < 60) {
-    console.log('Token expiring soon, refreshing...');
-    const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
-
-    if (refreshError || !newSession) {
-      throw new Error('Session expired. Please log out and log back in.');
-    }
-
-    return newSession;
-  }
-
+  console.log('Fresh token obtained, expires at:', new Date(session.expires_at! * 1000).toISOString());
   return session;
 }
 
