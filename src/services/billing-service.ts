@@ -811,9 +811,6 @@ export const billingService = {
       if (updateError) {
         throw new Error(`Failed to revert invoice: ${updateError.message}`);
       }
-
-      // Recalculate invoice balance to ensure amountOutstanding is correct
-      await supabase.rpc('recalculate_invoice_balances');
     } catch (error) {
       console.error('Error reverting invoice:', error);
       throw error;
