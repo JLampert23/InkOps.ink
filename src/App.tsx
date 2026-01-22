@@ -192,7 +192,7 @@ function AppContent() {
         lg:w-auto ${sidebarOpen ? 'lg:w-56' : 'lg:w-20'}
       `}>
         {/* Logo/Brand */}
-        <div className="h-20 border-b border-gray-200 dark:border-slate-700 flex items-center justify-center px-4 bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-700 dark:to-blue-800">
+        <div className="h-20 border-b border-gray-200 dark:border-slate-700 flex items-center justify-center px-4 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-slate-800 dark:to-slate-700">
           {sidebarOpen ? (
             companySettings?.logo_url ? (
               <div className="flex items-center justify-center w-full h-full py-1.5">
