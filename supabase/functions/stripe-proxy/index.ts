@@ -489,6 +489,36 @@ Deno.serve(async (req: Request) => {
         );
       }
 
+      case 'voidInvoice': {
+        const { invoiceId } = data;
+
+        const voidResponse = await callStripeAPI(
+          `/invoices/${invoiceId}/void`,
+          'POST',
+          config.secretKey,
+          {}
+        );
+
+        if (!voidResponse.ok) {
+          const error = await voidResponse.json();
+          throw new Error(error.error?.message || 'Failed to void invoice');
+        }
+
+        const invoice = await voidResponse.json();
+
+        return new Response(
+          JSON.stringify({
+            invoiceId: invoice.id,
+            status: invoice.status,
+            message: 'Invoice voided successfully',
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
       default:
         return new Response(
           JSON.stringify({ error: 'Unknown action' }),

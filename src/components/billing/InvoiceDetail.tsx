@@ -18,6 +18,7 @@ import {
   MessageSquare,
   Phone,
   RefreshCw,
+  RotateCcw,
   Send,
   User,
   XCircle,
@@ -60,6 +61,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
   const [unlocking, setUnlocking] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [reverting, setReverting] = useState(false);
   const [companySettings, setCompanySettings] = useState<{
     company_name: string | null;
     company_address: string | null;
@@ -290,6 +292,33 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
     if (!invoice?.stripePaymentLink?.url) return;
     await navigator.clipboard.writeText(invoice.stripePaymentLink.url);
     alert('Payment link copied to clipboard!');
+  };
+
+  const handleRevertInvoice = async () => {
+    if (!invoice?.billingQueueId) return;
+
+    const confirmed = confirm(
+      'Are you sure you want to revert this invoice?\n\n' +
+      'This will:\n' +
+      '- Void the Stripe invoice (if exists)\n' +
+      '- Clear the payment link\n' +
+      '- Allow you to create a new invoice or payment link\n' +
+      '- Reset the sent status\n\n' +
+      'This action cannot be undone.'
+    );
+
+    if (!confirmed) return;
+
+    setReverting(true);
+    try {
+      await billingService.revertInvoiceToUnsent(invoice.billingQueueId);
+      alert('Invoice reverted successfully! You can now create a new payment link or invoice.');
+      await loadInvoice();
+    } catch (err: any) {
+      alert(err.message || 'Failed to revert invoice');
+    } finally {
+      setReverting(false);
+    }
   };
 
   const formatDate = (dateString: string | null) => {
@@ -905,6 +934,21 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                     <CheckCircle className="w-4 h-4" />
                     Record Manual Payment
                   </button>
+
+                  {(invoice.stripePaymentLink || invoice.stripeInvoice) && (
+                    <button
+                      onClick={handleRevertInvoice}
+                      disabled={reverting || invoice.billingQueueStatus === 'paid'}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {reverting ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <RotateCcw className="w-4 h-4" />
+                      )}
+                      Revert Invoice
+                    </button>
+                  )}
                 </>
               )}
 

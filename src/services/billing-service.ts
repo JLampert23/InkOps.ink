@@ -776,6 +776,49 @@ export const billingService = {
     return successCount;
   },
 
+  async revertInvoiceToUnsent(queueItemId: string): Promise<void> {
+    try {
+      const { data: queueItem, error: queueError } = await supabase
+        .from('billing_queue')
+        .select('stripe_invoice_id, stripe_payment_link_id, payment_status')
+        .eq('id', queueItemId)
+        .maybeSingle();
+
+      if (queueError || !queueItem) {
+        throw new Error('Billing queue item not found');
+      }
+
+      if (queueItem.payment_status === 'paid') {
+        throw new Error('Cannot revert a paid invoice. Please reverse payments first.');
+      }
+
+      if (queueItem.stripe_invoice_id) {
+        try {
+          await stripeService.voidInvoice(queueItem.stripe_invoice_id);
+        } catch (error) {
+          console.warn('Failed to void Stripe invoice, it may already be paid or voided:', error);
+        }
+      }
+
+      const { error: updateError } = await supabase
+        .from('billing_queue')
+        .update({
+          stripe_invoice_id: null,
+          stripe_payment_link_id: null,
+          sent_at: null,
+          sent_method: null,
+        })
+        .eq('id', queueItemId);
+
+      if (updateError) {
+        throw new Error(`Failed to revert invoice: ${updateError.message}`);
+      }
+    } catch (error) {
+      console.error('Error reverting invoice:', error);
+      throw error;
+    }
+  },
+
   async moveToAccountsReceivable(queueItemId: string): Promise<void> {
     const { data: queueItem, error: queueError } = await supabase
       .from('billing_queue')

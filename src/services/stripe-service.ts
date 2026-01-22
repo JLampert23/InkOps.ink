@@ -636,4 +636,36 @@ export const stripeService = {
       return null;
     }
   },
+
+  async voidInvoice(stripeInvoiceId: string): Promise<void> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('You must be logged in');
+      }
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/stripe-proxy`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': supabaseAnonKey,
+        },
+        body: JSON.stringify({
+          action: 'voidInvoice',
+          data: {
+            invoiceId: stripeInvoiceId,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to void invoice');
+      }
+    } catch (error) {
+      console.error('Error voiding invoice:', error);
+      throw error;
+    }
+  },
 };
