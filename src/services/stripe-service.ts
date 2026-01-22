@@ -123,7 +123,9 @@ export const stripeService = {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to create payment link');
+        const errorMessage = error.error || error.message || 'Failed to create payment link';
+        console.error('Payment link creation failed:', errorMessage, error);
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
