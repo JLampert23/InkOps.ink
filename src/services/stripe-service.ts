@@ -112,6 +112,13 @@ export const stripeService = {
         throw new Error('Stripe is not configured. Please add your credentials in Settings → Integrations → Stripe');
       }
 
+      console.log('=== CLIENT JWT DEBUG ===');
+      console.log('Token length:', session.access_token.length);
+      console.log('Token prefix:', session.access_token.substring(0, 20) + '...');
+      console.log('Token expires at:', new Date(session.expires_at! * 1000).toISOString());
+      console.log('Current time:', new Date().toISOString());
+      console.log('Time until expiry (seconds):', session.expires_at! - Math.floor(Date.now() / 1000));
+
       const response = await fetch(`${supabaseUrl}/functions/v1/stripe-proxy`, {
         method: 'POST',
         headers: {

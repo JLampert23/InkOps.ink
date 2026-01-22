@@ -125,19 +125,31 @@ Deno.serve(async (req: Request) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
-    console.log('Validating JWT token, length:', token.length);
+    console.log('=== JWT VALIDATION DEBUG ===');
+    console.log('Token length:', token.length);
+    console.log('Token prefix:', token.substring(0, 20) + '...');
+    console.log('Supabase URL:', supabaseUrl);
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
+    console.log('Auth result:', {
+      hasUser: !!user,
+      hasError: !!authError,
+      errorMessage: authError?.message,
+      errorStatus: authError?.status,
+      errorName: authError?.name,
+    });
+
     if (authError || !user) {
-      console.error('Auth validation failed:', {
-        error: authError?.message,
-        code: authError?.status,
-        hasUser: !!user
-      });
+      console.error('=== AUTH VALIDATION FAILED ===');
+      console.error('Full error object:', JSON.stringify(authError, null, 2));
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
+        JSON.stringify({
+          code: 401,
+          message: 'Invalid JWT',
+          details: authError?.message || 'User not found'
+        }),
         {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
