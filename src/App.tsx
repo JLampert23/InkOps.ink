@@ -181,7 +181,6 @@ function AppContent() {
     setCustomerSearchTerm(searchTerm);
     setActiveTab('customers');
     setAccountingExpanded(true);
-    setSidebarOpen(false);
   };
 
   return (
@@ -524,7 +523,7 @@ function AppContent() {
         </header>
 
         {/* Content */}
-        <main className={activeTab === 'settings' ? 'flex-1 overflow-hidden' : 'py-4 px-3 sm:py-6 sm:px-4'}>
+        <main className={activeTab === 'settings' ? 'flex-1 overflow-hidden' : 'py-6 px-6 sm:py-8 sm:px-8'}>
           {activeTab === 'accounting-dashboard' && (
             <Suspense fallback={
               <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-8">
