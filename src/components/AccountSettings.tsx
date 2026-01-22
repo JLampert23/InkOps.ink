@@ -2153,9 +2153,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   }`}
                   style={{ animationDelay: '20ms' }}
                 >
-                  <Layers className={`w-4 h-4 flex-shrink-0 ${activeTab === 'workflow-setup' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                  <Layers className={`w-4 h-4 flex-shrink-0 ${activeTab === 'workflow-setup' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                   <div className="flex-1 text-left">
-                    <div className={`font-medium text-sm ${activeTab === 'workflow-setup' ? 'text-green-700' : 'text-gray-700'}`}>
+                    <div className={`font-medium text-sm ${activeTab === 'workflow-setup' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                       Workflow Setup
                     </div>
                   </div>
@@ -2171,9 +2171,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   }`}
                   style={{ animationDelay: '40ms' }}
                 >
-                  <Zap className={`w-4 h-4 flex-shrink-0 ${activeTab === 'automations' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                  <Zap className={`w-4 h-4 flex-shrink-0 ${activeTab === 'automations' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                   <div className="flex-1 text-left">
-                    <div className={`font-medium text-sm ${activeTab === 'automations' ? 'text-green-700' : 'text-gray-700'}`}>
+                    <div className={`font-medium text-sm ${activeTab === 'automations' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                       Automations
                     </div>
                   </div>
@@ -2426,21 +2426,21 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Printavo Email / Username
                   </label>
                   <input
                     type="email"
                     value={printavoUsername}
                     onChange={(e) => setPrintavoUsername(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="your@email.com"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Your Printavo account email</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Your Printavo account email</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Printavo API Token
                   </label>
                   <div className="relative">
@@ -2448,19 +2448,19 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       type={showPrintavoToken ? 'text' : 'password'}
                       value={printavoToken}
                       onChange={(e) => setPrintavoToken(e.target.value)}
-                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder={companySettings?.printavo_api_token_encrypted ? '••••••••••••••••' : 'Enter your API token'}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPrintavoToken(!showPrintavoToken)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                       tabIndex={-1}
                     >
                       {showPrintavoToken ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     {companySettings?.printavo_api_token_encrypted
                       ? 'Token is saved and encrypted. Enter a new token to update it.'
                       : 'Find your API token in Printavo Settings → Integrations'}
@@ -2489,9 +2489,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                 {companySettings?.printavo_username && (
                   <>
-                    <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-green-800">
+                        <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
                           <Key className="w-5 h-5" />
                           <div>
                             <p className="font-medium">Integration Active</p>
@@ -2519,7 +2519,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           <button
                             onClick={testPrintavoConnection}
                             disabled={testingConnection}
-                            className="flex items-center gap-2 px-4 py-2 bg-white border border-green-300 text-green-700 rounded-lg hover:bg-green-50 disabled:opacity-50 transition-colors"
+                            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/30 disabled:opacity-50 transition-colors"
                           >
                             {testingConnection ? (
                               <>
@@ -2535,8 +2535,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     </div>
 
                     {syncResult && (
-                      <div className={`mt-4 p-4 rounded-lg border ${syncResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                        <p className={`text-sm ${syncResult.success ? 'text-green-800' : 'text-red-800'}`}>
+                      <div className={`mt-4 p-4 rounded-lg border ${syncResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
+                        <p className={`text-sm ${syncResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
                           {syncResult.message}
                         </p>
                       </div>
@@ -2545,18 +2545,18 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     {testResult && (
                       <div className={`p-4 rounded-lg border ${
                         testResult.success
-                          ? 'bg-green-50 border-green-200'
+                          ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
                           : testResult.error === 'Rate limit exceeded'
-                            ? 'bg-yellow-50 border-yellow-200'
-                            : 'bg-red-50 border-red-200'
+                            ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
+                            : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
                       }`}>
                         <div className="space-y-3">
                           <div className={`font-medium text-lg ${
                             testResult.success
-                              ? 'text-green-800'
+                              ? 'text-green-800 dark:text-green-200'
                               : testResult.error === 'Rate limit exceeded'
-                                ? 'text-yellow-800'
-                                : 'text-red-800'
+                                ? 'text-yellow-800 dark:text-yellow-200'
+                                : 'text-red-800 dark:text-red-200'
                           }`}>
                             {testResult.success
                               ? '✓ Connection Successful!'
@@ -2566,13 +2566,13 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           </div>
 
                           {testResult.success && testResult.company && (
-                            <div className="text-sm text-green-700">
+                            <div className="text-sm text-green-700 dark:text-green-300">
                               Connected to: <strong>{testResult.company.name}</strong>
                             </div>
                           )}
 
                           {testResult.error === 'Rate limit exceeded' && (
-                            <div className="text-sm text-yellow-800 space-y-2">
+                            <div className="text-sm text-yellow-800 dark:text-yellow-200 space-y-2">
                               <p className="font-medium">
                                 {testResult.printavoError || 'Too many requests to Printavo API. Please wait a moment before testing again.'}
                               </p>
@@ -2584,20 +2584,20 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           )}
 
                           {testResult.error && testResult.error !== 'Rate limit exceeded' && (
-                            <div className="text-sm text-red-700 font-medium">
+                            <div className="text-sm text-red-700 dark:text-red-300 font-medium">
                               Error: {testResult.error}
                             </div>
                           )}
 
                           {testResult.printavoError && testResult.error !== 'Rate limit exceeded' && (
-                            <div className="text-sm text-red-700 font-medium">
+                            <div className="text-sm text-red-700 dark:text-red-300 font-medium">
                               Printavo Error: {testResult.printavoError}
                             </div>
                           )}
 
-                          <div className="mt-3 pt-3 border-t border-gray-200">
-                            <div className="text-xs font-medium text-gray-700 mb-2">Diagnostics:</div>
-                            <pre className="text-xs p-3 bg-white rounded border border-gray-300 overflow-x-auto max-h-96">
+                          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
+                            <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Diagnostics:</div>
+                            <pre className="text-xs p-3 bg-white dark:bg-slate-900 rounded border border-gray-300 dark:border-gray-600 overflow-x-auto max-h-96">
                               {JSON.stringify(testResult, null, 2)}
                             </pre>
                           </div>
@@ -2605,11 +2605,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       </div>
                     )}
 
-                    <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <div className="mt-6 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Bug className="w-5 h-5 text-yellow-600" />
-                          <span className="text-sm text-yellow-800 font-medium">Debug: Test Printavo Data Structure</span>
+                          <Bug className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                          <span className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">Debug: Test Printavo Data Structure</span>
                         </div>
                         <button
                           onClick={runPrintavoTest}
@@ -2622,17 +2622,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     </div>
 
                     {testData && (
-                      <div className="bg-white rounded-lg shadow p-6 border border-gray-200">
+                      <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 border border-gray-200 dark:border-slate-600">
                         <div className="flex items-center justify-between mb-4">
-                          <h3 className="text-lg font-semibold">Printavo API Response</h3>
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Printavo API Response</h3>
                           <button
                             onClick={() => setTestData(null)}
-                            className="text-gray-500 hover:text-gray-700"
+                            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                           >
                             Close
                           </button>
                         </div>
-                        <pre className="bg-gray-50 p-4 rounded overflow-auto max-h-96 text-xs">
+                        <pre className="bg-gray-50 dark:bg-slate-900 p-4 rounded overflow-auto max-h-96 text-xs">
                           {JSON.stringify(testData, null, 2)}
                         </pre>
                       </div>
@@ -2652,7 +2652,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Square Access Token <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
@@ -2660,19 +2660,19 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       type={showSquareToken ? 'text' : 'password'}
                       value={squareAccessToken}
                       onChange={(e) => setSquareAccessToken(e.target.value)}
-                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                       placeholder={companySettings?.square_access_token ? '••••••••••••••••' : 'Enter your Square access token'}
                     />
                     <button
                       type="button"
                       onClick={() => setShowSquareToken(!showSquareToken)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                       tabIndex={-1}
                     >
                       {showSquareToken ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     {companySettings?.square_access_token
                       ? 'Token is saved and encrypted. Enter a new token to update it.'
                       : 'Find your access token in Square Developer Dashboard'}
@@ -2680,41 +2680,41 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Application ID
                   </label>
                   <input
                     type="text"
                     value={squareApplicationId}
                     onChange={(e) => setSquareApplicationId(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     placeholder="sq0idp-XXXXXXXXXXXXXXXXXXXX"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Your Square Application ID</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Your Square Application ID</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Location ID
                   </label>
                   <input
                     type="text"
                     value={squareLocationId}
                     onChange={(e) => setSquareLocationId(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     placeholder="L1234567890"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Your Square Location ID (leave blank for all locations)</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Your Square Location ID (leave blank for all locations)</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Environment
                   </label>
                   <select
                     value={squareEnvironment}
                     onChange={(e) => setSquareEnvironment(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   >
                     <option value="production">Production</option>
                     <option value="sandbox">Sandbox (Testing)</option>
@@ -2744,9 +2744,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                 {companySettings?.square_access_token && (
                   <>
-                    <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-green-800">
+                        <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
                           <Key className="w-5 h-5" />
                           <div>
                             <p className="font-medium">Square Integration Active</p>
@@ -2756,7 +2756,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         <button
                           onClick={testSquareConnection}
                           disabled={testingSquare}
-                          className="flex items-center gap-2 px-4 py-2 bg-white border border-green-300 text-green-700 rounded-lg hover:bg-green-50 disabled:opacity-50 transition-colors"
+                          className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/30 disabled:opacity-50 transition-colors"
                         >
                           {testingSquare ? (
                             <>
@@ -2771,7 +2771,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     </div>
 
                     {squareTestResult && (
-                      <div className={`p-4 rounded-lg border ${squareTestResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                      <div className={`p-4 rounded-lg border ${squareTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
                         <div className="space-y-3">
                           {squareTestResult.success ? (
                             <>
@@ -2780,12 +2780,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                                   ✓
                                 </div>
                                 <div className="flex-1">
-                                  <h4 className="font-medium text-green-900">Connection Successful!</h4>
-                                  <p className="text-sm text-green-800 mt-1">{squareTestResult.message}</p>
+                                  <h4 className="font-medium text-green-900 dark:text-green-100">Connection Successful!</h4>
+                                  <p className="text-sm text-green-800 dark:text-green-200 mt-1">{squareTestResult.message}</p>
                                   {squareTestResult.locations && squareTestResult.locations.length > 0 && (
                                     <div className="mt-3">
-                                      <p className="text-xs font-medium text-green-900 mb-2">Locations:</p>
-                                      <ul className="text-xs text-green-800 space-y-1">
+                                      <p className="text-xs font-medium text-green-900 dark:text-green-100 mb-2">Locations:</p>
+                                      <ul className="text-xs text-green-800 dark:text-green-200 space-y-1">
                                         {squareTestResult.locations.slice(0, 5).map((loc: any) => (
                                           <li key={loc.id}>
                                             {loc.name} ({loc.id})
@@ -2804,16 +2804,16 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                                   ✕
                                 </div>
                                 <div className="flex-1">
-                                  <h4 className="font-medium text-red-900">Connection Failed</h4>
-                                  <p className="text-sm text-red-800 mt-1">{squareTestResult.error}</p>
+                                  <h4 className="font-medium text-red-900 dark:text-red-100">Connection Failed</h4>
+                                  <p className="text-sm text-red-800 dark:text-red-200 mt-1">{squareTestResult.error}</p>
                                 </div>
                               </div>
                             </>
                           )}
 
-                          <div className="mt-3 pt-3 border-t border-gray-200">
-                            <div className="text-xs font-medium text-gray-700 mb-2">Diagnostics:</div>
-                            <pre className="text-xs p-3 bg-white rounded border border-gray-300 overflow-x-auto max-h-96">
+                          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
+                            <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Diagnostics:</div>
+                            <pre className="text-xs p-3 bg-white dark:bg-slate-900 rounded border border-gray-300 dark:border-gray-600 overflow-x-auto max-h-96">
                               {JSON.stringify(squareTestResult, null, 2)}
                             </pre>
                           </div>
@@ -2835,7 +2835,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Resend API Key <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
@@ -2843,19 +2843,19 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       type={showResendKey ? 'text' : 'password'}
                       value={resendApiKey}
                       onChange={(e) => setResendApiKey(e.target.value)}
-                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                       placeholder={companySettings?.resend_api_key ? '••••••••••••••••' : 'Enter your Resend API key'}
                     />
                     <button
                       type="button"
                       onClick={() => setShowResendKey(!showResendKey)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                       tabIndex={-1}
                     >
                       {showResendKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     {companySettings?.resend_api_key
                       ? 'API key is saved and encrypted. Enter a new key to update it.'
                       : 'Get your API key from Resend Dashboard → API Keys'}
@@ -2863,30 +2863,30 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     From Email Address <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="email"
                     value={emailFromAddress}
                     onChange={(e) => setEmailFromAddress(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     placeholder="invoices@yourdomain.com"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Must use an email address from your verified domain (e.g., invoices@toddssportinggoods.com)
                   </p>
                 </div>
 
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-900">
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <p className="text-sm text-blue-900 dark:text-blue-200">
                     <strong>Note:</strong> You'll also need to verify your sending domain in the Resend dashboard before you can send emails.
                   </p>
                   <a
                     href="https://resend.com/api-keys"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm text-blue-600 hover:text-blue-700 underline mt-2 inline-block"
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline mt-2 inline-block"
                   >
                     Get API Key from Resend →
                   </a>
@@ -2914,9 +2914,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                 {companySettings?.resend_api_key && (
                   <>
-                    <div className="mt-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                    <div className="mt-6 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-purple-800">
+                        <div className="flex items-center gap-2 text-purple-800 dark:text-purple-200">
                           <Key className="w-5 h-5" />
                           <div>
                             <p className="font-medium">Resend Integration Active</p>
@@ -2926,7 +2926,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         <button
                           onClick={testResendConnection}
                           disabled={testingResend}
-                          className="flex items-center gap-2 px-4 py-2 bg-white border border-purple-300 text-purple-700 rounded-lg hover:bg-purple-50 disabled:opacity-50 transition-colors"
+                          className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/30 disabled:opacity-50 transition-colors"
                         >
                           {testingResend ? (
                             <>
@@ -2941,7 +2941,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     </div>
 
                     {resendTestResult && (
-                      <div className={`p-4 rounded-lg border ${resendTestResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                      <div className={`p-4 rounded-lg border ${resendTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
                         <div className="space-y-3">
                           {resendTestResult.success ? (
                             <>
@@ -2950,10 +2950,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                                   ✓
                                 </div>
                                 <div className="flex-1">
-                                  <h4 className="font-medium text-green-900">Connection Successful!</h4>
-                                  <p className="text-sm text-green-800 mt-1">{resendTestResult.message}</p>
+                                  <h4 className="font-medium text-green-900 dark:text-green-100">Connection Successful!</h4>
+                                  <p className="text-sm text-green-800 dark:text-green-200 mt-1">{resendTestResult.message}</p>
                                   {resendTestResult.emailId && (
-                                    <p className="text-xs text-green-700 mt-2">Email ID: {resendTestResult.emailId}</p>
+                                    <p className="text-xs text-green-700 dark:text-green-300 mt-2">Email ID: {resendTestResult.emailId}</p>
                                   )}
                                 </div>
                               </div>
@@ -2965,16 +2965,16 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                                   ✕
                                 </div>
                                 <div className="flex-1">
-                                  <h4 className="font-medium text-red-900">Connection Failed</h4>
-                                  <p className="text-sm text-red-800 mt-1">{resendTestResult.error}</p>
+                                  <h4 className="font-medium text-red-900 dark:text-red-100">Connection Failed</h4>
+                                  <p className="text-sm text-red-800 dark:text-red-200 mt-1">{resendTestResult.error}</p>
                                 </div>
                               </div>
                             </>
                           )}
 
-                          <div className="mt-3 pt-3 border-t border-gray-200">
-                            <div className="text-xs font-medium text-gray-700 mb-2">Diagnostics:</div>
-                            <pre className="text-xs p-3 bg-white rounded border border-gray-300 overflow-x-auto max-h-96">
+                          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
+                            <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Diagnostics:</div>
+                            <pre className="text-xs p-3 bg-white dark:bg-slate-900 rounded border border-gray-300 dark:border-gray-600 overflow-x-auto max-h-96">
                               {JSON.stringify(resendTestResult, null, 2)}
                             </pre>
                           </div>
@@ -2984,17 +2984,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   </>
                 )}
 
-                <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                  <p className="text-sm font-medium text-gray-900 mb-2">Available Email Templates:</p>
-                  <ul className="text-sm text-gray-600 space-y-1 ml-4 list-disc">
+                <div className="mt-6 p-4 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white mb-2">Available Email Templates:</p>
+                  <ul className="text-sm text-gray-600 dark:text-gray-300 space-y-1 ml-4 list-disc">
                     <li>Invoice Reminders</li>
                     <li>Payment Confirmations</li>
                     <li>Overdue Notices</li>
                     <li>Welcome Emails</li>
                     <li>Custom HTML Emails</li>
                   </ul>
-                  <p className="text-xs text-gray-500 mt-3">
-                    See <code className="bg-white px-2 py-0.5 rounded">EMAIL_GUIDE.md</code> for usage examples
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
+                    See <code className="bg-white dark:bg-slate-800 px-2 py-0.5 rounded">EMAIL_GUIDE.md</code> for usage examples
                   </p>
                 </div>
               </div>
@@ -3010,7 +3010,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Twilio Account SID <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
@@ -3018,19 +3018,19 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       type={showTwilioSid ? 'text' : 'password'}
                       value={twilioAccountSid}
                       onChange={(e) => setTwilioAccountSid(e.target.value)}
-                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                       placeholder={companySettings?.twilio_account_sid ? '••••••••••••••••' : 'Enter your Twilio Account SID'}
                     />
                     <button
                       type="button"
                       onClick={() => setShowTwilioSid(!showTwilioSid)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                       tabIndex={-1}
                     >
                       {showTwilioSid ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     {companySettings?.twilio_account_sid
                       ? 'Account SID is saved and encrypted. Enter a new value to update it.'
                       : 'Found in your Twilio Console Dashboard'}
@@ -3038,7 +3038,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Twilio Auth Token <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
@@ -3046,19 +3046,19 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       type={showTwilioToken ? 'text' : 'password'}
                       value={twilioAuthToken}
                       onChange={(e) => setTwilioAuthToken(e.target.value)}
-                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                       placeholder={companySettings?.twilio_auth_token ? '••••••••••••••••' : 'Enter your Twilio Auth Token'}
                     />
                     <button
                       type="button"
                       onClick={() => setShowTwilioToken(!showTwilioToken)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                       tabIndex={-1}
                     >
                       {showTwilioToken ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     {companySettings?.twilio_auth_token
                       ? 'Auth Token is saved and encrypted. Enter a new value to update it.'
                       : 'Found in your Twilio Console Dashboard'}
@@ -3066,17 +3066,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Twilio Phone Number <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={twilioPhoneNumber}
                     onChange={(e) => setTwilioPhoneNumber(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     placeholder="+14155551234"
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Your Twilio phone number in E.164 format (e.g., +14155551234)
                   </p>
                 </div>
@@ -3087,58 +3087,58 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       type="checkbox"
                       checked={twilioEnabled}
                       onChange={(e) => setTwilioEnabled(e.target.checked)}
-                      className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                      className="w-4 h-4 text-green-600 border-gray-300 dark:border-gray-600 rounded focus:ring-green-500"
                     />
-                    <span className="text-sm font-medium text-gray-700">Enable SMS sending</span>
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable SMS sending</span>
                   </label>
-                  <p className="text-xs text-gray-500 mt-1 ml-6">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-6">
                     When enabled, you can send invoices via text message
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Default Send Method
                   </label>
                   <select
                     value={defaultSendMethod}
                     onChange={(e) => setDefaultSendMethod(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   >
                     <option value="email">Email Only</option>
                     <option value="sms">Text Message Only</option>
                     <option value="both">Both Email and Text</option>
                   </select>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Default method for sending invoices (can be changed per invoice)
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     SMS Message Template
                   </label>
                   <textarea
                     value={smsMessageTemplate}
                     onChange={(e) => setSmsMessageTemplate(e.target.value)}
                     rows={4}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent font-mono text-sm"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent font-mono text-sm"
                     placeholder="Hi {CustomerName}, your invoice {InvoiceNumber} is ready..."
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     Available placeholders: {'{CustomerName}'}, {'{InvoiceNumber}'}, {'{Amount}'}, {'{PaymentLink}'}
                   </p>
                 </div>
 
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-900">
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <p className="text-sm text-blue-900 dark:text-blue-200">
                     <strong>Note:</strong> Make sure your Twilio account is active and has sufficient credits to send SMS messages. Standard SMS rates apply.
                   </p>
                   <a
                     href="https://console.twilio.com/"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm text-blue-600 hover:text-blue-700 underline mt-2 inline-block"
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline mt-2 inline-block"
                   >
                     Open Twilio Console →
                   </a>
@@ -3166,9 +3166,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                 {companySettings?.twilio_account_sid && (
                   <>
-                    <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-green-800">
+                        <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
                           <MessageSquare className="w-5 h-5" />
                           <div>
                             <p className="font-medium">Twilio Integration Active</p>
@@ -3178,7 +3178,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         <button
                           onClick={testTwilioConnection}
                           disabled={testingTwilio}
-                          className="flex items-center gap-2 px-4 py-2 bg-white border border-green-300 text-green-700 rounded-lg hover:bg-green-50 disabled:opacity-50 transition-colors"
+                          className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/30 disabled:opacity-50 transition-colors"
                         >
                           {testingTwilio ? (
                             <>
@@ -3193,7 +3193,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     </div>
 
                     {twilioTestResult && (
-                      <div className={`p-4 rounded-lg border ${twilioTestResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                      <div className={`p-4 rounded-lg border ${twilioTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
                         <div className="space-y-3">
                           {twilioTestResult.success ? (
                             <>
@@ -3202,8 +3202,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                                   ✓
                                 </div>
                                 <div className="flex-1">
-                                  <h4 className="font-medium text-green-900">Connection Successful!</h4>
-                                  <p className="text-sm text-green-800 mt-1">{twilioTestResult.message}</p>
+                                  <h4 className="font-medium text-green-900 dark:text-green-100">Connection Successful!</h4>
+                                  <p className="text-sm text-green-800 dark:text-green-200 mt-1">{twilioTestResult.message}</p>
                                 </div>
                               </div>
                             </>
@@ -3214,17 +3214,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                                   ✕
                                 </div>
                                 <div className="flex-1">
-                                  <h4 className="font-medium text-red-900">Connection Failed</h4>
-                                  <p className="text-sm text-red-800 mt-1">{twilioTestResult.error}</p>
+                                  <h4 className="font-medium text-red-900 dark:text-red-100">Connection Failed</h4>
+                                  <p className="text-sm text-red-800 dark:text-red-200 mt-1">{twilioTestResult.error}</p>
                                 </div>
                               </div>
                             </>
                           )}
 
                           {twilioTestResult.details && (
-                            <div className="mt-3 pt-3 border-t border-gray-200">
-                              <div className="text-xs font-medium text-gray-700 mb-2">Diagnostics:</div>
-                              <pre className="text-xs p-3 bg-white rounded border border-gray-300 overflow-x-auto max-h-96">
+                            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
+                              <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Diagnostics:</div>
+                              <pre className="text-xs p-3 bg-white dark:bg-slate-900 rounded border border-gray-300 dark:border-gray-600 overflow-x-auto max-h-96">
                                 {JSON.stringify(twilioTestResult.details, null, 2)}
                               </pre>
                             </div>
@@ -3242,8 +3242,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-1">User Management</h2>
-                  <p className="text-sm text-gray-600">Add and manage team members</p>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">User Management</h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Add and manage team members</p>
                 </div>
                 <button
                   onClick={() => setShowAddUser(!showAddUser)}
@@ -3255,41 +3255,41 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               </div>
 
               {showAddUser && (
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <h3 className="font-medium text-gray-900 mb-4">Add New User</h3>
+                <div className="p-4 bg-gray-50 dark:bg-slate-700 rounded-lg border border-gray-200 dark:border-slate-600">
+                  <h3 className="font-medium text-gray-900 dark:text-white mb-4">Add New User</h3>
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Email Address *
                       </label>
                       <input
                         type="email"
                         value={newUserEmail}
                         onChange={(e) => setNewUserEmail(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-600 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         placeholder="user@example.com"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Full Name
                       </label>
                       <input
                         type="text"
                         value={newUserName}
                         onChange={(e) => setNewUserName(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-600 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         placeholder="John Doe"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Role
                       </label>
                       <select
                         value={newUserRole}
                         onChange={(e) => setNewUserRole(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-600 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       >
                         <option value="super_admin">Super Admin</option>
                         <option value="admin">Admin</option>
@@ -3315,7 +3315,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       </button>
                       <button
                         onClick={() => setShowAddUser(false)}
-                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                        className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
                       >
                         Cancel
                       </button>
@@ -3324,80 +3324,80 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 </div>
               )}
 
-              <div className="divide-y divide-gray-200 border border-gray-200 rounded-lg">
+              <div className="divide-y divide-gray-200 dark:divide-slate-600 border border-gray-200 dark:border-slate-600 rounded-lg">
                 {users.length === 0 ? (
-                  <p className="text-center text-gray-500 py-8">No users found</p>
+                  <p className="text-center text-gray-500 dark:text-gray-400 py-8">No users found</p>
                 ) : (
                   users.map((userProfile) => (
                     <div key={userProfile.id}>
                       {editingUserId === userProfile.id ? (
-                        <div className="p-4 bg-blue-50">
+                        <div className="p-4 bg-blue-50 dark:bg-blue-900/20">
                           <div className="flex items-center gap-2 mb-4">
-                            <User className="w-5 h-5 text-blue-600" />
-                            <h4 className="font-medium text-gray-900">Edit User</h4>
+                            <User className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                            <h4 className="font-medium text-gray-900 dark:text-white">Edit User</h4>
                           </div>
                           <div className="space-y-3">
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Email Address *
                               </label>
                               <input
                                 type="email"
                                 value={editingUserEmail}
                                 onChange={(e) => setEditingUserEmail(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 placeholder="user@example.com"
                               />
                             </div>
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Full Name
                               </label>
                               <input
                                 type="text"
                                 value={editingUserName}
                                 onChange={(e) => setEditingUserName(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 placeholder="John Doe"
                               />
                             </div>
                             <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                 Role
                               </label>
                               <select
                                 value={editingUserRole}
                                 onChange={(e) => setEditingUserRole(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                               >
                                 <option value="super_admin">Super Admin</option>
                                 <option value="admin">Admin</option>
                               </select>
                             </div>
-                            <div className="border-t border-gray-200 pt-3">
-                              <p className="text-sm font-medium text-gray-700 mb-2">Change Password (Optional)</p>
+                            <div className="border-t border-gray-200 dark:border-slate-600 pt-3">
+                              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Change Password (Optional)</p>
                               <div className="space-y-3">
                                 <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                     New Password
                                   </label>
                                   <input
                                     type="password"
                                     value={editingUserPassword}
                                     onChange={(e) => setEditingUserPassword(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     placeholder="Leave blank to keep current password"
                                   />
                                 </div>
                                 <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                     Confirm New Password
                                   </label>
                                   <input
                                     type="password"
                                     value={editingUserPasswordConfirm}
                                     onChange={(e) => setEditingUserPasswordConfirm(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     placeholder="Re-enter new password"
                                   />
                                 </div>
@@ -3424,7 +3424,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                               <button
                                 onClick={cancelEditUser}
                                 disabled={updatingUser}
-                                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                                className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
                               >
                                 Cancel
                               </button>
@@ -3432,27 +3432,27 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           </div>
                         </div>
                       ) : (
-                        <div className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                        <div className="p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
                           <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-100 rounded-full">
-                              <User className="w-5 h-5 text-blue-600" />
+                            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+                              <User className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                             </div>
                             <div>
-                              <div className="font-medium text-gray-900">
+                              <div className="font-medium text-gray-900 dark:text-white">
                                 {userProfile.full_name || 'No name'}
                                 {userProfile.id === user?.id && (
-                                  <span className="ml-2 text-xs text-blue-600">(You)</span>
+                                  <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(You)</span>
                                 )}
                               </div>
-                              <div className="text-sm text-gray-500">
+                              <div className="text-sm text-gray-500 dark:text-gray-400">
                                 {userProfile.email}
                               </div>
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-2 px-3 py-1 bg-gray-100 rounded-full">
-                              <Shield className="w-3 h-3 text-gray-600" />
-                              <span className="text-xs font-medium text-gray-700">
+                            <div className="flex items-center gap-2 px-3 py-1 bg-gray-100 dark:bg-slate-700 rounded-full">
+                              <Shield className="w-3 h-3 text-gray-600 dark:text-gray-400" />
+                              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
                                 {userProfile.role === 'super_admin' ? 'Super Admin' : 'Admin'}
                               </span>
                             </div>
@@ -3485,13 +3485,13 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           {activeTab === 'user-security' && (
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 mb-1">Security Settings</h2>
-                <p className="text-sm text-gray-600">Manage your unlock PIN for financially locked invoices</p>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Security Settings</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Manage your unlock PIN for financially locked invoices</p>
               </div>
 
-              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <h3 className="font-medium text-gray-900 mb-3">Unlock PIN</h3>
-                <p className="text-sm text-gray-600 mb-4">
+              <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <h3 className="font-medium text-gray-900 dark:text-white mb-3">Unlock PIN</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
                   {hasExistingPin
                     ? 'You have set an unlock PIN. Enter your current PIN to change it.'
                     : 'Set a PIN to unlock financially locked invoices. Minimum 4 characters.'}
@@ -3500,41 +3500,41 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 <div className="space-y-4">
                   {hasExistingPin && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Current PIN
                       </label>
                       <input
                         type="password"
                         value={currentPin}
                         onChange={(e) => setCurrentPin(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         placeholder="Enter current PIN"
                       />
                     </div>
                   )}
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       {hasExistingPin ? 'New PIN' : 'PIN'}
                     </label>
                     <input
                       type="password"
                       value={unlockPin}
                       onChange={(e) => setUnlockPin(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder="Enter PIN (min 4 characters)"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Confirm {hasExistingPin ? 'New ' : ''}PIN
                     </label>
                     <input
                       type="password"
                       value={unlockPinConfirm}
                       onChange={(e) => setUnlockPinConfirm(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder="Confirm PIN"
                     />
                   </div>
@@ -3542,8 +3542,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   {pinSaveMessage && (
                     <div className={`p-3 rounded-lg ${
                       pinSaveMessage.type === 'success'
-                        ? 'bg-green-50 text-green-800 border border-green-200'
-                        : 'bg-red-50 text-red-800 border border-red-200'
+                        ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-800'
+                        : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800'
                     }`}>
                       {pinSaveMessage.text}
                     </div>
@@ -3569,9 +3569,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 </div>
               </div>
 
-              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <h4 className="font-medium text-gray-900 mb-2">About Unlock PINs</h4>
-                <ul className="text-sm text-gray-600 space-y-2">
+              <div className="p-4 bg-gray-50 dark:bg-slate-700 rounded-lg border border-gray-200 dark:border-slate-600">
+                <h4 className="font-medium text-gray-900 dark:text-white mb-2">About Unlock PINs</h4>
+                <ul className="text-sm text-gray-600 dark:text-gray-300 space-y-2">
                   <li>PINs are used to unlock financially locked invoices</li>
                   <li>Each user sets their own unique PIN</li>
                   <li>PINs are encrypted and stored securely</li>
@@ -3584,54 +3584,54 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           {activeTab === 'status-filters' && (
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 mb-1">Printavo Dashboard Status Filters</h2>
-                <p className="text-sm text-gray-600">Select statuses to display in Printavo Dashboard section</p>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Printavo Dashboard Status Filters</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Select statuses to display in Printavo Dashboard section</p>
               </div>
 
               {loadingStatuses ? (
                 <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+                  <Loader2 className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-spin" />
                 </div>
               ) : availableStatuses.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                   No invoice statuses found. Configure your Printavo integration and test the connection to load available statuses.
                 </div>
               ) : (
                 <>
                   <div className="flex items-center justify-between mb-4">
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
                       {selectedStatuses.length} of {availableStatuses.length} statuses selected
                     </p>
                     <div className="flex gap-2">
                       <button
                         onClick={() => setSelectedStatuses(availableStatuses)}
-                        className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                        className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
                       >
                         Select All
                       </button>
-                      <span className="text-gray-400">|</span>
+                      <span className="text-gray-400 dark:text-gray-500">|</span>
                       <button
                         onClick={() => setSelectedStatuses([])}
-                        className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                        className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
                       >
                         Clear All
                       </button>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto border border-gray-200 dark:border-slate-600 rounded-lg p-4">
                     {availableStatuses.map(status => (
                       <label
                         key={status}
-                        className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors border border-gray-200"
+                        className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer transition-colors border border-gray-200 dark:border-slate-600"
                       >
                         <input
                           type="checkbox"
                           checked={selectedStatuses.includes(status)}
                           onChange={() => toggleStatus(status)}
-                          className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          className="mt-1 w-4 h-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500"
                         />
-                        <span className="text-sm text-gray-900 break-words flex-1">{status}</span>
+                        <span className="text-sm text-gray-900 dark:text-white break-words flex-1">{status}</span>
                       </label>
                     ))}
                   </div>
@@ -3664,8 +3664,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-1">Billing & Payments Status Filters</h2>
-                  <p className="text-sm text-gray-600">Select which statuses should appear in Billing Queue, then click Save to apply.</p>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Billing & Payments Status Filters</h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Select which statuses should appear in Billing Queue, then click Save to apply.</p>
                 </div>
                 <button
                   onClick={syncStatuses}
@@ -3689,8 +3689,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               {billingFiltersSaveMessage && (
                 <div className={`flex items-center gap-2 p-3 rounded-lg ${
                   billingFiltersSaveMessage.type === 'success'
-                    ? 'bg-green-50 border border-green-200 text-green-800'
-                    : 'bg-red-50 border border-red-200 text-red-800'
+                    ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200'
+                    : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200'
                 }`}>
                   {billingFiltersSaveMessage.type === 'success' ? (
                     <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -3707,19 +3707,19 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
               {loadingStatuses ? (
                 <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+                  <Loader2 className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-spin" />
                 </div>
               ) : fullStatuses.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-gray-500 mb-4">No statuses found. Click "Sync from Printavo" to fetch all available statuses.</p>
+                  <p className="text-gray-500 dark:text-gray-400 mb-4">No statuses found. Click "Sync from Printavo" to fetch all available statuses.</p>
                 </div>
               ) : (
                 <>
                   <div className="flex items-center justify-between mb-4">
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
                       {fullStatuses.filter(s => s.is_billing_eligible).length} of {fullStatuses.length} statuses enabled for billing
                       {pendingBillingChanges.size > 0 && (
-                        <span className="ml-2 text-amber-600 font-medium">
+                        <span className="ml-2 text-amber-600 dark:text-amber-400 font-medium">
                           ({pendingBillingChanges.size} unsaved change{pendingBillingChanges.size !== 1 ? 's' : ''})
                         </span>
                       )}
@@ -3731,7 +3731,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     if (typeStatuses.length === 0) return null;
                     return (
                       <div key={statusType} className="mb-6">
-                        <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
                           <Layers className="w-4 h-4" />
                           {statusType} Statuses ({typeStatuses.length})
                         </h3>
@@ -3742,19 +3742,19 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                               onClick={() => toggleBillingEligibility(status.id, status.is_billing_eligible)}
                               className={`flex items-center gap-3 p-3 rounded-lg transition-all border ${
                                 status.is_billing_eligible
-                                  ? 'bg-blue-50 border-blue-300 hover:bg-blue-100'
-                                  : 'bg-white border-gray-200 hover:bg-gray-50'
+                                  ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30'
+                                  : 'bg-white dark:bg-slate-700 border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-600'
                               }`}
                             >
                               <div
-                                className="w-4 h-4 rounded-full flex-shrink-0 border border-gray-300"
+                                className="w-4 h-4 rounded-full flex-shrink-0 border border-gray-300 dark:border-gray-600"
                                 style={{ backgroundColor: status.color || '#9ca3af' }}
                               />
-                              <span className={`text-sm flex-1 text-left ${status.is_billing_eligible ? 'text-blue-900 font-medium' : 'text-gray-700'}`}>
+                              <span className={`text-sm flex-1 text-left ${status.is_billing_eligible ? 'text-blue-900 dark:text-blue-200 font-medium' : 'text-gray-700 dark:text-gray-300'}`}>
                                 {status.name}
                               </span>
                               <div className={`w-5 h-5 rounded flex items-center justify-center ${
-                                status.is_billing_eligible ? 'bg-blue-600' : 'bg-gray-200'
+                                status.is_billing_eligible ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
                               }`}>
                                 {status.is_billing_eligible && (
                                   <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -3771,7 +3771,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                   {fullStatuses.filter(s => !s.type || (s.type !== 'Invoice' && s.type !== 'Quote')).length > 0 && (
                     <div className="mb-6">
-                      <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
                         <Layers className="w-4 h-4" />
                         Other Statuses
                       </h3>
@@ -3782,19 +3782,19 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                             onClick={() => toggleBillingEligibility(status.id, status.is_billing_eligible)}
                             className={`flex items-center gap-3 p-3 rounded-lg transition-all border ${
                               status.is_billing_eligible
-                                ? 'bg-blue-50 border-blue-300 hover:bg-blue-100'
-                                : 'bg-white border-gray-200 hover:bg-gray-50'
+                                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30'
+                                : 'bg-white dark:bg-slate-700 border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-600'
                             }`}
                           >
                             <div
-                              className="w-4 h-4 rounded-full flex-shrink-0 border border-gray-300"
+                              className="w-4 h-4 rounded-full flex-shrink-0 border border-gray-300 dark:border-gray-600"
                               style={{ backgroundColor: status.color || '#9ca3af' }}
                             />
-                            <span className={`text-sm flex-1 text-left ${status.is_billing_eligible ? 'text-blue-900 font-medium' : 'text-gray-700'}`}>
+                            <span className={`text-sm flex-1 text-left ${status.is_billing_eligible ? 'text-blue-900 dark:text-blue-200 font-medium' : 'text-gray-700 dark:text-gray-300'}`}>
                               {status.name}
                             </span>
                             <div className={`w-5 h-5 rounded flex items-center justify-center ${
-                              status.is_billing_eligible ? 'bg-blue-600' : 'bg-gray-200'
+                              status.is_billing_eligible ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
                             }`}>
                               {status.is_billing_eligible && (
                                 <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -3808,7 +3808,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     </div>
                   )}
 
-                  <div className="pt-6 border-t border-gray-200 flex items-center justify-between">
+                  <div className="pt-6 border-t border-gray-200 dark:border-slate-600 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <button
                         onClick={saveBillingFilters}
@@ -3816,7 +3816,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-all ${
                           pendingBillingChanges.size > 0
                             ? 'bg-green-600 text-white hover:bg-green-700 shadow-sm'
-                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                            : 'bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
                         } disabled:opacity-50`}
                       >
                         {savingBillingFilters ? (
@@ -3835,14 +3835,14 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         <button
                           onClick={discardBillingChanges}
                           disabled={savingBillingFilters}
-                          className="px-4 py-2.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+                          className="px-4 py-2.5 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
                         >
                           Discard Changes
                         </button>
                       )}
                     </div>
                     {pendingBillingChanges.size > 0 && (
-                      <p className="text-sm text-amber-600">
+                      <p className="text-sm text-amber-600 dark:text-amber-400">
                         You have unsaved changes
                       </p>
                     )}
@@ -3854,16 +3854,16 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
 
           {activeTab === 'automated-reports' && (
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
               <AutomatedReports />
             </div>
           )}
 
           {activeTab === 'workflow-setup' && (
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
               <Suspense fallback={
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                  <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
                 </div>
               }>
                 <WorkflowCustomization />
@@ -3872,10 +3872,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           )}
 
           {activeTab === 'automations' && (
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
               <Suspense fallback={
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 text-purple-600 animate-spin" />
+                  <Loader2 className="w-8 h-8 text-purple-600 dark:text-purple-400 animate-spin" />
                 </div>
               }>
                 <AutomationsDashboard />
@@ -3892,17 +3892,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Stripe Publishable Key <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={stripePublicKey}
                     onChange={(e) => setStripePublicKey(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder={companySettings?.stripe_public_key ? '••••••••••••••••' : 'pk_live_...'}
                   />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     {companySettings?.stripe_public_key
                       ? 'Publishable key is saved and encrypted. Enter a new key to update it.'
                       : 'Your publishable key from Stripe Dashboard → Developers → API keys'}
@@ -3910,7 +3910,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Stripe Secret Key <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
@@ -3918,19 +3918,19 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       type={showStripeSecretKey ? 'text' : 'password'}
                       value={stripeSecretKey}
                       onChange={(e) => setStripeSecretKey(e.target.value)}
-                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder={companySettings?.stripe_secret_key ? '••••••••••••••••' : 'sk_live_...'}
                     />
                     <button
                       type="button"
                       onClick={() => setShowStripeSecretKey(!showStripeSecretKey)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                       tabIndex={-1}
                     >
                       {showStripeSecretKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     {companySettings?.stripe_secret_key
                       ? 'Secret key is saved and encrypted. Enter a new key to update it.'
                       : 'Your secret key from Stripe Dashboard → Developers → API keys (keep this confidential)'}
@@ -3938,7 +3938,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Stripe Webhook Secret
                   </label>
                   <div className="relative">
@@ -3946,29 +3946,29 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       type={showStripeWebhookSecret ? 'text' : 'password'}
                       value={stripeWebhookSecret}
                       onChange={(e) => setStripeWebhookSecret(e.target.value)}
-                      className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       placeholder={companySettings?.stripe_webhook_secret ? '••••••••••••••••' : 'whsec_...'}
                     />
                     <button
                       type="button"
                       onClick={() => setShowStripeWebhookSecret(!showStripeWebhookSecret)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                       tabIndex={-1}
                     >
                       {showStripeWebhookSecret ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     {companySettings?.stripe_webhook_secret
                       ? 'Webhook secret is saved and encrypted. Enter a new secret to update it.'
                       : 'Your webhook signing secret from Stripe Dashboard → Developers → Webhooks'}
                   </p>
                 </div>
 
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-3">
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg space-y-3">
                   <div>
-                    <p className="text-sm font-semibold text-blue-900 mb-2">Setup Instructions:</p>
-                    <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside ml-2">
+                    <p className="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-2">Setup Instructions:</p>
+                    <ol className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-decimal list-inside ml-2">
                       <li>Create a Stripe account at <a href="https://stripe.com" target="_blank" rel="noopener noreferrer" className="underline">stripe.com</a></li>
                       <li>Get your API keys from Stripe Dashboard → Developers → API keys</li>
                       <li>Set up a webhook endpoint for payment notifications (optional)</li>
@@ -3979,7 +3979,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     href="https://dashboard.stripe.com/apikeys"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm text-blue-600 hover:text-blue-700 underline inline-block"
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 underline inline-block"
                   >
                     Get API Keys from Stripe →
                   </a>
@@ -4007,9 +4007,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                 {companySettings?.stripe_secret_key && (
                   <>
-                    <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-blue-800">
+                        <div className="flex items-center gap-2 text-blue-800 dark:text-blue-200">
                           <CreditCard className="w-5 h-5" />
                           <div>
                             <p className="font-medium">Stripe Integration Active</p>
@@ -4019,7 +4019,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         <button
                           onClick={testStripeConnection}
                           disabled={testingStripe}
-                          className="flex items-center gap-2 px-4 py-2 bg-white border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50 disabled:opacity-50 transition-colors"
+                          className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 disabled:opacity-50 transition-colors"
                         >
                           {testingStripe ? (
                             <>
@@ -4034,7 +4034,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     </div>
 
                     {stripeTestResult && (
-                      <div className={`p-4 rounded-lg border ${stripeTestResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                      <div className={`p-4 rounded-lg border ${stripeTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
                         <div className="space-y-3">
                           {stripeTestResult.success ? (
                             <div className="flex items-start gap-3">
@@ -4042,21 +4042,21 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                                 ✓
                               </div>
                               <div className="flex-1">
-                                <h4 className="font-medium text-green-900">Connection Successful!</h4>
-                                <p className="text-sm text-green-800 mt-1">{stripeTestResult.message}</p>
+                                <h4 className="font-medium text-green-900 dark:text-green-100">Connection Successful!</h4>
+                                <p className="text-sm text-green-800 dark:text-green-200 mt-1">{stripeTestResult.message}</p>
                                 {stripeTestResult.balance && (
-                                  <div className="mt-3 p-3 bg-white rounded border border-green-200">
-                                    <p className="text-xs font-medium text-gray-600 mb-2">Account Balance:</p>
+                                  <div className="mt-3 p-3 bg-white dark:bg-slate-800 rounded border border-green-200 dark:border-green-700">
+                                    <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Account Balance:</p>
                                     <div className="grid grid-cols-2 gap-3">
                                       <div>
-                                        <p className="text-xs text-gray-500">Available</p>
-                                        <p className="text-lg font-semibold text-green-700">
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Available</p>
+                                        <p className="text-lg font-semibold text-green-700 dark:text-green-400">
                                           ${stripeTestResult.balance.available.toFixed(2)} {stripeTestResult.balance.currency.toUpperCase()}
                                         </p>
                                       </div>
                                       <div>
-                                        <p className="text-xs text-gray-500">Pending</p>
-                                        <p className="text-lg font-semibold text-gray-700">
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Pending</p>
+                                        <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">
                                           ${stripeTestResult.balance.pending.toFixed(2)} {stripeTestResult.balance.currency.toUpperCase()}
                                         </p>
                                       </div>
@@ -4071,8 +4071,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                                 ✕
                               </div>
                               <div className="flex-1">
-                                <h4 className="font-medium text-red-900">Connection Failed</h4>
-                                <p className="text-sm text-red-800 mt-1">{stripeTestResult.error}</p>
+                                <h4 className="font-medium text-red-900 dark:text-red-100">Connection Failed</h4>
+                                <p className="text-sm text-red-800 dark:text-red-200 mt-1">{stripeTestResult.error}</p>
                               </div>
                             </div>
                           )}
