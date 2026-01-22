@@ -80,6 +80,18 @@ export default function CustomersReport({ initialSearchTerm }: CustomersReportPr
   }, []);
 
   useEffect(() => {
+    if (initialSearchTerm && customers.length > 0 && !selectedCustomer) {
+      const matchedCustomer = customers.find(c =>
+        c.company_name.toLowerCase().includes(initialSearchTerm.toLowerCase()) ||
+        c.email.toLowerCase().includes(initialSearchTerm.toLowerCase())
+      );
+      if (matchedCustomer) {
+        loadCustomerDetails(matchedCustomer);
+      }
+    }
+  }, [initialSearchTerm, customers, selectedCustomer]);
+
+  useEffect(() => {
     if (selectedCustomer?.id && companyId) {
       fetchFundraisingCredits();
     }
@@ -392,49 +404,6 @@ export default function CustomersReport({ initialSearchTerm }: CustomersReportPr
 
   return (
     <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Customers</span>
-            <Users className="w-5 h-5 text-blue-600 dark:text-blue-500" />
-          </div>
-          <div className="text-2xl font-bold text-gray-900 dark:text-white">
-            {customers.length}
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Billed</span>
-            <DollarSign className="w-5 h-5 text-green-600 dark:text-green-500" />
-          </div>
-          <div className="text-2xl font-bold text-gray-900 dark:text-white">
-            ${customers.reduce((sum, c) => sum + c.total_billed, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Paid</span>
-            <CreditCard className="w-5 h-5 text-green-600 dark:text-green-500" />
-          </div>
-          <div className="text-2xl font-bold text-gray-900 dark:text-white">
-            ${customers.reduce((sum, c) => sum + c.total_paid, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Outstanding</span>
-            <FileText className="w-5 h-5 text-orange-600 dark:text-orange-500" />
-          </div>
-          <div className="text-2xl font-bold text-gray-900 dark:text-white">
-            ${customers.reduce((sum, c) => sum + c.outstanding_balance, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </div>
-        </div>
-      </div>
-
       {/* Search and Export */}
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
         <div className="flex flex-wrap items-center gap-4">
