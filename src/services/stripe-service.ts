@@ -83,9 +83,10 @@ export interface StripeInvoicePayment {
 export const stripeService = {
   async createPaymentLink(printavoInvoice: Invoice): Promise<StripePaymentLink> {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('You must be logged in to create payment links');
+      const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+
+      if (refreshError || !session) {
+        throw new Error('Unable to refresh authentication. Please log in again.');
       }
 
       const { data: settings } = await supabase
@@ -312,9 +313,9 @@ export const stripeService = {
 
   async initiateRefund(refund: RefundRequest): Promise<void> {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('You must be logged in to process refunds');
+      const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError || !session) {
+        throw new Error('Unable to refresh authentication. Please log in again.');
       }
 
       const response = await fetch(`${supabaseUrl}/functions/v1/stripe-proxy`, {
@@ -342,8 +343,8 @@ export const stripeService = {
 
   async fetchStripeBalance(): Promise<{ available: number; pending: number }> {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError || !session) {
         return { available: 0, pending: 0 };
       }
 
@@ -583,9 +584,9 @@ export const stripeService = {
 
   async refreshStripeInvoiceStatus(printavoInvoiceId: string): Promise<StripeInvoice | null> {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('You must be logged in');
+      const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError || !session) {
+        throw new Error('Unable to refresh authentication. Please log in again.');
       }
 
       const invoice = await this.getStripeInvoice(printavoInvoiceId);
@@ -641,9 +642,9 @@ export const stripeService = {
 
   async voidInvoice(stripeInvoiceId: string): Promise<void> {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('You must be logged in');
+      const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError || !session) {
+        throw new Error('Unable to refresh authentication. Please log in again.');
       }
 
       const response = await fetch(`${supabaseUrl}/functions/v1/stripe-proxy`, {

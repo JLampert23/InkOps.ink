@@ -379,9 +379,9 @@ export const billingService = {
 
   async sendInvoiceEmail(queueItemId: string, customMessage?: string, sendSMS: boolean = false): Promise<{ emailSent: boolean; smsSent: boolean }> {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('You must be logged in to send invoices');
+      const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError || !session) {
+        throw new Error('Unable to refresh authentication. Please log in again.');
       }
 
       const { data: queueItem } = await supabase
