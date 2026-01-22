@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Search, User, DollarSign, FileText, AlertCircle, ExternalLink, Plus, Edit2, Trash2, Save, X, Gift } from 'lucide-react';
+import { Search, User, DollarSign, FileText, AlertCircle, ExternalLink, Plus, Edit2, Trash2, Save, X, Gift, Upload, File } from 'lucide-react';
 import { Invoice } from '../types/printavo';
 import { formatCurrency, calculateCustomerLifetimeValue, calculateCustomerOutstandingBalance } from '../utils/financial-aggregations';
 import { format, parseISO } from 'date-fns';
@@ -28,6 +28,7 @@ interface FundraisingCredit {
   store_name: string;
   batch_number: string;
   amount: number;
+  report_file_path?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -381,11 +382,11 @@ function CustomerDetail({ customer }: CustomerDetailProps) {
       </div>
 
       {/* Fundraising Credits Section */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow">
+        <div className="p-4 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Gift className="w-5 h-5 text-purple-600" />
-            <h3 className="text-lg font-semibold">Fundraising Credits</h3>
+            <Gift className="w-5 h-5 text-purple-600 dark:text-purple-500" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Fundraising Credits</h3>
           </div>
           <button
             onClick={() => setIsAddingCredit(true)}
@@ -398,39 +399,39 @@ function CustomerDetail({ customer }: CustomerDetailProps) {
 
         <div className="p-4">
           {isAddingCredit && (
-            <div className="mb-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
+            <div className="mb-4 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
               <div className="grid grid-cols-4 gap-3 mb-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Date</label>
                   <input
                     type="date"
                     value={newCredit.date}
                     onChange={(e) => setNewCredit({ ...newCredit, date: e.target.value })}
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Store Name / Number</label>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Store Name / Number</label>
                   <input
                     type="text"
                     value={newCredit.store_name}
                     onChange={(e) => setNewCredit({ ...newCredit, store_name: e.target.value })}
                     placeholder="Store name"
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Batch Number</label>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Batch Number</label>
                   <input
                     type="text"
                     value={newCredit.batch_number}
                     onChange={(e) => setNewCredit({ ...newCredit, batch_number: e.target.value })}
                     placeholder="Batch #"
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Amount</label>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Amount</label>
                   <input
                     type="number"
                     step="0.01"
@@ -438,7 +439,7 @@ function CustomerDetail({ customer }: CustomerDetailProps) {
                     value={newCredit.amount}
                     onChange={(e) => setNewCredit({ ...newCredit, amount: e.target.value })}
                     placeholder="0.00"
-                    className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -461,7 +462,7 @@ function CustomerDetail({ customer }: CustomerDetailProps) {
                       amount: ''
                     });
                   }}
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors text-gray-900 dark:text-white"
                 >
                   <X className="w-4 h-4" />
                   Cancel
@@ -471,7 +472,7 @@ function CustomerDetail({ customer }: CustomerDetailProps) {
           )}
 
           {fundraisingCredits.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
               No fundraising credits recorded
             </div>
           ) : (
@@ -479,12 +480,13 @@ function CustomerDetail({ customer }: CustomerDetailProps) {
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left text-xs font-semibold text-gray-600 pb-2">Date</th>
-                      <th className="text-left text-xs font-semibold text-gray-600 pb-2">Store Name / Number</th>
-                      <th className="text-left text-xs font-semibold text-gray-600 pb-2">Batch Number</th>
-                      <th className="text-right text-xs font-semibold text-gray-600 pb-2">Amount</th>
-                      <th className="text-right text-xs font-semibold text-gray-600 pb-2">Actions</th>
+                    <tr className="border-b border-gray-200 dark:border-slate-700">
+                      <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Date</th>
+                      <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Store Name / Number</th>
+                      <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Batch Number</th>
+                      <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Amount</th>
+                      <th className="text-center text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Report</th>
+                      <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -498,16 +500,17 @@ function CustomerDetail({ customer }: CustomerDetailProps) {
                         onCancel={() => setEditingCreditId(null)}
                         onDelete={() => handleDeleteCredit(credit.id)}
                         loading={loading}
+                        companyId={companyId}
                       />
                     ))}
                   </tbody>
                 </table>
               </div>
 
-              <div className="mt-4 pt-4 border-t border-gray-200 flex justify-end">
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-slate-700 flex justify-end">
                 <div className="text-right">
-                  <div className="text-sm text-gray-600 mb-1">Total Fundraising Credits</div>
-                  <div className="text-2xl font-bold text-purple-600">
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Fundraising Credits</div>
+                  <div className="text-2xl font-bold text-purple-600 dark:text-purple-500">
                     {formatCurrency(totalFundraisingCredits)}
                   </div>
                 </div>
@@ -581,15 +584,18 @@ interface FundraisingCreditRowProps {
   onCancel: () => void;
   onDelete: () => void;
   loading: boolean;
+  companyId: string | null;
 }
 
-function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onDelete, loading }: FundraisingCreditRowProps) {
+function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onDelete, loading, companyId }: FundraisingCreditRowProps) {
   const [editValues, setEditValues] = useState({
     date: credit.date,
     store_name: credit.store_name,
     batch_number: credit.batch_number,
     amount: credit.amount.toString()
   });
+  const [uploading, setUploading] = useState(false);
+  const [reportUrl, setReportUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (isEditing) {
@@ -601,6 +607,65 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
       });
     }
   }, [isEditing, credit]);
+
+  useEffect(() => {
+    if (credit.report_file_path) {
+      loadReportUrl();
+    }
+  }, [credit.report_file_path]);
+
+  const loadReportUrl = async () => {
+    if (!credit.report_file_path) return;
+
+    try {
+      const { data, error } = await supabase.storage
+        .from('fundraising-reports')
+        .createSignedUrl(credit.report_file_path, 3600);
+
+      if (error) throw error;
+      setReportUrl(data.signedUrl);
+    } catch (error) {
+      console.error('Error loading report URL:', error);
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !companyId) return;
+
+    if (file.type !== 'application/pdf') {
+      alert('Please upload a PDF file');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const fileExt = 'pdf';
+      const fileName = `${companyId}/${credit.id}_${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('fundraising-reports')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { error: updateError } = await supabase
+        .from('customer_fundraising_credits')
+        .update({ report_file_path: fileName })
+        .eq('id', credit.id);
+
+      if (updateError) throw updateError;
+
+      onSave({ report_file_path: fileName });
+      await loadReportUrl();
+      alert('Report uploaded successfully!');
+    } catch (error) {
+      console.error('Error uploading report:', error);
+      alert('Failed to upload report');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleSave = () => {
     const amount = parseFloat(editValues.amount);
@@ -619,13 +684,13 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
 
   if (isEditing) {
     return (
-      <tr className="bg-purple-50">
+      <tr className="bg-purple-50 dark:bg-purple-900/20">
         <td className="py-2">
           <input
             type="date"
             value={editValues.date}
             onChange={(e) => setEditValues({ ...editValues, date: e.target.value })}
-            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
         </td>
         <td className="py-2">
@@ -633,7 +698,7 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
             type="text"
             value={editValues.store_name}
             onChange={(e) => setEditValues({ ...editValues, store_name: e.target.value })}
-            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
         </td>
         <td className="py-2">
@@ -641,7 +706,7 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
             type="text"
             value={editValues.batch_number}
             onChange={(e) => setEditValues({ ...editValues, batch_number: e.target.value })}
-            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
         </td>
         <td className="py-2">
@@ -651,22 +716,48 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
             min="0"
             value={editValues.amount}
             onChange={(e) => setEditValues({ ...editValues, amount: e.target.value })}
-            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent text-right"
+            className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent text-right"
           />
+        </td>
+        <td className="py-2 text-center">
+          <div className="flex items-center justify-center gap-1">
+            {credit.report_file_path && reportUrl ? (
+              <a
+                href={reportUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-1 text-blue-600 dark:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+                title="View Report"
+              >
+                <File className="w-4 h-4" />
+              </a>
+            ) : (
+              <label className="p-1 text-purple-600 dark:text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded transition-colors cursor-pointer" title="Upload Report">
+                <Upload className="w-4 h-4" />
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  onChange={handleFileUpload}
+                  disabled={uploading}
+                  className="hidden"
+                />
+              </label>
+            )}
+          </div>
         </td>
         <td className="py-2">
           <div className="flex items-center justify-end gap-1">
             <button
               onClick={handleSave}
               disabled={loading}
-              className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-50"
+              className="p-1 text-green-600 dark:text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded transition-colors disabled:opacity-50"
               title="Save"
             >
               <Save className="w-4 h-4" />
             </button>
             <button
               onClick={onCancel}
-              className="p-1 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+              className="p-1 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 rounded transition-colors"
               title="Cancel"
             >
               <X className="w-4 h-4" />
@@ -678,27 +769,55 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
   }
 
   return (
-    <tr className="hover:bg-gray-50">
-      <td className="py-3 text-sm text-gray-900">
+    <tr className="hover:bg-gray-50 dark:hover:bg-slate-700">
+      <td className="py-3 text-sm text-gray-900 dark:text-white">
         {format(parseISO(credit.date), 'MMM d, yyyy')}
       </td>
-      <td className="py-3 text-sm text-gray-900">{credit.store_name}</td>
-      <td className="py-3 text-sm text-gray-900">{credit.batch_number}</td>
-      <td className="py-3 text-sm text-gray-900 text-right font-medium">
+      <td className="py-3 text-sm text-gray-900 dark:text-white">{credit.store_name}</td>
+      <td className="py-3 text-sm text-gray-900 dark:text-white">{credit.batch_number}</td>
+      <td className="py-3 text-sm text-gray-900 dark:text-white text-right font-medium">
         {formatCurrency(parseFloat(credit.amount.toString()))}
+      </td>
+      <td className="py-3 text-center">
+        <div className="flex items-center justify-center gap-1">
+          {credit.report_file_path && reportUrl ? (
+            <a
+              href={reportUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 px-2 py-1 text-xs text-blue-600 dark:text-blue-500 hover:text-blue-800 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+              title="View Report"
+            >
+              <File className="w-3.5 h-3.5" />
+              <span>View</span>
+            </a>
+          ) : (
+            <label className="inline-flex items-center gap-1 px-2 py-1 text-xs text-purple-600 dark:text-purple-500 hover:text-purple-800 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded transition-colors cursor-pointer" title="Upload Report">
+              <Upload className="w-3.5 h-3.5" />
+              <span>{uploading ? 'Uploading...' : 'Upload'}</span>
+              <input
+                type="file"
+                accept="application/pdf"
+                onChange={handleFileUpload}
+                disabled={uploading}
+                className="hidden"
+              />
+            </label>
+          )}
+        </div>
       </td>
       <td className="py-3">
         <div className="flex items-center justify-end gap-1">
           <button
             onClick={onEdit}
-            className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+            className="p-1 text-blue-600 dark:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
             title="Edit"
           >
             <Edit2 className="w-4 h-4" />
           </button>
           <button
             onClick={onDelete}
-            className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+            className="p-1 text-red-600 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
             title="Delete"
           >
             <Trash2 className="w-4 h-4" />
