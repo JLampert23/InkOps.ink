@@ -478,15 +478,15 @@ function CustomerDetail({ customer }: CustomerDetailProps) {
           ) : (
             <>
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full table-auto">
                   <thead>
                     <tr className="border-b border-gray-200 dark:border-slate-700">
-                      <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Date</th>
+                      <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2 w-32">Date</th>
                       <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Store Name / Number</th>
                       <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Batch Number</th>
-                      <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Amount</th>
-                      <th className="text-center text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Report</th>
-                      <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Actions</th>
+                      <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2 w-28">Amount</th>
+                      <th className="text-center text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2 w-32">Report</th>
+                      <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2 w-24">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -726,14 +726,16 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
                 href={reportUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-1 text-blue-600 dark:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+                className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded transition-all border border-blue-200 dark:border-blue-800"
                 title="View Report"
               >
-                <File className="w-4 h-4" />
+                <File className="w-3.5 h-3.5" />
+                <span>View</span>
               </a>
             ) : (
-              <label className="p-1 text-purple-600 dark:text-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded transition-colors cursor-pointer" title="Upload Report">
-                <Upload className="w-4 h-4" />
+              <label className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded transition-all cursor-pointer border border-purple-200 dark:border-purple-800" title="Upload Report">
+                <Upload className="w-3.5 h-3.5" />
+                <span>Upload</span>
                 <input
                   type="file"
                   accept="application/pdf"
@@ -785,16 +787,16 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
               href={reportUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 px-2 py-1 text-xs text-blue-600 dark:text-blue-500 hover:text-blue-800 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-md transition-all border border-blue-200 dark:border-blue-800"
               title="View Report"
             >
-              <File className="w-3.5 h-3.5" />
-              <span>View</span>
+              <File className="w-4 h-4" />
+              <span>View PDF</span>
             </a>
           ) : (
-            <label className="inline-flex items-center gap-1 px-2 py-1 text-xs text-purple-600 dark:text-purple-500 hover:text-purple-800 dark:hover:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded transition-colors cursor-pointer" title="Upload Report">
-              <Upload className="w-3.5 h-3.5" />
-              <span>{uploading ? 'Uploading...' : 'Upload'}</span>
+            <label className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded-md transition-all cursor-pointer border border-purple-200 dark:border-purple-800" title="Upload Report">
+              <Upload className="w-4 h-4" />
+              <span>{uploading ? 'Uploading...' : 'Upload PDF'}</span>
               <input
                 type="file"
                 accept="application/pdf"
