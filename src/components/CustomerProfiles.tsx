@@ -387,6 +387,7 @@ function CustomerDetail({ customer }: CustomerDetailProps) {
           <div className="flex items-center gap-2">
             <Gift className="w-5 h-5 text-purple-600 dark:text-purple-500" />
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Fundraising Credits</h3>
+            <span className="px-2 py-1 text-xs font-bold bg-green-500 text-white rounded-full">v2.0 NEW</span>
           </div>
           {!isAddingCredit && (
             <button
