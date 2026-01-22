@@ -14,13 +14,32 @@ interface StripeConfig {
   secretKey: string;
 }
 
-async function getStripeConfig(): Promise<StripeConfig | null> {
+async function getStripeConfig(userId: string): Promise<StripeConfig | null> {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const { data: profileData, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('company_id')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error('Database error fetching user profile:', profileError);
+      throw new Error(`Database error: ${profileError.message}`);
+    }
+
+    if (!profileData?.company_id) {
+      console.error('No company_id found for user:', userId);
+      throw new Error('User profile not properly configured');
+    }
+
+    console.log('Fetching Stripe config for company:', profileData.company_id);
 
     const { data, error } = await supabase
       .from('company_settings')
       .select('stripe_secret_key')
+      .eq('id', profileData.company_id)
       .maybeSingle();
 
     if (error) {
@@ -75,17 +94,17 @@ async function callStripeAPI(
   body?: any
 ): Promise<Response> {
   const url = `https://api.stripe.com/v1${endpoint}`;
-  
+
   const headers: HeadersInit = {
     'Authorization': `Bearer ${secretKey}`,
     'Content-Type': 'application/x-www-form-urlencoded',
   };
-  
+
   const options: RequestInit = {
     method,
     headers,
   };
-  
+
   if (body && (method === 'POST' || method === 'PUT')) {
     const params = new URLSearchParams();
     Object.keys(body).forEach(key => {
@@ -99,7 +118,7 @@ async function callStripeAPI(
     });
     options.body = params;
   }
-  
+
   return await fetch(url, options);
 }
 
@@ -178,9 +197,8 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // getStripeConfig() will throw an error if config is not available
-    const config = await getStripeConfig();
-    
+    const config = await getStripeConfig(user.id);
+
     switch (action) {
       case 'testConnection': {
         console.log('Testing Stripe connection, key starts with:', config.secretKey.substring(0, 8));
@@ -229,7 +247,7 @@ Deno.serve(async (req: Request) => {
 
       case 'createPaymentLink': {
         const { amount, currency, metadata, customerEmail, description } = data;
-        
+
         const priceResponse = await callStripeAPI(
           '/prices',
           'POST',
@@ -240,43 +258,43 @@ Deno.serve(async (req: Request) => {
             'product_data[name]': description || 'Invoice Payment',
           }
         );
-        
+
         if (!priceResponse.ok) {
           const error = await priceResponse.json();
           throw new Error(error.error?.message || 'Failed to create price');
         }
-        
+
         const price = await priceResponse.json();
-        
+
         const paymentLinkBody: any = {
           'line_items[0][price]': price.id,
           'line_items[0][quantity]': 1,
         };
-        
+
         if (metadata) {
           Object.keys(metadata).forEach(key => {
             paymentLinkBody[`metadata[${key}]`] = metadata[key];
           });
         }
-        
+
         if (customerEmail) {
           paymentLinkBody['customer_creation'] = 'always';
         }
-        
+
         const linkResponse = await callStripeAPI(
           '/payment_links',
           'POST',
           config.secretKey,
           paymentLinkBody
         );
-        
+
         if (!linkResponse.ok) {
           const error = await linkResponse.json();
           throw new Error(error.error?.message || 'Failed to create payment link');
         }
-        
+
         const paymentLink = await linkResponse.json();
-        
+
         return new Response(
           JSON.stringify({
             paymentLinkId: paymentLink.id,
@@ -288,20 +306,20 @@ Deno.serve(async (req: Request) => {
           }
         );
       }
-      
+
       case 'getBalance': {
         const balanceResponse = await callStripeAPI(
           '/balance',
           'GET',
           config.secretKey
         );
-        
+
         if (!balanceResponse.ok) {
           throw new Error('Failed to fetch balance');
         }
-        
+
         const balance = await balanceResponse.json();
-        
+
         return new Response(
           JSON.stringify(balance),
           {
@@ -310,7 +328,7 @@ Deno.serve(async (req: Request) => {
           }
         );
       }
-      
+
       case 'createRefund': {
         const { paymentId, amount, reason } = data;
 
