@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { RefreshCw, AlertCircle, TrendingUp, Menu, X, LogOut, Loader2, Settings, CreditCard, Package, ChevronDown, ChevronUp, Send, Mail, Wallet, Users, CheckCircle, Sun, Moon } from 'lucide-react';
+import { RefreshCw, AlertCircle, TrendingUp, Menu, X, LogOut, Loader2, Settings, CreditCard, Package, ChevronDown, ChevronUp, Send, Mail, Wallet, Users, CheckCircle, Sun, Moon, UserPlus } from 'lucide-react';
 import { AccountSettings } from './components/AccountSettings';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider, useNotification } from './contexts/NotificationContext';
@@ -16,6 +16,7 @@ const PaidInvoicesPage = lazy(() => import('./components/billing/PaidInvoicesPag
 const AccountsReceivableReport = lazy(() => import('./components/accounting/AccountsReceivableReport'));
 const CustomersReport = lazy(() => import('./components/accounting/CustomersReport'));
 const PaymentsReport = lazy(() => import('./components/accounting/UnifiedPaymentsReport'));
+import CreateCustomerModal from './components/accounting/CreateCustomerModal';
 
 type Tab =
   | 'square' | 'production' | 'settings'
@@ -38,6 +39,8 @@ function AppContent() {
   const [settingsInitialTab, setSettingsInitialTab] = useState<string | undefined>(undefined);
   const [syncing, setSyncing] = useState(false);
   const [customerSearchTerm, setCustomerSearchTerm] = useState<string>('');
+  const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
+  const [customersKey, setCustomersKey] = useState(0);
   const { signOut, user } = useAuth();
   const { userProfile, canAccessIntegrations } = useRBAC();
   const { showNotification } = useNotification();
@@ -492,6 +495,16 @@ function AppContent() {
               </p>
             </div>
             <div className="hidden md:flex items-center gap-4">
+              {activeTab === 'customers' && (
+                <button
+                  onClick={() => setShowCreateCustomerModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-md hover:shadow-lg"
+                  title="Create new customer"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span className="font-medium">New Customer</span>
+                </button>
+              )}
               <button
                 onClick={toggleDarkMode}
                 className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
@@ -582,7 +595,7 @@ function AppContent() {
                 </div>
               </div>
             }>
-              <CustomersReport initialSearchTerm={customerSearchTerm} />
+              <CustomersReport key={customersKey} initialSearchTerm={customerSearchTerm} />
             </Suspense>
           )}
 
@@ -636,6 +649,16 @@ function AppContent() {
           )}
         </main>
       </div>
+
+      {/* Create Customer Modal */}
+      <CreateCustomerModal
+        isOpen={showCreateCustomerModal}
+        onClose={() => setShowCreateCustomerModal(false)}
+        onSuccess={() => {
+          setCustomersKey(prev => prev + 1);
+          setShowCreateCustomerModal(false);
+        }}
+      />
     </div>
   );
 }
