@@ -39,7 +39,7 @@ import { ManualPaymentModal } from './ManualPaymentModal';
 interface InvoiceDetailProps {
   invoiceId: string;
   onBack: () => void;
-  onNavigateToCustomer?: (customerEmail: string, customerName: string) => void;
+  onNavigateToCustomer?: (searchTerm: string, customerEmail: string) => void;
 }
 
 export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: InvoiceDetailProps) {
@@ -512,8 +512,8 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                   <p className="text-sm text-gray-500 dark:text-gray-400">Customer Name</p>
                   {onNavigateToCustomer ? (
                     <button
-                      onClick={() => onNavigateToCustomer(invoice.contact.email, invoice.contact.name)}
-                      className="font-medium text-blue-600 dark:text-blue-500 hover:text-blue-800 dark:hover:text-blue-400 hover:underline transition-colors text-left"
+                      onClick={() => onNavigateToCustomer(invoice.contact.company || invoice.contact.name, invoice.contact.email)}
+                      className="font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left p-0 border-0 bg-transparent cursor-pointer"
                     >
                       {invoice.contact.name || 'N/A'}
                     </button>
@@ -529,8 +529,8 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                     </p>
                     {onNavigateToCustomer ? (
                       <button
-                        onClick={() => onNavigateToCustomer(invoice.contact.email, invoice.contact.company || '')}
-                        className="font-medium text-blue-600 dark:text-blue-500 hover:text-blue-800 dark:hover:text-blue-400 hover:underline transition-colors text-left"
+                        onClick={() => onNavigateToCustomer(invoice.contact.company || invoice.contact.name, invoice.contact.email)}
+                        className="font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left p-0 border-0 bg-transparent cursor-pointer"
                       >
                         {invoice.contact.company}
                       </button>

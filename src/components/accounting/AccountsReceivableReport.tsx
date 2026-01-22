@@ -26,7 +26,7 @@ interface AgingBucket {
 
 interface AccountsReceivableReportProps {
   onNavigateToSettings?: (tab: string) => void;
-  onNavigateToCustomer?: (customerEmail: string, customerName: string) => void;
+  onNavigateToCustomer?: (searchTerm: string, customerEmail: string) => void;
 }
 
 export default function AccountsReceivableReport({ onNavigateToSettings, onNavigateToCustomer }: AccountsReceivableReportProps) {

@@ -177,8 +177,8 @@ function AppContent() {
     }
   };
 
-  const handleNavigateToCustomer = (customerEmail: string, customerName: string) => {
-    setCustomerSearchTerm(customerEmail || customerName);
+  const handleNavigateToCustomer = (searchTerm: string, customerEmail: string) => {
+    setCustomerSearchTerm(searchTerm);
     setActiveTab('customers');
     setAccountingExpanded(true);
     setSidebarOpen(false);

@@ -3,7 +3,7 @@ import { PaidInvoices } from './PaidInvoices';
 import { InvoiceDetail } from './InvoiceDetail';
 
 interface PaidInvoicesPageProps {
-  onNavigateToCustomer?: (customerEmail: string, customerName: string) => void;
+  onNavigateToCustomer?: (searchTerm: string, customerEmail: string) => void;
 }
 
 export function PaidInvoicesPage({ onNavigateToCustomer }: PaidInvoicesPageProps = {}) {

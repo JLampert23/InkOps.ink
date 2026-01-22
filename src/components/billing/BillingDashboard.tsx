@@ -6,7 +6,7 @@ import { InvoiceDetail } from './InvoiceDetail';
 import { BillingQueueItem } from '../../services/billing-service';
 
 interface BillingDashboardProps {
-  onNavigateToCustomer?: (customerEmail: string, customerName: string) => void;
+  onNavigateToCustomer?: (searchTerm: string, customerEmail: string) => void;
 }
 
 export function BillingDashboard({ onNavigateToCustomer }: BillingDashboardProps = {}) {

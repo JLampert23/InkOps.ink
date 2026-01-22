@@ -25,7 +25,7 @@ interface Payment {
 }
 
 interface UnifiedPaymentsReportProps {
-  onNavigateToCustomer?: (customerEmail: string, customerName: string) => void;
+  onNavigateToCustomer?: (searchTerm: string, customerEmail: string) => void;
 }
 
 export default function UnifiedPaymentsReport({ onNavigateToCustomer }: UnifiedPaymentsReportProps = {}) {
