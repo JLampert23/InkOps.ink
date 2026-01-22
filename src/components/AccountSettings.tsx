@@ -1883,12 +1883,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     <div className="flex h-full">
       {/* Left Sidebar Navigation */}
       <div className="w-64 bg-white dark:bg-slate-800 border-r border-gray-200 dark:border-slate-700 overflow-y-auto flex-shrink-0">
-        <div className="p-4">
-          <h1 className="text-lg font-bold text-gray-900 dark:text-white mb-1">Account Settings</h1>
-          <p className="text-xs text-gray-600 dark:text-gray-400">Manage your account</p>
-        </div>
-
-        <nav className="px-2 pb-4">
+        <nav className="px-2 pt-4 pb-4">
           {/* Company Settings Section */}
           <div className="mb-2">
             <button
