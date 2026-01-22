@@ -780,7 +780,7 @@ export const billingService = {
     try {
       const { data: queueItem, error: queueError } = await supabase
         .from('billing_queue')
-        .select('stripe_invoice_id, stripe_payment_link_id, payment_status, invoice_id')
+        .select('stripe_invoice_id, stripe_payment_link_id, payment_status, printavo_invoice_id')
         .eq('id', queueItemId)
         .maybeSingle();
 
@@ -792,7 +792,7 @@ export const billingService = {
       const { data: payments } = await supabase
         .from('payments')
         .select('amount')
-        .eq('invoice_id', queueItem.invoice_id)
+        .eq('invoice_id', queueItem.printavo_invoice_id)
         .neq('status', 'reversed');
 
       const totalPaid = payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
