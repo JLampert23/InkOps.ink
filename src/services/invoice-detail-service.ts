@@ -195,7 +195,20 @@ export const invoiceDetailService = {
         });
       }
 
-      const statusInfo = await this.getStatusInfo(invoice.status);
+      // Calculate actual status based on balance_remaining instead of using stale Printavo status
+      const balanceRemaining = parseFloat(invoice.balance_remaining || invoice.amount_outstanding) || 0;
+      const amountPaid = parseFloat(invoice.amount_paid) || 0;
+
+      let calculatedStatus = 'Unpaid';
+      let statusColor = '#EF4444'; // red
+
+      if (balanceRemaining <= 0) {
+        calculatedStatus = 'Paid';
+        statusColor = '#10B981'; // green
+      } else if (amountPaid > 0) {
+        calculatedStatus = 'Partially Paid';
+        statusColor = '#F59E0B'; // yellow/orange
+      }
 
       // Extract addresses from individual fields first, then fallback to JSON fields and raw_data
       const billingAddress: InvoiceAddress = {
@@ -220,8 +233,8 @@ export const invoiceDetailService = {
         id: invoice.id,
         printavoInvoiceId: invoice.id,
         visualId: invoice.invoice_number || '',
-        status: invoice.status || 'Unknown',
-        statusColor: statusInfo?.color || '#6B7280',
+        status: calculatedStatus,
+        statusColor: statusColor,
 
         contact: {
           name: invoice.customer_name || contact.fullName || '',
