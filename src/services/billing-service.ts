@@ -788,18 +788,7 @@ export const billingService = {
         throw new Error('Billing queue item not found');
       }
 
-      // Check if there are actual payments recorded (not including reversed payments)
-      const { data: payments } = await supabase
-        .from('payments')
-        .select('amount')
-        .eq('invoice_id', queueItem.printavo_invoice_id)
-        .neq('status', 'reversed');
-
-      const totalPaid = payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
-
-      if (totalPaid > 0) {
-        throw new Error('Cannot revert a paid invoice. Please reverse payments first.');
-      }
+      // Allow revert regardless of payment status - user should be able to manage this
 
       if (queueItem.stripe_invoice_id) {
         try {
