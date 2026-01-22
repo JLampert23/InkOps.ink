@@ -496,7 +496,7 @@ function CustomerDetail({ customer }: CustomerDetailProps) {
                         <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Store Name / Number</th>
                         <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Batch Number</th>
                         <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2 w-28">Amount</th>
-                        <th className="text-center text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2 w-32">Report</th>
+                        <th className="text-center text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2 w-36">📄 Report Upload</th>
                         <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2 w-24">Actions</th>
                       </tr>
                     </thead>
@@ -540,7 +540,7 @@ function CustomerDetail({ customer }: CustomerDetailProps) {
                       <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Store Name / Number</th>
                       <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Batch Number</th>
                       <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2 w-28">Amount</th>
-                      <th className="text-center text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2 w-32">Report</th>
+                      <th className="text-center text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2 w-36">📄 Report Upload</th>
                       <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2 w-24">Actions</th>
                     </tr>
                   </thead>
