@@ -2031,17 +2031,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 onClick={() => setActiveTab('user-management')}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
                   activeTab === 'user-management'
-                    ? 'bg-blue-50 text-blue-700 shadow-sm'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
                 }`}
               >
-                <Shield className={`w-4 h-4 flex-shrink-0 ${activeTab === 'user-management' ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'}`} />
+                <Shield className={`w-4 h-4 flex-shrink-0 ${activeTab === 'user-management' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                 <div className="flex-1 text-left">
-                  <div className={`font-medium text-sm ${activeTab === 'user-management' ? 'text-blue-700' : 'text-gray-700'}`}>
+                  <div className={`font-medium text-sm ${activeTab === 'user-management' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                     User Management
                   </div>
                 </div>
-                {activeTab === 'user-management' && <div className="w-1 h-6 bg-blue-600 rounded-full absolute right-0" />}
+                {activeTab === 'user-management' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
               </button>
             </div>
           )}
