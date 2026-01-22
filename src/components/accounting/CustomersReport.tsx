@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Search, ChevronRight, Mail, Phone, DollarSign, Loader2, FileText, CreditCard, FileSpreadsheet, Gift, Plus, Save, X, Edit2, Trash2 } from 'lucide-react';
+import { Users, Search, ChevronRight, Mail, Phone, DollarSign, Loader2, FileText, CreditCard, FileSpreadsheet, Gift, Plus, Save, X, Edit2, Trash2, Upload } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format } from 'date-fns';
 import { InvoiceDetail } from '../billing/InvoiceDetail';
@@ -667,6 +667,7 @@ export default function CustomersReport() {
                               <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Store</th>
                               <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Batch</th>
                               <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Amount</th>
+                              <th className="text-center text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Report Upload</th>
                               <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Actions</th>
                             </tr>
                           </thead>
@@ -681,6 +682,7 @@ export default function CustomersReport() {
                                 onCancel={() => setEditingCreditId(null)}
                                 onDelete={() => handleDeleteCredit(credit.id)}
                                 loading={savingCredit}
+                                companyId={companyId}
                               />
                             ))}
                           </tbody>
@@ -766,15 +768,56 @@ interface FundraisingCreditRowProps {
   onCancel: () => void;
   onDelete: () => void;
   loading: boolean;
+  companyId: string | null;
 }
 
-function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onDelete, loading }: FundraisingCreditRowProps) {
+function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onDelete, loading, companyId }: FundraisingCreditRowProps) {
   const [editValues, setEditValues] = useState({
     date: credit.date,
     store_name: credit.store_name,
     batch_number: credit.batch_number,
     amount: credit.amount.toString()
   });
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileUpload = async (file: File) => {
+    if (!companyId) {
+      alert('Company ID not found');
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${companyId}/${credit.id}/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('fundraising-reports')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('fundraising-reports')
+        .getPublicUrl(fileName);
+
+      const { error: updateError } = await supabase
+        .from('customer_fundraising_credits')
+        .update({ report_url: publicUrl })
+        .eq('id', credit.id);
+
+      if (updateError) throw updateError;
+
+      alert('Report uploaded successfully!');
+      window.location.reload();
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      alert('Failed to upload report');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   useEffect(() => {
     if (isEditing) {
@@ -838,6 +881,9 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
             className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-transparent text-right"
           />
         </td>
+        <td className="py-2 text-center">
+          <span className="text-xs text-gray-500 dark:text-gray-400">—</span>
+        </td>
         <td className="py-2">
           <div className="flex items-center justify-end gap-1">
             <button
@@ -870,6 +916,27 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
       <td className="py-2 text-xs text-gray-900 dark:text-white">{credit.batch_number}</td>
       <td className="py-2 text-xs text-gray-900 dark:text-white text-right font-medium">
         ${parseFloat(credit.amount.toString()).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      </td>
+      <td className="py-2 text-center">
+        <input
+          type="file"
+          accept="application/pdf"
+          onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
+          className="hidden"
+          id={`upload-${credit.id}`}
+          disabled={uploading}
+        />
+        <label
+          htmlFor={`upload-${credit.id}`}
+          className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded cursor-pointer transition-colors ${
+            uploading
+              ? 'bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+              : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800'
+          }`}
+        >
+          <Upload className="w-3 h-3" />
+          {uploading ? 'Uploading...' : 'Upload PDF'}
+        </label>
       </td>
       <td className="py-2">
         <div className="flex items-center justify-end gap-1">
