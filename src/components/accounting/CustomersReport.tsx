@@ -194,14 +194,27 @@ export default function CustomersReport() {
 
       if (error) throw error;
 
-      const details: CustomerDetail[] = (data || []).map((inv: any) => ({
-        invoice_id: inv.id,
-        invoice_number: inv.invoice_number,
-        invoice_date: inv.invoice_date,
-        total: parseFloat(inv.total || 0),
-        amount_paid: parseFloat(inv.amount_paid || 0),
-        status: inv.status,
-      }));
+      const details: CustomerDetail[] = (data || []).map((inv: any) => {
+        const total = parseFloat(inv.total || 0);
+        const amountPaid = parseFloat(inv.amount_paid || 0);
+        const balanceRemaining = parseFloat(inv.balance_remaining || 0);
+
+        let calculatedStatus = 'Unpaid';
+        if (balanceRemaining <= 0) {
+          calculatedStatus = 'Paid';
+        } else if (amountPaid > 0) {
+          calculatedStatus = 'Partially Paid';
+        }
+
+        return {
+          invoice_id: inv.id,
+          invoice_number: inv.invoice_number,
+          invoice_date: inv.invoice_date,
+          total,
+          amount_paid: amountPaid,
+          status: calculatedStatus,
+        };
+      });
 
       setCustomerInvoices(details);
     } catch (error) {
