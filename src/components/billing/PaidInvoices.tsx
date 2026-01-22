@@ -96,16 +96,6 @@ export function PaidInvoices({ onViewInvoice }: PaidInvoicesProps) {
 
   return (
     <div className="space-y-6">
-      {/* Info Banner */}
-      <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 flex items-start gap-3">
-        <Wallet className="w-5 h-5 text-green-600 dark:text-green-500 mt-0.5 flex-shrink-0" />
-        <div className="flex-1">
-          <p className="text-sm text-green-900 dark:text-green-200">
-            <span className="font-medium">Payment History:</span> View all successfully completed payments and analyze payment trends. Use filters to search by date range, payment method, or customer information for detailed financial reporting.
-          </p>
-        </div>
-      </div>
-
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 border-l-4 border-green-500">

@@ -202,16 +202,6 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
 
   return (
     <div className="space-y-6">
-      {/* Info Banner */}
-      <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-4 flex items-start gap-3">
-        <Package className="w-5 h-5 text-orange-600 dark:text-orange-500 mt-0.5 flex-shrink-0" />
-        <div className="flex-1">
-          <p className="text-sm text-orange-900 dark:text-orange-200">
-            <span className="font-medium">Billing Queue:</span> Manage and send invoices to customers. Use bulk actions to efficiently generate payment links, create Stripe invoices, and send invoices to multiple customers at once.
-          </p>
-        </div>
-      </div>
-
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 border-l-4 border-orange-500">

@@ -206,17 +206,6 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
 
   return (
     <div className="space-y-6">
-      {/* Info Banner */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 flex items-start gap-3">
-        <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-500 mt-0.5 flex-shrink-0" />
-        <div className="flex-1">
-          <p className="text-sm text-blue-900 dark:text-blue-200">
-            <span className="font-medium">Tip:</span> You can schedule automated AR reports to be sent via email from the{' '}
-            <span className="font-semibold">Settings → Automated Reports</span> section. Set up daily, weekly, or monthly reports in PDF or CSV format.
-          </p>
-        </div>
-      </div>
-
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
