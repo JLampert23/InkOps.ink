@@ -3854,33 +3854,27 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
 
           {activeTab === 'automated-reports' && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
-              <AutomatedReports />
-            </div>
+            <AutomatedReports />
           )}
 
           {activeTab === 'workflow-setup' && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
-              <Suspense fallback={
-                <div className="flex items-center justify-center py-12">
+            <Suspense fallback={
+              <div className="flex items-center justify-center py-12">
                   <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
                 </div>
               }>
                 <WorkflowCustomization />
               </Suspense>
-            </div>
           )}
 
           {activeTab === 'automations' && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
-              <Suspense fallback={
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 text-purple-600 dark:text-purple-400 animate-spin" />
-                </div>
-              }>
-                <AutomationsDashboard />
-              </Suspense>
-            </div>
+            <Suspense fallback={
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 text-purple-600 dark:text-purple-400 animate-spin" />
+              </div>
+            }>
+              <AutomationsDashboard />
+            </Suspense>
           )}
 
           {activeTab === 'stripe-payments' && canAccessIntegrations && (
