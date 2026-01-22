@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CheckCircle, DollarSign, Calendar, CreditCard, Search, Download, AlertCircle, Loader2, Filter, FileText, FileSpreadsheet, TrendingUp } from 'lucide-react';
+import { CheckCircle, DollarSign, Calendar, CreditCard, Search, Download, AlertCircle, Loader2, Filter, FileText, FileSpreadsheet, TrendingUp, Wallet } from 'lucide-react';
 import { billingService, PaidInvoice } from '../../services/billing-service';
 
 interface PaidInvoicesProps {
@@ -97,32 +97,32 @@ export function PaidInvoices({ onViewInvoice }: PaidInvoicesProps) {
   return (
     <div className="space-y-6">
       {/* Info Banner */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 flex items-start gap-3">
-        <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-500 mt-0.5 flex-shrink-0" />
+      <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 flex items-start gap-3">
+        <Wallet className="w-5 h-5 text-green-600 dark:text-green-500 mt-0.5 flex-shrink-0" />
         <div className="flex-1">
-          <p className="text-sm text-blue-900 dark:text-blue-200">
-            <span className="font-medium">Tip:</span> Track all successfully completed payments here. Use filters to analyze payment trends by date range and payment method for better financial insights.
+          <p className="text-sm text-green-900 dark:text-green-200">
+            <span className="font-medium">Payment History:</span> View all successfully completed payments and analyze payment trends. Use filters to search by date range, payment method, or customer information for detailed financial reporting.
           </p>
         </div>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 border-l-4 border-green-500">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Paid</span>
-            <DollarSign className="w-5 h-5 text-green-600 dark:text-green-500" />
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Collected</span>
+            <Wallet className="w-5 h-5 text-green-600 dark:text-green-500" />
           </div>
           <div className="text-2xl font-bold text-gray-900 dark:text-white">
             ${totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{filteredInvoices.length} invoices</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{filteredInvoices.length} payments</div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 border-l-4 border-emerald-500">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Last 7 Days</span>
-            <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-500" />
+            <TrendingUp className="w-5 h-5 text-emerald-600 dark:text-emerald-500" />
           </div>
           <div className="text-2xl font-bold text-gray-900 dark:text-white">
             {last7Days}
@@ -130,10 +130,10 @@ export function PaidInvoices({ onViewInvoice }: PaidInvoicesProps) {
           <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">Recent payments</div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 border-l-4 border-teal-500">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Last 30 Days</span>
-            <TrendingUp className="w-5 h-5 text-purple-600 dark:text-purple-500" />
+            <Calendar className="w-5 h-5 text-teal-600 dark:text-teal-500" />
           </div>
           <div className="text-2xl font-bold text-gray-900 dark:text-white">
             {last30Days}
@@ -141,10 +141,10 @@ export function PaidInvoices({ onViewInvoice }: PaidInvoicesProps) {
           <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">This month</div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 border-l-4 border-lime-500">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Average Amount</span>
-            <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-500" />
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Average Payment</span>
+            <DollarSign className="w-5 h-5 text-lime-600 dark:text-lime-500" />
           </div>
           <div className="text-2xl font-bold text-gray-900 dark:text-white">
             ${averageInvoiceAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -171,14 +171,14 @@ export function PaidInvoices({ onViewInvoice }: PaidInvoicesProps) {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search by invoice, customer, or email..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-600"
                 />
               </div>
 
               <select
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600"
+                className="px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-600"
               >
                 <option value="all">All Time</option>
                 <option value="today">Today</option>
@@ -189,7 +189,7 @@ export function PaidInvoices({ onViewInvoice }: PaidInvoicesProps) {
               <select
                 value={paymentMethodFilter}
                 onChange={(e) => setPaymentMethodFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600"
+                className="px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-600"
               >
                 <option value="all">All Methods</option>
                 <option value="card">Card</option>
@@ -251,6 +251,10 @@ export function PaidInvoices({ onViewInvoice }: PaidInvoicesProps) {
                       >
                         {invoice.printavoVisualId}
                       </button>
+                      <div className="text-xs text-green-600 dark:text-green-400 font-medium flex items-center gap-1 mt-1">
+                        <CheckCircle className="w-3 h-3" />
+                        Paid
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-gray-900 dark:text-white">
