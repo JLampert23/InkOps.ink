@@ -3,6 +3,7 @@ import { Users, Search, ChevronRight, Mail, Phone, DollarSign, Loader2, FileText
 import { supabase } from '../../lib/supabase-client';
 import { format } from 'date-fns';
 import { InvoiceDetail } from '../billing/InvoiceDetail';
+import { useNotification } from '../../contexts/NotificationContext';
 import {
   exportCustomerListToPDF,
   exportCustomerListToCSV,
@@ -46,6 +47,7 @@ interface FundraisingCredit {
 }
 
 export default function CustomersReport() {
+  const { showNotification } = useNotification();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -211,13 +213,13 @@ export default function CustomersReport() {
 
   const handleAddCredit = async () => {
     if (!companyId || !selectedCustomer || !newCredit.date || !newCredit.store_name || !newCredit.batch_number || !newCredit.amount) {
-      alert('Please fill in all fields');
+      showNotification('warning', 'Missing Information', 'Please fill in all fields');
       return;
     }
 
     const amount = parseFloat(newCredit.amount);
     if (isNaN(amount)) {
-      alert('Please enter a valid amount');
+      showNotification('warning', 'Invalid Amount', 'Please enter a valid amount');
       return;
     }
 
@@ -240,7 +242,7 @@ export default function CustomersReport() {
 
     if (error) {
       console.error('Error adding fundraising credit:', error);
-      alert('Failed to add fundraising credit');
+      showNotification('error', 'Failed to Add', 'Failed to add fundraising credit. Please try again.');
     } else {
       setFundraisingCredits([data, ...fundraisingCredits]);
       setNewCredit({
@@ -250,6 +252,7 @@ export default function CustomersReport() {
         amount: ''
       });
       setIsAddingCredit(false);
+      showNotification('success', 'Credit Added', 'Fundraising credit has been added successfully');
     }
   };
 
@@ -267,18 +270,15 @@ export default function CustomersReport() {
 
     if (error) {
       console.error('Error updating fundraising credit:', error);
-      alert('Failed to update fundraising credit');
+      showNotification('error', 'Update Failed', 'Failed to update fundraising credit. Please try again.');
     } else {
       setFundraisingCredits(fundraisingCredits.map(c => c.id === creditId ? data : c));
       setEditingCreditId(null);
+      showNotification('success', 'Credit Updated', 'Fundraising credit has been updated successfully');
     }
   };
 
   const handleDeleteCredit = async (creditId: string) => {
-    if (!confirm('Are you sure you want to delete this fundraising credit entry?')) {
-      return;
-    }
-
     setSavingCredit(true);
 
     const { error } = await supabase
@@ -290,9 +290,10 @@ export default function CustomersReport() {
 
     if (error) {
       console.error('Error deleting fundraising credit:', error);
-      alert('Failed to delete fundraising credit');
+      showNotification('error', 'Delete Failed', 'Failed to delete fundraising credit. Please try again.');
     } else {
       setFundraisingCredits(fundraisingCredits.filter(c => c.id !== creditId));
+      showNotification('success', 'Credit Deleted', 'Fundraising credit has been deleted');
     }
   };
 
@@ -684,6 +685,7 @@ export default function CustomersReport() {
                                 onDelete={() => handleDeleteCredit(credit.id)}
                                 loading={savingCredit}
                                 companyId={companyId}
+                                onRefresh={fetchFundraisingCredits}
                               />
                             ))}
                           </tbody>
@@ -770,9 +772,11 @@ interface FundraisingCreditRowProps {
   onDelete: () => void;
   loading: boolean;
   companyId: string | null;
+  onRefresh?: () => void;
 }
 
-function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onDelete, loading, companyId }: FundraisingCreditRowProps) {
+function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onDelete, loading, companyId, onRefresh }: FundraisingCreditRowProps) {
+  const { showNotification } = useNotification();
   const [editValues, setEditValues] = useState({
     date: credit.date,
     store_name: credit.store_name,
@@ -783,7 +787,7 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
 
   const handleFileUpload = async (file: File) => {
     if (!companyId) {
-      alert('Company ID not found');
+      showNotification('error', 'Error', 'Company ID not found');
       return;
     }
 
@@ -810,11 +814,11 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
 
       if (updateError) throw updateError;
 
-      alert('Report uploaded successfully!');
-      window.location.reload();
+      showNotification('success', 'Upload Successful', 'Report has been uploaded successfully');
+      if (onRefresh) onRefresh();
     } catch (error) {
       console.error('Error uploading file:', error);
-      alert('Failed to upload report');
+      showNotification('error', 'Upload Failed', 'Failed to upload report. Please try again.');
     } finally {
       setUploading(false);
     }
@@ -834,7 +838,7 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
   const handleSave = () => {
     const amount = parseFloat(editValues.amount);
     if (isNaN(amount)) {
-      alert('Please enter a valid amount');
+      showNotification('warning', 'Invalid Amount', 'Please enter a valid amount');
       return;
     }
 

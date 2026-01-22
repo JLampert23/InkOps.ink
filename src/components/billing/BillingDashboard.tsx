@@ -14,6 +14,7 @@ export function BillingDashboard({ initialTab = 'queue' }: BillingDashboardProps
   const [activeTab, setActiveTab] = useState<'queue' | 'paid'>(initialTab);
   const [selectedInvoice, setSelectedInvoice] = useState<BillingQueueItem | null>(null);
   const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const handleSendInvoice = (item: BillingQueueItem) => {
     setSelectedInvoice(item);
@@ -24,7 +25,8 @@ export function BillingDashboard({ initialTab = 'queue' }: BillingDashboardProps
   };
 
   const handleSuccess = () => {
-    window.location.reload();
+    setSelectedInvoice(null);
+    setRefreshKey(prev => prev + 1);
   };
 
   const handleViewInvoice = (printavoInvoiceId: string) => {
@@ -83,9 +85,9 @@ export function BillingDashboard({ initialTab = 'queue' }: BillingDashboardProps
 
         <div className="p-6">
           {activeTab === 'queue' && (
-            <BillingQueue onSendInvoice={handleSendInvoice} onViewInvoice={handleViewInvoice} />
+            <BillingQueue key={`queue-${refreshKey}`} onSendInvoice={handleSendInvoice} onViewInvoice={handleViewInvoice} />
           )}
-          {activeTab === 'paid' && <PaidInvoices onViewInvoice={handleViewInvoice} />}
+          {activeTab === 'paid' && <PaidInvoices key={`paid-${refreshKey}`} onViewInvoice={handleViewInvoice} />}
         </div>
       </div>
 

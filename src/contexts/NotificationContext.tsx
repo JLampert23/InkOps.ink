@@ -38,7 +38,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [confirmDialog, setConfirmDialog] = useState<(ConfirmOptions & { resolve: (value: boolean) => void }) | null>(null);
 
-  const showNotification = useCallback((type: NotificationType, title: string, message?: string, duration: number = 5000) => {
+  const showNotification = useCallback((type: NotificationType, title: string, message?: string, duration: number = 4000) => {
     const id = Math.random().toString(36).substring(7);
     const notification: Notification = { id, type, title, message, duration };
 
@@ -68,21 +68,30 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const getIcon = (type: NotificationType) => {
+  const getColors = (type: NotificationType) => {
     switch (type) {
-      case 'success': return <CheckCircle className="w-5 h-5 text-green-600" />;
-      case 'error': return <XCircle className="w-5 h-5 text-red-600" />;
-      case 'warning': return <AlertCircle className="w-5 h-5 text-yellow-600" />;
-      case 'info': return <Info className="w-5 h-5 text-blue-600" />;
+      case 'success': return 'bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-300';
+      case 'error': return 'bg-gradient-to-br from-rose-50 to-red-50 border-rose-300';
+      case 'warning': return 'bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-300';
+      case 'info': return 'bg-gradient-to-br from-sky-50 to-blue-50 border-sky-300';
     }
   };
 
-  const getColors = (type: NotificationType) => {
+  const getIconColor = (type: NotificationType) => {
     switch (type) {
-      case 'success': return 'bg-green-50 border-green-200';
-      case 'error': return 'bg-red-50 border-red-200';
-      case 'warning': return 'bg-yellow-50 border-yellow-200';
-      case 'info': return 'bg-blue-50 border-blue-200';
+      case 'success': return 'text-emerald-600';
+      case 'error': return 'text-rose-600';
+      case 'warning': return 'text-amber-600';
+      case 'info': return 'text-sky-600';
+    }
+  };
+
+  const getIconBg = (type: NotificationType) => {
+    switch (type) {
+      case 'success': return 'bg-emerald-100';
+      case 'error': return 'bg-rose-100';
+      case 'warning': return 'bg-amber-100';
+      case 'info': return 'bg-sky-100';
     }
   };
 
@@ -91,22 +100,30 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       {children}
 
       {/* Notification Toasts */}
-      <div className="fixed top-4 right-4 z-50 space-y-2 max-w-md">
+      <div className="fixed top-4 right-4 z-50 space-y-3 max-w-md pointer-events-none">
         {notifications.map(notification => (
           <div
             key={notification.id}
-            className={`${getColors(notification.type)} border rounded-lg shadow-lg p-4 flex items-start gap-3 animate-slide-in`}
+            className={`${getColors(notification.type)} border-2 rounded-xl shadow-xl backdrop-blur-sm p-4 flex items-start gap-3 animate-slide-in pointer-events-auto`}
+            style={{
+              boxShadow: '0 10px 40px -10px rgba(0, 0, 0, 0.15), 0 4px 8px -4px rgba(0, 0, 0, 0.1)'
+            }}
           >
-            {getIcon(notification.type)}
-            <div className="flex-1">
-              <h4 className="font-semibold text-gray-900">{notification.title}</h4>
+            <div className={`${getIconBg(notification.type)} ${getIconColor(notification.type)} p-2 rounded-lg flex-shrink-0`}>
+              {notification.type === 'success' && <CheckCircle className="w-5 h-5" />}
+              {notification.type === 'error' && <XCircle className="w-5 h-5" />}
+              {notification.type === 'warning' && <AlertCircle className="w-5 h-5" />}
+              {notification.type === 'info' && <Info className="w-5 h-5" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h4 className="font-semibold text-gray-900 leading-tight">{notification.title}</h4>
               {notification.message && (
-                <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
+                <p className="text-sm text-gray-700 mt-1.5 leading-relaxed">{notification.message}</p>
               )}
             </div>
             <button
               onClick={() => removeNotification(notification.id)}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              className="text-gray-500 hover:text-gray-700 transition-all duration-200 flex-shrink-0 hover:bg-white/50 rounded-lg p-1"
             >
               <X className="w-4 h-4" />
             </button>
@@ -116,29 +133,39 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
       {/* Confirmation Modal */}
       {confirmDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in">
           <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/60 backdrop-blur-md"
             onClick={() => handleConfirm(false)}
           />
-          <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full p-6 animate-scale-in">
-            <div className="flex items-start gap-3 mb-4">
-              {getIcon(confirmDialog.type || 'info')}
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900">{confirmDialog.title}</h3>
-                <p className="text-sm text-gray-600 mt-1">{confirmDialog.message}</p>
+          <div
+            className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate-scale-in"
+            style={{
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+            }}
+          >
+            <div className="flex items-start gap-4 mb-6">
+              <div className={`${getIconBg(confirmDialog.type || 'info')} ${getIconColor(confirmDialog.type || 'info')} p-3 rounded-xl flex-shrink-0`}>
+                {confirmDialog.type === 'success' && <CheckCircle className="w-6 h-6" />}
+                {confirmDialog.type === 'error' && <XCircle className="w-6 h-6" />}
+                {confirmDialog.type === 'warning' && <AlertCircle className="w-6 h-6" />}
+                {(!confirmDialog.type || confirmDialog.type === 'info') && <Info className="w-6 h-6" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-xl font-bold text-gray-900 leading-tight">{confirmDialog.title}</h3>
+                <p className="text-sm text-gray-600 mt-2 leading-relaxed">{confirmDialog.message}</p>
               </div>
             </div>
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => handleConfirm(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                className="px-5 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
               >
                 {confirmDialog.cancelText || 'Cancel'}
               </button>
               <button
                 onClick={() => handleConfirm(true)}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                className="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-blue-500/30"
               >
                 {confirmDialog.confirmText || 'Confirm'}
               </button>
@@ -150,18 +177,18 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       <style>{`
         @keyframes slide-in {
           from {
-            transform: translateX(100%);
+            transform: translateX(120%) translateY(-10px);
             opacity: 0;
           }
           to {
-            transform: translateX(0);
+            transform: translateX(0) translateY(0);
             opacity: 1;
           }
         }
 
         @keyframes scale-in {
           from {
-            transform: scale(0.95);
+            transform: scale(0.9);
             opacity: 0;
           }
           to {
@@ -170,12 +197,25 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           }
         }
 
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+
         .animate-slide-in {
-          animation: slide-in 0.3s ease-out;
+          animation: slide-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
 
         .animate-scale-in {
-          animation: scale-in 0.2s ease-out;
+          animation: scale-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .animate-fade-in {
+          animation: fade-in 0.2s ease-out;
         }
       `}</style>
     </NotificationContext.Provider>
