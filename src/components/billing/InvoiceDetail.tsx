@@ -354,8 +354,8 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
     return (
       <div className="min-h-[400px] flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-10 h-10 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Loading invoice...</p>
+          <Loader2 className="w-10 h-10 text-blue-600 dark:text-blue-500 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Loading invoice...</p>
         </div>
       </div>
     );
@@ -365,11 +365,11 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
     return (
       <div className="min-h-[400px] flex items-center justify-center">
         <div className="text-center">
-          <XCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">{error || 'Invoice not found'}</h3>
+          <XCircle className="w-12 h-12 text-red-500 dark:text-red-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">{error || 'Invoice not found'}</h3>
           <button
             onClick={onBack}
-            className="inline-flex items-center gap-2 px-4 py-2 text-blue-600 hover:text-blue-800"
+            className="inline-flex items-center gap-2 px-4 py-2 text-blue-600 dark:text-blue-500 hover:text-blue-800 dark:hover:text-blue-400"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Billing Queue
@@ -382,18 +382,18 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
   return (
     <div className="space-y-4 lg:space-y-6">
       {/* Sticky Header */}
-      <div className="bg-white sticky top-0 z-10 -mx-3 sm:-mx-4 px-3 sm:px-4 py-4 border-b border-gray-200 shadow-sm">
+      <div className="bg-white dark:bg-slate-800 sticky top-0 z-10 -mx-3 sm:-mx-4 px-3 sm:px-4 py-4 border-b border-gray-200 dark:border-slate-700 shadow-sm">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={onBack}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
+              className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors flex-shrink-0"
             >
-              <ArrowLeft className="w-5 h-5 text-gray-600" />
+              <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
             </button>
             <div className="min-w-0">
               <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                <h1 className="text-xl lg:text-2xl font-bold text-gray-900 truncate">
+                <h1 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-white truncate">
                   Invoice #{invoice.visualId}
                 </h1>
                 <div className="flex items-center gap-2 flex-wrap">
@@ -423,7 +423,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                   )}
                 </div>
               </div>
-              <p className="text-xs sm:text-sm text-gray-500 mt-1 truncate">
+              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1 truncate">
                 Printavo ID: {invoice.printavoInvoiceId}
               </p>
             </div>
@@ -432,7 +432,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
             <button
               onClick={handleSync}
               disabled={syncing}
-              className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 whitespace-nowrap"
+              className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors disabled:opacity-50 whitespace-nowrap"
             >
               <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Sync</span>
@@ -446,7 +446,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                 companyWebsite: companySettings?.company_website || undefined,
                 invoiceTerms: companySettings?.invoice_terms || undefined,
               })}
-              className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap"
+              className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors whitespace-nowrap"
             >
               <Download className="w-4 h-4" />
               <span className="hidden sm:inline">Download PDF</span>
@@ -455,7 +455,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
               href={`https://www.printavo.com/invoices/${invoice.printavoInvoiceId}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap"
+              className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors whitespace-nowrap"
             >
               <ExternalLink className="w-4 h-4" />
               <span className="hidden lg:inline">View in Printavo</span>
@@ -472,46 +472,46 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
           {/* Customer & Invoice Meta */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
             {/* Customer Information */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <User className="w-5 h-5 text-gray-400" />
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <User className="w-5 h-5 text-gray-400 dark:text-gray-500" />
                 Customer Information
               </h2>
               <div className="space-y-4">
                 <div>
-                  <p className="text-sm text-gray-500">Customer Name</p>
-                  <p className="font-medium text-gray-900">{invoice.contact.name || 'N/A'}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Customer Name</p>
+                  <p className="font-medium text-gray-900 dark:text-white">{invoice.contact.name || 'N/A'}</p>
                 </div>
                 {invoice.contact.company && (
                   <div>
-                    <p className="text-sm text-gray-500 flex items-center gap-1">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
                       <Building2 className="w-3.5 h-3.5" />
                       Company
                     </p>
-                    <p className="font-medium text-gray-900">{invoice.contact.company}</p>
+                    <p className="font-medium text-gray-900 dark:text-white">{invoice.contact.company}</p>
                   </div>
                 )}
                 <div>
-                  <p className="text-sm text-gray-500 flex items-center gap-1">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
                     <Mail className="w-3.5 h-3.5" />
                     Email
                   </p>
                   <a
                     href={`mailto:${invoice.contact.email}`}
-                    className="font-medium text-blue-600 hover:text-blue-800"
+                    className="font-medium text-blue-600 dark:text-blue-500 hover:text-blue-800 dark:hover:text-blue-400"
                   >
                     {invoice.contact.email || 'N/A'}
                   </a>
                 </div>
                 {invoice.contact.phone && (
                   <div>
-                    <p className="text-sm text-gray-500 flex items-center gap-1">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
                       <Phone className="w-3.5 h-3.5" />
                       Phone
                     </p>
                     <a
                       href={`tel:${invoice.contact.phone}`}
-                      className="font-medium text-blue-600 hover:text-blue-800"
+                      className="font-medium text-blue-600 dark:text-blue-500 hover:text-blue-800 dark:hover:text-blue-400"
                     >
                       {invoice.contact.phone}
                     </a>
@@ -521,44 +521,44 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
             </div>
 
             {/* Invoice Metadata */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <FileText className="w-5 h-5 text-gray-400" />
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-gray-400 dark:text-gray-500" />
                 Invoice Details
               </h2>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-gray-500 flex items-center gap-1">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
                       <Calendar className="w-3.5 h-3.5" />
                       Invoice Date
                     </p>
-                    <p className="font-medium text-gray-900">{formatDate(invoice.invoiceDate)}</p>
+                    <p className="font-medium text-gray-900 dark:text-white">{formatDate(invoice.invoiceDate)}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500 flex items-center gap-1">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
                       <Clock className="w-3.5 h-3.5" />
                       Payment Due
                     </p>
-                    <p className="font-medium text-gray-900">{formatDate(invoice.dueDate)}</p>
+                    <p className="font-medium text-gray-900 dark:text-white">{formatDate(invoice.dueDate)}</p>
                   </div>
                 </div>
                 {invoice.productionDueDate && (
                   <div>
-                    <p className="text-sm text-gray-500">Production Due</p>
-                    <p className="font-medium text-gray-900">{formatDate(invoice.productionDueDate)}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Production Due</p>
+                    <p className="font-medium text-gray-900 dark:text-white">{formatDate(invoice.productionDueDate)}</p>
                   </div>
                 )}
                 {invoice.customerPO && (
                   <div>
-                    <p className="text-sm text-gray-500">Customer PO</p>
-                    <p className="font-medium text-gray-900">{invoice.customerPO}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Customer PO</p>
+                    <p className="font-medium text-gray-900 dark:text-white">{invoice.customerPO}</p>
                   </div>
                 )}
                 {invoice.sentAt && (
-                  <div className="pt-2 border-t border-gray-100">
-                    <p className="text-sm text-gray-500">Invoice Sent</p>
-                    <p className="font-medium text-green-600 flex items-center gap-1">
+                  <div className="pt-2 border-t border-gray-100 dark:border-slate-700">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Invoice Sent</p>
+                    <p className="font-medium text-green-600 dark:text-green-500 flex items-center gap-1">
                       <Mail className="w-3.5 h-3.5" />
                       {formatDateTime(invoice.sentAt)} via {invoice.sentMethod}
                     </p>
@@ -572,23 +572,23 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
           {(invoiceDetailService.hasAddress(invoice.billingAddress) || invoiceDetailService.hasAddress(invoice.shippingAddress)) && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
               {invoiceDetailService.hasAddress(invoice.billingAddress) && (
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-gray-400" />
+                <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                     Billing Address
                   </h3>
-                  <p className="text-gray-700 whitespace-pre-line">
+                  <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
                     {invoiceDetailService.formatAddress(invoice.billingAddress)}
                   </p>
                 </div>
               )}
               {invoiceDetailService.hasAddress(invoice.shippingAddress) && (
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-gray-400" />
+                <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                     Shipping Address
                   </h3>
-                  <p className="text-gray-700 whitespace-pre-line">
+                  <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
                     {invoiceDetailService.formatAddress(invoice.shippingAddress)}
                   </p>
                 </div>
@@ -597,104 +597,104 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
           )}
 
           {/* Line Items Table */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Line Items</h2>
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Line Items</h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50">
+                <thead className="bg-gray-50 dark:bg-slate-900">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Style
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Color
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Description
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Sizes
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Qty
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Unit Price
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Total
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
                   {invoice.lineItems.length > 0 ? (
                     invoice.lineItems.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm text-gray-900">
+                      <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-slate-700">
+                        <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
                           <span className="font-medium">{item.style}</span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
+                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
                           {item.color}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-600 max-w-xs">
+                        <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 max-w-xs">
                           <span className="line-clamp-2" title={item.description}>
                             {item.description}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">
-                          <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">
+                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                          <span className="text-xs font-mono bg-gray-100 dark:bg-slate-700 px-2 py-1 rounded">
                             {item.sizes}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-900 text-right font-medium">
+                        <td className="px-4 py-3 text-sm text-gray-900 dark:text-white text-right font-medium">
                           {item.quantity}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-900 text-right">
+                        <td className="px-4 py-3 text-sm text-gray-900 dark:text-white text-right">
                           ${item.unitPrice.toFixed(2)}
                         </td>
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white text-right">
                           ${item.totalPrice.toFixed(2)}
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                      <td colSpan={7} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                         No line items available
                       </td>
                     </tr>
                   )}
                   {invoice.fees.length > 0 && (
                     <>
-                      <tr className="bg-gray-100">
-                        <td colSpan={7} className="px-4 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      <tr className="bg-gray-100 dark:bg-slate-900">
+                        <td colSpan={7} className="px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
                           Fees & Additional Charges
                         </td>
                       </tr>
                       {invoice.fees.map((fee) => (
-                        <tr key={fee.id} className="hover:bg-gray-50 bg-gray-50/50">
-                          <td colSpan={4} className="px-4 py-3 text-sm text-gray-900">
+                        <tr key={fee.id} className="hover:bg-gray-50 dark:hover:bg-slate-700 bg-gray-50/50 dark:bg-slate-800/50">
+                          <td colSpan={4} className="px-4 py-3 text-sm text-gray-900 dark:text-white">
                             <div className="flex items-center gap-2">
                               <span className="font-medium">{fee.name}</span>
                               {fee.taxable && (
-                                <span className="text-xs text-gray-500 bg-gray-200 px-1.5 py-0.5 rounded">
+                                <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded">
                                   Taxable
                                 </span>
                               )}
                             </div>
                             {fee.description && fee.description !== fee.name && (
-                              <p className="text-xs text-gray-500 mt-0.5">{fee.description}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{fee.description}</p>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-500 text-right">
+                          <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 text-right">
                             1
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-900 text-right">
+                          <td className="px-4 py-3 text-sm text-gray-900 dark:text-white text-right">
                             ${fee.amount.toFixed(2)}
                           </td>
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">
+                          <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white text-right">
                             ${fee.amount.toFixed(2)}
                           </td>
                         </tr>
@@ -702,66 +702,66 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                     </>
                   )}
                 </tbody>
-                <tfoot className="bg-gray-50">
+                <tfoot className="bg-gray-50 dark:bg-slate-900">
                   <tr>
-                    <td colSpan={6} className="px-6 py-3 text-right text-sm font-medium text-gray-500">
+                    <td colSpan={6} className="px-6 py-3 text-right text-sm font-medium text-gray-500 dark:text-gray-400">
                       Line Items Subtotal
                     </td>
-                    <td className="px-6 py-3 text-right text-sm font-medium text-gray-900">
+                    <td className="px-6 py-3 text-right text-sm font-medium text-gray-900 dark:text-white">
                       ${invoice.subtotal.toFixed(2)}
                     </td>
                   </tr>
                   {invoice.feesTotal > 0 && (
                     <tr>
-                      <td colSpan={6} className="px-6 py-3 text-right text-sm font-medium text-gray-500">
+                      <td colSpan={6} className="px-6 py-3 text-right text-sm font-medium text-gray-500 dark:text-gray-400">
                         Fees Total
                       </td>
-                      <td className="px-6 py-3 text-right text-sm font-medium text-gray-900">
+                      <td className="px-6 py-3 text-right text-sm font-medium text-gray-900 dark:text-white">
                         ${invoice.feesTotal.toFixed(2)}
                       </td>
                     </tr>
                   )}
                   {invoice.discounts > 0 && (
                     <tr>
-                      <td colSpan={6} className="px-6 py-3 text-right text-sm font-medium text-gray-500">
+                      <td colSpan={6} className="px-6 py-3 text-right text-sm font-medium text-gray-500 dark:text-gray-400">
                         Discounts
                       </td>
-                      <td className="px-6 py-3 text-right text-sm font-medium text-green-600">
+                      <td className="px-6 py-3 text-right text-sm font-medium text-green-600 dark:text-green-500">
                         -${invoice.discounts.toFixed(2)}
                       </td>
                     </tr>
                   )}
                   <tr>
-                    <td colSpan={6} className="px-6 py-3 text-right text-sm font-medium text-gray-500">
+                    <td colSpan={6} className="px-6 py-3 text-right text-sm font-medium text-gray-500 dark:text-gray-400">
                       Tax
                     </td>
-                    <td className="px-6 py-3 text-right text-sm font-medium text-gray-900">
+                    <td className="px-6 py-3 text-right text-sm font-medium text-gray-900 dark:text-white">
                       ${invoice.tax.toFixed(2)}
                     </td>
                   </tr>
-                  <tr className="border-t-2 border-gray-300">
-                    <td colSpan={6} className="px-6 py-4 text-right text-base font-bold text-gray-900">
+                  <tr className="border-t-2 border-gray-300 dark:border-slate-600">
+                    <td colSpan={6} className="px-6 py-4 text-right text-base font-bold text-gray-900 dark:text-white">
                       Total
                     </td>
-                    <td className="px-6 py-4 text-right text-base font-bold text-gray-900">
+                    <td className="px-6 py-4 text-right text-base font-bold text-gray-900 dark:text-white">
                       ${invoice.total.toFixed(2)}
                     </td>
                   </tr>
                   {invoice.amountPaid > 0 && (
                     <>
                       <tr>
-                        <td colSpan={6} className="px-6 py-3 text-right text-sm font-medium text-gray-500">
+                        <td colSpan={6} className="px-6 py-3 text-right text-sm font-medium text-gray-500 dark:text-gray-400">
                           Amount Paid
                         </td>
-                        <td className="px-6 py-3 text-right text-sm font-medium text-green-600">
+                        <td className="px-6 py-3 text-right text-sm font-medium text-green-600 dark:text-green-500">
                           -${invoice.amountPaid.toFixed(2)}
                         </td>
                       </tr>
-                      <tr className="bg-blue-50">
-                        <td colSpan={6} className="px-6 py-4 text-right text-base font-bold text-blue-900">
+                      <tr className="bg-blue-50 dark:bg-blue-900/20">
+                        <td colSpan={6} className="px-6 py-4 text-right text-base font-bold text-blue-900 dark:text-blue-400">
                           Balance Due
                         </td>
-                        <td className="px-6 py-4 text-right text-base font-bold text-blue-900">
+                        <td className="px-6 py-4 text-right text-base font-bold text-blue-900 dark:text-blue-400">
                           ${invoice.amountOutstanding.toFixed(2)}
                         </td>
                       </tr>
@@ -774,35 +774,35 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
 
           {/* Notes Section - Collapsible */}
           {(invoice.notes || invoice.internalNotes) && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
               <button
                 onClick={() => setNotesExpanded(!notesExpanded)}
-                className="w-full px-6 py-4 border-b border-gray-200 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                className="w-full px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
               >
-                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                  <MessageSquare className="w-5 h-5 text-gray-400" />
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5 text-gray-400 dark:text-gray-500" />
                   Notes
                 </h2>
                 {notesExpanded ? (
-                  <ChevronUp className="w-5 h-5 text-gray-400" />
+                  <ChevronUp className="w-5 h-5 text-gray-400 dark:text-gray-500" />
                 ) : (
-                  <ChevronDown className="w-5 h-5 text-gray-400" />
+                  <ChevronDown className="w-5 h-5 text-gray-400 dark:text-gray-500" />
                 )}
               </button>
               {notesExpanded && (
                 <div className="p-6 space-y-4">
                   {invoice.notes && (
                     <div>
-                      <p className="text-sm font-medium text-gray-500 mb-2">Customer Notes</p>
-                      <p className="text-gray-700 whitespace-pre-wrap bg-gray-50 p-4 rounded-lg">
+                      <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Customer Notes</p>
+                      <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap bg-gray-50 dark:bg-slate-900 p-4 rounded-lg">
                         {invoice.notes}
                       </p>
                     </div>
                   )}
                   {invoice.internalNotes && (
                     <div>
-                      <p className="text-sm font-medium text-gray-500 mb-2">Internal Notes</p>
-                      <p className="text-gray-700 whitespace-pre-wrap bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                      <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Internal Notes</p>
+                      <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg border border-yellow-200 dark:border-yellow-800">
                         {invoice.internalNotes}
                       </p>
                     </div>
@@ -814,19 +814,19 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
 
           {/* Mockups Section - Collapsible */}
           {invoice.mockups.length > 0 && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
               <button
                 onClick={() => setMockupsExpanded(!mockupsExpanded)}
-                className="w-full px-6 py-4 border-b border-gray-200 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                className="w-full px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
               >
-                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                  <ImageIcon className="w-5 h-5 text-gray-400" />
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                  <ImageIcon className="w-5 h-5 text-gray-400 dark:text-gray-500" />
                   Mockups & Attachments ({invoice.mockups.length})
                 </h2>
                 {mockupsExpanded ? (
-                  <ChevronUp className="w-5 h-5 text-gray-400" />
+                  <ChevronUp className="w-5 h-5 text-gray-400 dark:text-gray-500" />
                 ) : (
-                  <ChevronDown className="w-5 h-5 text-gray-400" />
+                  <ChevronDown className="w-5 h-5 text-gray-400 dark:text-gray-500" />
                 )}
               </button>
               {mockupsExpanded && (
@@ -838,7 +838,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                         href={url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block aspect-square bg-gray-100 rounded-lg overflow-hidden hover:opacity-80 transition-opacity border border-gray-200"
+                        className="block aspect-square bg-gray-100 dark:bg-slate-900 rounded-lg overflow-hidden hover:opacity-80 transition-opacity border border-gray-200 dark:border-slate-700"
                       >
                         <img
                           src={url}
@@ -857,8 +857,8 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
         {/* Right Column - Payment & Actions */}
         <div className="lg:col-span-4 space-y-4 lg:space-y-6">
           {/* Actions Panel */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Actions</h2>
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Actions</h2>
             <div className="space-y-3">
               {invoice.billingQueueId && (
                 <>
@@ -909,7 +909,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
               )}
 
               {!invoice.billingQueueId && (
-                <div className="text-center py-4 text-gray-500">
+                <div className="text-center py-4 text-gray-500 dark:text-gray-400">
                   <p className="text-sm">This invoice is not in the billing queue.</p>
                   <p className="text-xs mt-1">Add it to the queue to enable billing actions.</p>
                 </div>
@@ -919,26 +919,26 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
 
           {/* Stripe Payment Link */}
           {invoice.stripePaymentLink && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-gray-400" />
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-gray-400 dark:text-gray-500" />
                 Stripe Payment Link
               </h2>
               <div className="space-y-3">
-                <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
-                  <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                  <span className="text-sm text-blue-900">Payment link active</span>
+                <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <CheckCircle className="w-5 h-5 text-blue-600 dark:text-blue-500 flex-shrink-0" />
+                  <span className="text-sm text-blue-900 dark:text-blue-400">Payment link active</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
                     value={invoice.stripePaymentLink.url}
                     readOnly
-                    className="flex-1 px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg truncate"
+                    className="flex-1 px-3 py-2 text-sm bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg truncate text-gray-900 dark:text-white"
                   />
                   <button
                     onClick={handleCopyLink}
-                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    className="p-2 text-blue-600 dark:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
                     title="Copy link"
                   >
                     <Copy className="w-4 h-4" />
@@ -947,7 +947,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                     href={invoice.stripePaymentLink.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    className="p-2 text-blue-600 dark:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
                     title="Open link"
                   >
                     <ExternalLink className="w-4 h-4" />
@@ -959,35 +959,35 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
 
           {/* Stripe Invoice */}
           {invoice.stripeInvoice && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-gray-400" />
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-gray-400 dark:text-gray-500" />
                 Stripe Invoice
               </h2>
               <div className="space-y-3">
-                <div className="flex items-center gap-2 p-3 bg-purple-50 rounded-lg">
-                  <CheckCircle className="w-5 h-5 text-purple-600 flex-shrink-0" />
+                <div className="flex items-center gap-2 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                  <CheckCircle className="w-5 h-5 text-purple-600 dark:text-purple-500 flex-shrink-0" />
                   <div className="flex-1">
-                    <span className="text-sm font-medium text-purple-900 block">Invoice Created</span>
-                    <span className="text-xs text-purple-700">Minimum payment: ${invoice.stripeInvoice.minimumDueAmount.toFixed(2)}</span>
+                    <span className="text-sm font-medium text-purple-900 dark:text-purple-400 block">Invoice Created</span>
+                    <span className="text-xs text-purple-700 dark:text-purple-500">Minimum payment: ${invoice.stripeInvoice.minimumDueAmount.toFixed(2)}</span>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
-                    <p className="text-gray-500">Total Amount</p>
-                    <p className="font-semibold text-gray-900">${invoice.stripeInvoice.totalAmount.toFixed(2)}</p>
+                    <p className="text-gray-500 dark:text-gray-400">Total Amount</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">${invoice.stripeInvoice.totalAmount.toFixed(2)}</p>
                   </div>
                   <div>
-                    <p className="text-gray-500">Amount Paid</p>
-                    <p className="font-semibold text-green-600">${invoice.stripeInvoice.amountPaid.toFixed(2)}</p>
+                    <p className="text-gray-500 dark:text-gray-400">Amount Paid</p>
+                    <p className="font-semibold text-green-600 dark:text-green-500">${invoice.stripeInvoice.amountPaid.toFixed(2)}</p>
                   </div>
                   <div>
-                    <p className="text-gray-500">Remaining</p>
-                    <p className="font-semibold text-gray-900">${invoice.stripeInvoice.amountRemaining.toFixed(2)}</p>
+                    <p className="text-gray-500 dark:text-gray-400">Remaining</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">${invoice.stripeInvoice.amountRemaining.toFixed(2)}</p>
                   </div>
                   <div>
-                    <p className="text-gray-500">Status</p>
-                    <p className="font-semibold text-gray-900 capitalize">{invoice.stripeInvoice.status}</p>
+                    <p className="text-gray-500 dark:text-gray-400">Status</p>
+                    <p className="font-semibold text-gray-900 dark:text-white capitalize">{invoice.stripeInvoice.status}</p>
                   </div>
                 </div>
                 <div className="flex gap-2 pt-2">
@@ -1016,23 +1016,23 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
           )}
 
           {/* Payment Summary */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-gray-400" />
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-gray-400 dark:text-gray-500" />
               Payment Summary
             </h2>
             <div className="space-y-3">
               <div className="flex justify-between items-center py-2">
-                <span className="text-gray-600">Invoice Total</span>
-                <span className="font-semibold text-gray-900">${invoice.total.toFixed(2)}</span>
+                <span className="text-gray-600 dark:text-gray-400">Invoice Total</span>
+                <span className="font-semibold text-gray-900 dark:text-white">${invoice.total.toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center py-2">
-                <span className="text-gray-600">Amount Paid</span>
-                <span className="font-semibold text-green-600">${invoice.amountPaid.toFixed(2)}</span>
+                <span className="text-gray-600 dark:text-gray-400">Amount Paid</span>
+                <span className="font-semibold text-green-600 dark:text-green-500">${invoice.amountPaid.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between items-center py-3 border-t border-gray-200">
-                <span className="font-medium text-gray-900">Balance Due</span>
-                <span className={`text-xl font-bold ${invoice.amountOutstanding > 0 ? 'text-red-600' : 'text-green-600'}`}>
+              <div className="flex justify-between items-center py-3 border-t border-gray-200 dark:border-slate-700">
+                <span className="font-medium text-gray-900 dark:text-white">Balance Due</span>
+                <span className={`text-xl font-bold ${invoice.amountOutstanding > 0 ? 'text-red-600 dark:text-red-500' : 'text-green-600 dark:text-green-500'}`}>
                   ${invoice.amountOutstanding.toFixed(2)}
                 </span>
               </div>
@@ -1040,13 +1040,13 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
           </div>
 
           {/* Payment History */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Payment History</h2>
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Payment History</h2>
 
             {/* Stripe Payments */}
             {invoice.stripePayments.length > 0 && (
               <div className="mb-4">
-                <p className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-1">
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-1">
                   <CreditCard className="w-3.5 h-3.5" />
                   Stripe Payments
                 </p>
@@ -1054,21 +1054,21 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                   {invoice.stripePayments.map((payment) => (
                     <div
                       key={payment.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                      className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-900 rounded-lg"
                     >
                       <div>
-                        <p className="text-sm font-medium text-gray-900">${payment.amount.toFixed(2)}</p>
-                        <p className="text-xs text-gray-500">{formatDateTime(payment.createdAt)}</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">${payment.amount.toFixed(2)}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{formatDateTime(payment.createdAt)}</p>
                       </div>
                       <div className="text-right">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                          payment.status === 'succeeded' ? 'bg-green-100 text-green-800' :
-                          payment.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
+                          payment.status === 'succeeded' ? 'bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400' :
+                          payment.status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400' :
+                          'bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400'
                         }`}>
                           {payment.status}
                         </span>
-                        <p className="text-xs text-gray-500 mt-1">{payment.paymentMethod}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{payment.paymentMethod}</p>
                       </div>
                     </div>
                   ))}
@@ -1079,7 +1079,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
             {/* Manual Payments */}
             {invoice.manualPayments.length > 0 && (
               <div className="mb-4">
-                <p className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-1">
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-1">
                   <DollarSign className="w-3.5 h-3.5" />
                   Manual Payments
                 </p>
@@ -1087,21 +1087,21 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                   {invoice.manualPayments.map((payment) => (
                     <div
                       key={payment.id}
-                      className="flex items-start justify-between p-3 bg-green-50 rounded-lg border border-green-200"
+                      className="flex items-start justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800"
                     >
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-1">
-                          <p className="text-sm font-semibold text-gray-900">${payment.amount.toFixed(2)}</p>
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white">${payment.amount.toFixed(2)}</p>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-400">
                             {payment.paymentMethod || payment.paymentType}
                           </span>
                         </div>
-                        <p className="text-xs text-gray-600">{formatDateTime(payment.paymentDate)}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">{formatDateTime(payment.paymentDate)}</p>
                         {payment.checkNumber && (
-                          <p className="text-xs text-gray-600 mt-1">Check #{payment.checkNumber}</p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Check #{payment.checkNumber}</p>
                         )}
                         {payment.notes && (
-                          <p className="text-xs text-gray-500 mt-1 italic">{payment.notes}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic">{payment.notes}</p>
                         )}
                       </div>
                     </div>
@@ -1113,19 +1113,19 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
             {/* Printavo Payments */}
             {invoice.printavoPayments.length > 0 && (
               <div>
-                <p className="text-sm font-medium text-gray-500 mb-2">Printavo Payments</p>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Printavo Payments</p>
                 <div className="space-y-2">
                   {invoice.printavoPayments.map((payment) => (
                     <div
                       key={payment.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                      className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-900 rounded-lg"
                     >
                       <div>
-                        <p className="text-sm font-medium text-gray-900">${payment.amount.toFixed(2)}</p>
-                        <p className="text-xs text-gray-500">{formatDateTime(payment.paymentDate)}</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">${payment.amount.toFixed(2)}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{formatDateTime(payment.paymentDate)}</p>
                       </div>
                       {payment.paymentMethod && (
-                        <span className="text-xs text-gray-500">{payment.paymentMethod}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">{payment.paymentMethod}</span>
                       )}
                     </div>
                   ))}
@@ -1134,63 +1134,63 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
             )}
 
             {invoice.stripePayments.length === 0 && invoice.printavoPayments.length === 0 && invoice.manualPayments.length === 0 && (
-              <p className="text-center text-gray-500 py-4">No payments recorded</p>
+              <p className="text-center text-gray-500 dark:text-gray-400 py-4">No payments recorded</p>
             )}
           </div>
 
           {/* Communication Log */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-gray-400" />
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-gray-400 dark:text-gray-500" />
               Communication Log
             </h2>
             {invoice.communicationLogs.length > 0 || invoice.smsLogs.length > 0 ? (
               <div className="space-y-3 max-h-64 overflow-y-auto">
                 {invoice.communicationLogs.map((log) => (
-                  <div key={log.id} className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div key={log.id} className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                     <div className="flex items-start justify-between mb-1">
                       <div className="flex items-center gap-2">
-                        <Mail className="w-4 h-4 text-blue-600" />
-                        <span className="text-sm font-medium text-gray-900">{log.subject}</span>
+                        <Mail className="w-4 h-4 text-blue-600 dark:text-blue-500" />
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">{log.subject}</span>
                       </div>
                       <span className={`text-xs px-2 py-0.5 rounded ${
-                        log.status === 'sent' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                        log.status === 'sent' ? 'bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300'
                       }`}>
                         {log.status}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-600 ml-6">{log.recipient}</p>
-                    <p className="text-xs text-gray-400 mt-1 ml-6">{formatDateTime(log.sentAt)}</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 ml-6">{log.recipient}</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 ml-6">{formatDateTime(log.sentAt)}</p>
                   </div>
                 ))}
                 {invoice.smsLogs.map((log) => (
-                  <div key={log.id} className="p-3 bg-green-50 rounded-lg border border-green-200">
+                  <div key={log.id} className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
                     <div className="flex items-start justify-between mb-1">
                       <div className="flex items-center gap-2">
-                        <MessageSquare className="w-4 h-4 text-green-600" />
-                        <span className="text-sm font-medium text-gray-900">SMS Message</span>
+                        <MessageSquare className="w-4 h-4 text-green-600 dark:text-green-500" />
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">SMS Message</span>
                       </div>
                       <span className={`text-xs px-2 py-0.5 rounded ${
                         log.deliveryStatus === 'sent' || log.deliveryStatus === 'delivered'
-                          ? 'bg-green-100 text-green-700'
+                          ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'
                           : log.deliveryStatus === 'failed'
-                          ? 'bg-red-100 text-red-700'
-                          : 'bg-gray-100 text-gray-700'
+                          ? 'bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+                          : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300'
                       }`}>
                         {log.deliveryStatus}
                       </span>
                     </div>
-                    <p className="text-xs text-gray-600 ml-6">{log.phoneNumber}</p>
-                    <p className="text-xs text-gray-500 mt-1 ml-6 italic">{log.messageBody}</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 ml-6">{log.phoneNumber}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-6 italic">{log.messageBody}</p>
                     {log.errorMessage && (
-                      <p className="text-xs text-red-600 mt-1 ml-6">Error: {log.errorMessage}</p>
+                      <p className="text-xs text-red-600 dark:text-red-400 mt-1 ml-6">Error: {log.errorMessage}</p>
                     )}
-                    <p className="text-xs text-gray-400 mt-1 ml-6">{formatDateTime(log.sentAt)}</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 ml-6">{formatDateTime(log.sentAt)}</p>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-center text-gray-500 py-4">No communications sent</p>
+              <p className="text-center text-gray-500 dark:text-gray-400 py-4">No communications sent</p>
             )}
           </div>
         </div>
@@ -1199,34 +1199,34 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
       {/* Send Invoice Modal */}
       {showSendModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">Send Invoice</h3>
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Send Invoice</h3>
               <button
                 onClick={() => {
                   setShowSendModal(false);
                   setCustomMessage('');
                 }}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
               >
                 <XCircle className="w-5 h-5" />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Recipient Information
                 </label>
                 <div className="space-y-1 text-sm">
                   {invoice.contact.email && (
-                    <div className="flex items-center gap-2 text-gray-700">
-                      <Mail className="w-4 h-4 text-gray-400" />
+                    <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                      <Mail className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                       <span>{invoice.contact.email}</span>
                     </div>
                   )}
                   {customerPhone && twilioEnabled && (
-                    <div className="flex items-center gap-2 text-gray-700">
-                      <Phone className="w-4 h-4 text-gray-400" />
+                    <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                      <Phone className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                       <span>{customerPhone}</span>
                     </div>
                   )}
@@ -1235,7 +1235,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
 
               {twilioEnabled && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Send Method
                   </label>
                   <div className="grid grid-cols-3 gap-2">
@@ -1243,8 +1243,8 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                       onClick={() => setSendMethod('email')}
                       className={`flex items-center justify-center gap-2 px-3 py-3 rounded-lg border-2 transition-colors ${
                         sendMethod === 'email'
-                          ? 'border-blue-600 bg-blue-50 text-blue-700'
-                          : 'border-gray-300 hover:border-gray-400'
+                          ? 'border-blue-600 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
+                          : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500'
                       }`}
                       disabled={!invoice.contact.email}
                     >
@@ -1255,8 +1255,8 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                       onClick={() => setSendMethod('sms')}
                       className={`flex items-center justify-center gap-2 px-3 py-3 rounded-lg border-2 transition-colors ${
                         sendMethod === 'sms'
-                          ? 'border-green-600 bg-green-50 text-green-700'
-                          : 'border-gray-300 hover:border-gray-400'
+                          ? 'border-green-600 dark:border-green-500 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                          : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500'
                       }`}
                       disabled={!customerPhone}
                     >
@@ -1267,8 +1267,8 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                       onClick={() => setSendMethod('both')}
                       className={`flex items-center justify-center gap-2 px-3 py-3 rounded-lg border-2 transition-colors ${
                         sendMethod === 'both'
-                          ? 'border-purple-600 bg-purple-50 text-purple-700'
-                          : 'border-gray-300 hover:border-gray-400'
+                          ? 'border-purple-600 dark:border-purple-500 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400'
+                          : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500'
                       }`}
                       disabled={!invoice.contact.email || !customerPhone}
                     >
@@ -1280,7 +1280,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                     </button>
                   </div>
                   {(!invoice.contact.email || !customerPhone) && (
-                    <p className="text-xs text-amber-600 mt-2">
+                    <p className="text-xs text-amber-600 dark:text-amber-500 mt-2">
                       {!invoice.contact.email && !customerPhone && 'Email and phone number are required'}
                       {!invoice.contact.email && customerPhone && 'Email is required for email sending'}
                       {invoice.contact.email && !customerPhone && 'Phone number is required for SMS sending'}
@@ -1290,7 +1290,7 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Custom Message (optional)
                 </label>
                 <textarea
@@ -1298,17 +1298,17 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                   onChange={(e) => setCustomMessage(e.target.value)}
                   rows={4}
                   placeholder="Add a personal message to include..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-blue-500 dark:focus:border-blue-600"
                 />
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-slate-700 flex justify-end gap-3">
               <button
                 onClick={() => {
                   setShowSendModal(false);
                   setCustomMessage('');
                 }}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
               >
                 Cancel
               </button>
