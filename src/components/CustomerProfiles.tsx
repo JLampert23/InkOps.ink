@@ -388,13 +388,19 @@ function CustomerDetail({ customer }: CustomerDetailProps) {
             <Gift className="w-5 h-5 text-purple-600 dark:text-purple-500" />
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Fundraising Credits</h3>
           </div>
-          <button
-            onClick={() => setIsAddingCredit(true)}
-            className="flex items-center gap-2 px-3 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Add Credit
-          </button>
+          {!isAddingCredit && (
+            <button
+              onClick={() => setIsAddingCredit(true)}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg transition-all ${
+                fundraisingCredits.length === 0
+                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg animate-pulse'
+                  : 'bg-purple-600 hover:bg-purple-700'
+              }`}
+            >
+              <Plus className="w-4 h-4" />
+              Add Credit
+            </button>
+          )}
         </div>
 
         <div className="p-4">
@@ -472,8 +478,57 @@ function CustomerDetail({ customer }: CustomerDetailProps) {
           )}
 
           {fundraisingCredits.length === 0 ? (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-              No fundraising credits recorded
+            <div className="space-y-4">
+              <div className="text-center py-8">
+                <Gift className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                <p className="text-gray-500 dark:text-gray-400 mb-2">No fundraising credits recorded yet</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500">Click "Add Credit" above to get started. After adding a credit, you'll be able to upload PDF reports.</p>
+              </div>
+
+              {/* Example/Preview of what the table will look like */}
+              <div className="border-t border-gray-200 dark:border-slate-700 pt-4">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-medium">Preview: Once you add credits, your table will look like this:</p>
+                <div className="overflow-x-auto opacity-50">
+                  <table className="w-full table-auto">
+                    <thead>
+                      <tr className="border-b border-gray-200 dark:border-slate-700">
+                        <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2 w-32">Date</th>
+                        <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Store Name / Number</th>
+                        <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Batch Number</th>
+                        <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2 w-28">Amount</th>
+                        <th className="text-center text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2 w-32">Report</th>
+                        <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2 w-24">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="hover:bg-gray-50 dark:hover:bg-slate-700">
+                        <td className="py-3 text-sm text-gray-900 dark:text-white">Jan 15, 2026</td>
+                        <td className="py-3 text-sm text-gray-900 dark:text-white">Store #123</td>
+                        <td className="py-3 text-sm text-gray-900 dark:text-white">BATCH-001</td>
+                        <td className="py-3 text-sm text-gray-900 dark:text-white text-right font-medium">$500.00</td>
+                        <td className="py-3 text-center">
+                          <div className="flex items-center justify-center">
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 rounded-md border border-purple-200 dark:border-purple-800">
+                              <Upload className="w-4 h-4" />
+                              <span>Upload PDF ← Upload button appears here</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            <button className="p-1 text-blue-600 dark:text-blue-500 rounded">
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button className="p-1 text-red-600 dark:text-red-500 rounded">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           ) : (
             <>
