@@ -48,17 +48,17 @@ export function AuthScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 flex items-center justify-center p-4 sm:p-6">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 p-8 sm:p-10 backdrop-blur-sm">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-900 rounded-xl mb-4">
-              <Lock className="w-8 h-8 text-white" />
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-slate-800 to-slate-900 dark:from-slate-700 dark:to-slate-800 rounded-2xl mb-6 shadow-lg shadow-slate-500/30 transform hover:scale-105 transition-transform duration-200">
+              <Lock className="w-10 h-10 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">
               {isSignUp ? 'Create Account' : 'Welcome Back'}
             </h1>
-            <p className="text-gray-600">
+            <p className="text-gray-600 dark:text-gray-400 text-base leading-relaxed">
               {isSignUp
                 ? 'Sign up to access your dashboard'
                 : 'Sign in to access your dashboard'}
@@ -66,51 +66,59 @@ export function AuthScreen() {
           </div>
 
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-800">{error}</p>
+            <div className="mb-6 p-4 bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/30 dark:to-rose-950/30 border-2 border-red-300 dark:border-red-800 rounded-xl flex items-start gap-3 backdrop-blur-sm">
+              <div className="bg-red-100 dark:bg-red-900/50 p-2 rounded-lg flex-shrink-0">
+                <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+              </div>
+              <p className="text-sm text-red-800 dark:text-red-300 leading-relaxed">{error}</p>
             </div>
           )}
 
           {successMessage && (
-            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-green-800">{successMessage}</p>
+            <div className="mb-6 p-4 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-2 border-emerald-300 dark:border-emerald-800 rounded-xl flex items-start gap-3 backdrop-blur-sm">
+              <div className="bg-emerald-100 dark:bg-emerald-900/50 p-2 rounded-lg flex-shrink-0">
+                <AlertCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <p className="text-sm text-emerald-800 dark:text-emerald-300 leading-relaxed">{successMessage}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="email" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2.5">
                 Email Address
               </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <div className="relative group">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 group-focus-within:text-slate-600 dark:group-focus-within:text-slate-400 transition-colors">
+                  <Mail className="w-5 h-5" />
+                </div>
                 <input
                   id="email"
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                  className="w-full pl-12 pr-4 py-3.5 bg-gray-50 dark:bg-slate-900/50 border-2 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white rounded-xl focus:ring-2 focus:ring-slate-500 dark:focus:ring-slate-400 focus:border-slate-500 dark:focus:border-slate-400 transition-all duration-200 placeholder:text-gray-400 dark:placeholder:text-gray-600"
                   placeholder="you@example.com"
                 />
               </div>
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="password" className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2.5">
                 Password
               </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <div className="relative group">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 group-focus-within:text-slate-600 dark:group-focus-within:text-slate-400 transition-colors">
+                  <Lock className="w-5 h-5" />
+                </div>
                 <input
                   id="password"
                   type="password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all"
+                  className="w-full pl-12 pr-4 py-3.5 bg-gray-50 dark:bg-slate-900/50 border-2 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white rounded-xl focus:ring-2 focus:ring-slate-500 dark:focus:ring-slate-400 focus:border-slate-500 dark:focus:border-slate-400 transition-all duration-200 placeholder:text-gray-400 dark:placeholder:text-gray-600"
                   placeholder={isSignUp ? 'At least 6 characters' : 'Enter your password'}
                   minLength={6}
                 />
@@ -120,7 +128,7 @@ export function AuthScreen() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-slate-900 text-white py-3 rounded-lg font-medium hover:bg-slate-800 focus:ring-4 focus:ring-slate-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full bg-gradient-to-br from-slate-800 to-slate-900 dark:from-slate-700 dark:to-slate-800 text-white py-4 rounded-xl font-semibold text-base hover:from-slate-900 hover:to-slate-950 dark:hover:from-slate-800 dark:hover:to-slate-900 focus:ring-4 focus:ring-slate-300 dark:focus:ring-slate-900 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-slate-500/30 dark:shadow-slate-900/30 hover:scale-[1.01] active:scale-[0.99]"
             >
               {loading ? (
                 <>
@@ -133,7 +141,7 @@ export function AuthScreen() {
             </button>
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="mt-6 pt-6 border-t border-gray-200 dark:border-slate-700 text-center">
             <button
               type="button"
               onClick={() => {
@@ -141,24 +149,24 @@ export function AuthScreen() {
                 setError(null);
                 setSuccessMessage(null);
               }}
-              className="text-sm text-slate-600 hover:text-slate-900 transition-colors"
+              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors"
             >
               {isSignUp ? (
                 <>
                   Already have an account?{' '}
-                  <span className="font-medium text-slate-900">Sign in</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-300 hover:underline">Sign in</span>
                 </>
               ) : (
                 <>
                   Don't have an account?{' '}
-                  <span className="font-medium text-slate-900">Sign up</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-300 hover:underline">Sign up</span>
                 </>
               )}
             </button>
           </div>
         </div>
 
-        <p className="text-center text-sm text-gray-600 mt-6">
+        <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-8 font-medium">
           Secure authentication powered by Supabase
         </p>
       </div>
