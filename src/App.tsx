@@ -12,6 +12,7 @@ import { useRBAC } from './hooks/useRBAC';
 const SquareData = lazy(() => import('./components/SquareData'));
 const ProductionManagement = lazy(() => import('./components/ProductionManagement').then(m => ({ default: m.ProductionManagement })));
 const BillingDashboard = lazy(() => import('./components/billing/BillingDashboard').then(m => ({ default: m.BillingDashboard })));
+const PaidInvoicesPage = lazy(() => import('./components/billing/PaidInvoicesPage').then(m => ({ default: m.PaidInvoicesPage })));
 const AccountsReceivableReport = lazy(() => import('./components/accounting/AccountsReceivableReport'));
 const CustomersReport = lazy(() => import('./components/accounting/CustomersReport'));
 const PaymentsReport = lazy(() => import('./components/accounting/UnifiedPaymentsReport'));
@@ -557,7 +558,7 @@ function AppContent() {
                 </div>
               </div>
             }>
-              <BillingDashboard initialTab="paid" />
+              <PaidInvoicesPage />
             </Suspense>
           )}
 
