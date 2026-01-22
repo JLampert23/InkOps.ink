@@ -90,46 +90,46 @@ export default function AutomatedReports() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg shadow-lg p-6 text-white">
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-700 dark:to-blue-800 rounded-lg shadow-lg p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold mb-2">Automated Reports</h1>
-            <p className="text-blue-100">
+            <p className="text-blue-100 dark:text-blue-200">
               Schedule reports to be delivered automatically to your team via email
             </p>
           </div>
           <div className="text-right">
             <div className="text-3xl font-bold">{activeRulesCount}</div>
-            <div className="text-sm text-blue-100">Active Rules</div>
+            <div className="text-sm text-blue-100 dark:text-blue-200">Active Rules</div>
           </div>
         </div>
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <h3 className="font-semibold text-red-900">Error</h3>
-            <p className="text-sm text-red-800">{error}</p>
+            <h3 className="font-semibold text-red-900 dark:text-red-300">Error</h3>
+            <p className="text-sm text-red-800 dark:text-red-400">{error}</p>
           </div>
         </div>
       )}
 
       {successMessage && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
-          <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 flex items-start gap-3">
+          <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <h3 className="font-semibold text-green-900">Success</h3>
-            <p className="text-sm text-green-800">{successMessage}</p>
+            <h3 className="font-semibold text-green-900 dark:text-green-300">Success</h3>
+            <p className="text-sm text-green-800 dark:text-green-400">{successMessage}</p>
           </div>
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow border border-gray-200 dark:border-slate-700 p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">Automation Rules</h2>
-            <p className="text-sm text-gray-600 mt-1">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Automation Rules</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
               Configure scheduled reports with custom recipients and formats
             </p>
           </div>
@@ -137,7 +137,7 @@ export default function AutomatedReports() {
             <button
               onClick={loadRules}
               disabled={loading}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors flex items-center gap-2"
+              className="px-4 py-2 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-50 transition-colors flex items-center gap-2"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               Refresh
@@ -154,8 +154,8 @@ export default function AutomatedReports() {
 
         {loading ? (
           <div className="text-center py-12">
-            <RefreshCw className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-4" />
-            <p className="text-gray-600">Loading automation rules...</p>
+            <RefreshCw className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin mx-auto mb-4" />
+            <p className="text-gray-600 dark:text-gray-400">Loading automation rules...</p>
           </div>
         ) : (
           <AutomationRuleList
@@ -169,46 +169,46 @@ export default function AutomatedReports() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-6">
           <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-blue-50 rounded-lg">
-              <Clock className="w-5 h-5 text-blue-600" />
+            <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+              <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             </div>
-            <h3 className="font-semibold text-gray-900">Flexible Scheduling</h3>
+            <h3 className="font-semibold text-gray-900 dark:text-white">Flexible Scheduling</h3>
           </div>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             Choose from daily, weekly, monthly, or custom schedules with timezone support
           </p>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-6">
           <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-green-50 rounded-lg">
-              <CheckCircle className="w-5 h-5 text-green-600" />
+            <div className="p-2 bg-green-50 dark:bg-green-900/30 rounded-lg">
+              <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
             </div>
-            <h3 className="font-semibold text-gray-900">Multiple Formats</h3>
+            <h3 className="font-semibold text-gray-900 dark:text-white">Multiple Formats</h3>
           </div>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             Receive reports as PDF, CSV, or both formats automatically attached to emails
           </p>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-6">
           <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-purple-50 rounded-lg">
-              <AlertCircle className="w-5 h-5 text-purple-600" />
+            <div className="p-2 bg-purple-50 dark:bg-purple-900/30 rounded-lg">
+              <AlertCircle className="w-5 h-5 text-purple-600 dark:text-purple-400" />
             </div>
-            <h3 className="font-semibold text-gray-900">Easy Management</h3>
+            <h3 className="font-semibold text-gray-900 dark:text-white">Easy Management</h3>
           </div>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             Pause, edit, or delete automation rules at any time with a single click
           </p>
         </div>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-        <h3 className="text-sm font-semibold text-blue-900 mb-3">How Automated Reports Work</h3>
-        <ol className="text-sm text-blue-800 space-y-2">
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+        <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-300 mb-3">How Automated Reports Work</h3>
+        <ol className="text-sm text-blue-800 dark:text-blue-400 space-y-2">
           <li className="flex items-start gap-2">
             <span className="font-semibold">1.</span>
             <span>Create a new automation rule and select the report type you want to automate</span>

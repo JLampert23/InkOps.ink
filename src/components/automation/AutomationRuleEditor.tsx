@@ -167,34 +167,34 @@ export default function AutomationRuleEditor({ ruleId, onClose, onSave }: Automa
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 px-6 py-4 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">
             {ruleId ? 'Edit Automation Rule' : 'Create Automation Rule'}
           </h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
           >
-            <X className="w-5 h-5 text-gray-500" />
+            <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
           </button>
         </div>
 
         <div className="p-6 space-y-6">
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-sm text-red-800">{error}</p>
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+              <p className="text-sm text-red-800 dark:text-red-300">{error}</p>
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
+            <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
               Report Type
             </label>
             <select
               value={formData.report_type}
               onChange={(e) => handleReportTypeChange(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-4 py-2.5 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">Select a report...</option>
               {REPORT_TYPES.map(report => (
@@ -206,7 +206,7 @@ export default function AutomationRuleEditor({ ruleId, onClose, onSave }: Automa
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
+            <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
               Schedule Type
             </label>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -217,7 +217,7 @@ export default function AutomationRuleEditor({ ruleId, onClose, onSave }: Automa
                   className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
                     formData.schedule_type === type
                       ? 'bg-blue-600 text-white shadow-md'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'
                   }`}
                 >
                   {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -228,13 +228,13 @@ export default function AutomationRuleEditor({ ruleId, onClose, onSave }: Automa
 
           {formData.schedule_type === 'weekly' && (
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
+              <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
                 Day of Week
               </label>
               <select
                 value={formData.schedule_day_of_week ?? ''}
                 onChange={(e) => setFormData({ ...formData, schedule_day_of_week: parseInt(e.target.value) })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-2.5 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="">Select a day...</option>
                 {DAYS_OF_WEEK.map(day => (
@@ -248,13 +248,13 @@ export default function AutomationRuleEditor({ ruleId, onClose, onSave }: Automa
 
           {formData.schedule_type === 'monthly' && (
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
+              <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
                 Day of Month
               </label>
               <select
                 value={formData.schedule_day_of_month ?? ''}
                 onChange={(e) => setFormData({ ...formData, schedule_day_of_month: parseInt(e.target.value) })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-2.5 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="">Select a day...</option>
                 {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
@@ -268,25 +268,25 @@ export default function AutomationRuleEditor({ ruleId, onClose, onSave }: Automa
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
+              <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
                 Delivery Time
               </label>
               <input
                 type="time"
                 value={formData.schedule_time}
                 onChange={(e) => setFormData({ ...formData, schedule_time: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-2.5 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">
+              <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
                 Timezone
               </label>
               <select
                 value={formData.schedule_timezone}
                 onChange={(e) => setFormData({ ...formData, schedule_timezone: e.target.value })}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-2.5 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 {TIMEZONES.map(tz => (
                   <option key={tz.value} value={tz.value}>
@@ -298,7 +298,7 @@ export default function AutomationRuleEditor({ ruleId, onClose, onSave }: Automa
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
+            <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
               Email Recipients
             </label>
             <div className="flex gap-2 mb-3">
@@ -308,7 +308,7 @@ export default function AutomationRuleEditor({ ruleId, onClose, onSave }: Automa
                 onChange={(e) => setEmailInput(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleAddEmail()}
                 placeholder="Enter email address..."
-                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
               <button
                 onClick={handleAddEmail}
@@ -323,14 +323,14 @@ export default function AutomationRuleEditor({ ruleId, onClose, onSave }: Automa
                 {formData.email_recipients.map(email => (
                   <div
                     key={email}
-                    className="flex items-center justify-between bg-gray-50 px-4 py-2 rounded-lg"
+                    className="flex items-center justify-between bg-gray-50 dark:bg-slate-700/50 px-4 py-2 rounded-lg"
                   >
-                    <span className="text-sm text-gray-900">{email}</span>
+                    <span className="text-sm text-gray-900 dark:text-white">{email}</span>
                     <button
                       onClick={() => handleRemoveEmail(email)}
-                      className="p-1 hover:bg-gray-200 rounded transition-colors"
+                      className="p-1 hover:bg-gray-200 dark:hover:bg-slate-600 rounded transition-colors"
                     >
-                      <Trash2 className="w-4 h-4 text-red-600" />
+                      <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
                     </button>
                   </div>
                 ))}
@@ -339,7 +339,7 @@ export default function AutomationRuleEditor({ ruleId, onClose, onSave }: Automa
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
+            <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
               File Formats
             </label>
             <div className="flex gap-3">
@@ -348,7 +348,7 @@ export default function AutomationRuleEditor({ ruleId, onClose, onSave }: Automa
                 className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   formData.file_formats.includes('pdf')
                     ? 'bg-blue-600 text-white shadow-md'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'
                 }`}
               >
                 PDF
@@ -358,7 +358,7 @@ export default function AutomationRuleEditor({ ruleId, onClose, onSave }: Automa
                 className={`px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   formData.file_formats.includes('csv')
                     ? 'bg-blue-600 text-white shadow-md'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'
                 }`}
               >
                 CSV
@@ -366,17 +366,17 @@ export default function AutomationRuleEditor({ ruleId, onClose, onSave }: Automa
             </div>
           </div>
 
-          <div className="flex items-center justify-between bg-gray-50 p-4 rounded-lg">
+          <div className="flex items-center justify-between bg-gray-50 dark:bg-slate-700/50 p-4 rounded-lg">
             <div>
-              <h4 className="text-sm font-medium text-gray-900">Enable Automation</h4>
-              <p className="text-xs text-gray-600 mt-0.5">
+              <h4 className="text-sm font-medium text-gray-900 dark:text-white">Enable Automation</h4>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
                 Turn this rule on or off
               </p>
             </div>
             <button
               onClick={() => setFormData({ ...formData, is_enabled: !formData.is_enabled })}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                formData.is_enabled ? 'bg-blue-600' : 'bg-gray-300'
+                formData.is_enabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-slate-600'
               }`}
             >
               <span
@@ -388,10 +388,10 @@ export default function AutomationRuleEditor({ ruleId, onClose, onSave }: Automa
           </div>
         </div>
 
-        <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex items-center justify-end gap-3">
+        <div className="sticky bottom-0 bg-gray-50 dark:bg-slate-700 border-t border-gray-200 dark:border-slate-600 px-6 py-4 flex items-center justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+            className="px-6 py-2.5 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors"
           >
             Cancel
           </button>
