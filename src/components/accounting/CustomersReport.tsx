@@ -40,6 +40,7 @@ interface FundraisingCredit {
   store_name: string;
   batch_number: string;
   amount: number;
+  report_url?: string;
   created_at: string;
   updated_at: string;
 }
@@ -918,25 +919,39 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
         ${parseFloat(credit.amount.toString()).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </td>
       <td className="py-2 text-center">
-        <input
-          type="file"
-          accept="application/pdf"
-          onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
-          className="hidden"
-          id={`upload-${credit.id}`}
-          disabled={uploading}
-        />
-        <label
-          htmlFor={`upload-${credit.id}`}
-          className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded cursor-pointer transition-colors ${
-            uploading
-              ? 'bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
-              : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800'
-          }`}
-        >
-          <Upload className="w-3 h-3" />
-          {uploading ? 'Uploading...' : 'Upload PDF'}
-        </label>
+        <div className="flex items-center justify-center gap-2">
+          {credit.report_url && (
+            <a
+              href={credit.report_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/50 border border-green-200 dark:border-green-800"
+              title="View uploaded report"
+            >
+              <FileText className="w-3 h-3" />
+              View Report
+            </a>
+          )}
+          <input
+            type="file"
+            accept="application/pdf"
+            onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
+            className="hidden"
+            id={`upload-${credit.id}`}
+            disabled={uploading}
+          />
+          <label
+            htmlFor={`upload-${credit.id}`}
+            className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded cursor-pointer transition-colors ${
+              uploading
+                ? 'bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800'
+            }`}
+          >
+            <Upload className="w-3 h-3" />
+            {uploading ? 'Uploading...' : credit.report_url ? 'Replace PDF' : 'Upload PDF'}
+          </label>
+        </div>
       </td>
       <td className="py-2">
         <div className="flex items-center justify-end gap-1">
