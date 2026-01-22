@@ -938,15 +938,16 @@ export function InvoiceDetail({ invoiceId, onBack }: InvoiceDetailProps) {
                   {(invoice.stripePaymentLink || invoice.stripeInvoice) && (
                     <button
                       onClick={handleRevertInvoice}
-                      disabled={reverting || invoice.billingQueueStatus === 'paid'}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={reverting || (invoice.amountPaid > 0)}
+                      className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Revert invoice to unsent state"
                     >
                       {reverting ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       ) : (
-                        <RotateCcw className="w-4 h-4" />
+                        <RotateCcw className="w-3.5 h-3.5" />
                       )}
-                      Revert Invoice
+                      Revert
                     </button>
                   )}
                 </>
