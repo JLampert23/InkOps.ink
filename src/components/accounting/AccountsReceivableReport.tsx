@@ -37,7 +37,6 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
   const [customers, setCustomers] = useState<string[]>([]);
   const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState('Company Name');
-  const [hasNoEligibleStatuses, setHasNoEligibleStatuses] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -55,26 +54,12 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
         setCompanyName(settings.company_name);
       }
 
-      const { data: billingStatuses } = await supabase
-        .from('printavo_statuses')
-        .select('name')
-        .eq('is_billing_eligible', true);
-
-      const eligibleStatuses = (billingStatuses || []).map(s => s.name);
-
-      if (eligibleStatuses.length === 0) {
-        setInvoices([]);
-        setHasNoEligibleStatuses(true);
-        setLoading(false);
-        return;
-      }
-
-      setHasNoEligibleStatuses(false);
-
+      // Use status_stage instead of Printavo status to determine AR eligibility
+      // This ensures refunded invoices appear correctly in AR
       let query = supabase
         .from('printavo_invoices')
         .select('*')
-        .in('status', eligibleStatuses)
+        .in('status_stage', ['billing_queue', 'accounts_receivable'])
         .gt('amount_outstanding', 0)
         .order('due_date', { ascending: true });
 
@@ -221,25 +206,6 @@ export default function AccountsReceivableReport({ onNavigateToSettings }: Accou
 
   return (
     <div className="space-y-6">
-      {/* Warning Banner for No Eligible Statuses */}
-      {hasNoEligibleStatuses && (
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-500 mt-0.5 flex-shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm text-yellow-900 dark:text-yellow-200">
-              <span className="font-medium">No billing-eligible statuses selected.</span> Please go to{' '}
-              <button
-                onClick={() => onNavigateToSettings?.('billing')}
-                className="font-semibold underline hover:text-yellow-700 dark:hover:text-yellow-300"
-              >
-                Settings → Billing & Invoicing
-              </button>
-              {' '}to select which invoice statuses should appear in Accounts Receivable.
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Info Banner */}
       <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 flex items-start gap-3">
         <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-500 mt-0.5 flex-shrink-0" />
