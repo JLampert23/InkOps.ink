@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CheckCircle, DollarSign, Calendar, CreditCard, Search, Download } from 'lucide-react';
+import { CheckCircle, DollarSign, Calendar, CreditCard, Search, Download, AlertCircle, Loader2, Filter, FileText, FileSpreadsheet, TrendingUp } from 'lucide-react';
 import { billingService, PaidInvoice } from '../../services/billing-service';
 
 interface PaidInvoicesProps {
@@ -11,6 +11,7 @@ export function PaidInvoices({ onViewInvoice }: PaidInvoicesProps) {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState('all');
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState('all');
 
   const formatPaymentMethod = (method: string | null): string => {
     if (!method) return 'N/A';
@@ -45,6 +46,13 @@ export function PaidInvoices({ onViewInvoice }: PaidInvoicesProps) {
 
     if (!matchesSearch) return false;
 
+    if (paymentMethodFilter !== 'all') {
+      const method = formatPaymentMethod(invoice.paymentMethod).toLowerCase();
+      if (paymentMethodFilter === 'card' && method !== 'card') return false;
+      if (paymentMethodFilter === 'manual' && method !== 'manual') return false;
+      if (paymentMethodFilter === 'check' && method !== 'check/ach') return false;
+    }
+
     if (dateFilter === 'all') return true;
 
     const paymentDate = new Date(invoice.paymentDate);
@@ -65,179 +73,228 @@ export function PaidInvoices({ onViewInvoice }: PaidInvoicesProps) {
   });
 
   const totalPaid = filteredInvoices.reduce((sum, inv) => sum + inv.amountPaid, 0);
+  const last7Days = filteredInvoices.filter(inv => {
+    const date = new Date(inv.paymentDate);
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    return date >= weekAgo;
+  }).length;
+  const last30Days = filteredInvoices.filter(inv => {
+    const date = new Date(inv.paymentDate);
+    const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    return date >= monthAgo;
+  }).length;
+
+  const averageInvoiceAmount = filteredInvoices.length > 0 ? totalPaid / filteredInvoices.length : 0;
 
   if (loading) {
     return (
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-12 text-center">
-        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-500 mb-4" />
-        <p className="text-gray-600 dark:text-gray-400">Loading paid invoices...</p>
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 text-green-600 dark:text-green-500 animate-spin" />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Paid Invoices</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Successfully completed payments ({filteredInvoices.length} invoices)
+      {/* Info Banner */}
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 flex items-start gap-3">
+        <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-500 mt-0.5 flex-shrink-0" />
+        <div className="flex-1">
+          <p className="text-sm text-blue-900 dark:text-blue-200">
+            <span className="font-medium">Tip:</span> Track all successfully completed payments here. Use filters to analyze payment trends by date range and payment method for better financial insights.
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-2">
-            <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-500" />
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Paid</span>
+            <DollarSign className="w-5 h-5 text-green-600 dark:text-green-500" />
           </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
-            {filteredInvoices.length}
-          </p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Paid Invoices</p>
-        </div>
-
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
-          <div className="flex items-center justify-between mb-2">
-            <DollarSign className="w-8 h-8 text-green-600 dark:text-green-500" />
-          </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
+          <div className="text-2xl font-bold text-gray-900 dark:text-white">
             ${totalPaid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Total Received</p>
+          </div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{filteredInvoices.length} invoices</div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-2">
-            <Calendar className="w-8 h-8 text-blue-600 dark:text-blue-500" />
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Last 7 Days</span>
+            <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-500" />
           </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
-            {filteredInvoices.filter(inv => {
-              const date = new Date(inv.paymentDate);
-              const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-              return date >= weekAgo;
-            }).length}
-          </p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Last 7 Days</p>
+          <div className="text-2xl font-bold text-gray-900 dark:text-white">
+            {last7Days}
+          </div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">Recent payments</div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Last 30 Days</span>
+            <TrendingUp className="w-5 h-5 text-purple-600 dark:text-purple-500" />
+          </div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-white">
+            {last30Days}
+          </div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">This month</div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Average Amount</span>
+            <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-500" />
+          </div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-white">
+            ${averageInvoiceAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">Per invoice</div>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by invoice, customer, or email..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-transparent"
-            />
+      {/* Filters and Search */}
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4 lg:p-6">
+        <div className="space-y-4">
+          {/* Filter Row */}
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-1">
+              <div className="flex items-center gap-2">
+                <Filter className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Filters:</span>
+              </div>
+
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search by invoice, customer, or email..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600"
+                />
+              </div>
+
+              <select
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600"
+              >
+                <option value="all">All Time</option>
+                <option value="today">Today</option>
+                <option value="week">Last 7 Days</option>
+                <option value="month">Last 30 Days</option>
+              </select>
+
+              <select
+                value={paymentMethodFilter}
+                onChange={(e) => setPaymentMethodFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600"
+              >
+                <option value="all">All Methods</option>
+                <option value="card">Card</option>
+                <option value="manual">Manual</option>
+                <option value="check">Check/ACH</option>
+              </select>
+            </div>
           </div>
-          <select
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-transparent"
-          >
-            <option value="all">All Time</option>
-            <option value="today">Today</option>
-            <option value="week">Last 7 Days</option>
-            <option value="month">Last 30 Days</option>
-          </select>
         </div>
       </div>
 
+      {/* Invoices Table */}
       {filteredInvoices.length === 0 ? (
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-12 text-center">
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-12 text-center">
           <CheckCircle className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No paid invoices found</h3>
           <p className="text-gray-600 dark:text-gray-400">
-            {searchTerm || dateFilter !== 'all'
+            {searchTerm || dateFilter !== 'all' || paymentMethodFilter !== 'all'
               ? 'Try adjusting your search or filters'
               : 'Paid invoices will appear here once payments are received'}
           </p>
         </div>
       ) : (
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Invoice
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Customer
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Invoice Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Total Amount
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Payment Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Method
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Transaction ID
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
-              {filteredInvoices.map((invoice) => (
-                <tr key={invoice.id} className="hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <button
-                      onClick={() => onViewInvoice?.(invoice.printavoInvoiceId)}
-                      className="text-sm font-medium text-blue-600 dark:text-blue-500 hover:text-blue-800 dark:hover:text-blue-400 hover:underline cursor-pointer"
-                    >
-                      {invoice.printavoVisualId}
-                    </button>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">
-                      {invoice.customerName}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {invoice.customerEmail}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 dark:text-white">
-                      {new Date(invoice.invoiceDate).toLocaleDateString()}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center text-sm font-medium text-gray-900 dark:text-white">
-                      <DollarSign className="w-4 h-4 mr-1 text-gray-400 dark:text-gray-500" />
-                      {invoice.invoiceTotal.toFixed(2)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center text-sm text-gray-900 dark:text-white">
-                      <Calendar className="w-4 h-4 text-gray-400 dark:text-gray-500 mr-2" />
-                      {new Date(invoice.paymentDate).toLocaleDateString()}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-1">
-                      <CreditCard className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                      <span className="text-sm text-gray-900 dark:text-white">
-                        {formatPaymentMethod(invoice.paymentMethod)}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">
-                      {invoice.stripePaymentIntentId ? invoice.stripePaymentIntentId.slice(0, 20) + '...' : 'N/A'}
-                    </div>
-                  </td>
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Invoice
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Customer
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Invoice Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Total Amount
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Payment Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Method
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Transaction ID
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
+                {filteredInvoices.map((invoice) => (
+                  <tr key={invoice.id} className="hover:bg-gray-50 dark:hover:bg-slate-700">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <button
+                        onClick={() => onViewInvoice?.(invoice.printavoInvoiceId)}
+                        className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline cursor-pointer"
+                      >
+                        {invoice.printavoVisualId}
+                      </button>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                        {invoice.customerName}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {invoice.customerEmail}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 dark:text-white">
+                        {new Date(invoice.invoiceDate).toLocaleDateString()}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center text-sm font-medium text-gray-900 dark:text-white">
+                        <DollarSign className="w-4 h-4 mr-1 text-gray-400 dark:text-gray-500" />
+                        {invoice.invoiceTotal.toFixed(2)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center text-sm text-gray-900 dark:text-white">
+                        <Calendar className="w-4 h-4 text-gray-400 dark:text-gray-500 mr-2" />
+                        {new Date(invoice.paymentDate).toLocaleDateString()}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-1">
+                        <CreditCard className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                        <span className="text-sm text-gray-900 dark:text-white">
+                          {formatPaymentMethod(invoice.paymentMethod)}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                        {invoice.stripePaymentIntentId ? invoice.stripePaymentIntentId.slice(0, 20) + '...' : 'N/A'}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

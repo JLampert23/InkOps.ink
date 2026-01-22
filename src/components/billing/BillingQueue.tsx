@@ -12,6 +12,9 @@ import {
   DollarSign,
   Download,
   Loader2,
+  FileText,
+  Filter,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { billingService, BillingQueueItem } from '../../services/billing-service';
 import { invoiceDetailService } from '../../services/invoice-detail-service';
@@ -30,6 +33,7 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
   const [sendingInvoices, setSendingInvoices] = useState(false);
   const [downloadingPDF, setDownloadingPDF] = useState<string | null>(null);
   const [creatingStripeInvoices, setCreatingStripeInvoices] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => {
     loadQueue();
@@ -58,10 +62,11 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
   };
 
   const handleSelectAll = () => {
-    if (selectedItems.size === queueItems.length) {
+    const filtered = getFilteredItems();
+    if (selectedItems.size === filtered.length) {
       setSelectedItems(new Set());
     } else {
-      setSelectedItems(new Set(queueItems.map(item => item.id)));
+      setSelectedItems(new Set(filtered.map(item => item.id)));
     }
   };
 
@@ -156,10 +161,10 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
 
   const getPaymentStatusBadge = (status: string) => {
     const statusConfig = {
-      unpaid: { label: 'Unpaid', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
-      processing: { label: 'Processing', color: 'bg-blue-100 text-blue-800', icon: RefreshCw },
-      paid: { label: 'Paid', color: 'bg-green-100 text-green-800', icon: CheckCircle },
-      failed: { label: 'Failed', color: 'bg-red-100 text-red-800', icon: XCircle },
+      unpaid: { label: 'Unpaid', color: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400', icon: Clock },
+      processing: { label: 'Processing', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400', icon: RefreshCw },
+      paid: { label: 'Paid', color: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400', icon: CheckCircle },
+      failed: { label: 'Failed', color: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400', icon: XCircle },
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.unpaid;
@@ -173,37 +178,128 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
     );
   };
 
+  const getFilteredItems = () => {
+    if (statusFilter === 'all') return queueItems;
+    if (statusFilter === 'ready') return queueItems.filter(item => !item.sentAt && !item.stripePaymentLinkId);
+    if (statusFilter === 'link-created') return queueItems.filter(item => item.stripePaymentLinkId);
+    if (statusFilter === 'sent') return queueItems.filter(item => item.sentAt);
+    return queueItems;
+  };
+
+  const filteredItems = getFilteredItems();
+  const totalAmount = filteredItems.reduce((sum, item) => sum + item.invoiceTotal, 0);
+  const readyToSend = queueItems.filter(item => !item.sentAt).length;
+  const withLinks = queueItems.filter(item => item.stripePaymentLinkId).length;
+  const alreadySent = queueItems.filter(item => item.sentAt).length;
+
   if (loading) {
     return (
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-12 text-center">
-        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 dark:border-blue-500 mb-4" />
-        <p className="text-gray-600 dark:text-gray-400">Loading billing queue...</p>
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-500 animate-spin" />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Billing Queue</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Invoices ready for billing ({queueItems.length} total)
+      {/* Info Banner */}
+      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 flex items-start gap-3">
+        <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-500 mt-0.5 flex-shrink-0" />
+        <div className="flex-1">
+          <p className="text-sm text-blue-900 dark:text-blue-200">
+            <span className="font-medium">Tip:</span> Use bulk actions to efficiently generate payment links, create Stripe invoices, and send invoices to multiple customers at once. Click the checkboxes to select invoices.
           </p>
         </div>
       </div>
 
-      {selectedItems.size > 0 && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-blue-900 dark:text-blue-300">
-              {selectedItems.size} invoice(s) selected
-            </p>
-            <div className="flex items-center gap-3">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Total in Queue</span>
+            <FileText className="w-5 h-5 text-blue-600 dark:text-blue-500" />
+          </div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-white">
+            {filteredItems.length}
+          </div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            ${totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Ready to Send</span>
+            <Clock className="w-5 h-5 text-yellow-600 dark:text-yellow-500" />
+          </div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-white">
+            {readyToSend}
+          </div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">Not yet sent</div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Links Created</span>
+            <LinkIcon className="w-5 h-5 text-green-600 dark:text-green-500" />
+          </div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-white">
+            {withLinks}
+          </div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">Payment links</div>
+        </div>
+
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Already Sent</span>
+            <Mail className="w-5 h-5 text-blue-600 dark:text-blue-500" />
+          </div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-white">
+            {alreadySent}
+          </div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">Delivered</div>
+        </div>
+      </div>
+
+      {/* Filters and Actions */}
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4 lg:p-6">
+        <div className="space-y-4">
+          {/* Filters Row */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Filter className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Filters:</span>
+              </div>
+
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600"
+              >
+                <option value="all">All Invoices</option>
+                <option value="ready">Ready to Send</option>
+                <option value="link-created">Links Created</option>
+                <option value="sent">Already Sent</option>
+              </select>
+            </div>
+
+            {selectedItems.size > 0 && (
+              <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <span className="text-sm font-medium text-blue-900 dark:text-blue-300">
+                  {selectedItems.size} selected
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Bulk Actions Row */}
+          {selectedItems.size > 0 && (
+            <div className="flex flex-wrap items-center justify-end gap-3 pt-3 border-t border-gray-200 dark:border-slate-700">
               <button
                 onClick={handleGenerateLinks}
                 disabled={generatingLinks}
-                className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-blue-300 dark:border-blue-600 text-blue-700 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-slate-600 transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-green-300 dark:border-green-600 text-green-700 dark:text-green-400 rounded-lg hover:bg-green-50 dark:hover:bg-slate-600 transition-colors disabled:opacity-50"
               >
                 <LinkIcon className="w-4 h-4" />
                 Generate Links
@@ -211,7 +307,7 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
               <button
                 onClick={handleCreateStripeInvoices}
                 disabled={creatingStripeInvoices}
-                className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-green-300 dark:border-green-600 text-green-700 dark:text-green-400 rounded-lg hover:bg-green-50 dark:hover:bg-slate-600 transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-purple-300 dark:border-purple-600 text-purple-700 dark:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-slate-600 transition-colors disabled:opacity-50"
               >
                 <DollarSign className="w-4 h-4" />
                 Create Stripe Invoices
@@ -225,172 +321,177 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
                 Send Invoices
               </button>
             </div>
-          </div>
+          )}
         </div>
-      )}
+      </div>
 
-      {queueItems.length === 0 ? (
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-12 text-center">
+      {/* Invoices Table */}
+      {filteredItems.length === 0 ? (
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-12 text-center">
           <AlertCircle className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No invoices in queue</h3>
           <p className="text-gray-600 dark:text-gray-400">
-            Use the "Sync from Printavo" button in the sidebar to populate the billing queue
+            {statusFilter !== 'all'
+              ? 'No invoices match the selected filter'
+              : 'Use the "Sync from Printavo" button in the sidebar to populate the billing queue'}
           </p>
         </div>
       ) : (
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-slate-700 border-b border-gray-200 dark:border-slate-600">
-              <tr>
-                <th className="px-6 py-3 text-left">
-                  <input
-                    type="checkbox"
-                    checked={selectedItems.size === queueItems.length}
-                    onChange={handleSelectAll}
-                    className="w-4 h-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500"
-                  />
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Invoice
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Customer
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Phone
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Address
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Amount
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Payment Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
-              {queueItems.map((item) => (
-                <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
-                  <td className="px-6 py-4">
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700">
+                <tr>
+                  <th className="px-6 py-3 text-left">
                     <input
                       type="checkbox"
-                      checked={selectedItems.has(item.id)}
-                      onChange={() => handleToggleSelect(item.id)}
+                      checked={selectedItems.size === filteredItems.length && filteredItems.length > 0}
+                      onChange={handleSelectAll}
                       className="w-4 h-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500"
                     />
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <button
-                      onClick={() => onViewInvoice?.(item.printavoInvoiceId)}
-                      className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline cursor-pointer"
-                    >
-                      {item.printavoVisualId}
-                    </button>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {item.printavoStatus}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {item.customerName}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {item.customerEmail}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 dark:text-gray-100">
-                      {item.customerPhone || '-'}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm text-gray-900 dark:text-gray-100">
-                      {item.billingAddressLine1 ? (
-                        <>
-                          <div>{item.billingAddressLine1}</div>
-                          {item.billingAddressLine2 && <div>{item.billingAddressLine2}</div>}
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {[item.billingCity, item.billingState, item.billingZip]
-                              .filter(Boolean)
-                              .join(', ')}
-                          </div>
-                        </>
-                      ) : (
-                        '-'
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center text-sm font-medium text-gray-900 dark:text-gray-100">
-                      <DollarSign className="w-4 h-4 text-gray-400 dark:text-gray-500 mr-1" />
-                      {item.invoiceTotal.toFixed(2)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex flex-col gap-1">
-                      {item.stripePaymentLinkId && (
-                        <span className="inline-flex items-center gap-1 text-xs text-green-700">
-                          <CheckCircle className="w-3 h-3" />
-                          Link Created
-                        </span>
-                      )}
-                      {item.stripeInvoiceId && (
-                        <span className="inline-flex items-center gap-1 text-xs text-purple-700">
-                          <DollarSign className="w-3 h-3" />
-                          Stripe Invoice
-                        </span>
-                      )}
-                      {item.sentAt && (
-                        <span className="inline-flex items-center gap-1 text-xs text-blue-700">
-                          <Mail className="w-3 h-3" />
-                          Sent {new Date(item.sentAt).toLocaleDateString()}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {getPaymentStatusBadge(item.paymentStatus)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                    <button
-                      onClick={() => handleDownloadPDF(item)}
-                      disabled={downloadingPDF === item.printavoInvoiceId}
-                      className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-300 disabled:opacity-50"
-                      title="Download PDF"
-                    >
-                      {downloadingPDF === item.printavoInvoiceId ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Download className="w-4 h-4" />
-                      )}
-                    </button>
-                    <button
-                      onClick={() => handleCopyLink(item)}
-                      className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
-                      title="Copy payment link"
-                    >
-                      <Copy className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => onSendInvoice?.(item)}
-                      className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300"
-                      title="Send invoice"
-                    >
-                      <Send className="w-4 h-4" />
-                    </button>
-                  </td>
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Invoice
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Customer
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Phone
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Address
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Amount
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Payment Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
+                {filteredItems.map((item) => (
+                  <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-slate-700">
+                    <td className="px-6 py-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedItems.has(item.id)}
+                        onChange={() => handleToggleSelect(item.id)}
+                        className="w-4 h-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500"
+                      />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <button
+                        onClick={() => onViewInvoice?.(item.printavoInvoiceId)}
+                        className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline cursor-pointer"
+                      >
+                        {item.printavoVisualId}
+                      </button>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {item.printavoStatus}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                        {item.customerName}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {item.customerEmail}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 dark:text-gray-100">
+                        {item.customerPhone || '-'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900 dark:text-gray-100">
+                        {item.billingAddressLine1 ? (
+                          <>
+                            <div>{item.billingAddressLine1}</div>
+                            {item.billingAddressLine2 && <div>{item.billingAddressLine2}</div>}
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {[item.billingCity, item.billingState, item.billingZip]
+                                .filter(Boolean)
+                                .join(', ')}
+                            </div>
+                          </>
+                        ) : (
+                          '-'
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center text-sm font-medium text-gray-900 dark:text-gray-100">
+                        <DollarSign className="w-4 h-4 text-gray-400 dark:text-gray-500 mr-1" />
+                        {item.invoiceTotal.toFixed(2)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex flex-col gap-1">
+                        {item.stripePaymentLinkId && (
+                          <span className="inline-flex items-center gap-1 text-xs text-green-700 dark:text-green-400">
+                            <CheckCircle className="w-3 h-3" />
+                            Link Created
+                          </span>
+                        )}
+                        {item.stripeInvoiceId && (
+                          <span className="inline-flex items-center gap-1 text-xs text-purple-700 dark:text-purple-400">
+                            <DollarSign className="w-3 h-3" />
+                            Stripe Invoice
+                          </span>
+                        )}
+                        {item.sentAt && (
+                          <span className="inline-flex items-center gap-1 text-xs text-blue-700 dark:text-blue-400">
+                            <Mail className="w-3 h-3" />
+                            Sent {new Date(item.sentAt).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {getPaymentStatusBadge(item.paymentStatus)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                      <button
+                        onClick={() => handleDownloadPDF(item)}
+                        disabled={downloadingPDF === item.printavoInvoiceId}
+                        className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-300 disabled:opacity-50"
+                        title="Download PDF"
+                      >
+                        {downloadingPDF === item.printavoInvoiceId ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Download className="w-4 h-4" />
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleCopyLink(item)}
+                        className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+                        title="Copy payment link"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => onSendInvoice?.(item)}
+                        className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300"
+                        title="Send invoice"
+                      >
+                        <Send className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
