@@ -233,7 +233,7 @@ function CustomerDetail({ customer }: CustomerDetailProps) {
         .select('*')
         .eq('customer_id', customer.id)
         .eq('company_id', companyId)
-        .order('date', { ascending: false });
+        .order('date', { ascending: true });
 
       if (error) {
         console.error('Error fetching fundraising credits:', error);
@@ -537,12 +537,12 @@ function CustomerDetail({ customer }: CustomerDetailProps) {
                 <table className="w-full table-auto">
                   <thead>
                     <tr className="border-b border-gray-200 dark:border-slate-700">
-                      <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2 w-32">Date</th>
-                      <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Store Name / Number</th>
+                      <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Date</th>
                       <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Batch Number</th>
-                      <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2 w-28">Amount</th>
-                      <th className="text-center text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2 w-36">📄 Report Upload</th>
-                      <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2 w-24">Actions</th>
+                      <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Amount</th>
+                      <th className="text-center text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Report</th>
+                      <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Invoice #</th>
+                      <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2 w-20">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -752,14 +752,6 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
         <td className="py-2">
           <input
             type="text"
-            value={editValues.store_name}
-            onChange={(e) => setEditValues({ ...editValues, store_name: e.target.value })}
-            className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          />
-        </td>
-        <td className="py-2">
-          <input
-            type="text"
             value={editValues.batch_number}
             onChange={(e) => setEditValues({ ...editValues, batch_number: e.target.value })}
             className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -782,15 +774,15 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
                 href={reportUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded transition-all border border-blue-200 dark:border-blue-800"
+                className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded transition-all border border-blue-200 dark:border-blue-800"
                 title="View Report"
               >
-                <File className="w-3.5 h-3.5" />
+                <File className="w-3 h-3" />
                 <span>View</span>
               </a>
             ) : (
-              <label className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded transition-all cursor-pointer border border-purple-200 dark:border-purple-800" title="Upload Report">
-                <Upload className="w-3.5 h-3.5" />
+              <label className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded transition-all cursor-pointer border border-purple-200 dark:border-purple-800" title="Upload Report">
+                <Upload className="w-3 h-3" />
                 <span>Upload</span>
                 <input
                   type="file"
@@ -803,6 +795,9 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
             )}
           </div>
         </td>
+        <td className="py-2 text-sm text-gray-900 dark:text-white">
+          {invoiceNumber || '-'}
+        </td>
         <td className="py-2">
           <div className="flex items-center justify-end gap-1">
             <button
@@ -811,14 +806,14 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
               className="p-1 text-green-600 dark:text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 rounded transition-colors disabled:opacity-50"
               title="Save"
             >
-              <Save className="w-4 h-4" />
+              <Save className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={onCancel}
               className="p-1 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 rounded transition-colors"
               title="Cancel"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
         </td>
@@ -828,31 +823,30 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
 
   return (
     <tr className="hover:bg-gray-50 dark:hover:bg-slate-700">
-      <td className="py-3 text-sm text-gray-900 dark:text-white">
+      <td className="py-2 text-sm text-gray-900 dark:text-white">
         {format(parseISO(credit.date), 'MMM d, yyyy')}
       </td>
-      <td className="py-3 text-sm text-gray-900 dark:text-white">{credit.store_name}</td>
-      <td className="py-3 text-sm text-gray-900 dark:text-white">{credit.batch_number}</td>
-      <td className="py-3 text-sm text-gray-900 dark:text-white text-right font-medium">
+      <td className="py-2 text-sm text-gray-900 dark:text-white">{credit.batch_number}</td>
+      <td className="py-2 text-sm text-gray-900 dark:text-white text-right font-medium">
         {formatCurrency(parseFloat(credit.amount.toString()))}
       </td>
-      <td className="py-3 text-center">
+      <td className="py-2 text-center">
         <div className="flex items-center justify-center gap-1">
           {credit.report_file_path && reportUrl ? (
             <a
               href={reportUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-md transition-all border border-blue-200 dark:border-blue-800"
+              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded transition-all border border-blue-200 dark:border-blue-800"
               title="View Report"
             >
-              <File className="w-4 h-4" />
-              <span>View PDF</span>
+              <File className="w-3 h-3" />
+              <span>View</span>
             </a>
           ) : (
-            <label className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded-md transition-all cursor-pointer border border-purple-200 dark:border-purple-800" title="Upload Report">
-              <Upload className="w-4 h-4" />
-              <span>{uploading ? 'Uploading...' : 'Upload PDF'}</span>
+            <label className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 rounded transition-all cursor-pointer border border-purple-200 dark:border-purple-800" title="Upload Report">
+              <Upload className="w-3 h-3" />
+              <span>{uploading ? 'Uploading...' : 'Upload'}</span>
               <input
                 type="file"
                 accept="application/pdf"
@@ -864,21 +858,24 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
           )}
         </div>
       </td>
-      <td className="py-3">
+      <td className="py-2 text-sm text-gray-900 dark:text-white">
+        {invoiceNumber || '-'}
+      </td>
+      <td className="py-2">
         <div className="flex items-center justify-end gap-1">
           <button
             onClick={onEdit}
             className="p-1 text-blue-600 dark:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
             title="Edit"
           >
-            <Edit2 className="w-4 h-4" />
+            <Edit2 className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={onDelete}
             className="p-1 text-red-600 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
             title="Delete"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
       </td>
