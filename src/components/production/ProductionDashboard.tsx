@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FileText, ClipboardList, CalendarDays, Package, Users } from 'lucide-react';
 import { QuotesManager } from './QuotesManager';
 
@@ -6,10 +6,20 @@ type ProductionTab = 'quotes' | 'work-orders' | 'scheduling' | 'manage-goods';
 
 interface ProductionDashboardProps {
   onNavigateToCustomers: () => void;
+  initialCustomerId?: string;
+  onCustomerIdConsumed?: () => void;
 }
 
-export function ProductionDashboard({ onNavigateToCustomers }: ProductionDashboardProps) {
+export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, onCustomerIdConsumed }: ProductionDashboardProps) {
   const [activeTab, setActiveTab] = useState<ProductionTab>('quotes');
+  const [customerIdForQuote, setCustomerIdForQuote] = useState<string | undefined>(initialCustomerId);
+
+  useEffect(() => {
+    if (initialCustomerId) {
+      setActiveTab('quotes');
+      setCustomerIdForQuote(initialCustomerId);
+    }
+  }, [initialCustomerId]);
 
   const tabs = [
     { id: 'quotes' as ProductionTab, label: 'Quotes', icon: FileText, description: 'Quote management & approvals' },
@@ -18,10 +28,22 @@ export function ProductionDashboard({ onNavigateToCustomers }: ProductionDashboa
     { id: 'manage-goods' as ProductionTab, label: 'Manage Goods', icon: Package, description: 'Inventory & products' },
   ];
 
+  const handleQuoteCustomerConsumed = () => {
+    setCustomerIdForQuote(undefined);
+    if (onCustomerIdConsumed) {
+      onCustomerIdConsumed();
+    }
+  };
+
   const renderTabContent = () => {
     switch (activeTab) {
       case 'quotes':
-        return <QuotesManager />;
+        return (
+          <QuotesManager
+            initialCustomerId={customerIdForQuote}
+            onCustomerIdConsumed={handleQuoteCustomerConsumed}
+          />
+        );
       case 'work-orders':
         return (
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-12 text-center">

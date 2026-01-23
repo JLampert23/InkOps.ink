@@ -48,17 +48,18 @@ interface QuoteFee {
 
 interface QuoteBuilderProps {
   quoteId?: string;
+  initialCustomerId?: string;
   onSave?: () => void;
   onCancel?: () => void;
 }
 
-export function QuoteBuilder({ quoteId, onSave, onCancel }: QuoteBuilderProps) {
+export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: QuoteBuilderProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [companySettings, setCompanySettings] = useState<any>(null);
   const [customers, setCustomers] = useState<any[]>([]);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>(initialCustomerId || '');
 
   const [quoteNumber, setQuoteNumber] = useState('');
   const [title, setTitle] = useState('');

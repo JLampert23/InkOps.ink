@@ -48,9 +48,10 @@ interface FundraisingCredit {
 
 interface CustomersReportProps {
   initialSearchTerm?: string;
+  onCreateQuote?: (customerId: string) => void;
 }
 
-export default function CustomersReport({ initialSearchTerm }: CustomersReportProps = {}) {
+export default function CustomersReport({ initialSearchTerm, onCreateQuote }: CustomersReportProps = {}) {
   const { showNotification } = useNotification();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -458,48 +459,66 @@ export default function CustomersReport({ initialSearchTerm }: CustomersReportPr
           </div>
           <div className="overflow-y-auto" style={{ maxHeight: '600px' }}>
             {filteredCustomers.map((customer) => (
-              <button
+              <div
                 key={customer.id}
-                onClick={() => loadCustomerDetails(customer)}
-                className={`w-full px-6 py-4 border-b border-gray-100 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors text-left ${
+                className={`w-full px-6 py-4 border-b border-gray-100 dark:border-slate-700 ${
                   selectedCustomer?.id === customer.id ? 'bg-green-50 dark:bg-green-900/20' : ''
                 }`}
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-gray-900 dark:text-white">{customer.company_name}</h4>
-                    {customer.contact_name && (
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{customer.contact_name}</p>
-                    )}
-                    <div className="mt-1 space-y-1">
-                      {customer.email && (
-                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                          <Mail className="w-4 h-4" />
-                          {customer.email}
-                        </div>
+                <button
+                  onClick={() => loadCustomerDetails(customer)}
+                  className="w-full hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors text-left rounded-lg p-2 -m-2"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-gray-900 dark:text-white">{customer.company_name}</h4>
+                      {customer.contact_name && (
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{customer.contact_name}</p>
                       )}
-                      {customer.phone && (
-                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                          <Phone className="w-4 h-4" />
-                          {customer.phone}
-                        </div>
-                      )}
-                    </div>
-                    <div className="mt-2 flex items-center gap-4 text-sm">
-                      <span className="text-gray-600 dark:text-gray-400">{customer.total_invoices} invoices</span>
-                      <span className="font-semibold text-gray-900 dark:text-white">
-                        ${customer.total_billed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                      {customer.outstanding_balance > 0 && (
-                        <span className="text-orange-600 dark:text-orange-500 font-medium">
-                          ${customer.outstanding_balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} due
+                      <div className="mt-1 space-y-1">
+                        {customer.email && (
+                          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                            <Mail className="w-4 h-4" />
+                            {customer.email}
+                          </div>
+                        )}
+                        {customer.phone && (
+                          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                            <Phone className="w-4 h-4" />
+                            {customer.phone}
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-2 flex items-center gap-4 text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">{customer.total_invoices} invoices</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">
+                          ${customer.total_billed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
-                      )}
+                        {customer.outstanding_balance > 0 && (
+                          <span className="text-orange-600 dark:text-orange-500 font-medium">
+                            ${customer.outstanding_balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} due
+                          </span>
+                        )}
+                      </div>
                     </div>
+                    <ChevronRight className="w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0 mt-1" />
                   </div>
-                  <ChevronRight className="w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0 mt-1" />
-                </div>
-              </button>
+                </button>
+                {onCreateQuote && (
+                  <div className="mt-2 pl-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onCreateQuote(customer.id);
+                      }}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors border border-blue-200 dark:border-blue-800"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Create Quote
+                    </button>
+                  </div>
+                )}
+              </div>
             ))}
 
             {filteredCustomers.length === 0 && (

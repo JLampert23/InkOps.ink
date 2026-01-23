@@ -1,10 +1,27 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import QuotesList from './QuotesList';
 import QuoteDetail from './QuoteDetail';
+import { QuoteBuilder } from './QuoteBuilder';
 
-export function QuotesManager() {
+interface QuotesManagerProps {
+  initialCustomerId?: string;
+  onCustomerIdConsumed?: () => void;
+}
+
+export function QuotesManager({ initialCustomerId, onCustomerIdConsumed }: QuotesManagerProps = {}) {
   const [view, setView] = useState<'list' | 'detail' | 'edit' | 'create'>('list');
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
+  const [preselectedCustomerId, setPreselectedCustomerId] = useState<string | undefined>(initialCustomerId);
+
+  useEffect(() => {
+    if (initialCustomerId) {
+      setView('create');
+      setPreselectedCustomerId(initialCustomerId);
+      if (onCustomerIdConsumed) {
+        onCustomerIdConsumed();
+      }
+    }
+  }, [initialCustomerId, onCustomerIdConsumed]);
 
   const handleSelectQuote = (quoteId: string) => {
     setSelectedQuoteId(quoteId);
@@ -18,11 +35,13 @@ export function QuotesManager() {
 
   const handleCreateQuote = () => {
     setSelectedQuoteId(null);
+    setPreselectedCustomerId(undefined);
     setView('create');
   };
 
   const handleBack = () => {
     setSelectedQuoteId(null);
+    setPreselectedCustomerId(undefined);
     setView('list');
   };
 
@@ -38,20 +57,12 @@ export function QuotesManager() {
 
   if (view === 'edit' || view === 'create') {
     return (
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-          {view === 'create' ? 'Create Quote' : 'Edit Quote'}
-        </h2>
-        <p className="text-gray-600 dark:text-gray-400 mb-6">
-          Quote Editor component - Coming soon
-        </p>
-        <button
-          onClick={handleBack}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          Back to Quotes
-        </button>
-      </div>
+      <QuoteBuilder
+        quoteId={selectedQuoteId || undefined}
+        initialCustomerId={preselectedCustomerId}
+        onSave={handleBack}
+        onCancel={handleBack}
+      />
     );
   }
 

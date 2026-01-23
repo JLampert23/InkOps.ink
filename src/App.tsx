@@ -41,6 +41,7 @@ function AppContent() {
   const [customerSearchTerm, setCustomerSearchTerm] = useState<string>('');
   const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
   const [customersKey, setCustomersKey] = useState(0);
+  const [quoteCustomerId, setQuoteCustomerId] = useState<string | undefined>(undefined);
   const { signOut, user } = useAuth();
   const { userProfile, canAccessIntegrations } = useRBAC();
   const { showNotification } = useNotification();
@@ -184,6 +185,12 @@ function AppContent() {
     setCustomerSearchTerm(searchTerm);
     setActiveTab('customers');
     setAccountingExpanded(true);
+  };
+
+  const handleCreateQuoteForCustomer = (customerId: string) => {
+    setQuoteCustomerId(customerId);
+    setActiveTab('production');
+    closeSidebarOnMobile();
   };
 
   return (
@@ -595,7 +602,11 @@ function AppContent() {
                 </div>
               </div>
             }>
-              <CustomersReport key={customersKey} initialSearchTerm={customerSearchTerm} />
+              <CustomersReport
+                key={customersKey}
+                initialSearchTerm={customerSearchTerm}
+                onCreateQuote={handleCreateQuoteForCustomer}
+              />
             </Suspense>
           )}
 
@@ -643,6 +654,8 @@ function AppContent() {
                   setAccountingExpanded(true);
                   closeSidebarOnMobile();
                 }}
+                initialCustomerId={quoteCustomerId}
+                onCustomerIdConsumed={() => setQuoteCustomerId(undefined)}
               />
             </Suspense>
           )}
