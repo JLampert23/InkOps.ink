@@ -120,7 +120,7 @@ export default function CustomersReport({ initialSearchTerm }: CustomersReportPr
       .select('*')
       .eq('customer_id', selectedCustomer.id)
       .eq('company_id', companyId)
-      .order('date', { ascending: false });
+      .order('date', { ascending: true });
 
     if (error) {
       console.error('Error fetching fundraising credits:', error);
@@ -652,11 +652,11 @@ export default function CustomersReport({ initialSearchTerm }: CustomersReportPr
                           <thead className="border-b border-gray-200 dark:border-slate-700">
                             <tr>
                               <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Date</th>
-                              <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Store</th>
-                              <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Batch</th>
+                              <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Batch Number</th>
                               <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Amount</th>
-                              <th className="text-center text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Report Upload</th>
-                              <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Actions</th>
+                              <th className="text-center text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Report</th>
+                              <th className="text-left text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2">Invoice #</th>
+                              <th className="text-right text-xs font-semibold text-gray-600 dark:text-gray-400 pb-2 w-20">Actions</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
@@ -765,7 +765,6 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
   const { showNotification } = useNotification();
   const [editValues, setEditValues] = useState({
     date: credit.date,
-    store_name: credit.store_name,
     batch_number: credit.batch_number,
     amount: credit.amount.toString()
   });
@@ -814,7 +813,6 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
     if (isEditing) {
       setEditValues({
         date: credit.date,
-        store_name: credit.store_name,
         batch_number: credit.batch_number,
         amount: credit.amount.toString()
       });
@@ -830,11 +828,32 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
 
     onSave({
       date: editValues.date,
-      store_name: editValues.store_name,
       batch_number: editValues.batch_number,
       amount: amount
     });
   };
+
+  const [invoiceNumber, setInvoiceNumber] = useState<string>('');
+
+  // Fetch invoice number where this credit was applied
+  useEffect(() => {
+    async function fetchInvoiceNumber() {
+      if (!credit.id || !companyId) return;
+
+      const { data } = await supabase
+        .from('payments')
+        .select('invoice_id, invoices!inner(visual_id)')
+        .eq('fundraising_credit_id', credit.id)
+        .eq('company_id', companyId)
+        .maybeSingle();
+
+      if (data && data.invoices) {
+        setInvoiceNumber(data.invoices.visual_id);
+      }
+    }
+
+    fetchInvoiceNumber();
+  }, [credit.id, companyId]);
 
   if (isEditing) {
     return (
@@ -844,14 +863,6 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
             type="date"
             value={editValues.date}
             onChange={(e) => setEditValues({ ...editValues, date: e.target.value })}
-            className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-transparent"
-          />
-        </td>
-        <td className="py-2">
-          <input
-            type="text"
-            value={editValues.store_name}
-            onChange={(e) => setEditValues({ ...editValues, store_name: e.target.value })}
             className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 focus:border-transparent"
           />
         </td>
@@ -874,6 +885,9 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
         </td>
         <td className="py-2 text-center">
           <span className="text-xs text-gray-500 dark:text-gray-400">—</span>
+        </td>
+        <td className="py-2 text-xs text-gray-900 dark:text-white">
+          {invoiceNumber || '—'}
         </td>
         <td className="py-2">
           <div className="flex items-center justify-end gap-1">
@@ -903,45 +917,50 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
       <td className="py-2 text-xs text-gray-900 dark:text-white">
         {format(new Date(credit.date), 'MMM d, yyyy')}
       </td>
-      <td className="py-2 text-xs text-gray-900 dark:text-white">{credit.store_name}</td>
       <td className="py-2 text-xs text-gray-900 dark:text-white">{credit.batch_number}</td>
       <td className="py-2 text-xs text-gray-900 dark:text-white text-right font-medium">
         ${parseFloat(credit.amount.toString()).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </td>
       <td className="py-2 text-center">
-        <div className="flex items-center justify-center gap-2">
-          {credit.report_url && (
+        <div className="flex items-center justify-center gap-1">
+          {credit.report_url ? (
             <a
               href={credit.report_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/50 border border-green-200 dark:border-green-800"
+              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800"
               title="View uploaded report"
             >
               <FileText className="w-3 h-3" />
-              View Report
+              View
             </a>
+          ) : (
+            <>
+              <input
+                type="file"
+                accept="application/pdf"
+                onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
+                className="hidden"
+                id={`upload-${credit.id}`}
+                disabled={uploading}
+              />
+              <label
+                htmlFor={`upload-${credit.id}`}
+                className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded cursor-pointer transition-colors ${
+                  uploading
+                    ? 'bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                    : 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/50 border border-purple-200 dark:border-purple-800'
+                }`}
+              >
+                <Upload className="w-3 h-3" />
+                {uploading ? 'Uploading...' : 'Upload'}
+              </label>
+            </>
           )}
-          <input
-            type="file"
-            accept="application/pdf"
-            onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
-            className="hidden"
-            id={`upload-${credit.id}`}
-            disabled={uploading}
-          />
-          <label
-            htmlFor={`upload-${credit.id}`}
-            className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded cursor-pointer transition-colors ${
-              uploading
-                ? 'bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800'
-            }`}
-          >
-            <Upload className="w-3 h-3" />
-            {uploading ? 'Uploading...' : credit.report_url ? 'Replace PDF' : 'Upload PDF'}
-          </label>
         </div>
+      </td>
+      <td className="py-2 text-xs text-gray-900 dark:text-white">
+        {invoiceNumber || '—'}
       </td>
       <td className="py-2">
         <div className="flex items-center justify-end gap-1">
