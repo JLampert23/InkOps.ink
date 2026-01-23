@@ -868,102 +868,97 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
               <p className="text-gray-500 dark:text-gray-400">No items added yet</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {items.map((item, idx) => (
-                <div key={idx} className="border border-gray-200 dark:border-slate-700 rounded-lg p-4 bg-gray-50 dark:bg-slate-900">
-                  <div className="flex justify-between items-start mb-4">
-                    <h4 className="font-medium text-gray-900 dark:text-white">Item {idx + 1}</h4>
-                    <button
-                      onClick={() => removeItem(idx)}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+            <div className="overflow-x-auto">
+              <div className="space-y-3 min-w-max">
+                <div className="flex gap-2 items-center text-xs font-semibold text-gray-700 dark:text-gray-300 px-2">
+                  <div className="w-20">Item #</div>
+                  <div className="w-24">Color</div>
+                  <div className="w-40">Description</div>
+                  <div className="w-12 text-center">YXS</div>
+                  <div className="w-12 text-center">YS</div>
+                  <div className="w-12 text-center">YM</div>
+                  <div className="w-12 text-center">YL</div>
+                  <div className="w-12 text-center">YXL</div>
+                  <div className="w-12 text-center">XS</div>
+                  <div className="w-12 text-center">S</div>
+                  <div className="w-12 text-center">M</div>
+                  <div className="w-12 text-center">L</div>
+                  <div className="w-12 text-center">XL</div>
+                  <div className="w-12 text-center">2XL</div>
+                  <div className="w-12 text-center">3XL</div>
+                  <div className="w-12 text-center">4XL</div>
+                  <div className="w-16 text-center">Qty</div>
+                  <div className="w-24 text-right">Price</div>
+                  <div className="w-24 text-right">Total</div>
+                  <div className="w-8"></div>
+                </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+                {items.map((item, idx) => (
+                  <div key={idx} className="flex gap-2 items-center border border-gray-200 dark:border-slate-700 rounded-lg p-2 bg-gray-50 dark:bg-slate-900">
                     <input
                       type="text"
                       value={item.item_number}
                       onChange={(e) => updateItem(idx, 'item_number', e.target.value)}
-                      className="px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
+                      className="w-20 px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
                       placeholder="Item #"
                     />
                     <input
                       type="text"
                       value={item.color}
                       onChange={(e) => updateItem(idx, 'color', e.target.value)}
-                      className="px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
+                      className="w-24 px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
                       placeholder="Color"
                     />
                     <input
                       type="text"
                       value={item.description}
                       onChange={(e) => updateItem(idx, 'description', e.target.value)}
-                      className="md:col-span-2 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
+                      className="w-40 px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
                       placeholder="Description"
                     />
-                  </div>
 
-                  <div className="mb-4">
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Sizes:</p>
-                    <div className="grid grid-cols-7 md:grid-cols-13 gap-2">
-                      {['yxs', 'ys', 'ym', 'yl', 'yxl', 'xs', 's', 'm', 'l', 'xl', '2xl', '3xl', '4xl'].map((size) => (
-                        <div key={size}>
-                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1 uppercase">
-                            {size}
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={item[`qty_${size}` as keyof QuoteItem] || 0}
-                            onChange={(e) => updateItem(idx, `qty_${size}`, parseInt(e.target.value) || 0)}
-                            className="w-full px-2 py-1 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Unit Price
-                      </label>
+                    {['yxs', 'ys', 'ym', 'yl', 'yxl', 'xs', 's', 'm', 'l', 'xl', '2xl', '3xl', '4xl'].map((size) => (
                       <input
+                        key={size}
                         type="number"
-                        step="0.01"
                         min="0"
-                        value={item.unit_price}
-                        onChange={(e) => updateItem(idx, 'unit_price', parseFloat(e.target.value) || 0)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
+                        value={item[`qty_${size}` as keyof QuoteItem] || ''}
+                        onChange={(e) => updateItem(idx, `qty_${size}`, parseInt(e.target.value) || 0)}
+                        className="w-12 px-1 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm text-center dark:bg-slate-700 dark:text-white"
+                        placeholder="0"
                       />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Total Qty
-                      </label>
-                      <input
-                        type="number"
-                        value={item.total_quantity}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-gray-100 dark:bg-slate-900 dark:text-white"
-                        readOnly
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Total Price
-                      </label>
-                      <input
-                        type="text"
-                        value={`$${item.total_price.toFixed(2)}`}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-gray-100 dark:bg-slate-900 dark:text-white"
-                        readOnly
-                      />
-                    </div>
+                    ))}
+
+                    <input
+                      type="number"
+                      value={item.total_quantity}
+                      className="w-16 px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm text-center bg-gray-100 dark:bg-slate-800 dark:text-white"
+                      readOnly
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={item.unit_price}
+                      onChange={(e) => updateItem(idx, 'unit_price', parseFloat(e.target.value) || 0)}
+                      className="w-24 px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm text-right dark:bg-slate-700 dark:text-white"
+                      placeholder="0.00"
+                    />
+                    <input
+                      type="text"
+                      value={`$${item.total_price.toFixed(2)}`}
+                      className="w-24 px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm text-right bg-gray-100 dark:bg-slate-800 dark:text-white"
+                      readOnly
+                    />
+                    <button
+                      onClick={() => removeItem(idx)}
+                      className="w-8 text-red-600 hover:text-red-700 flex items-center justify-center"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
         </section>
