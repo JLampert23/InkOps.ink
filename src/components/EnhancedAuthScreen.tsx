@@ -80,7 +80,7 @@ export function EnhancedAuthScreen() {
               <img
                 src="/create_variation_b_f.png"
                 alt="InkOps Logo"
-                className="h-24 w-auto"
+                className="h-40 w-auto"
               />
             </div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">
