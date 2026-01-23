@@ -64,7 +64,7 @@ type SettingsTab =
   | 'company-info'
   | 'printavo-integration' | 'square-integration' | 'resend-integration' | 'twilio-integration' | 'stripe-payments'
   | 'user-management' | 'user-security'
-  | 'status-filters' | 'billing-status-filters'
+  | 'billing-status-filters'
   | 'automated-reports' | 'workflow-setup' | 'automations'
   | 'invoice-fees' | 'custom-invoice-status';
 
@@ -85,6 +85,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [integrationsExpanded, setIntegrationsExpanded] = useState(false);
   const [productionExpanded, setProductionExpanded] = useState(false);
   const [accountingExpanded, setAccountingExpanded] = useState(false);
+  const [companySettingsExpanded, setCompanySettingsExpanded] = useState(false);
 
   const [companyName, setCompanyName] = useState('');
   const [companyAddress, setCompanyAddress] = useState('');
@@ -2080,24 +2081,83 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       {/* Left Sidebar Navigation */}
       <div className="w-64 bg-white dark:bg-slate-800 border-r border-gray-200 dark:border-slate-700 overflow-y-auto flex-shrink-0">
         <nav className="px-2 pt-4 pb-4">
-          {/* Company Settings Section */}
+          {/* Company Settings Section - Collapsible */}
           <div className="mb-2">
             <button
-              onClick={() => setActiveTab('company-info')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
-                activeTab === 'company-info'
-                  ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
-              }`}
+              onClick={() => setCompanySettingsExpanded(!companySettingsExpanded)}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-slate-700/50"
             >
-              <Building2 className={`w-4 h-4 flex-shrink-0 ${activeTab === 'company-info' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+              <Building2 className="w-4 h-4 flex-shrink-0 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
               <div className="flex-1 text-left">
-                <div className={`font-medium text-sm ${activeTab === 'company-info' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
                   Company Settings
                 </div>
               </div>
-              {activeTab === 'company-info' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+              {companySettingsExpanded ? (
+                <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200" />
+              ) : (
+                <ChevronUp className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200 rotate-180" />
+              )}
             </button>
+
+            {companySettingsExpanded && (
+              <div className="mt-1 ml-2 space-y-1 collapsible-section collapsible-section-enter">
+                <button
+                  onClick={() => setActiveTab('company-info')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'company-info'
+                      ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Building2 className={`w-4 h-4 flex-shrink-0 ${activeTab === 'company-info' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'company-info' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      Company Info
+                    </div>
+                  </div>
+                  {activeTab === 'company-info' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                </button>
+
+                {isAdmin && (
+                  <button
+                    onClick={() => setActiveTab('user-management')}
+                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                      activeTab === 'user-management'
+                        ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
+                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                    style={{ animationDelay: '20ms' }}
+                  >
+                    <Shield className={`w-4 h-4 flex-shrink-0 ${activeTab === 'user-management' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                    <div className="flex-1 text-left">
+                      <div className={`font-medium text-sm ${activeTab === 'user-management' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                        User Management
+                      </div>
+                    </div>
+                    {activeTab === 'user-management' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                  </button>
+                )}
+
+                <button
+                  onClick={() => setActiveTab('user-security')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'user-security'
+                      ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                  style={{ animationDelay: '40ms' }}
+                >
+                  <Key className={`w-4 h-4 flex-shrink-0 ${activeTab === 'user-security' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'user-security' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      Security
+                    </div>
+                  </div>
+                  {activeTab === 'user-security' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Integrations Section - Collapsible (Super Admin only) */}
@@ -2214,68 +2274,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               )}
             </div>
           )}
-
-          {/* User Management (Admin only) */}
-          {isAdmin && (
-            <div className="mb-2">
-              <button
-                onClick={() => setActiveTab('user-management')}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
-                  activeTab === 'user-management'
-                    ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
-                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
-                }`}
-              >
-                <Shield className={`w-4 h-4 flex-shrink-0 ${activeTab === 'user-management' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
-                <div className="flex-1 text-left">
-                  <div className={`font-medium text-sm ${activeTab === 'user-management' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                    User Management
-                  </div>
-                </div>
-                {activeTab === 'user-management' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
-              </button>
-            </div>
-          )}
-
-          {/* Security */}
-          <div className="mb-2">
-            <button
-              onClick={() => setActiveTab('user-security')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
-                activeTab === 'user-security'
-                  ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
-              <Key className={`w-4 h-4 flex-shrink-0 ${activeTab === 'user-security' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
-              <div className="flex-1 text-left">
-                <div className={`font-medium text-sm ${activeTab === 'user-security' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                  Security
-                </div>
-              </div>
-              {activeTab === 'user-security' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
-            </button>
-          </div>
-
-          {/* Status Filters */}
-          <div className="mb-2">
-            <button
-              onClick={() => setActiveTab('status-filters')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
-                activeTab === 'status-filters'
-                  ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
-              <Filter className={`w-4 h-4 flex-shrink-0 ${activeTab === 'status-filters' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
-              <div className="flex-1 text-left">
-                <div className={`font-medium text-sm ${activeTab === 'status-filters' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                  Dashboard Filters
-                </div>
-              </div>
-              {activeTab === 'status-filters' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
-            </button>
-          </div>
 
           {/* Accounting Settings Section - Collapsible */}
           <div className="mb-2">
@@ -3826,85 +3824,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   <li>Only users with the correct PIN can unlock invoices</li>
                 </ul>
               </div>
-            </div>
-          )}
-
-          {activeTab === 'status-filters' && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Printavo Dashboard Status Filters</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Select statuses to display in Printavo Dashboard section</p>
-              </div>
-
-              {loadingStatuses ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-spin" />
-                </div>
-              ) : availableStatuses.length === 0 ? (
-                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  No invoice statuses found. Configure your Printavo integration and test the connection to load available statuses.
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between mb-4">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {selectedStatuses.length} of {availableStatuses.length} statuses selected
-                    </p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setSelectedStatuses(availableStatuses)}
-                        className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
-                      >
-                        Select All
-                      </button>
-                      <span className="text-gray-400 dark:text-gray-500">|</span>
-                      <button
-                        onClick={() => setSelectedStatuses([])}
-                        className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
-                      >
-                        Clear All
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto border border-gray-200 dark:border-slate-600 rounded-lg p-4">
-                    {availableStatuses.map(status => (
-                      <label
-                        key={status}
-                        className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer transition-colors border border-gray-200 dark:border-slate-600"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedStatuses.includes(status)}
-                          onChange={() => toggleStatus(status)}
-                          className="mt-1 w-4 h-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500"
-                        />
-                        <span className="text-sm text-gray-900 dark:text-white break-words flex-1">{status}</span>
-                      </label>
-                    ))}
-                  </div>
-
-                  <div className="pt-4">
-                    <button
-                      onClick={saveStatusPreferences}
-                      disabled={savingStatuses}
-                      className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                    >
-                      {savingStatuses ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="w-4 h-4" />
-                          Save Preferences
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </>
-              )}
             </div>
           )}
 
