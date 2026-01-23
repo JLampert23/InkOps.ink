@@ -73,6 +73,14 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
   });
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [savingCredit, setSavingCredit] = useState(false);
+  const [isEditingCustomer, setIsEditingCustomer] = useState(false);
+  const [editedCustomer, setEditedCustomer] = useState<{
+    company_name: string;
+    contact_name: string;
+    email: string;
+    phone: string;
+    website?: string;
+  } | null>(null);
 
   useEffect(() => {
     loadCustomers();
@@ -327,6 +335,41 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
     }
   };
 
+  const handleSaveCustomer = async () => {
+    if (!editedCustomer || !selectedCustomer) return;
+
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .update({
+          company_name: editedCustomer.company_name,
+          contact_name: editedCustomer.contact_name || null,
+          email: editedCustomer.email || null,
+          phone: editedCustomer.phone || null,
+          website: editedCustomer.website || null,
+        })
+        .eq('id', selectedCustomer.id);
+
+      if (error) throw error;
+
+      // Update local state
+      const updatedCustomer = {
+        ...selectedCustomer,
+        company_name: editedCustomer.company_name,
+        contact_name: editedCustomer.contact_name,
+        email: editedCustomer.email,
+        phone: editedCustomer.phone
+      };
+      setSelectedCustomer(updatedCustomer);
+      setCustomers(customers.map(c => c.id === selectedCustomer.id ? updatedCustomer : c));
+      setIsEditingCustomer(false);
+      showNotification('success', 'Customer Updated', 'Customer information has been updated successfully');
+    } catch (error) {
+      console.error('Error updating customer:', error);
+      showNotification('error', 'Update Failed', 'Failed to update customer. Please try again.');
+    }
+  };
+
   const filteredCustomers = customers.filter(customer =>
     customer.company_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     customer.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -536,34 +579,132 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
           {selectedCustomer ? (
             <>
               <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{selectedCustomer.company_name}</h3>
-                {selectedCustomer.contact_name && (
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{selectedCustomer.contact_name}</p>
-                )}
-                <div className="mt-2 grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-gray-600 dark:text-gray-400">Total Billed:</span>
-                    <span className="ml-2 font-semibold text-gray-900 dark:text-white">
-                      ${selectedCustomer.total_billed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex-1">
+                    {isEditingCustomer && editedCustomer ? (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Company Name *</label>
+                          <input
+                            type="text"
+                            value={editedCustomer.company_name}
+                            onChange={(e) => setEditedCustomer({ ...editedCustomer, company_name: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Contact Name</label>
+                            <input
+                              type="text"
+                              value={editedCustomer.contact_name || ''}
+                              onChange={(e) => setEditedCustomer({ ...editedCustomer, contact_name: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                            <input
+                              type="email"
+                              value={editedCustomer.email || ''}
+                              onChange={(e) => setEditedCustomer({ ...editedCustomer, email: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone</label>
+                            <input
+                              type="text"
+                              value={editedCustomer.phone || ''}
+                              onChange={(e) => setEditedCustomer({ ...editedCustomer, phone: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Website</label>
+                            <input
+                              type="text"
+                              value={editedCustomer.website || ''}
+                              onChange={(e) => setEditedCustomer({ ...editedCustomer, website: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleSaveCustomer}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                          >
+                            <Save className="w-4 h-4" />
+                            Save Changes
+                          </button>
+                          <button
+                            onClick={() => {
+                              setIsEditingCustomer(false);
+                              setEditedCustomer(null);
+                            }}
+                            className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-900 dark:text-white transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{selectedCustomer.company_name}</h3>
+                        {selectedCustomer.contact_name && (
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{selectedCustomer.contact_name}</p>
+                        )}
+                      </>
+                    )}
                   </div>
-                  <div>
-                    <span className="text-gray-600 dark:text-gray-400">Total Paid:</span>
-                    <span className="ml-2 font-semibold text-green-600 dark:text-green-500">
-                      ${selectedCustomer.total_paid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-600 dark:text-gray-400">Outstanding:</span>
-                    <span className="ml-2 font-semibold text-orange-600 dark:text-orange-500">
-                      ${selectedCustomer.outstanding_balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-600 dark:text-gray-400">Invoices:</span>
-                    <span className="ml-2 font-semibold text-gray-900 dark:text-white">{selectedCustomer.total_invoices}</span>
-                  </div>
+                  {!isEditingCustomer && (
+                    <button
+                      onClick={() => {
+                        setEditedCustomer({
+                          company_name: selectedCustomer.company_name,
+                          contact_name: selectedCustomer.contact_name,
+                          email: selectedCustomer.email,
+                          phone: selectedCustomer.phone,
+                          website: ''
+                        });
+                        setIsEditingCustomer(true);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shrink-0 ml-4"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      Edit Customer
+                    </button>
+                  )}
                 </div>
+
+                {!isEditingCustomer && (
+                  <div className="mt-2 grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">Total Billed:</span>
+                      <span className="ml-2 font-semibold text-gray-900 dark:text-white">
+                        ${selectedCustomer.total_billed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">Total Paid:</span>
+                      <span className="ml-2 font-semibold text-green-600 dark:text-green-500">
+                        ${selectedCustomer.total_paid.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">Outstanding:</span>
+                      <span className="ml-2 font-semibold text-orange-600 dark:text-orange-500">
+                        ${selectedCustomer.outstanding_balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600 dark:text-gray-400">Invoices:</span>
+                      <span className="ml-2 font-semibold text-gray-900 dark:text-white">{selectedCustomer.total_invoices}</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="overflow-y-auto" style={{ maxHeight: '520px' }}>
