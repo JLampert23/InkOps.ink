@@ -3,6 +3,7 @@ import { Save, Plus, Trash2, GripVertical, X, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
 import CreateCustomerModal from '../accounting/CreateCustomerModal';
+import { ManageImprintsModal } from './ManageImprintsModal';
 
 interface QuoteItem {
   id?: string;
@@ -88,6 +89,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const [salesTaxRate, setSalesTaxRate] = useState(6.25);
 
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
+  const [showImprintsModal, setShowImprintsModal] = useState(false);
 
   useEffect(() => {
     loadCustomers();
@@ -938,6 +940,13 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                 <Plus className="w-4 h-4" />
                 Line Item
               </button>
+              <button
+                onClick={() => setShowImprintsModal(true)}
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded text-sm flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Imprint(s)
+              </button>
             </div>
           </div>
 
@@ -1112,6 +1121,13 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         isOpen={showNewCustomerModal}
         onClose={() => setShowNewCustomerModal(false)}
         onSuccess={handleCustomerCreated}
+      />
+
+      {/* Manage Imprints Modal */}
+      <ManageImprintsModal
+        isOpen={showImprintsModal}
+        onClose={() => setShowImprintsModal(false)}
+        quoteId={quoteId}
       />
     </div>
   );
