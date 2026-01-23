@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 interface QuoteItem {
   id?: string;
+  line_type?: 'item' | 'fee' | 'imprint';
   item_number: string;
   color: string;
   description: string;
@@ -20,10 +21,17 @@ interface QuoteItem {
   qty_xl: number;
   qty_2xl: number;
   qty_3xl: number;
+  qty_4xl: number;
   unit_price: number;
   total_quantity: number;
   total_price: number;
   image_url?: string;
+  decoration_method?: string;
+  decoration_location?: string;
+  artwork_url?: string;
+  imprint_number?: string;
+  num_colors?: number;
+  notes?: string;
 }
 
 interface QuoteImprint {
@@ -67,6 +75,11 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const [dueDate, setDueDate] = useState('');
   const [terms, setTerms] = useState('Net 30');
   const [validUntil, setValidUntil] = useState('');
+  const [poNumber, setPoNumber] = useState('');
+  const [deliveryMethod, setDeliveryMethod] = useState('PICK-UP');
+  const [invoiceDate, setInvoiceDate] = useState('');
+  const [paymentDueDate, setPaymentDueDate] = useState('');
+  const [customerNotes, setCustomerNotes] = useState('');
 
   const [billName, setBillName] = useState('');
   const [billContact, setBillContact] = useState('');
@@ -251,11 +264,12 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
 
   const addItem = () => {
     setItems([...items, {
+      line_type: 'item',
       item_number: '',
       color: '',
       description: '',
       qty_yxs: 0, qty_ys: 0, qty_ym: 0, qty_yl: 0, qty_yxl: 0,
-      qty_xs: 0, qty_s: 0, qty_m: 0, qty_l: 0, qty_xl: 0, qty_2xl: 0, qty_3xl: 0,
+      qty_xs: 0, qty_s: 0, qty_m: 0, qty_l: 0, qty_xl: 0, qty_2xl: 0, qty_3xl: 0, qty_4xl: 0,
       unit_price: 0,
       total_quantity: 0,
       total_price: 0,
@@ -267,7 +281,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
     updated[index] = { ...updated[index], [field]: value };
 
     if (field.startsWith('qty_')) {
-      const totalQty = ['qty_yxs', 'qty_ys', 'qty_ym', 'qty_yl', 'qty_yxl', 'qty_xs', 'qty_s', 'qty_m', 'qty_l', 'qty_xl', 'qty_2xl', 'qty_3xl']
+      const totalQty = ['qty_yxs', 'qty_ys', 'qty_ym', 'qty_yl', 'qty_yxl', 'qty_xs', 'qty_s', 'qty_m', 'qty_l', 'qty_xl', 'qty_2xl', 'qty_3xl', 'qty_4xl']
         .reduce((sum, key) => sum + Number(updated[index][key as keyof QuoteItem] || 0), 0);
       updated[index].total_quantity = totalQty;
       updated[index].total_price = totalQty * Number(updated[index].unit_price);
@@ -340,46 +354,71 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   };
 
   const saveQuote = async () => {
-    if (!title.trim()) {
-      alert('Please enter a quote title');
+    if (!billName.trim()) {
+      alert('Please enter a customer name');
       return;
     }
 
     setSaving(true);
     try {
+      const { data: { user: authUser } } = await supabase.auth.getSession();
+      if (!authUser?.user) throw new Error('No authenticated user');
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', authUser.user.id)
+        .single();
+
+      if (!profile?.company_id) throw new Error('No company found');
+
       const quoteData = {
         quote_number: quoteNumber,
-        title,
-        created_date: createdDate,
-        due_date: dueDate || null,
-        terms,
-        valid_until: validUntil || null,
+        company_id: profile.company_id,
         customer_id: selectedCustomerId || null,
-        customer_billing_name: billName,
-        customer_billing_contact: billContact,
-        customer_billing_address_line1: billAddress1,
-        customer_billing_address_line2: billAddress2,
-        customer_billing_city: billCity,
-        customer_billing_state: billState,
-        customer_billing_zip: billZip,
-        customer_billing_phone: billPhone,
-        customer_billing_email: billEmail,
-        customer_shipping_name: shipName,
-        customer_shipping_contact: shipContact,
-        customer_shipping_address_line1: shipAddress1,
-        customer_shipping_address_line2: shipAddress2,
-        customer_shipping_city: shipCity,
-        customer_shipping_state: shipState,
-        customer_shipping_zip: shipZip,
-        item_total: itemTotal,
-        fees_total: feesTotal,
+        customer_name: billName,
+        customer_email: billEmail || null,
+        customer_phone: billPhone || null,
+        customer_company: billName,
+        billing_address: {
+          line1: billAddress1,
+          line2: billAddress2,
+          city: billCity,
+          state: billState,
+          zip: billZip,
+        },
+        shipping_address: {
+          name: shipName,
+          contact: shipContact,
+          line1: shipAddress1,
+          line2: shipAddress2,
+          city: shipCity,
+          state: shipState,
+          zip: shipZip,
+        },
         subtotal: subtotal,
-        tax: tax,
+        tax_rate: 0,
+        tax_amount: tax,
         total: total,
-        paid: 0,
-        outstanding: total,
         status: 'draft',
-        created_by: user?.id,
+        valid_until: validUntil || null,
+        notes: '',
+        customer_notes: customerNotes,
+        po_number: poNumber || null,
+        delivery_method: deliveryMethod,
+        invoice_date: invoiceDate || null,
+        payment_due_date: paymentDueDate || null,
+        terms: terms,
+        company_name: companySettings?.company_name || "Todd's Sporting Goods",
+        company_address: companySettings?.company_address || '393 Cabot Street',
+        company_city: companySettings?.company_city || 'Beverly',
+        company_state: companySettings?.company_state || 'Massachusetts',
+        company_zip: companySettings?.company_zip || '01915',
+        company_phone: companySettings?.company_phone || '19789271600',
+        company_email: companySettings?.company_email || 'jamie@toddssportinggoods.com',
+        company_website: companySettings?.company_website || 'https://www.toddssportinggoods.com',
+        company_logo_url: companySettings?.company_logo_primary_url || null,
+        created_by: authUser.user.id,
       };
 
       let savedQuoteId = quoteId;
@@ -401,37 +440,65 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       }
 
       if (savedQuoteId) {
-        await supabase.from('quote_items').delete().eq('quote_id', savedQuoteId);
-        if (items.length > 0) {
-          await supabase.from('quote_items').insert(
-            items.map((item, idx) => ({
-              ...item,
-              quote_id: savedQuoteId,
-              sort_order: idx,
-            }))
-          );
-        }
+        await supabase.from('quote_line_items').delete().eq('quote_id', savedQuoteId);
 
-        await supabase.from('quote_imprints').delete().eq('quote_id', savedQuoteId);
-        if (imprints.length > 0) {
-          await supabase.from('quote_imprints').insert(
-            imprints.map((imprint, idx) => ({
-              ...imprint,
-              quote_id: savedQuoteId,
-              sort_order: idx,
-            }))
-          );
-        }
+        const allLineItems = [
+          ...items.map((item, idx) => ({
+            quote_id: savedQuoteId,
+            company_id: profile.company_id,
+            line_number: idx,
+            line_type: 'item',
+            item_number: item.item_number,
+            color: item.color,
+            sku: item.item_number,
+            description: item.description,
+            quantity: item.total_quantity,
+            unit_price: item.unit_price,
+            total_price: item.total_price,
+            qty_yxs: item.qty_yxs || 0,
+            qty_ys: item.qty_ys || 0,
+            qty_ym: item.qty_ym || 0,
+            qty_yl: item.qty_yl || 0,
+            qty_yxl: item.qty_yxl || 0,
+            qty_xs: item.qty_xs || 0,
+            qty_s: item.qty_s || 0,
+            qty_m: item.qty_m || 0,
+            qty_l: item.qty_l || 0,
+            qty_xl: item.qty_xl || 0,
+            qty_2xl: item.qty_2xl || 0,
+            qty_3xl: item.qty_3xl || 0,
+            qty_4xl: item.qty_4xl || 0,
+          })),
+          ...imprints.map((imprint, idx) => ({
+            quote_id: savedQuoteId,
+            company_id: profile.company_id,
+            line_number: items.length + idx,
+            line_type: 'imprint',
+            description: imprint.description,
+            quantity: 1,
+            unit_price: 0,
+            total_price: 0,
+            imprint_number: imprint.imprint_number,
+            decoration_method: imprint.decoration_method,
+            decoration_location: imprint.location,
+            artwork_url: imprint.artwork_url,
+            num_colors: imprint.num_colors,
+          })),
+          ...fees.map((fee, idx) => ({
+            quote_id: savedQuoteId,
+            company_id: profile.company_id,
+            line_number: items.length + imprints.length + idx,
+            line_type: 'fee',
+            description: fee.fee_name,
+            notes: fee.description,
+            quantity: fee.quantity,
+            unit_price: fee.unit_amount,
+            total_price: fee.total_amount,
+          })),
+        ];
 
-        await supabase.from('quote_fees').delete().eq('quote_id', savedQuoteId);
-        if (fees.length > 0) {
-          await supabase.from('quote_fees').insert(
-            fees.map((fee, idx) => ({
-              ...fee,
-              quote_id: savedQuoteId,
-              sort_order: idx,
-            }))
-          );
+        if (allLineItems.length > 0) {
+          await supabase.from('quote_line_items').insert(allLineItems);
         }
       }
 
@@ -439,7 +506,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       if (onSave) onSave();
     } catch (err) {
       console.error('Error saving quote:', err);
-      alert('Failed to save quote');
+      alert(`Failed to save quote: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setSaving(false);
     }
@@ -564,6 +631,66 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                 className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                PO Number
+              </label>
+              <input
+                type="text"
+                value={poNumber}
+                onChange={(e) => setPoNumber(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
+                placeholder="Purchase Order #"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Delivery Method
+              </label>
+              <select
+                value={deliveryMethod}
+                onChange={(e) => setDeliveryMethod(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
+              >
+                <option value="PICK-UP">PICK-UP</option>
+                <option value="DELIVERY">DELIVERY</option>
+                <option value="SHIPPING">SHIPPING</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Invoice Date
+              </label>
+              <input
+                type="date"
+                value={invoiceDate}
+                onChange={(e) => setInvoiceDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Payment Due Date
+              </label>
+              <input
+                type="date"
+                value={paymentDueDate}
+                onChange={(e) => setPaymentDueDate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
+              />
+            </div>
+          </div>
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Customer Notes
+            </label>
+            <textarea
+              value={customerNotes}
+              onChange={(e) => setCustomerNotes(e.target.value)}
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
+              placeholder="Notes visible to customer on quote/invoice"
+            />
           </div>
         </section>
 
@@ -780,8 +907,8 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
 
                   <div className="mb-4">
                     <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Sizes:</p>
-                    <div className="grid grid-cols-6 md:grid-cols-12 gap-2">
-                      {['yxs', 'ys', 'ym', 'yl', 'yxl', 'xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].map((size) => (
+                    <div className="grid grid-cols-7 md:grid-cols-13 gap-2">
+                      {['yxs', 'ys', 'ym', 'yl', 'yxl', 'xs', 's', 'm', 'l', 'xl', '2xl', '3xl', '4xl'].map((size) => (
                         <div key={size}>
                           <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1 uppercase">
                             {size}
