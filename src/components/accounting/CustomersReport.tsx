@@ -588,6 +588,58 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
               </div>
 
               <div className="overflow-y-auto" style={{ maxHeight: '520px' }}>
+                {/* Invoice History */}
+                {loadingDetails ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-8 h-8 text-green-600 dark:text-green-500 animate-spin" />
+                  </div>
+                ) : (
+                  <div className="border-b border-gray-200 dark:border-slate-700">
+                    <div className="px-4 py-3 bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700">
+                      <h4 className="font-semibold text-gray-900 dark:text-white">Invoice History</h4>
+                    </div>
+                    <table className="w-full">
+                      <thead className="bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700 sticky top-0">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Invoice #</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Amount</th>
+                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
+                        {customerInvoices.map((inv) => (
+                          <tr key={inv.invoice_number} className="hover:bg-gray-50 dark:hover:bg-slate-700">
+                            <td className="px-4 py-3">
+                              <button
+                                onClick={() => handleViewInvoice(inv.invoice_id)}
+                                className="text-sm font-medium text-blue-600 dark:text-blue-500 hover:text-blue-800 dark:hover:text-blue-400 hover:underline cursor-pointer"
+                              >
+                                {inv.invoice_number}
+                              </button>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                              {format(new Date(inv.invoice_date), 'MMM dd, yyyy')}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
+                              ${inv.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                inv.status === 'Paid' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400' :
+                                inv.status === 'Partially Paid' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400' :
+                                'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400'
+                              }`}>
+                                {inv.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
                 {/* Fundraising Credits Section */}
                 <div className="border-b border-gray-200 dark:border-slate-700">
                   <div className="px-4 py-3 bg-gray-50 dark:bg-slate-900 flex items-center justify-between">
@@ -720,58 +772,6 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
                     )}
                   </div>
                 </div>
-
-                {/* Invoice History */}
-                {loadingDetails ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="w-8 h-8 text-green-600 dark:text-green-500 animate-spin" />
-                  </div>
-                ) : (
-                  <div>
-                    <div className="px-4 py-3 bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700">
-                      <h4 className="font-semibold text-gray-900 dark:text-white">Invoice History</h4>
-                    </div>
-                    <table className="w-full">
-                      <thead className="bg-gray-50 dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700 sticky top-0">
-                        <tr>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Invoice #</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Amount</th>
-                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
-                        {customerInvoices.map((inv) => (
-                          <tr key={inv.invoice_number} className="hover:bg-gray-50 dark:hover:bg-slate-700">
-                            <td className="px-4 py-3">
-                              <button
-                                onClick={() => handleViewInvoice(inv.invoice_id)}
-                                className="text-sm font-medium text-blue-600 dark:text-blue-500 hover:text-blue-800 dark:hover:text-blue-400 hover:underline cursor-pointer"
-                              >
-                                {inv.invoice_number}
-                              </button>
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
-                              {format(new Date(inv.invoice_date), 'MMM dd, yyyy')}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
-                              ${inv.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                inv.status === 'Paid' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400' :
-                                inv.status === 'Partially Paid' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400' :
-                                'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400'
-                              }`}>
-                                {inv.status}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
               </div>
             </>
           ) : (
