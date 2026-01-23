@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, Copy, Loader2, X, FileText, ChevronDown, ChevronRight, DollarSign, User, Package, Palette, Receipt } from 'lucide-react';
+import { Save, Plus, Trash2, Copy, Loader2, X, FileText, DollarSign, User, Package, Palette, Receipt } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -109,13 +109,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const [tax, setTax] = useState(0);
   const [total, setTotal] = useState(0);
 
-  const [expandedSections, setExpandedSections] = useState({
-    customer: true,
-    items: true,
-    imprints: true,
-    fees: true,
-  });
-
   useEffect(() => {
     loadCompanySettings();
     loadCustomers();
@@ -129,10 +122,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   useEffect(() => {
     calculateTotals();
   }, [items, fees, tax]);
-
-  const toggleSection = (section: keyof typeof expandedSections) => {
-    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
-  };
 
   const loadCompanySettings = async () => {
     const { data } = await supabase
@@ -825,128 +814,110 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
             </div>
           </div>
 
-          {/* Customer Address Details (Collapsible) */}
-          <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
-            <button
-              onClick={() => toggleSection('customer')}
-              className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
-            >
+          {/* Customer Address Details */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <User className="w-5 h-5 text-blue-600" />
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Billing & Shipping Addresses</h3>
               </div>
-              {expandedSections.customer ? (
-                <ChevronDown className="w-5 h-5 text-gray-400" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-gray-400" />
-              )}
-            </button>
+              <button
+                onClick={copyBillingToShipping}
+                className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700"
+              >
+                <Copy className="w-4 h-4" />
+                Copy Billing to Shipping
+              </button>
+            </div>
 
-            {expandedSections.customer && (
-              <div className="p-4 pt-0 space-y-4 border-t border-gray-100 dark:border-slate-700">
-                <div className="flex items-center justify-end">
-                  <button
-                    onClick={copyBillingToShipping}
-                    className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700"
-                  >
-                    <Copy className="w-4 h-4" />
-                    Copy Billing to Shipping
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-gray-900 dark:text-white text-sm">Billing Address</h4>
-                    <input
-                      type="text"
-                      value={billAddress1}
-                      onChange={(e) => setBillAddress1(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
-                      placeholder="Address Line 1"
-                    />
-                    <input
-                      type="text"
-                      value={billAddress2}
-                      onChange={(e) => setBillAddress2(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
-                      placeholder="Address Line 2"
-                    />
-                    <div className="grid grid-cols-3 gap-2">
-                      <input
-                        type="text"
-                        value={billCity}
-                        onChange={(e) => setBillCity(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
-                        placeholder="City"
-                      />
-                      <input
-                        type="text"
-                        value={billState}
-                        onChange={(e) => setBillState(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
-                        placeholder="State"
-                      />
-                      <input
-                        type="text"
-                        value={billZip}
-                        onChange={(e) => setBillZip(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
-                        placeholder="ZIP"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-gray-900 dark:text-white text-sm">Shipping Address</h4>
-                    <input
-                      type="text"
-                      value={shipAddress1}
-                      onChange={(e) => setShipAddress1(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
-                      placeholder="Address Line 1"
-                    />
-                    <input
-                      type="text"
-                      value={shipAddress2}
-                      onChange={(e) => setShipAddress2(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
-                      placeholder="Address Line 2"
-                    />
-                    <div className="grid grid-cols-3 gap-2">
-                      <input
-                        type="text"
-                        value={shipCity}
-                        onChange={(e) => setShipCity(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
-                        placeholder="City"
-                      />
-                      <input
-                        type="text"
-                        value={shipState}
-                        onChange={(e) => setShipState(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
-                        placeholder="State"
-                      />
-                      <input
-                        type="text"
-                        value={shipZip}
-                        onChange={(e) => setShipZip(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
-                        placeholder="ZIP"
-                      />
-                    </div>
-                  </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <h4 className="font-medium text-gray-900 dark:text-white text-sm">Billing Address</h4>
+                <input
+                  type="text"
+                  value={billAddress1}
+                  onChange={(e) => setBillAddress1(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
+                  placeholder="Address Line 1"
+                />
+                <input
+                  type="text"
+                  value={billAddress2}
+                  onChange={(e) => setBillAddress2(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
+                  placeholder="Address Line 2"
+                />
+                <div className="grid grid-cols-3 gap-2">
+                  <input
+                    type="text"
+                    value={billCity}
+                    onChange={(e) => setBillCity(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
+                    placeholder="City"
+                  />
+                  <input
+                    type="text"
+                    value={billState}
+                    onChange={(e) => setBillState(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
+                    placeholder="State"
+                  />
+                  <input
+                    type="text"
+                    value={billZip}
+                    onChange={(e) => setBillZip(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
+                    placeholder="ZIP"
+                  />
                 </div>
               </div>
-            )}
+
+              <div className="space-y-3">
+                <h4 className="font-medium text-gray-900 dark:text-white text-sm">Shipping Address</h4>
+                <input
+                  type="text"
+                  value={shipAddress1}
+                  onChange={(e) => setShipAddress1(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
+                  placeholder="Address Line 1"
+                />
+                <input
+                  type="text"
+                  value={shipAddress2}
+                  onChange={(e) => setShipAddress2(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
+                  placeholder="Address Line 2"
+                />
+                <div className="grid grid-cols-3 gap-2">
+                  <input
+                    type="text"
+                    value={shipCity}
+                    onChange={(e) => setShipCity(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
+                    placeholder="City"
+                  />
+                  <input
+                    type="text"
+                    value={shipState}
+                    onChange={(e) => setShipState(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
+                    placeholder="State"
+                  />
+                  <input
+                    type="text"
+                    value={shipZip}
+                    onChange={(e) => setShipZip(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
+                    placeholder="ZIP"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Line Items Section */}
-          <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
-            <button
-              onClick={() => toggleSection('items')}
-              className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
-            >
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Package className="w-5 h-5 text-blue-600" />
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Line Items</h3>
@@ -954,239 +925,222 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                   {items.length}
                 </span>
               </div>
-              <div className="flex items-center gap-2">
+              <button
+                onClick={addItem}
+                className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+              >
+                <Plus className="w-3 h-3" />
+                Add
+              </button>
+            </div>
+
+            {items.length === 0 ? (
+              <div className="text-center py-12 bg-gray-50 dark:bg-slate-900 rounded-lg border-2 border-dashed border-gray-300 dark:border-slate-600">
+                <Package className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                <p className="text-gray-500 dark:text-gray-400 mb-3">No items added yet</p>
                 <button
-                  onClick={(e) => { e.stopPropagation(); addItem(); }}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                  onClick={addItem}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
-                  <Plus className="w-3 h-3" />
-                  Add
+                  <Plus className="w-4 h-4" />
+                  Add First Item
                 </button>
-                {expandedSections.items ? (
-                  <ChevronDown className="w-5 h-5 text-gray-400" />
-                ) : (
-                  <ChevronRight className="w-5 h-5 text-gray-400" />
-                )}
               </div>
-            </button>
+            ) : (
+              <div className="space-y-4">
+                {items.map((item, idx) => (
+                  <div key={idx} className="border border-gray-200 dark:border-slate-700 rounded-lg p-4 bg-white dark:bg-slate-800">
+                    <div className="flex gap-2 mb-3">
+                      <input
+                        type="text"
+                        value={item.item_number}
+                        onChange={(e) => updateItem(idx, 'item_number', e.target.value)}
+                        className="w-32 px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
+                        placeholder="Item #"
+                      />
+                      <input
+                        type="text"
+                        value={item.color}
+                        onChange={(e) => updateItem(idx, 'color', e.target.value)}
+                        className="w-32 px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
+                        placeholder="Color"
+                      />
+                      <input
+                        type="text"
+                        value={item.description}
+                        onChange={(e) => updateItem(idx, 'description', e.target.value)}
+                        className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
+                        placeholder="Description"
+                      />
+                      <button
+                        onClick={() => removeItem(idx)}
+                        className="px-2 text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
 
-            {expandedSections.items && (
-              <div className="p-4 pt-0 border-t border-gray-100 dark:border-slate-700">
-                {items.length === 0 ? (
-                  <div className="text-center py-12 bg-gray-50 dark:bg-slate-900 rounded-lg border-2 border-dashed border-gray-300 dark:border-slate-600">
-                    <Package className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-500 dark:text-gray-400 mb-3">No items added yet</p>
-                    <button
-                      onClick={addItem}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Add First Item
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {items.map((item, idx) => (
-                      <div key={idx} className="border border-gray-200 dark:border-slate-700 rounded-lg p-3 bg-gray-50 dark:bg-slate-900">
-                        <div className="flex gap-2 mb-3">
-                          <input
-                            type="text"
-                            value={item.item_number}
-                            onChange={(e) => updateItem(idx, 'item_number', e.target.value)}
-                            className="w-24 px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
-                            placeholder="Item #"
-                          />
-                          <input
-                            type="text"
-                            value={item.color}
-                            onChange={(e) => updateItem(idx, 'color', e.target.value)}
-                            className="w-32 px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
-                            placeholder="Color"
-                          />
-                          <input
-                            type="text"
-                            value={item.description}
-                            onChange={(e) => updateItem(idx, 'description', e.target.value)}
-                            className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
-                            placeholder="Description"
-                          />
-                          <button
-                            onClick={() => removeItem(idx)}
-                            className="px-2 text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-
-                        <div className="grid grid-cols-7 gap-2 mb-3">
-                          <div className="text-center">
-                            <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">YXS</label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={item.qty_yxs || ''}
-                              onChange={(e) => updateItem(idx, 'qty_yxs', parseInt(e.target.value) || 0)}
-                              className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-sm text-center dark:bg-slate-700 dark:text-white"
-                            />
-                          </div>
-                          <div className="text-center">
-                            <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">YS</label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={item.qty_ys || ''}
-                              onChange={(e) => updateItem(idx, 'qty_ys', parseInt(e.target.value) || 0)}
-                              className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-sm text-center dark:bg-slate-700 dark:text-white"
-                            />
-                          </div>
-                          <div className="text-center">
-                            <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">YM</label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={item.qty_ym || ''}
-                              onChange={(e) => updateItem(idx, 'qty_ym', parseInt(e.target.value) || 0)}
-                              className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-sm text-center dark:bg-slate-700 dark:text-white"
-                            />
-                          </div>
-                          <div className="text-center">
-                            <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">YL</label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={item.qty_yl || ''}
-                              onChange={(e) => updateItem(idx, 'qty_yl', parseInt(e.target.value) || 0)}
-                              className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-sm text-center dark:bg-slate-700 dark:text-white"
-                            />
-                          </div>
-                          <div className="text-center">
-                            <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">YXL</label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={item.qty_yxl || ''}
-                              onChange={(e) => updateItem(idx, 'qty_yxl', parseInt(e.target.value) || 0)}
-                              className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-sm text-center dark:bg-slate-700 dark:text-white"
-                            />
-                          </div>
-                          <div className="text-center">
-                            <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">XS</label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={item.qty_xs || ''}
-                              onChange={(e) => updateItem(idx, 'qty_xs', parseInt(e.target.value) || 0)}
-                              className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-sm text-center dark:bg-slate-700 dark:text-white"
-                            />
-                          </div>
-                          <div className="text-center">
-                            <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">S</label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={item.qty_s || ''}
-                              onChange={(e) => updateItem(idx, 'qty_s', parseInt(e.target.value) || 0)}
-                              className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-sm text-center dark:bg-slate-700 dark:text-white"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-7 gap-2 mb-3">
-                          <div className="text-center">
-                            <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">M</label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={item.qty_m || ''}
-                              onChange={(e) => updateItem(idx, 'qty_m', parseInt(e.target.value) || 0)}
-                              className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-sm text-center dark:bg-slate-700 dark:text-white"
-                            />
-                          </div>
-                          <div className="text-center">
-                            <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">L</label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={item.qty_l || ''}
-                              onChange={(e) => updateItem(idx, 'qty_l', parseInt(e.target.value) || 0)}
-                              className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-sm text-center dark:bg-slate-700 dark:text-white"
-                            />
-                          </div>
-                          <div className="text-center">
-                            <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">XL</label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={item.qty_xl || ''}
-                              onChange={(e) => updateItem(idx, 'qty_xl', parseInt(e.target.value) || 0)}
-                              className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-sm text-center dark:bg-slate-700 dark:text-white"
-                            />
-                          </div>
-                          <div className="text-center">
-                            <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">2XL</label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={item.qty_2xl || ''}
-                              onChange={(e) => updateItem(idx, 'qty_2xl', parseInt(e.target.value) || 0)}
-                              className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-sm text-center dark:bg-slate-700 dark:text-white"
-                            />
-                          </div>
-                          <div className="text-center">
-                            <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">3XL</label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={item.qty_3xl || ''}
-                              onChange={(e) => updateItem(idx, 'qty_3xl', parseInt(e.target.value) || 0)}
-                              className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-sm text-center dark:bg-slate-700 dark:text-white"
-                            />
-                          </div>
-                          <div className="text-center">
-                            <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">4XL</label>
-                            <input
-                              type="number"
-                              min="0"
-                              value={item.qty_4xl || ''}
-                              onChange={(e) => updateItem(idx, 'qty_4xl', parseInt(e.target.value) || 0)}
-                              className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-sm text-center dark:bg-slate-700 dark:text-white"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="flex gap-2 items-center justify-end">
-                          <div className="text-sm text-gray-600 dark:text-gray-400">
-                            Total Qty: <span className="font-medium text-gray-900 dark:text-white">{item.total_quantity}</span>
-                          </div>
-                          <div className="text-sm text-gray-600 dark:text-gray-400">×</div>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={item.unit_price}
-                            onChange={(e) => updateItem(idx, 'unit_price', parseFloat(e.target.value) || 0)}
-                            className="w-24 px-2 py-1 border border-gray-300 dark:border-slate-600 rounded text-sm text-right dark:bg-slate-700 dark:text-white"
-                            placeholder="Price"
-                          />
-                          <div className="text-sm text-gray-600 dark:text-gray-400">=</div>
-                          <div className="w-24 text-right font-medium text-gray-900 dark:text-white">
-                            ${item.total_price.toFixed(2)}
-                          </div>
-                        </div>
+                    <div className="grid grid-cols-13 gap-2 mb-3">
+                      <div className="text-center">
+                        <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">YXS</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.qty_yxs || ''}
+                          onChange={(e) => updateItem(idx, 'qty_yxs', parseInt(e.target.value) || 0)}
+                          className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-xs text-center dark:bg-slate-700 dark:text-white"
+                        />
                       </div>
-                    ))}
+                      <div className="text-center">
+                        <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">YS</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.qty_ys || ''}
+                          onChange={(e) => updateItem(idx, 'qty_ys', parseInt(e.target.value) || 0)}
+                          className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-xs text-center dark:bg-slate-700 dark:text-white"
+                        />
+                      </div>
+                      <div className="text-center">
+                        <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">YM</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.qty_ym || ''}
+                          onChange={(e) => updateItem(idx, 'qty_ym', parseInt(e.target.value) || 0)}
+                          className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-xs text-center dark:bg-slate-700 dark:text-white"
+                        />
+                      </div>
+                      <div className="text-center">
+                        <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">YL</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.qty_yl || ''}
+                          onChange={(e) => updateItem(idx, 'qty_yl', parseInt(e.target.value) || 0)}
+                          className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-xs text-center dark:bg-slate-700 dark:text-white"
+                        />
+                      </div>
+                      <div className="text-center">
+                        <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">YXL</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.qty_yxl || ''}
+                          onChange={(e) => updateItem(idx, 'qty_yxl', parseInt(e.target.value) || 0)}
+                          className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-xs text-center dark:bg-slate-700 dark:text-white"
+                        />
+                      </div>
+                      <div className="text-center">
+                        <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">XS</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.qty_xs || ''}
+                          onChange={(e) => updateItem(idx, 'qty_xs', parseInt(e.target.value) || 0)}
+                          className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-xs text-center dark:bg-slate-700 dark:text-white"
+                        />
+                      </div>
+                      <div className="text-center">
+                        <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">S</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.qty_s || ''}
+                          onChange={(e) => updateItem(idx, 'qty_s', parseInt(e.target.value) || 0)}
+                          className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-xs text-center dark:bg-slate-700 dark:text-white"
+                        />
+                      </div>
+                      <div className="text-center">
+                        <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">M</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.qty_m || ''}
+                          onChange={(e) => updateItem(idx, 'qty_m', parseInt(e.target.value) || 0)}
+                          className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-xs text-center dark:bg-slate-700 dark:text-white"
+                        />
+                      </div>
+                      <div className="text-center">
+                        <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">L</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.qty_l || ''}
+                          onChange={(e) => updateItem(idx, 'qty_l', parseInt(e.target.value) || 0)}
+                          className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-xs text-center dark:bg-slate-700 dark:text-white"
+                        />
+                      </div>
+                      <div className="text-center">
+                        <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">XL</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.qty_xl || ''}
+                          onChange={(e) => updateItem(idx, 'qty_xl', parseInt(e.target.value) || 0)}
+                          className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-xs text-center dark:bg-slate-700 dark:text-white"
+                        />
+                      </div>
+                      <div className="text-center">
+                        <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">2XL</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.qty_2xl || ''}
+                          onChange={(e) => updateItem(idx, 'qty_2xl', parseInt(e.target.value) || 0)}
+                          className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-xs text-center dark:bg-slate-700 dark:text-white"
+                        />
+                      </div>
+                      <div className="text-center">
+                        <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">3XL</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.qty_3xl || ''}
+                          onChange={(e) => updateItem(idx, 'qty_3xl', parseInt(e.target.value) || 0)}
+                          className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-xs text-center dark:bg-slate-700 dark:text-white"
+                        />
+                      </div>
+                      <div className="text-center">
+                        <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">4XL</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.qty_4xl || ''}
+                          onChange={(e) => updateItem(idx, 'qty_4xl', parseInt(e.target.value) || 0)}
+                          className="w-full px-1 py-1 border border-gray-300 dark:border-slate-600 rounded text-xs text-center dark:bg-slate-700 dark:text-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 items-center justify-end">
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        Total Qty: <span className="font-medium text-gray-900 dark:text-white">{item.total_quantity}</span>
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">×</div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={item.unit_price}
+                        onChange={(e) => updateItem(idx, 'unit_price', parseFloat(e.target.value) || 0)}
+                        className="w-24 px-2 py-1 border border-gray-300 dark:border-slate-600 rounded text-sm text-right dark:bg-slate-700 dark:text-white"
+                        placeholder="Price"
+                      />
+                      <div className="text-sm text-gray-600 dark:text-gray-400">=</div>
+                      <div className="w-24 text-right font-medium text-gray-900 dark:text-white">
+                        ${item.total_price.toFixed(2)}
+                      </div>
+                    </div>
                   </div>
-                )}
+                ))}
               </div>
             )}
           </div>
 
           {/* Imprints Section */}
-          <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
-            <button
-              onClick={() => toggleSection('imprints')}
-              className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
-            >
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Palette className="w-5 h-5 text-blue-600" />
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Imprints / Decorations</h3>
@@ -1194,100 +1148,86 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                   {imprints.length}
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={(e) => { e.stopPropagation(); addImprint(); }}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-                >
-                  <Plus className="w-3 h-3" />
-                  Add
-                </button>
-                {expandedSections.imprints ? (
-                  <ChevronDown className="w-5 h-5 text-gray-400" />
-                ) : (
-                  <ChevronRight className="w-5 h-5 text-gray-400" />
-                )}
+              <button
+                onClick={addImprint}
+                className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+              >
+                <Plus className="w-3 h-3" />
+                Add
+              </button>
+            </div>
+
+            {imprints.length === 0 ? (
+              <div className="text-center py-8 bg-gray-50 dark:bg-slate-900 rounded-lg border-2 border-dashed border-gray-300 dark:border-slate-600">
+                <p className="text-gray-500 dark:text-gray-400">No imprints added yet</p>
               </div>
-            </button>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {imprints.map((imprint, idx) => (
+                  <div key={idx} className="border border-gray-200 dark:border-slate-700 rounded-lg p-4 bg-white dark:bg-slate-800">
+                    <div className="flex justify-between items-start mb-3">
+                      <h4 className="font-medium text-gray-900 dark:text-white text-sm">Imprint {idx + 1}</h4>
+                      <button
+                        onClick={() => removeImprint(idx)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
 
-            {expandedSections.imprints && (
-              <div className="p-4 pt-0 border-t border-gray-100 dark:border-slate-700">
-                {imprints.length === 0 ? (
-                  <div className="text-center py-8 bg-gray-50 dark:bg-slate-900 rounded-lg border-2 border-dashed border-gray-300 dark:border-slate-600">
-                    <p className="text-gray-500 dark:text-gray-400">No imprints added yet</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {imprints.map((imprint, idx) => (
-                      <div key={idx} className="border border-gray-200 dark:border-slate-700 rounded-lg p-3 bg-gray-50 dark:bg-slate-900">
-                        <div className="flex justify-between items-start mb-3">
-                          <h4 className="font-medium text-gray-900 dark:text-white text-sm">Imprint {idx + 1}</h4>
-                          <button
-                            onClick={() => removeImprint(idx)}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-
-                        <div className="space-y-2">
-                          <input
-                            type="text"
-                            value={imprint.imprint_number}
-                            onChange={(e) => updateImprint(idx, 'imprint_number', e.target.value)}
-                            className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
-                            placeholder="Imprint Number"
-                          />
-                          <select
-                            value={imprint.decoration_method}
-                            onChange={(e) => updateImprint(idx, 'decoration_method', e.target.value)}
-                            className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
-                          >
-                            <option>Screen Printing - Underbase/Darks</option>
-                            <option>Screen Printing - Standard</option>
-                            <option>DTG - Direct to Garment</option>
-                            <option>Embroidery</option>
-                            <option>Heat Transfer</option>
-                          </select>
-                          <div className="grid grid-cols-2 gap-2">
-                            <input
-                              type="number"
-                              min="1"
-                              value={imprint.num_colors}
-                              onChange={(e) => updateImprint(idx, 'num_colors', parseInt(e.target.value) || 1)}
-                              className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
-                              placeholder="# Colors"
-                            />
-                            <input
-                              type="text"
-                              value={imprint.location}
-                              onChange={(e) => updateImprint(idx, 'location', e.target.value)}
-                              className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
-                              placeholder="Location"
-                            />
-                          </div>
-                          <textarea
-                            value={imprint.description}
-                            onChange={(e) => updateImprint(idx, 'description', e.target.value)}
-                            className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
-                            rows={2}
-                            placeholder="Description"
-                          />
-                        </div>
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={imprint.imprint_number}
+                        onChange={(e) => updateImprint(idx, 'imprint_number', e.target.value)}
+                        className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
+                        placeholder="Imprint Number"
+                      />
+                      <select
+                        value={imprint.decoration_method}
+                        onChange={(e) => updateImprint(idx, 'decoration_method', e.target.value)}
+                        className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
+                      >
+                        <option>Screen Printing - Underbase/Darks</option>
+                        <option>Screen Printing - Standard</option>
+                        <option>DTG - Direct to Garment</option>
+                        <option>Embroidery</option>
+                        <option>Heat Transfer</option>
+                      </select>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="number"
+                          min="1"
+                          value={imprint.num_colors}
+                          onChange={(e) => updateImprint(idx, 'num_colors', parseInt(e.target.value) || 1)}
+                          className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
+                          placeholder="# Colors"
+                        />
+                        <input
+                          type="text"
+                          value={imprint.location}
+                          onChange={(e) => updateImprint(idx, 'location', e.target.value)}
+                          className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
+                          placeholder="Location"
+                        />
                       </div>
-                    ))}
+                      <textarea
+                        value={imprint.description}
+                        onChange={(e) => updateImprint(idx, 'description', e.target.value)}
+                        className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
+                        rows={2}
+                        placeholder="Description"
+                      />
+                    </div>
                   </div>
-                )}
+                ))}
               </div>
             )}
           </div>
 
           {/* Fees Section */}
-          <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
-            <button
-              onClick={() => toggleSection('fees')}
-              className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
-            >
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Receipt className="w-5 h-5 text-blue-600" />
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Additional Fees</h3>
@@ -1295,76 +1235,65 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                   {fees.length}
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={(e) => { e.stopPropagation(); addFee(); }}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-                >
-                  <Plus className="w-3 h-3" />
-                  Add
-                </button>
-                {expandedSections.fees ? (
-                  <ChevronDown className="w-5 h-5 text-gray-400" />
-                ) : (
-                  <ChevronRight className="w-5 h-5 text-gray-400" />
-                )}
-              </div>
-            </button>
+              <button
+                onClick={addFee}
+                className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+              >
+                <Plus className="w-3 h-3" />
+                Add
+              </button>
+            </div>
 
-            {expandedSections.fees && (
-              <div className="p-4 pt-0 border-t border-gray-100 dark:border-slate-700">
-                {fees.length === 0 ? (
-                  <div className="text-center py-8 bg-gray-50 dark:bg-slate-900 rounded-lg border-2 border-dashed border-gray-300 dark:border-slate-600">
-                    <p className="text-gray-500 dark:text-gray-400">No fees added yet</p>
+            {fees.length === 0 ? (
+              <div className="text-center py-8 bg-gray-50 dark:bg-slate-900 rounded-lg border-2 border-dashed border-gray-300 dark:border-slate-600">
+                <p className="text-gray-500 dark:text-gray-400">No fees added yet</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {fees.map((fee, idx) => (
+                  <div key={idx} className="flex gap-2 items-center border border-gray-200 dark:border-slate-700 rounded-lg p-3 bg-white dark:bg-slate-800">
+                    <input
+                      type="text"
+                      value={fee.fee_name}
+                      onChange={(e) => updateFee(idx, 'fee_name', e.target.value)}
+                      className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
+                      placeholder="Fee Name"
+                    />
+                    <input
+                      type="text"
+                      value={fee.description}
+                      onChange={(e) => updateFee(idx, 'description', e.target.value)}
+                      className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
+                      placeholder="Description"
+                    />
+                    <input
+                      type="number"
+                      min="1"
+                      value={fee.quantity}
+                      onChange={(e) => updateFee(idx, 'quantity', parseInt(e.target.value) || 1)}
+                      className="w-16 px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
+                      placeholder="Qty"
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={fee.unit_amount}
+                      onChange={(e) => updateFee(idx, 'unit_amount', parseFloat(e.target.value) || 0)}
+                      className="w-24 px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
+                      placeholder="Amount"
+                    />
+                    <div className="w-24 px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded bg-gray-100 dark:bg-slate-900 text-sm text-right dark:text-white">
+                      ${fee.total_amount.toFixed(2)}
+                    </div>
+                    <button
+                      onClick={() => removeFee(idx)}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    {fees.map((fee, idx) => (
-                      <div key={idx} className="flex gap-2 items-center border border-gray-200 dark:border-slate-700 rounded-lg p-3 bg-gray-50 dark:bg-slate-900">
-                        <input
-                          type="text"
-                          value={fee.fee_name}
-                          onChange={(e) => updateFee(idx, 'fee_name', e.target.value)}
-                          className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
-                          placeholder="Fee Name"
-                        />
-                        <input
-                          type="text"
-                          value={fee.description}
-                          onChange={(e) => updateFee(idx, 'description', e.target.value)}
-                          className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
-                          placeholder="Description"
-                        />
-                        <input
-                          type="number"
-                          min="1"
-                          value={fee.quantity}
-                          onChange={(e) => updateFee(idx, 'quantity', parseInt(e.target.value) || 1)}
-                          className="w-16 px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
-                          placeholder="Qty"
-                        />
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={fee.unit_amount}
-                          onChange={(e) => updateFee(idx, 'unit_amount', parseFloat(e.target.value) || 0)}
-                          className="w-24 px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
-                          placeholder="Amount"
-                        />
-                        <div className="w-24 px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded bg-gray-100 dark:bg-slate-900 text-sm text-right dark:text-white">
-                          ${fee.total_amount.toFixed(2)}
-                        </div>
-                        <button
-                          onClick={() => removeFee(idx)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                ))}
               </div>
             )}
           </div>
