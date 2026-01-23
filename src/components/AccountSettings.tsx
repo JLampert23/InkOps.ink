@@ -51,7 +51,8 @@ type SettingsTab =
   | 'printavo-integration' | 'square-integration' | 'resend-integration' | 'twilio-integration' | 'stripe-payments'
   | 'user-management' | 'user-security'
   | 'status-filters' | 'billing-status-filters'
-  | 'automated-reports' | 'workflow-setup' | 'automations';
+  | 'automated-reports' | 'workflow-setup' | 'automations'
+  | 'invoice-fees' | 'custom-invoice-status';
 
 interface AccountSettingsProps {
   initialTab?: SettingsTab;
@@ -68,7 +69,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null);
 
   const [integrationsExpanded, setIntegrationsExpanded] = useState(false);
-  const [automationExpanded, setAutomationExpanded] = useState(false);
+  const [productionExpanded, setProductionExpanded] = useState(false);
+  const [accountingExpanded, setAccountingExpanded] = useState(false);
 
   const [companyName, setCompanyName] = useState('');
   const [companyAddress, setCompanyAddress] = useState('');
@@ -2081,76 +2083,133 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             </button>
           </div>
 
-          {/* Billing Status Filters */}
+          {/* Accounting Settings Section - Collapsible */}
           <div className="mb-2">
             <button
-              onClick={() => setActiveTab('billing-status-filters')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group ${
-                activeTab === 'billing-status-filters'
-                  ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
-              }`}
-            >
-              <Filter className={`w-4 h-4 flex-shrink-0 ${activeTab === 'billing-status-filters' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
-              <div className="flex-1 text-left">
-                <div className={`font-medium text-sm ${activeTab === 'billing-status-filters' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                  Billing Filters
-                </div>
-              </div>
-              {activeTab === 'billing-status-filters' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
-            </button>
-          </div>
-
-          {/* Automations Section - Collapsible */}
-          <div className="mb-2">
-            <button
-              onClick={() => setAutomationExpanded(!automationExpanded)}
+              onClick={() => setAccountingExpanded(!accountingExpanded)}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-slate-700/50"
             >
-              <Zap className="w-4 h-4 flex-shrink-0 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
+              <CreditCard className="w-4 h-4 flex-shrink-0 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
               <div className="flex-1 text-left">
                 <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
-                  Automations
+                  Accounting Settings
                 </div>
               </div>
-              {automationExpanded ? (
+              {accountingExpanded ? (
                 <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200" />
               ) : (
                 <ChevronUp className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200 rotate-180" />
               )}
             </button>
 
-            {automationExpanded && (
+            {accountingExpanded && (
               <div className="mt-1 ml-2 space-y-1 collapsible-section collapsible-section-enter">
+                <button
+                  onClick={() => setActiveTab('billing-status-filters')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'billing-status-filters'
+                      ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Filter className={`w-4 h-4 flex-shrink-0 ${activeTab === 'billing-status-filters' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'billing-status-filters' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      Billing Filters
+                    </div>
+                  </div>
+                  {activeTab === 'billing-status-filters' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                </button>
+
                 <button
                   onClick={() => setActiveTab('automated-reports')}
                   className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
                     activeTab === 'automated-reports'
-                      ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
+                      ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
                       : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
                   }`}
+                  style={{ animationDelay: '20ms' }}
                 >
-                  <Clock className={`w-4 h-4 flex-shrink-0 ${activeTab === 'automated-reports' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <Clock className={`w-4 h-4 flex-shrink-0 ${activeTab === 'automated-reports' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                   <div className="flex-1 text-left">
-                    <div className={`font-medium text-sm ${activeTab === 'automated-reports' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                    <div className={`font-medium text-sm ${activeTab === 'automated-reports' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                       Automated Reports
                     </div>
                   </div>
-                  {activeTab === 'automated-reports' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                  {activeTab === 'automated-reports' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Production Settings Section - Collapsible */}
+          <div className="mb-2">
+            <button
+              onClick={() => setProductionExpanded(!productionExpanded)}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-slate-700/50"
+            >
+              <SettingsIcon className="w-4 h-4 flex-shrink-0 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
+              <div className="flex-1 text-left">
+                <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                  Production Settings
+                </div>
+              </div>
+              {productionExpanded ? (
+                <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200" />
+              ) : (
+                <ChevronUp className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200 rotate-180" />
+              )}
+            </button>
+
+            {productionExpanded && (
+              <div className="mt-1 ml-2 space-y-1 collapsible-section collapsible-section-enter">
+                <button
+                  onClick={() => setActiveTab('invoice-fees')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'invoice-fees'
+                      ? 'bg-green-50 dark:bg-green-600/20 text-green-700 dark:text-green-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  <CreditCard className={`w-4 h-4 flex-shrink-0 ${activeTab === 'invoice-fees' ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'invoice-fees' ? 'text-green-700 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      Invoice Fees
+                    </div>
+                  </div>
+                  {activeTab === 'invoice-fees' && <div className="w-1 h-6 bg-green-600 dark:bg-green-500 rounded-full absolute right-0" />}
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('custom-invoice-status')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'custom-invoice-status'
+                      ? 'bg-green-50 dark:bg-green-600/20 text-green-700 dark:text-green-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                  style={{ animationDelay: '20ms' }}
+                >
+                  <Filter className={`w-4 h-4 flex-shrink-0 ${activeTab === 'custom-invoice-status' ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'custom-invoice-status' ? 'text-green-700 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      Custom Invoice Status
+                    </div>
+                  </div>
+                  {activeTab === 'custom-invoice-status' && <div className="w-1 h-6 bg-green-600 dark:bg-green-500 rounded-full absolute right-0" />}
                 </button>
 
                 <button
                   onClick={() => setActiveTab('workflow-setup')}
                   className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
                     activeTab === 'workflow-setup'
-                      ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
+                      ? 'bg-green-50 dark:bg-green-600/20 text-green-700 dark:text-green-400 shadow-sm'
                       : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
                   }`}
-                  style={{ animationDelay: '20ms' }}
+                  style={{ animationDelay: '40ms' }}
                 >
-                  <Layers className={`w-4 h-4 flex-shrink-0 ${activeTab === 'workflow-setup' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <Layers className={`w-4 h-4 flex-shrink-0 ${activeTab === 'workflow-setup' ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                   <div className="flex-1 text-left">
-                    <div className={`font-medium text-sm ${activeTab === 'workflow-setup' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                    <div className={`font-medium text-sm ${activeTab === 'workflow-setup' ? 'text-green-700 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>
                       Workflow Setup
                     </div>
                   </div>
@@ -2161,14 +2220,14 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   onClick={() => setActiveTab('automations')}
                   className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
                     activeTab === 'automations'
-                      ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
+                      ? 'bg-green-50 dark:bg-green-600/20 text-green-700 dark:text-green-400 shadow-sm'
                       : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
                   }`}
-                  style={{ animationDelay: '40ms' }}
+                  style={{ animationDelay: '60ms' }}
                 >
-                  <Zap className={`w-4 h-4 flex-shrink-0 ${activeTab === 'automations' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <Zap className={`w-4 h-4 flex-shrink-0 ${activeTab === 'automations' ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                   <div className="flex-1 text-left">
-                    <div className={`font-medium text-sm ${activeTab === 'automations' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                    <div className={`font-medium text-sm ${activeTab === 'automations' ? 'text-green-700 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>
                       Automations
                     </div>
                   </div>
@@ -4070,6 +4129,70 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     )}
                   </>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Invoice Fees Section */}
+          {activeTab === 'invoice-fees' && (
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Invoice Fees</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Configure additional fees that can be applied to invoices</p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <CreditCard className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">Invoice Fee Management</h3>
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        Set up and manage additional fees that can be applied to invoices such as processing fees, late payment fees, or service charges.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border border-gray-200 dark:border-slate-700 rounded-lg p-6 text-center">
+                  <CreditCard className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-3" />
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Invoice Fees Coming Soon</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+                    The ability to configure and manage invoice fees will be available in an upcoming release. This feature will allow you to add processing fees, late payment charges, and other customizable fees to your invoices.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Custom Invoice Status Section */}
+          {activeTab === 'custom-invoice-status' && (
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Custom Invoice Status</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Create and manage custom invoice status labels for your workflow</p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <Filter className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h3 className="text-sm font-semibold text-green-900 dark:text-green-100 mb-1">Custom Status Management</h3>
+                      <p className="text-sm text-green-800 dark:text-green-200">
+                        Define custom status labels beyond the standard Printavo statuses to better match your unique business processes and workflows.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border border-gray-200 dark:border-slate-700 rounded-lg p-6 text-center">
+                  <Filter className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-3" />
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Custom Status Labels Coming Soon</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+                    The ability to create custom invoice status labels will be available in an upcoming release. This feature will enable you to define status categories that align with your specific business needs and reporting requirements.
+                  </p>
+                </div>
               </div>
             </div>
           )}
