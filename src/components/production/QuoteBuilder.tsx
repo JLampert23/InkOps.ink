@@ -57,8 +57,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const [createdDate, setCreatedDate] = useState(new Date().toISOString().split('T')[0]);
   const [productionDueDate, setProductionDueDate] = useState('');
   const [customerDueDate, setCustomerDueDate] = useState('');
-  const [invoiceDate, setInvoiceDate] = useState('');
-  const [paymentDueDate, setPaymentDueDate] = useState('');
   const [terms, setTerms] = useState('Net 30');
   const [poNumber, setPoNumber] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState('');
@@ -166,8 +164,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       setCreatedDate(quote.created_date || '');
       setProductionDueDate(quote.production_due_date || '');
       setCustomerDueDate(quote.customer_due_date || '');
-      setInvoiceDate(quote.invoice_date || '');
-      setPaymentDueDate(quote.payment_due_date || '');
       setTerms(quote.terms || 'Net 30');
       setPoNumber(quote.po_number || '');
       setDeliveryMethod(quote.delivery_method || '');
@@ -362,8 +358,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         created_date: createdDate,
         production_due_date: productionDueDate,
         customer_due_date: customerDueDate,
-        invoice_date: invoiceDate,
-        payment_due_date: paymentDueDate,
         terms,
         po_number: poNumber,
         delivery_method: deliveryMethod,
@@ -714,16 +708,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
               </div>
 
               <div>
-                <label className="text-sm text-gray-400 mb-2 block">Invoice Date ?</label>
-                <input
-                  type="date"
-                  value={invoiceDate}
-                  onChange={(e) => setInvoiceDate(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded text-white text-sm"
-                />
-              </div>
-
-              <div>
                 <label className="text-sm text-gray-400 mb-2 block">Terms</label>
                 <select
                   value={terms}
@@ -735,16 +719,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                   <option value="Net 60">Net 60</option>
                   <option value="Due on Receipt">Due on Receipt</option>
                 </select>
-              </div>
-
-              <div>
-                <label className="text-sm text-gray-400 mb-2 block">Payment Due Date ?</label>
-                <input
-                  type="date"
-                  value={paymentDueDate}
-                  onChange={(e) => setPaymentDueDate(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded text-white text-sm"
-                />
               </div>
             </div>
           </div>
