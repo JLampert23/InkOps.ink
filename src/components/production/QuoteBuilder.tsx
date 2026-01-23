@@ -110,10 +110,10 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const [total, setTotal] = useState(0);
 
   const [expandedSections, setExpandedSections] = useState({
-    customer: false,
+    customer: true,
     items: true,
-    imprints: false,
-    fees: false,
+    imprints: true,
+    fees: true,
   });
 
   useEffect(() => {
