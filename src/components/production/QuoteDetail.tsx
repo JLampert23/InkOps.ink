@@ -260,8 +260,8 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
   if (!quote) {
     return (
       <div className="text-center py-8">
-        <p className="text-gray-600">Quote not found</p>
-        <button onClick={onBack} className="mt-4 text-blue-600 hover:underline">
+        <p className="text-gray-600 dark:text-gray-400">Quote not found</p>
+        <button onClick={onBack} className="mt-4 text-blue-600 dark:text-blue-400 hover:underline">
           Go Back
         </button>
       </div>
@@ -275,7 +275,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         <div className="flex items-center gap-4">
           <button
             onClick={onBack}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors text-gray-700 dark:text-gray-300"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
@@ -292,7 +292,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
           {(quote.status === 'draft' || quote.status === 'sent') && (
             <button
               onClick={onEdit}
-              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors text-gray-700 dark:text-gray-300"
             >
               <Edit className="w-4 h-4" />
               Edit
@@ -319,7 +319,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
           )}
           <button
             onClick={loadQuoteDetails}
-            className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="p-2 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors text-gray-700 dark:text-gray-300"
           >
             <RefreshCw className="w-4 h-4" />
           </button>
@@ -362,12 +362,12 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
           <table className="w-full">
             <thead className="bg-gray-50 dark:bg-slate-900">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Decoration</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qty</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Unit Price</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">#</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Description</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Decoration</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Qty</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Unit Price</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Total</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
@@ -536,7 +536,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                   type="number"
                   value={expiresInDays}
                   onChange={(e) => setExpiresInDays(parseInt(e.target.value) || 30)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
                   min="1"
                 />
               </div>
@@ -563,7 +563,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                   value={autoApproveAfterDays || ''}
                   onChange={(e) => setAutoApproveAfterDays(e.target.value ? parseInt(e.target.value) : null)}
                   placeholder="Leave empty to disable"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
                   min="1"
                 />
               </div>
@@ -584,7 +584,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
               <div className="flex gap-2 pt-4">
                 <button
                   onClick={() => setShowSendModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors text-gray-700 dark:text-gray-300"
                 >
                   Cancel
                 </button>
