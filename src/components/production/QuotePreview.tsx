@@ -228,7 +228,7 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-8">
+        <div className="bg-white dark:bg-slate-800 rounded-lg p-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto" />
         </div>
       </div>
@@ -239,9 +239,9 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col">
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
-          <h2 className="text-xl font-bold text-gray-900">Quote Preview</h2>
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col">
+        <div className="p-4 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between bg-gray-50 dark:bg-slate-700">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Quote Preview</h2>
           <div className="flex gap-2">
             <button
               onClick={exportToPDF}
@@ -252,14 +252,14 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
             </button>
             <button
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+              className="p-2 text-gray-400 dark:text-gray-300 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700"
             >
               <X className="w-6 h-6" />
             </button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8 bg-gray-100">
+        <div className="flex-1 overflow-y-auto p-8 bg-gray-100 dark:bg-slate-900">
           <div className="bg-white shadow-lg rounded-lg p-8 max-w-5xl mx-auto" style={{ minHeight: '11in' }}>
             <div className="flex items-start justify-between mb-8">
               <div>

@@ -454,11 +454,11 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   }
 
   return (
-    <div className="max-w-7xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200">
-      <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+    <div className="max-w-7xl mx-auto bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
+      <div className="p-6 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <FileText className="w-6 h-6 text-blue-600" />
-          <h2 className="text-xl font-bold text-gray-900">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">
             {quoteId ? 'Edit Quote' : 'Create New Quote'}
           </h2>
         </div>
@@ -466,7 +466,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           {onCancel && (
             <button
               onClick={onCancel}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              className="px-4 py-2 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700"
             >
               Cancel
             </button>
@@ -493,75 +493,75 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
 
       <div className="p-6 space-y-8">
         <section>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Quote Information</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quote Information</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Quote Number
               </label>
               <input
                 type="text"
                 value={quoteNumber}
                 onChange={(e) => setQuoteNumber(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-gray-50 dark:bg-slate-900 dark:text-white"
                 readOnly
               />
             </div>
             <div className="md:col-span-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Title <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                 placeholder="e.g., FAITH LION TEE"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Created Date
               </label>
               <input
                 type="date"
                 value={createdDate}
                 onChange={(e) => setCreatedDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Due Date
               </label>
               <input
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Terms
               </label>
               <input
                 type="text"
                 value={terms}
                 onChange={(e) => setTerms(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                 placeholder="Net 30"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Valid Until
               </label>
               <input
                 type="date"
                 value={validUntil}
                 onChange={(e) => setValidUntil(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
               />
             </div>
           </div>
@@ -569,7 +569,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
 
         <section>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Customer Information</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Customer Information</h3>
             <button
               onClick={copyBillingToShipping}
               className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700"
@@ -580,13 +580,13 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           </div>
 
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Select Existing Customer
             </label>
             <select
               value={selectedCustomerId}
               onChange={(e) => handleCustomerSelect(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
             >
               <option value="">-- Select a customer or enter manually --</option>
               {customers.map((customer) => (
@@ -599,33 +599,33 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-3">
-              <h4 className="font-medium text-gray-900">Billing Address</h4>
+              <h4 className="font-medium text-gray-900 dark:text-white">Billing Address</h4>
               <input
                 type="text"
                 value={billName}
                 onChange={(e) => setBillName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                 placeholder="Company Name"
               />
               <input
                 type="text"
                 value={billContact}
                 onChange={(e) => setBillContact(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                 placeholder="Contact Name"
               />
               <input
                 type="text"
                 value={billAddress1}
                 onChange={(e) => setBillAddress1(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                 placeholder="Address Line 1"
               />
               <input
                 type="text"
                 value={billAddress2}
                 onChange={(e) => setBillAddress2(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                 placeholder="Address Line 2"
               />
               <div className="grid grid-cols-2 gap-3">
@@ -633,14 +633,14 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                   type="text"
                   value={billCity}
                   onChange={(e) => setBillCity(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                   placeholder="City"
                 />
                 <input
                   type="text"
                   value={billState}
                   onChange={(e) => setBillState(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                   placeholder="State"
                 />
               </div>
@@ -648,53 +648,53 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                 type="text"
                 value={billZip}
                 onChange={(e) => setBillZip(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                 placeholder="ZIP Code"
               />
               <input
                 type="tel"
                 value={billPhone}
                 onChange={(e) => setBillPhone(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                 placeholder="Phone"
               />
               <input
                 type="email"
                 value={billEmail}
                 onChange={(e) => setBillEmail(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                 placeholder="Email"
               />
             </div>
 
             <div className="space-y-3">
-              <h4 className="font-medium text-gray-900">Shipping Address</h4>
+              <h4 className="font-medium text-gray-900 dark:text-white">Shipping Address</h4>
               <input
                 type="text"
                 value={shipName}
                 onChange={(e) => setShipName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                 placeholder="Company Name"
               />
               <input
                 type="text"
                 value={shipContact}
                 onChange={(e) => setShipContact(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                 placeholder="Contact Name"
               />
               <input
                 type="text"
                 value={shipAddress1}
                 onChange={(e) => setShipAddress1(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                 placeholder="Address Line 1"
               />
               <input
                 type="text"
                 value={shipAddress2}
                 onChange={(e) => setShipAddress2(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                 placeholder="Address Line 2"
               />
               <div className="grid grid-cols-2 gap-3">
@@ -702,14 +702,14 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                   type="text"
                   value={shipCity}
                   onChange={(e) => setShipCity(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                   placeholder="City"
                 />
                 <input
                   type="text"
                   value={shipState}
                   onChange={(e) => setShipState(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                   placeholder="State"
                 />
               </div>
@@ -717,7 +717,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                 type="text"
                 value={shipZip}
                 onChange={(e) => setShipZip(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                 placeholder="ZIP Code"
               />
             </div>
@@ -726,7 +726,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
 
         <section>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Line Items</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Line Items</h3>
             <button
               onClick={addItem}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -737,15 +737,15 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           </div>
 
           {items.length === 0 ? (
-            <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-              <p className="text-gray-500">No items added yet</p>
+            <div className="text-center py-8 bg-gray-50 dark:bg-slate-900 rounded-lg border-2 border-dashed border-gray-300 dark:border-slate-600">
+              <p className="text-gray-500 dark:text-gray-400">No items added yet</p>
             </div>
           ) : (
             <div className="space-y-4">
               {items.map((item, idx) => (
-                <div key={idx} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <div key={idx} className="border border-gray-200 dark:border-slate-700 rounded-lg p-4 bg-gray-50 dark:bg-slate-900">
                   <div className="flex justify-between items-start mb-4">
-                    <h4 className="font-medium text-gray-900">Item {idx + 1}</h4>
+                    <h4 className="font-medium text-gray-900 dark:text-white">Item {idx + 1}</h4>
                     <button
                       onClick={() => removeItem(idx)}
                       className="text-red-600 hover:text-red-700"
@@ -759,31 +759,31 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       type="text"
                       value={item.item_number}
                       onChange={(e) => updateItem(idx, 'item_number', e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg"
+                      className="px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                       placeholder="Item #"
                     />
                     <input
                       type="text"
                       value={item.color}
                       onChange={(e) => updateItem(idx, 'color', e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg"
+                      className="px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                       placeholder="Color"
                     />
                     <input
                       type="text"
                       value={item.description}
                       onChange={(e) => updateItem(idx, 'description', e.target.value)}
-                      className="md:col-span-2 px-3 py-2 border border-gray-300 rounded-lg"
+                      className="md:col-span-2 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                       placeholder="Description"
                     />
                   </div>
 
                   <div className="mb-4">
-                    <p className="text-sm font-medium text-gray-700 mb-2">Sizes:</p>
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Sizes:</p>
                     <div className="grid grid-cols-6 md:grid-cols-12 gap-2">
                       {['yxs', 'ys', 'ym', 'yl', 'yxl', 'xs', 's', 'm', 'l', 'xl', '2xl', '3xl'].map((size) => (
                         <div key={size}>
-                          <label className="block text-xs text-gray-600 mb-1 uppercase">
+                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1 uppercase">
                             {size}
                           </label>
                           <input
@@ -791,7 +791,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                             min="0"
                             value={item[`qty_${size}` as keyof QuoteItem] || 0}
                             onChange={(e) => updateItem(idx, `qty_${size}`, parseInt(e.target.value) || 0)}
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                            className="w-full px-2 py-1 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
                           />
                         </div>
                       ))}
@@ -800,7 +800,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
 
                   <div className="grid grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Unit Price
                       </label>
                       <input
@@ -809,28 +809,28 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                         min="0"
                         value={item.unit_price}
                         onChange={(e) => updateItem(idx, 'unit_price', parseFloat(e.target.value) || 0)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Total Qty
                       </label>
                       <input
                         type="number"
                         value={item.total_quantity}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-gray-100 dark:bg-slate-900 dark:text-white"
                         readOnly
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Total Price
                       </label>
                       <input
                         type="text"
                         value={`$${item.total_price.toFixed(2)}`}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-gray-100 dark:bg-slate-900 dark:text-white"
                         readOnly
                       />
                     </div>
@@ -843,7 +843,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
 
         <section>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Imprints / Decorations</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Imprints / Decorations</h3>
             <button
               onClick={addImprint}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -854,15 +854,15 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           </div>
 
           {imprints.length === 0 ? (
-            <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-              <p className="text-gray-500">No imprints added yet</p>
+            <div className="text-center py-8 bg-gray-50 dark:bg-slate-900 rounded-lg border-2 border-dashed border-gray-300 dark:border-slate-600">
+              <p className="text-gray-500 dark:text-gray-400">No imprints added yet</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {imprints.map((imprint, idx) => (
-                <div key={idx} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <div key={idx} className="border border-gray-200 dark:border-slate-700 rounded-lg p-4 bg-gray-50 dark:bg-slate-900">
                   <div className="flex justify-between items-start mb-3">
-                    <h4 className="font-medium text-gray-900">Imprint {idx + 1}</h4>
+                    <h4 className="font-medium text-gray-900 dark:text-white">Imprint {idx + 1}</h4>
                     <button
                       onClick={() => removeImprint(idx)}
                       className="text-red-600 hover:text-red-700"
@@ -876,13 +876,13 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       type="text"
                       value={imprint.imprint_number}
                       onChange={(e) => updateImprint(idx, 'imprint_number', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                       placeholder="Imprint Number"
                     />
                     <select
                       value={imprint.decoration_method}
                       onChange={(e) => updateImprint(idx, 'decoration_method', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white"
                     >
                       <option>Screen Printing - Underbase/Darks</option>
                       <option>Screen Printing - Standard</option>
@@ -896,21 +896,21 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                         min="1"
                         value={imprint.num_colors}
                         onChange={(e) => updateImprint(idx, 'num_colors', parseInt(e.target.value) || 1)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                         placeholder="# Colors"
                       />
                       <input
                         type="text"
                         value={imprint.location}
                         onChange={(e) => updateImprint(idx, 'location', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                         placeholder="Location"
                       />
                     </div>
                     <textarea
                       value={imprint.description}
                       onChange={(e) => updateImprint(idx, 'description', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                       rows={2}
                       placeholder="Description"
                     />
@@ -923,7 +923,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
 
         <section>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Additional Fees</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Additional Fees</h3>
             <button
               onClick={addFee}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -934,25 +934,25 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           </div>
 
           {fees.length === 0 ? (
-            <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-              <p className="text-gray-500">No fees added yet</p>
+            <div className="text-center py-8 bg-gray-50 dark:bg-slate-900 rounded-lg border-2 border-dashed border-gray-300 dark:border-slate-600">
+              <p className="text-gray-500 dark:text-gray-400">No fees added yet</p>
             </div>
           ) : (
             <div className="space-y-3">
               {fees.map((fee, idx) => (
-                <div key={idx} className="flex gap-3 items-center border border-gray-200 rounded-lg p-3 bg-gray-50">
+                <div key={idx} className="flex gap-3 items-center border border-gray-200 dark:border-slate-700 rounded-lg p-3 bg-gray-50 dark:bg-slate-900">
                   <input
                     type="text"
                     value={fee.fee_name}
                     onChange={(e) => updateFee(idx, 'fee_name', e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                     placeholder="Fee Name"
                   />
                   <input
                     type="text"
                     value={fee.description}
                     onChange={(e) => updateFee(idx, 'description', e.target.value)}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                     placeholder="Description"
                   />
                   <input
@@ -960,7 +960,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                     min="1"
                     value={fee.quantity}
                     onChange={(e) => updateFee(idx, 'quantity', parseInt(e.target.value) || 1)}
-                    className="w-20 px-3 py-2 border border-gray-300 rounded-lg"
+                    className="w-20 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                     placeholder="Qty"
                   />
                   <input
@@ -969,10 +969,10 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                     min="0"
                     value={fee.unit_amount}
                     onChange={(e) => updateFee(idx, 'unit_amount', parseFloat(e.target.value) || 0)}
-                    className="w-32 px-3 py-2 border border-gray-300 rounded-lg"
+                    className="w-32 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white dark:placeholder-gray-500"
                     placeholder="Amount"
                   />
-                  <div className="w-32 px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-right">
+                  <div className="w-32 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-gray-100 dark:bg-slate-900 text-right dark:text-white">
                     ${fee.total_amount.toFixed(2)}
                   </div>
                   <button
@@ -987,37 +987,37 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           )}
         </section>
 
-        <section className="bg-gray-50 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Totals</h3>
+        <section className="bg-gray-50 dark:bg-slate-900 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Totals</h3>
           <div className="space-y-3 max-w-md ml-auto">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Item Total:</span>
-              <span className="font-medium">${itemTotal.toFixed(2)}</span>
+              <span className="text-gray-600 dark:text-gray-400">Item Total:</span>
+              <span className="font-medium dark:text-white">${itemTotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Fees Total:</span>
-              <span className="font-medium">${feesTotal.toFixed(2)}</span>
+              <span className="text-gray-600 dark:text-gray-400">Fees Total:</span>
+              <span className="font-medium dark:text-white">${feesTotal.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-sm border-t border-gray-300 pt-2">
-              <span className="text-gray-600">Subtotal:</span>
-              <span className="font-medium">${subtotal.toFixed(2)}</span>
+            <div className="flex justify-between text-sm border-t border-gray-300 dark:border-slate-600 pt-2">
+              <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
+              <span className="font-medium dark:text-white">${subtotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center text-sm">
-              <span className="text-gray-600">Tax:</span>
+              <span className="text-gray-600 dark:text-gray-400">Tax:</span>
               <input
                 type="number"
                 step="0.01"
                 min="0"
                 value={tax}
                 onChange={(e) => setTax(parseFloat(e.target.value) || 0)}
-                className="w-32 px-3 py-1 border border-gray-300 rounded-lg text-right"
+                className="w-32 px-3 py-1 border border-gray-300 dark:border-slate-600 rounded-lg text-right dark:bg-slate-700 dark:text-white"
               />
             </div>
-            <div className="flex justify-between text-lg font-bold border-t-2 border-gray-400 pt-3">
-              <span>Total:</span>
+            <div className="flex justify-between text-lg font-bold border-t-2 border-gray-400 dark:border-slate-600 pt-3">
+              <span className="dark:text-white">Total:</span>
               <span className="text-blue-600">${total.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-sm text-gray-600">
+            <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
               <span>Outstanding:</span>
               <span>${total.toFixed(2)}</span>
             </div>
