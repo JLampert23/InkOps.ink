@@ -717,9 +717,9 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
                   </div>
                 </div>
               ) : (
-                <>
-                  <div className="flex items-start justify-between">
-                    <div>
+                <div>
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
                       <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{customer.name}</h2>
                       <div className="mt-2 space-y-1">
                         {databaseCustomer.contact_name && (
@@ -752,13 +752,13 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
                     </div>
                     <button
                       onClick={() => setIsEditingInfo(true)}
-                      className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-900 dark:text-white"
+                      className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shrink-0 ml-4"
                     >
                       <Edit2 className="w-4 h-4" />
                       Edit Info
                     </button>
                   </div>
-                </>
+                </div>
               )}
             </div>
           </div>
