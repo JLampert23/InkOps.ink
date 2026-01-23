@@ -110,11 +110,10 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const [total, setTotal] = useState(0);
 
   const [expandedSections, setExpandedSections] = useState({
-    customer: true,
+    customer: false,
     items: true,
     imprints: false,
     fees: false,
-    details: false,
   });
 
   useEffect(() => {
@@ -635,31 +634,19 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-5xl mx-auto p-6 space-y-4">
 
-          {/* Customer Section */}
-          <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
-            <button
-              onClick={() => toggleSection('customer')}
-              className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <User className="w-5 h-5 text-blue-600" />
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Customer Information</h3>
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                  {billName && `(${billName})`}
-                </span>
-              </div>
-              {expandedSections.customer ? (
-                <ChevronDown className="w-5 h-5 text-gray-400" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-gray-400" />
-              )}
-            </button>
+          {/* Top Section: Customer Name + Quote Details */}
+          <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-6">
+            <div className="grid grid-cols-2 gap-6">
+              {/* Left: Customer Information */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <User className="w-5 h-5 text-blue-600" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Customer Information</h3>
+                </div>
 
-            {expandedSections.customer && (
-              <div className="p-4 pt-0 space-y-4 border-t border-gray-100 dark:border-slate-700">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Select Existing Customer
+                    Select Customer
                   </label>
                   <select
                     value={selectedCustomerId}
@@ -675,6 +662,188 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                   </select>
                 </div>
 
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Company Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={billName}
+                    onChange={(e) => setBillName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
+                    placeholder="Company Name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Contact Name
+                  </label>
+                  <input
+                    type="text"
+                    value={billContact}
+                    onChange={(e) => setBillContact(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
+                    placeholder="Contact Name"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Phone
+                    </label>
+                    <input
+                      type="tel"
+                      value={billPhone}
+                      onChange={(e) => setBillPhone(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
+                      placeholder="Phone"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={billEmail}
+                      onChange={(e) => setBillEmail(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
+                      placeholder="Email"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Right: Quote Details */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <FileText className="w-5 h-5 text-blue-600" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Quote Details</h3>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Quote Number
+                    </label>
+                    <input
+                      type="text"
+                      value={quoteNumber}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-gray-50 dark:bg-slate-900 dark:text-white"
+                      readOnly
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Created Date
+                    </label>
+                    <input
+                      type="date"
+                      value={createdDate}
+                      onChange={(e) => setCreatedDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Due Date
+                    </label>
+                    <input
+                      type="date"
+                      value={dueDate}
+                      onChange={(e) => setDueDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Valid Until
+                    </label>
+                    <input
+                      type="date"
+                      value={validUntil}
+                      onChange={(e) => setValidUntil(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Terms
+                    </label>
+                    <input
+                      type="text"
+                      value={terms}
+                      onChange={(e) => setTerms(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
+                      placeholder="Net 30"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      PO Number
+                    </label>
+                    <input
+                      type="text"
+                      value={poNumber}
+                      onChange={(e) => setPoNumber(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
+                      placeholder="Purchase Order #"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Delivery Method
+                  </label>
+                  <select
+                    value={deliveryMethod}
+                    onChange={(e) => setDeliveryMethod(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
+                  >
+                    <option value="PICK-UP">PICK-UP</option>
+                    <option value="DELIVERY">DELIVERY</option>
+                    <option value="SHIPPING">SHIPPING</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Customer Notes
+                  </label>
+                  <textarea
+                    value={customerNotes}
+                    onChange={(e) => setCustomerNotes(e.target.value)}
+                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
+                    placeholder="Notes visible to customer on quote/invoice"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Customer Address Details (Collapsible) */}
+          <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
+            <button
+              onClick={() => toggleSection('customer')}
+              className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <User className="w-5 h-5 text-blue-600" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Billing & Shipping Addresses</h3>
+              </div>
+              {expandedSections.customer ? (
+                <ChevronDown className="w-5 h-5 text-gray-400" />
+              ) : (
+                <ChevronRight className="w-5 h-5 text-gray-400" />
+              )}
+            </button>
+
+            {expandedSections.customer && (
+              <div className="p-4 pt-0 space-y-4 border-t border-gray-100 dark:border-slate-700">
                 <div className="flex items-center justify-end">
                   <button
                     onClick={copyBillingToShipping}
@@ -690,20 +859,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                     <h4 className="font-medium text-gray-900 dark:text-white text-sm">Billing Address</h4>
                     <input
                       type="text"
-                      value={billName}
-                      onChange={(e) => setBillName(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
-                      placeholder="Company Name"
-                    />
-                    <input
-                      type="text"
-                      value={billContact}
-                      onChange={(e) => setBillContact(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
-                      placeholder="Contact Name"
-                    />
-                    <input
-                      type="text"
                       value={billAddress1}
                       onChange={(e) => setBillAddress1(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
@@ -716,7 +871,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
                       placeholder="Address Line 2"
                     />
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <input
                         type="text"
                         value={billCity}
@@ -731,46 +886,18 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                         className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
                         placeholder="State"
                       />
+                      <input
+                        type="text"
+                        value={billZip}
+                        onChange={(e) => setBillZip(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
+                        placeholder="ZIP"
+                      />
                     </div>
-                    <input
-                      type="text"
-                      value={billZip}
-                      onChange={(e) => setBillZip(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
-                      placeholder="ZIP Code"
-                    />
-                    <input
-                      type="tel"
-                      value={billPhone}
-                      onChange={(e) => setBillPhone(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
-                      placeholder="Phone"
-                    />
-                    <input
-                      type="email"
-                      value={billEmail}
-                      onChange={(e) => setBillEmail(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
-                      placeholder="Email"
-                    />
                   </div>
 
                   <div className="space-y-3">
                     <h4 className="font-medium text-gray-900 dark:text-white text-sm">Shipping Address</h4>
-                    <input
-                      type="text"
-                      value={shipName}
-                      onChange={(e) => setShipName(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
-                      placeholder="Company Name"
-                    />
-                    <input
-                      type="text"
-                      value={shipContact}
-                      onChange={(e) => setShipContact(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
-                      placeholder="Contact Name"
-                    />
                     <input
                       type="text"
                       value={shipAddress1}
@@ -785,7 +912,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
                       placeholder="Address Line 2"
                     />
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <input
                         type="text"
                         value={shipCity}
@@ -800,14 +927,14 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                         className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
                         placeholder="State"
                       />
+                      <input
+                        type="text"
+                        value={shipZip}
+                        onChange={(e) => setShipZip(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
+                        placeholder="ZIP"
+                      />
                     </div>
-                    <input
-                      type="text"
-                      value={shipZip}
-                      onChange={(e) => setShipZip(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white text-sm"
-                      placeholder="ZIP Code"
-                    />
                   </div>
                 </div>
               </div>
@@ -1238,125 +1365,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                     ))}
                   </div>
                 )}
-              </div>
-            )}
-          </div>
-
-          {/* Quote Details Section */}
-          <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
-            <button
-              onClick={() => toggleSection('details')}
-              className="w-full flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <FileText className="w-5 h-5 text-blue-600" />
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Quote Details</h3>
-              </div>
-              {expandedSections.details ? (
-                <ChevronDown className="w-5 h-5 text-gray-400" />
-              ) : (
-                <ChevronRight className="w-5 h-5 text-gray-400" />
-              )}
-            </button>
-
-            {expandedSections.details && (
-              <div className="p-4 pt-0 space-y-4 border-t border-gray-100 dark:border-slate-700">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Quote Number
-                    </label>
-                    <input
-                      type="text"
-                      value={quoteNumber}
-                      className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm bg-gray-50 dark:bg-slate-900 dark:text-white"
-                      readOnly
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Created Date
-                    </label>
-                    <input
-                      type="date"
-                      value={createdDate}
-                      onChange={(e) => setCreatedDate(e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Due Date
-                    </label>
-                    <input
-                      type="date"
-                      value={dueDate}
-                      onChange={(e) => setDueDate(e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Valid Until
-                    </label>
-                    <input
-                      type="date"
-                      value={validUntil}
-                      onChange={(e) => setValidUntil(e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Terms
-                    </label>
-                    <input
-                      type="text"
-                      value={terms}
-                      onChange={(e) => setTerms(e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
-                      placeholder="Net 30"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      PO Number
-                    </label>
-                    <input
-                      type="text"
-                      value={poNumber}
-                      onChange={(e) => setPoNumber(e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
-                      placeholder="Purchase Order #"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Delivery Method
-                    </label>
-                    <select
-                      value={deliveryMethod}
-                      onChange={(e) => setDeliveryMethod(e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
-                    >
-                      <option value="PICK-UP">PICK-UP</option>
-                      <option value="DELIVERY">DELIVERY</option>
-                      <option value="SHIPPING">SHIPPING</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Customer Notes
-                  </label>
-                  <textarea
-                    value={customerNotes}
-                    onChange={(e) => setCustomerNotes(e.target.value)}
-                    rows={3}
-                    className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white"
-                    placeholder="Notes visible to customer on quote/invoice"
-                  />
-                </div>
               </div>
             )}
           </div>
