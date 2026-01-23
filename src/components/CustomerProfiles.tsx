@@ -265,10 +265,10 @@ export function CustomerProfiles({ invoices, loading }: CustomerProfilesProps) {
       </div>
 
       <div className="lg:col-span-2">
-        {selectedCustomer && selectedDatabaseCustomer ? (
+        {selectedCustomer ? (
           <CustomerDetail
             customer={selectedCustomer}
-            databaseCustomer={selectedDatabaseCustomer}
+            databaseCustomer={selectedDatabaseCustomer || null}
             onUpdate={loadCustomersFromDatabase}
           />
         ) : (
@@ -283,7 +283,7 @@ export function CustomerProfiles({ invoices, loading }: CustomerProfilesProps) {
 
 interface CustomerDetailProps {
   customer: CustomerProfile;
-  databaseCustomer: DatabaseCustomer;
+  databaseCustomer: DatabaseCustomer | null;
   onUpdate: () => void;
 }
 
@@ -296,7 +296,7 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
   const [editingCreditId, setEditingCreditId] = useState<string | null>(null);
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
 
-  const [editedCustomer, setEditedCustomer] = useState(databaseCustomer);
+  const [editedCustomer, setEditedCustomer] = useState<DatabaseCustomer | null>(databaseCustomer);
 
   const [newCredit, setNewCredit] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
@@ -383,7 +383,41 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
     return fundraisingCredits.reduce((sum, credit) => sum + parseFloat(credit.amount.toString()), 0);
   }, [fundraisingCredits]);
 
+  const handleCreateCustomerRecord = async () => {
+    if (!companyId) {
+      alert('Company ID not found');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .insert([{
+          id: customer.id,
+          company_name: customer.name,
+          email: customer.email || null,
+          company_id: companyId,
+          status: 'active'
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      onUpdate();
+      alert('Customer record created successfully');
+    } catch (error) {
+      console.error('Error creating customer:', error);
+      alert('Failed to create customer record');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSaveCustomerInfo = async () => {
+    if (!editedCustomer) return;
+
     setLoading(true);
     try {
       const { error } = await supabase
@@ -587,126 +621,150 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
     <div className="space-y-6">
       {/* Customer Info Header */}
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow border border-gray-200 dark:border-slate-700 p-6">
-        <div className="flex items-start justify-between mb-6">
-          <div className="flex-1">
-            {isEditingInfo ? (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Company Name *</label>
-                  <input
-                    type="text"
-                    value={editedCustomer.company_name}
-                    onChange={(e) => setEditedCustomer({ ...editedCustomer, company_name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+        {!databaseCustomer ? (
+          <div className="text-center py-8">
+            <div className="mb-4">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{customer.name}</h2>
+              {customer.email && (
+                <p className="text-gray-600 dark:text-gray-400">{customer.email}</p>
+              )}
+            </div>
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
+              <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-3">
+                This customer exists in your invoices but doesn't have an editable profile yet. Create one to add contacts, addresses, and more details.
+              </p>
+              <button
+                onClick={handleCreateCustomerRecord}
+                disabled={loading}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 mx-auto"
+              >
+                <Plus className="w-4 h-4" />
+                Create Customer Profile
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-start justify-between mb-6">
+            <div className="flex-1">
+              {isEditingInfo && editedCustomer ? (
+                <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Contact Name</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Company Name *</label>
                     <input
                       type="text"
-                      value={editedCustomer.contact_name || ''}
-                      onChange={(e) => setEditedCustomer({ ...editedCustomer, contact_name: e.target.value })}
+                      value={editedCustomer.company_name}
+                      onChange={(e) => setEditedCustomer({ ...editedCustomer, company_name: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
-                    <input
-                      type="email"
-                      value={editedCustomer.email || ''}
-                      onChange={(e) => setEditedCustomer({ ...editedCustomer, email: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone</label>
-                    <input
-                      type="text"
-                      value={editedCustomer.phone || ''}
-                      onChange={(e) => setEditedCustomer({ ...editedCustomer, phone: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Website</label>
-                    <input
-                      type="text"
-                      value={editedCustomer.website || ''}
-                      onChange={(e) => setEditedCustomer({ ...editedCustomer, website: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleSaveCustomerInfo}
-                    disabled={loading}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    <Save className="w-4 h-4" />
-                    Save Changes
-                  </button>
-                  <button
-                    onClick={() => {
-                      setEditedCustomer(databaseCustomer);
-                      setIsEditingInfo(false);
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-900 dark:text-white"
-                  >
-                    <X className="w-4 h-4" />
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{customer.name}</h2>
-                    <div className="mt-2 space-y-1">
-                      {databaseCustomer.contact_name && (
-                        <p className="text-gray-600 dark:text-gray-400 flex items-center gap-2">
-                          <User className="w-4 h-4" />
-                          {databaseCustomer.contact_name}
-                        </p>
-                      )}
-                      {databaseCustomer.email && (
-                        <p className="text-gray-600 dark:text-gray-400 flex items-center gap-2">
-                          <Mail className="w-4 h-4" />
-                          {databaseCustomer.email}
-                        </p>
-                      )}
-                      {databaseCustomer.phone && (
-                        <p className="text-gray-600 dark:text-gray-400 flex items-center gap-2">
-                          <Phone className="w-4 h-4" />
-                          {databaseCustomer.phone}
-                        </p>
-                      )}
-                      {databaseCustomer.website && (
-                        <p className="text-gray-600 dark:text-gray-400 flex items-center gap-2">
-                          <Globe className="w-4 h-4" />
-                          <a href={databaseCustomer.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
-                            {databaseCustomer.website}
-                          </a>
-                        </p>
-                      )}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Contact Name</label>
+                      <input
+                        type="text"
+                        value={editedCustomer.contact_name || ''}
+                        onChange={(e) => setEditedCustomer({ ...editedCustomer, contact_name: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                      <input
+                        type="email"
+                        value={editedCustomer.email || ''}
+                        onChange={(e) => setEditedCustomer({ ...editedCustomer, email: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone</label>
+                      <input
+                        type="text"
+                        value={editedCustomer.phone || ''}
+                        onChange={(e) => setEditedCustomer({ ...editedCustomer, phone: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Website</label>
+                      <input
+                        type="text"
+                        value={editedCustomer.website || ''}
+                        onChange={(e) => setEditedCustomer({ ...editedCustomer, website: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                      />
                     </div>
                   </div>
-                  <button
-                    onClick={() => setIsEditingInfo(true)}
-                    className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-900 dark:text-white"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                    Edit Info
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSaveCustomerInfo}
+                      disabled={loading}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      <Save className="w-4 h-4" />
+                      Save Changes
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditedCustomer(databaseCustomer);
+                        setIsEditingInfo(false);
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-900 dark:text-white"
+                    >
+                      <X className="w-4 h-4" />
+                      Cancel
+                    </button>
+                  </div>
                 </div>
-              </>
-            )}
+              ) : (
+                <>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{customer.name}</h2>
+                      <div className="mt-2 space-y-1">
+                        {databaseCustomer.contact_name && (
+                          <p className="text-gray-600 dark:text-gray-400 flex items-center gap-2">
+                            <User className="w-4 h-4" />
+                            {databaseCustomer.contact_name}
+                          </p>
+                        )}
+                        {databaseCustomer.email && (
+                          <p className="text-gray-600 dark:text-gray-400 flex items-center gap-2">
+                            <Mail className="w-4 h-4" />
+                            {databaseCustomer.email}
+                          </p>
+                        )}
+                        {databaseCustomer.phone && (
+                          <p className="text-gray-600 dark:text-gray-400 flex items-center gap-2">
+                            <Phone className="w-4 h-4" />
+                            {databaseCustomer.phone}
+                          </p>
+                        )}
+                        {databaseCustomer.website && (
+                          <p className="text-gray-600 dark:text-gray-400 flex items-center gap-2">
+                            <Globe className="w-4 h-4" />
+                            <a href={databaseCustomer.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                              {databaseCustomer.website}
+                            </a>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setIsEditingInfo(true)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-900 dark:text-white"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      Edit Info
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
-        {!isEditingInfo && (
+        {!isEditingInfo && databaseCustomer && (
           <div className="grid grid-cols-3 gap-4">
             <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
               <div className="flex items-center gap-2 mb-2">
@@ -740,7 +798,7 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
       </div>
 
       {/* Addresses Section */}
-      {!isEditingInfo && (databaseCustomer.billing_city || databaseCustomer.shipping_city) && (
+      {!isEditingInfo && databaseCustomer && (databaseCustomer.billing_city || databaseCustomer.shipping_city) && (
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow border border-gray-200 dark:border-slate-700 p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
             <MapPin className="w-5 h-5" />
@@ -778,22 +836,23 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
       )}
 
       {/* Contacts Section */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow border border-gray-200 dark:border-slate-700">
-        <div className="p-4 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-            <Building className="w-5 h-5" />
-            Contacts ({contacts.length})
-          </h3>
-          {!isAddingContact && (
-            <button
-              onClick={() => setIsAddingContact(true)}
-              className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              <Plus className="w-4 h-4" />
-              Add Contact
-            </button>
-          )}
-        </div>
+      {databaseCustomer && (
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow border border-gray-200 dark:border-slate-700">
+          <div className="p-4 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+              <Building className="w-5 h-5" />
+              Contacts ({contacts.length})
+            </h3>
+            {!isAddingContact && (
+              <button
+                onClick={() => setIsAddingContact(true)}
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                <Plus className="w-4 h-4" />
+                Add Contact
+              </button>
+            )}
+          </div>
 
         <div className="p-4">
           {isAddingContact && (
@@ -912,25 +971,27 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
             </div>
           )}
         </div>
-      </div>
+        </div>
+      )}
 
       {/* Fundraising Credits Section */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow border border-gray-200 dark:border-slate-700">
-        <div className="p-4 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Gift className="w-5 h-5 text-purple-600 dark:text-purple-500" />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Fundraising Credits</h3>
+      {databaseCustomer && (
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow border border-gray-200 dark:border-slate-700">
+          <div className="p-4 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Gift className="w-5 h-5 text-purple-600 dark:text-purple-500" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Fundraising Credits</h3>
+            </div>
+            {!isAddingCredit && (
+              <button
+                onClick={() => setIsAddingCredit(true)}
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+              >
+                <Plus className="w-4 h-4" />
+                Add Credit
+              </button>
+            )}
           </div>
-          {!isAddingCredit && (
-            <button
-              onClick={() => setIsAddingCredit(true)}
-              className="flex items-center gap-2 px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-            >
-              <Plus className="w-4 h-4" />
-              Add Credit
-            </button>
-          )}
-        </div>
 
         <div className="p-4">
           {isAddingCredit && (
@@ -1053,7 +1114,8 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
             </>
           )}
         </div>
-      </div>
+        </div>
+      )}
 
       {/* Invoice History */}
       {customer.invoices.length > 0 && (
