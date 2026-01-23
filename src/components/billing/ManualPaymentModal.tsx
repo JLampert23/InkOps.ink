@@ -113,11 +113,18 @@ export function ManualPaymentModal({
 
     setSubmitting(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+
+      if (!accessToken) {
+        throw new Error('No access token available. Please sign in again.');
+      }
+
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/record-manual-payment`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await import('../../lib/supabase-client')).supabase.auth.getSession().then(s => s.data.session?.access_token)}`,
+          'Authorization': `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           invoiceId,
@@ -162,16 +169,16 @@ export function ManualPaymentModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-            <DollarSign className="w-6 h-6 text-green-600" />
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white dark:bg-slate-800 px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between">
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+            <DollarSign className="w-6 h-6 text-green-600 dark:text-green-500" />
             Record a Payment
           </h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
             disabled={submitting}
           >
             <XCircle className="w-6 h-6" />
@@ -180,32 +187,32 @@ export function ManualPaymentModal({
 
         <div className="p-6 space-y-5">
           {errors.submit && (
-            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-red-700">{errors.submit}</p>
+            <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-red-700 dark:text-red-300">{errors.submit}</p>
             </div>
           )}
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h4 className="text-sm font-semibold text-blue-900 mb-2">Invoice Summary</h4>
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-2">Invoice Summary</h4>
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
-                <p className="text-blue-700">Invoice Number</p>
-                <p className="font-semibold text-blue-900">{invoiceNumber}</p>
+                <p className="text-blue-700 dark:text-blue-300">Invoice Number</p>
+                <p className="font-semibold text-blue-900 dark:text-blue-100">{invoiceNumber}</p>
               </div>
               <div>
-                <p className="text-blue-700">Invoice Total</p>
-                <p className="font-semibold text-blue-900">${invoiceTotal.toFixed(2)}</p>
+                <p className="text-blue-700 dark:text-blue-300">Invoice Total</p>
+                <p className="font-semibold text-blue-900 dark:text-blue-100">${invoiceTotal.toFixed(2)}</p>
               </div>
               <div className="col-span-2">
-                <p className="text-blue-700">Balance Remaining</p>
-                <p className="text-lg font-bold text-blue-900">${invoiceBalance.toFixed(2)}</p>
+                <p className="text-blue-700 dark:text-blue-300">Balance Remaining</p>
+                <p className="text-lg font-bold text-blue-900 dark:text-blue-100">${invoiceBalance.toFixed(2)}</p>
               </div>
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-2">
+            <label className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
               Payment Type <span className="text-red-500">*</span>
             </label>
             <div className="grid grid-cols-2 gap-3">
@@ -222,8 +229,8 @@ export function ManualPaymentModal({
                 disabled={submitting}
                 className={`p-4 rounded-lg border-2 transition-all ${
                   paymentType === 'cash'
-                    ? 'border-green-600 bg-green-50 text-green-900'
-                    : 'border-gray-300 hover:border-gray-400 text-gray-700'
+                    ? 'border-green-600 bg-green-50 dark:bg-green-900/30 text-green-900 dark:text-green-100'
+                    : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500 text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-700'
                 } ${submitting ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <DollarSign className="w-6 h-6 mx-auto mb-1" />
@@ -242,8 +249,8 @@ export function ManualPaymentModal({
                 disabled={submitting}
                 className={`p-4 rounded-lg border-2 transition-all ${
                   paymentType === 'debit_credit'
-                    ? 'border-blue-600 bg-blue-50 text-blue-900'
-                    : 'border-gray-300 hover:border-gray-400 text-gray-700'
+                    ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100'
+                    : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500 text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-700'
                 } ${submitting ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <CheckCircle className="w-6 h-6 mx-auto mb-1" />
@@ -262,8 +269,8 @@ export function ManualPaymentModal({
                 disabled={submitting}
                 className={`p-4 rounded-lg border-2 transition-all ${
                   paymentType === 'check_ach'
-                    ? 'border-purple-600 bg-purple-50 text-purple-900'
-                    : 'border-gray-300 hover:border-gray-400 text-gray-700'
+                    ? 'border-purple-600 bg-purple-50 dark:bg-purple-900/30 text-purple-900 dark:text-purple-100'
+                    : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500 text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-700'
                 } ${submitting ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <FileText className="w-6 h-6 mx-auto mb-1" />
@@ -283,8 +290,8 @@ export function ManualPaymentModal({
                   disabled={submitting || loadingCredit || availableFundraisingCredit === 0}
                   className={`p-4 rounded-lg border-2 transition-all ${
                     paymentType === 'fundraising_credit'
-                      ? 'border-pink-600 bg-pink-50 text-pink-900'
-                      : 'border-gray-300 hover:border-gray-400 text-gray-700'
+                      ? 'border-pink-600 bg-pink-50 dark:bg-pink-900/30 text-pink-900 dark:text-pink-100'
+                      : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500 text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-700'
                   } ${submitting || loadingCredit || availableFundraisingCredit === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   <Gift className="w-6 h-6 mx-auto mb-1" />
@@ -293,7 +300,7 @@ export function ManualPaymentModal({
               )}
             </div>
             {errors.paymentType && (
-              <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+              <p className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
                 <AlertCircle className="w-4 h-4" />
                 {errors.paymentType}
               </p>
@@ -301,18 +308,18 @@ export function ManualPaymentModal({
           </div>
 
           {paymentType === 'fundraising_credit' && (
-            <div className="bg-pink-50 border border-pink-200 rounded-lg p-4">
+            <div className="bg-pink-50 dark:bg-pink-900/20 border border-pink-200 dark:border-pink-800 rounded-lg p-4">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-semibold text-pink-900">Available Fundraising Credit</h4>
-                <p className="text-lg font-bold text-pink-900">${availableFundraisingCredit.toFixed(2)}</p>
+                <h4 className="text-sm font-semibold text-pink-900 dark:text-pink-200">Available Fundraising Credit</h4>
+                <p className="text-lg font-bold text-pink-900 dark:text-pink-100">${availableFundraisingCredit.toFixed(2)}</p>
               </div>
-              <p className="text-xs text-pink-700 mb-2">
+              <p className="text-xs text-pink-700 dark:text-pink-300 mb-2">
                 This will deduct the payment amount from the customer's fundraising credit balance.
               </p>
               <button
                 type="button"
                 onClick={fillMaxFundraisingCredit}
-                className="text-xs text-pink-700 hover:text-pink-900 underline"
+                className="text-xs text-pink-700 dark:text-pink-300 hover:text-pink-900 dark:hover:text-pink-100 underline"
               >
                 Apply maximum available credit
               </button>
@@ -320,12 +327,12 @@ export function ManualPaymentModal({
           )}
 
           <div>
-            <label htmlFor="amount" className="block text-sm font-semibold text-gray-900 mb-2">
+            <label htmlFor="amount" className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
               Amount Paid <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <span className="text-gray-500 text-lg">$</span>
+                <span className="text-gray-500 dark:text-gray-400 text-lg">$</span>
               </div>
               <input
                 type="text"
@@ -333,20 +340,20 @@ export function ManualPaymentModal({
                 value={amount}
                 onChange={(e) => handleAmountChange(e.target.value)}
                 disabled={submitting}
-                className={`w-full pl-8 pr-4 py-3 text-lg font-semibold border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  errors.amount ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                className={`w-full pl-8 pr-4 py-3 text-lg font-semibold border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white ${
+                  errors.amount ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20' : 'border-gray-300 dark:border-slate-600'
                 } ${submitting ? 'opacity-50 cursor-not-allowed' : ''}`}
                 placeholder="0.00"
               />
             </div>
             {errors.amount && (
-              <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+              <p className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
                 <AlertCircle className="w-4 h-4" />
                 {errors.amount}
               </p>
             )}
             {!errors.amount && parseFloat(amount) > 0 && parseFloat(amount) < invoiceBalance && (
-              <p className="mt-2 text-sm text-amber-600">
+              <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">
                 Remaining balance after payment: ${(invoiceBalance - parseFloat(amount)).toFixed(2)}
               </p>
             )}
@@ -354,7 +361,7 @@ export function ManualPaymentModal({
 
           {paymentType === 'check_ach' && (
             <div>
-              <label htmlFor="checkNumber" className="block text-sm font-semibold text-gray-900 mb-2">
+              <label htmlFor="checkNumber" className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
                 Check Number <span className="text-red-500">*</span>
               </label>
               <input
@@ -370,13 +377,13 @@ export function ManualPaymentModal({
                   }
                 }}
                 disabled={submitting}
-                className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                  errors.checkNumber ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                className={`w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white ${
+                  errors.checkNumber ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20' : 'border-gray-300 dark:border-slate-600'
                 } ${submitting ? 'opacity-50 cursor-not-allowed' : ''}`}
                 placeholder="Enter check number"
               />
               {errors.checkNumber && (
-                <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
+                <p className="mt-2 text-sm text-red-600 dark:text-red-400 flex items-center gap-1">
                   <AlertCircle className="w-4 h-4" />
                   {errors.checkNumber}
                 </p>
@@ -385,12 +392,12 @@ export function ManualPaymentModal({
           )}
 
           <div>
-            <label htmlFor="paymentDate" className="block text-sm font-semibold text-gray-900 mb-2">
+            <label htmlFor="paymentDate" className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
               Payment Date
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Calendar className="w-5 h-5 text-gray-400" />
+                <Calendar className="w-5 h-5 text-gray-400 dark:text-gray-500" />
               </div>
               <input
                 type="date"
@@ -399,7 +406,7 @@ export function ManualPaymentModal({
                 onChange={(e) => setPaymentDate(e.target.value)}
                 disabled={submitting}
                 max={new Date().toISOString().split('T')[0]}
-                className={`w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                className={`w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white ${
                   submitting ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               />
@@ -407,7 +414,7 @@ export function ManualPaymentModal({
           </div>
 
           <div>
-            <label htmlFor="notes" className="block text-sm font-semibold text-gray-900 mb-2">
+            <label htmlFor="notes" className="block text-sm font-semibold text-gray-900 dark:text-white mb-2">
               Notes (Optional)
             </label>
             <textarea
@@ -416,7 +423,7 @@ export function ManualPaymentModal({
               onChange={(e) => setNotes(e.target.value)}
               disabled={submitting}
               rows={3}
-              className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none ${
+              className={`w-full px-4 py-2.5 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 ${
                 submitting ? 'opacity-50 cursor-not-allowed' : ''
               }`}
               placeholder="Add any additional notes about this payment..."
@@ -424,11 +431,11 @@ export function ManualPaymentModal({
           </div>
         </div>
 
-        <div className="sticky bottom-0 bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+        <div className="sticky bottom-0 bg-gray-50 dark:bg-slate-900 px-6 py-4 border-t border-gray-200 dark:border-slate-700 flex justify-end gap-3">
           <button
             onClick={onClose}
             disabled={submitting}
-            className="px-5 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+            className="px-5 py-2.5 text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
           >
             Cancel
           </button>
