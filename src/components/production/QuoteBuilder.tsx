@@ -94,6 +94,8 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
     loadCustomers();
     if (quoteId) {
       loadQuote();
+    } else {
+      loadDefaultFees();
     }
   }, [quoteId]);
 
@@ -103,6 +105,33 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       .select('*')
       .order('company_name');
     setCustomers(data || []);
+  };
+
+  const loadDefaultFees = async () => {
+    try {
+      const { data: defaultFees, error } = await supabase
+        .from('invoice_fees')
+        .select('*')
+        .eq('is_active', true)
+        .eq('show_by_default', true)
+        .eq('amount_type', 'dollar');
+
+      if (error) throw error;
+
+      if (defaultFees && defaultFees.length > 0) {
+        const formattedFees: QuoteFee[] = defaultFees.map(fee => ({
+          fee_name: fee.fee_name,
+          description: fee.description,
+          quantity: 1,
+          unit_amount: fee.amount,
+          total_amount: fee.amount,
+          taxed: fee.is_taxed,
+        }));
+        setFees(formattedFees);
+      }
+    } catch (err) {
+      console.error('Error loading default fees:', err);
+    }
   };
 
   const loadQuote = async () => {

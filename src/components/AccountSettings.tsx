@@ -46,6 +46,20 @@ interface PrintavoStatus {
   is_billing_eligible: boolean;
 }
 
+interface InvoiceFee {
+  id: string;
+  company_id: string;
+  fee_name: string;
+  description: string;
+  amount: number;
+  amount_type: 'dollar' | 'percent';
+  is_taxed: boolean;
+  show_by_default: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 type SettingsTab =
   | 'company-info'
   | 'printavo-integration' | 'square-integration' | 'resend-integration' | 'twilio-integration' | 'stripe-payments'
@@ -163,6 +177,20 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   const [unlockPin, setUnlockPin] = useState('');
   const [unlockPinConfirm, setUnlockPinConfirm] = useState('');
+
+  const [invoiceFees, setInvoiceFees] = useState<InvoiceFee[]>([]);
+  const [loadingFees, setLoadingFees] = useState(false);
+  const [editingFeeId, setEditingFeeId] = useState<string | null>(null);
+  const [showAddFeeModal, setShowAddFeeModal] = useState(false);
+  const [feeFormData, setFeeFormData] = useState({
+    fee_name: '',
+    description: '',
+    amount: '',
+    amount_type: 'dollar' as 'dollar' | 'percent',
+    is_taxed: false,
+    show_by_default: false,
+  });
+  const [savingFee, setSavingFee] = useState(false);
   const [currentPin, setCurrentPin] = useState('');
   const [hasExistingPin, setHasExistingPin] = useState(false);
   const [savingPin, setSavingPin] = useState(false);
@@ -173,6 +201,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     loadUsers();
     loadAvailableStatuses();
     loadStatusesFromDatabase();
+    loadInvoiceFees();
   }, []);
 
   useEffect(() => {
@@ -1868,6 +1897,167 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       });
     } finally {
       setSyncingPrintavoData(false);
+    }
+  };
+
+  const loadInvoiceFees = async () => {
+    try {
+      setLoadingFees(true);
+      const { data, error } = await supabase
+        .from('invoice_fees')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setInvoiceFees(data || []);
+    } catch (err) {
+      console.error('Error loading invoice fees:', err);
+      showNotification('error', 'Load Failed', 'Failed to load invoice fees.');
+    } finally {
+      setLoadingFees(false);
+    }
+  };
+
+  const resetFeeForm = () => {
+    setFeeFormData({
+      fee_name: '',
+      description: '',
+      amount: '',
+      amount_type: 'dollar',
+      is_taxed: false,
+      show_by_default: false,
+    });
+    setEditingFeeId(null);
+  };
+
+  const openAddFeeModal = () => {
+    resetFeeForm();
+    setShowAddFeeModal(true);
+  };
+
+  const openEditFeeModal = (fee: InvoiceFee) => {
+    setFeeFormData({
+      fee_name: fee.fee_name,
+      description: fee.description,
+      amount: fee.amount.toString(),
+      amount_type: fee.amount_type,
+      is_taxed: fee.is_taxed,
+      show_by_default: fee.show_by_default,
+    });
+    setEditingFeeId(fee.id);
+    setShowAddFeeModal(true);
+  };
+
+  const saveFee = async () => {
+    if (!feeFormData.fee_name.trim()) {
+      showNotification('error', 'Validation Error', 'Fee name is required.');
+      return;
+    }
+
+    const amount = parseFloat(feeFormData.amount);
+    if (isNaN(amount) || amount < 0) {
+      showNotification('error', 'Validation Error', 'Please enter a valid amount.');
+      return;
+    }
+
+    if (feeFormData.amount_type === 'percent' && amount > 100) {
+      showNotification('error', 'Validation Error', 'Percentage cannot exceed 100%.');
+      return;
+    }
+
+    try {
+      setSavingFee(true);
+
+      if (editingFeeId) {
+        const { error } = await supabase
+          .from('invoice_fees')
+          .update({
+            fee_name: feeFormData.fee_name,
+            description: feeFormData.description,
+            amount: amount,
+            amount_type: feeFormData.amount_type,
+            is_taxed: feeFormData.is_taxed,
+            show_by_default: feeFormData.show_by_default,
+          })
+          .eq('id', editingFeeId);
+
+        if (error) throw error;
+        showNotification('success', 'Fee Updated', 'Invoice fee updated successfully!');
+      } else {
+        const { data: companyData, error: companyError } = await supabase
+          .from('user_profiles')
+          .select('company_id')
+          .eq('id', user?.id)
+          .single();
+
+        if (companyError) throw companyError;
+
+        const { error } = await supabase
+          .from('invoice_fees')
+          .insert([{
+            company_id: companyData.company_id,
+            fee_name: feeFormData.fee_name,
+            description: feeFormData.description,
+            amount: amount,
+            amount_type: feeFormData.amount_type,
+            is_taxed: feeFormData.is_taxed,
+            show_by_default: feeFormData.show_by_default,
+          }]);
+
+        if (error) throw error;
+        showNotification('success', 'Fee Created', 'Invoice fee created successfully!');
+      }
+
+      setShowAddFeeModal(false);
+      resetFeeForm();
+      loadInvoiceFees();
+    } catch (err) {
+      console.error('Error saving fee:', err);
+      showNotification('error', 'Save Failed', 'Failed to save invoice fee. Please try again.');
+    } finally {
+      setSavingFee(false);
+    }
+  };
+
+  const deleteFee = async (feeId: string) => {
+    const confirmed = await confirm(
+      'Delete Invoice Fee?',
+      'Are you sure you want to delete this invoice fee? This action cannot be undone.'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from('invoice_fees')
+        .update({ is_active: false })
+        .eq('id', feeId);
+
+      if (error) throw error;
+
+      showNotification('success', 'Fee Deleted', 'Invoice fee deleted successfully!');
+      loadInvoiceFees();
+    } catch (err) {
+      console.error('Error deleting fee:', err);
+      showNotification('error', 'Delete Failed', 'Failed to delete invoice fee. Please try again.');
+    }
+  };
+
+  const toggleFeeDefault = async (feeId: string, currentValue: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('invoice_fees')
+        .update({ show_by_default: !currentValue })
+        .eq('id', feeId);
+
+      if (error) throw error;
+
+      loadInvoiceFees();
+      showNotification('success', 'Updated', `Fee will ${!currentValue ? 'now' : 'no longer'} be added by default.`);
+    } catch (err) {
+      console.error('Error toggling fee default:', err);
+      showNotification('error', 'Update Failed', 'Failed to update fee default setting.');
     }
   };
 
@@ -4136,30 +4326,238 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           {/* Invoice Fees Section */}
           {activeTab === 'invoice-fees' && (
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Invoice Fees</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Configure additional fees that can be applied to invoices</p>
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Invoice Fees</h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Configure additional fees that can be applied to invoices</p>
+                </div>
+                <button
+                  onClick={openAddFeeModal}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Fee
+                </button>
               </div>
 
-              <div className="space-y-4">
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <CreditCard className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">Invoice Fee Management</h3>
-                      <p className="text-sm text-blue-800 dark:text-blue-200">
-                        Set up and manage additional fees that can be applied to invoices such as processing fees, late payment fees, or service charges.
-                      </p>
-                    </div>
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <CreditCard className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">Invoice Fee Management</h3>
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                      Create fees that auto-populate in quotes/invoices. Fees marked as "Show By Default" will be automatically added to new quotes and invoices.
+                    </p>
                   </div>
                 </div>
+              </div>
 
-                <div className="border border-gray-200 dark:border-slate-700 rounded-lg p-6 text-center">
+              {loadingFees ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-spin" />
+                </div>
+              ) : invoiceFees.length === 0 ? (
+                <div className="border border-gray-200 dark:border-slate-700 rounded-lg p-8 text-center">
                   <CreditCard className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-3" />
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Invoice Fees Coming Soon</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 max-w-md mx-auto">
-                    The ability to configure and manage invoice fees will be available in an upcoming release. This feature will allow you to add processing fees, late payment charges, and other customizable fees to your invoices.
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Invoice Fees</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    You haven't created any invoice fees yet. Click "Add Fee" to create your first fee.
                   </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {invoiceFees.map((fee) => (
+                    <div
+                      key={fee.id}
+                      className="border border-gray-200 dark:border-slate-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-semibold text-gray-900 dark:text-white">{fee.fee_name}</h3>
+                            {fee.show_by_default && (
+                              <span className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full font-medium">
+                                Auto-Add
+                              </span>
+                            )}
+                            {fee.is_taxed && (
+                              <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full font-medium">
+                                Taxed
+                              </span>
+                            )}
+                          </div>
+                          {fee.description && (
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{fee.description}</p>
+                          )}
+                          <div className="text-lg font-bold text-gray-900 dark:text-white">
+                            {fee.amount_type === 'dollar' ? `$${fee.amount.toFixed(2)}` : `${fee.amount}%`}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => toggleFeeDefault(fee.id, fee.show_by_default)}
+                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-gray-100 dark:hover:bg-slate-600 rounded-lg transition-colors"
+                            title={fee.show_by_default ? 'Disable auto-add' : 'Enable auto-add'}
+                          >
+                            {fee.show_by_default ? (
+                              <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                              </svg>
+                            ) : (
+                              <svg className="w-5 h-5" fill="none" viewBox="0 0 20 20" stroke="currentColor">
+                                <circle cx="10" cy="10" r="8" strokeWidth="2" />
+                              </svg>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => openEditFeeModal(fee)}
+                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-slate-600 rounded-lg transition-colors"
+                          >
+                            <Edit className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => deleteFee(fee.id)}
+                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-gray-100 dark:hover:bg-slate-600 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Add/Edit Fee Modal */}
+          {showAddFeeModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                <div className="p-6 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                      {editingFeeId ? 'Edit Invoice Fee' : 'Add Invoice Fee'}
+                    </h2>
+                    <button
+                      onClick={() => setShowAddFeeModal(false)}
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    >
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Fee Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={feeFormData.fee_name}
+                        onChange={(e) => setFeeFormData({ ...feeFormData, fee_name: e.target.value })}
+                        placeholder="e.g., Processing Fee, Late Fee"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Description
+                      </label>
+                      <textarea
+                        value={feeFormData.description}
+                        onChange={(e) => setFeeFormData({ ...feeFormData, description: e.target.value })}
+                        placeholder="Optional description"
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Amount <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={feeFormData.amount}
+                          onChange={(e) => setFeeFormData({ ...feeFormData, amount: e.target.value })}
+                          placeholder="0.00"
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Type
+                        </label>
+                        <select
+                          value={feeFormData.amount_type}
+                          onChange={(e) => setFeeFormData({ ...feeFormData, amount_type: e.target.value as 'dollar' | 'percent' })}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                        >
+                          <option value="dollar">$ Dollar</option>
+                          <option value="percent">% Percent</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={feeFormData.is_taxed}
+                          onChange={(e) => setFeeFormData({ ...feeFormData, is_taxed: e.target.checked })}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">This fee is taxed</span>
+                      </label>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={feeFormData.show_by_default}
+                          onChange={(e) => setFeeFormData({ ...feeFormData, show_by_default: e.target.checked })}
+                          className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">Show by default (auto-add to new quotes/invoices)</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-slate-700">
+                    <button
+                      onClick={() => setShowAddFeeModal(false)}
+                      disabled={savingFee}
+                      className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={saveFee}
+                      disabled={savingFee}
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {savingFee ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4" />
+                          {editingFeeId ? 'Update Fee' : 'Create Fee'}
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
