@@ -113,12 +113,21 @@ export function ManualPaymentModal({
 
     setSubmitting(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        throw new Error('Failed to get session. Please sign in again.');
+      }
+
       const accessToken = session?.access_token;
 
       if (!accessToken) {
+        console.error('No access token in session:', session);
         throw new Error('No access token available. Please sign in again.');
       }
+
+      console.log('Making payment request with token length:', accessToken.length);
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/record-manual-payment`, {
         method: 'POST',
@@ -137,10 +146,13 @@ export function ManualPaymentModal({
         }),
       });
 
+      console.log('Response status:', response.status);
+
       const result = await response.json();
+      console.log('Response result:', result);
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to record payment');
+        throw new Error(result.error || result.details || 'Failed to record payment');
       }
 
       onSuccess();

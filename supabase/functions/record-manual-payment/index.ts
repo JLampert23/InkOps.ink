@@ -21,7 +21,10 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const authHeader = req.headers.get("Authorization");
 
+    console.log('Auth header present:', !!authHeader);
+
     if (!authHeader) {
+      console.error("No authorization header provided");
       return new Response(
         JSON.stringify({ error: "No authorization header" }),
         {
@@ -32,14 +35,28 @@ Deno.serve(async (req: Request) => {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+    console.log('Token length:', token.length);
+
+    // Use service role key for auth validation
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
 
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
+
+    console.log('User lookup result:', { userId: user?.id, error: userError?.message });
 
     if (userError || !user) {
       console.error("Error getting user:", userError);
       return new Response(
-        JSON.stringify({ error: "Unauthorized", details: userError?.message }),
+        JSON.stringify({
+          error: "Unauthorized",
+          details: userError?.message || 'No user found',
+          tokenLength: token.length
+        }),
         {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
