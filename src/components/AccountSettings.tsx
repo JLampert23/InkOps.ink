@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, CreditCard as Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, RefreshCw, Bug, MessageSquare, Eye, EyeOff } from 'lucide-react';
+import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, CreditCard as Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, RefreshCw, Bug, MessageSquare, Eye, EyeOff, Grid3x3 } from 'lucide-react';
 import { supabase } from '../lib/supabase-client';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
@@ -8,6 +8,7 @@ import AutomatedReports from './automation/AutomatedReports';
 const WorkflowCustomization = lazy(() => import('./production/WorkflowCustomization').then(m => ({ default: m.WorkflowCustomization })));
 const AutomationsDashboard = lazy(() => import('./automations/AutomationsDashboard').then(m => ({ default: m.AutomationsDashboard })));
 const StripePayments = lazy(() => import('./production/StripePayments').then(m => ({ default: m.StripePayments })));
+const PriceMatricesManager = lazy(() => import('./production/PriceMatricesManager').then(m => ({ default: m.PriceMatricesManager })));
 
 interface CompanySettings {
   id: string;
@@ -66,7 +67,7 @@ type SettingsTab =
   | 'user-management' | 'user-security'
   | 'billing-status-filters'
   | 'automated-reports' | 'workflow-setup' | 'automations'
-  | 'invoice-fees' | 'custom-invoice-status';
+  | 'invoice-fees' | 'custom-invoice-status' | 'price-matrices';
 
 interface AccountSettingsProps {
   initialTab?: SettingsTab;
@@ -2425,6 +2426,24 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   </div>
                   {activeTab === 'automations' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
                 </button>
+
+                <button
+                  onClick={() => setActiveTab('price-matrices')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'price-matrices'
+                      ? 'bg-green-50 dark:bg-green-600/20 text-green-700 dark:text-green-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                  style={{ animationDelay: '80ms' }}
+                >
+                  <Grid3x3 className={`w-4 h-4 flex-shrink-0 ${activeTab === 'price-matrices' ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'price-matrices' ? 'text-green-700 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      Price Matrices
+                    </div>
+                  </div>
+                  {activeTab === 'price-matrices' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
+                </button>
               </div>
             )}
           </div>
@@ -4041,6 +4060,16 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               </div>
             }>
               <AutomationsDashboard />
+            </Suspense>
+          )}
+
+          {activeTab === 'price-matrices' && (
+            <Suspense fallback={
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 text-green-600 dark:text-green-400 animate-spin" />
+              </div>
+            }>
+              <PriceMatricesManager />
             </Suspense>
           )}
 

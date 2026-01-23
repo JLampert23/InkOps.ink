@@ -1,0 +1,492 @@
+import { useState, useEffect } from 'react';
+import { Plus, Trash2, Edit2, Save, X, Grid3x3 } from 'lucide-react';
+import { supabase } from '../../lib/supabase-client';
+import { useNotification } from '../../contexts/NotificationContext';
+import { useAuth } from '../../contexts/AuthContext';
+
+interface PriceMatrix {
+  id: string;
+  name: string;
+  description: string;
+  columns: string[];
+  rows: string[];
+  cells: Record<string, number>;
+  is_active: boolean;
+}
+
+export function PriceMatricesManager() {
+  const { showNotification } = useNotification();
+  const { user } = useAuth();
+  const [matrices, setMatrices] = useState<PriceMatrix[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingMatrix, setEditingMatrix] = useState<PriceMatrix | null>(null);
+  const [showEditor, setShowEditor] = useState(false);
+
+  useEffect(() => {
+    loadMatrices();
+  }, []);
+
+  const loadMatrices = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('price_matrices')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setMatrices(data || []);
+    } catch (err) {
+      console.error('Error loading matrices:', err);
+      showNotification('error', 'Load Failed', 'Failed to load price matrices');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createNewMatrix = () => {
+    setEditingMatrix({
+      id: '',
+      name: '',
+      description: '',
+      columns: ['Column 1', 'Column 2', 'Column 3'],
+      rows: ['Row 1', 'Row 2', 'Row 3'],
+      cells: {},
+      is_active: true,
+    });
+    setShowEditor(true);
+  };
+
+  const editMatrix = (matrix: PriceMatrix) => {
+    setEditingMatrix({ ...matrix });
+    setShowEditor(true);
+  };
+
+  const deleteMatrix = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('price_matrices')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      showNotification('success', 'Deleted', 'Price matrix deleted successfully');
+      loadMatrices();
+    } catch (err) {
+      console.error('Error deleting matrix:', err);
+      showNotification('error', 'Delete Failed', 'Failed to delete price matrix');
+    }
+  };
+
+  const closeEditor = () => {
+    setShowEditor(false);
+    setEditingMatrix(null);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Price Matrices</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Create and manage pricing tables with custom columns and rows</p>
+          </div>
+          <button
+            onClick={createNewMatrix}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            New Matrix
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            Loading matrices...
+          </div>
+        ) : matrices.length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 dark:bg-slate-700/50 rounded-lg">
+            <Grid3x3 className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-3" />
+            <p className="text-gray-600 dark:text-gray-400 mb-4">No price matrices created yet</p>
+            <button
+              onClick={createNewMatrix}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Create Your First Matrix
+            </button>
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            {matrices.map((matrix) => (
+              <div
+                key={matrix.id}
+                className="border border-gray-200 dark:border-slate-600 rounded-lg p-4 hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-md font-semibold text-gray-900 dark:text-white">{matrix.name}</h3>
+                      {matrix.is_active && (
+                        <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    {matrix.description && (
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{matrix.description}</p>
+                    )}
+                    <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                      <span>{matrix.columns.length} columns</span>
+                      <span>•</span>
+                      <span>{matrix.rows.length} rows</span>
+                      <span>•</span>
+                      <span>{Object.keys(matrix.cells).length} prices set</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => editMatrix(matrix)}
+                      className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+                      title="Edit matrix"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => deleteMatrix(matrix.id)}
+                      className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                      title="Delete matrix"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {showEditor && editingMatrix && (
+        <MatrixEditor
+          matrix={editingMatrix}
+          onSave={() => {
+            loadMatrices();
+            closeEditor();
+          }}
+          onCancel={closeEditor}
+        />
+      )}
+    </div>
+  );
+}
+
+interface MatrixEditorProps {
+  matrix: PriceMatrix;
+  onSave: () => void;
+  onCancel: () => void;
+}
+
+function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
+  const { showNotification } = useNotification();
+  const [name, setName] = useState(matrix.name);
+  const [description, setDescription] = useState(matrix.description);
+  const [columns, setColumns] = useState<string[]>(matrix.columns);
+  const [rows, setRows] = useState<string[]>(matrix.rows);
+  const [cells, setCells] = useState<Record<string, number>>(matrix.cells);
+  const [isActive, setIsActive] = useState(matrix.is_active);
+  const [saving, setSaving] = useState(false);
+
+  const addColumn = () => {
+    setColumns([...columns, `Column ${columns.length + 1}`]);
+  };
+
+  const addRow = () => {
+    setRows([...rows, `Row ${rows.length + 1}`]);
+  };
+
+  const removeColumn = (index: number) => {
+    const newColumns = columns.filter((_, i) => i !== index);
+    const newCells = { ...cells };
+    Object.keys(newCells).forEach((key) => {
+      const [rowIdx, colIdx] = key.split('-').map(Number);
+      if (colIdx === index) {
+        delete newCells[key];
+      } else if (colIdx > index) {
+        const value = newCells[key];
+        delete newCells[key];
+        newCells[`${rowIdx}-${colIdx - 1}`] = value;
+      }
+    });
+    setColumns(newColumns);
+    setCells(newCells);
+  };
+
+  const removeRow = (index: number) => {
+    const newRows = rows.filter((_, i) => i !== index);
+    const newCells = { ...cells };
+    Object.keys(newCells).forEach((key) => {
+      const [rowIdx, colIdx] = key.split('-').map(Number);
+      if (rowIdx === index) {
+        delete newCells[key];
+      } else if (rowIdx > index) {
+        const value = newCells[key];
+        delete newCells[key];
+        newCells[`${rowIdx - 1}-${colIdx}`] = value;
+      }
+    });
+    setRows(newRows);
+    setCells(newCells);
+  };
+
+  const updateColumn = (index: number, value: string) => {
+    const newColumns = [...columns];
+    newColumns[index] = value;
+    setColumns(newColumns);
+  };
+
+  const updateRow = (index: number, value: string) => {
+    const newRows = [...rows];
+    newRows[index] = value;
+    setRows(newRows);
+  };
+
+  const updateCell = (rowIndex: number, colIndex: number, value: string) => {
+    const numValue = parseFloat(value);
+    if (!isNaN(numValue)) {
+      setCells({ ...cells, [`${rowIndex}-${colIndex}`]: numValue });
+    } else if (value === '') {
+      const newCells = { ...cells };
+      delete newCells[`${rowIndex}-${colIndex}`];
+      setCells(newCells);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      showNotification('error', 'Validation Error', 'Matrix name is required');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const matrixData = {
+        name,
+        description,
+        columns,
+        rows,
+        cells,
+        is_active: isActive,
+      };
+
+      if (matrix.id) {
+        const { error } = await supabase
+          .from('price_matrices')
+          .update(matrixData)
+          .eq('id', matrix.id);
+
+        if (error) throw error;
+        showNotification('success', 'Updated', 'Price matrix updated successfully');
+      } else {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('company_id')
+          .eq('id', (await supabase.auth.getUser()).data.user?.id)
+          .single();
+
+        if (!profile?.company_id) throw new Error('Company ID not found');
+
+        const { error } = await supabase
+          .from('price_matrices')
+          .insert({ ...matrixData, company_id: profile.company_id });
+
+        if (error) throw error;
+        showNotification('success', 'Created', 'Price matrix created successfully');
+      }
+
+      onSave();
+    } catch (err) {
+      console.error('Error saving matrix:', err);
+      showNotification('error', 'Save Failed', 'Failed to save price matrix');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-lg w-full max-w-6xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-slate-700">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            {matrix.id ? 'Edit Price Matrix' : 'Create Price Matrix'}
+          </h2>
+          <button onClick={onCancel} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-auto p-6 space-y-6">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Matrix Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g., T-Shirt Pricing"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Status
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isActive}
+                  onChange={(e) => setIsActive(e.target.checked)}
+                  className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Active</span>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Description
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
+              placeholder="Optional description"
+            />
+          </div>
+
+          <div className="overflow-x-auto">
+            <div className="inline-block min-w-full align-middle">
+              <table className="min-w-full border border-gray-300 dark:border-slate-600">
+                <thead>
+                  <tr className="bg-gray-50 dark:bg-slate-700">
+                    <th className="border border-gray-300 dark:border-slate-600 p-2 w-48">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Row / Column</span>
+                      </div>
+                    </th>
+                    {columns.map((col, colIndex) => (
+                      <th key={colIndex} className="border border-gray-300 dark:border-slate-600 p-2 min-w-32">
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            value={col}
+                            onChange={(e) => updateColumn(colIndex, e.target.value)}
+                            className="flex-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 dark:bg-slate-800 dark:text-white rounded"
+                          />
+                          <button
+                            onClick={() => removeColumn(colIndex)}
+                            className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                            title="Remove column"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </th>
+                    ))}
+                    <th className="border border-gray-300 dark:border-slate-600 p-2 w-16">
+                      <button
+                        onClick={addColumn}
+                        className="p-1 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded"
+                        title="Add column"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row, rowIndex) => (
+                    <tr key={rowIndex}>
+                      <td className="border border-gray-300 dark:border-slate-600 p-2 bg-gray-50 dark:bg-slate-700">
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            value={row}
+                            onChange={(e) => updateRow(rowIndex, e.target.value)}
+                            className="flex-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 dark:bg-slate-800 dark:text-white rounded"
+                          />
+                          <button
+                            onClick={() => removeRow(rowIndex)}
+                            className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                            title="Remove row"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </td>
+                      {columns.map((_, colIndex) => (
+                        <td key={colIndex} className="border border-gray-300 dark:border-slate-600 p-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={cells[`${rowIndex}-${colIndex}`] || ''}
+                            onChange={(e) => updateCell(rowIndex, colIndex, e.target.value)}
+                            className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 dark:bg-slate-900 dark:text-white rounded text-right"
+                            placeholder="0.00"
+                          />
+                        </td>
+                      ))}
+                      <td className="border border-gray-300 dark:border-slate-600 p-2"></td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td className="border border-gray-300 dark:border-slate-600 p-2 bg-gray-50 dark:bg-slate-700">
+                      <button
+                        onClick={addRow}
+                        className="w-full flex items-center justify-center gap-2 p-1 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span className="text-sm">Add Row</span>
+                      </button>
+                    </td>
+                    <td colSpan={columns.length + 1} className="border border-gray-300 dark:border-slate-600"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-slate-700">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+          >
+            {saving ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                Save Matrix
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
