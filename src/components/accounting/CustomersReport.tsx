@@ -587,7 +587,7 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
                 </div>
               </div>
 
-              <div className="overflow-y-auto" style={{ maxHeight: '520px' }}>
+              <div className="overflow-y-auto mt-4" style={{ maxHeight: '520px' }}>
                 {/* Invoice History */}
                 {loadingDetails ? (
                   <div className="flex items-center justify-center py-12">
