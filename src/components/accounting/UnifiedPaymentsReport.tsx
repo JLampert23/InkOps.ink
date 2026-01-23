@@ -220,6 +220,17 @@ export default function UnifiedPaymentsReport({ onNavigateToCustomer }: UnifiedP
         throw new Error('Not authenticated');
       }
 
+      // Update the original payment status to 'reversed'
+      const { error: updateError } = await supabase
+        .from('payments')
+        .update({
+          status: 'reversed'
+        })
+        .eq('id', paymentId);
+
+      if (updateError) throw updateError;
+
+      // Create a negative payment entry
       const { error: paymentError } = await supabase
         .from('payments')
         .insert({
