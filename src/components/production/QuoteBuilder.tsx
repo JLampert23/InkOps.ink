@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Save, Plus, Trash2, GripVertical, X, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
+import CreateCustomerModal from '../accounting/CreateCustomerModal';
 
 interface QuoteItem {
   id?: string;
@@ -88,10 +89,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const [salesTaxRate, setSalesTaxRate] = useState(6.25);
 
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
-  const [newCustomerName, setNewCustomerName] = useState('');
-  const [newCustomerEmail, setNewCustomerEmail] = useState('');
-  const [newCustomerPhone, setNewCustomerPhone] = useState('');
-  const [creatingCustomer, setCreatingCustomer] = useState(false);
 
   useEffect(() => {
     loadCustomers();
@@ -252,41 +249,8 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
     setShipZip(billZip);
   };
 
-  const createCustomer = async () => {
-    if (!newCustomerName.trim()) {
-      alert('Customer name is required');
-      return;
-    }
-
-    setCreatingCustomer(true);
-    try {
-      const { data, error } = await supabase
-        .from('customers')
-        .insert({
-          company_name: newCustomerName,
-          email: newCustomerEmail || null,
-          phone: newCustomerPhone || null,
-          status: 'active',
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      if (data) {
-        await loadCustomers();
-        setSelectedCustomerId(data.id);
-        setShowNewCustomerModal(false);
-        setNewCustomerName('');
-        setNewCustomerEmail('');
-        setNewCustomerPhone('');
-      }
-    } catch (error) {
-      console.error('Error creating customer:', error);
-      alert('Failed to create customer');
-    } finally {
-      setCreatingCustomer(false);
-    }
+  const handleCustomerCreated = () => {
+    loadCustomers();
   };
 
   const calculateTotals = () => {
@@ -1092,92 +1056,11 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       </div>
 
       {/* New Customer Modal */}
-      {showNewCustomerModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-slate-900 rounded-lg p-6 w-full max-w-md border border-slate-700">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white">New Customer</h3>
-              <button
-                onClick={() => {
-                  setShowNewCustomerModal(false);
-                  setNewCustomerName('');
-                  setNewCustomerEmail('');
-                  setNewCustomerPhone('');
-                }}
-                className="text-gray-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">
-                  Customer Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={newCustomerName}
-                  onChange={(e) => setNewCustomerName(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white"
-                  placeholder="Enter customer name"
-                  autoFocus
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">Email</label>
-                <input
-                  type="email"
-                  value={newCustomerEmail}
-                  onChange={(e) => setNewCustomerEmail(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white"
-                  placeholder="customer@example.com"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">Phone</label>
-                <input
-                  type="tel"
-                  value={newCustomerPhone}
-                  onChange={(e) => setNewCustomerPhone(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white"
-                  placeholder="(555) 555-5555"
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={() => {
-                    setShowNewCustomerModal(false);
-                    setNewCustomerName('');
-                    setNewCustomerEmail('');
-                    setNewCustomerPhone('');
-                  }}
-                  className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={createCustomer}
-                  disabled={creatingCustomer || !newCustomerName.trim()}
-                  className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {creatingCustomer ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    'Create Customer'
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <CreateCustomerModal
+        isOpen={showNewCustomerModal}
+        onClose={() => setShowNewCustomerModal(false)}
+        onSuccess={handleCustomerCreated}
+      />
     </div>
   );
 }
