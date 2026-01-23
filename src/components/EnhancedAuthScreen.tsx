@@ -76,8 +76,12 @@ export function EnhancedAuthScreen() {
       <div className="w-full max-w-md">
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 p-8 sm:p-10 backdrop-blur-sm">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-600 to-blue-700 dark:from-blue-500 dark:to-blue-600 rounded-2xl mb-6 shadow-lg shadow-blue-500/30 transform hover:scale-105 transition-transform duration-200">
-              <Building2 className="w-10 h-10 text-white" />
+            <div className="inline-flex items-center justify-center mb-6 transform hover:scale-105 transition-transform duration-200">
+              <img
+                src="/create_variation_b_f.png"
+                alt="InkOps Logo"
+                className="h-24 w-auto"
+              />
             </div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">
               {isForgotPassword ? 'Reset Password' : isSignUp ? 'Create Company Account' : 'Welcome Back'}
