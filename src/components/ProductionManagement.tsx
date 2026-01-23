@@ -3,7 +3,11 @@ import { Loader2 } from 'lucide-react';
 
 const ProductionDashboard = lazy(() => import('./production/ProductionDashboard').then(m => ({ default: m.ProductionDashboard })));
 
-export function ProductionManagement() {
+interface ProductionManagementProps {
+  onNavigateToCustomers: () => void;
+}
+
+export function ProductionManagement({ onNavigateToCustomers }: ProductionManagementProps) {
   const LoadingFallback = () => (
     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-12 text-center">
       <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
@@ -19,7 +23,7 @@ export function ProductionManagement() {
       </div>
 
       <Suspense fallback={<LoadingFallback />}>
-        <ProductionDashboard />
+        <ProductionDashboard onNavigateToCustomers={onNavigateToCustomers} />
       </Suspense>
     </div>
   );

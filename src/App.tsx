@@ -637,7 +637,13 @@ function AppContent() {
                 </div>
               </div>
             }>
-              <ProductionManagement />
+              <ProductionManagement
+                onNavigateToCustomers={() => {
+                  setActiveTab('customers');
+                  setAccountingExpanded(true);
+                  closeSidebarOnMobile();
+                }}
+              />
             </Suspense>
           )}
 
