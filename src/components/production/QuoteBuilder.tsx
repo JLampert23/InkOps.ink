@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, GripVertical, X, Loader2 } from 'lucide-react';
+import { Save, Plus, Trash2, GripVertical, X, Loader2, ImageIcon, DollarSign } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
 import CreateCustomerModal from '../accounting/CreateCustomerModal';
 import { ManageImprintsModal } from './ManageImprintsModal';
+import { ImprintBuilder } from './ImprintBuilder';
 
 interface QuoteItem {
   id?: string;
@@ -90,6 +91,9 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
 
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
   const [showImprintsModal, setShowImprintsModal] = useState(false);
+  const [showImprintBuilder, setShowImprintBuilder] = useState(false);
+  const [editingLineItemId, setEditingLineItemId] = useState<string | null>(null);
+  const [editingLineItemIndex, setEditingLineItemIndex] = useState<number | null>(null);
 
   useEffect(() => {
     loadCustomers();
@@ -752,7 +756,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                     <th className="p-2 text-right border border-slate-800 w-20">Price</th>
                     <th className="p-2 text-center border border-slate-800 w-12">Taxed</th>
                     <th className="p-2 text-right border border-slate-800 w-24">Total</th>
-                    <th className="p-2 border border-slate-800 w-8"></th>
+                    <th className="p-2 text-center border border-slate-800 w-32">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -921,10 +925,41 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       <td className="p-2 border border-slate-800 text-right text-sm">
                         ${item.total_price.toFixed(2)}
                       </td>
-                      <td className="p-1 border border-slate-800 text-center">
-                        <button onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-400">
-                          <X className="w-4 h-4" />
-                        </button>
+                      <td className="p-1 border border-slate-800">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => {
+                              if (!item.id) {
+                                alert('Please save the quote first before managing imprints.');
+                                return;
+                              }
+                              setEditingLineItemId(item.id);
+                              setEditingLineItemIndex(idx);
+                              setShowImprintBuilder(true);
+                            }}
+                            className={`p-1 hover:bg-slate-800 rounded ${item.id ? 'text-blue-500 hover:text-blue-400' : 'text-gray-600 cursor-not-allowed'}`}
+                            title={item.id ? 'Manage Imprints' : 'Save quote first'}
+                            disabled={!item.id}
+                          >
+                            <ImageIcon className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              // Refresh pricing logic here
+                            }}
+                            className="p-1 text-green-500 hover:text-green-400 hover:bg-slate-800 rounded"
+                            title="Refresh Pricing"
+                          >
+                            <DollarSign className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => removeItem(idx)}
+                            className="p-1 text-red-500 hover:text-red-400 hover:bg-slate-800 rounded"
+                            title="Remove Item"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1129,6 +1164,25 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         onClose={() => setShowImprintsModal(false)}
         quoteId={quoteId}
       />
+
+      {/* Imprint Builder Modal */}
+      {showImprintBuilder && editingLineItemId && editingLineItemIndex !== null && (
+        <ImprintBuilder
+          lineItemId={editingLineItemId}
+          lineItemDescription={items[editingLineItemIndex]?.description || ''}
+          lineItemQuantity={items[editingLineItemIndex]?.total_quantity || 0}
+          onClose={() => {
+            setShowImprintBuilder(false);
+            setEditingLineItemId(null);
+            setEditingLineItemIndex(null);
+          }}
+          onSave={() => {
+            setShowImprintBuilder(false);
+            setEditingLineItemId(null);
+            setEditingLineItemIndex(null);
+          }}
+        />
+      )}
     </div>
   );
 }

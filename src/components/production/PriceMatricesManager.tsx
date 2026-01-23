@@ -8,6 +8,8 @@ interface PriceMatrix {
   id: string;
   name: string;
   description: string;
+  matrix_type: string;
+  setup_fee: number;
   columns: string[];
   rows: string[];
   cells: Record<string, number>;
@@ -49,6 +51,8 @@ export function PriceMatricesManager() {
       id: '',
       name: '',
       description: '',
+      matrix_type: 'general',
+      setup_fee: 0,
       columns: ['Column 1', 'Column 2', 'Column 3'],
       rows: ['Row 1', 'Row 2', 'Row 3'],
       cells: {},
@@ -127,6 +131,9 @@ export function PriceMatricesManager() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="text-md font-semibold text-gray-900 dark:text-white">{matrix.name}</h3>
+                      <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs rounded">
+                        {matrix.matrix_type.replace('_', ' ')}
+                      </span>
                       {matrix.is_active && (
                         <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded">
                           Active
@@ -191,6 +198,8 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
   const { showNotification } = useNotification();
   const [name, setName] = useState(matrix.name);
   const [description, setDescription] = useState(matrix.description);
+  const [matrixType, setMatrixType] = useState(matrix.matrix_type);
+  const [setupFee, setSetupFee] = useState(matrix.setup_fee);
   const [columns, setColumns] = useState<string[]>(matrix.columns);
   const [rows, setRows] = useState<string[]>(matrix.rows);
   const [cells, setCells] = useState<Record<string, number>>(matrix.cells);
@@ -273,6 +282,8 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
       const matrixData = {
         name,
         description,
+        matrix_type: matrixType,
+        setup_fee: setupFee,
         columns,
         rows,
         cells,
@@ -366,6 +377,41 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
               placeholder="Optional description"
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Matrix Type
+              </label>
+              <select
+                value={matrixType}
+                onChange={(e) => setMatrixType(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="general">General</option>
+                <option value="screen_print">Screen Print</option>
+                <option value="embroidery">Embroidery</option>
+                <option value="dtg">DTG (Direct to Garment)</option>
+                <option value="vinyl">Vinyl</option>
+                <option value="sublimation">Sublimation</option>
+                <option value="heat_transfer">Heat Transfer</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Setup Fee
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={setupFee}
+                onChange={(e) => setSetupFee(parseFloat(e.target.value) || 0)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="0.00"
+              />
+            </div>
           </div>
 
           <div className="overflow-x-auto">
