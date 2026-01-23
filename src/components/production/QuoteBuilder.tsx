@@ -51,6 +51,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const [saving, setSaving] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(initialCustomerId || '');
+  const [availableFees, setAvailableFees] = useState<any[]>([]);
 
   const [quoteNumber, setQuoteNumber] = useState('');
   const [createdDate, setCreatedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -92,6 +93,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
 
   useEffect(() => {
     loadCustomers();
+    loadAvailableFees();
     if (quoteId) {
       loadQuote();
     } else {
@@ -105,6 +107,21 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       .select('*')
       .order('company_name');
     setCustomers(data || []);
+  };
+
+  const loadAvailableFees = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('invoice_fees')
+        .select('*')
+        .eq('is_active', true)
+        .order('fee_name');
+
+      if (error) throw error;
+      setAvailableFees(data || []);
+    } catch (err) {
+      console.error('Error loading available fees:', err);
+    }
   };
 
   const loadDefaultFees = async () => {
@@ -250,6 +267,17 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       unit_amount: 0,
       total_amount: 0,
       taxed: false,
+    }]);
+  };
+
+  const addFeeFromTemplate = (feeTemplate: any) => {
+    setFees([...fees, {
+      fee_name: feeTemplate.fee_name,
+      description: feeTemplate.description,
+      quantity: 1,
+      unit_amount: feeTemplate.amount,
+      total_amount: feeTemplate.amount,
+      taxed: feeTemplate.is_taxed,
     }]);
   };
 
@@ -1012,13 +1040,34 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
               </tbody>
             </table>
 
-            <button
-              onClick={addFee}
-              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded text-sm flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Fee
-            </button>
+            <div className="flex gap-2">
+              <select
+                onChange={(e) => {
+                  if (e.target.value) {
+                    const fee = availableFees.find(f => f.id === e.target.value);
+                    if (fee) {
+                      addFeeFromTemplate(fee);
+                      e.target.value = '';
+                    }
+                  }
+                }}
+                className="px-3 py-2 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-white rounded text-sm"
+              >
+                <option value="">Select a fee to add...</option>
+                {availableFees.map(fee => (
+                  <option key={fee.id} value={fee.id}>
+                    {fee.fee_name} - ${Number(fee.amount).toFixed(2)}
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={addFee}
+                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded text-sm flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Custom Fee
+              </button>
+            </div>
           </div>
 
           {/* Totals Summary */}
