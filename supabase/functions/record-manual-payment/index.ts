@@ -127,9 +127,32 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Get user's profile to find their company_id
+    const { data: userProfile, error: profileError } = await supabaseAuth
+      .from("user_profiles")
+      .select("company_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    console.log('User profile lookup:', { userId: user.id, companyId: userProfile?.company_id, error: profileError?.message });
+
+    if (profileError || !userProfile || !userProfile.company_id) {
+      return new Response(
+        JSON.stringify({
+          error: "User profile or company not found",
+          details: profileError?.message || "No company_id in profile"
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     const { data: companySettings } = await supabaseAuth
       .from("company_settings")
       .select("id")
+      .eq("id", userProfile.company_id)
       .maybeSingle();
 
     if (!companySettings) {
