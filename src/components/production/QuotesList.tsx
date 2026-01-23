@@ -1,33 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase-client';
+import { useNotification } from '../../contexts/NotificationContext';
 import {
+  FileText,
   Search,
-  Filter,
   Plus,
-  Eye,
-  Edit,
-  Copy,
+  Clock,
   Send,
-  Trash2,
   CheckCircle,
   XCircle,
-  Clock,
-  FileText,
+  AlertCircle,
+  Loader2,
+  Edit,
+  Eye,
+  Copy,
+  RefreshCw,
 } from 'lucide-react';
-
-interface Quote {
-  id: string;
-  quote_number: string;
-  customer_name: string;
-  customer_email: string;
-  customer_company: string;
-  total: number;
-  status: string;
-  created_at: string;
-  valid_until: string | null;
-  sent_at: string | null;
-  approved_at: string | null;
-}
+import { format } from 'date-fns';
 
 interface QuotesListProps {
   onSelectQuote: (quoteId: string) => void;
@@ -35,57 +24,80 @@ interface QuotesListProps {
   onEditQuote: (quoteId: string) => void;
 }
 
+interface Quote {
+  id: string;
+  quote_number: string;
+  customer_name: string;
+  customer_company: string;
+  customer_email: string;
+  total: number;
+  status: string;
+  created_at: string;
+  sent_at: string | null;
+  approved_at: string | null;
+  valid_until: string | null;
+}
+
 export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }: QuotesListProps) {
+  const { showNotification } = useNotification();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [showFilters, setShowFilters] = useState(false);
+  const [duplicating, setDuplicating] = useState<string | null>(null);
 
   useEffect(() => {
     loadQuotes();
+
+    const channel = supabase
+      .channel('quotes-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'quotes',
+        },
+        () => {
+          loadQuotes();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [statusFilter]);
 
   const loadQuotes = async () => {
     setLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quotes-api`;
-      const params = new URLSearchParams();
+      let query = supabase
+        .from('quotes')
+        .select('*')
+        .order('created_at', { ascending: false });
 
       if (statusFilter !== 'all') {
-        params.append('status', statusFilter);
-      }
-      if (searchTerm) {
-        params.append('search', searchTerm);
+        query = query.eq('status', statusFilter);
       }
 
-      const response = await fetch(`${url}?${params.toString()}`, {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const { data, error } = await query;
 
-      if (!response.ok) {
-        throw new Error('Failed to load quotes');
-      }
+      if (error) throw error;
 
-      const data = await response.json();
-      setQuotes(data.quotes || []);
+      setQuotes(data || []);
     } catch (error) {
       console.error('Error loading quotes:', error);
-      alert('Failed to load quotes');
+      showNotification('Failed to load quotes', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   const handleDuplicate = async (quoteId: string) => {
-    if (!confirm('Duplicate this quote?')) return;
+    if (!confirm('Create a copy of this quote?')) return;
 
+    setDuplicating(quoteId);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
@@ -103,283 +115,276 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
         throw new Error('Failed to duplicate quote');
       }
 
-      alert('Quote duplicated successfully!');
+      const data = await response.json();
+      showNotification(`Quote duplicated as ${data.quote.quote_number}`, 'success');
       loadQuotes();
     } catch (error) {
       console.error('Error duplicating quote:', error);
-      alert('Failed to duplicate quote');
+      showNotification('Failed to duplicate quote', 'error');
+    } finally {
+      setDuplicating(null);
     }
   };
 
-  const handleDelete = async (quoteId: string) => {
-    if (!confirm('Are you sure you want to delete this quote? This action cannot be undone.')) return;
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quotes-api/${quoteId}`;
-      const response = await fetch(url, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete quote');
-      }
-
-      alert('Quote deleted successfully!');
-      loadQuotes();
-    } catch (error) {
-      console.error('Error deleting quote:', error);
-      alert('Failed to delete quote. Only admins can delete quotes.');
-    }
-  };
-
-  const getStatusColor = (status: string) => {
+  const getStatusConfig = (status: string) => {
     switch (status) {
       case 'draft':
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+        return { color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300', icon: Clock, label: 'Draft' };
       case 'sent':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400';
+        return { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400', icon: Send, label: 'Sent' };
       case 'approved':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400';
+        return { color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', icon: CheckCircle, label: 'Approved' };
       case 'rejected':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400';
+        return { color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', icon: XCircle, label: 'Rejected' };
       case 'expired':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400';
+        return { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400', icon: AlertCircle, label: 'Expired' };
       case 'converted':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400';
+        return { color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400', icon: CheckCircle, label: 'Converted' };
       default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
+        return { color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300', icon: Clock, label: status };
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'approved':
-        return <CheckCircle className="w-4 h-4" />;
-      case 'rejected':
-        return <XCircle className="w-4 h-4" />;
-      case 'sent':
-        return <Send className="w-4 h-4" />;
-      case 'expired':
-        return <Clock className="w-4 h-4" />;
-      case 'converted':
-        return <FileText className="w-4 h-4" />;
-      default:
-        return <Edit className="w-4 h-4" />;
-    }
-  };
+  const filteredQuotes = quotes.filter(
+    (quote) =>
+      quote.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      quote.quote_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (quote.customer_company || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (quote.customer_email || '').toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString();
+  const stats = {
+    total: quotes.length,
+    draft: quotes.filter(q => q.status === 'draft').length,
+    sent: quotes.filter(q => q.status === 'sent').length,
+    approved: quotes.filter(q => q.status === 'approved').length,
+    rejected: quotes.filter(q => q.status === 'rejected').length,
   };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Quotes</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">
-            Create and manage customer quotes
-          </p>
+          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Quotes & Approvals</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Create and manage customer quotes</p>
         </div>
-        <button
-          onClick={onCreateQuote}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          New Quote
-        </button>
-      </div>
-
-      {/* Search and Filters */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
-        <div className="flex items-center gap-4">
-          <div className="flex-1 relative">
-            <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search quotes by number, customer name, or email..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && loadQuotes()}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
-            />
-          </div>
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
-          >
-            <Filter className="w-5 h-5" />
-            Filters
-          </button>
+        <div className="flex items-center gap-2">
           <button
             onClick={loadQuotes}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            disabled={loading}
+            className="p-2 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+            title="Refresh"
           >
-            Search
+            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            onClick={onCreateQuote}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+          >
+            <Plus className="w-5 h-5" />
+            <span className="hidden sm:inline">Create Quote</span>
           </button>
         </div>
-
-        {/* Filter Options */}
-        {showFilters && (
-          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
-            <div className="flex items-center gap-4">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Status:
-              </label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-1 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
-              >
-                <option value="all">All Statuses</option>
-                <option value="draft">Draft</option>
-                <option value="sent">Sent</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-                <option value="expired">Expired</option>
-                <option value="converted">Converted</option>
-              </select>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Quotes Table */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="mt-2 text-gray-600 dark:text-gray-400">Loading quotes...</p>
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
+          <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">Total Quotes</div>
+        </div>
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
+          <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">{stats.draft}</div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">Draft</div>
+        </div>
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
+          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.sent}</div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">Sent</div>
+        </div>
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
+          <div className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.approved}</div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">Approved</div>
+        </div>
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
+          <div className="text-2xl font-bold text-red-600 dark:text-red-400">{stats.rejected}</div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">Rejected</div>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by customer, quote number, or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+            />
           </div>
-        ) : quotes.length === 0 ? (
-          <div className="p-8 text-center">
-            <FileText className="w-16 h-16 mx-auto text-gray-400" />
-            <p className="mt-2 text-gray-600 dark:text-gray-400">No quotes found</p>
+          <div className="flex gap-2">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-4 py-2.5 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+            >
+              <option value="all">All Status</option>
+              <option value="draft">Draft</option>
+              <option value="sent">Sent</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+              <option value="expired">Expired</option>
+              <option value="converted">Converted</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-16 text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto" />
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading quotes...</p>
+        </div>
+      ) : filteredQuotes.length === 0 ? (
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-16 text-center">
+          <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No quotes found</h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
+            {searchTerm || statusFilter !== 'all'
+              ? 'Try adjusting your filters to see more results'
+              : 'Get started by creating your first customer quote'}
+          </p>
+          {!searchTerm && statusFilter === 'all' && (
             <button
               onClick={onCreateQuote}
-              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
             >
-              Create your first quote
+              <Plus className="w-5 h-5" />
+              Create Your First Quote
             </button>
-          </div>
-        ) : (
+          )}
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-slate-900">
+              <thead className="bg-gray-50 dark:bg-slate-900/50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                     Quote #
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                     Customer
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Total
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Created
+                  <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                    Total
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Valid Until
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                    Date
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
-                {quotes.map((quote) => (
-                  <tr
-                    key={quote.id}
-                    className="hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer"
-                    onClick={() => onSelectQuote(quote.id)}
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                        {quote.quote_number}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm">
-                        <div className="font-medium text-gray-900 dark:text-white">
-                          {quote.customer_name}
+                {filteredQuotes.map((quote) => {
+                  const statusConfig = getStatusConfig(quote.status);
+                  const StatusIcon = statusConfig.icon;
+
+                  return (
+                    <tr
+                      key={quote.id}
+                      className="hover:bg-gray-50 dark:hover:bg-slate-700/30 transition-colors cursor-pointer"
+                      onClick={() => onSelectQuote(quote.id)}
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-gray-400" />
+                          <span className="text-sm font-semibold text-gray-900 dark:text-white">{quote.quote_number}</span>
                         </div>
-                        <div className="text-gray-500 dark:text-gray-400">
-                          {quote.customer_company || quote.customer_email}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">{quote.customer_name}</div>
+                          {quote.customer_company && (
+                            <div className="text-xs text-gray-500 dark:text-gray-400">{quote.customer_company}</div>
+                          )}
+                          {quote.customer_email && (
+                            <div className="text-xs text-gray-500 dark:text-gray-400">{quote.customer_email}</div>
+                          )}
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                        ${quote.total.toFixed(2)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(quote.status)}`}>
-                        {getStatusIcon(quote.status)}
-                        {quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {formatDate(quote.created_at)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {formatDate(quote.valid_until)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => onSelectQuote(quote.id)}
-                          className="text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
-                          title="View"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        {(quote.status === 'draft' || quote.status === 'sent') && (
-                          <button
-                            onClick={() => onEditQuote(quote.id)}
-                            className="text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
-                            title="Edit"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${statusConfig.color}`}>
+                          <StatusIcon className="w-3.5 h-3.5" />
+                          {statusConfig.label}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <div className="text-sm font-semibold text-gray-900 dark:text-white">${quote.total.toFixed(2)}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          {format(new Date(quote.created_at), 'MMM d, yyyy')}
+                        </div>
+                        {quote.valid_until && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            Valid until {format(new Date(quote.valid_until), 'MMM d')}
+                          </div>
                         )}
-                        <button
-                          onClick={() => handleDuplicate(quote.id)}
-                          className="text-gray-600 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
-                          title="Duplicate"
-                        >
-                          <Copy className="w-4 h-4" />
-                        </button>
-                        {(quote.status === 'draft' || quote.status === 'rejected') && (
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                           <button
-                            onClick={() => handleDelete(quote.id)}
-                            className="text-gray-600 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
-                            title="Delete"
+                            onClick={() => onSelectQuote(quote.id)}
+                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                            title="View Details"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Eye className="w-4 h-4" />
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          {(quote.status === 'draft' || quote.status === 'sent') && (
+                            <button
+                              onClick={() => onEditQuote(quote.id)}
+                              className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                              title="Edit Quote"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDuplicate(quote.id)}
+                            disabled={duplicating === quote.id}
+                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors disabled:opacity-50"
+                            title="Duplicate Quote"
+                          >
+                            {duplicating === quote.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Copy className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+
+          {filteredQuotes.length > 0 && (
+            <div className="px-6 py-4 bg-gray-50 dark:bg-slate-900/50 border-t border-gray-200 dark:border-slate-700">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Showing {filteredQuotes.length} of {quotes.length} quotes
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
