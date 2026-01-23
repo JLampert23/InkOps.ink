@@ -1985,25 +1985,28 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         if (error) throw error;
         showNotification('success', 'Fee Updated', 'Invoice fee updated successfully!');
       } else {
-        const { data: companyData, error: companyError } = await supabase
-          .from('user_profiles')
-          .select('company_id')
-          .eq('id', user?.id)
-          .single();
+        if (!companySettings?.id) {
+          showNotification('error', 'Error', 'Company settings not found. Please refresh the page.');
+          setSavingFee(false);
+          return;
+        }
 
-        if (companyError) throw companyError;
+        console.log('Creating invoice fee with company_id:', companySettings.id);
 
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('invoice_fees')
           .insert([{
-            company_id: companyData.company_id,
+            company_id: companySettings.id,
             fee_name: feeFormData.fee_name,
             description: feeFormData.description,
             amount: amount,
             amount_type: feeFormData.amount_type,
             is_taxed: feeFormData.is_taxed,
             show_by_default: feeFormData.show_by_default,
-          }]);
+          }])
+          .select();
+
+        console.log('Insert result:', { data, error });
 
         if (error) throw error;
         showNotification('success', 'Fee Created', 'Invoice fee created successfully!');
@@ -2012,9 +2015,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setShowAddFeeModal(false);
       resetFeeForm();
       loadInvoiceFees();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving fee:', err);
-      showNotification('error', 'Save Failed', 'Failed to save invoice fee. Please try again.');
+      const errorMessage = err?.message || 'Failed to save invoice fee. Please try again.';
+      showNotification('error', 'Save Failed', errorMessage);
     } finally {
       setSavingFee(false);
     }
