@@ -131,7 +131,7 @@ Deno.serve(async (req: Request) => {
     const { data: userProfile, error: profileError } = await supabaseAuth
       .from("user_profiles")
       .select("company_id")
-      .eq("user_id", user.id)
+      .eq("id", user.id)
       .maybeSingle();
 
     console.log('User profile lookup:', { userId: user.id, companyId: userProfile?.company_id, error: profileError?.message });
