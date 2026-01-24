@@ -33,7 +33,6 @@ interface CompanySettings {
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState<Tab>('accounting-dashboard');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [accountingExpanded, setAccountingExpanded] = useState(true);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [settingsInitialTab, setSettingsInitialTab] = useState<string | undefined>(undefined);
@@ -46,20 +45,6 @@ function AppContent() {
   const { userProfile, canAccessIntegrations } = useRBAC();
   const { showNotification } = useNotification();
   const { darkMode, toggleDarkMode } = useTheme();
-
-  useEffect(() => {
-    const checkScreenSize = () => {
-      if (window.innerWidth >= 1024) {
-        setSidebarOpen(true);
-      } else {
-        setSidebarOpen(false);
-      }
-    };
-
-    checkScreenSize();
-    window.addEventListener('resize', checkScreenSize);
-    return () => window.removeEventListener('resize', checkScreenSize);
-  }, []);
 
   useEffect(() => {
     const loadCompanySettings = async () => {
@@ -163,12 +148,6 @@ function AppContent() {
     },
   ];
 
-  const closeSidebarOnMobile = () => {
-    if (window.innerWidth < 1024) {
-      setSidebarOpen(false);
-    }
-  };
-
   const handleSync = async () => {
     setSyncing(true);
     try {
@@ -190,62 +169,34 @@ function AppContent() {
   const handleCreateQuoteForCustomer = (customerId: string) => {
     setQuoteCustomerId(customerId);
     setActiveTab('production');
-    closeSidebarOnMobile();
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 transition-colors">
-      {/* Mobile backdrop overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
       {/* Sidebar */}
-      <aside className={`fixed top-0 left-0 h-full bg-white dark:bg-[#1a2744] border-r border-gray-200 dark:border-slate-700 shadow-xl transition-all duration-300 z-30 w-56
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-        lg:w-auto ${sidebarOpen ? 'lg:w-56' : 'lg:w-20'}
-      `}>
+      <aside className="fixed top-0 left-0 h-full bg-white dark:bg-[#1a2744] border-r border-gray-200 dark:border-slate-700 shadow-xl z-30 w-56">
         {/* Logo/Brand */}
         <div className="h-20 border-b border-gray-200 dark:border-slate-700 flex items-center justify-center px-4 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-slate-800 dark:to-slate-700">
-          {sidebarOpen ? (
-            companySettings?.logo_url ? (
-              <div className="flex items-center justify-center w-full h-full py-1.5">
-                <img
-                  src={companySettings.logo_url}
-                  alt={companySettings.company_name || 'Company Logo'}
-                  className="max-h-full max-w-full object-contain"
-                />
-              </div>
-            ) : (
-              <div className="flex items-center gap-3 min-w-0 w-full">
-                <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm flex-shrink-0">
-                  <TrendingUp className="w-6 h-6 text-white" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h1 className="text-white font-bold text-lg truncate">
-                    {companySettings?.company_name || 'Printavo'}
-                  </h1>
-                  <p className="text-blue-100 text-xs truncate">Financial Dashboard</p>
-                </div>
-              </div>
-            )
+          {companySettings?.logo_url ? (
+            <div className="flex items-center justify-center w-full h-full py-1.5">
+              <img
+                src={companySettings.logo_url}
+                alt={companySettings.company_name || 'Company Logo'}
+                className="max-h-full max-w-full object-contain"
+              />
+            </div>
           ) : (
-            companySettings?.logo_url ? (
-              <div className="flex items-center justify-center w-full h-full py-1.5">
-                <img
-                  src={companySettings.logo_url}
-                  alt={companySettings.company_name || 'Company Logo'}
-                  className="max-h-full max-w-full object-contain"
-                />
-              </div>
-            ) : (
-              <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
+            <div className="flex items-center gap-3 min-w-0 w-full">
+              <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm flex-shrink-0">
                 <TrendingUp className="w-6 h-6 text-white" />
               </div>
-            )
+              <div className="min-w-0 flex-1">
+                <h1 className="text-white font-bold text-lg truncate">
+                  {companySettings?.company_name || 'Printavo'}
+                </h1>
+                <p className="text-blue-100 text-xs truncate">Financial Dashboard</p>
+              </div>
+            </div>
           )}
         </div>
 
@@ -258,32 +209,20 @@ function AppContent() {
             <button
               onClick={() => setAccountingExpanded(!accountingExpanded)}
               className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-slate-700/50"
-              title={!sidebarOpen ? 'ACCOUNTING' : ''}
               aria-label="Accounting"
               aria-expanded={accountingExpanded}
               aria-controls="accounting-submenu"
             >
               <Wallet className="w-5 h-5 flex-shrink-0 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
-              {sidebarOpen && (
-                <>
-                  <div className="flex-1 text-left">
-                    <div className="font-bold text-sm uppercase tracking-wide text-gray-900 dark:text-gray-100">
-                      Accounting
-                    </div>
-                  </div>
-                  {accountingExpanded ? (
-                    <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200" />
-                  ) : (
-                    <ChevronUp className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200 rotate-180" />
-                  )}
-                </>
-              )}
-              {!sidebarOpen && (
-                accountingExpanded ? (
-                  <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400 absolute right-2" />
-                ) : (
-                  <ChevronUp className="w-4 h-4 text-gray-500 dark:text-gray-400 absolute right-2 rotate-180" />
-                )
+              <div className="flex-1 text-left">
+                <div className="font-bold text-sm uppercase tracking-wide text-gray-900 dark:text-gray-100">
+                  Accounting
+                </div>
+              </div>
+              {accountingExpanded ? (
+                <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200" />
+              ) : (
+                <ChevronUp className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200 rotate-180" />
               )}
             </button>
 
@@ -301,26 +240,20 @@ function AppContent() {
                   return (
                     <button
                       key={item.id}
-                      onClick={() => {
-                        setActiveTab(item.id);
-                        closeSidebarOnMobile();
-                      }}
+                      onClick={() => setActiveTab(item.id)}
                       className={`collapsible-item w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 group ${
                         isActive
                           ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
                           : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
                       }`}
-                      title={!sidebarOpen ? item.name : ''}
                       style={{ animationDelay: `${index * 20}ms` }}
                     >
                       <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
-                      {sidebarOpen && (
-                        <div className="flex-1 text-left">
-                          <div className={`font-medium text-sm ${isActive ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                            {item.name}
-                          </div>
+                      <div className="flex-1 text-left">
+                        <div className={`font-medium text-sm ${isActive ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                          {item.name}
                         </div>
-                      )}
+                      </div>
                       {isActive && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
                     </button>
                   );
@@ -340,26 +273,20 @@ function AppContent() {
               return (
                 <button
                   key={item.id}
-                  onClick={() => {
-                    setActiveTab(item.id);
-                    closeSidebarOnMobile();
-                  }}
+                  onClick={() => setActiveTab(item.id)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
                     isActive
                       ? 'bg-orange-50 dark:bg-blue-600/20 text-orange-700 dark:text-blue-400 shadow-sm'
                       : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
                   }`}
-                  title={!sidebarOpen ? 'PRODUCTION DASHBOARD' : ''}
                   aria-label="Production Dashboard"
                 >
                   <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-orange-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
-                  {sidebarOpen && (
-                    <div className="flex-1 text-left">
-                      <div className={`font-bold text-xs uppercase tracking-wide leading-tight ${isActive ? 'text-orange-700 dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'}`}>
-                        Production<br />Dashboard
-                      </div>
+                  <div className="flex-1 text-left">
+                    <div className={`font-bold text-xs uppercase tracking-wide leading-tight ${isActive ? 'text-orange-700 dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'}`}>
+                      Production<br />Dashboard
                     </div>
-                  )}
+                  </div>
                   {isActive && <div className="w-1 h-8 bg-orange-600 dark:bg-blue-500 rounded-full absolute right-0" />}
                 </button>
               );
@@ -377,26 +304,20 @@ function AppContent() {
               return (
                 <button
                   key={item.id}
-                  onClick={() => {
-                    setActiveTab(item.id);
-                    closeSidebarOnMobile();
-                  }}
+                  onClick={() => setActiveTab(item.id)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
                     isActive
                       ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
                       : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
                   }`}
-                  title={!sidebarOpen ? 'SQUARE DASHBOARD' : ''}
                   aria-label="Square Dashboard"
                 >
                   <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
-                  {sidebarOpen && (
-                    <div className="flex-1 text-left">
-                      <div className={`font-bold text-xs uppercase tracking-wide leading-tight ${isActive ? 'text-green-700 dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'}`}>
-                        Square<br />Dashboard
-                      </div>
+                  <div className="flex-1 text-left">
+                    <div className={`font-bold text-xs uppercase tracking-wide leading-tight ${isActive ? 'text-green-700 dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'}`}>
+                      Square<br />Dashboard
                     </div>
-                  )}
+                  </div>
                   {isActive && <div className="w-1 h-8 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
                 </button>
               );
@@ -406,77 +327,41 @@ function AppContent() {
 
         {/* User & Controls */}
         <div className="absolute bottom-4 left-0 right-0 px-4 space-y-2">
-          {sidebarOpen && user && (
+          {user && (
             <div className="px-4 py-3 bg-gray-50 dark:bg-slate-700/50 rounded-lg mb-2 min-w-0">
               <p className="text-xs text-gray-500 dark:text-gray-400">Signed in as</p>
               <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate" title={user.email}>{user.email}</p>
-              <button
-                onClick={() => {
-                  setActiveTab('settings');
-                  closeSidebarOnMobile();
-                }}
-                className="mt-2 w-full flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
-              >
-                <Settings className="w-3 h-3 flex-shrink-0" />
-                <span className="truncate">Account Settings</span>
-              </button>
             </div>
           )}
           <button
-            onClick={handleSync}
-            disabled={syncing}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors disabled:opacity-50"
-            title={!sidebarOpen ? 'Sync from Printavo' : ''}
+            onClick={() => setActiveTab('settings')}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
           >
-            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-            {sidebarOpen && <span className="text-sm font-medium">{syncing ? 'Syncing...' : 'Sync from Printavo'}</span>}
+            <Settings className="w-4 h-4" />
+            <span className="text-sm font-medium">Account Settings</span>
           </button>
           <button
             onClick={toggleDarkMode}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
-            title={!sidebarOpen ? (darkMode ? 'Light Mode' : 'Dark Mode') : ''}
           >
             {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            {sidebarOpen && <span className="text-sm font-medium">{darkMode ? 'Light Mode' : 'Dark Mode'}</span>}
+            <span className="text-sm font-medium">{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
           </button>
           <button
             onClick={() => signOut()}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-            title={!sidebarOpen ? 'Sign Out' : ''}
           >
             <LogOut className="w-4 h-4" />
-            {sidebarOpen && <span className="text-sm font-medium">Sign Out</span>}
-          </button>
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
-          >
-            {sidebarOpen ? (
-              <>
-                <X className="w-4 h-4" />
-                <span className="text-sm font-medium">Collapse</span>
-              </>
-            ) : (
-              <Menu className="w-4 h-4" />
-            )}
+            <span className="text-sm font-medium">Sign Out</span>
           </button>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <div className={`transition-all duration-300 lg:ml-20 ${sidebarOpen ? 'lg:ml-56' : 'lg:ml-20'} ${activeTab === 'settings' ? 'flex flex-col h-screen' : ''}`}>
+      <div className={`ml-56 ${activeTab === 'settings' ? 'flex flex-col h-screen' : ''}`}>
         {/* Top Bar */}
         <header className={`h-20 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 sticky top-0 z-20 shadow-sm ${activeTab === 'settings' ? 'flex-shrink-0' : ''}`}>
           <div className="h-full px-4 flex items-center justify-between gap-4">
-            {/* Mobile menu button */}
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="lg:hidden p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-              aria-label="Toggle menu"
-            >
-              <Menu className="w-6 h-6" />
-            </button>
-
             <div className="flex-1 min-w-0">
               <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate">
                 {activeTab === 'accounting-dashboard' ? 'Billing Queue' :
@@ -509,7 +394,23 @@ function AppContent() {
                 )}
               </p>
             </div>
-            <div className="hidden md:flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              {/* Sync to Printavo button - Only show on accounting pages */}
+              {(activeTab === 'accounting-dashboard' ||
+                activeTab === 'accounts-receivable' ||
+                activeTab === 'paid-invoices' ||
+                activeTab === 'customers' ||
+                activeTab === 'payments') && (
+                <button
+                  onClick={handleSync}
+                  disabled={syncing}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors shadow-md hover:shadow-lg disabled:opacity-50"
+                  title="Sync from Printavo"
+                >
+                  <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+                  <span className="font-medium">{syncing ? 'Syncing...' : 'Sync to Printavo'}</span>
+                </button>
+              )}
               {activeTab === 'customers' && (
                 <button
                   onClick={() => setShowCreateCustomerModal(true)}
@@ -634,7 +535,6 @@ function AppContent() {
                 onNavigateToCustomers={() => {
                   setActiveTab('customers');
                   setAccountingExpanded(true);
-                  closeSidebarOnMobile();
                 }}
                 initialCustomerId={quoteCustomerId}
                 onCustomerIdConsumed={() => setQuoteCustomerId(undefined)}
