@@ -23,12 +23,14 @@ interface Imprint {
   details: string;
   proofs: Proof[];
   thread_ink_color?: string;
+  pricing_matrix_column?: string;
 }
 
 interface PriceMatrix {
   id: string;
   name: string;
   matrix_type: string;
+  columns?: string[];
 }
 
 interface DecorationLocation {
@@ -81,10 +83,12 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
     details: '',
     proofs: [],
     thread_ink_color: '',
+    pricing_matrix_column: '',
   });
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [selectedProofForNote, setSelectedProofForNote] = useState<number | null>(null);
+  const [selectedMatrixColumns, setSelectedMatrixColumns] = useState<string[]>([]);
 
   useEffect(() => {
     if (isOpen) {
@@ -102,7 +106,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
   const loadPriceMatrices = async () => {
     const { data, error } = await supabase
       .from('price_matrices')
-      .select('id, name, matrix_type')
+      .select('id, name, matrix_type, columns')
       .eq('is_active', true)
       .order('name');
 
@@ -210,6 +214,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
         details: imp.details || '',
         proofs: imp.mockups || [],
         thread_ink_color: imp.thread_ink_color || '',
+        pricing_matrix_column: imp.pricing_matrix_column || '',
       })));
     }
   };
@@ -330,14 +335,26 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
       details: '',
       proofs: [],
       thread_ink_color: '',
+      pricing_matrix_column: '',
     });
+    setSelectedMatrixColumns([]);
     setSelectedProofForNote(null);
   };
 
   const handleEditImprint = (index: number) => {
-    setCurrentImprint({ ...imprints[index] });
+    const imprint = imprints[index];
+    setCurrentImprint({ ...imprint });
     setEditingIndex(index);
     setSelectedProofForNote(null);
+
+    // Load columns if a matrix is selected
+    if (imprint.price_matrix_id) {
+      const matrix = priceMatrices.find(m => m.id === imprint.price_matrix_id);
+      const columns = matrix?.columns || [];
+      setSelectedMatrixColumns(columns);
+    } else {
+      setSelectedMatrixColumns([]);
+    }
   };
 
   const handleDeleteImprint = (index: number) => {
@@ -352,7 +369,9 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
         details: '',
         proofs: [],
         thread_ink_color: '',
+        pricing_matrix_column: '',
       });
+      setSelectedMatrixColumns([]);
       setEditingIndex(null);
       setSelectedProofForNote(null);
     }
@@ -375,6 +394,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
             details: imp.details,
             mockups: imp.proofs,
             thread_ink_color: imp.thread_ink_color,
+            pricing_matrix_column: imp.pricing_matrix_column,
           }))
         );
       }
@@ -400,10 +420,16 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
             <div className="bg-slate-800/50 rounded-lg p-4 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">Type of Work</label>
+                  <label className="block text-sm text-gray-400 mb-2">
+                    Type of Work <span className="text-red-400">*</span>
+                  </label>
                   <select
                     value={currentImprint.type_of_work}
-                    onChange={(e) => setCurrentImprint({ ...currentImprint, type_of_work: e.target.value })}
+                    onChange={(e) => setCurrentImprint({
+                      ...currentImprint,
+                      type_of_work: e.target.value,
+                      thread_ink_color: '' // Reset color when type changes
+                    })}
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm"
                   >
                     <option value="">Select type of work</option>
@@ -416,7 +442,9 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                 </div>
 
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">Location</label>
+                  <label className="block text-sm text-gray-400 mb-2">
+                    Decoration Location <span className="text-red-400">*</span>
+                  </label>
                   <select
                     value={currentImprint.location}
                     onChange={(e) => setCurrentImprint({ ...currentImprint, location: e.target.value })}
@@ -434,33 +462,11 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">Price Matrices</label>
-                  <select
-                    value={currentImprint.price_matrix_id}
-                    onChange={(e) => {
-                      const matrix = priceMatrices.find(m => m.id === e.target.value);
-                      setCurrentImprint({
-                        ...currentImprint,
-                        price_matrix_id: e.target.value,
-                        matrix: matrix?.name || ''
-                      });
-                    }}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm"
-                  >
-                    <option value="">Select matrix</option>
-                    {priceMatrices.map((matrix) => (
-                      <option key={matrix.id} value={matrix.id}>
-                        {matrix.name} ({matrix.matrix_type})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
                   <label className="block text-sm text-gray-400 mb-2">
                     {(() => {
                       const workType = workTypes.find(wt => wt.work_type_name === currentImprint.type_of_work);
-                      return workType?.uses_ink ? 'Ink Color' : 'Thread Color';
+                      if (!workType) return 'Color';
+                      return workType.uses_ink ? 'Ink Color' : 'Thread Color';
                     })()}
                   </label>
                   <select
@@ -469,10 +475,13 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                       const selectedName = e.target.value;
                       setCurrentImprint({ ...currentImprint, thread_ink_color: selectedName });
                     }}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm"
+                    disabled={!currentImprint.type_of_work}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <option value="">Select color (optional)</option>
-                    {(() => {
+                    <option value="">
+                      {!currentImprint.type_of_work ? 'Select type of work first' : 'Select color (optional)'}
+                    </option>
+                    {currentImprint.type_of_work && (() => {
                       const workType = workTypes.find(wt => wt.work_type_name === currentImprint.type_of_work);
                       const colors = workType?.uses_ink ? inkColors : threadColors;
                       return colors.map((color, idx) => (
@@ -494,6 +503,60 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                       })()}
                     </p>
                   )}
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">Pricing Matrix</label>
+                  <select
+                    value={currentImprint.price_matrix_id}
+                    onChange={(e) => {
+                      const matrix = priceMatrices.find(m => m.id === e.target.value);
+                      const columns = matrix?.columns || [];
+                      setCurrentImprint({
+                        ...currentImprint,
+                        price_matrix_id: e.target.value,
+                        matrix: matrix?.name || '',
+                        pricing_matrix_column: '' // Reset column when matrix changes
+                      });
+                      setSelectedMatrixColumns(columns);
+                    }}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm"
+                  >
+                    <option value="">Select pricing matrix</option>
+                    {priceMatrices.map((matrix) => (
+                      <option key={matrix.id} value={matrix.id}>
+                        {matrix.name} ({matrix.matrix_type})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">Column</label>
+                  <select
+                    value={currentImprint.pricing_matrix_column}
+                    onChange={(e) => setCurrentImprint({ ...currentImprint, pricing_matrix_column: e.target.value })}
+                    disabled={!currentImprint.price_matrix_id || selectedMatrixColumns.length === 0}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <option value="">
+                      {!currentImprint.price_matrix_id ? 'Select a pricing matrix first' : 'Select column'}
+                    </option>
+                    {selectedMatrixColumns.map((col, idx) => (
+                      <option key={idx} value={col}>
+                        {col}
+                      </option>
+                    ))}
+                  </select>
+                  {!currentImprint.price_matrix_id && (
+                    <p className="text-xs text-gray-500 mt-1">Choose a pricing matrix to see available columns</p>
+                  )}
+                </div>
+
+                <div>
+                  {/* Spacer for layout balance */}
                 </div>
               </div>
 
@@ -617,18 +680,19 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-white font-medium">{imprint.location || imprint.matrix}</span>
-                          {imprint.column_number && imprint.column_number !== 'custom' && (
+                          {imprint.pricing_matrix_column && (
                             <span className="text-xs text-gray-400">
-                              {(() => {
-                                const allOptions = [...colorOptions, ...stitchOptions];
-                                const option = allOptions.find(opt => opt.option_value === imprint.column_number);
-                                return option ? option.option_label : imprint.column_number;
-                              })()}
+                              {imprint.pricing_matrix_column}
                             </span>
                           )}
                           <span className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded">
                             {imprint.type_of_work}
                           </span>
+                          {imprint.thread_ink_color && (
+                            <span className="text-xs px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded">
+                              {imprint.thread_ink_color}
+                            </span>
+                          )}
                         </div>
                         {imprint.details && (
                           <div className="text-sm text-gray-400 mb-2 line-clamp-2">{imprint.details}</div>
