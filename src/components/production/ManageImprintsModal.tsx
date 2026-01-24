@@ -43,6 +43,18 @@ interface ColorStitchOption {
   option_type: 'color' | 'stitch' | 'other';
 }
 
+interface ProductionColor {
+  name: string;
+  code?: string;
+  charge?: number;
+}
+
+interface TypeOfWork {
+  id: string;
+  work_type_name: string;
+  uses_ink: boolean;
+}
+
 interface ManageImprintsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -57,7 +69,9 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
   const [decorationLocations, setDecorationLocations] = useState<DecorationLocation[]>([]);
   const [colorOptions, setColorOptions] = useState<ColorStitchOption[]>([]);
   const [stitchOptions, setStitchOptions] = useState<ColorStitchOption[]>([]);
-  const [threadInkColors, setThreadInkColors] = useState<ColorStitchOption[]>([]);
+  const [inkColors, setInkColors] = useState<ProductionColor[]>([]);
+  const [threadColors, setThreadColors] = useState<ProductionColor[]>([]);
+  const [workTypes, setWorkTypes] = useState<TypeOfWork[]>([]);
   const [currentImprint, setCurrentImprint] = useState<Imprint>({
     location: '',
     price_matrix_id: '',
@@ -77,6 +91,8 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
       loadPriceMatrices();
       loadDecorationLocations();
       loadColorStitchOptions();
+      loadProductionColors();
+      loadWorkTypes();
       if (quoteId) {
         loadImprints();
       }
@@ -117,7 +133,60 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
     if (data && !error) {
       setColorOptions(data.filter(opt => opt.option_type === 'color'));
       setStitchOptions(data.filter(opt => opt.option_type === 'stitch'));
-      setThreadInkColors(data.filter(opt => opt.option_type === 'color'));
+    }
+  };
+
+  const loadProductionColors = async () => {
+    try {
+      // Get company_id from user profile
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user?.id)
+        .single();
+
+      if (!profile?.company_id) return;
+
+      // Get production color settings
+      const { data, error } = await supabase
+        .from('production_color_settings')
+        .select('ink_colors, thread_colors')
+        .eq('company_id', profile.company_id)
+        .maybeSingle();
+
+      if (data && !error) {
+        setInkColors(data.ink_colors || []);
+        setThreadColors(data.thread_colors || []);
+      }
+    } catch (err) {
+      console.error('Error loading production colors:', err);
+    }
+  };
+
+  const loadWorkTypes = async () => {
+    try {
+      // Get company_id from user profile
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user?.id)
+        .single();
+
+      if (!profile?.company_id) return;
+
+      // Get work types
+      const { data, error } = await supabase
+        .from('type_of_work_settings')
+        .select('id, work_type_name, uses_ink')
+        .eq('company_id', profile.company_id)
+        .eq('is_active', true)
+        .order('sort_order');
+
+      if (data && !error) {
+        setWorkTypes(data);
+      }
+    } catch (err) {
+      console.error('Error loading work types:', err);
     }
   };
 
@@ -338,13 +407,11 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm"
                   >
                     <option value="">Select type of work</option>
-                    <option value="Screen Print">Screen Print</option>
-                    <option value="Embroidery">Embroidery</option>
-                    <option value="DTG">DTG</option>
-                    <option value="DTF">DTF</option>
-                    <option value="Heat Press">Heat Press</option>
-                    <option value="Vinyl">Vinyl</option>
-                    <option value="Sublimation">Sublimation</option>
+                    {workTypes.map((workType) => (
+                      <option key={workType.id} value={workType.work_type_name}>
+                        {workType.work_type_name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -391,43 +458,42 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
 
                 <div>
                   <label className="block text-sm text-gray-400 mb-2">
-                    {currentImprint.type_of_work === 'Embroidery' ? 'Stitch Count' : 'Color/Thread Count'}
+                    {(() => {
+                      const workType = workTypes.find(wt => wt.work_type_name === currentImprint.type_of_work);
+                      return workType?.uses_ink ? 'Ink Color' : 'Thread Color';
+                    })()}
                   </label>
                   <select
-                    value={currentImprint.column_number}
-                    onChange={(e) => setCurrentImprint({ ...currentImprint, column_number: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm"
-                  >
-                    <option value="">
-                      {currentImprint.type_of_work === 'Embroidery'
-                        ? 'Select stitch count'
-                        : 'Select color/thread count'}
-                    </option>
-                    {(currentImprint.type_of_work === 'Embroidery' ? stitchOptions : colorOptions).map((option) => (
-                      <option key={option.id} value={option.option_value}>
-                        {option.option_label}
-                      </option>
-                    ))}
-                    <option value="custom">Custom (enter in details)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Thread/Ink Color</label>
-                  <select
                     value={currentImprint.thread_ink_color}
-                    onChange={(e) => setCurrentImprint({ ...currentImprint, thread_ink_color: e.target.value })}
+                    onChange={(e) => {
+                      const selectedName = e.target.value;
+                      setCurrentImprint({ ...currentImprint, thread_ink_color: selectedName });
+                    }}
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm"
                   >
                     <option value="">Select color (optional)</option>
-                    {threadInkColors.map((color) => (
-                      <option key={color.id} value={color.option_label}>
-                        {color.option_label}
-                      </option>
-                    ))}
+                    {(() => {
+                      const workType = workTypes.find(wt => wt.work_type_name === currentImprint.type_of_work);
+                      const colors = workType?.uses_ink ? inkColors : threadColors;
+                      return colors.map((color, idx) => (
+                        <option key={idx} value={color.name}>
+                          {color.name}
+                          {color.charge !== undefined && color.charge > 0 ? ` (+$${color.charge})` : ''}
+                        </option>
+                      ));
+                    })()}
                   </select>
+                  {currentImprint.thread_ink_color && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Selected: {currentImprint.thread_ink_color}
+                      {(() => {
+                        const workType = workTypes.find(wt => wt.work_type_name === currentImprint.type_of_work);
+                        const colors = workType?.uses_ink ? inkColors : threadColors;
+                        const selected = colors.find(c => c.name === currentImprint.thread_ink_color);
+                        return selected?.charge ? ` (Charge: $${selected.charge})` : '';
+                      })()}
+                    </p>
+                  )}
                 </div>
               </div>
 
