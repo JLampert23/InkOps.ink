@@ -73,17 +73,25 @@ export function ImprintBuilder({
     try {
       setLoading(true);
 
-      const [matricesRes, imprintRes] = await Promise.all([
-        supabase.from('price_matrices').select('*').eq('is_active', true).order('name'),
-        supabase
-          .from('imprints')
-          .select('*, imprint_proofs(*)')
-          .eq('quote_line_item_id', lineItemId)
-          .maybeSingle(),
-      ]);
+      const matricesRes = await supabase
+        .from('price_matrices')
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
 
       if (matricesRes.error) throw matricesRes.error;
       setMatrices(matricesRes.data || []);
+
+      if (lineItemId.startsWith('temp-')) {
+        setLoading(false);
+        return;
+      }
+
+      const imprintRes = await supabase
+        .from('imprints')
+        .select('*, imprint_proofs(*)')
+        .eq('quote_line_item_id', lineItemId)
+        .maybeSingle();
 
       if (imprintRes.data) {
         setImprint({
@@ -220,6 +228,15 @@ export function ImprintBuilder({
   const handleSave = async () => {
     if (!imprint.location.trim()) {
       showNotification('error', 'Validation Error', 'Location is required');
+      return;
+    }
+
+    if (lineItemId.startsWith('temp-')) {
+      showNotification(
+        'warning',
+        'Save Quote First',
+        'Please save the quote first, then you can save imprint data.'
+      );
       return;
     }
 

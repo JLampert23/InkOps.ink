@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Save, Plus, Trash2, GripVertical, X, Loader2, ImageIcon, DollarSign } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotification } from '../../contexts/NotificationContext';
 import CreateCustomerModal from '../accounting/CreateCustomerModal';
 import { ManageImprintsModal } from './ManageImprintsModal';
 import { ImprintBuilder } from './ImprintBuilder';
@@ -49,6 +50,7 @@ interface QuoteBuilderProps {
 
 export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: QuoteBuilderProps) {
   const { user } = useAuth();
+  const { showNotification } = useNotification();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
@@ -929,26 +931,21 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                         <div className="flex items-center justify-center gap-1">
                           <button
                             onClick={() => {
-                              if (!item.id) {
-                                alert('Please save the quote first before managing imprints.');
-                                return;
-                              }
-                              setEditingLineItemId(item.id);
+                              setEditingLineItemId(item.id || `temp-${idx}`);
                               setEditingLineItemIndex(idx);
                               setShowImprintBuilder(true);
                             }}
-                            className={`p-1 hover:bg-slate-800 rounded ${item.id ? 'text-blue-500 hover:text-blue-400' : 'text-gray-600 cursor-not-allowed'}`}
-                            title={item.id ? 'Manage Imprints' : 'Save quote first'}
-                            disabled={!item.id}
+                            className="p-1 text-blue-500 hover:text-blue-400 hover:bg-slate-800 rounded"
+                            title="Manage Imprints"
                           >
                             <ImageIcon className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => {
-                              // Refresh pricing logic here
+                              showNotification('info', 'Coming Soon', 'Refresh pricing from matrix will be available soon');
                             }}
                             className="p-1 text-green-500 hover:text-green-400 hover:bg-slate-800 rounded"
-                            title="Refresh Pricing"
+                            title="Refresh Pricing from Matrix"
                           >
                             <DollarSign className="w-4 h-4" />
                           </button>
@@ -1166,9 +1163,9 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       />
 
       {/* Imprint Builder Modal */}
-      {showImprintBuilder && editingLineItemId && editingLineItemIndex !== null && (
+      {showImprintBuilder && editingLineItemIndex !== null && (
         <ImprintBuilder
-          lineItemId={editingLineItemId}
+          lineItemId={editingLineItemId || `temp-${editingLineItemIndex}`}
           lineItemDescription={items[editingLineItemIndex]?.description || ''}
           lineItemQuantity={items[editingLineItemIndex]?.total_quantity || 0}
           onClose={() => {
