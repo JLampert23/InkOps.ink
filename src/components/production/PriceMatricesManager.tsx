@@ -199,7 +199,7 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
   const [name, setName] = useState(matrix.name);
   const [description, setDescription] = useState(matrix.description);
   const [matrixType, setMatrixType] = useState(matrix.matrix_type);
-  const [setupFee, setSetupFee] = useState(matrix.setup_fee);
+  const [setupFee, setSetupFee] = useState(matrix.setup_fee.toString());
   const [columns, setColumns] = useState<string[]>(matrix.columns);
   const [rows, setRows] = useState<string[]>(matrix.rows);
   const [cells, setCells] = useState<Record<string, number>>(matrix.cells);
@@ -283,7 +283,7 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
         name,
         description,
         matrix_type: matrixType,
-        setup_fee: setupFee,
+        setup_fee: parseFloat(setupFee) || 0,
         columns,
         rows,
         cells,
@@ -407,7 +407,7 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
                 step="0.01"
                 min="0"
                 value={setupFee}
-                onChange={(e) => setSetupFee(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setSetupFee(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="0.00"
               />
