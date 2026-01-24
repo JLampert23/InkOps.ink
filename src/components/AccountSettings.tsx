@@ -4708,92 +4708,68 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
           {/* Production General Settings Section */}
           {activeTab === 'production-general' && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* Invoice Fees */}
-              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
-                <div className="flex items-start justify-between">
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4 space-y-4">
+                <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Invoice Fees</h2>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Configure additional fees that can be applied to invoices</p>
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">Invoice Fees</h2>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Configure additional fees for invoices</p>
                   </div>
                   <button
                     onClick={openAddFeeModal}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                   >
-                    <Plus className="w-4 h-4" />
-                    Add Fee
+                    <Plus className="w-3.5 h-3.5" />
+                    Add
                   </button>
                 </div>
 
-                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">Invoice Fee Management</h3>
-                  <p className="text-sm text-blue-800 dark:text-blue-200">
-                    Create fees that auto-populate in quotes/invoices. Fees marked as "Show By Default" will be automatically added to new quotes and invoices.
-                  </p>
-                </div>
-
                 {loadingFees ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-spin" />
                   </div>
                 ) : invoiceFees.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                    <CreditCard className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Invoice Fees</h3>
-                    <p className="text-sm">
-                      You haven't created any invoice fees yet. Click "Add Fee" to create your first fee.
-                    </p>
+                  <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                    <p className="text-xs">No invoice fees yet. Click "Add" to create one.</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     {invoiceFees.map((fee) => (
                       <div
                         key={fee.id}
-                        className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
+                        className="flex items-center justify-between p-2.5 bg-gray-50 dark:bg-slate-700 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
                       >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3">
-                            <h3 className="font-medium text-gray-900 dark:text-white">{fee.fee_name}</h3>
-                            <span className="px-2 py-1 text-xs font-medium rounded bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">{fee.fee_name}</h3>
+                            <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 whitespace-nowrap">
                               {fee.amount_type === 'dollar' ? `$${fee.amount.toFixed(2)}` : `${fee.amount}%`}
                             </span>
                             {fee.is_taxed && (
-                              <span className="px-2 py-1 text-xs font-medium rounded bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">
-                                Taxable
+                              <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 whitespace-nowrap">
+                                Tax
                               </span>
                             )}
                             {fee.show_by_default && (
-                              <span className="px-2 py-1 text-xs font-medium rounded bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
-                                Auto-Add
+                              <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 whitespace-nowrap">
+                                Auto
                               </span>
                             )}
                           </div>
-                          {fee.description && (
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{fee.description}</p>
-                          )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => toggleFeeDefault(fee.id, fee.show_by_default)}
-                            className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                              fee.show_by_default
-                                ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50'
-                                : 'bg-gray-200 dark:bg-slate-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-slate-500'
-                            }`}
-                          >
-                            {fee.show_by_default ? 'Default On' : 'Default Off'}
-                          </button>
+                        <div className="flex items-center gap-1 ml-2">
                           <button
                             onClick={() => openEditFeeModal(fee)}
-                            className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                            className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
                           >
-                            <Edit className="w-4 h-4" />
+                            <Edit className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => deleteFee(fee.id)}
-                            className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                            className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
@@ -4803,58 +4779,51 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               </div>
 
               {/* Decoration Locations */}
-              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
-                <div className="flex items-start justify-between">
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4 space-y-4">
+                <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Decoration Locations</h2>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Define decoration positions on garments (e.g., Left Front, Full Back, Left Sleeve)</p>
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">Decoration Locations</h2>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Positions on garments (e.g., Left Front, Full Back)</p>
                   </div>
                   <button
                     onClick={openAddLocationModal}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                   >
-                    <Plus className="w-4 h-4" />
-                    Add Location
+                    <Plus className="w-3.5 h-3.5" />
+                    Add
                   </button>
                 </div>
 
                 {loadingLocations ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-spin" />
                   </div>
                 ) : decorationLocations.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                    <Building2 className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Decoration Locations</h3>
-                    <p className="text-sm">
-                      You haven't created any decoration locations yet. Click "Add Location" to create your first location.
-                    </p>
+                  <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                    <p className="text-xs">No decoration locations yet. Click "Add" to create one.</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     {decorationLocations.map((location) => (
                       <div
                         key={location.id}
-                        className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
+                        className="flex items-center justify-between p-2.5 bg-gray-50 dark:bg-slate-700 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
                       >
-                        <div className="flex-1">
-                          <h3 className="font-medium text-gray-900 dark:text-white">{location.decoration_name}</h3>
-                          {location.address && (
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{location.address}</p>
-                          )}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">{location.decoration_name}</h3>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 ml-2">
                           <button
                             onClick={() => openEditLocationModal(location)}
-                            className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                            className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
                           >
-                            <Edit className="w-4 h-4" />
+                            <Edit className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => deleteLocation(location.id)}
-                            className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                            className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
@@ -4864,64 +4833,60 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               </div>
 
               {/* Type of Work */}
-              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
-                <div className="flex items-start justify-between">
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4 space-y-4">
+                <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Type of Work</h2>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Define decoration methods (Screen Print, Embroidery, DTG, etc.)</p>
+                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">Type of Work</h2>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Decoration methods (Screen Print, Embroidery, DTG)</p>
                   </div>
                   <button
                     onClick={openAddWorkTypeModal}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                   >
-                    <Plus className="w-4 h-4" />
-                    Add Type of Work
+                    <Plus className="w-3.5 h-3.5" />
+                    Add
                   </button>
                 </div>
 
                 {loadingWorkTypes ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-spin" />
                   </div>
                 ) : workTypes.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                    <Layers className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Work Types</h3>
-                    <p className="text-sm">
-                      You haven't created any work types yet. Click "Add Type of Work" to create your first work type.
-                    </p>
+                  <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                    <p className="text-xs">No work types yet. Click "Add" to create one.</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     {workTypes.map((workType) => (
                       <div
                         key={workType.id}
-                        className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
+                        className="flex items-center justify-between p-2.5 bg-gray-50 dark:bg-slate-700 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
                       >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3">
-                            <h3 className="font-medium text-gray-900 dark:text-white">{workType.work_type_name}</h3>
-                            <span className={`px-2 py-1 text-xs font-medium rounded ${
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">{workType.work_type_name}</h3>
+                            <span className={`px-1.5 py-0.5 text-xs font-medium rounded whitespace-nowrap ${
                               workType.uses_ink
                                 ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200'
                                 : 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200'
                             }`}>
-                              {workType.uses_ink ? 'Uses Ink Colors' : 'Uses Thread Colors'}
+                              {workType.uses_ink ? 'Ink' : 'Thread'}
                             </span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 ml-2">
                           <button
                             onClick={() => openEditWorkTypeModal(workType)}
-                            className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                            className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
                           >
-                            <Edit className="w-4 h-4" />
+                            <Edit className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => deleteWorkType(workType.id)}
-                            className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                            className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>

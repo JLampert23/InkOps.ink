@@ -174,27 +174,27 @@ export function InkThreadColorsManager() {
 
   return (
     <>
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
-        <div className="flex items-start justify-between">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4 space-y-4">
+        <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Ink & Thread Colors</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Manage available ink colors (for screen printing, DTG) and thread colors (for embroidery)
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white">Ink & Thread Colors</h2>
+            <p className="text-xs text-gray-600 dark:text-gray-400">
+              Ink colors (screen print, DTG) and thread colors (embroidery)
             </p>
           </div>
           <button
             onClick={openAddColorStitchModal}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
           >
-            <Plus className="w-4 h-4" />
-            Add Color
+            <Plus className="w-3.5 h-3.5" />
+            Add
           </button>
         </div>
 
-        <div className="flex items-center gap-2 border-b border-gray-200 dark:border-slate-700">
+        <div className="flex items-center gap-1 border-b border-gray-200 dark:border-slate-700">
           <button
             onClick={() => setFilterType('all')}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
+            className={`px-3 py-1.5 text-xs font-medium transition-colors ${
               filterType === 'all'
                 ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
@@ -204,57 +204,50 @@ export function InkThreadColorsManager() {
           </button>
           <button
             onClick={() => setFilterType('color')}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
+            className={`px-3 py-1.5 text-xs font-medium transition-colors ${
               filterType === 'color'
                 ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
-            Ink Colors ({inkColors.length})
+            Ink ({inkColors.length})
           </button>
           <button
             onClick={() => setFilterType('stitch')}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
+            className={`px-3 py-1.5 text-xs font-medium transition-colors ${
               filterType === 'stitch'
                 ? 'text-purple-600 dark:text-purple-400 border-b-2 border-purple-600 dark:border-purple-400'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
-            Thread Colors ({threadColors.length})
+            Thread ({threadColors.length})
           </button>
         </div>
 
         {loadingColorStitch ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-spin" />
           </div>
         ) : filteredOptions.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-            <Palette className="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              {filterType === 'all' ? 'No Colors' : filterType === 'color' ? 'No Ink Colors' : 'No Thread Colors'}
-            </h3>
-            <p className="text-sm">
-              Click "Add Color" to create your first {filterType === 'color' ? 'ink color' : filterType === 'stitch' ? 'thread color' : 'color option'}.
-            </p>
+          <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+            <p className="text-xs">No {filterType === 'color' ? 'ink' : filterType === 'stitch' ? 'thread' : ''} colors yet. Click "Add" to create one.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
             {filteredOptions.map((option) => (
               <div
                 key={option.id}
-                className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
+                className="flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-700 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
               >
-                <div className="flex items-center gap-3 flex-1">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
                   <div
-                    className="w-8 h-8 rounded border-2 border-gray-300 dark:border-slate-600 flex-shrink-0"
+                    className="w-6 h-6 rounded border border-gray-300 dark:border-slate-600 flex-shrink-0"
                     style={{ backgroundColor: option.option_value }}
                     title={option.option_value}
                   />
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-gray-900 dark:text-white truncate">{option.option_label}</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{option.option_value}</p>
-                    <span className={`inline-block mt-1 px-2 py-0.5 text-xs font-medium rounded ${
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">{option.option_label}</h3>
+                    <span className={`inline-block px-1.5 py-0.5 text-xs font-medium rounded ${
                       option.option_type === 'color'
                         ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200'
                         : 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200'
@@ -263,18 +256,18 @@ export function InkThreadColorsManager() {
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-1 ml-2">
+                <div className="flex items-center gap-0.5 ml-1">
                   <button
                     onClick={() => openEditColorStitchModal(option)}
-                    className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                    className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
                   >
-                    <EditIcon className="w-4 h-4" />
+                    <EditIcon className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => deleteColorStitchOption(option.id)}
-                    className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                    className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
