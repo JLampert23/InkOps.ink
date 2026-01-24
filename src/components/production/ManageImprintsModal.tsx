@@ -35,6 +35,13 @@ interface DecorationLocation {
   decoration_name: string;
 }
 
+interface ColorStitchOption {
+  id: string;
+  option_label: string;
+  option_value: string;
+  option_type: 'color' | 'stitch' | 'other';
+}
+
 interface ManageImprintsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -47,6 +54,8 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
   const [imprints, setImprints] = useState<Imprint[]>([]);
   const [priceMatrices, setPriceMatrices] = useState<PriceMatrix[]>([]);
   const [decorationLocations, setDecorationLocations] = useState<DecorationLocation[]>([]);
+  const [colorOptions, setColorOptions] = useState<ColorStitchOption[]>([]);
+  const [stitchOptions, setStitchOptions] = useState<ColorStitchOption[]>([]);
   const [currentImprint, setCurrentImprint] = useState<Imprint>({
     location: '',
     price_matrix_id: '',
@@ -64,6 +73,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
     if (isOpen) {
       loadPriceMatrices();
       loadDecorationLocations();
+      loadColorStitchOptions();
       if (quoteId) {
         loadImprints();
       }
@@ -91,6 +101,19 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
 
     if (data && !error) {
       setDecorationLocations(data);
+    }
+  };
+
+  const loadColorStitchOptions = async () => {
+    const { data, error } = await supabase
+      .from('color_stitch_options')
+      .select('id, option_label, option_value, option_type')
+      .eq('is_active', true)
+      .order('sort_order');
+
+    if (data && !error) {
+      setColorOptions(data.filter(opt => opt.option_type === 'color'));
+      setStitchOptions(data.filter(opt => opt.option_type === 'stitch'));
     }
   };
 
@@ -360,15 +383,25 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
 
                 <div>
                   <label className="block text-sm text-gray-400 mb-2">
-                    Colors/Stitches
+                    {currentImprint.type_of_work === 'Embroidery' ? 'Stitch Count' : 'Color Count'}
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={currentImprint.column_number}
                     onChange={(e) => setCurrentImprint({ ...currentImprint, column_number: e.target.value })}
-                    placeholder="e.g., 3 colors or 5000 stitches"
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm"
-                  />
+                  >
+                    <option value="">
+                      {currentImprint.type_of_work === 'Embroidery'
+                        ? 'Select stitch count'
+                        : 'Select color count'}
+                    </option>
+                    {(currentImprint.type_of_work === 'Embroidery' ? stitchOptions : colorOptions).map((option) => (
+                      <option key={option.id} value={option.option_value}>
+                        {option.option_label}
+                      </option>
+                    ))}
+                    <option value="custom">Custom (enter in details)</option>
+                  </select>
                 </div>
               </div>
 
@@ -491,9 +524,15 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-white font-medium">{imprint.matrix}</span>
-                          {imprint.column_number && (
-                            <span className="text-xs text-gray-400">Col {imprint.column_number}</span>
+                          <span className="text-white font-medium">{imprint.location || imprint.matrix}</span>
+                          {imprint.column_number && imprint.column_number !== 'custom' && (
+                            <span className="text-xs text-gray-400">
+                              {(() => {
+                                const allOptions = [...colorOptions, ...stitchOptions];
+                                const option = allOptions.find(opt => opt.option_value === imprint.column_number);
+                                return option ? option.option_label : imprint.column_number;
+                              })()}
+                            </span>
                           )}
                           <span className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded">
                             {imprint.type_of_work}
