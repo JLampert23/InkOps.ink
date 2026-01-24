@@ -4719,19 +4719,19 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 )}
               </div>
 
-              {/* Thread & Ink Colors / Stitch Counts */}
+              {/* Thread and Ink Colors */}
               <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Thread & Ink Colors / Stitch Counts</h2>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Manage available color counts and stitch count options for imprints</p>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Thread and Ink Colors</h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Manage available thread and ink colors for imprints (e.g., Red, Blue, White, Black)</p>
                   </div>
                   <button
                     onClick={openAddColorStitchModal}
                     className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                   >
                     <Plus className="w-4 h-4" />
-                    Add Option
+                    Add Color
                   </button>
                 </div>
 
@@ -4739,83 +4739,42 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
                   </div>
-                ) : colorStitchOptions.length === 0 ? (
+                ) : colorStitchOptions.filter(opt => opt.option_type === 'color').length === 0 ? (
                   <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                     <Grid3x3 className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Options Available</h3>
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Colors Available</h3>
                     <p className="text-sm">
-                      You haven't created any color or stitch options yet. Click "Add Option" to create your first option.
+                      You haven't created any thread/ink colors yet. Click "Add Color" to create your first color.
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    {/* Color Options */}
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Color Options</h3>
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                        {colorStitchOptions
-                          .filter(opt => opt.option_type === 'color')
-                          .map((option) => (
-                            <div
-                              key={option.id}
-                              className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                    {colorStitchOptions
+                      .filter(opt => opt.option_type === 'color')
+                      .map((option) => (
+                        <div
+                          key={option.id}
+                          className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm text-gray-900 dark:text-white truncate">{option.option_label}</div>
+                          </div>
+                          <div className="flex items-center gap-1 ml-2">
+                            <button
+                              onClick={() => openEditColorStitchModal(option)}
+                              className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded transition-colors"
                             >
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium text-sm text-gray-900 dark:text-white truncate">{option.option_label}</div>
-                                <div className="text-xs text-gray-500 dark:text-gray-400">Value: {option.option_value}</div>
-                              </div>
-                              <div className="flex items-center gap-1 ml-2">
-                                <button
-                                  onClick={() => openEditColorStitchModal(option)}
-                                  className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded transition-colors"
-                                >
-                                  <Edit className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => deleteColorStitchOption(option.id)}
-                                  className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded transition-colors"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-
-                    {/* Stitch Options */}
-                    <div>
-                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Stitch Count Options</h3>
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                        {colorStitchOptions
-                          .filter(opt => opt.option_type === 'stitch')
-                          .map((option) => (
-                            <div
-                              key={option.id}
-                              className="flex items-center justify-between p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
+                              <Edit className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => deleteColorStitchOption(option.id)}
+                              className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded transition-colors"
                             >
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium text-sm text-gray-900 dark:text-white truncate">{option.option_label}</div>
-                                <div className="text-xs text-gray-500 dark:text-gray-400">Value: {option.option_value}</div>
-                              </div>
-                              <div className="flex items-center gap-1 ml-2">
-                                <button
-                                  onClick={() => openEditColorStitchModal(option)}
-                                  className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded transition-colors"
-                                >
-                                  <Edit className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => deleteColorStitchOption(option.id)}
-                                  className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded transition-colors"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                   </div>
                 )}
               </div>
@@ -5140,14 +5099,14 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             </div>
           )}
 
-          {/* Add/Edit Color/Stitch Option Modal */}
+          {/* Add/Edit Thread/Ink Color Modal */}
           {showAddColorStitchModal && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
               <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
                 <div className="p-6 space-y-6">
                   <div className="flex items-center justify-between">
                     <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                      {editingColorStitchId ? 'Edit Option' : 'Add Color/Stitch Option'}
+                      {editingColorStitchId ? 'Edit Color' : 'Add Thread/Ink Color'}
                     </h2>
                     <button
                       onClick={() => setShowAddColorStitchModal(false)}
@@ -5162,45 +5121,16 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Option Type <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={colorStitchFormData.option_type}
-                        onChange={(e) => setColorStitchFormData({ ...colorStitchFormData, option_type: e.target.value as 'color' | 'stitch' | 'other' })}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
-                      >
-                        <option value="color">Color (for Screen Print, DTG, etc.)</option>
-                        <option value="stitch">Stitch Count (for Embroidery)</option>
-                        <option value="other">Other</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Display Label <span className="text-red-500">*</span>
+                        Color Name <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
                         value={colorStitchFormData.option_label}
-                        onChange={(e) => setColorStitchFormData({ ...colorStitchFormData, option_label: e.target.value })}
-                        placeholder="e.g., 5 Colors or 10,000 Stitches"
+                        onChange={(e) => setColorStitchFormData({ ...colorStitchFormData, option_label: e.target.value, option_value: e.target.value })}
+                        placeholder="e.g., Red, Blue, White, Black, Navy, Forest Green"
                         className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
                       />
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">This is what users will see in the dropdown</p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Value <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={colorStitchFormData.option_value}
-                        onChange={(e) => setColorStitchFormData({ ...colorStitchFormData, option_value: e.target.value })}
-                        placeholder="e.g., 5 or 10000"
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
-                      />
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">This is the stored value (usually a number)</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Enter the name of the thread or ink color</p>
                     </div>
                   </div>
 
@@ -5225,7 +5155,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       ) : (
                         <>
                           <Save className="w-4 h-4" />
-                          {editingColorStitchId ? 'Update Option' : 'Create Option'}
+                          {editingColorStitchId ? 'Update Color' : 'Create Color'}
                         </>
                       )}
                     </button>

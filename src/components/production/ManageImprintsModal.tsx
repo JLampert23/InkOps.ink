@@ -22,6 +22,7 @@ interface Imprint {
   type_of_work: string;
   details: string;
   proofs: Proof[];
+  thread_ink_color?: string;
 }
 
 interface PriceMatrix {
@@ -56,6 +57,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
   const [decorationLocations, setDecorationLocations] = useState<DecorationLocation[]>([]);
   const [colorOptions, setColorOptions] = useState<ColorStitchOption[]>([]);
   const [stitchOptions, setStitchOptions] = useState<ColorStitchOption[]>([]);
+  const [threadInkColors, setThreadInkColors] = useState<ColorStitchOption[]>([]);
   const [currentImprint, setCurrentImprint] = useState<Imprint>({
     location: '',
     price_matrix_id: '',
@@ -64,6 +66,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
     type_of_work: '',
     details: '',
     proofs: [],
+    thread_ink_color: '',
   });
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -114,6 +117,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
     if (data && !error) {
       setColorOptions(data.filter(opt => opt.option_type === 'color'));
       setStitchOptions(data.filter(opt => opt.option_type === 'stitch'));
+      setThreadInkColors(data.filter(opt => opt.option_type === 'color'));
     }
   };
 
@@ -136,6 +140,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
         type_of_work: imp.type_of_work || '',
         details: imp.details || '',
         proofs: imp.mockups || [],
+        thread_ink_color: imp.thread_ink_color || '',
       })));
     }
   };
@@ -255,6 +260,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
       type_of_work: '',
       details: '',
       proofs: [],
+      thread_ink_color: '',
     });
     setSelectedProofForNote(null);
   };
@@ -276,6 +282,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
         type_of_work: '',
         details: '',
         proofs: [],
+        thread_ink_color: '',
       });
       setEditingIndex(null);
       setSelectedProofForNote(null);
@@ -298,6 +305,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
             type_of_work: imp.type_of_work,
             details: imp.details,
             mockups: imp.proofs,
+            thread_ink_color: imp.thread_ink_color,
           }))
         );
       }
@@ -383,7 +391,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
 
                 <div>
                   <label className="block text-sm text-gray-400 mb-2">
-                    {currentImprint.type_of_work === 'Embroidery' ? 'Stitch Count' : 'Color Count'}
+                    {currentImprint.type_of_work === 'Embroidery' ? 'Stitch Count' : 'Color/Thread Count'}
                   </label>
                   <select
                     value={currentImprint.column_number}
@@ -393,7 +401,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                     <option value="">
                       {currentImprint.type_of_work === 'Embroidery'
                         ? 'Select stitch count'
-                        : 'Select color count'}
+                        : 'Select color/thread count'}
                     </option>
                     {(currentImprint.type_of_work === 'Embroidery' ? stitchOptions : colorOptions).map((option) => (
                       <option key={option.id} value={option.option_value}>
@@ -401,6 +409,24 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                       </option>
                     ))}
                     <option value="custom">Custom (enter in details)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">Thread/Ink Color</label>
+                  <select
+                    value={currentImprint.thread_ink_color}
+                    onChange={(e) => setCurrentImprint({ ...currentImprint, thread_ink_color: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm"
+                  >
+                    <option value="">Select color (optional)</option>
+                    {threadInkColors.map((color) => (
+                      <option key={color.id} value={color.option_label}>
+                        {color.option_label}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
