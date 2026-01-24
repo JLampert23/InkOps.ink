@@ -54,7 +54,7 @@ interface ProductionColor {
 interface TypeOfWork {
   id: string;
   work_type_name: string;
-  uses_ink: boolean;
+  color_type: 'ink' | 'thread' | 'none';
 }
 
 interface ManageImprintsModalProps {
@@ -181,7 +181,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
       // Get work types
       const { data, error } = await supabase
         .from('type_of_work_settings')
-        .select('id, work_type_name, uses_ink')
+        .select('id, work_type_name, color_type')
         .eq('company_id', profile.company_id)
         .eq('is_active', true)
         .order('sort_order');
@@ -466,7 +466,8 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                     {(() => {
                       const workType = workTypes.find(wt => wt.work_type_name === currentImprint.type_of_work);
                       if (!workType) return 'Color';
-                      return workType.uses_ink ? 'Ink Color' : 'Thread Color';
+                      if (workType.color_type === 'none') return 'Color';
+                      return workType.color_type === 'ink' ? 'Ink Color' : 'Thread Color';
                     })()}
                   </label>
                   <select
@@ -475,15 +476,23 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                       const selectedName = e.target.value;
                       setCurrentImprint({ ...currentImprint, thread_ink_color: selectedName });
                     }}
-                    disabled={!currentImprint.type_of_work}
+                    disabled={!currentImprint.type_of_work || (() => {
+                      const workType = workTypes.find(wt => wt.work_type_name === currentImprint.type_of_work);
+                      return workType?.color_type === 'none';
+                    })()}
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <option value="">
-                      {!currentImprint.type_of_work ? 'Select type of work first' : 'Select color (optional)'}
+                      {!currentImprint.type_of_work ? 'Select type of work first' :
+                       (() => {
+                         const workType = workTypes.find(wt => wt.work_type_name === currentImprint.type_of_work);
+                         return workType?.color_type === 'none' ? 'No color needed' : 'Select color (optional)';
+                       })()}
                     </option>
                     {currentImprint.type_of_work && (() => {
                       const workType = workTypes.find(wt => wt.work_type_name === currentImprint.type_of_work);
-                      const colors = workType?.uses_ink ? inkColors : threadColors;
+                      if (!workType || workType.color_type === 'none') return null;
+                      const colors = workType.color_type === 'ink' ? inkColors : threadColors;
                       return colors.map((color, idx) => (
                         <option key={idx} value={color.name}>
                           {color.name}
@@ -497,7 +506,8 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                       Selected: {currentImprint.thread_ink_color}
                       {(() => {
                         const workType = workTypes.find(wt => wt.work_type_name === currentImprint.type_of_work);
-                        const colors = workType?.uses_ink ? inkColors : threadColors;
+                        if (!workType || workType.color_type === 'none') return '';
+                        const colors = workType.color_type === 'ink' ? inkColors : threadColors;
                         const selected = colors.find(c => c.name === currentImprint.thread_ink_color);
                         return selected?.charge ? ` (Charge: $${selected.charge})` : '';
                       })()}
