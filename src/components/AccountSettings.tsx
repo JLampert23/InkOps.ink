@@ -61,13 +61,23 @@ interface InvoiceFee {
   updated_at: string;
 }
 
+interface CustomerLocation {
+  id: string;
+  company_id: string;
+  location_name: string;
+  address: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 type SettingsTab =
   | 'company-info'
   | 'printavo-integration' | 'square-integration' | 'resend-integration' | 'twilio-integration' | 'stripe-payments'
   | 'user-management' | 'user-security'
   | 'billing-status-filters'
   | 'automated-reports' | 'workflow-setup' | 'automations'
-  | 'invoice-fees' | 'custom-invoice-status' | 'price-matrices';
+  | 'production-general' | 'invoice-fees' | 'custom-invoice-status' | 'price-matrices';
 
 interface AccountSettingsProps {
   initialTab?: SettingsTab;
@@ -193,6 +203,16 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     show_by_default: false,
   });
   const [savingFee, setSavingFee] = useState(false);
+
+  const [customerLocations, setCustomerLocations] = useState<CustomerLocation[]>([]);
+  const [loadingLocations, setLoadingLocations] = useState(false);
+  const [editingLocationId, setEditingLocationId] = useState<string | null>(null);
+  const [showAddLocationModal, setShowAddLocationModal] = useState(false);
+  const [locationFormData, setLocationFormData] = useState({
+    location_name: '',
+    address: '',
+  });
+  const [savingLocation, setSavingLocation] = useState(false);
   const [currentPin, setCurrentPin] = useState('');
   const [hasExistingPin, setHasExistingPin] = useState(false);
   const [savingPin, setSavingPin] = useState(false);
@@ -204,6 +224,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     loadAvailableStatuses();
     loadStatusesFromDatabase();
     loadInvoiceFees();
+    loadCustomerLocations();
   }, []);
 
   useEffect(() => {
@@ -2067,6 +2088,122 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     }
   };
 
+  const loadCustomerLocations = async () => {
+    try {
+      setLoadingLocations(true);
+      const { data, error } = await supabase
+        .from('customer_locations')
+        .select('*')
+        .eq('is_active', true)
+        .order('location_name');
+
+      if (error) throw error;
+      setCustomerLocations(data || []);
+    } catch (err) {
+      console.error('Error loading customer locations:', err);
+      showNotification('error', 'Load Failed', 'Failed to load customer locations.');
+    } finally {
+      setLoadingLocations(false);
+    }
+  };
+
+  const resetLocationForm = () => {
+    setLocationFormData({
+      location_name: '',
+      address: '',
+    });
+    setEditingLocationId(null);
+  };
+
+  const openAddLocationModal = () => {
+    resetLocationForm();
+    setShowAddLocationModal(true);
+  };
+
+  const openEditLocationModal = (location: CustomerLocation) => {
+    setLocationFormData({
+      location_name: location.location_name,
+      address: location.address || '',
+    });
+    setEditingLocationId(location.id);
+    setShowAddLocationModal(true);
+  };
+
+  const saveLocation = async () => {
+    if (!locationFormData.location_name.trim()) {
+      showNotification('error', 'Validation Error', 'Location name is required.');
+      return;
+    }
+
+    try {
+      setSavingLocation(true);
+
+      if (editingLocationId) {
+        const { error } = await supabase
+          .from('customer_locations')
+          .update({
+            location_name: locationFormData.location_name,
+            address: locationFormData.address,
+          })
+          .eq('id', editingLocationId);
+
+        if (error) throw error;
+        showNotification('success', 'Location Updated', 'Customer location updated successfully!');
+      } else {
+        if (!companySettings?.id) {
+          showNotification('error', 'Error', 'Company settings not found. Please refresh the page.');
+          setSavingLocation(false);
+          return;
+        }
+
+        const { error } = await supabase
+          .from('customer_locations')
+          .insert([{
+            company_id: companySettings.id,
+            location_name: locationFormData.location_name,
+            address: locationFormData.address,
+          }]);
+
+        if (error) throw error;
+        showNotification('success', 'Location Created', 'Customer location created successfully!');
+      }
+
+      setShowAddLocationModal(false);
+      resetLocationForm();
+      loadCustomerLocations();
+    } catch (err: any) {
+      console.error('Error saving location:', err);
+      const errorMessage = err?.message || 'Failed to save customer location. Please try again.';
+      showNotification('error', 'Save Failed', errorMessage);
+    } finally {
+      setSavingLocation(false);
+    }
+  };
+
+  const deleteLocation = async (locationId: string) => {
+    const confirmed = await confirm(
+      'Delete Customer Location?',
+      'Are you sure you want to delete this location? This action cannot be undone.'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from('customer_locations')
+        .update({ is_active: false })
+        .eq('id', locationId);
+
+      if (error) throw error;
+
+      showNotification('success', 'Location Deleted', 'Customer location deleted successfully!');
+      loadCustomerLocations();
+    } catch (err) {
+      console.error('Error deleting location:', err);
+      showNotification('error', 'Delete Failed', 'Failed to delete customer location. Please try again.');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -2357,20 +2494,20 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             {productionExpanded && (
               <div className="mt-1 ml-2 space-y-1 collapsible-section collapsible-section-enter">
                 <button
-                  onClick={() => setActiveTab('invoice-fees')}
+                  onClick={() => setActiveTab('production-general')}
                   className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
-                    activeTab === 'invoice-fees'
+                    activeTab === 'production-general'
                       ? 'bg-green-50 dark:bg-green-600/20 text-green-700 dark:text-green-400 shadow-sm'
                       : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
                   }`}
                 >
-                  <CreditCard className={`w-4 h-4 flex-shrink-0 ${activeTab === 'invoice-fees' ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <SettingsIcon className={`w-4 h-4 flex-shrink-0 ${activeTab === 'production-general' ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                   <div className="flex-1 text-left">
-                    <div className={`font-medium text-sm ${activeTab === 'invoice-fees' ? 'text-green-700 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                      Invoice Fees
+                    <div className={`font-medium text-sm ${activeTab === 'production-general' ? 'text-green-700 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      General Settings
                     </div>
                   </div>
-                  {activeTab === 'invoice-fees' && <div className="w-1 h-6 bg-green-600 dark:bg-green-500 rounded-full absolute right-0" />}
+                  {activeTab === 'production-general' && <div className="w-1 h-6 bg-green-600 dark:bg-green-500 rounded-full absolute right-0" />}
                 </button>
 
                 <button
@@ -4275,6 +4412,165 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             </div>
           )}
 
+          {/* Production General Settings Section */}
+          {activeTab === 'production-general' && (
+            <div className="space-y-6">
+              {/* Invoice Fees */}
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Invoice Fees</h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Configure additional fees that can be applied to invoices</p>
+                  </div>
+                  <button
+                    onClick={openAddFeeModal}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Fee
+                  </button>
+                </div>
+
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">Invoice Fee Management</h3>
+                  <p className="text-sm text-blue-800 dark:text-blue-200">
+                    Create fees that auto-populate in quotes/invoices. Fees marked as "Show By Default" will be automatically added to new quotes and invoices.
+                  </p>
+                </div>
+
+                {loadingFees ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
+                  </div>
+                ) : invoiceFees.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <CreditCard className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Invoice Fees</h3>
+                    <p className="text-sm">
+                      You haven't created any invoice fees yet. Click "Add Fee" to create your first fee.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {invoiceFees.map((fee) => (
+                      <div
+                        key={fee.id}
+                        className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3">
+                            <h3 className="font-medium text-gray-900 dark:text-white">{fee.fee_name}</h3>
+                            <span className="px-2 py-1 text-xs font-medium rounded bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
+                              {fee.amount_type === 'dollar' ? `$${fee.amount.toFixed(2)}` : `${fee.amount}%`}
+                            </span>
+                            {fee.is_taxed && (
+                              <span className="px-2 py-1 text-xs font-medium rounded bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">
+                                Taxable
+                              </span>
+                            )}
+                            {fee.show_by_default && (
+                              <span className="px-2 py-1 text-xs font-medium rounded bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
+                                Auto-Add
+                              </span>
+                            )}
+                          </div>
+                          {fee.description && (
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{fee.description}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => toggleFeeDefault(fee.id, fee.show_by_default)}
+                            className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                              fee.show_by_default
+                                ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50'
+                                : 'bg-gray-200 dark:bg-slate-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-slate-500'
+                            }`}
+                          >
+                            {fee.show_by_default ? 'Default On' : 'Default Off'}
+                          </button>
+                          <button
+                            onClick={() => openEditFeeModal(fee)}
+                            className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => deleteFee(fee.id)}
+                            className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Customer Locations */}
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Customer Locations</h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Manage locations for your customers</p>
+                  </div>
+                  <button
+                    onClick={openAddLocationModal}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Location
+                  </button>
+                </div>
+
+                {loadingLocations ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
+                  </div>
+                ) : customerLocations.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <Building2 className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Customer Locations</h3>
+                    <p className="text-sm">
+                      You haven't created any customer locations yet. Click "Add Location" to create your first location.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {customerLocations.map((location) => (
+                      <div
+                        key={location.id}
+                        className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
+                      >
+                        <div className="flex-1">
+                          <h3 className="font-medium text-gray-900 dark:text-white">{location.location_name}</h3>
+                          {location.address && (
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{location.address}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => openEditLocationModal(location)}
+                            className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => deleteLocation(location.id)}
+                            className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Invoice Fees Section */}
           {activeTab === 'invoice-fees' && (
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
@@ -4506,6 +4802,84 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         <>
                           <Save className="w-4 h-4" />
                           {editingFeeId ? 'Update Fee' : 'Create Fee'}
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Add/Edit Location Modal */}
+          {showAddLocationModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                <div className="p-6 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                      {editingLocationId ? 'Edit Customer Location' : 'Add Customer Location'}
+                    </h2>
+                    <button
+                      onClick={() => setShowAddLocationModal(false)}
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    >
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Location Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={locationFormData.location_name}
+                        onChange={(e) => setLocationFormData({ ...locationFormData, location_name: e.target.value })}
+                        placeholder="e.g., Downtown Store, Main Warehouse"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Address
+                      </label>
+                      <textarea
+                        value={locationFormData.address}
+                        onChange={(e) => setLocationFormData({ ...locationFormData, address: e.target.value })}
+                        placeholder="Enter full address"
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-slate-700">
+                    <button
+                      onClick={() => setShowAddLocationModal(false)}
+                      disabled={savingLocation}
+                      className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={saveLocation}
+                      disabled={savingLocation}
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {savingLocation ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4" />
+                          {editingLocationId ? 'Update Location' : 'Create Location'}
                         </>
                       )}
                     </button>

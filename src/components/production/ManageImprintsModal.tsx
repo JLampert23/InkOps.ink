@@ -344,13 +344,13 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
 
                 <div>
                   <label className="block text-sm text-gray-400 mb-2">
-                    {currentImprint.type_of_work === 'Embroidery' ? 'Stitch Count' : 'Colors'}
+                    Colors/Stitches
                   </label>
                   <input
                     type="text"
                     value={currentImprint.column_number}
                     onChange={(e) => setCurrentImprint({ ...currentImprint, column_number: e.target.value })}
-                    placeholder={currentImprint.type_of_work === 'Embroidery' ? 'e.g., 5000 stitches' : 'e.g., 3 colors'}
+                    placeholder="e.g., 3 colors or 5000 stitches"
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm"
                   />
                 </div>
