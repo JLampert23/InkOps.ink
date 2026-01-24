@@ -61,10 +61,10 @@ interface InvoiceFee {
   updated_at: string;
 }
 
-interface CustomerLocation {
+interface DecorationLocation {
   id: string;
   company_id: string;
-  location_name: string;
+  decoration_name: string;
   address: string | null;
   is_active: boolean;
   created_at: string;
@@ -204,12 +204,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   });
   const [savingFee, setSavingFee] = useState(false);
 
-  const [customerLocations, setCustomerLocations] = useState<CustomerLocation[]>([]);
+  const [decorationLocations, setDecorationLocations] = useState<DecorationLocation[]>([]);
   const [loadingLocations, setLoadingLocations] = useState(false);
   const [editingLocationId, setEditingLocationId] = useState<string | null>(null);
   const [showAddLocationModal, setShowAddLocationModal] = useState(false);
   const [locationFormData, setLocationFormData] = useState({
-    location_name: '',
+    decoration_name: '',
     address: '',
   });
   const [savingLocation, setSavingLocation] = useState(false);
@@ -224,7 +224,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     loadAvailableStatuses();
     loadStatusesFromDatabase();
     loadInvoiceFees();
-    loadCustomerLocations();
+    loadDecorationLocations();
   }, []);
 
   useEffect(() => {
@@ -2088,20 +2088,20 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     }
   };
 
-  const loadCustomerLocations = async () => {
+  const loadDecorationLocations = async () => {
     try {
       setLoadingLocations(true);
       const { data, error } = await supabase
-        .from('customer_locations')
+        .from('decoration_locations')
         .select('*')
         .eq('is_active', true)
-        .order('location_name');
+        .order('decoration_name');
 
       if (error) throw error;
-      setCustomerLocations(data || []);
+      setDecorationLocations(data || []);
     } catch (err) {
-      console.error('Error loading customer locations:', err);
-      showNotification('error', 'Load Failed', 'Failed to load customer locations.');
+      console.error('Error loading decoration locations:', err);
+      showNotification('error', 'Load Failed', 'Failed to load decoration locations.');
     } finally {
       setLoadingLocations(false);
     }
@@ -2109,7 +2109,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   const resetLocationForm = () => {
     setLocationFormData({
-      location_name: '',
+      decoration_name: '',
       address: '',
     });
     setEditingLocationId(null);
@@ -2120,9 +2120,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     setShowAddLocationModal(true);
   };
 
-  const openEditLocationModal = (location: CustomerLocation) => {
+  const openEditLocationModal = (location: DecorationLocation) => {
     setLocationFormData({
-      location_name: location.location_name,
+      decoration_name: location.decoration_name,
       address: location.address || '',
     });
     setEditingLocationId(location.id);
@@ -2130,8 +2130,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   };
 
   const saveLocation = async () => {
-    if (!locationFormData.location_name.trim()) {
-      showNotification('error', 'Validation Error', 'Location name is required.');
+    if (!locationFormData.decoration_name.trim()) {
+      showNotification('error', 'Validation Error', 'Decoration location name is required.');
       return;
     }
 
@@ -2140,15 +2140,15 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
       if (editingLocationId) {
         const { error } = await supabase
-          .from('customer_locations')
+          .from('decoration_locations')
           .update({
-            location_name: locationFormData.location_name,
+            decoration_name: locationFormData.decoration_name,
             address: locationFormData.address,
           })
           .eq('id', editingLocationId);
 
         if (error) throw error;
-        showNotification('success', 'Location Updated', 'Customer location updated successfully!');
+        showNotification('success', 'Location Updated', 'Decoration location updated successfully!');
       } else {
         if (!companySettings?.id) {
           showNotification('error', 'Error', 'Company settings not found. Please refresh the page.');
@@ -2157,23 +2157,23 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         }
 
         const { error } = await supabase
-          .from('customer_locations')
+          .from('decoration_locations')
           .insert([{
             company_id: companySettings.id,
-            location_name: locationFormData.location_name,
+            decoration_name: locationFormData.decoration_name,
             address: locationFormData.address,
           }]);
 
         if (error) throw error;
-        showNotification('success', 'Location Created', 'Customer location created successfully!');
+        showNotification('success', 'Location Created', 'Decoration location created successfully!');
       }
 
       setShowAddLocationModal(false);
       resetLocationForm();
-      loadCustomerLocations();
+      loadDecorationLocations();
     } catch (err: any) {
       console.error('Error saving location:', err);
-      const errorMessage = err?.message || 'Failed to save customer location. Please try again.';
+      const errorMessage = err?.message || 'Failed to save decoration location. Please try again.';
       showNotification('error', 'Save Failed', errorMessage);
     } finally {
       setSavingLocation(false);
@@ -2182,7 +2182,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   const deleteLocation = async (locationId: string) => {
     const confirmed = await confirm(
-      'Delete Customer Location?',
+      'Delete Decoration Location?',
       'Are you sure you want to delete this location? This action cannot be undone.'
     );
 
@@ -2190,17 +2190,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
     try {
       const { error } = await supabase
-        .from('customer_locations')
+        .from('decoration_locations')
         .update({ is_active: false })
         .eq('id', locationId);
 
       if (error) throw error;
 
-      showNotification('success', 'Location Deleted', 'Customer location deleted successfully!');
-      loadCustomerLocations();
+      showNotification('success', 'Location Deleted', 'Decoration location deleted successfully!');
+      loadDecorationLocations();
     } catch (err) {
       console.error('Error deleting location:', err);
-      showNotification('error', 'Delete Failed', 'Failed to delete customer location. Please try again.');
+      showNotification('error', 'Delete Failed', 'Failed to delete decoration location. Please try again.');
     }
   };
 
@@ -4508,12 +4508,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 )}
               </div>
 
-              {/* Customer Locations */}
+              {/* Decoration Locations */}
               <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Customer Locations</h2>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Manage locations for your customers</p>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Decoration Locations</h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Define decoration positions on garments (e.g., Left Front, Full Back, Left Sleeve)</p>
                   </div>
                   <button
                     onClick={openAddLocationModal}
@@ -4528,23 +4528,23 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
                   </div>
-                ) : customerLocations.length === 0 ? (
+                ) : decorationLocations.length === 0 ? (
                   <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                     <Building2 className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Customer Locations</h3>
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Decoration Locations</h3>
                     <p className="text-sm">
-                      You haven't created any customer locations yet. Click "Add Location" to create your first location.
+                      You haven't created any decoration locations yet. Click "Add Location" to create your first location.
                     </p>
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {customerLocations.map((location) => (
+                    {decorationLocations.map((location) => (
                       <div
                         key={location.id}
                         className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
                       >
                         <div className="flex-1">
-                          <h3 className="font-medium text-gray-900 dark:text-white">{location.location_name}</h3>
+                          <h3 className="font-medium text-gray-900 dark:text-white">{location.decoration_name}</h3>
                           {location.address && (
                             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{location.address}</p>
                           )}
@@ -4811,14 +4811,14 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             </div>
           )}
 
-          {/* Add/Edit Location Modal */}
+          {/* Add/Edit Decoration Location Modal */}
           {showAddLocationModal && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
               <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
                 <div className="p-6 space-y-6">
                   <div className="flex items-center justify-between">
                     <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                      {editingLocationId ? 'Edit Customer Location' : 'Add Customer Location'}
+                      {editingLocationId ? 'Edit Decoration Location' : 'Add Decoration Location'}
                     </h2>
                     <button
                       onClick={() => setShowAddLocationModal(false)}
@@ -4837,21 +4837,21 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       </label>
                       <input
                         type="text"
-                        value={locationFormData.location_name}
-                        onChange={(e) => setLocationFormData({ ...locationFormData, location_name: e.target.value })}
-                        placeholder="e.g., Downtown Store, Main Warehouse"
+                        value={locationFormData.decoration_name}
+                        onChange={(e) => setLocationFormData({ ...locationFormData, decoration_name: e.target.value })}
+                        placeholder="e.g., Left Front, Full Back, Left Sleeve"
                         className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
                       />
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Address
+                        Description (Optional)
                       </label>
                       <textarea
                         value={locationFormData.address}
                         onChange={(e) => setLocationFormData({ ...locationFormData, address: e.target.value })}
-                        placeholder="Enter full address"
+                        placeholder="Optional description or notes about this decoration location"
                         rows={3}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
                       />

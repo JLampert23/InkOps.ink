@@ -30,6 +30,11 @@ interface PriceMatrix {
   matrix_type: string;
 }
 
+interface DecorationLocation {
+  id: string;
+  decoration_name: string;
+}
+
 interface ManageImprintsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -41,6 +46,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
   const { showNotification } = useNotification();
   const [imprints, setImprints] = useState<Imprint[]>([]);
   const [priceMatrices, setPriceMatrices] = useState<PriceMatrix[]>([]);
+  const [decorationLocations, setDecorationLocations] = useState<DecorationLocation[]>([]);
   const [currentImprint, setCurrentImprint] = useState<Imprint>({
     location: '',
     price_matrix_id: '',
@@ -57,6 +63,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
   useEffect(() => {
     if (isOpen) {
       loadPriceMatrices();
+      loadDecorationLocations();
       if (quoteId) {
         loadImprints();
       }
@@ -72,6 +79,18 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
 
     if (data && !error) {
       setPriceMatrices(data);
+    }
+  };
+
+  const loadDecorationLocations = async () => {
+    const { data, error } = await supabase
+      .from('decoration_locations')
+      .select('id, decoration_name')
+      .eq('is_active', true)
+      .order('decoration_name');
+
+    if (data && !error) {
+      setDecorationLocations(data);
     }
   };
 
@@ -306,14 +325,11 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm"
                   >
                     <option value="">Select location</option>
-                    <option value="Front">Front</option>
-                    <option value="Back">Back</option>
-                    <option value="Left Chest">Left Chest</option>
-                    <option value="Right Chest">Right Chest</option>
-                    <option value="Left Sleeve">Left Sleeve</option>
-                    <option value="Right Sleeve">Right Sleeve</option>
-                    <option value="Hood">Hood</option>
-                    <option value="Pocket">Pocket</option>
+                    {decorationLocations.map((loc) => (
+                      <option key={loc.id} value={loc.decoration_name}>
+                        {loc.decoration_name}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
