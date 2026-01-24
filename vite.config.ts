@@ -7,6 +7,36 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  server: {
+    watch: {
+      // Ignore files that shouldn't trigger HMR
+      ignored: [
+        '**/node_modules/**',
+        '**/.git/**',
+        '**/.bolt/**',
+        '**/*.md',
+        '**/*.sql',
+        '**/*.sh',
+        '**/*.ps1',
+        '**/supabase/migrations/**',
+        '**/supabase/functions/**',
+        '**/dist/**',
+        '**/deploy-*.js',
+        '**/test-*.js',
+        '**/debug-*.js',
+        '**/trigger-*.js',
+        '**/clear-*.js',
+        '**/query.json',
+        '**/response.json',
+        '**/recent_query.json',
+        '**/search_query.json',
+        '**/deploy-payload.json',
+      ],
+    },
+    hmr: {
+      overlay: true,
+    },
+  },
   build: {
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
