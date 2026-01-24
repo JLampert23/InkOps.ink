@@ -432,6 +432,14 @@ function AppContent() {
             {sidebarOpen && <span className="text-sm font-medium">{syncing ? 'Syncing...' : 'Sync from Printavo'}</span>}
           </button>
           <button
+            onClick={toggleDarkMode}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
+            title={!sidebarOpen ? (darkMode ? 'Light Mode' : 'Dark Mode') : ''}
+          >
+            {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            {sidebarOpen && <span className="text-sm font-medium">{darkMode ? 'Light Mode' : 'Dark Mode'}</span>}
+          </button>
+          <button
             onClick={() => signOut()}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
             title={!sidebarOpen ? 'Sign Out' : ''}
@@ -511,32 +519,6 @@ function AppContent() {
                   <UserPlus className="w-4 h-4" />
                   <span className="font-medium">New Customer</span>
                 </button>
-              )}
-              <button
-                onClick={toggleDarkMode}
-                className="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-                aria-label="Toggle dark mode"
-                title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-              >
-                {darkMode ? (
-                  <Sun className="w-5 h-5" />
-                ) : (
-                  <Moon className="w-5 h-5" />
-                )}
-              </button>
-              {activeTab === 'square' && (
-                <div className="text-xs lg:text-sm text-gray-600 dark:text-gray-300 flex items-center gap-2 bg-green-50 dark:bg-green-900/20 px-3 lg:px-4 py-2 rounded-lg border border-green-200 dark:border-green-700">
-                  <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0" />
-                  <span className="hidden xl:inline">Square data is fetched in real-time. Use "Fetch Data" buttons in each module.</span>
-                  <span className="xl:hidden">Real-time Square data</span>
-                </div>
-              )}
-              {activeTab === 'production' && (
-                <div className="text-xs lg:text-sm text-gray-600 dark:text-gray-300 flex items-center gap-2 bg-orange-50 dark:bg-orange-900/20 px-3 lg:px-4 py-2 rounded-lg border border-orange-200 dark:border-orange-700">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full flex-shrink-0" />
-                  <span className="hidden xl:inline">Production workflows use placeholder data. Connect your systems in Settings.</span>
-                  <span className="xl:hidden">Placeholder data</span>
-                </div>
               )}
             </div>
           </div>
