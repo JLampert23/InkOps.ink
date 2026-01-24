@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, GripVertical, X, Loader2, ImageIcon, DollarSign } from 'lucide-react';
+import { Save, Plus, Trash2, GripVertical, X, Loader2, DollarSign } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import CreateCustomerModal from '../accounting/CreateCustomerModal';
 import { ManageImprintsModal } from './ManageImprintsModal';
-import { ImprintBuilder } from './ImprintBuilder';
 
 interface QuoteItem {
   id?: string;
@@ -93,9 +92,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
 
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
   const [showImprintsModal, setShowImprintsModal] = useState(false);
-  const [showImprintBuilder, setShowImprintBuilder] = useState(false);
-  const [editingLineItemId, setEditingLineItemId] = useState<string | null>(null);
-  const [editingLineItemIndex, setEditingLineItemIndex] = useState<number | null>(null);
 
   useEffect(() => {
     loadCustomers();
@@ -931,17 +927,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                         <div className="flex items-center justify-center gap-1">
                           <button
                             onClick={() => {
-                              setEditingLineItemId(item.id || `temp-${idx}`);
-                              setEditingLineItemIndex(idx);
-                              setShowImprintBuilder(true);
-                            }}
-                            className="p-1 text-blue-500 hover:text-blue-400 hover:bg-slate-800 rounded"
-                            title="Manage Imprints"
-                          >
-                            <ImageIcon className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => {
                               showNotification('info', 'Coming Soon', 'Refresh pricing from matrix will be available soon');
                             }}
                             className="p-1 text-green-500 hover:text-green-400 hover:bg-slate-800 rounded"
@@ -1161,25 +1146,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         onClose={() => setShowImprintsModal(false)}
         quoteId={quoteId}
       />
-
-      {/* Imprint Builder Modal */}
-      {showImprintBuilder && editingLineItemIndex !== null && (
-        <ImprintBuilder
-          lineItemId={editingLineItemId || `temp-${editingLineItemIndex}`}
-          lineItemDescription={items[editingLineItemIndex]?.description || ''}
-          lineItemQuantity={items[editingLineItemIndex]?.total_quantity || 0}
-          onClose={() => {
-            setShowImprintBuilder(false);
-            setEditingLineItemId(null);
-            setEditingLineItemIndex(null);
-          }}
-          onSave={() => {
-            setShowImprintBuilder(false);
-            setEditingLineItemId(null);
-            setEditingLineItemIndex(null);
-          }}
-        />
-      )}
     </div>
   );
 }

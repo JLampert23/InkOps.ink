@@ -2,7 +2,7 @@
 
 ## Where to Find the New Features
 
-### 1. Imprint Builder (Per Line Item)
+### 1. Manage Imprints Modal
 
 **Location:** Production → Quotes → Create/Edit Quote
 
@@ -10,12 +10,14 @@
 1. Navigate to **Production** tab in the main navigation
 2. Click on **Quotes**
 3. Either create a new quote or edit an existing one
-4. In the **Line Items Table**, you'll see three new action buttons for each line item:
-   - **Blue Image Icon** - Opens the Imprint Builder
-   - **Green Dollar Icon** - Refresh pricing from matrix (placeholder)
+4. Below the **Line Items Table**, click the **"+ Imprint(s)"** button next to the "+ Line Item" button
+5. This opens the **Manage Imprints** modal where you can configure decorations for all line items in the quote
+
+**In the Line Items Table**, you'll see action buttons in the rightmost column for each line item:
+   - **Green Dollar Icon** - Refresh pricing from matrix (coming soon)
    - **Red X Icon** - Remove line item
 
-**Imprint Builder Features:**
+**Manage Imprints Modal Features:**
 - **Proof Builder Section (Blue):**
   - Upload artwork files (images or PDFs)
   - Manage multiple proof versions
@@ -87,12 +89,13 @@ The `price_matrices` table now includes:
    - Fill in prices for each tier
 5. Click **Save**
 
-### Adding Imprints to a Quote Line Item
+### Adding Imprints to a Quote
 
 1. Go to **Production** → **Quotes** → **Create Quote**
-2. Add a line item (e.g., "Gildan T-Shirt")
-3. Click the **blue image icon** in the Actions column
-4. In the Imprint Builder:
+2. Add line items to your quote (e.g., "Gildan T-Shirt - Navy - L")
+3. Click the **"+ Imprint(s)"** button below the line items table
+4. In the Manage Imprints modal:
+   - Select which line items should have imprints
    - Upload artwork using the "Upload Artwork" button
    - Set location: "Front"
    - Add ink colors: "Black", "White"
@@ -100,14 +103,14 @@ The `price_matrices` table now includes:
    - Review calculated price
 5. Click **Save & Close**
 
-**Note:** To save imprint data to the database, you must first save the quote. The Imprint Builder will work with unsaved quotes but will prompt you to save the quote before persisting imprint data.
+**Note:** To save imprint data to the database, you must first save the quote. The Manage Imprints modal will work with unsaved quotes but will prompt you to save the quote before persisting imprint data.
 
 ## Visual Features
 
-- **Color-coded sections** in Imprint Builder for easy navigation
+- **Color-coded sections** in Manage Imprints modal for easy navigation
 - **Matrix type badges** in Price Matrices list (blue badges)
 - **Active status indicators** (green badges)
-- **Icon-based actions** for intuitive navigation
+- **Centralized imprint management** with "+ Imprint(s)" button
 - **Real-time price calculation** as you select matrices and adjust quantities
 
 ## Security
