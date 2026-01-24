@@ -218,6 +218,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [loadingFees, setLoadingFees] = useState(false);
   const [editingFeeId, setEditingFeeId] = useState<string | null>(null);
   const [showAddFeeModal, setShowAddFeeModal] = useState(false);
+  const [showBulkAddFeesModal, setShowBulkAddFeesModal] = useState(false);
+  const [bulkFeesText, setBulkFeesText] = useState('');
+  const [savingBulkFees, setSavingBulkFees] = useState(false);
   const [feeFormData, setFeeFormData] = useState({
     fee_name: '',
     description: '',
@@ -232,6 +235,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [loadingLocations, setLoadingLocations] = useState(false);
   const [editingLocationId, setEditingLocationId] = useState<string | null>(null);
   const [showAddLocationModal, setShowAddLocationModal] = useState(false);
+  const [showBulkAddLocationsModal, setShowBulkAddLocationsModal] = useState(false);
+  const [bulkLocationsText, setBulkLocationsText] = useState('');
+  const [savingBulkLocations, setSavingBulkLocations] = useState(false);
   const [locationFormData, setLocationFormData] = useState({
     decoration_name: '',
     address: '',
@@ -242,6 +248,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [loadingWorkTypes, setLoadingWorkTypes] = useState(false);
   const [editingWorkTypeId, setEditingWorkTypeId] = useState<string | null>(null);
   const [showAddWorkTypeModal, setShowAddWorkTypeModal] = useState(false);
+  const [showBulkAddWorkTypesModal, setShowBulkAddWorkTypesModal] = useState(false);
+  const [bulkWorkTypesText, setBulkWorkTypesText] = useState('');
+  const [bulkWorkTypeColorType, setBulkWorkTypeColorType] = useState<'ink' | 'thread' | 'none'>('ink');
+  const [savingBulkWorkTypes, setSavingBulkWorkTypes] = useState(false);
   const [workTypeFormData, setWorkTypeFormData] = useState({
     work_type_name: '',
     color_type: 'ink' as 'ink' | 'thread' | 'none',
@@ -2133,6 +2143,145 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     } catch (err) {
       console.error('Error toggling fee default:', err);
       showNotification('error', 'Update Failed', 'Failed to update fee default setting.');
+    }
+  };
+
+  const bulkAddFees = async () => {
+    if (!bulkFeesText.trim()) {
+      showNotification('error', 'No Input', 'Please enter at least one fee.');
+      return;
+    }
+
+    if (!companySettings?.id) {
+      showNotification('error', 'Error', 'Company settings not found. Please refresh the page.');
+      return;
+    }
+
+    try {
+      setSavingBulkFees(true);
+
+      const lines = bulkFeesText.split('\n').map(line => line.trim()).filter(line => line);
+      if (lines.length === 0) {
+        showNotification('error', 'No Valid Entries', 'Please enter valid fee names.');
+        setSavingBulkFees(false);
+        return;
+      }
+
+      const newFees = lines.map(feeName => ({
+        company_id: companySettings.id,
+        fee_name: feeName,
+        description: '',
+        amount: 0,
+        amount_type: 'dollar',
+        is_taxed: false,
+        show_by_default: false,
+      }));
+
+      const { error } = await supabase
+        .from('invoice_fees')
+        .insert(newFees);
+
+      if (error) throw error;
+
+      showNotification('success', 'Bulk Add Complete', `Added ${lines.length} fee(s) successfully!`);
+      setShowBulkAddFeesModal(false);
+      setBulkFeesText('');
+      loadInvoiceFees();
+    } catch (err: any) {
+      console.error('Error bulk adding fees:', err);
+      showNotification('error', 'Bulk Add Failed', err?.message || 'Failed to add fees. Please try again.');
+    } finally {
+      setSavingBulkFees(false);
+    }
+  };
+
+  const bulkAddLocations = async () => {
+    if (!bulkLocationsText.trim()) {
+      showNotification('error', 'No Input', 'Please enter at least one location.');
+      return;
+    }
+
+    if (!companySettings?.id) {
+      showNotification('error', 'Error', 'Company settings not found. Please refresh the page.');
+      return;
+    }
+
+    try {
+      setSavingBulkLocations(true);
+
+      const lines = bulkLocationsText.split('\n').map(line => line.trim()).filter(line => line);
+      if (lines.length === 0) {
+        showNotification('error', 'No Valid Entries', 'Please enter valid location names.');
+        setSavingBulkLocations(false);
+        return;
+      }
+
+      const newLocations = lines.map(locationName => ({
+        company_id: companySettings.id,
+        decoration_name: locationName,
+        address: '',
+      }));
+
+      const { error } = await supabase
+        .from('decoration_locations')
+        .insert(newLocations);
+
+      if (error) throw error;
+
+      showNotification('success', 'Bulk Add Complete', `Added ${lines.length} location(s) successfully!`);
+      setShowBulkAddLocationsModal(false);
+      setBulkLocationsText('');
+      loadDecorationLocations();
+    } catch (err: any) {
+      console.error('Error bulk adding locations:', err);
+      showNotification('error', 'Bulk Add Failed', err?.message || 'Failed to add locations. Please try again.');
+    } finally {
+      setSavingBulkLocations(false);
+    }
+  };
+
+  const bulkAddWorkTypes = async () => {
+    if (!bulkWorkTypesText.trim()) {
+      showNotification('error', 'No Input', 'Please enter at least one work type.');
+      return;
+    }
+
+    if (!companySettings?.id) {
+      showNotification('error', 'Error', 'Company settings not found. Please refresh the page.');
+      return;
+    }
+
+    try {
+      setSavingBulkWorkTypes(true);
+
+      const lines = bulkWorkTypesText.split('\n').map(line => line.trim()).filter(line => line);
+      if (lines.length === 0) {
+        showNotification('error', 'No Valid Entries', 'Please enter valid work type names.');
+        setSavingBulkWorkTypes(false);
+        return;
+      }
+
+      const newWorkTypes = lines.map(workTypeName => ({
+        company_id: companySettings.id,
+        work_type_name: workTypeName,
+        color_type: bulkWorkTypeColorType,
+      }));
+
+      const { error } = await supabase
+        .from('type_of_work')
+        .insert(newWorkTypes);
+
+      if (error) throw error;
+
+      showNotification('success', 'Bulk Add Complete', `Added ${lines.length} work type(s) successfully!`);
+      setShowBulkAddWorkTypesModal(false);
+      setBulkWorkTypesText('');
+      loadWorkTypes();
+    } catch (err: any) {
+      console.error('Error bulk adding work types:', err);
+      showNotification('error', 'Bulk Add Failed', err?.message || 'Failed to add work types. Please try again.');
+    } finally {
+      setSavingBulkWorkTypes(false);
     }
   };
 
@@ -4708,68 +4857,77 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
           {/* Production General Settings Section */}
           {activeTab === 'production-general' && (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {/* Invoice Fees */}
-              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4 space-y-4">
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">Invoice Fees</h2>
+                    <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Invoice Fees</h2>
                     <p className="text-xs text-gray-600 dark:text-gray-400">Configure additional fees for invoices</p>
                   </div>
-                  <button
-                    onClick={openAddFeeModal}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    Add
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setShowBulkAddFeesModal(true)}
+                      className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Bulk
+                    </button>
+                    <button
+                      onClick={openAddFeeModal}
+                      className="flex items-center gap-1 px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Add
+                    </button>
+                  </div>
                 </div>
 
                 {loadingFees ? (
-                  <div className="flex items-center justify-center py-4">
-                    <Loader2 className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-spin" />
+                  <div className="flex items-center justify-center py-3">
+                    <Loader2 className="w-5 h-5 text-blue-600 dark:text-blue-400 animate-spin" />
                   </div>
                 ) : invoiceFees.length === 0 ? (
-                  <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                  <div className="text-center py-3 text-gray-500 dark:text-gray-400">
                     <p className="text-xs">No invoice fees yet. Click "Add" to create one.</p>
                   </div>
                 ) : (
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     {invoiceFees.map((fee) => (
                       <div
                         key={fee.id}
-                        className="flex items-center justify-between p-2.5 bg-gray-50 dark:bg-slate-700 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
+                        className="flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
                       >
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">{fee.fee_name}</h3>
-                            <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <h3 className="text-xs font-medium text-gray-900 dark:text-white truncate">{fee.fee_name}</h3>
+                            <span className="px-1 py-0.5 text-xs font-medium rounded bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 whitespace-nowrap">
                               {fee.amount_type === 'dollar' ? `$${fee.amount.toFixed(2)}` : `${fee.amount}%`}
                             </span>
                             {fee.is_taxed && (
-                              <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 whitespace-nowrap">
+                              <span className="px-1 py-0.5 text-xs font-medium rounded bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 whitespace-nowrap">
                                 Tax
                               </span>
                             )}
                             {fee.show_by_default && (
-                              <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 whitespace-nowrap">
+                              <span className="px-1 py-0.5 text-xs font-medium rounded bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 whitespace-nowrap">
                                 Auto
                               </span>
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-1 ml-2">
+                        <div className="flex items-center gap-0.5 ml-2">
                           <button
                             onClick={() => openEditFeeModal(fee)}
-                            className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                            className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
                           >
-                            <Edit className="w-3.5 h-3.5" />
+                            <Edit className="w-3 h-3" />
                           </button>
                           <button
                             onClick={() => deleteFee(fee.id)}
-                            className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                            className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3 h-3" />
                           </button>
                         </div>
                       </div>
@@ -4779,51 +4937,60 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               </div>
 
               {/* Decoration Locations */}
-              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4 space-y-4">
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">Decoration Locations</h2>
+                    <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Decoration Locations</h2>
                     <p className="text-xs text-gray-600 dark:text-gray-400">Positions on garments (e.g., Left Front, Full Back)</p>
                   </div>
-                  <button
-                    onClick={openAddLocationModal}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    Add
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setShowBulkAddLocationsModal(true)}
+                      className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Bulk
+                    </button>
+                    <button
+                      onClick={openAddLocationModal}
+                      className="flex items-center gap-1 px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Add
+                    </button>
+                  </div>
                 </div>
 
                 {loadingLocations ? (
-                  <div className="flex items-center justify-center py-4">
-                    <Loader2 className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-spin" />
+                  <div className="flex items-center justify-center py-3">
+                    <Loader2 className="w-5 h-5 text-blue-600 dark:text-blue-400 animate-spin" />
                   </div>
                 ) : decorationLocations.length === 0 ? (
-                  <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                  <div className="text-center py-3 text-gray-500 dark:text-gray-400">
                     <p className="text-xs">No decoration locations yet. Click "Add" to create one.</p>
                   </div>
                 ) : (
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     {decorationLocations.map((location) => (
                       <div
                         key={location.id}
-                        className="flex items-center justify-between p-2.5 bg-gray-50 dark:bg-slate-700 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
+                        className="flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
                       >
                         <div className="flex-1 min-w-0">
-                          <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">{location.decoration_name}</h3>
+                          <h3 className="text-xs font-medium text-gray-900 dark:text-white truncate">{location.decoration_name}</h3>
                         </div>
-                        <div className="flex items-center gap-1 ml-2">
+                        <div className="flex items-center gap-0.5 ml-2">
                           <button
                             onClick={() => openEditLocationModal(location)}
-                            className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                            className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
                           >
-                            <Edit className="w-3.5 h-3.5" />
+                            <Edit className="w-3 h-3" />
                           </button>
                           <button
                             onClick={() => deleteLocation(location.id)}
-                            className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                            className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3 h-3" />
                           </button>
                         </div>
                       </div>
@@ -4833,40 +5000,49 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               </div>
 
               {/* Type of Work */}
-              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4 space-y-4">
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">Type of Work</h2>
+                    <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Type of Work</h2>
                     <p className="text-xs text-gray-600 dark:text-gray-400">Decoration methods (Screen Print, Embroidery, DTG)</p>
                   </div>
-                  <button
-                    onClick={openAddWorkTypeModal}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    Add
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setShowBulkAddWorkTypesModal(true)}
+                      className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Bulk
+                    </button>
+                    <button
+                      onClick={openAddWorkTypeModal}
+                      className="flex items-center gap-1 px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Add
+                    </button>
+                  </div>
                 </div>
 
                 {loadingWorkTypes ? (
-                  <div className="flex items-center justify-center py-4">
-                    <Loader2 className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-spin" />
+                  <div className="flex items-center justify-center py-3">
+                    <Loader2 className="w-5 h-5 text-blue-600 dark:text-blue-400 animate-spin" />
                   </div>
                 ) : workTypes.length === 0 ? (
-                  <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                  <div className="text-center py-3 text-gray-500 dark:text-gray-400">
                     <p className="text-xs">No work types yet. Click "Add" to create one.</p>
                   </div>
                 ) : (
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     {workTypes.map((workType) => (
                       <div
                         key={workType.id}
-                        className="flex items-center justify-between p-2.5 bg-gray-50 dark:bg-slate-700 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
+                        className="flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
                       >
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">{workType.work_type_name}</h3>
-                            <span className={`px-1.5 py-0.5 text-xs font-medium rounded whitespace-nowrap ${
+                          <div className="flex items-center gap-1.5">
+                            <h3 className="text-xs font-medium text-gray-900 dark:text-white truncate">{workType.work_type_name}</h3>
+                            <span className={`px-1 py-0.5 text-xs font-medium rounded whitespace-nowrap ${
                               workType.color_type === 'ink'
                                 ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200'
                                 : workType.color_type === 'thread'
@@ -4877,18 +5053,18 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                             </span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-1 ml-2">
+                        <div className="flex items-center gap-0.5 ml-2">
                           <button
                             onClick={() => openEditWorkTypeModal(workType)}
-                            className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                            className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
                           >
-                            <Edit className="w-3.5 h-3.5" />
+                            <Edit className="w-3 h-3" />
                           </button>
                           <button
                             onClick={() => deleteWorkType(workType.id)}
-                            className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                            className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3 h-3" />
                           </button>
                         </div>
                       </div>
@@ -5394,6 +5570,279 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         <>
                           <Save className="w-4 h-4" />
                           {editingColorStitchId ? 'Update Color' : 'Create Color'}
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Bulk Add Invoice Fees Modal */}
+          {showBulkAddFeesModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                <div className="p-6 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                      Bulk Add Invoice Fees
+                    </h2>
+                    <button
+                      onClick={() => setShowBulkAddFeesModal(false)}
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    >
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        Enter one fee name per line. All fees will be added with default values ($0, not taxed) that you can edit later.
+                      </p>
+                      <p className="text-xs text-blue-700 dark:text-blue-300 mt-2">
+                        Example:<br />
+                        Processing Fee<br />
+                        Shipping Fee<br />
+                        Setup Fee
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Fee Names (one per line)
+                      </label>
+                      <textarea
+                        value={bulkFeesText}
+                        onChange={(e) => setBulkFeesText(e.target.value)}
+                        placeholder="Processing Fee&#10;Shipping Fee&#10;Setup Fee"
+                        rows={10}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white font-mono text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-slate-700">
+                    <button
+                      onClick={() => setShowBulkAddFeesModal(false)}
+                      disabled={savingBulkFees}
+                      className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={bulkAddFees}
+                      disabled={savingBulkFees}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {savingBulkFees ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Adding...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4" />
+                          Add All Fees
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Bulk Add Decoration Locations Modal */}
+          {showBulkAddLocationsModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                <div className="p-6 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                      Bulk Add Decoration Locations
+                    </h2>
+                    <button
+                      onClick={() => setShowBulkAddLocationsModal(false)}
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    >
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        Enter one decoration location per line.
+                      </p>
+                      <p className="text-xs text-blue-700 dark:text-blue-300 mt-2">
+                        Example:<br />
+                        Left Front<br />
+                        Full Back<br />
+                        Left Sleeve<br />
+                        Right Sleeve
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Location Names (one per line)
+                      </label>
+                      <textarea
+                        value={bulkLocationsText}
+                        onChange={(e) => setBulkLocationsText(e.target.value)}
+                        placeholder="Left Front&#10;Full Back&#10;Left Sleeve"
+                        rows={10}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white font-mono text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-slate-700">
+                    <button
+                      onClick={() => setShowBulkAddLocationsModal(false)}
+                      disabled={savingBulkLocations}
+                      className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={bulkAddLocations}
+                      disabled={savingBulkLocations}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {savingBulkLocations ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Adding...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4" />
+                          Add All Locations
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Bulk Add Type of Work Modal */}
+          {showBulkAddWorkTypesModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                <div className="p-6 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                      Bulk Add Type of Work
+                    </h2>
+                    <button
+                      onClick={() => setShowBulkAddWorkTypesModal(false)}
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    >
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        Enter one work type per line. All work types will use the color type you select below.
+                      </p>
+                      <p className="text-xs text-blue-700 dark:text-blue-300 mt-2">
+                        Example:<br />
+                        Screen Print<br />
+                        DTG<br />
+                        DTF
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Color Type for All Work Types
+                      </label>
+                      <div className="space-y-2">
+                        <label className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-slate-700 rounded-lg cursor-pointer hover:bg-blue-50 dark:hover:bg-slate-600 transition-colors">
+                          <input
+                            type="radio"
+                            checked={bulkWorkTypeColorType === 'ink'}
+                            onChange={() => setBulkWorkTypeColorType('ink')}
+                            className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                          />
+                          <div>
+                            <span className="text-sm font-medium text-gray-900 dark:text-white">Uses Ink Colors</span>
+                          </div>
+                        </label>
+                        <label className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-slate-700 rounded-lg cursor-pointer hover:bg-blue-50 dark:hover:bg-slate-600 transition-colors">
+                          <input
+                            type="radio"
+                            checked={bulkWorkTypeColorType === 'thread'}
+                            onChange={() => setBulkWorkTypeColorType('thread')}
+                            className="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500"
+                          />
+                          <div>
+                            <span className="text-sm font-medium text-gray-900 dark:text-white">Uses Thread Colors</span>
+                          </div>
+                        </label>
+                        <label className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-slate-700 rounded-lg cursor-pointer hover:bg-blue-50 dark:hover:bg-slate-600 transition-colors">
+                          <input
+                            type="radio"
+                            checked={bulkWorkTypeColorType === 'none'}
+                            onChange={() => setBulkWorkTypeColorType('none')}
+                            className="w-4 h-4 text-gray-600 border-gray-300 focus:ring-gray-500"
+                          />
+                          <div>
+                            <span className="text-sm font-medium text-gray-900 dark:text-white">No Colors</span>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Work Type Names (one per line)
+                      </label>
+                      <textarea
+                        value={bulkWorkTypesText}
+                        onChange={(e) => setBulkWorkTypesText(e.target.value)}
+                        placeholder="Screen Print&#10;DTG&#10;DTF"
+                        rows={10}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white font-mono text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-slate-700">
+                    <button
+                      onClick={() => setShowBulkAddWorkTypesModal(false)}
+                      disabled={savingBulkWorkTypes}
+                      className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={bulkAddWorkTypes}
+                      disabled={savingBulkWorkTypes}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {savingBulkWorkTypes ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Adding...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4" />
+                          Add All Work Types
                         </>
                       )}
                     </button>
