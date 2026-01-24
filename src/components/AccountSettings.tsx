@@ -88,7 +88,7 @@ interface TypeOfWork {
   id: string;
   company_id: string;
   work_type_name: string;
-  uses_ink: boolean;
+  color_type: 'ink' | 'thread' | 'none';
   sort_order: number;
   is_active: boolean;
   created_at: string;
@@ -244,7 +244,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [showAddWorkTypeModal, setShowAddWorkTypeModal] = useState(false);
   const [workTypeFormData, setWorkTypeFormData] = useState({
     work_type_name: '',
-    uses_ink: true,
+    color_type: 'ink' as 'ink' | 'thread' | 'none',
   });
   const [savingWorkType, setSavingWorkType] = useState(false);
 
@@ -2274,7 +2274,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const resetWorkTypeForm = () => {
     setWorkTypeFormData({
       work_type_name: '',
-      uses_ink: true,
+      color_type: 'ink',
     });
     setEditingWorkTypeId(null);
   };
@@ -2287,7 +2287,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const openEditWorkTypeModal = (workType: TypeOfWork) => {
     setWorkTypeFormData({
       work_type_name: workType.work_type_name,
-      uses_ink: workType.uses_ink,
+      color_type: workType.color_type,
     });
     setEditingWorkTypeId(workType.id);
     setShowAddWorkTypeModal(true);
@@ -2312,7 +2312,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           .from('type_of_work_settings')
           .update({
             work_type_name: workTypeFormData.work_type_name,
-            uses_ink: workTypeFormData.uses_ink,
+            color_type: workTypeFormData.color_type,
           })
           .eq('id', editingWorkTypeId);
 
@@ -2328,7 +2328,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           .insert([{
             company_id: companySettings.id,
             work_type_name: workTypeFormData.work_type_name,
-            uses_ink: workTypeFormData.uses_ink,
+            color_type: workTypeFormData.color_type,
             sort_order: nextSortOrder,
           }]);
 
@@ -4867,11 +4867,13 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           <div className="flex items-center gap-2">
                             <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">{workType.work_type_name}</h3>
                             <span className={`px-1.5 py-0.5 text-xs font-medium rounded whitespace-nowrap ${
-                              workType.uses_ink
+                              workType.color_type === 'ink'
                                 ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200'
-                                : 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200'
+                                : workType.color_type === 'thread'
+                                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200'
+                                : 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-200'
                             }`}>
-                              {workType.uses_ink ? 'Ink' : 'Thread'}
+                              {workType.color_type === 'ink' ? 'Ink' : workType.color_type === 'thread' ? 'Thread' : 'None'}
                             </span>
                           </div>
                         </div>
@@ -4895,9 +4897,14 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 )}
               </div>
 
-              {/* Ink & Thread Colors */}
+              {/* Ink Colors */}
               <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" /></div>}>
-                <InkThreadColorsManager />
+                <InkThreadColorsManager colorType="ink" />
+              </Suspense>
+
+              {/* Thread Colors */}
+              <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" /></div>}>
+                <InkThreadColorsManager colorType="thread" />
               </Suspense>
             </div>
           )}
@@ -5256,14 +5263,14 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                       <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">Color Type Selection</h3>
                       <p className="text-sm text-blue-800 dark:text-blue-200 mb-3">
-                        Choose whether this decoration method uses ink colors or thread colors. This determines which color list appears in the Manage Imprints modal.
+                        Choose whether this decoration method uses ink colors, thread colors, or no colors.
                       </p>
                       <div className="space-y-2">
                         <label className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 rounded-lg cursor-pointer hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors">
                           <input
                             type="radio"
-                            checked={workTypeFormData.uses_ink === true}
-                            onChange={() => setWorkTypeFormData({ ...workTypeFormData, uses_ink: true })}
+                            checked={workTypeFormData.color_type === 'ink'}
+                            onChange={() => setWorkTypeFormData({ ...workTypeFormData, color_type: 'ink' })}
                             className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
                           />
                           <div>
@@ -5274,13 +5281,25 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         <label className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 rounded-lg cursor-pointer hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors">
                           <input
                             type="radio"
-                            checked={workTypeFormData.uses_ink === false}
-                            onChange={() => setWorkTypeFormData({ ...workTypeFormData, uses_ink: false })}
+                            checked={workTypeFormData.color_type === 'thread'}
+                            onChange={() => setWorkTypeFormData({ ...workTypeFormData, color_type: 'thread' })}
                             className="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500"
                           />
                           <div>
                             <span className="text-sm font-medium text-gray-900 dark:text-white">Uses Thread Colors</span>
                             <p className="text-xs text-gray-600 dark:text-gray-400">Embroidery</p>
+                          </div>
+                        </label>
+                        <label className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 rounded-lg cursor-pointer hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors">
+                          <input
+                            type="radio"
+                            checked={workTypeFormData.color_type === 'none'}
+                            onChange={() => setWorkTypeFormData({ ...workTypeFormData, color_type: 'none' })}
+                            className="w-4 h-4 text-gray-600 border-gray-300 focus:ring-gray-500"
+                          />
+                          <div>
+                            <span className="text-sm font-medium text-gray-900 dark:text-white">No Colors</span>
+                            <p className="text-xs text-gray-600 dark:text-gray-400">Laser Engraving, Heat Press, etc.</p>
                           </div>
                         </label>
                       </div>

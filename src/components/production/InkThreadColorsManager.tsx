@@ -15,7 +15,11 @@ interface ColorStitchOption {
   updated_at: string;
 }
 
-export function InkThreadColorsManager() {
+interface InkThreadColorsManagerProps {
+  colorType: 'ink' | 'thread';
+}
+
+export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProps) {
   const { showNotification, confirm } = useNotification();
   const [colorStitchOptions, setColorStitchOptions] = useState<ColorStitchOption[]>([]);
   const [loadingColorStitch, setLoadingColorStitch] = useState(false);
@@ -24,10 +28,9 @@ export function InkThreadColorsManager() {
   const [colorStitchFormData, setColorStitchFormData] = useState({
     option_label: '',
     option_value: '',
-    option_type: 'color' as 'color' | 'stitch' | 'other',
+    option_type: colorType === 'ink' ? 'color' as const : 'stitch' as const,
   });
   const [savingColorStitch, setSavingColorStitch] = useState(false);
-  const [filterType, setFilterType] = useState<'all' | 'color' | 'stitch'>('all');
 
   useEffect(() => {
     loadColorStitchOptions();
@@ -36,18 +39,19 @@ export function InkThreadColorsManager() {
   const loadColorStitchOptions = async () => {
     try {
       setLoadingColorStitch(true);
+      const optionType = colorType === 'ink' ? 'color' : 'stitch';
       const { data, error } = await supabase
         .from('color_stitch_options')
         .select('*')
         .eq('is_active', true)
-        .order('option_type')
+        .eq('option_type', optionType)
         .order('sort_order');
 
       if (error) throw error;
       setColorStitchOptions(data || []);
     } catch (err) {
       console.error('Error loading color/stitch options:', err);
-      showNotification('error', 'Load Failed', 'Failed to load color/stitch options.');
+      showNotification('error', 'Load Failed', `Failed to load ${colorType} colors.`);
     } finally {
       setLoadingColorStitch(false);
     }
@@ -57,7 +61,7 @@ export function InkThreadColorsManager() {
     setColorStitchFormData({
       option_label: '',
       option_value: '',
-      option_type: 'color',
+      option_type: colorType === 'ink' ? 'color' : 'stitch',
     });
     setEditingColorStitchId(null);
   };
@@ -164,23 +168,17 @@ export function InkThreadColorsManager() {
     }
   };
 
-  const filteredOptions = colorStitchOptions.filter(opt => {
-    if (filterType === 'all') return true;
-    return opt.option_type === filterType;
-  });
-
-  const inkColors = colorStitchOptions.filter(opt => opt.option_type === 'color');
-  const threadColors = colorStitchOptions.filter(opt => opt.option_type === 'stitch');
+  const title = colorType === 'ink' ? 'Ink Colors' : 'Thread Colors';
+  const description = colorType === 'ink' ? 'For screen printing, DTG, and other ink-based methods' : 'For embroidery';
+  const badgeColor = colorType === 'ink' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200' : 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200';
 
   return (
     <>
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base font-semibold text-gray-900 dark:text-white">Ink & Thread Colors</h2>
-            <p className="text-xs text-gray-600 dark:text-gray-400">
-              Ink colors (screen print, DTG) and thread colors (embroidery)
-            </p>
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white">{title}</h2>
+            <p className="text-xs text-gray-600 dark:text-gray-400">{description}</p>
           </div>
           <button
             onClick={openAddColorStitchModal}
@@ -191,50 +189,17 @@ export function InkThreadColorsManager() {
           </button>
         </div>
 
-        <div className="flex items-center gap-1 border-b border-gray-200 dark:border-slate-700">
-          <button
-            onClick={() => setFilterType('all')}
-            className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-              filterType === 'all'
-                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-            }`}
-          >
-            All ({colorStitchOptions.length})
-          </button>
-          <button
-            onClick={() => setFilterType('color')}
-            className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-              filterType === 'color'
-                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-            }`}
-          >
-            Ink ({inkColors.length})
-          </button>
-          <button
-            onClick={() => setFilterType('stitch')}
-            className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-              filterType === 'stitch'
-                ? 'text-purple-600 dark:text-purple-400 border-b-2 border-purple-600 dark:border-purple-400'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-            }`}
-          >
-            Thread ({threadColors.length})
-          </button>
-        </div>
-
         {loadingColorStitch ? (
           <div className="flex items-center justify-center py-4">
             <Loader2 className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-spin" />
           </div>
-        ) : filteredOptions.length === 0 ? (
+        ) : colorStitchOptions.length === 0 ? (
           <div className="text-center py-4 text-gray-500 dark:text-gray-400">
-            <p className="text-xs">No {filterType === 'color' ? 'ink' : filterType === 'stitch' ? 'thread' : ''} colors yet. Click "Add" to create one.</p>
+            <p className="text-xs">No {colorType} colors yet. Click "Add" to create one.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-            {filteredOptions.map((option) => (
+            {colorStitchOptions.map((option) => (
               <div
                 key={option.id}
                 className="flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-700 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
@@ -247,13 +212,6 @@ export function InkThreadColorsManager() {
                   />
                   <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">{option.option_label}</h3>
-                    <span className={`inline-block px-1.5 py-0.5 text-xs font-medium rounded ${
-                      option.option_type === 'color'
-                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200'
-                        : 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200'
-                    }`}>
-                      {option.option_type === 'color' ? 'Ink' : 'Thread'}
-                    </span>
                   </div>
                 </div>
                 <div className="flex items-center gap-0.5 ml-1">
@@ -282,7 +240,7 @@ export function InkThreadColorsManager() {
             <div className="p-6 space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  {editingColorStitchId ? 'Edit Color' : 'Add Color'}
+                  {editingColorStitchId ? `Edit ${colorType === 'ink' ? 'Ink' : 'Thread'} Color` : `Add ${colorType === 'ink' ? 'Ink' : 'Thread'} Color`}
                 </h2>
                 <button
                   onClick={() => setShowAddColorStitchModal(false)}
@@ -295,32 +253,6 @@ export function InkThreadColorsManager() {
               </div>
 
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Type <span className="text-red-500">*</span>
-                  </label>
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        checked={colorStitchFormData.option_type === 'color'}
-                        onChange={() => setColorStitchFormData({ ...colorStitchFormData, option_type: 'color' })}
-                        className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700 dark:text-gray-300">Ink Color</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        checked={colorStitchFormData.option_type === 'stitch'}
-                        onChange={() => setColorStitchFormData({ ...colorStitchFormData, option_type: 'stitch' })}
-                        className="w-4 h-4 text-purple-600 border-gray-300 focus:ring-purple-500"
-                      />
-                      <span className="text-sm text-gray-700 dark:text-gray-300">Thread Color</span>
-                    </label>
-                  </div>
-                </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Color Name <span className="text-red-500">*</span>
