@@ -71,6 +71,18 @@ interface DecorationLocation {
   updated_at: string;
 }
 
+interface ColorStitchOption {
+  id: string;
+  company_id: string;
+  option_label: string;
+  option_value: string;
+  option_type: 'color' | 'stitch' | 'other';
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 type SettingsTab =
   | 'company-info'
   | 'printavo-integration' | 'square-integration' | 'resend-integration' | 'twilio-integration' | 'stripe-payments'
@@ -218,6 +230,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [savingPin, setSavingPin] = useState(false);
   const [pinSaveMessage, setPinSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  const [colorStitchOptions, setColorStitchOptions] = useState<ColorStitchOption[]>([]);
+  const [loadingColorStitch, setLoadingColorStitch] = useState(false);
+  const [editingColorStitchId, setEditingColorStitchId] = useState<string | null>(null);
+  const [showAddColorStitchModal, setShowAddColorStitchModal] = useState(false);
+  const [colorStitchFormData, setColorStitchFormData] = useState({
+    option_label: '',
+    option_value: '',
+    option_type: 'color' as 'color' | 'stitch' | 'other',
+  });
+  const [savingColorStitch, setSavingColorStitch] = useState(false);
+
   useEffect(() => {
     loadSettings();
     loadUsers();
@@ -225,6 +248,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     loadStatusesFromDatabase();
     loadInvoiceFees();
     loadDecorationLocations();
+    loadColorStitchOptions();
   }, []);
 
   useEffect(() => {
@@ -2201,6 +2225,132 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     } catch (err) {
       console.error('Error deleting location:', err);
       showNotification('error', 'Delete Failed', 'Failed to delete decoration location. Please try again.');
+    }
+  };
+
+  const loadColorStitchOptions = async () => {
+    try {
+      setLoadingColorStitch(true);
+      const { data, error } = await supabase
+        .from('color_stitch_options')
+        .select('*')
+        .eq('is_active', true)
+        .order('option_type')
+        .order('sort_order');
+
+      if (error) throw error;
+      setColorStitchOptions(data || []);
+    } catch (err) {
+      console.error('Error loading color/stitch options:', err);
+      showNotification('error', 'Load Failed', 'Failed to load color/stitch options.');
+    } finally {
+      setLoadingColorStitch(false);
+    }
+  };
+
+  const resetColorStitchForm = () => {
+    setColorStitchFormData({
+      option_label: '',
+      option_value: '',
+      option_type: 'color',
+    });
+    setEditingColorStitchId(null);
+  };
+
+  const openAddColorStitchModal = () => {
+    resetColorStitchForm();
+    setShowAddColorStitchModal(true);
+  };
+
+  const openEditColorStitchModal = (option: ColorStitchOption) => {
+    setColorStitchFormData({
+      option_label: option.option_label,
+      option_value: option.option_value,
+      option_type: option.option_type,
+    });
+    setEditingColorStitchId(option.id);
+    setShowAddColorStitchModal(true);
+  };
+
+  const saveColorStitchOption = async () => {
+    if (!colorStitchFormData.option_label || !colorStitchFormData.option_value) {
+      showNotification('error', 'Missing Information', 'Please fill in all required fields.');
+      return;
+    }
+
+    try {
+      setSavingColorStitch(true);
+
+      if (editingColorStitchId) {
+        const { error } = await supabase
+          .from('color_stitch_options')
+          .update({
+            option_label: colorStitchFormData.option_label,
+            option_value: colorStitchFormData.option_value,
+            option_type: colorStitchFormData.option_type,
+          })
+          .eq('id', editingColorStitchId);
+
+        if (error) throw error;
+        showNotification('success', 'Option Updated', 'Color/stitch option updated successfully!');
+      } else {
+        if (!companySettings?.id) {
+          showNotification('error', 'Error', 'Company settings not found. Please refresh the page.');
+          setSavingColorStitch(false);
+          return;
+        }
+
+        const maxSortOrder = colorStitchOptions
+          .filter(opt => opt.option_type === colorStitchFormData.option_type)
+          .reduce((max, opt) => Math.max(max, opt.sort_order), 0);
+
+        const { error } = await supabase
+          .from('color_stitch_options')
+          .insert([{
+            company_id: companySettings.id,
+            option_label: colorStitchFormData.option_label,
+            option_value: colorStitchFormData.option_value,
+            option_type: colorStitchFormData.option_type,
+            sort_order: maxSortOrder + 1,
+          }]);
+
+        if (error) throw error;
+        showNotification('success', 'Option Created', 'Color/stitch option created successfully!');
+      }
+
+      setShowAddColorStitchModal(false);
+      resetColorStitchForm();
+      loadColorStitchOptions();
+    } catch (err: any) {
+      console.error('Error saving color/stitch option:', err);
+      const errorMessage = err?.message || 'Failed to save option. Please try again.';
+      showNotification('error', 'Save Failed', errorMessage);
+    } finally {
+      setSavingColorStitch(false);
+    }
+  };
+
+  const deleteColorStitchOption = async (optionId: string) => {
+    const confirmed = await confirm(
+      'Delete Option?',
+      'Are you sure you want to delete this color/stitch option? This action cannot be undone.'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from('color_stitch_options')
+        .update({ is_active: false })
+        .eq('id', optionId);
+
+      if (error) throw error;
+
+      showNotification('success', 'Option Deleted', 'Color/stitch option deleted successfully!');
+      loadColorStitchOptions();
+    } catch (err) {
+      console.error('Error deleting option:', err);
+      showNotification('error', 'Delete Failed', 'Failed to delete option. Please try again.');
     }
   };
 
@@ -4568,6 +4718,107 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   </div>
                 )}
               </div>
+
+              {/* Thread & Ink Colors / Stitch Counts */}
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Thread & Ink Colors / Stitch Counts</h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Manage available color counts and stitch count options for imprints</p>
+                  </div>
+                  <button
+                    onClick={openAddColorStitchModal}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Option
+                  </button>
+                </div>
+
+                {loadingColorStitch ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
+                  </div>
+                ) : colorStitchOptions.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <Grid3x3 className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Options Available</h3>
+                    <p className="text-sm">
+                      You haven't created any color or stitch options yet. Click "Add Option" to create your first option.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Color Options */}
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Color Options</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                        {colorStitchOptions
+                          .filter(opt => opt.option_type === 'color')
+                          .map((option) => (
+                            <div
+                              key={option.id}
+                              className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-sm text-gray-900 dark:text-white truncate">{option.option_label}</div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">Value: {option.option_value}</div>
+                              </div>
+                              <div className="flex items-center gap-1 ml-2">
+                                <button
+                                  onClick={() => openEditColorStitchModal(option)}
+                                  className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded transition-colors"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => deleteColorStitchOption(option.id)}
+                                  className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded transition-colors"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+
+                    {/* Stitch Options */}
+                    <div>
+                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Stitch Count Options</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                        {colorStitchOptions
+                          .filter(opt => opt.option_type === 'stitch')
+                          .map((option) => (
+                            <div
+                              key={option.id}
+                              className="flex items-center justify-between p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-sm text-gray-900 dark:text-white truncate">{option.option_label}</div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">Value: {option.option_value}</div>
+                              </div>
+                              <div className="flex items-center gap-1 ml-2">
+                                <button
+                                  onClick={() => openEditColorStitchModal(option)}
+                                  className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded transition-colors"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => deleteColorStitchOption(option.id)}
+                                  className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded transition-colors"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -4880,6 +5131,101 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         <>
                           <Save className="w-4 h-4" />
                           {editingLocationId ? 'Update Location' : 'Create Location'}
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Add/Edit Color/Stitch Option Modal */}
+          {showAddColorStitchModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                <div className="p-6 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                      {editingColorStitchId ? 'Edit Option' : 'Add Color/Stitch Option'}
+                    </h2>
+                    <button
+                      onClick={() => setShowAddColorStitchModal(false)}
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    >
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Option Type <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={colorStitchFormData.option_type}
+                        onChange={(e) => setColorStitchFormData({ ...colorStitchFormData, option_type: e.target.value as 'color' | 'stitch' | 'other' })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                      >
+                        <option value="color">Color (for Screen Print, DTG, etc.)</option>
+                        <option value="stitch">Stitch Count (for Embroidery)</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Display Label <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={colorStitchFormData.option_label}
+                        onChange={(e) => setColorStitchFormData({ ...colorStitchFormData, option_label: e.target.value })}
+                        placeholder="e.g., 5 Colors or 10,000 Stitches"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">This is what users will see in the dropdown</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Value <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={colorStitchFormData.option_value}
+                        onChange={(e) => setColorStitchFormData({ ...colorStitchFormData, option_value: e.target.value })}
+                        placeholder="e.g., 5 or 10000"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">This is the stored value (usually a number)</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-slate-700">
+                    <button
+                      onClick={() => setShowAddColorStitchModal(false)}
+                      disabled={savingColorStitch}
+                      className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={saveColorStitchOption}
+                      disabled={savingColorStitch}
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {savingColorStitch ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4" />
+                          {editingColorStitchId ? 'Update Option' : 'Create Option'}
                         </>
                       )}
                     </button>
