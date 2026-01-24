@@ -15,11 +15,19 @@ interface Proof {
 
 interface Imprint {
   id?: string;
+  location: string;
+  price_matrix_id: string;
   matrix: string;
   column_number: string;
   type_of_work: string;
   details: string;
   proofs: Proof[];
+}
+
+interface PriceMatrix {
+  id: string;
+  name: string;
+  matrix_type: string;
 }
 
 interface ManageImprintsModalProps {
@@ -32,7 +40,10 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
   const { user } = useAuth();
   const { showNotification } = useNotification();
   const [imprints, setImprints] = useState<Imprint[]>([]);
+  const [priceMatrices, setPriceMatrices] = useState<PriceMatrix[]>([]);
   const [currentImprint, setCurrentImprint] = useState<Imprint>({
+    location: '',
+    price_matrix_id: '',
     matrix: '',
     column_number: '',
     type_of_work: '',
@@ -44,10 +55,25 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
   const [selectedProofForNote, setSelectedProofForNote] = useState<number | null>(null);
 
   useEffect(() => {
-    if (isOpen && quoteId) {
-      loadImprints();
+    if (isOpen) {
+      loadPriceMatrices();
+      if (quoteId) {
+        loadImprints();
+      }
     }
   }, [isOpen, quoteId]);
+
+  const loadPriceMatrices = async () => {
+    const { data, error } = await supabase
+      .from('price_matrices')
+      .select('id, name, matrix_type')
+      .eq('is_active', true)
+      .order('name');
+
+    if (data && !error) {
+      setPriceMatrices(data);
+    }
+  };
 
   const loadImprints = async () => {
     if (!quoteId) return;
@@ -61,6 +87,8 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
     if (data && !error) {
       setImprints(data.map(imp => ({
         id: imp.id,
+        location: imp.location || '',
+        price_matrix_id: imp.price_matrix_id || '',
         matrix: imp.matrix || '',
         column_number: imp.column_number || '',
         type_of_work: imp.type_of_work || '',
@@ -163,8 +191,8 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
   };
 
   const handleAddImprint = () => {
-    if (!currentImprint.matrix || !currentImprint.type_of_work) {
-      showNotification('error', 'Missing Information', 'Please fill in Matrix and Type of Work');
+    if (!currentImprint.type_of_work || !currentImprint.location) {
+      showNotification('error', 'Missing Information', 'Please fill in Type of Work and Location');
       return;
     }
 
@@ -178,6 +206,8 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
     }
 
     setCurrentImprint({
+      location: '',
+      price_matrix_id: '',
       matrix: '',
       column_number: '',
       type_of_work: '',
@@ -197,6 +227,8 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
     setImprints(imprints.filter((_, i) => i !== index));
     if (editingIndex === index) {
       setCurrentImprint({
+        location: '',
+        price_matrix_id: '',
         matrix: '',
         column_number: '',
         type_of_work: '',
@@ -217,6 +249,8 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
           imprints.map((imp, idx) => ({
             quote_id: quoteId,
             sort_order: idx,
+            location: imp.location,
+            price_matrix_id: imp.price_matrix_id,
             matrix: imp.matrix,
             column_number: imp.column_number,
             type_of_work: imp.type_of_work,
@@ -247,10 +281,28 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
             <div className="bg-slate-800/50 rounded-lg p-4 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">Location/Matrix</label>
+                  <label className="block text-sm text-gray-400 mb-2">Type of Work</label>
                   <select
-                    value={currentImprint.matrix}
-                    onChange={(e) => setCurrentImprint({ ...currentImprint, matrix: e.target.value })}
+                    value={currentImprint.type_of_work}
+                    onChange={(e) => setCurrentImprint({ ...currentImprint, type_of_work: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm"
+                  >
+                    <option value="">Select type of work</option>
+                    <option value="Screen Print">Screen Print</option>
+                    <option value="Embroidery">Embroidery</option>
+                    <option value="DTG">DTG</option>
+                    <option value="DTF">DTF</option>
+                    <option value="Heat Press">Heat Press</option>
+                    <option value="Vinyl">Vinyl</option>
+                    <option value="Sublimation">Sublimation</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">Location</label>
+                  <select
+                    value={currentImprint.location}
+                    onChange={(e) => setCurrentImprint({ ...currentImprint, location: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm"
                   >
                     <option value="">Select location</option>
@@ -264,40 +316,44 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                     <option value="Pocket">Pocket</option>
                   </select>
                 </div>
-
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Column</label>
-                  <select
-                    value={currentImprint.column_number}
-                    onChange={(e) => setCurrentImprint({ ...currentImprint, column_number: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm"
-                  >
-                    <option value="">Column</option>
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                  </select>
-                </div>
               </div>
 
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">Type of Work</label>
-                <select
-                  value={currentImprint.type_of_work}
-                  onChange={(e) => setCurrentImprint({ ...currentImprint, type_of_work: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm"
-                >
-                  <option value="">Select type of work</option>
-                  <option value="Screen Print">Screen Print</option>
-                  <option value="Embroidery">Embroidery</option>
-                  <option value="DTG">DTG</option>
-                  <option value="DTF">DTF</option>
-                  <option value="Heat Press">Heat Press</option>
-                  <option value="Vinyl">Vinyl</option>
-                  <option value="Sublimation">Sublimation</option>
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">Price Matrices</label>
+                  <select
+                    value={currentImprint.price_matrix_id}
+                    onChange={(e) => {
+                      const matrix = priceMatrices.find(m => m.id === e.target.value);
+                      setCurrentImprint({
+                        ...currentImprint,
+                        price_matrix_id: e.target.value,
+                        matrix: matrix?.name || ''
+                      });
+                    }}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm"
+                  >
+                    <option value="">Select matrix</option>
+                    {priceMatrices.map((matrix) => (
+                      <option key={matrix.id} value={matrix.id}>
+                        {matrix.name} ({matrix.matrix_type})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">
+                    {currentImprint.type_of_work === 'Embroidery' ? 'Stitch Count' : 'Colors'}
+                  </label>
+                  <input
+                    type="text"
+                    value={currentImprint.column_number}
+                    onChange={(e) => setCurrentImprint({ ...currentImprint, column_number: e.target.value })}
+                    placeholder={currentImprint.type_of_work === 'Embroidery' ? 'e.g., 5000 stitches' : 'e.g., 3 colors'}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm"
+                  />
+                </div>
               </div>
 
               <div>
