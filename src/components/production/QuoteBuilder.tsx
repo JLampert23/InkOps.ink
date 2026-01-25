@@ -105,6 +105,12 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
     }
   }, [quoteId]);
 
+  useEffect(() => {
+    if (selectedCustomerId && !quoteId) {
+      loadCustomerDetails(selectedCustomerId);
+    }
+  }, [selectedCustomerId, quoteId]);
+
   const loadCompanySettings = async () => {
     try {
       const { data, error } = await supabase
@@ -154,6 +160,38 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       .select('*')
       .order('company_name');
     setCustomers(data || []);
+  };
+
+  const loadCustomerDetails = async (customerId: string) => {
+    try {
+      const { data: customer, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('id', customerId)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (customer) {
+        setBillCompany(customer.company_name || '');
+        setBillName(customer.contact_name || '');
+        setBillAddress1(customer.billing_address_line1 || '');
+        setBillAddress2(customer.billing_address_line2 || '');
+        setBillCity(customer.billing_city || '');
+        setBillState(customer.billing_state || '');
+        setBillZip(customer.billing_zip || '');
+
+        setShipCompany(customer.company_name || '');
+        setShipName(customer.contact_name || '');
+        setShipAddress1(customer.shipping_address_line1 || '');
+        setShipAddress2(customer.shipping_address_line2 || '');
+        setShipCity(customer.shipping_city || '');
+        setShipState(customer.shipping_state || '');
+        setShipZip(customer.shipping_zip || '');
+      }
+    } catch (err) {
+      console.error('Error loading customer details:', err);
+    }
   };
 
   const loadAvailableFees = async () => {
