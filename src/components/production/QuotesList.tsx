@@ -15,6 +15,7 @@ import {
   Eye,
   Copy,
   RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -45,6 +46,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [duplicating, setDuplicating] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
     loadQuotes();
@@ -123,6 +125,35 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
       showNotification('Failed to duplicate quote', 'error');
     } finally {
       setDuplicating(null);
+    }
+  };
+
+  const handleDelete = async (quoteId: string, quoteNumber: string) => {
+    if (!confirm(`Are you sure you want to delete quote ${quoteNumber}? This action cannot be undone.`)) return;
+
+    setDeleting(quoteId);
+    try {
+      // Delete related records first (cascade delete)
+      await supabase.from('quote_line_items').delete().eq('quote_id', quoteId);
+      await supabase.from('quote_fees').delete().eq('quote_id', quoteId);
+      await supabase.from('quote_imprints').delete().eq('quote_id', quoteId);
+      await supabase.from('quote_approvals').delete().eq('quote_id', quoteId);
+
+      // Delete the quote
+      const { error } = await supabase
+        .from('quotes')
+        .delete()
+        .eq('id', quoteId);
+
+      if (error) throw error;
+
+      showNotification(`Quote ${quoteNumber} deleted successfully`, 'success');
+      loadQuotes();
+    } catch (error) {
+      console.error('Error deleting quote:', error);
+      showNotification('Failed to delete quote', 'error');
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -365,6 +396,18 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
                               <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (
                               <Copy className="w-4 h-4" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => handleDelete(quote.id, quote.quote_number)}
+                            disabled={deleting === quote.id}
+                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
+                            title="Delete Quote"
+                          >
+                            {deleting === quote.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
                             )}
                           </button>
                         </div>
