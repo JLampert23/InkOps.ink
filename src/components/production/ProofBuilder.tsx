@@ -12,6 +12,7 @@ import {
   RotateCw,
   Move,
   Loader2,
+  Download,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import ColorSelectionPanel from './ColorSelectionPanel';
@@ -51,11 +52,10 @@ export default function ProofBuilder({
 }: ProofBuilderProps) {
   const [garmentImage, setGarmentImage] = useState<string | null>(null);
   const [garmentName, setGarmentName] = useState('');
-  const [artworks, setArtworks] = useState<Artwork[]>([]);
+  const [artworkImage, setArtworkImage] = useState<string | null>(null);
+  const [artworkName, setArtworkName] = useState('');
   const [printWidth, setPrintWidth] = useState('');
   const [printHeight, setPrintHeight] = useState('');
-  const [printDepth, setPrintDepth] = useState('');
-  const [printUnit, setPrintUnit] = useState<'inches' | 'cm'>('inches');
   const [selectedColors, setSelectedColors] = useState<SelectedColor[]>([]);
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
@@ -64,8 +64,16 @@ export default function ProofBuilder({
   const [proofId, setProofId] = useState<string | null>(existingProofId || null);
   const [savedGarments, setSavedGarments] = useState<Array<{ url: string; name: string }>>([]);
 
+  const [artworkPosition, setArtworkPosition] = useState({ x: 50, y: 50 });
+  const [artworkScale, setArtworkScale] = useState(1.0);
+  const [artworkRotation, setArtworkRotation] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
   const garmentInputRef = useRef<HTMLInputElement>(null);
   const artworkInputRef = useRef<HTMLInputElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (existingProofId) {
@@ -95,20 +103,15 @@ export default function ProofBuilder({
       setGarmentName(proof.garment_name || '');
       setPrintWidth(proof.print_width?.toString() || '');
       setPrintHeight(proof.print_height?.toString() || '');
-      setPrintDepth(proof.print_depth?.toString() || '');
-      setPrintUnit(proof.print_unit || 'inches');
       setNotes(proof.notes || '');
 
-      if (proof.proof_artwork) {
-        setArtworks(proof.proof_artwork.map((a: any) => ({
-          id: a.id,
-          artwork_url: a.artwork_url,
-          artwork_name: a.artwork_name,
-          position_x: a.position_x || 0,
-          position_y: a.position_y || 0,
-          scale: a.scale || 1.0,
-          rotation: a.rotation || 0,
-        })));
+      if (proof.proof_artwork && proof.proof_artwork.length > 0) {
+        const firstArtwork = proof.proof_artwork[0];
+        setArtworkImage(firstArtwork.artwork_url);
+        setArtworkName(firstArtwork.artwork_name);
+        setArtworkPosition({ x: firstArtwork.position_x || 50, y: firstArtwork.position_y || 50 });
+        setArtworkScale(firstArtwork.scale || 1.0);
+        setArtworkRotation(firstArtwork.rotation || 0);
       }
 
       if (proof.proof_colors) {
@@ -199,23 +202,108 @@ export default function ProofBuilder({
         .from('proof-artwork')
         .getPublicUrl(filePath);
 
-      const newArtwork: Artwork = {
-        id: `temp-${Date.now()}`,
-        artwork_url: publicUrl,
-        artwork_name: file.name,
-        position_x: 0,
-        position_y: 0,
-        scale: 1.0,
-        rotation: 0,
-      };
-
-      setArtworks([...artworks, newArtwork]);
+      setArtworkImage(publicUrl);
+      setArtworkName(file.name);
     } catch (error) {
       console.error('Error uploading artwork:', error);
       alert('Failed to upload artwork');
     } finally {
       setUploading(false);
     }
+  };
+
+  const generateCompositeImage = async (): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      if (!garmentImage || !canvasRef.current) {
+        reject('Missing garment image or canvas');
+        return;
+      }
+
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject('Failed to get canvas context');
+        return;
+      }
+
+      const garmentImg = new Image();
+      garmentImg.crossOrigin = 'anonymous';
+
+      garmentImg.onload = () => {
+        canvas.width = garmentImg.width;
+        canvas.height = garmentImg.height;
+
+        ctx.drawImage(garmentImg, 0, 0);
+
+        if (artworkImage) {
+          const artworkImg = new Image();
+          artworkImg.crossOrigin = 'anonymous';
+
+          artworkImg.onload = () => {
+            const centerX = canvas.width * (artworkPosition.x / 100);
+            const centerY = canvas.height * (artworkPosition.y / 100);
+
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate((artworkRotation * Math.PI) / 180);
+            ctx.scale(artworkScale, artworkScale);
+
+            const artWidth = artworkImg.width;
+            const artHeight = artworkImg.height;
+            ctx.drawImage(artworkImg, -artWidth / 2, -artHeight / 2, artWidth, artHeight);
+
+            ctx.restore();
+
+            canvas.toBlob((blob) => {
+              if (blob) {
+                const url = URL.createObjectURL(blob);
+                resolve(url);
+              } else {
+                reject('Failed to create blob');
+              }
+            }, 'image/png');
+          };
+
+          artworkImg.onerror = () => reject('Failed to load artwork image');
+          artworkImg.src = artworkImage;
+        } else {
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const url = URL.createObjectURL(blob);
+              resolve(url);
+            } else {
+              reject('Failed to create blob');
+            }
+          }, 'image/png');
+        }
+      };
+
+      garmentImg.onerror = () => reject('Failed to load garment image');
+      garmentImg.src = garmentImage;
+    });
+  };
+
+  const uploadCompositeImage = async (blobUrl: string): Promise<string> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Not authenticated');
+
+    const response = await fetch(blobUrl);
+    const blob = await response.blob();
+
+    const fileName = `${Date.now()}.png`;
+    const filePath = `${session.user.id}/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('proof-composites')
+      .upload(filePath, blob);
+
+    if (uploadError) throw uploadError;
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('proof-composites')
+      .getPublicUrl(filePath);
+
+    return publicUrl;
   };
 
   const handleSaveProof = async () => {
@@ -229,9 +317,11 @@ export default function ProofBuilder({
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
+      const compositeUrl = await generateCompositeImage();
+      const uploadedCompositeUrl = await uploadCompositeImage(compositeUrl);
+
       let currentProofId = proofId;
 
-      // Create or update proof
       if (!currentProofId) {
         const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/proofs-api`;
         const response = await fetch(url, {
@@ -246,10 +336,10 @@ export default function ProofBuilder({
             customer_id: customerId,
             garment_image_url: garmentImage,
             garment_name: garmentName,
+            composite_image_url: uploadedCompositeUrl,
             print_width: printWidth ? parseFloat(printWidth) : null,
             print_height: printHeight ? parseFloat(printHeight) : null,
-            print_depth: printDepth ? parseFloat(printDepth) : null,
-            print_unit: printUnit,
+            print_unit: 'inches',
             notes: notes,
             status: 'draft',
           }),
@@ -271,10 +361,10 @@ export default function ProofBuilder({
           body: JSON.stringify({
             garment_image_url: garmentImage,
             garment_name: garmentName,
+            composite_image_url: uploadedCompositeUrl,
             print_width: printWidth ? parseFloat(printWidth) : null,
             print_height: printHeight ? parseFloat(printHeight) : null,
-            print_depth: printDepth ? parseFloat(printDepth) : null,
-            print_unit: printUnit,
+            print_unit: 'inches',
             notes: notes,
           }),
         });
@@ -282,29 +372,25 @@ export default function ProofBuilder({
         if (!response.ok) throw new Error('Failed to update proof');
       }
 
-      // Save artwork
-      for (const artwork of artworks) {
-        if (artwork.id.startsWith('temp-')) {
-          const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/proofs-api/${currentProofId}/artwork`;
-          await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              artwork_url: artwork.artwork_url,
-              artwork_name: artwork.artwork_name,
-              position_x: artwork.position_x,
-              position_y: artwork.position_y,
-              scale: artwork.scale,
-              rotation: artwork.rotation,
-            }),
-          });
-        }
+      if (artworkImage) {
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/proofs-api/${currentProofId}/artwork`;
+        await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            artwork_url: artworkImage,
+            artwork_name: artworkName,
+            position_x: artworkPosition.x,
+            position_y: artworkPosition.y,
+            scale: artworkScale,
+            rotation: artworkRotation,
+          }),
+        });
       }
 
-      // Save colors
       const colorsUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/proofs-api/${currentProofId}/colors`;
       await fetch(colorsUrl, {
         method: 'POST',
@@ -325,22 +411,44 @@ export default function ProofBuilder({
     }
   };
 
-  const removeArtwork = (artworkId: string) => {
-    setArtworks(artworks.filter(a => a.id !== artworkId));
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!artworkImage || !previewRef.current) return;
+    setIsDragging(true);
+    const rect = previewRef.current.getBoundingClientRect();
+    setDragStart({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !previewRef.current) return;
+
+    const rect = previewRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+    setArtworkPosition({
+      x: Math.max(0, Math.min(100, x)),
+      y: Math.max(0, Math.min(100, y)),
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
   };
 
   return (
     <>
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
         <div className="bg-white dark:bg-slate-800 rounded-lg max-w-7xl w-full my-8">
-          {/* Header */}
           <div className="p-6 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                 {existingProofId ? 'Edit Proof' : 'Create Proof'}
               </h2>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Build a professional proof with garment mockup and artwork positioning
+                Upload garment and artwork, position the artwork, and save your proof
               </p>
             </div>
             <button
@@ -351,211 +459,282 @@ export default function ProofBuilder({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
-            {/* Left Column - Settings */}
-            <div className="space-y-6">
-              {/* Garment Selection */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="grid grid-cols-2 gap-6">
+                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <Upload className="w-5 h-5" />
+                    Upload Artwork
+                  </h3>
+
+                  {artworkImage ? (
+                    <div className="relative">
+                      <img
+                        src={artworkImage}
+                        alt="Artwork"
+                        className="w-full h-48 object-contain border border-gray-300 dark:border-slate-600 rounded-lg bg-white"
+                      />
+                      <button
+                        onClick={() => {
+                          setArtworkImage(null);
+                          setArtworkName('');
+                        }}
+                        className="absolute top-2 right-2 p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => artworkInputRef.current?.click()}
+                      disabled={uploading}
+                      className="w-full px-4 py-8 border-2 border-dashed border-gray-300 dark:border-slate-600 rounded-lg hover:border-blue-500 dark:hover:border-blue-400 transition-colors text-gray-700 dark:text-gray-300 flex flex-col items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      {uploading ? (
+                        <Loader2 className="w-8 h-8 animate-spin" />
+                      ) : (
+                        <>
+                          <Upload className="w-8 h-8" />
+                          <span className="text-sm">Upload Artwork</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                  <input
+                    ref={artworkInputRef}
+                    type="file"
+                    accept="image/*,.pdf,.svg,.ai,.eps"
+                    onChange={(e) => e.target.files?.[0] && handleArtworkUpload(e.target.files[0])}
+                    className="hidden"
+                  />
+                </div>
+
+                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <ImageIcon className="w-5 h-5" />
+                    Upload Garment Image
+                  </h3>
+
+                  {garmentImage ? (
+                    <div className="relative">
+                      <img
+                        src={garmentImage}
+                        alt="Garment"
+                        className="w-full h-48 object-contain border border-gray-300 dark:border-slate-600 rounded-lg bg-white"
+                      />
+                      <button
+                        onClick={() => {
+                          setGarmentImage(null);
+                          setGarmentName('');
+                        }}
+                        className="absolute top-2 right-2 p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => garmentInputRef.current?.click()}
+                        disabled={uploading}
+                        className="w-full px-4 py-8 border-2 border-dashed border-gray-300 dark:border-slate-600 rounded-lg hover:border-blue-500 dark:hover:border-blue-400 transition-colors text-gray-700 dark:text-gray-300 flex flex-col items-center justify-center gap-2 disabled:opacity-50 mb-3"
+                      >
+                        {uploading ? (
+                          <Loader2 className="w-8 h-8 animate-spin" />
+                        ) : (
+                          <>
+                            <Upload className="w-8 h-8" />
+                            <span className="text-sm">Upload Garment</span>
+                          </>
+                        )}
+                      </button>
+                      <input
+                        ref={garmentInputRef}
+                        type="file"
+                        accept="image/*,.pdf,.svg"
+                        onChange={(e) => e.target.files?.[0] && handleGarmentUpload(e.target.files[0])}
+                        className="hidden"
+                      />
+
+                      {savedGarments.length > 0 && (
+                        <div>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Saved garments:</p>
+                          <div className="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto">
+                            {savedGarments.slice(0, 6).map((garment, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => {
+                                  setGarmentImage(garment.url);
+                                  setGarmentName(garment.name);
+                                }}
+                                className="aspect-square border border-gray-300 dark:border-slate-600 rounded hover:border-blue-500 dark:hover:border-blue-400 overflow-hidden"
+                              >
+                                <img
+                                  src={garment.url}
+                                  alt={garment.name}
+                                  className="w-full h-full object-contain bg-white"
+                                />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+
               <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                  <ImageIcon className="w-5 h-5" />
-                  Garment Image
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                  Proof Preview
                 </h3>
 
                 {garmentImage ? (
-                  <div className="relative">
+                  <div
+                    ref={previewRef}
+                    className="relative bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg p-8 min-h-[500px] flex items-center justify-center overflow-hidden"
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseUp}
+                    style={{ cursor: isDragging ? 'grabbing' : artworkImage ? 'grab' : 'default' }}
+                  >
                     <img
                       src={garmentImage}
                       alt="Garment"
-                      className="w-full h-48 object-contain border border-gray-300 dark:border-slate-600 rounded-lg bg-white"
+                      className="max-w-full max-h-[450px] object-contain"
+                      draggable={false}
                     />
-                    <button
-                      onClick={() => setGarmentImage(null)}
-                      className="absolute top-2 right-2 p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <button
-                      onClick={() => garmentInputRef.current?.click()}
-                      disabled={uploading}
-                      className="w-full px-4 py-3 border-2 border-dashed border-gray-300 dark:border-slate-600 rounded-lg hover:border-blue-500 dark:hover:border-blue-400 transition-colors text-gray-700 dark:text-gray-300 flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                      {uploading ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <Upload className="w-5 h-5" />
-                      )}
-                      Upload Garment Image
-                    </button>
-                    <input
-                      ref={garmentInputRef}
-                      type="file"
-                      accept="image/*,.pdf,.svg"
-                      onChange={(e) => e.target.files?.[0] && handleGarmentUpload(e.target.files[0])}
-                      className="hidden"
-                    />
-
-                    {savedGarments.length > 0 && (
-                      <div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Or select from saved garments:</p>
-                        <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
-                          {savedGarments.map((garment, idx) => (
-                            <button
-                              key={idx}
-                              onClick={() => {
-                                setGarmentImage(garment.url);
-                                setGarmentName(garment.name);
-                              }}
-                              className="aspect-square border border-gray-300 dark:border-slate-600 rounded-lg hover:border-blue-500 dark:hover:border-blue-400 overflow-hidden"
-                            >
-                              <img
-                                src={garment.url}
-                                alt={garment.name}
-                                className="w-full h-full object-contain bg-white"
-                              />
-                            </button>
-                          ))}
-                        </div>
+                    {artworkImage && (
+                      <div
+                        className="absolute pointer-events-none"
+                        style={{
+                          left: `${artworkPosition.x}%`,
+                          top: `${artworkPosition.y}%`,
+                          transform: `translate(-50%, -50%) scale(${artworkScale}) rotate(${artworkRotation}deg)`,
+                        }}
+                      >
+                        <img
+                          src={artworkImage}
+                          alt={artworkName}
+                          className="max-w-[200px] opacity-90"
+                          draggable={false}
+                        />
+                      </div>
+                    )}
+                    {printWidth && printHeight && (
+                      <div className="absolute bottom-4 right-4 bg-black bg-opacity-75 text-white px-3 py-2 rounded text-sm">
+                        Print Size: {printWidth} × {printHeight} in
                       </div>
                     )}
                   </div>
-                )}
-              </div>
-
-              {/* Artwork Upload */}
-              <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                  <Upload className="w-5 h-5" />
-                  Artwork Files
-                </h3>
-
-                <button
-                  onClick={() => artworkInputRef.current?.click()}
-                  disabled={uploading}
-                  className="w-full px-4 py-3 border-2 border-dashed border-gray-300 dark:border-slate-600 rounded-lg hover:border-blue-500 dark:hover:border-blue-400 transition-colors text-gray-700 dark:text-gray-300 flex items-center justify-center gap-2 mb-4 disabled:opacity-50"
-                >
-                  {uploading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <Upload className="w-5 h-5" />
-                  )}
-                  Upload Artwork
-                </button>
-                <input
-                  ref={artworkInputRef}
-                  type="file"
-                  accept="image/*,.pdf,.svg,.ai,.eps"
-                  onChange={(e) => e.target.files?.[0] && handleArtworkUpload(e.target.files[0])}
-                  className="hidden"
-                />
-
-                {artworks.length > 0 && (
-                  <div className="space-y-2">
-                    {artworks.map((artwork) => (
-                      <div
-                        key={artwork.id}
-                        className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-600"
-                      >
-                        <div className="flex items-center gap-3">
-                          <img
-                            src={artwork.artwork_url}
-                            alt={artwork.artwork_name}
-                            className="w-12 h-12 object-contain bg-gray-100 dark:bg-slate-700 rounded"
-                          />
-                          <span className="text-sm text-gray-700 dark:text-gray-300 truncate max-w-[200px]">
-                            {artwork.artwork_name}
-                          </span>
-                        </div>
-                        <button
-                          onClick={() => removeArtwork(artwork.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
+                ) : (
+                  <div className="bg-white dark:bg-slate-800 border-2 border-dashed border-gray-300 dark:border-slate-600 rounded-lg p-8 min-h-[500px] flex items-center justify-center">
+                    <div className="text-center text-gray-500 dark:text-gray-400">
+                      <ImageIcon className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                      <p>Upload a garment to preview</p>
+                    </div>
                   </div>
                 )}
               </div>
+            </div>
 
-              {/* Print Size */}
+            <div className="space-y-6">
+              {artworkImage && (
+                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <Move className="w-5 h-5" />
+                    Position Artwork
+                  </h3>
+
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Scale
+                        </label>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">{artworkScale.toFixed(2)}x</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.1"
+                        max="3"
+                        step="0.1"
+                        value={artworkScale}
+                        onChange={(e) => setArtworkScale(parseFloat(e.target.value))}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Rotation
+                        </label>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">{artworkRotation}°</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="360"
+                        step="5"
+                        value={artworkRotation}
+                        onChange={(e) => setArtworkRotation(parseInt(e.target.value))}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setArtworkPosition({ x: 50, y: 50 });
+                        setArtworkScale(1.0);
+                        setArtworkRotation(0);
+                      }}
+                      className="w-full px-4 py-2 bg-gray-200 dark:bg-slate-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-slate-500 transition-colors text-sm"
+                    >
+                      Reset Position
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                   <Ruler className="w-5 h-5" />
-                  Print Size
+                  Print Size (inches)
                 </h3>
 
-                <div className="space-y-4">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setPrintUnit('inches')}
-                      className={`flex-1 px-4 py-2 rounded-lg transition-colors ${
-                        printUnit === 'inches'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-slate-600'
-                      }`}
-                    >
-                      Inches
-                    </button>
-                    <button
-                      onClick={() => setPrintUnit('cm')}
-                      className={`flex-1 px-4 py-2 rounded-lg transition-colors ${
-                        printUnit === 'cm'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-slate-600'
-                      }`}
-                    >
-                      Centimeters
-                    </button>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Width
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={printWidth}
+                      onChange={(e) => setPrintWidth(e.target.value)}
+                      placeholder="0.0"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                    />
                   </div>
-
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Width
-                      </label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={printWidth}
-                        onChange={(e) => setPrintWidth(e.target.value)}
-                        placeholder="0.0"
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Height
-                      </label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={printHeight}
-                        onChange={(e) => setPrintHeight(e.target.value)}
-                        placeholder="0.0"
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Depth
-                      </label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={printDepth}
-                        onChange={(e) => setPrintDepth(e.target.value)}
-                        placeholder="0.0"
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Height
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={printHeight}
+                      onChange={(e) => setPrintHeight(e.target.value)}
+                      placeholder="0.0"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                    />
                   </div>
                 </div>
               </div>
 
-              {/* Color Selection */}
               <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                   <Palette className="w-5 h-5" />
@@ -591,7 +770,6 @@ export default function ProofBuilder({
                 )}
               </div>
 
-              {/* Notes */}
               <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                   Notes
@@ -605,55 +783,8 @@ export default function ProofBuilder({
                 />
               </div>
             </div>
-
-            {/* Right Column - Preview */}
-            <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                Proof Preview
-              </h3>
-
-              {garmentImage ? (
-                <div className="relative bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg p-8 min-h-[600px] flex items-center justify-center">
-                  <img
-                    src={garmentImage}
-                    alt="Garment"
-                    className="max-w-full max-h-[500px] object-contain"
-                  />
-                  {artworks.map((artwork) => (
-                    <div
-                      key={artwork.id}
-                      className="absolute pointer-events-none"
-                      style={{
-                        left: `${50 + artwork.position_x}%`,
-                        top: `${50 + artwork.position_y}%`,
-                        transform: `translate(-50%, -50%) scale(${artwork.scale}) rotate(${artwork.rotation}deg)`,
-                      }}
-                    >
-                      <img
-                        src={artwork.artwork_url}
-                        alt={artwork.artwork_name}
-                        className="max-w-[200px] opacity-80"
-                      />
-                    </div>
-                  ))}
-                  {printWidth && printHeight && (
-                    <div className="absolute bottom-4 right-4 bg-black bg-opacity-75 text-white px-3 py-2 rounded text-sm">
-                      Print Size: {printWidth} × {printHeight} {printUnit}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="bg-white dark:bg-slate-800 border-2 border-dashed border-gray-300 dark:border-slate-600 rounded-lg p-8 min-h-[600px] flex items-center justify-center">
-                  <div className="text-center text-gray-500 dark:text-gray-400">
-                    <ImageIcon className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                    <p>Select or upload a garment to preview</p>
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
 
-          {/* Footer */}
           <div className="p-6 border-t border-gray-200 dark:border-slate-700 flex items-center justify-end gap-3">
             <button
               onClick={onClose}
@@ -676,6 +807,8 @@ export default function ProofBuilder({
           </div>
         </div>
       </div>
+
+      <canvas ref={canvasRef} className="hidden" />
 
       {showColorPanel && (
         <ColorSelectionPanel
