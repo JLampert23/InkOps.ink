@@ -285,7 +285,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Quote #${quote.quote_number}`, 14, 28);
+    doc.text(quote.quote_number, 14, 28);
 
     let yPos = 45;
     doc.setFontSize(11);
@@ -537,7 +537,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Quote {quote.quote_number}</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{quote.quote_number}</h1>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
               Created {format(new Date(quote.created_at), 'MMM d, yyyy')}
             </p>
