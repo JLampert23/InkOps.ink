@@ -19,6 +19,13 @@ import {
   DollarSign,
   Package,
   Palette,
+  MapPin,
+  User,
+  FileCheck,
+  Truck,
+  CreditCard,
+  StickyNote,
+  Tag,
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -33,23 +40,46 @@ interface QuoteDetailProps {
 interface Quote {
   id: string;
   quote_number: string;
+  nickname?: string;
   customer_name: string;
   customer_email: string;
   customer_company: string;
   customer_phone: string;
+  bill_company?: string;
+  bill_name?: string;
+  bill_address_1?: string;
+  bill_address_2?: string;
+  bill_city?: string;
+  bill_state?: string;
+  bill_zip?: string;
+  bill_phone?: string;
+  bill_email?: string;
+  ship_company?: string;
+  ship_name?: string;
+  ship_address_1?: string;
+  ship_address_2?: string;
+  ship_city?: string;
+  ship_state?: string;
+  ship_zip?: string;
   subtotal: number;
   tax_rate: number;
   tax_amount: number;
   discount_amount: number;
+  discount_type?: string;
   total: number;
   status: string;
   valid_until: string | null;
   created_at: string;
+  created_date?: string;
+  customer_due_date?: string;
+  production_due_date?: string;
   sent_at: string | null;
   approved_at: string | null;
   rejected_at: string | null;
+  converted_at?: string | null;
   customer_notes: string | null;
   notes: string | null;
+  production_notes?: string | null;
   delivery_method: string | null;
   po_number: string | null;
   terms: string | null;
@@ -83,6 +113,8 @@ interface LineItem {
   imprint_number: string | null;
   artwork_url: string | null;
   notes: string | null;
+  placement?: string | null;
+  ink_colors?: string | null;
   qty_yxs: number | null;
   qty_ys: number | null;
   qty_ym: number | null;
@@ -268,233 +300,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
   const exportToPDF = () => {
     if (!quote) return;
-    const doc = new jsPDF();
-
-    const companyName = quote.company_name || "Todd's Sporting Goods";
-    const companyAddress = quote.company_address || '393 Cabot Street';
-    const companyCity = quote.company_city || 'Beverly';
-    const companyState = quote.company_state || 'Massachusetts';
-    const companyZip = quote.company_zip || '01915';
-    const companyPhone = quote.company_phone || '19789271600';
-    const companyWebsite = quote.company_website || 'https://www.toddssportinggoods.com';
-    const companyEmail = quote.company_email || 'jamie@toddssportinggoods.com';
-
-    doc.setFontSize(20);
-    doc.setFont('helvetica', 'bold');
-    doc.text('QUOTE', 14, 20);
-
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text(quote.quote_number, 14, 28);
-
-    let yPos = 45;
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text(companyName, 14, yPos);
-    yPos += 5;
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.text(companyAddress, 14, yPos);
-    yPos += 4;
-    doc.text(`${companyCity}, ${companyState} ${companyZip}`, 14, yPos);
-    yPos += 4;
-    doc.text(companyPhone, 14, yPos);
-    yPos += 4;
-    doc.setTextColor(0, 102, 204);
-    doc.text(companyWebsite, 14, yPos);
-    yPos += 4;
-    doc.text(companyEmail, 14, yPos);
-    doc.setTextColor(0, 0, 0);
-
-    yPos = 45;
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Customer:', 140, yPos);
-    doc.setFont('helvetica', 'normal');
-    doc.text(quote.customer_name || '', 165, yPos);
-    yPos += 5;
-
-    if (quote.customer_company) {
-      doc.setFont('helvetica', 'bold');
-      doc.text('Company:', 140, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(quote.customer_company, 165, yPos);
-      yPos += 5;
-    }
-
-    doc.setFont('helvetica', 'bold');
-    doc.text('Created:', 140, yPos);
-    doc.setFont('helvetica', 'normal');
-    doc.text(new Date(quote.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), 165, yPos);
-    yPos += 5;
-
-    if (quote.valid_until) {
-      doc.setFont('helvetica', 'bold');
-      doc.text('Valid Until:', 140, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(new Date(quote.valid_until).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), 165, yPos);
-      yPos += 5;
-    }
-
-    doc.setFont('helvetica', 'bold');
-    doc.text('Delivery:', 140, yPos);
-    doc.setFont('helvetica', 'normal');
-    doc.text(quote.delivery_method || 'PICK-UP', 165, yPos);
-    yPos += 5;
-
-    doc.setFont('helvetica', 'bold');
-    doc.text('Terms:', 140, yPos);
-    doc.setFont('helvetica', 'normal');
-    doc.text(quote.terms || 'Net 30', 165, yPos);
-
-    yPos = 85;
-    const items = lineItems.filter(item => item.line_type === 'item' || !item.line_type);
-    const fees = lineItems.filter(item => item.line_type === 'fee');
-    const imprints = lineItems.filter(item => item.line_type === 'imprint');
-
-    if (items.length > 0) {
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Line Items', 14, yPos);
-      yPos += 6;
-
-      const itemRows = items.map(item => {
-        const qty = (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) +
-                   (item.qty_yl || 0) + (item.qty_yxl || 0) + (item.qty_xs || 0) +
-                   (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) +
-                   (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
-                   (item.qty_4xl || 0);
-        return [
-          item.item_number || '',
-          item.color || '',
-          item.description || '',
-          qty,
-          `$${(item.unit_price || 0).toFixed(2)}`,
-          `$${(item.total_price || 0).toFixed(2)}`,
-        ];
-      });
-
-      autoTable(doc, {
-        startY: yPos,
-        head: [['Item #', 'Color', 'Description', 'Qty', 'Unit Price', 'Total']],
-        body: itemRows,
-        theme: 'striped',
-        styles: { fontSize: 9, cellPadding: 2 },
-        headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [249, 250, 251] },
-      });
-
-      yPos = (doc as any).lastAutoTable.finalY + 8;
-    }
-
-    if (imprints.length > 0) {
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Imprints & Decorations', 14, yPos);
-      yPos += 6;
-
-      imprints.forEach((imprint) => {
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`Imprint #${imprint.imprint_number || ''}`, 14, yPos);
-        yPos += 5;
-        doc.setFont('helvetica', 'normal');
-        if (imprint.decoration_method) {
-          doc.text(`Method: ${imprint.decoration_method.toUpperCase()}`, 14, yPos);
-          yPos += 4;
-        }
-        if (imprint.decoration_location) {
-          doc.text(`Location: ${imprint.decoration_location}`, 14, yPos);
-          yPos += 4;
-        }
-        if (imprint.description) {
-          const descLines = doc.splitTextToSize(imprint.description, 180);
-          doc.text(descLines, 14, yPos);
-          yPos += descLines.length * 4;
-        }
-        yPos += 2;
-      });
-      yPos += 4;
-    }
-
-    if (fees.length > 0) {
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Additional Fees', 14, yPos);
-      yPos += 6;
-
-      const feeRows = fees.map(fee => [
-        fee.description || '',
-        fee.quantity || 1,
-        `$${(fee.unit_price || 0).toFixed(2)}`,
-        `$${(fee.total_price || 0).toFixed(2)}`,
-      ]);
-
-      autoTable(doc, {
-        startY: yPos,
-        head: [['Description', 'Qty', 'Amount', 'Total']],
-        body: feeRows,
-        theme: 'striped',
-        styles: { fontSize: 9, cellPadding: 2 },
-        headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [249, 250, 251] },
-      });
-
-      yPos = (doc as any).lastAutoTable.finalY + 8;
-    }
-
-    doc.setDrawColor(200, 200, 200);
-    doc.line(140, yPos, 196, yPos);
-    yPos += 6;
-
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Subtotal:', 140, yPos);
-    doc.text(`$${quote.subtotal.toFixed(2)}`, 196, yPos, { align: 'right' });
-    yPos += 5;
-
-    if (quote.discount_amount > 0) {
-      doc.text('Discount:', 140, yPos);
-      doc.text(`-$${quote.discount_amount.toFixed(2)}`, 196, yPos, { align: 'right' });
-      yPos += 5;
-    }
-
-    doc.text(`Tax (${(quote.tax_rate * 100).toFixed(2)}%):`, 140, yPos);
-    doc.text(`$${quote.tax_amount.toFixed(2)}`, 196, yPos, { align: 'right' });
-    yPos += 6;
-
-    doc.setDrawColor(59, 130, 246);
-    doc.setLineWidth(0.5);
-    doc.line(140, yPos, 196, yPos);
-    yPos += 6;
-
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Total:', 140, yPos);
-    doc.text(`$${quote.total.toFixed(2)}`, 196, yPos, { align: 'right' });
-
-    yPos += 10;
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    const terms = [
-      'This quote is valid for 15 days from the date above.',
-      '',
-      'Payment Terms: Unless you have a billing account, a 50% down payment is due before ordering blank goods, and the remaining 50% balance is due at pickup.',
-      '',
-      'All orders require customer approval on artwork before production begins. Once approved, production will proceed. No refunds, returns, or reprints for approved artwork with incorrect spelling, placement, or colors.',
-    ];
-
-    terms.forEach(term => {
-      if (term === '') {
-        yPos += 3;
-      } else {
-        const lines = doc.splitTextToSize(term, 180);
-        doc.text(lines, 14, yPos);
-        yPos += lines.length * 3.5;
-      }
-    });
-
-    doc.save(`quote-${quote.quote_number}.pdf`);
+    alert('PDF export functionality available - use Preview to export formatted quote');
   };
 
   if (loading) {
@@ -538,7 +344,10 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
           </button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{quote.quote_number}</h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+            {quote.nickname && (
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mt-0.5">{quote.nickname}</p>
+            )}
+            <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
               Created {format(new Date(quote.created_at), 'MMM d, yyyy')}
             </p>
           </div>
@@ -547,13 +356,6 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={exportToPDF}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors text-gray-700 dark:text-gray-300"
-          >
-            <Download className="w-4 h-4" />
-            Export PDF
-          </button>
           {(quote.status === 'draft' || quote.status === 'sent') && (
             <button
               onClick={onEdit}
@@ -591,85 +393,292 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Line Items</h2>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                {totalQty} total units
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="xl:col-span-2 space-y-6">
+          {/* Quote Overview */}
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
+            <div className="p-6 border-b border-gray-200 dark:border-slate-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <FileCheck className="w-5 h-5" />
+                Quote Details
+              </h2>
+            </div>
+            <div className="p-6 grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <label className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">Quote Number</label>
+                <p className="font-semibold text-gray-900 dark:text-white mt-1">{quote.quote_number}</p>
+              </div>
+              {quote.nickname && (
+                <div>
+                  <label className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">Job Title</label>
+                  <p className="font-semibold text-gray-900 dark:text-white mt-1">{quote.nickname}</p>
+                </div>
+              )}
+              {quote.po_number && (
+                <div>
+                  <label className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">PO Number</label>
+                  <p className="font-semibold text-gray-900 dark:text-white mt-1">{quote.po_number}</p>
+                </div>
+              )}
+              <div>
+                <label className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">Status</label>
+                <p className="font-semibold text-gray-900 dark:text-white mt-1 capitalize">{quote.status}</p>
+              </div>
+              <div>
+                <label className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">Delivery Method</label>
+                <p className="font-semibold text-gray-900 dark:text-white mt-1">{quote.delivery_method || 'PICK-UP'}</p>
+              </div>
+              <div>
+                <label className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">Payment Terms</label>
+                <p className="font-semibold text-gray-900 dark:text-white mt-1">{quote.terms || 'Net 30'}</p>
               </div>
             </div>
-
-            {items.length > 0 ? (
-              <div className="space-y-3">
-                {items.map((item, idx) => {
-                  const itemQty = (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) +
-                                 (item.qty_yl || 0) + (item.qty_yxl || 0) + (item.qty_xs || 0) +
-                                 (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) +
-                                 (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
-                                 (item.qty_4xl || 0);
-                  return (
-                    <div key={idx} className="p-4 bg-gray-50 dark:bg-slate-700/50 rounded-lg border border-gray-200 dark:border-slate-600">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            {item.item_number && (
-                              <span className="px-2 py-0.5 bg-gray-200 dark:bg-slate-600 rounded text-xs font-mono text-gray-700 dark:text-gray-300">
-                                {item.item_number}
-                              </span>
-                            )}
-                            {item.color && (
-                              <span className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
-                                <Palette className="w-3 h-3" />
-                                {item.color}
-                              </span>
-                            )}
-                          </div>
-                          <p className="font-medium text-gray-900 dark:text-white">{item.description}</p>
-                        </div>
-                        <div className="text-right ml-4">
-                          <div className="text-lg font-semibold text-gray-900 dark:text-white">
-                            ${item.total_price.toFixed(2)}
-                          </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {itemQty} × ${item.unit_price.toFixed(2)}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2 text-xs">
-                        {item.qty_yxs ? <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded">YXS: {item.qty_yxs}</span> : null}
-                        {item.qty_ys ? <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded">YS: {item.qty_ys}</span> : null}
-                        {item.qty_ym ? <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded">YM: {item.qty_ym}</span> : null}
-                        {item.qty_yl ? <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded">YL: {item.qty_yl}</span> : null}
-                        {item.qty_yxl ? <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded">YXL: {item.qty_yxl}</span> : null}
-                        {item.qty_xs ? <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 rounded">XS: {item.qty_xs}</span> : null}
-                        {item.qty_s ? <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 rounded">S: {item.qty_s}</span> : null}
-                        {item.qty_m ? <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 rounded">M: {item.qty_m}</span> : null}
-                        {item.qty_l ? <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 rounded">L: {item.qty_l}</span> : null}
-                        {item.qty_xl ? <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 rounded">XL: {item.qty_xl}</span> : null}
-                        {item.qty_2xl ? <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-400 rounded">2XL: {item.qty_2xl}</span> : null}
-                        {item.qty_3xl ? <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-400 rounded">3XL: {item.qty_3xl}</span> : null}
-                        {item.qty_4xl ? <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-400 rounded">4XL: {item.qty_4xl}</span> : null}
-                      </div>
-
-                      {item.notes && (
-                        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400 italic">{item.notes}</p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-gray-500 dark:text-gray-400 text-center py-8">No line items</p>
-            )}
           </div>
 
+          {/* Important Dates */}
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
+            <div className="p-6 border-b border-gray-200 dark:border-slate-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <Calendar className="w-5 h-5" />
+                Important Dates
+              </h2>
+            </div>
+            <div className="p-6 grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <label className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">Created</label>
+                <p className="font-semibold text-gray-900 dark:text-white mt-1">
+                  {format(new Date(quote.created_at), 'MMM d, yyyy')}
+                </p>
+              </div>
+              {quote.valid_until && (
+                <div>
+                  <label className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">Valid Until</label>
+                  <p className="font-semibold text-gray-900 dark:text-white mt-1">
+                    {format(new Date(quote.valid_until), 'MMM d, yyyy')}
+                  </p>
+                </div>
+              )}
+              {quote.customer_due_date && (
+                <div>
+                  <label className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">Customer Due Date</label>
+                  <p className="font-semibold text-gray-900 dark:text-white mt-1">
+                    {format(new Date(quote.customer_due_date), 'MMM d, yyyy')}
+                  </p>
+                </div>
+              )}
+              {quote.production_due_date && (
+                <div>
+                  <label className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">Production Due</label>
+                  <p className="font-semibold text-gray-900 dark:text-white mt-1">
+                    {format(new Date(quote.production_due_date), 'MMM d, yyyy')}
+                  </p>
+                </div>
+              )}
+              {quote.invoice_date && (
+                <div>
+                  <label className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">Invoice Date</label>
+                  <p className="font-semibold text-gray-900 dark:text-white mt-1">
+                    {format(new Date(quote.invoice_date), 'MMM d, yyyy')}
+                  </p>
+                </div>
+              )}
+              {quote.payment_due_date && (
+                <div>
+                  <label className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">Payment Due</label>
+                  <p className="font-semibold text-gray-900 dark:text-white mt-1">
+                    {format(new Date(quote.payment_due_date), 'MMM d, yyyy')}
+                  </p>
+                </div>
+              )}
+              {quote.sent_at && (
+                <div>
+                  <label className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">Sent</label>
+                  <p className="font-semibold text-gray-900 dark:text-white mt-1">
+                    {format(new Date(quote.sent_at), 'MMM d, yyyy')}
+                  </p>
+                </div>
+              )}
+              {quote.approved_at && (
+                <div>
+                  <label className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">Approved</label>
+                  <p className="font-semibold text-green-600 dark:text-green-400 mt-1">
+                    {format(new Date(quote.approved_at), 'MMM d, yyyy')}
+                  </p>
+                </div>
+              )}
+              {quote.rejected_at && (
+                <div>
+                  <label className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">Rejected</label>
+                  <p className="font-semibold text-red-600 dark:text-red-400 mt-1">
+                    {format(new Date(quote.rejected_at), 'MMM d, yyyy')}
+                  </p>
+                </div>
+              )}
+              {quote.converted_at && (
+                <div>
+                  <label className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">Converted</label>
+                  <p className="font-semibold text-teal-600 dark:text-teal-400 mt-1">
+                    {format(new Date(quote.converted_at), 'MMM d, yyyy')}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Customer Billing Address */}
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
+            <div className="p-6 border-b border-gray-200 dark:border-slate-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <MapPin className="w-5 h-5" />
+                Billing Address
+              </h2>
+            </div>
+            <div className="p-6 text-sm space-y-1">
+              {quote.bill_company && <p className="font-semibold text-gray-900 dark:text-white">{quote.bill_company}</p>}
+              {quote.bill_name && <p className="text-gray-700 dark:text-gray-300">{quote.bill_name}</p>}
+              {quote.bill_address_1 && <p className="text-gray-700 dark:text-gray-300">{quote.bill_address_1}</p>}
+              {quote.bill_address_2 && <p className="text-gray-700 dark:text-gray-300">{quote.bill_address_2}</p>}
+              {quote.bill_city && (
+                <p className="text-gray-700 dark:text-gray-300">
+                  {quote.bill_city}, {quote.bill_state} {quote.bill_zip}
+                </p>
+              )}
+              {quote.bill_phone && (
+                <p className="text-gray-700 dark:text-gray-300 flex items-center gap-2 mt-2">
+                  <Phone className="w-3 h-3" />
+                  <a href={`tel:${quote.bill_phone}`} className="text-blue-600 dark:text-blue-400 hover:underline">
+                    {quote.bill_phone}
+                  </a>
+                </p>
+              )}
+              {quote.bill_email && (
+                <p className="text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                  <Mail className="w-3 h-3" />
+                  <a href={`mailto:${quote.bill_email}`} className="text-blue-600 dark:text-blue-400 hover:underline">
+                    {quote.bill_email}
+                  </a>
+                </p>
+              )}
+              {!quote.bill_company && !quote.bill_name && !quote.bill_address_1 && (
+                <p className="text-gray-500 dark:text-gray-400 italic">No billing address provided</p>
+              )}
+            </div>
+          </div>
+
+          {/* Customer Shipping Address */}
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
+            <div className="p-6 border-b border-gray-200 dark:border-slate-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <Truck className="w-5 h-5" />
+                Shipping Address
+              </h2>
+            </div>
+            <div className="p-6 text-sm space-y-1">
+              {quote.ship_company && <p className="font-semibold text-gray-900 dark:text-white">{quote.ship_company}</p>}
+              {quote.ship_name && <p className="text-gray-700 dark:text-gray-300">{quote.ship_name}</p>}
+              {quote.ship_address_1 && <p className="text-gray-700 dark:text-gray-300">{quote.ship_address_1}</p>}
+              {quote.ship_address_2 && <p className="text-gray-700 dark:text-gray-300">{quote.ship_address_2}</p>}
+              {quote.ship_city && (
+                <p className="text-gray-700 dark:text-gray-300">
+                  {quote.ship_city}, {quote.ship_state} {quote.ship_zip}
+                </p>
+              )}
+              {!quote.ship_company && !quote.ship_name && !quote.ship_address_1 && (
+                <p className="text-gray-500 dark:text-gray-400 italic">No shipping address provided</p>
+              )}
+            </div>
+          </div>
+
+          {/* Line Items */}
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
+            <div className="p-6 border-b border-gray-200 dark:border-slate-700">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Package className="w-5 h-5" />
+                  Line Items
+                </h2>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  {totalQty} total units
+                </div>
+              </div>
+            </div>
+            <div className="p-6">
+              {items.length > 0 ? (
+                <div className="space-y-3">
+                  {items.map((item, idx) => {
+                    const itemQty = (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) +
+                                   (item.qty_yl || 0) + (item.qty_yxl || 0) + (item.qty_xs || 0) +
+                                   (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) +
+                                   (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
+                                   (item.qty_4xl || 0);
+                    return (
+                      <div key={idx} className="p-4 bg-gray-50 dark:bg-slate-700/50 rounded-lg border border-gray-200 dark:border-slate-600">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              {item.item_number && (
+                                <span className="px-2 py-0.5 bg-gray-200 dark:bg-slate-600 rounded text-xs font-mono text-gray-700 dark:text-gray-300">
+                                  {item.item_number}
+                                </span>
+                              )}
+                              {item.color && (
+                                <span className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
+                                  <Palette className="w-3 h-3" />
+                                  {item.color}
+                                </span>
+                              )}
+                            </div>
+                            <p className="font-medium text-gray-900 dark:text-white">{item.description}</p>
+                          </div>
+                          <div className="text-right ml-4">
+                            <div className="text-lg font-semibold text-gray-900 dark:text-white">
+                              ${item.total_price.toFixed(2)}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {itemQty} × ${item.unit_price.toFixed(2)}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 text-xs">
+                          {item.qty_yxs ? <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded">YXS: {item.qty_yxs}</span> : null}
+                          {item.qty_ys ? <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded">YS: {item.qty_ys}</span> : null}
+                          {item.qty_ym ? <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded">YM: {item.qty_ym}</span> : null}
+                          {item.qty_yl ? <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded">YL: {item.qty_yl}</span> : null}
+                          {item.qty_yxl ? <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 rounded">YXL: {item.qty_yxl}</span> : null}
+                          {item.qty_xs ? <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 rounded">XS: {item.qty_xs}</span> : null}
+                          {item.qty_s ? <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 rounded">S: {item.qty_s}</span> : null}
+                          {item.qty_m ? <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 rounded">M: {item.qty_m}</span> : null}
+                          {item.qty_l ? <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 rounded">L: {item.qty_l}</span> : null}
+                          {item.qty_xl ? <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 rounded">XL: {item.qty_xl}</span> : null}
+                          {item.qty_2xl ? <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-400 rounded">2XL: {item.qty_2xl}</span> : null}
+                          {item.qty_3xl ? <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-400 rounded">3XL: {item.qty_3xl}</span> : null}
+                          {item.qty_4xl ? <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-400 rounded">4XL: {item.qty_4xl}</span> : null}
+                        </div>
+
+                        {item.notes && (
+                          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400 italic">{item.notes}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-gray-500 dark:text-gray-400 text-center py-8">No line items</p>
+              )}
+            </div>
+          </div>
+
+          {/* Imprints & Decorations */}
           {imprints.length > 0 && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Imprints & Decorations</h2>
-              <div className="space-y-4">
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
+              <div className="p-6 border-b border-gray-200 dark:border-slate-700">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Palette className="w-5 h-5" />
+                  Imprints & Decorations
+                </h2>
+              </div>
+              <div className="p-6 space-y-4">
                 {imprints.map((imprint, idx) => (
                   <div key={idx} className="p-4 bg-gray-50 dark:bg-slate-700/50 rounded-lg border border-gray-200 dark:border-slate-600">
                     <div className="flex items-start gap-4">
@@ -677,25 +686,35 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                         <img
                           src={imprint.artwork_url}
                           alt="Artwork"
-                          className="w-20 h-20 object-contain border border-gray-300 dark:border-slate-600 rounded bg-white"
+                          className="w-24 h-24 object-contain border border-gray-300 dark:border-slate-600 rounded bg-white"
                         />
                       )}
                       <div className="flex-1">
                         <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
-                          Imprint #{imprint.imprint_number || `${quote.quote_number}-${idx + 1}`}
+                          Imprint #{imprint.imprint_number || `${idx + 1}`}
                         </h3>
                         {imprint.decoration_method && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                          <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">
                             <span className="font-medium">Method:</span> {imprint.decoration_method}
                           </p>
                         )}
                         {imprint.decoration_location && (
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
+                          <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">
                             <span className="font-medium">Location:</span> {imprint.decoration_location}
                           </p>
                         )}
+                        {imprint.placement && (
+                          <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">
+                            <span className="font-medium">Placement:</span> {imprint.placement}
+                          </p>
+                        )}
+                        {imprint.ink_colors && (
+                          <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">
+                            <span className="font-medium">Ink/Thread Colors:</span> {imprint.ink_colors}
+                          </p>
+                        )}
                         {imprint.description && (
-                          <p className="text-sm text-gray-700 dark:text-gray-300 mt-2">{imprint.description}</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{imprint.description}</p>
                         )}
                       </div>
                     </div>
@@ -705,10 +724,16 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             </div>
           )}
 
+          {/* Additional Fees */}
           {fees.length > 0 && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Additional Fees</h2>
-              <div className="space-y-2">
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
+              <div className="p-6 border-b border-gray-200 dark:border-slate-700">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                  <DollarSign className="w-5 h-5" />
+                  Additional Fees
+                </h2>
+              </div>
+              <div className="p-6 space-y-2">
                 {fees.map((fee, idx) => (
                   <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-slate-700/50 rounded-lg">
                     <div>
@@ -726,11 +751,47 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
               </div>
             </div>
           )}
+
+          {/* Notes */}
+          {(quote.customer_notes || quote.notes || quote.production_notes) && (
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
+              <div className="p-6 border-b border-gray-200 dark:border-slate-700">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                  <StickyNote className="w-5 h-5" />
+                  Notes
+                </h2>
+              </div>
+              <div className="p-6 space-y-4">
+                {quote.customer_notes && (
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Customer Notes</label>
+                    <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">{quote.customer_notes}</p>
+                  </div>
+                )}
+                {quote.notes && (
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Internal Notes</label>
+                    <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">{quote.notes}</p>
+                  </div>
+                )}
+                {quote.production_notes && (
+                  <div>
+                    <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Production Notes</label>
+                    <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">{quote.production_notes}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="space-y-6">
+          {/* Quote Total */}
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quote Total</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+              <CreditCard className="w-5 h-5" />
+              Quote Total
+            </h2>
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
@@ -738,7 +799,9 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
               </div>
               {quote.discount_amount > 0 && (
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Discount</span>
+                  <span className="text-gray-600 dark:text-gray-400">
+                    Discount {quote.discount_type === '%' ? `(${quote.discount_amount}%)` : ''}
+                  </span>
                   <span className="font-medium text-green-600">-${quote.discount_amount.toFixed(2)}</span>
                 </div>
               )}
@@ -755,8 +818,12 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             </div>
           </div>
 
+          {/* Customer Information */}
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Customer Information</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+              <User className="w-5 h-5" />
+              Customer Information
+            </h2>
             <div className="space-y-3 text-sm">
               <div className="flex items-start gap-2">
                 <Building className="w-4 h-4 text-gray-400 mt-0.5" />
@@ -783,69 +850,51 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                   </a>
                 </div>
               )}
-              {quote.customer_notes && (
-                <div className="pt-3 border-t border-gray-200 dark:border-slate-600">
-                  <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Customer Notes</p>
-                  <p className="text-gray-600 dark:text-gray-400">{quote.customer_notes}</p>
-                </div>
-              )}
             </div>
           </div>
 
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Details</h2>
-            <div className="space-y-3 text-sm">
-              {quote.valid_until && (
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Valid Until</span>
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {format(new Date(quote.valid_until), 'MMM d, yyyy')}
-                  </span>
-                </div>
-              )}
-              {quote.po_number && (
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">PO Number</span>
-                  <span className="font-medium text-gray-900 dark:text-white">{quote.po_number}</span>
-                </div>
-              )}
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Delivery Method</span>
-                <span className="font-medium text-gray-900 dark:text-white">{quote.delivery_method || 'PICK-UP'}</span>
+          {/* Company Information */}
+          {quote.company_name && (
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <Building className="w-5 h-5" />
+                Company Information
+              </h2>
+              <div className="space-y-2 text-sm">
+                {quote.company_logo_url && (
+                  <img src={quote.company_logo_url} alt="Company Logo" className="h-12 mb-2" />
+                )}
+                <p className="font-medium text-gray-900 dark:text-white">{quote.company_name}</p>
+                {quote.company_address && <p className="text-gray-700 dark:text-gray-300">{quote.company_address}</p>}
+                {quote.company_city && (
+                  <p className="text-gray-700 dark:text-gray-300">
+                    {quote.company_city}, {quote.company_state} {quote.company_zip}
+                  </p>
+                )}
+                {quote.company_phone && (
+                  <p className="text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                    <Phone className="w-3 h-3" />
+                    {quote.company_phone}
+                  </p>
+                )}
+                {quote.company_email && (
+                  <p className="text-blue-600 dark:text-blue-400 flex items-center gap-2">
+                    <Mail className="w-3 h-3" />
+                    {quote.company_email}
+                  </p>
+                )}
+                {quote.company_website && (
+                  <p className="text-blue-600 dark:text-blue-400">
+                    {quote.company_website}
+                  </p>
+                )}
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Terms</span>
-                <span className="font-medium text-gray-900 dark:text-white">{quote.terms || 'Net 30'}</span>
-              </div>
-              {quote.sent_at && (
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Sent</span>
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {format(new Date(quote.sent_at), 'MMM d, yyyy')}
-                  </span>
-                </div>
-              )}
-              {quote.approved_at && (
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Approved</span>
-                  <span className="font-medium text-green-600 dark:text-green-400">
-                    {format(new Date(quote.approved_at), 'MMM d, yyyy')}
-                  </span>
-                </div>
-              )}
-              {quote.rejected_at && (
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Rejected</span>
-                  <span className="font-medium text-red-600 dark:text-red-400">
-                    {format(new Date(quote.rejected_at), 'MMM d, yyyy')}
-                  </span>
-                </div>
-              )}
             </div>
-          </div>
+          )}
         </div>
       </div>
 
+      {/* Approval Links */}
       {approvals.length > 0 && (
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Approval Links</h2>
@@ -905,6 +954,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         </div>
       )}
 
+      {/* Send Approval Modal */}
       {showSendModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-slate-800 rounded-lg max-w-md w-full p-6">
