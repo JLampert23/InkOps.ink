@@ -440,14 +440,14 @@ export default function ProofBuilder({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-        <div className="bg-white dark:bg-slate-800 rounded-lg max-w-7xl w-full my-8">
-          <div className="p-6 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white dark:bg-slate-800 rounded-lg max-w-6xl w-full max-h-[95vh] flex flex-col">
+          <div className="p-4 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between flex-shrink-0">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                 {existingProofId ? 'Edit Proof' : 'Create Proof'}
               </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
                 Upload garment and artwork, position the artwork, and save your proof
               </p>
             </div>
@@ -459,12 +459,12 @@ export default function ProofBuilder({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
-            <div className="lg:col-span-2 space-y-6">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                    <Upload className="w-5 h-5" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4 overflow-y-auto flex-1">
+            <div className="lg:col-span-2 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                    <Upload className="w-4 h-4" />
                     Upload Artwork
                   </h3>
 
@@ -473,7 +473,7 @@ export default function ProofBuilder({
                       <img
                         src={artworkImage}
                         alt="Artwork"
-                        className="w-full h-48 object-contain border border-gray-300 dark:border-slate-600 rounded-lg bg-white"
+                        className="w-full h-32 object-contain border border-gray-300 dark:border-slate-600 rounded-lg bg-white"
                       />
                       <button
                         onClick={() => {
@@ -489,14 +489,14 @@ export default function ProofBuilder({
                     <button
                       onClick={() => artworkInputRef.current?.click()}
                       disabled={uploading}
-                      className="w-full px-4 py-8 border-2 border-dashed border-gray-300 dark:border-slate-600 rounded-lg hover:border-blue-500 dark:hover:border-blue-400 transition-colors text-gray-700 dark:text-gray-300 flex flex-col items-center justify-center gap-2 disabled:opacity-50"
+                      className="w-full px-4 py-6 border-2 border-dashed border-gray-300 dark:border-slate-600 rounded-lg hover:border-blue-500 dark:hover:border-blue-400 transition-colors text-gray-700 dark:text-gray-300 flex flex-col items-center justify-center gap-1 disabled:opacity-50"
                     >
                       {uploading ? (
-                        <Loader2 className="w-8 h-8 animate-spin" />
+                        <Loader2 className="w-6 h-6 animate-spin" />
                       ) : (
                         <>
-                          <Upload className="w-8 h-8" />
-                          <span className="text-sm">Upload Artwork</span>
+                          <Upload className="w-6 h-6" />
+                          <span className="text-xs">Upload Artwork</span>
                         </>
                       )}
                     </button>
@@ -510,9 +510,9 @@ export default function ProofBuilder({
                   />
                 </div>
 
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                    <ImageIcon className="w-5 h-5" />
+                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                    <ImageIcon className="w-4 h-4" />
                     Upload Garment Image
                   </h3>
 
@@ -521,7 +521,7 @@ export default function ProofBuilder({
                       <img
                         src={garmentImage}
                         alt="Garment"
-                        className="w-full h-48 object-contain border border-gray-300 dark:border-slate-600 rounded-lg bg-white"
+                        className="w-full h-32 object-contain border border-gray-300 dark:border-slate-600 rounded-lg bg-white"
                       />
                       <button
                         onClick={() => {
@@ -538,14 +538,14 @@ export default function ProofBuilder({
                       <button
                         onClick={() => garmentInputRef.current?.click()}
                         disabled={uploading}
-                        className="w-full px-4 py-8 border-2 border-dashed border-gray-300 dark:border-slate-600 rounded-lg hover:border-blue-500 dark:hover:border-blue-400 transition-colors text-gray-700 dark:text-gray-300 flex flex-col items-center justify-center gap-2 disabled:opacity-50 mb-3"
+                        className="w-full px-4 py-6 border-2 border-dashed border-gray-300 dark:border-slate-600 rounded-lg hover:border-blue-500 dark:hover:border-blue-400 transition-colors text-gray-700 dark:text-gray-300 flex flex-col items-center justify-center gap-1 disabled:opacity-50 mb-2"
                       >
                         {uploading ? (
-                          <Loader2 className="w-8 h-8 animate-spin" />
+                          <Loader2 className="w-6 h-6 animate-spin" />
                         ) : (
                           <>
-                            <Upload className="w-8 h-8" />
-                            <span className="text-sm">Upload Garment</span>
+                            <Upload className="w-6 h-6" />
+                            <span className="text-xs">Upload Garment</span>
                           </>
                         )}
                       </button>
@@ -559,8 +559,8 @@ export default function ProofBuilder({
 
                       {savedGarments.length > 0 && (
                         <div>
-                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Saved garments:</p>
-                          <div className="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto">
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Saved:</p>
+                          <div className="grid grid-cols-3 gap-1 max-h-24 overflow-y-auto">
                             {savedGarments.slice(0, 6).map((garment, idx) => (
                               <button
                                 key={idx}
@@ -585,15 +585,15 @@ export default function ProofBuilder({
                 </div>
               </div>
 
-              <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
                   Proof Preview
                 </h3>
 
                 {garmentImage ? (
                   <div
                     ref={previewRef}
-                    className="relative bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg p-8 min-h-[500px] flex items-center justify-center overflow-hidden"
+                    className="relative bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg p-4 min-h-[300px] max-h-[350px] flex items-center justify-center overflow-hidden"
                     onMouseDown={handleMouseDown}
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
@@ -603,7 +603,7 @@ export default function ProofBuilder({
                     <img
                       src={garmentImage}
                       alt="Garment"
-                      className="max-w-full max-h-[450px] object-contain"
+                      className="max-w-full max-h-[300px] object-contain"
                       draggable={false}
                     />
                     {artworkImage && (
@@ -624,37 +624,37 @@ export default function ProofBuilder({
                       </div>
                     )}
                     {printWidth && printHeight && (
-                      <div className="absolute bottom-4 right-4 bg-black bg-opacity-75 text-white px-3 py-2 rounded text-sm">
-                        Print Size: {printWidth} × {printHeight} in
+                      <div className="absolute bottom-2 right-2 bg-black bg-opacity-75 text-white px-2 py-1 rounded text-xs">
+                        {printWidth} × {printHeight} in
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="bg-white dark:bg-slate-800 border-2 border-dashed border-gray-300 dark:border-slate-600 rounded-lg p-8 min-h-[500px] flex items-center justify-center">
+                  <div className="bg-white dark:bg-slate-800 border-2 border-dashed border-gray-300 dark:border-slate-600 rounded-lg p-4 min-h-[300px] flex items-center justify-center">
                     <div className="text-center text-gray-500 dark:text-gray-400">
-                      <ImageIcon className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                      <p>Upload a garment to preview</p>
+                      <ImageIcon className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p className="text-xs">Upload a garment to preview</p>
                     </div>
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-4">
               {artworkImage && (
-                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                    <Move className="w-5 h-5" />
+                <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                    <Move className="w-4 h-4" />
                     Position Artwork
                   </h3>
 
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
                           Scale
                         </label>
-                        <span className="text-sm text-gray-600 dark:text-gray-400">{artworkScale.toFixed(2)}x</span>
+                        <span className="text-xs text-gray-600 dark:text-gray-400">{artworkScale.toFixed(2)}x</span>
                       </div>
                       <input
                         type="range"
@@ -668,11 +668,11 @@ export default function ProofBuilder({
                     </div>
 
                     <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
                           Rotation
                         </label>
-                        <span className="text-sm text-gray-600 dark:text-gray-400">{artworkRotation}°</span>
+                        <span className="text-xs text-gray-600 dark:text-gray-400">{artworkRotation}°</span>
                       </div>
                       <input
                         type="range"
@@ -691,7 +691,7 @@ export default function ProofBuilder({
                         setArtworkScale(1.0);
                         setArtworkRotation(0);
                       }}
-                      className="w-full px-4 py-2 bg-gray-200 dark:bg-slate-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-slate-500 transition-colors text-sm"
+                      className="w-full px-3 py-1.5 bg-gray-200 dark:bg-slate-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-slate-500 transition-colors text-xs"
                     >
                       Reset Position
                     </button>
@@ -699,15 +699,15 @@ export default function ProofBuilder({
                 </div>
               )}
 
-              <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                  <Ruler className="w-5 h-5" />
+              <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                  <Ruler className="w-4 h-4" />
                   Print Size (inches)
                 </h3>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Width
                     </label>
                     <input
@@ -716,11 +716,11 @@ export default function ProofBuilder({
                       value={printWidth}
                       onChange={(e) => setPrintWidth(e.target.value)}
                       placeholder="0.0"
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Height
                     </label>
                     <input
@@ -729,28 +729,28 @@ export default function ProofBuilder({
                       value={printHeight}
                       onChange={(e) => setPrintHeight(e.target.value)}
                       placeholder="0.0"
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                  <Palette className="w-5 h-5" />
+              <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                  <Palette className="w-4 h-4" />
                   Colors
                 </h3>
 
                 <button
                   onClick={() => setShowColorPanel(true)}
-                  className="w-full px-4 py-3 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg hover:border-blue-500 dark:hover:border-blue-400 transition-colors text-gray-700 dark:text-gray-300 flex items-center justify-center gap-2"
+                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg hover:border-blue-500 dark:hover:border-blue-400 transition-colors text-gray-700 dark:text-gray-300 flex items-center justify-center gap-2 text-sm"
                 >
-                  <Palette className="w-5 h-5" />
+                  <Palette className="w-4 h-4" />
                   Select Colors
                 </button>
 
                 {selectedColors.length > 0 && (
-                  <div className="mt-4 space-y-2">
+                  <div className="mt-3 space-y-1.5">
                     {selectedColors.map((color, idx) => (
                       <div
                         key={idx}
@@ -770,32 +770,32 @@ export default function ProofBuilder({
                 )}
               </div>
 
-              <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
                   Notes
                 </h3>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Add any notes or instructions..."
-                  rows={4}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-sm"
                 />
               </div>
             </div>
           </div>
 
-          <div className="p-6 border-t border-gray-200 dark:border-slate-700 flex items-center justify-end gap-3">
+          <div className="p-4 border-t border-gray-200 dark:border-slate-700 flex items-center justify-end gap-2 flex-shrink-0">
             <button
               onClick={onClose}
-              className="px-6 py-2 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300 transition-colors"
+              className="px-4 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300 transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleSaveProof}
               disabled={loading || !garmentImage}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
+              className="px-4 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
