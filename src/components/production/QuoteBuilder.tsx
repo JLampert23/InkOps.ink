@@ -728,6 +728,17 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
               </div>
 
               <div>
+                <label className="text-sm text-gray-400 mb-2 block">Quote Number</label>
+                <input
+                  type="text"
+                  value={quoteNumber}
+                  onChange={(e) => setQuoteNumber(e.target.value)}
+                  placeholder="Auto-generated if left empty"
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded text-white text-sm"
+                />
+              </div>
+
+              <div>
                 <label className="text-sm text-gray-400 mb-2 block">Owner</label>
                 <select className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded text-white text-sm">
                   <option>Jamie</option>
