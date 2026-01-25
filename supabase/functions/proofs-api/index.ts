@@ -119,6 +119,12 @@ Deno.serve(async (req: Request) => {
           print_unit: body.print_unit || 'inches',
           status: body.status || 'draft',
           notes: body.notes,
+          type_of_work: body.type_of_work,
+          decoration_location_id: body.decoration_location_id,
+          pricing_matrix_id: body.pricing_matrix_id,
+          pricing_matrix_column: body.pricing_matrix_column,
+          imprint_unit_price: body.imprint_unit_price,
+          imprint_setup_fee: body.imprint_setup_fee,
           created_by: user.id,
         })
         .select()
@@ -148,6 +154,12 @@ Deno.serve(async (req: Request) => {
           print_unit: body.print_unit,
           status: body.status,
           notes: body.notes,
+          type_of_work: body.type_of_work,
+          decoration_location_id: body.decoration_location_id,
+          pricing_matrix_id: body.pricing_matrix_id,
+          pricing_matrix_column: body.pricing_matrix_column,
+          imprint_unit_price: body.imprint_unit_price,
+          imprint_setup_fee: body.imprint_setup_fee,
           approved_at: body.status === 'approved' ? new Date().toISOString() : undefined,
           rejected_at: body.status === 'rejected' ? new Date().toISOString() : undefined,
         })

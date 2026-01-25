@@ -19,13 +19,14 @@ interface ColorSelectionPanelProps {
   onClose: () => void;
   onSave: (colors: SelectedColor[]) => void;
   selectedColors: SelectedColor[];
+  colorType?: 'ink' | 'thread' | 'none';
 }
 
-export default function ColorSelectionPanel({ onClose, onSave, selectedColors }: ColorSelectionPanelProps) {
+export default function ColorSelectionPanel({ onClose, onSave, selectedColors, colorType = 'ink' }: ColorSelectionPanelProps) {
   const [inkColors, setInkColors] = useState<Color[]>([]);
   const [threadColors, setThreadColors] = useState<Color[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'ink' | 'thread'>('ink');
+  const [activeTab, setActiveTab] = useState<'ink' | 'thread'>(colorType === 'thread' ? 'thread' : 'ink');
   const [searchTerm, setSearchTerm] = useState('');
   const [tempSelected, setTempSelected] = useState<SelectedColor[]>(selectedColors);
 

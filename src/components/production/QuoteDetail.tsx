@@ -15,7 +15,7 @@ import {
   Plus,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import ProofBuilder from './ProofBuilder';
+import UnifiedImprintProofBuilder from './UnifiedImprintProofBuilder';
 import ProofDisplay from './ProofDisplay';
 
 interface QuoteDetailProps {
@@ -718,15 +718,37 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         </div>
       )}
 
-      {/* Proof Builder Modal */}
+      {/* Unified Imprint + Proof Builder Modal */}
       {showProofBuilder && selectedLineItemId && quote && (
-        <ProofBuilder
+        <UnifiedImprintProofBuilder
           onClose={handleCloseProofBuilder}
           onSave={handleSaveProof}
           lineItemId={selectedLineItemId}
           quoteId={quoteId}
           customerId={quote.customer_id}
           existingProofId={editingProofId || undefined}
+          lineItemDescription={
+            lineItems.find((item) => item.id === selectedLineItemId)?.description || ''
+          }
+          lineItemQuantity={
+            lineItems.find((item) => item.id === selectedLineItemId)
+              ? (
+                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_yxs || 0) +
+                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_ys || 0) +
+                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_ym || 0) +
+                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_yl || 0) +
+                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_yxl || 0) +
+                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_xs || 0) +
+                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_s || 0) +
+                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_m || 0) +
+                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_l || 0) +
+                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_xl || 0) +
+                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_2xl || 0) +
+                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_3xl || 0) +
+                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_4xl || 0)
+                )
+              : 1
+          }
         />
       )}
     </div>
