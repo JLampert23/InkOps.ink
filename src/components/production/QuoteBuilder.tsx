@@ -886,7 +886,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
             {/* Right: Quote Details */}
             <div className="space-y-4 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-200 dark:border-slate-800 p-6">
               <div className="flex items-center justify-end">
-                <span className="px-4 py-2 border-2 border-blue-600 text-blue-600 dark:border-blue-500 dark:text-blue-500 rounded text-sm font-medium">
+                <span className="px-4 py-2 border-2 border-orange-600 text-orange-600 dark:border-orange-500 dark:text-orange-500 rounded text-sm font-medium">
                   QUOTE
                 </span>
               </div>
@@ -1042,6 +1042,34 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                               )}
                             </div>
                           </td>
+                        </tr>
+                      )}
+                      {/* Group Column Headers */}
+                      {groupIdx > 0 && (
+                        <tr key={`columns-${group.id}`} className="bg-gray-100 dark:bg-slate-900 text-sm text-gray-700 dark:text-gray-400">
+                          <th className="p-2 text-left border border-gray-300 dark:border-slate-800 w-8"></th>
+                          <th className="p-2 text-left border border-gray-300 dark:border-slate-800">Item #</th>
+                          <th className="p-2 text-left border border-gray-300 dark:border-slate-800">Color</th>
+                          <th className="p-2 text-left border border-gray-300 dark:border-slate-800">Description</th>
+                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">YXS</th>
+                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">YS</th>
+                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">YM</th>
+                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">YL</th>
+                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">YXL</th>
+                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">XS</th>
+                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">S</th>
+                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">M</th>
+                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">L</th>
+                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">XL</th>
+                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">2XL</th>
+                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">3XL</th>
+                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">4XL</th>
+                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-16">Quantity</th>
+                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-16">Items</th>
+                          <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-20">Price</th>
+                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">Taxed</th>
+                          <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-24">Total</th>
+                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-32">Actions</th>
                         </tr>
                       )}
                       {/* Group Items */}
