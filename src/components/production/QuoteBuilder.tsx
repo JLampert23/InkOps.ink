@@ -1332,6 +1332,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         isOpen={showImprintsModal}
         onClose={() => setShowImprintsModal(false)}
         quoteId={quoteId}
+        customerId={selectedCustomerId}
       />
     </div>
   );
