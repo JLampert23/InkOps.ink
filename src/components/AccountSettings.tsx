@@ -96,12 +96,12 @@ interface TypeOfWork {
 }
 
 type SettingsTab =
-  | 'company-info'
+  | 'company-info' | 'quote-invoice-settings'
   | 'printavo-integration' | 'square-integration' | 'resend-integration' | 'twilio-integration' | 'stripe-payments'
   | 'user-management' | 'user-security'
   | 'billing-status-filters'
   | 'automated-reports' | 'workflow-setup' | 'automations'
-  | 'production-general' | 'invoice-fees' | 'custom-invoice-status' | 'price-matrices';
+  | 'production-general' | 'invoice-fees' | 'price-matrices';
 
 interface AccountSettingsProps {
   initialTab?: SettingsTab;
@@ -263,6 +263,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [savingPin, setSavingPin] = useState(false);
   const [pinSaveMessage, setPinSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  const [invoicePrefix, setInvoicePrefix] = useState('');
+  const [useInvoicePrefix, setUseInvoicePrefix] = useState(false);
+  const [invoiceStartNumber, setInvoiceStartNumber] = useState(1);
+  const [savingInvoiceSettings, setSavingInvoiceSettings] = useState(false);
+
   const [colorStitchOptions, setColorStitchOptions] = useState<ColorStitchOption[]>([]);
   const [loadingColorStitch, setLoadingColorStitch] = useState(false);
   const [editingColorStitchId, setEditingColorStitchId] = useState<string | null>(null);
@@ -331,6 +336,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setTwilioEnabled(data.twilio_enabled || false);
         setDefaultSendMethod(data.default_send_method || 'email');
         setSmsMessageTemplate(data.sms_message_template || 'Hi {CustomerName}, your invoice {InvoiceNumber} is ready. Amount Due: ${Amount}. Pay here: {PaymentLink}. Reply STOP to unsubscribe.');
+        setInvoicePrefix(data.invoice_prefix || '');
+        setUseInvoicePrefix(data.use_invoice_prefix || false);
+        setInvoiceStartNumber(data.invoice_start_number || 1);
       }
     } catch (err) {
       console.error('Error loading settings:', err);
@@ -426,6 +434,42 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setPinSaveMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to save PIN' });
     } finally {
       setSavingPin(false);
+    }
+  };
+
+  const saveInvoiceNumberingSettings = async () => {
+    if (!companySettings?.id) {
+      showNotification('error', 'No Company Settings', 'Please set up company settings first.');
+      return;
+    }
+
+    if (invoiceStartNumber < 1) {
+      showNotification('warning', 'Invalid Start Number', 'Invoice start number must be at least 1.');
+      return;
+    }
+
+    try {
+      setSavingInvoiceSettings(true);
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update({
+          invoice_prefix: invoicePrefix.trim(),
+          use_invoice_prefix: useInvoicePrefix,
+          invoice_start_number: invoiceStartNumber,
+          next_invoice_number: invoiceStartNumber,
+        })
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
+
+      showNotification('success', 'Settings Saved', 'Invoice numbering settings have been updated successfully!');
+      await loadSettings();
+    } catch (err) {
+      console.error('Error saving invoice numbering settings:', err);
+      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save settings');
+    } finally {
+      setSavingInvoiceSettings(false);
     }
   };
 
@@ -2700,6 +2744,24 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   {activeTab === 'company-info' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
                 </button>
 
+                <button
+                  onClick={() => setActiveTab('quote-invoice-settings')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'quote-invoice-settings'
+                      ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                  style={{ animationDelay: '20ms' }}
+                >
+                  <FileText className={`w-4 h-4 flex-shrink-0 ${activeTab === 'quote-invoice-settings' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'quote-invoice-settings' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      Quote/Invoice Settings
+                    </div>
+                  </div>
+                  {activeTab === 'quote-invoice-settings' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                </button>
+
                 {isAdmin && (
                   <button
                     onClick={() => setActiveTab('user-management')}
@@ -2951,24 +3013,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     </div>
                   </div>
                   {activeTab === 'production-general' && <div className="w-1 h-6 bg-green-600 dark:bg-green-500 rounded-full absolute right-0" />}
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('custom-invoice-status')}
-                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
-                    activeTab === 'custom-invoice-status'
-                      ? 'bg-green-50 dark:bg-green-600/20 text-green-700 dark:text-green-400 shadow-sm'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                  style={{ animationDelay: '20ms' }}
-                >
-                  <Filter className={`w-4 h-4 flex-shrink-0 ${activeTab === 'custom-invoice-status' ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
-                  <div className="flex-1 text-left">
-                    <div className={`font-medium text-sm ${activeTab === 'custom-invoice-status' ? 'text-green-700 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                      Custom Invoice Status
-                    </div>
-                  </div>
-                  {activeTab === 'custom-invoice-status' && <div className="w-1 h-6 bg-green-600 dark:bg-green-500 rounded-full absolute right-0" />}
                 </button>
 
                 <button
@@ -5852,13 +5896,100 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             </div>
           )}
 
-          {/* Custom Invoice Status Section */}
-          {activeTab === 'custom-invoice-status' && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Custom Invoice Status</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Create and manage custom invoice status labels for your workflow</p>
+          {/* Quote/Invoice Settings Section */}
+          {activeTab === 'quote-invoice-settings' && (
+            <div className="space-y-4">
+              {/* Invoice Numbering Settings */}
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Invoice Numbering</h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Configure sequential invoice numbering with optional prefix</p>
+                </div>
+
+                <div className="space-y-4 border-t border-gray-200 dark:border-slate-700 pt-4">
+                  {/* Invoice Prefix */}
+                  <div className="flex items-start gap-3">
+                    <div className="flex items-center h-9">
+                      <input
+                        type="checkbox"
+                        id="use-prefix"
+                        checked={useInvoicePrefix}
+                        onChange={(e) => setUseInvoicePrefix(e.target.checked)}
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <label htmlFor="use-prefix" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Use Invoice Prefix
+                      </label>
+                      <input
+                        type="text"
+                        value={invoicePrefix}
+                        onChange={(e) => setInvoicePrefix(e.target.value.toUpperCase())}
+                        disabled={!useInvoicePrefix}
+                        placeholder="e.g., TSG-"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Optional prefix for invoice numbers (e.g., TSG-)
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Invoice Start Number */}
+                  <div>
+                    <label htmlFor="start-number" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Invoice Start Number
+                    </label>
+                    <input
+                      type="number"
+                      id="start-number"
+                      value={invoiceStartNumber}
+                      onChange={(e) => setInvoiceStartNumber(Math.max(1, parseInt(e.target.value) || 1))}
+                      min="1"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Starting number for sequential invoice numbering (minimum 4 digits)
+                    </p>
+                  </div>
+
+                  {/* Preview */}
+                  <div className="bg-gray-50 dark:bg-slate-700 rounded-lg p-3 border border-gray-200 dark:border-slate-600">
+                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Preview:</p>
+                    <p className="text-lg font-mono font-bold text-gray-900 dark:text-white">
+                      {useInvoicePrefix && invoicePrefix ? invoicePrefix : ''}
+                      {invoiceStartNumber.toString().padStart(4, '0')}
+                    </p>
+                  </div>
+
+                  {/* Save Button */}
+                  <button
+                    onClick={saveInvoiceNumberingSettings}
+                    disabled={savingInvoiceSettings}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {savingInvoiceSettings ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Save Invoice Numbering
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
+
+              {/* Custom Invoice Status */}
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Custom Invoice Status</h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Create and manage custom invoice status labels for your workflow</p>
+                </div>
 
               <div className="space-y-4">
                 <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
@@ -5882,7 +6013,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 </div>
               </div>
             </div>
+            </div>
           )}
+
         </div>
       </div>
     </div>
