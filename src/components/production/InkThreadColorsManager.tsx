@@ -3,12 +3,12 @@ import { Palette, Plus, Edit as EditIcon, Trash2, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useNotification } from '../../contexts/NotificationContext';
 
-interface ColorStitchOption {
+interface ProductionColor {
   id: string;
   company_id: string;
-  option_label: string;
-  option_value: string;
-  option_type: 'color' | 'stitch' | 'other';
+  name: string;
+  color_code: string;
+  type_of_work: 'screen_printing' | 'embroidery';
   sort_order: number;
   is_active: boolean;
   created_at: string;
@@ -21,90 +21,87 @@ interface InkThreadColorsManagerProps {
 
 export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProps) {
   const { showNotification, confirm } = useNotification();
-  const [colorStitchOptions, setColorStitchOptions] = useState<ColorStitchOption[]>([]);
-  const [loadingColorStitch, setLoadingColorStitch] = useState(false);
-  const [editingColorStitchId, setEditingColorStitchId] = useState<string | null>(null);
-  const [showAddColorStitchModal, setShowAddColorStitchModal] = useState(false);
+  const [colors, setColors] = useState<ProductionColor[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [editingColorId, setEditingColorId] = useState<string | null>(null);
+  const [showAddColorModal, setShowAddColorModal] = useState(false);
   const [showBulkAddModal, setShowBulkAddModal] = useState(false);
   const [bulkColorText, setBulkColorText] = useState('');
   const [savingBulk, setSavingBulk] = useState(false);
-  const [colorStitchFormData, setColorStitchFormData] = useState({
-    option_label: '',
-    option_value: '',
-    option_type: colorType === 'ink' ? 'color' as const : 'stitch' as const,
+  const [colorFormData, setColorFormData] = useState({
+    name: '',
+    color_code: '#000000',
   });
-  const [savingColorStitch, setSavingColorStitch] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    loadColorStitchOptions();
+    loadColors();
   }, []);
 
-  const loadColorStitchOptions = async () => {
+  const loadColors = async () => {
     try {
-      setLoadingColorStitch(true);
-      const optionType = colorType === 'ink' ? 'color' : 'stitch';
+      setLoading(true);
+      const typeOfWork = colorType === 'ink' ? 'screen_printing' : 'embroidery';
       const { data, error } = await supabase
-        .from('color_stitch_options')
+        .from('production_colors')
         .select('*')
         .eq('is_active', true)
-        .eq('option_type', optionType)
+        .eq('type_of_work', typeOfWork)
         .order('sort_order');
 
       if (error) throw error;
-      setColorStitchOptions(data || []);
+      setColors(data || []);
     } catch (err) {
-      console.error('Error loading color/stitch options:', err);
+      console.error('Error loading colors:', err);
       showNotification('error', 'Load Failed', `Failed to load ${colorType} colors.`);
     } finally {
-      setLoadingColorStitch(false);
+      setLoading(false);
     }
   };
 
-  const resetColorStitchForm = () => {
-    setColorStitchFormData({
-      option_label: '',
-      option_value: '',
-      option_type: colorType === 'ink' ? 'color' : 'stitch',
+  const resetColorForm = () => {
+    setColorFormData({
+      name: '',
+      color_code: '#000000',
     });
-    setEditingColorStitchId(null);
+    setEditingColorId(null);
   };
 
-  const openAddColorStitchModal = () => {
-    resetColorStitchForm();
-    setShowAddColorStitchModal(true);
+  const openAddColorModal = () => {
+    resetColorForm();
+    setShowAddColorModal(true);
   };
 
-  const openEditColorStitchModal = (option: ColorStitchOption) => {
-    setColorStitchFormData({
-      option_label: option.option_label,
-      option_value: option.option_value,
-      option_type: option.option_type,
+  const openEditColorModal = (color: ProductionColor) => {
+    setColorFormData({
+      name: color.name,
+      color_code: color.color_code,
     });
-    setEditingColorStitchId(option.id);
-    setShowAddColorStitchModal(true);
+    setEditingColorId(color.id);
+    setShowAddColorModal(true);
   };
 
-  const saveColorStitchOption = async () => {
-    if (!colorStitchFormData.option_label || !colorStitchFormData.option_value) {
+  const saveColor = async () => {
+    if (!colorFormData.name || !colorFormData.color_code) {
       showNotification('error', 'Missing Information', 'Please fill in all required fields.');
       return;
     }
 
     try {
-      setSavingColorStitch(true);
+      setSaving(true);
+      const typeOfWork = colorType === 'ink' ? 'screen_printing' : 'embroidery';
 
-      if (editingColorStitchId) {
+      if (editingColorId) {
         const { error } = await supabase
-          .from('color_stitch_options')
+          .from('production_colors')
           .update({
-            option_label: colorStitchFormData.option_label,
-            option_value: colorStitchFormData.option_value,
-            option_type: colorStitchFormData.option_type,
+            name: colorFormData.name,
+            color_code: colorFormData.color_code,
           })
-          .eq('id', editingColorStitchId);
+          .eq('id', editingColorId);
 
         if (error) throw error;
-        showNotification('success', 'Option Updated', 'Color/stitch option updated successfully!');
+        showNotification('success', 'Color Updated', 'Color updated successfully!');
       } else {
         const { data: companyData } = await supabase
           .from('company_settings')
@@ -113,61 +110,59 @@ export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProp
 
         if (!companyData?.id) {
           showNotification('error', 'Error', 'Company settings not found. Please refresh the page.');
-          setSavingColorStitch(false);
+          setSaving(false);
           return;
         }
 
-        const maxSortOrder = colorStitchOptions
-          .filter(opt => opt.option_type === colorStitchFormData.option_type)
-          .reduce((max, opt) => Math.max(max, opt.sort_order), 0);
+        const maxSortOrder = colors.reduce((max, color) => Math.max(max, color.sort_order), 0);
 
         const { error } = await supabase
-          .from('color_stitch_options')
+          .from('production_colors')
           .insert([{
             company_id: companyData.id,
-            option_label: colorStitchFormData.option_label,
-            option_value: colorStitchFormData.option_value,
-            option_type: colorStitchFormData.option_type,
+            name: colorFormData.name,
+            color_code: colorFormData.color_code,
+            type_of_work: typeOfWork,
             sort_order: maxSortOrder + 1,
           }]);
 
         if (error) throw error;
-        showNotification('success', 'Option Created', 'Color/stitch option created successfully!');
+        showNotification('success', 'Color Created', 'Color created successfully!');
       }
 
-      setShowAddColorStitchModal(false);
-      resetColorStitchForm();
-      loadColorStitchOptions();
+      setShowAddColorModal(false);
+      resetColorForm();
+      loadColors();
     } catch (err: any) {
-      console.error('Error saving color/stitch option:', err);
-      const errorMessage = err?.message || 'Failed to save option. Please try again.';
+      console.error('Error saving color:', err);
+      const errorMessage = err?.message || 'Failed to save color. Please try again.';
       showNotification('error', 'Save Failed', errorMessage);
     } finally {
-      setSavingColorStitch(false);
+      setSaving(false);
     }
   };
 
-  const deleteColorStitchOption = async (optionId: string) => {
+  const deleteColor = async (colorId: string) => {
     const confirmed = await confirm(
-      'Delete Option?',
-      'Are you sure you want to delete this color/stitch option? This action cannot be undone.'
+      'Delete Color?',
+      'Are you sure you want to delete this color? This action cannot be undone.'
     );
 
     if (!confirmed) return;
 
     try {
       const { error } = await supabase
-        .from('color_stitch_options')
+        .from('production_colors')
         .update({ is_active: false })
-        .eq('id', optionId);
+        .eq('id', colorId);
 
       if (error) throw error;
 
-      showNotification('success', 'Option Deleted', 'Color/stitch option deleted successfully!');
-      loadColorStitchOptions();
+      showNotification('success', 'Color Deleted', 'Color deleted successfully!');
+      loadColors();
     } catch (err) {
-      console.error('Error deleting option:', err);
-      showNotification('error', 'Delete Failed', 'Failed to delete option. Please try again.');
+      console.error('Error deleting color:', err);
+      showNotification('error', 'Delete Failed', 'Failed to delete color. Please try again.');
     }
   };
 
@@ -198,19 +193,19 @@ export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProp
         return;
       }
 
-      const maxSortOrder = colorStitchOptions.reduce((max, opt) => Math.max(max, opt.sort_order), 0);
-      const optionType = colorType === 'ink' ? 'color' : 'stitch';
+      const maxSortOrder = colors.reduce((max, color) => Math.max(max, color.sort_order), 0);
+      const typeOfWork = colorType === 'ink' ? 'screen_printing' : 'embroidery';
 
       const newColors = lines.map((colorName, index) => ({
         company_id: companyData.id,
-        option_label: colorName,
-        option_value: '#000000',
-        option_type: optionType,
+        name: colorName,
+        color_code: '#000000',
+        type_of_work: typeOfWork,
         sort_order: maxSortOrder + index + 1,
       }));
 
       const { error } = await supabase
-        .from('color_stitch_options')
+        .from('production_colors')
         .insert(newColors);
 
       if (error) throw error;
@@ -218,7 +213,7 @@ export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProp
       showNotification('success', 'Bulk Add Complete', `Added ${lines.length} ${colorType} color(s) successfully!`);
       setShowBulkAddModal(false);
       setBulkColorText('');
-      loadColorStitchOptions();
+      loadColors();
     } catch (err: any) {
       console.error('Error bulk adding colors:', err);
       showNotification('error', 'Bulk Add Failed', err?.message || 'Failed to add colors. Please try again.');
@@ -248,7 +243,7 @@ export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProp
               Bulk
             </button>
             <button
-              onClick={openAddColorStitchModal}
+              onClick={openAddColorModal}
               className="flex items-center gap-1 px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
             >
               <Plus className="w-3 h-3" />
@@ -257,40 +252,40 @@ export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProp
           </div>
         </div>
 
-        {loadingColorStitch ? (
+        {loading ? (
           <div className="flex items-center justify-center py-3">
             <Loader2 className="w-5 h-5 text-blue-600 dark:text-blue-400 animate-spin" />
           </div>
-        ) : colorStitchOptions.length === 0 ? (
+        ) : colors.length === 0 ? (
           <div className="text-center py-3 text-gray-500 dark:text-gray-400">
             <p className="text-xs">No {colorType} colors yet. Click "Add" to create one.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1.5">
-            {colorStitchOptions.map((option) => (
+            {colors.map((color) => (
               <div
-                key={option.id}
+                key={color.id}
                 className="flex items-center justify-between p-1.5 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
               >
                 <div className="flex items-center gap-1.5 flex-1 min-w-0">
                   <div
                     className="w-5 h-5 rounded border border-gray-300 dark:border-slate-600 flex-shrink-0"
-                    style={{ backgroundColor: option.option_value }}
-                    title={option.option_value}
+                    style={{ backgroundColor: color.color_code }}
+                    title={color.color_code}
                   />
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-xs font-medium text-gray-900 dark:text-white truncate">{option.option_label}</h3>
+                    <h3 className="text-xs font-medium text-gray-900 dark:text-white truncate">{color.name}</h3>
                   </div>
                 </div>
                 <div className="flex items-center gap-0.5 ml-1">
                   <button
-                    onClick={() => openEditColorStitchModal(option)}
+                    onClick={() => openEditColorModal(color)}
                     className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
                   >
                     <EditIcon className="w-3 h-3" />
                   </button>
                   <button
-                    onClick={() => deleteColorStitchOption(option.id)}
+                    onClick={() => deleteColor(color.id)}
                     className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
                   >
                     <Trash2 className="w-3 h-3" />
@@ -302,16 +297,16 @@ export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProp
         )}
       </div>
 
-      {showAddColorStitchModal && (
+      {showAddColorModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  {editingColorStitchId ? `Edit ${colorType === 'ink' ? 'Ink' : 'Thread'} Color` : `Add ${colorType === 'ink' ? 'Ink' : 'Thread'} Color`}
+                  {editingColorId ? `Edit ${colorType === 'ink' ? 'Ink' : 'Thread'} Color` : `Add ${colorType === 'ink' ? 'Ink' : 'Thread'} Color`}
                 </h2>
                 <button
-                  onClick={() => setShowAddColorStitchModal(false)}
+                  onClick={() => setShowAddColorModal(false)}
                   className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                 >
                   <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -327,8 +322,8 @@ export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProp
                   </label>
                   <input
                     type="text"
-                    value={colorStitchFormData.option_label}
-                    onChange={(e) => setColorStitchFormData({ ...colorStitchFormData, option_label: e.target.value })}
+                    value={colorFormData.name}
+                    onChange={(e) => setColorFormData({ ...colorFormData, name: e.target.value })}
                     placeholder="e.g., Black, White, Red"
                     className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
                   />
@@ -341,14 +336,14 @@ export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProp
                   <div className="flex gap-2">
                     <input
                       type="color"
-                      value={colorStitchFormData.option_value}
-                      onChange={(e) => setColorStitchFormData({ ...colorStitchFormData, option_value: e.target.value })}
+                      value={colorFormData.color_code}
+                      onChange={(e) => setColorFormData({ ...colorFormData, color_code: e.target.value })}
                       className="w-16 h-10 rounded border border-gray-300 dark:border-slate-600 cursor-pointer"
                     />
                     <input
                       type="text"
-                      value={colorStitchFormData.option_value}
-                      onChange={(e) => setColorStitchFormData({ ...colorStitchFormData, option_value: e.target.value })}
+                      value={colorFormData.color_code}
+                      onChange={(e) => setColorFormData({ ...colorFormData, color_code: e.target.value })}
                       placeholder="#000000"
                       className="flex-1 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
                     />
@@ -358,18 +353,18 @@ export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProp
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-slate-700">
                 <button
-                  onClick={() => setShowAddColorStitchModal(false)}
-                  disabled={savingColorStitch}
+                  onClick={() => setShowAddColorModal(false)}
+                  disabled={saving}
                   className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={saveColorStitchOption}
-                  disabled={savingColorStitch}
+                  onClick={saveColor}
+                  disabled={saving}
                   className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {savingColorStitch ? (
+                  {saving ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
                       Saving...
@@ -377,7 +372,7 @@ export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProp
                   ) : (
                     <>
                       <Palette className="w-4 h-4" />
-                      {editingColorStitchId ? 'Update Color' : 'Create Color'}
+                      {editingColorId ? 'Update Color' : 'Create Color'}
                     </>
                   )}
                 </button>
