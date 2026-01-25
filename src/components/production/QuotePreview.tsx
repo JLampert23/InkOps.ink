@@ -50,12 +50,12 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
     const companyWebsite = quote.company_website || 'https://www.toddssportinggoods.com';
     const companyEmail = quote.company_email || 'jamie@toddssportinggoods.com';
 
-    doc.setFontSize(18);
+    doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
-    doc.text(`Invoice #${quote.quote_number}`, 14, 20);
+    doc.text('QUOTE', 14, 18);
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
-    doc.text(quote.customer_name || '', 14, 28);
+    doc.text(`Quote #${quote.quote_number}`, 14, 26);
 
     let yPos = 45;
     doc.setFontSize(11);
@@ -361,7 +361,7 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
             {/* Header */}
             <div className="flex items-start justify-between mb-3 pb-3 border-b border-gray-300">
               <div>
-                <h1 className="text-lg font-bold text-gray-900 mb-0.5">Invoice #{quote.quote_number}</h1>
+                <h1 className="text-lg font-bold text-gray-900 mb-0.5">Quote #{quote.quote_number}</h1>
                 <p className="text-sm text-gray-600 uppercase">{quote.customer_name}</p>
               </div>
             </div>
