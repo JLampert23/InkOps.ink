@@ -160,7 +160,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
   const getStatusConfig = (status: string) => {
     switch (status) {
       case 'draft':
-        return { color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300', icon: Clock, label: 'Draft' };
+        return { color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300', icon: Clock, label: 'Unsent' };
       case 'sent':
         return { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400', icon: Send, label: 'Sent' };
       case 'approved':
@@ -225,7 +225,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
           <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">{stats.draft}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Draft</div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">Unsent</div>
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
           <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.sent}</div>
@@ -260,7 +260,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
               className="px-4 py-2.5 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
             >
               <option value="all">All Status</option>
-              <option value="draft">Draft</option>
+              <option value="draft">Unsent</option>
               <option value="sent">Sent</option>
               <option value="approved">Approved</option>
               <option value="rejected">Rejected</option>
