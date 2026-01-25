@@ -112,6 +112,7 @@ Deno.serve(async (req: Request) => {
           proof_version: body.proof_version || 1,
           garment_image_url: body.garment_image_url,
           garment_name: body.garment_name,
+          composite_image_url: body.composite_image_url,
           print_width: body.print_width,
           print_height: body.print_height,
           print_depth: body.print_depth,
@@ -140,6 +141,7 @@ Deno.serve(async (req: Request) => {
         .update({
           garment_image_url: body.garment_image_url,
           garment_name: body.garment_name,
+          composite_image_url: body.composite_image_url,
           print_width: body.print_width,
           print_height: body.print_height,
           print_depth: body.print_depth,
