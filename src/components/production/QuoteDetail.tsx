@@ -140,9 +140,14 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
     setLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!session) {
+        console.error('No session found');
+        return;
+      }
 
       const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quotes-api/${quoteId}`;
+      console.log('Fetching quote from:', url);
+
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -151,17 +156,21 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
       });
 
       if (!response.ok) {
-        throw new Error('Failed to load quote');
+        const errorText = await response.text();
+        console.error('Response not OK:', response.status, errorText);
+        throw new Error(`Failed to load quote: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
+      console.log('Quote data loaded:', data);
+
       setQuote(data.quote);
       setLineItems(data.lineItems || []);
       setApprovals(data.approvals || []);
       setActivityLog(data.activityLog || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading quote:', error);
-      alert('Failed to load quote details');
+      alert(`Failed to load quote details: ${error.message}`);
     } finally {
       setLoading(false);
     }

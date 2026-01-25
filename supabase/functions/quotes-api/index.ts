@@ -118,26 +118,38 @@ Deno.serve(async (req: Request) => {
       }
 
       // Get line items
-      const { data: lineItems } = await supabase
+      const { data: lineItems, error: lineItemsError } = await supabase
         .from("quote_line_items")
         .select("*")
         .eq("quote_id", quoteId)
-        .order("line_number");
+        .order("sort_order");
+
+      if (lineItemsError) {
+        console.error("Error fetching line items:", lineItemsError);
+      }
 
       // Get activity log
-      const { data: activityLog } = await supabase
+      const { data: activityLog, error: activityError } = await supabase
         .from("quote_activity_log")
         .select("*")
         .eq("quote_id", quoteId)
         .order("performed_at", { ascending: false })
         .limit(50);
 
+      if (activityError) {
+        console.error("Error fetching activity log:", activityError);
+      }
+
       // Get approvals
-      const { data: approvals } = await supabase
+      const { data: approvals, error: approvalsError } = await supabase
         .from("quote_approvals")
         .select("*, responses:quote_approval_responses(*)")
         .eq("quote_id", quoteId)
         .order("created_at", { ascending: false});
+
+      if (approvalsError) {
+        console.error("Error fetching approvals:", approvalsError);
+      }
 
       return new Response(
         JSON.stringify({
