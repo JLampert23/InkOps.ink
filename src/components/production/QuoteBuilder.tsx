@@ -1246,6 +1246,13 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                               <Plus className="w-4 h-4" />
                               Line Item
                             </button>
+                            <button
+                              onClick={() => setShowImprintsModal(true)}
+                              className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2 shadow-sm"
+                            >
+                              <Plus className="w-4 h-4" />
+                              Imprint(s)
+                            </button>
                             {itemGroups[itemGroups.length - 1].id === group.id && (
                               <button
                                 onClick={addItemGroup}
@@ -1262,16 +1269,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                   ))}
                 </tbody>
               </table>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowImprintsModal(true)}
-                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2 shadow-sm"
-              >
-                <Plus className="w-4 h-4" />
-                Imprint(s)
-              </button>
             </div>
           </div>
 
