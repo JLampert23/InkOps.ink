@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Upload, FileText, Image as ImageIcon, Wand2 } from 'lucide-react';
+import { X, Plus, Trash2, Upload, FileText, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
-import ProofBuilder from './ProofBuilder';
-import ProofDisplay from './ProofDisplay';
 
 interface Proof {
   id?: string;
@@ -63,10 +61,9 @@ interface ManageImprintsModalProps {
   isOpen: boolean;
   onClose: () => void;
   quoteId?: string;
-  customerId?: string;
 }
 
-export function ManageImprintsModal({ isOpen, onClose, quoteId, customerId }: ManageImprintsModalProps) {
+export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprintsModalProps) {
   const { user } = useAuth();
   const { showNotification } = useNotification();
   const [imprints, setImprints] = useState<Imprint[]>([]);
@@ -93,13 +90,6 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, customerId }: Ma
   const [selectedProofForNote, setSelectedProofForNote] = useState<number | null>(null);
   const [selectedMatrixColumns, setSelectedMatrixColumns] = useState<string[]>([]);
 
-  // Proof builder state
-  const [showProofBuilder, setShowProofBuilder] = useState(false);
-  const [selectedLineItemId, setSelectedLineItemId] = useState<string | null>(null);
-  const [editingProofId, setEditingProofId] = useState<string | null>(null);
-  const [lineItems, setLineItems] = useState<Array<{ id: string; description: string; color?: string }>>([]);
-  const [proofRefreshTrigger, setProofRefreshTrigger] = useState(0);
-
   useEffect(() => {
     if (isOpen) {
       loadPriceMatrices();
@@ -109,7 +99,6 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, customerId }: Ma
       loadWorkTypes();
       if (quoteId) {
         loadImprints();
-        loadLineItems();
       }
     }
   }, [isOpen, quoteId]);
@@ -227,20 +216,6 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, customerId }: Ma
         thread_ink_color: imp.thread_ink_color || '',
         pricing_matrix_column: imp.pricing_matrix_column || '',
       })));
-    }
-  };
-
-  const loadLineItems = async () => {
-    if (!quoteId) return;
-
-    const { data, error } = await supabase
-      .from('quote_line_items')
-      .select('id, description, color')
-      .eq('quote_id', quoteId)
-      .order('sort_order');
-
-    if (data && !error) {
-      setLineItems(data);
     }
   };
 
@@ -426,29 +401,6 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, customerId }: Ma
       showNotification('success', 'Saved', 'Imprints saved successfully');
     }
     onClose();
-  };
-
-  const handleCreateProof = (lineItemId: string) => {
-    setSelectedLineItemId(lineItemId);
-    setEditingProofId(null);
-    setShowProofBuilder(true);
-  };
-
-  const handleEditProof = (proofId: string, lineItemId: string) => {
-    setSelectedLineItemId(lineItemId);
-    setEditingProofId(proofId);
-    setShowProofBuilder(true);
-  };
-
-  const handleCloseProofBuilder = () => {
-    setShowProofBuilder(false);
-    setSelectedLineItemId(null);
-    setEditingProofId(null);
-    setProofRefreshTrigger(prev => prev + 1);
-  };
-
-  const handleSaveProof = () => {
-    setProofRefreshTrigger(prev => prev + 1);
   };
 
   if (!isOpen) return null;
@@ -794,42 +746,6 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, customerId }: Ma
                 ))}
               </div>
             )}
-
-            {/* Professional Proofs Section */}
-            {lineItems.length > 0 && quoteId && (
-              <div className="border-t border-slate-700 pt-6 mt-6">
-                <h3 className="text-lg font-semibold text-white mb-4">Professional Proofs</h3>
-                <p className="text-sm text-gray-400 mb-4">
-                  Create mockups showing how decorations will look on each garment
-                </p>
-                <div className="space-y-4">
-                  {lineItems.map((item) => (
-                    <div key={item.id} className="bg-slate-800/50 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div>
-                          <h4 className="text-white font-medium">{item.description}</h4>
-                          {item.color && (
-                            <p className="text-sm text-gray-400">{item.color}</p>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => handleCreateProof(item.id)}
-                          className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm"
-                        >
-                          <Wand2 className="w-4 h-4" />
-                          Create Proof
-                        </button>
-                      </div>
-                      <ProofDisplay
-                        lineItemId={item.id}
-                        onEdit={(proofId) => handleEditProof(proofId, item.id)}
-                        refreshTrigger={proofRefreshTrigger}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
@@ -842,18 +758,6 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, customerId }: Ma
           </button>
         </div>
       </div>
-
-      {/* Proof Builder Modal */}
-      {showProofBuilder && selectedLineItemId && quoteId && (
-        <ProofBuilder
-          lineItemId={selectedLineItemId}
-          quoteId={quoteId}
-          customerId={customerId}
-          existingProofId={editingProofId || undefined}
-          onClose={handleCloseProofBuilder}
-          onSave={handleSaveProof}
-        />
-      )}
     </div>
   );
 }

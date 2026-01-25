@@ -14,8 +14,6 @@ import {
   Download,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import UnifiedImprintProofBuilder from './UnifiedImprintProofBuilder';
-import ProofDisplay from './ProofDisplay';
 
 interface QuoteDetailProps {
   quoteId: string;
@@ -115,11 +113,6 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
   const [sending, setSending] = useState(false);
   const [converting, setConverting] = useState(false);
 
-  const [showProofBuilder, setShowProofBuilder] = useState(false);
-  const [selectedLineItemId, setSelectedLineItemId] = useState<string | null>(null);
-  const [editingProofId, setEditingProofId] = useState<string | null>(null);
-  const [proofRefreshTrigger, setProofRefreshTrigger] = useState(0);
-
   const [expiresInDays, setExpiresInDays] = useState(30);
   const [singleUse, setSingleUse] = useState(true);
   const [autoApproveAfterDays, setAutoApproveAfterDays] = useState<number | null>(null);
@@ -190,22 +183,6 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
     } finally {
       setSending(false);
     }
-  };
-
-  const handleEditProof = (proofId: string, lineItemId: string) => {
-    setSelectedLineItemId(lineItemId);
-    setEditingProofId(proofId);
-    setShowProofBuilder(true);
-  };
-
-  const handleCloseProofBuilder = () => {
-    setShowProofBuilder(false);
-    setSelectedLineItemId(null);
-    setEditingProofId(null);
-  };
-
-  const handleSaveProof = () => {
-    setProofRefreshTrigger(prev => prev + 1);
   };
 
   const getStatusColor = (status: string) => {
@@ -529,17 +506,6 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                         ${item.total_price.toFixed(2)}
                       </td>
                     </tr>
-                    <tr>
-                      <td colSpan={19} className="p-0">
-                        <div className="px-4 pb-4">
-                          <ProofDisplay
-                            lineItemId={item.id}
-                            onEdit={(proofId) => handleEditProof(proofId, item.id)}
-                            refreshTrigger={proofRefreshTrigger}
-                          />
-                        </div>
-                      </td>
-                    </tr>
                   </React.Fragment>
                 );
               })}
@@ -702,40 +668,6 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             </div>
           </div>
         </div>
-      )}
-
-      {/* Unified Imprint + Proof Builder Modal */}
-      {showProofBuilder && selectedLineItemId && quote && (
-        <UnifiedImprintProofBuilder
-          onClose={handleCloseProofBuilder}
-          onSave={handleSaveProof}
-          lineItemId={selectedLineItemId}
-          quoteId={quoteId}
-          customerId={quote.customer_id}
-          existingProofId={editingProofId || undefined}
-          lineItemDescription={
-            lineItems.find((item) => item.id === selectedLineItemId)?.description || ''
-          }
-          lineItemQuantity={
-            lineItems.find((item) => item.id === selectedLineItemId)
-              ? (
-                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_yxs || 0) +
-                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_ys || 0) +
-                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_ym || 0) +
-                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_yl || 0) +
-                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_yxl || 0) +
-                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_xs || 0) +
-                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_s || 0) +
-                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_m || 0) +
-                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_l || 0) +
-                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_xl || 0) +
-                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_2xl || 0) +
-                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_3xl || 0) +
-                  (lineItems.find((item) => item.id === selectedLineItemId)?.qty_4xl || 0)
-                )
-              : 1
-          }
-        />
       )}
     </div>
   );
