@@ -121,39 +121,25 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
 
   const generateNextQuoteNumber = async (userCompanyId: string): Promise<string> => {
     try {
-      // Get company settings for quote numbering
+      // Get company settings for unified numbering
       const { data: settings } = await supabase
         .from('company_settings')
-        .select('use_quote_prefix, quote_prefix, quote_start_number')
+        .select('use_number_prefix, number_start_number, next_number')
         .eq('id', userCompanyId)
         .maybeSingle();
 
-      // Get the highest existing quote number for this company
-      const { data: quotes } = await supabase
-        .from('quotes')
-        .select('quote_number')
-        .eq('company_id', userCompanyId)
-        .order('created_at', { ascending: false })
-        .limit(1);
+      // Get the current next_number or use start number
+      let nextNumber = settings?.next_number || settings?.number_start_number || 1;
 
-      let nextNumber = settings?.quote_start_number || 1;
+      // Update next_number in database
+      await supabase
+        .from('company_settings')
+        .update({ next_number: nextNumber + 1 })
+        .eq('id', userCompanyId);
 
-      // Extract number from last quote and increment
-      if (quotes && quotes.length > 0 && quotes[0].quote_number) {
-        const lastQuoteNumber = quotes[0].quote_number;
-        // Remove prefix if it exists
-        const prefix = settings?.use_quote_prefix ? settings.quote_prefix : '';
-        const numberPart = lastQuoteNumber.replace(prefix, '');
-        const lastNumber = parseInt(numberPart, 10);
-
-        if (!isNaN(lastNumber)) {
-          nextNumber = lastNumber + 1;
-        }
-      }
-
-      // Format with prefix if enabled
+      // Format with QTE- prefix if enabled
       const formattedNumber = nextNumber.toString().padStart(4, '0');
-      const prefix = settings?.use_quote_prefix ? (settings.quote_prefix || '') : '';
+      const prefix = settings?.use_number_prefix ? 'QTE-' : '';
 
       return `${prefix}${formattedNumber}`;
     } catch (err) {
