@@ -26,10 +26,14 @@ import {
   CreditCard,
   StickyNote,
   Tag,
+  Image as ImageIcon,
+  Plus,
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
+import ProofBuilder from './ProofBuilder';
+import ProofDisplay from './ProofDisplay';
 
 interface QuoteDetailProps {
   quoteId: string;
@@ -41,6 +45,7 @@ interface Quote {
   id: string;
   quote_number: string;
   nickname?: string;
+  customer_id?: string;
   customer_name: string;
   customer_email: string;
   customer_company: string;
@@ -173,6 +178,11 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
   const [autoApproveAfterDays, setAutoApproveAfterDays] = useState<number | null>(null);
   const [autoConvertOnApproval, setAutoConvertOnApproval] = useState(false);
 
+  const [showProofBuilder, setShowProofBuilder] = useState(false);
+  const [selectedLineItemId, setSelectedLineItemId] = useState<string | null>(null);
+  const [editingProofId, setEditingProofId] = useState<string | null>(null);
+  const [proofRefreshTrigger, setProofRefreshTrigger] = useState(0);
+
   useEffect(() => {
     loadQuoteDetails();
   }, [quoteId]);
@@ -284,6 +294,28 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
     const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quote-approval/${token}`;
     await navigator.clipboard.writeText(url);
     alert('Approval link copied to clipboard!');
+  };
+
+  const handleCreateProof = (lineItemId: string) => {
+    setSelectedLineItemId(lineItemId);
+    setEditingProofId(null);
+    setShowProofBuilder(true);
+  };
+
+  const handleEditProof = (proofId: string, lineItemId: string) => {
+    setSelectedLineItemId(lineItemId);
+    setEditingProofId(proofId);
+    setShowProofBuilder(true);
+  };
+
+  const handleCloseProofBuilder = () => {
+    setShowProofBuilder(false);
+    setSelectedLineItemId(null);
+    setEditingProofId(null);
+  };
+
+  const handleSaveProof = () => {
+    setProofRefreshTrigger(prev => prev + 1);
   };
 
   const getStatusColor = (status: string) => {
@@ -659,6 +691,24 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                         {item.notes && (
                           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400 italic">{item.notes}</p>
                         )}
+
+                        {/* Create Proof Button */}
+                        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
+                          <button
+                            onClick={() => handleCreateProof(item.id)}
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm text-sm"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Create Proof
+                          </button>
+                        </div>
+
+                        {/* Display Proofs */}
+                        <ProofDisplay
+                          lineItemId={item.id}
+                          onEdit={(proofId) => handleEditProof(proofId, item.id)}
+                          refreshTrigger={proofRefreshTrigger}
+                        />
                       </div>
                     );
                   })}
@@ -1028,6 +1078,18 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             </div>
           </div>
         </div>
+      )}
+
+      {/* Proof Builder Modal */}
+      {showProofBuilder && selectedLineItemId && quote && (
+        <ProofBuilder
+          onClose={handleCloseProofBuilder}
+          onSave={handleSaveProof}
+          lineItemId={selectedLineItemId}
+          quoteId={quoteId}
+          customerId={quote.customer_id}
+          existingProofId={editingProofId || undefined}
+        />
       )}
     </div>
   );
