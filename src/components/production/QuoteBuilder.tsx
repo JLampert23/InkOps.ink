@@ -23,7 +23,7 @@ interface QuoteItem {
   qty_xl: number;
   qty_2xl: number;
   qty_3xl: number;
-  qty_4xl: number;
+  qty_4xl?: number;
   unit_price: number;
   total_quantity: number;
   total_price: number;
@@ -252,7 +252,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       item.total_quantity =
         item.qty_yxs + item.qty_ys + item.qty_ym + item.qty_yl + item.qty_yxl +
         item.qty_xs + item.qty_s + item.qty_m + item.qty_l + item.qty_xl +
-        item.qty_2xl + item.qty_3xl + item.qty_4xl;
+        item.qty_2xl + item.qty_3xl + (item.qty_4xl || 0);
       item.total_price = item.total_quantity * item.unit_price;
     }
 
@@ -349,83 +349,160 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
 
   const handleSave = async () => {
     if (!selectedCustomerId) {
-      alert('Please select a customer');
+      showNotification('error', 'Validation Error', 'Please select a customer');
+      return;
+    }
+
+    if (!user) {
+      showNotification('error', 'Authentication Error', 'You must be logged in to save a quote');
       return;
     }
 
     setSaving(true);
     try {
+      // Get user's company_id
+      const { data: userProfile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!userProfile?.company_id) {
+        showNotification('error', 'Configuration Error', 'User company not found');
+        setSaving(false);
+        return;
+      }
+
+      // Get customer details for customer_name
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('company_name, email, phone')
+        .eq('id', selectedCustomerId)
+        .maybeSingle();
+
       const quoteData = {
-        quote_number: quoteNumber,
+        quote_number: quoteNumber || `Q${Date.now()}`, // Generate temporary number if empty
+        company_id: userProfile.company_id,
         customer_id: selectedCustomerId,
+        customer_name: customer?.company_name || 'Unknown Customer',
+        customer_email: customer?.email,
+        customer_phone: customer?.phone,
         status: 'draft',
         created_date: createdDate,
-        production_due_date: productionDueDate,
-        customer_due_date: customerDueDate,
+        production_due_date: productionDueDate || null,
+        customer_due_date: customerDueDate || null,
         terms,
-        po_number: poNumber,
-        delivery_method: deliveryMethod,
-        nickname,
-        customer_notes: customerNotes,
-        production_notes: productionNotes,
-        bill_company: billCompany,
-        bill_name: billName,
-        bill_address_1: billAddress1,
-        bill_address_2: billAddress2,
-        bill_city: billCity,
-        bill_state: billState,
-        bill_zip: billZip,
-        ship_company: shipCompany,
-        ship_name: shipName,
-        ship_address_1: shipAddress1,
-        ship_address_2: shipAddress2,
-        ship_city: shipCity,
-        ship_state: shipState,
-        ship_zip: shipZip,
+        po_number: poNumber || null,
+        delivery_method: deliveryMethod || null,
+        nickname: nickname || null,
+        customer_notes: customerNotes || null,
+        production_notes: productionNotes || null,
+        bill_company: billCompany || null,
+        bill_name: billName || null,
+        bill_address_1: billAddress1 || null,
+        bill_address_2: billAddress2 || null,
+        bill_city: billCity || null,
+        bill_state: billState || null,
+        bill_zip: billZip || null,
+        ship_company: shipCompany || null,
+        ship_name: shipName || null,
+        ship_address_1: shipAddress1 || null,
+        ship_address_2: shipAddress2 || null,
+        ship_city: shipCity || null,
+        ship_state: shipState || null,
+        ship_zip: shipZip || null,
         subtotal: totals.subtotal,
         discount,
         discount_type: discountType,
         sales_tax_rate: salesTaxRate,
         sales_tax: totals.salesTax,
         total: totals.totalDue,
+        created_by: user.id,
       };
 
       let savedQuoteId = quoteId;
 
       if (quoteId) {
-        await supabase.from('quotes').update(quoteData).eq('id', quoteId);
+        const { error: updateError } = await supabase
+          .from('quotes')
+          .update(quoteData)
+          .eq('id', quoteId);
+
+        if (updateError) throw updateError;
       } else {
-        const { data } = await supabase.from('quotes').insert(quoteData).select().single();
+        const { data, error: insertError } = await supabase
+          .from('quotes')
+          .insert(quoteData)
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
         savedQuoteId = data?.id;
       }
 
       if (savedQuoteId) {
+        // Delete existing line items
         await supabase.from('quote_line_items').delete().eq('quote_id', savedQuoteId);
+
+        // Insert new line items
         if (items.length > 0) {
-          await supabase.from('quote_line_items').insert(
+          const { error: itemsError } = await supabase.from('quote_line_items').insert(
             items.map((item, idx) => ({
               quote_id: savedQuoteId,
+              company_id: userProfile.company_id,
               sort_order: idx,
-              ...item,
+              item_number: item.item_number,
+              color: item.color,
+              description: item.description,
+              qty_yxs: item.qty_yxs,
+              qty_ys: item.qty_ys,
+              qty_ym: item.qty_ym,
+              qty_yl: item.qty_yl,
+              qty_yxl: item.qty_yxl,
+              qty_xs: item.qty_xs,
+              qty_s: item.qty_s,
+              qty_m: item.qty_m,
+              qty_l: item.qty_l,
+              qty_xl: item.qty_xl,
+              qty_2xl: item.qty_2xl,
+              qty_3xl: item.qty_3xl,
+              qty_4xl: item.qty_4xl || 0,
+              unit_price: item.unit_price,
+              total_quantity: item.total_quantity,
+              total_price: item.total_price,
+              taxed: item.taxed,
             }))
           );
+
+          if (itemsError) throw itemsError;
         }
 
+        // Delete existing fees
         await supabase.from('quote_fees').delete().eq('quote_id', savedQuoteId);
+
+        // Insert new fees
         if (fees.length > 0) {
-          await supabase.from('quote_fees').insert(
+          const { error: feesError } = await supabase.from('quote_fees').insert(
             fees.map(fee => ({
               quote_id: savedQuoteId,
-              ...fee,
+              fee_name: fee.fee_name,
+              description: fee.description,
+              quantity: fee.quantity,
+              unit_amount: fee.unit_amount,
+              total_amount: fee.total_amount,
+              taxed: fee.taxed,
             }))
           );
+
+          if (feesError) throw feesError;
         }
       }
 
+      showNotification('success', 'Quote Saved', 'Quote has been saved successfully');
       onSave?.();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving quote:', error);
-      alert('Failed to save quote');
+      showNotification('error', 'Save Failed', error.message || 'Failed to save quote');
     } finally {
       setSaving(false);
     }
@@ -749,6 +826,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                     <th className="p-2 text-center border border-slate-800 w-12">XL</th>
                     <th className="p-2 text-center border border-slate-800 w-12">2XL</th>
                     <th className="p-2 text-center border border-slate-800 w-12">3XL</th>
+                    <th className="p-2 text-center border border-slate-800 w-12">4XL</th>
                     <th className="p-2 text-center border border-slate-800 w-16">Quantity</th>
                     <th className="p-2 text-center border border-slate-800 w-16">Items</th>
                     <th className="p-2 text-right border border-slate-800 w-20">Price</th>
@@ -893,6 +971,15 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           min="0"
                           value={item.qty_3xl || ''}
                           onChange={(e) => updateItem(idx, 'qty_3xl', parseInt(e.target.value) || 0)}
+                          className="w-full px-1 py-1 bg-slate-800 border-0 text-white text-xs text-center"
+                        />
+                      </td>
+                      <td className="p-1 border border-slate-800">
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.qty_4xl || ''}
+                          onChange={(e) => updateItem(idx, 'qty_4xl', parseInt(e.target.value) || 0)}
                           className="w-full px-1 py-1 bg-slate-800 border-0 text-white text-xs text-center"
                         />
                       </td>
