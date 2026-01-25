@@ -268,6 +268,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [invoiceStartNumber, setInvoiceStartNumber] = useState(1);
   const [savingInvoiceSettings, setSavingInvoiceSettings] = useState(false);
 
+  const [quotePrefix, setQuotePrefix] = useState('');
+  const [useQuotePrefix, setUseQuotePrefix] = useState(false);
+  const [quoteStartNumber, setQuoteStartNumber] = useState(1);
+  const [savingQuoteSettings, setSavingQuoteSettings] = useState(false);
+
   const [colorStitchOptions, setColorStitchOptions] = useState<ColorStitchOption[]>([]);
   const [loadingColorStitch, setLoadingColorStitch] = useState(false);
   const [editingColorStitchId, setEditingColorStitchId] = useState<string | null>(null);
@@ -339,6 +344,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setInvoicePrefix(data.invoice_prefix || '');
         setUseInvoicePrefix(data.use_invoice_prefix || false);
         setInvoiceStartNumber(data.invoice_start_number || 1);
+        setQuotePrefix(data.quote_prefix || '');
+        setUseQuotePrefix(data.use_quote_prefix || false);
+        setQuoteStartNumber(data.quote_start_number || 1);
       }
     } catch (err) {
       console.error('Error loading settings:', err);
@@ -470,6 +478,41 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save settings');
     } finally {
       setSavingInvoiceSettings(false);
+    }
+  };
+
+  const saveQuoteNumberingSettings = async () => {
+    if (!companySettings?.id) {
+      showNotification('error', 'No Company Settings', 'Please set up company settings first.');
+      return;
+    }
+
+    if (quoteStartNumber < 1) {
+      showNotification('warning', 'Invalid Start Number', 'Quote start number must be at least 1.');
+      return;
+    }
+
+    try {
+      setSavingQuoteSettings(true);
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update({
+          quote_prefix: quotePrefix.trim(),
+          use_quote_prefix: useQuotePrefix,
+          quote_start_number: quoteStartNumber,
+        })
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
+
+      showNotification('success', 'Settings Saved', 'Quote numbering settings have been updated successfully!');
+      await loadSettings();
+    } catch (err) {
+      console.error('Error saving quote numbering settings:', err);
+      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save settings');
+    } finally {
+      setSavingQuoteSettings(false);
     }
   };
 
@@ -5978,6 +6021,91 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       <>
                         <Save className="w-4 h-4" />
                         Save Invoice Numbering
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Quote Numbering Settings */}
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Quote Numbering</h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Configure sequential quote numbering with optional prefix</p>
+                </div>
+
+                <div className="space-y-4 border-t border-gray-200 dark:border-slate-700 pt-4">
+                  {/* Quote Prefix */}
+                  <div className="flex items-start gap-3">
+                    <div className="flex items-center h-9">
+                      <input
+                        type="checkbox"
+                        id="use-quote-prefix"
+                        checked={useQuotePrefix}
+                        onChange={(e) => setUseQuotePrefix(e.target.checked)}
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <label htmlFor="use-quote-prefix" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Use Quote Prefix
+                      </label>
+                      <input
+                        type="text"
+                        value={quotePrefix}
+                        onChange={(e) => setQuotePrefix(e.target.value.toUpperCase())}
+                        disabled={!useQuotePrefix}
+                        placeholder="e.g., Q-"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Optional prefix for quote numbers (e.g., Q-)
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Quote Start Number */}
+                  <div>
+                    <label htmlFor="quote-start-number" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Quote Start Number
+                    </label>
+                    <input
+                      type="number"
+                      id="quote-start-number"
+                      value={quoteStartNumber}
+                      onChange={(e) => setQuoteStartNumber(Math.max(1, parseInt(e.target.value) || 1))}
+                      min="1"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Starting number for sequential quote numbering (minimum 4 digits)
+                    </p>
+                  </div>
+
+                  {/* Preview */}
+                  <div className="bg-gray-50 dark:bg-slate-700 rounded-lg p-3 border border-gray-200 dark:border-slate-600">
+                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Preview:</p>
+                    <p className="text-lg font-mono font-bold text-gray-900 dark:text-white">
+                      {useQuotePrefix && quotePrefix ? quotePrefix : ''}
+                      {quoteStartNumber.toString().padStart(4, '0')}
+                    </p>
+                  </div>
+
+                  {/* Save Button */}
+                  <button
+                    onClick={saveQuoteNumberingSettings}
+                    disabled={savingQuoteSettings}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {savingQuoteSettings ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Save Quote Numbering
                       </>
                     )}
                   </button>

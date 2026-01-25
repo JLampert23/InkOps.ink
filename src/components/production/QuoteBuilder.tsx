@@ -55,6 +55,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const [customers, setCustomers] = useState<any[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(initialCustomerId || '');
   const [availableFees, setAvailableFees] = useState<any[]>([]);
+  const [companySettings, setCompanySettings] = useState<any>(null);
 
   const [quoteNumber, setQuoteNumber] = useState('');
   const [createdDate, setCreatedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -94,6 +95,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const [showImprintsModal, setShowImprintsModal] = useState(false);
 
   useEffect(() => {
+    loadCompanySettings();
     loadCustomers();
     loadAvailableFees();
     if (quoteId) {
@@ -102,6 +104,63 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       loadDefaultFees();
     }
   }, [quoteId]);
+
+  const loadCompanySettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('company_settings')
+        .select('*')
+        .maybeSingle();
+
+      if (error) throw error;
+      setCompanySettings(data);
+    } catch (err) {
+      console.error('Error loading company settings:', err);
+    }
+  };
+
+  const generateNextQuoteNumber = async (userCompanyId: string): Promise<string> => {
+    try {
+      // Get company settings for quote numbering
+      const { data: settings } = await supabase
+        .from('company_settings')
+        .select('use_quote_prefix, quote_prefix, quote_start_number')
+        .eq('id', userCompanyId)
+        .maybeSingle();
+
+      // Get the highest existing quote number for this company
+      const { data: quotes } = await supabase
+        .from('quotes')
+        .select('quote_number')
+        .eq('company_id', userCompanyId)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      let nextNumber = settings?.quote_start_number || 1;
+
+      // Extract number from last quote and increment
+      if (quotes && quotes.length > 0 && quotes[0].quote_number) {
+        const lastQuoteNumber = quotes[0].quote_number;
+        // Remove prefix if it exists
+        const prefix = settings?.use_quote_prefix ? settings.quote_prefix : '';
+        const numberPart = lastQuoteNumber.replace(prefix, '');
+        const lastNumber = parseInt(numberPart, 10);
+
+        if (!isNaN(lastNumber)) {
+          nextNumber = lastNumber + 1;
+        }
+      }
+
+      // Format with prefix if enabled
+      const formattedNumber = nextNumber.toString().padStart(4, '0');
+      const prefix = settings?.use_quote_prefix ? (settings.quote_prefix || '') : '';
+
+      return `${prefix}${formattedNumber}`;
+    } catch (err) {
+      console.error('Error generating quote number:', err);
+      return `Q${Date.now()}`; // Fallback
+    }
+  };
 
   const loadCustomers = async () => {
     const { data } = await supabase
@@ -380,8 +439,14 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         .eq('id', selectedCustomerId)
         .maybeSingle();
 
+      // Generate quote number if not provided
+      let finalQuoteNumber = quoteNumber;
+      if (!finalQuoteNumber && !quoteId) {
+        finalQuoteNumber = await generateNextQuoteNumber(userProfile.company_id);
+      }
+
       const quoteData = {
-        quote_number: quoteNumber || `Q${Date.now()}`, // Generate temporary number if empty
+        quote_number: finalQuoteNumber || `Q${Date.now()}`, // Fallback to timestamp if generation fails
         company_id: userProfile.company_id,
         customer_id: selectedCustomerId,
         customer_name: customer?.company_name || 'Unknown Customer',
