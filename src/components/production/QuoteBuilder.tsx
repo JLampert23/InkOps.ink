@@ -1011,8 +1011,14 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                   </tr>
                 </thead>
                 <tbody>
-                  {itemGroups.map((group) => (
+                  {itemGroups.map((group, groupIdx) => (
                     <>
+                      {/* Spacer Row Between Groups */}
+                      {groupIdx > 0 && (
+                        <tr key={`spacer-${group.id}`} className="bg-transparent">
+                          <td colSpan={23} className="p-4 border-0"></td>
+                        </tr>
+                      )}
                       {/* Group Header Row with Label */}
                       {(itemGroups.length > 1 || group.label) && (
                         <tr key={`header-${group.id}`} className="bg-gray-200 dark:bg-slate-800">
