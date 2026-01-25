@@ -12,7 +12,6 @@ import {
   Loader2,
   RefreshCw,
   Download,
-  Plus,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import UnifiedImprintProofBuilder from './UnifiedImprintProofBuilder';
@@ -191,12 +190,6 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
     } finally {
       setSending(false);
     }
-  };
-
-  const handleCreateProof = (lineItemId: string) => {
-    setSelectedLineItemId(lineItemId);
-    setEditingProofId(null);
-    setShowProofBuilder(true);
   };
 
   const handleEditProof = (proofId: string, lineItemId: string) => {
@@ -539,13 +532,6 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                     <tr>
                       <td colSpan={19} className="p-0">
                         <div className="px-4 pb-4">
-                          <button
-                            onClick={() => handleCreateProof(item.id)}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors"
-                          >
-                            <Plus className="w-3 h-3" />
-                            Create Proof
-                          </button>
                           <ProofDisplay
                             lineItemId={item.id}
                             onEdit={(proofId) => handleEditProof(proofId, item.id)}
