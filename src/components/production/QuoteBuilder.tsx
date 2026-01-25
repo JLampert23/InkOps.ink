@@ -1235,6 +1235,29 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           </td>
                         </tr>
                       ))}
+                      {/* Group Actions Row */}
+                      <tr key={`actions-${group.id}`}>
+                        <td colSpan={23} className="p-2 border-t-2 border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => addItem(group.id)}
+                              className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2 shadow-sm"
+                            >
+                              <Plus className="w-4 h-4" />
+                              Line Item
+                            </button>
+                            {itemGroups[itemGroups.length - 1].id === group.id && (
+                              <button
+                                onClick={addItemGroup}
+                                className="px-3 py-2 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-900 dark:text-white rounded text-sm flex items-center gap-2 shadow-sm"
+                              >
+                                <Plus className="w-4 h-4" />
+                                Line Item Group
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
                     </>
                   ))}
                 </tbody>
@@ -1243,25 +1266,11 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
 
             <div className="flex gap-2">
               <button
-                onClick={() => addItem(itemGroups[itemGroups.length - 1].id)}
-                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2 shadow-sm"
-              >
-                <Plus className="w-4 h-4" />
-                Line Item
-              </button>
-              <button
                 onClick={() => setShowImprintsModal(true)}
                 className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2 shadow-sm"
               >
                 <Plus className="w-4 h-4" />
                 Imprint(s)
-              </button>
-              <button
-                onClick={addItemGroup}
-                className="px-3 py-2 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-900 dark:text-white rounded text-sm flex items-center gap-2 shadow-sm"
-              >
-                <Plus className="w-4 h-4" />
-                Line Item Group
               </button>
             </div>
           </div>
