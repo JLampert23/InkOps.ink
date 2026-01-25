@@ -40,6 +40,12 @@ interface QuoteFee {
   taxed: boolean;
 }
 
+interface LineItemGroup {
+  id: string;
+  label: string;
+  items: QuoteItem[];
+}
+
 interface QuoteBuilderProps {
   quoteId?: string;
   initialCustomerId?: string;
@@ -84,7 +90,9 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const [shipState, setShipState] = useState('');
   const [shipZip, setShipZip] = useState('');
 
-  const [items, setItems] = useState<QuoteItem[]>([]);
+  const [itemGroups, setItemGroups] = useState<LineItemGroup[]>([
+    { id: crypto.randomUUID(), label: '', items: [] }
+  ]);
   const [fees, setFees] = useState<QuoteFee[]>([]);
 
   const [discount, setDiscount] = useState(0);
@@ -280,10 +288,32 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         .select('*')
         .eq('quote_id', quoteId)
         .order('sort_order');
-      setItems(lineItems?.map(item => ({
-        ...item,
-        taxed: item.taxed || false,
-      })) || []);
+
+      // Group items by group_label
+      if (lineItems && lineItems.length > 0) {
+        const groupMap = new Map<string, QuoteItem[]>();
+
+        lineItems.forEach(item => {
+          const groupLabel = item.group_label || '';
+          if (!groupMap.has(groupLabel)) {
+            groupMap.set(groupLabel, []);
+          }
+          groupMap.get(groupLabel)!.push({
+            ...item,
+            taxed: item.taxed || false,
+          });
+        });
+
+        const groups: LineItemGroup[] = Array.from(groupMap.entries()).map(([label, items]) => ({
+          id: crypto.randomUUID(),
+          label,
+          items,
+        }));
+
+        setItemGroups(groups);
+      } else {
+        setItemGroups([{ id: crypto.randomUUID(), label: '', items: [] }]);
+      }
 
       const { data: quoteFees } = await supabase
         .from('quote_fees')
@@ -297,49 +327,91 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
     setLoading(false);
   };
 
-  const addItem = () => {
-    setItems([...items, {
-      item_number: '',
-      color: '',
-      description: '',
-      qty_yxs: 0,
-      qty_ys: 0,
-      qty_ym: 0,
-      qty_yl: 0,
-      qty_yxl: 0,
-      qty_xs: 0,
-      qty_s: 0,
-      qty_m: 0,
-      qty_l: 0,
-      qty_xl: 0,
-      qty_2xl: 0,
-      qty_3xl: 0,
-      qty_4xl: 0,
-      unit_price: 0,
-      total_quantity: 0,
-      total_price: 0,
-      taxed: false,
+  const addItem = (groupId: string) => {
+    const newGroups = itemGroups.map(group => {
+      if (group.id === groupId) {
+        return {
+          ...group,
+          items: [...group.items, {
+            item_number: '',
+            color: '',
+            description: '',
+            qty_yxs: 0,
+            qty_ys: 0,
+            qty_ym: 0,
+            qty_yl: 0,
+            qty_yxl: 0,
+            qty_xs: 0,
+            qty_s: 0,
+            qty_m: 0,
+            qty_l: 0,
+            qty_xl: 0,
+            qty_2xl: 0,
+            qty_3xl: 0,
+            qty_4xl: 0,
+            unit_price: 0,
+            total_quantity: 0,
+            total_price: 0,
+            taxed: false,
+          }]
+        };
+      }
+      return group;
+    });
+    setItemGroups(newGroups);
+  };
+
+  const removeItem = (groupId: string, itemIndex: number) => {
+    const newGroups = itemGroups.map(group => {
+      if (group.id === groupId) {
+        return {
+          ...group,
+          items: group.items.filter((_, i) => i !== itemIndex)
+        };
+      }
+      return group;
+    });
+    setItemGroups(newGroups);
+  };
+
+  const updateItem = (groupId: string, itemIndex: number, field: keyof QuoteItem, value: any) => {
+    const newGroups = itemGroups.map(group => {
+      if (group.id === groupId) {
+        const newItems = [...group.items];
+        newItems[itemIndex] = { ...newItems[itemIndex], [field]: value };
+
+        if (field.startsWith('qty_') || field === 'unit_price') {
+          const item = newItems[itemIndex];
+          item.total_quantity =
+            item.qty_yxs + item.qty_ys + item.qty_ym + item.qty_yl + item.qty_yxl +
+            item.qty_xs + item.qty_s + item.qty_m + item.qty_l + item.qty_xl +
+            item.qty_2xl + item.qty_3xl + (item.qty_4xl || 0);
+          item.total_price = item.total_quantity * item.unit_price;
+        }
+
+        return { ...group, items: newItems };
+      }
+      return group;
+    });
+    setItemGroups(newGroups);
+  };
+
+  const addItemGroup = () => {
+    setItemGroups([...itemGroups, {
+      id: crypto.randomUUID(),
+      label: '',
+      items: []
     }]);
   };
 
-  const removeItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index));
+  const removeItemGroup = (groupId: string) => {
+    setItemGroups(itemGroups.filter(group => group.id !== groupId));
   };
 
-  const updateItem = (index: number, field: keyof QuoteItem, value: any) => {
-    const newItems = [...items];
-    newItems[index] = { ...newItems[index], [field]: value };
-
-    if (field.startsWith('qty_') || field === 'unit_price') {
-      const item = newItems[index];
-      item.total_quantity =
-        item.qty_yxs + item.qty_ys + item.qty_ym + item.qty_yl + item.qty_yxl +
-        item.qty_xs + item.qty_s + item.qty_m + item.qty_l + item.qty_xl +
-        item.qty_2xl + item.qty_3xl + (item.qty_4xl || 0);
-      item.total_price = item.total_quantity * item.unit_price;
-    }
-
-    setItems(newItems);
+  const updateGroupLabel = (groupId: string, label: string) => {
+    setItemGroups(itemGroups.map(group =>
+      group.id === groupId ? { ...group, label } : group
+    ));
   };
 
   const addFee = () => {
@@ -394,7 +466,8 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   };
 
   const calculateTotals = () => {
-    const itemTotal = items.reduce((sum, item) => sum + item.total_price, 0);
+    const allItems = itemGroups.flatMap(group => group.items);
+    const itemTotal = allItems.reduce((sum, item) => sum + item.total_price, 0);
     const feeTotal = fees.reduce((sum, fee) => sum + fee.total_amount, 0);
     const subtotal = itemTotal + feeTotal;
 
@@ -407,7 +480,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
 
     const afterDiscount = subtotal - discountAmount;
 
-    const taxableAmount = items
+    const taxableAmount = allItems
       .filter(item => item.taxed)
       .reduce((sum, item) => sum + item.total_price, 0) +
       fees
@@ -418,7 +491,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
     const totalDue = afterDiscount + salesTax;
 
     return {
-      totalQuantity: items.reduce((sum, item) => sum + item.total_quantity, 0),
+      totalQuantity: allItems.reduce((sum, item) => sum + item.total_quantity, 0),
       itemTotal,
       feeTotal,
       subtotal,
@@ -533,36 +606,38 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         // Delete existing line items
         await supabase.from('quote_line_items').delete().eq('quote_id', savedQuoteId);
 
-        // Insert new line items
-        if (items.length > 0) {
-          const { error: itemsError } = await supabase.from('quote_line_items').insert(
-            items.map((item, idx) => ({
-              quote_id: savedQuoteId,
-              company_id: userProfile.company_id,
-              sort_order: idx,
-              item_number: item.item_number,
-              color: item.color,
-              description: item.description,
-              qty_yxs: item.qty_yxs,
-              qty_ys: item.qty_ys,
-              qty_ym: item.qty_ym,
-              qty_yl: item.qty_yl,
-              qty_yxl: item.qty_yxl,
-              qty_xs: item.qty_xs,
-              qty_s: item.qty_s,
-              qty_m: item.qty_m,
-              qty_l: item.qty_l,
-              qty_xl: item.qty_xl,
-              qty_2xl: item.qty_2xl,
-              qty_3xl: item.qty_3xl,
-              qty_4xl: item.qty_4xl || 0,
-              unit_price: item.unit_price,
-              total_quantity: item.total_quantity,
-              total_price: item.total_price,
-              taxed: item.taxed,
-            }))
-          );
+        // Insert new line items with group labels
+        const allItems = itemGroups.flatMap((group, groupIdx) =>
+          group.items.map((item, itemIdx) => ({
+            quote_id: savedQuoteId,
+            company_id: userProfile.company_id,
+            sort_order: groupIdx * 1000 + itemIdx, // Group items together with spacing
+            group_label: group.label || '',
+            item_number: item.item_number,
+            color: item.color,
+            description: item.description,
+            qty_yxs: item.qty_yxs,
+            qty_ys: item.qty_ys,
+            qty_ym: item.qty_ym,
+            qty_yl: item.qty_yl,
+            qty_yxl: item.qty_yxl,
+            qty_xs: item.qty_xs,
+            qty_s: item.qty_s,
+            qty_m: item.qty_m,
+            qty_l: item.qty_l,
+            qty_xl: item.qty_xl,
+            qty_2xl: item.qty_2xl,
+            qty_3xl: item.qty_3xl,
+            qty_4xl: item.qty_4xl || 0,
+            unit_price: item.unit_price,
+            total_quantity: item.total_quantity,
+            total_price: item.total_price,
+            taxed: item.taxed,
+          }))
+        );
 
+        if (allItems.length > 0) {
+          const { error: itemsError } = await supabase.from('quote_line_items').insert(allItems);
           if (itemsError) throw itemsError;
         }
 
@@ -936,42 +1011,70 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((item, idx) => (
-                    <tr key={idx} className="bg-white dark:bg-slate-900/50 hover:bg-gray-50 dark:hover:bg-slate-900">
-                      <td className="p-1 border border-gray-300 dark:border-slate-800 text-center">
-                        <GripVertical className="w-4 h-4 text-gray-600 mx-auto" />
-                      </td>
-                      <td className="p-1 border border-gray-300 dark:border-slate-800">
-                        <input
-                          type="text"
-                          value={item.item_number}
-                          onChange={(e) => updateItem(idx, 'item_number', e.target.value)}
-                          className="w-full px-2 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs"
-                          placeholder="Item #"
-                        />
-                      </td>
-                      <td className="p-1 border border-gray-300 dark:border-slate-800">
-                        <input
-                          type="text"
-                          value={item.color}
-                          onChange={(e) => updateItem(idx, 'color', e.target.value)}
-                          className="w-full px-2 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs"
-                        />
-                      </td>
-                      <td className="p-1 border border-gray-300 dark:border-slate-800">
-                        <input
-                          type="text"
-                          value={item.description}
-                          onChange={(e) => updateItem(idx, 'description', e.target.value)}
-                          className="w-full px-2 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs"
-                        />
-                      </td>
+                  {itemGroups.map((group) => (
+                    <>
+                      {/* Group Header Row with Label */}
+                      {(itemGroups.length > 1 || group.label) && (
+                        <tr key={`header-${group.id}`} className="bg-gray-200 dark:bg-slate-800">
+                          <td colSpan={23} className="p-2 border border-gray-300 dark:border-slate-800">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={group.label}
+                                onChange={(e) => updateGroupLabel(group.id, e.target.value)}
+                                placeholder="Group Label (optional)"
+                                className="px-3 py-1 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-sm text-gray-900 dark:text-white w-64"
+                              />
+                              {itemGroups.length > 1 && (
+                                <button
+                                  onClick={() => removeItemGroup(group.id)}
+                                  className="ml-auto px-2 py-1 text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-slate-700 rounded"
+                                  title="Remove Group"
+                                >
+                                  Remove Group
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      {/* Group Items */}
+                      {group.items.map((item, itemIdx) => (
+                        <tr key={`${group.id}-${itemIdx}`} className="bg-white dark:bg-slate-900/50 hover:bg-gray-50 dark:hover:bg-slate-900">
+                          <td className="p-1 border border-gray-300 dark:border-slate-800 text-center">
+                            <GripVertical className="w-4 h-4 text-gray-600 mx-auto" />
+                          </td>
+                          <td className="p-1 border border-gray-300 dark:border-slate-800">
+                            <input
+                              type="text"
+                              value={item.item_number}
+                              onChange={(e) => updateItem(group.id, itemIdx, 'item_number', e.target.value)}
+                              className="w-full px-2 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs"
+                              placeholder="Item #"
+                            />
+                          </td>
+                          <td className="p-1 border border-gray-300 dark:border-slate-800">
+                            <input
+                              type="text"
+                              value={item.color}
+                              onChange={(e) => updateItem(group.id, itemIdx, 'color', e.target.value)}
+                              className="w-full px-2 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs"
+                            />
+                          </td>
+                          <td className="p-1 border border-gray-300 dark:border-slate-800">
+                            <input
+                              type="text"
+                              value={item.description}
+                              onChange={(e) => updateItem(group.id, itemIdx, 'description', e.target.value)}
+                              className="w-full px-2 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs"
+                            />
+                          </td>
                       <td className="p-1 border border-gray-300 dark:border-slate-800">
                         <input
                           type="number"
                           min="0"
                           value={item.qty_yxs || ''}
-                          onChange={(e) => updateItem(idx, 'qty_yxs', parseInt(e.target.value) || 0)}
+                              onChange={(e) => updateItem(group.id, itemIdx, 'qty_yxs', parseInt(e.target.value) || 0)}
                           className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
@@ -980,7 +1083,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           type="number"
                           min="0"
                           value={item.qty_ys || ''}
-                          onChange={(e) => updateItem(idx, 'qty_ys', parseInt(e.target.value) || 0)}
+                          onChange={(e) => updateItem(group.id, itemIdx, 'qty_ys', parseInt(e.target.value) || 0)}
                           className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
@@ -989,7 +1092,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           type="number"
                           min="0"
                           value={item.qty_ym || ''}
-                          onChange={(e) => updateItem(idx, 'qty_ym', parseInt(e.target.value) || 0)}
+                          onChange={(e) => updateItem(group.id, itemIdx, 'qty_ym', parseInt(e.target.value) || 0)}
                           className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
@@ -998,7 +1101,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           type="number"
                           min="0"
                           value={item.qty_yl || ''}
-                          onChange={(e) => updateItem(idx, 'qty_yl', parseInt(e.target.value) || 0)}
+                          onChange={(e) => updateItem(group.id, itemIdx, 'qty_yl', parseInt(e.target.value) || 0)}
                           className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
@@ -1007,7 +1110,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           type="number"
                           min="0"
                           value={item.qty_yxl || ''}
-                          onChange={(e) => updateItem(idx, 'qty_yxl', parseInt(e.target.value) || 0)}
+                          onChange={(e) => updateItem(group.id, itemIdx, 'qty_yxl', parseInt(e.target.value) || 0)}
                           className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
@@ -1016,7 +1119,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           type="number"
                           min="0"
                           value={item.qty_xs || ''}
-                          onChange={(e) => updateItem(idx, 'qty_xs', parseInt(e.target.value) || 0)}
+                          onChange={(e) => updateItem(group.id, itemIdx, 'qty_xs', parseInt(e.target.value) || 0)}
                           className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
@@ -1025,7 +1128,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           type="number"
                           min="0"
                           value={item.qty_s || ''}
-                          onChange={(e) => updateItem(idx, 'qty_s', parseInt(e.target.value) || 0)}
+                          onChange={(e) => updateItem(group.id, itemIdx, 'qty_s', parseInt(e.target.value) || 0)}
                           className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
@@ -1034,7 +1137,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           type="number"
                           min="0"
                           value={item.qty_m || ''}
-                          onChange={(e) => updateItem(idx, 'qty_m', parseInt(e.target.value) || 0)}
+                          onChange={(e) => updateItem(group.id, itemIdx, 'qty_m', parseInt(e.target.value) || 0)}
                           className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
@@ -1043,7 +1146,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           type="number"
                           min="0"
                           value={item.qty_l || ''}
-                          onChange={(e) => updateItem(idx, 'qty_l', parseInt(e.target.value) || 0)}
+                          onChange={(e) => updateItem(group.id, itemIdx, 'qty_l', parseInt(e.target.value) || 0)}
                           className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
@@ -1052,7 +1155,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           type="number"
                           min="0"
                           value={item.qty_xl || ''}
-                          onChange={(e) => updateItem(idx, 'qty_xl', parseInt(e.target.value) || 0)}
+                          onChange={(e) => updateItem(group.id, itemIdx, 'qty_xl', parseInt(e.target.value) || 0)}
                           className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
@@ -1061,7 +1164,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           type="number"
                           min="0"
                           value={item.qty_2xl || ''}
-                          onChange={(e) => updateItem(idx, 'qty_2xl', parseInt(e.target.value) || 0)}
+                          onChange={(e) => updateItem(group.id, itemIdx, 'qty_2xl', parseInt(e.target.value) || 0)}
                           className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
@@ -1070,7 +1173,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           type="number"
                           min="0"
                           value={item.qty_3xl || ''}
-                          onChange={(e) => updateItem(idx, 'qty_3xl', parseInt(e.target.value) || 0)}
+                          onChange={(e) => updateItem(group.id, itemIdx, 'qty_3xl', parseInt(e.target.value) || 0)}
                           className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
@@ -1079,7 +1182,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           type="number"
                           min="0"
                           value={item.qty_4xl || ''}
-                          onChange={(e) => updateItem(idx, 'qty_4xl', parseInt(e.target.value) || 0)}
+                          onChange={(e) => updateItem(group.id, itemIdx, 'qty_4xl', parseInt(e.target.value) || 0)}
                           className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
@@ -1095,7 +1198,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           step="0.01"
                           min="0"
                           value={item.unit_price}
-                          onChange={(e) => updateItem(idx, 'unit_price', parseFloat(e.target.value) || 0)}
+                          onChange={(e) => updateItem(group.id, itemIdx, 'unit_price', parseFloat(e.target.value) || 0)}
                           className="w-full px-2 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-right"
                         />
                       </td>
@@ -1103,7 +1206,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                         <input
                           type="checkbox"
                           checked={item.taxed}
-                          onChange={(e) => updateItem(idx, 'taxed', e.target.checked)}
+                          onChange={(e) => updateItem(group.id, itemIdx, 'taxed', e.target.checked)}
                           className="w-4 h-4"
                         />
                       </td>
@@ -1121,16 +1224,18 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           >
                             <DollarSign className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => removeItem(idx)}
-                            className="p-1 text-red-600 dark:text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-slate-800 rounded"
-                            title="Remove Item"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                              <button
+                                onClick={() => removeItem(group.id, itemIdx)}
+                                className="p-1 text-red-600 dark:text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-slate-800 rounded"
+                                title="Remove Item"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </>
                   ))}
                 </tbody>
               </table>
@@ -1138,7 +1243,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
 
             <div className="flex gap-2">
               <button
-                onClick={addItem}
+                onClick={() => addItem(itemGroups[itemGroups.length - 1].id)}
                 className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2 shadow-sm"
               >
                 <Plus className="w-4 h-4" />
@@ -1150,6 +1255,13 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
               >
                 <Plus className="w-4 h-4" />
                 Imprint(s)
+              </button>
+              <button
+                onClick={addItemGroup}
+                className="px-3 py-2 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-900 dark:text-white rounded text-sm flex items-center gap-2 shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                Line Item Group
               </button>
             </div>
           </div>
