@@ -6,6 +6,7 @@ import {
   Upload,
   Image as ImageIcon,
   RotateCw,
+  RotateCcw,
   ZoomIn,
   ZoomOut,
   Move,
@@ -617,29 +618,50 @@ export default function ProofGenerator({
 
               {selectedArtwork.length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Transform</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      onClick={() => updateActiveArtwork({ scale: selectedArtwork[activeArtworkIndex].scale + 0.1 })}
-                      className="flex items-center justify-center px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                      title="Zoom In"
-                    >
-                      <ZoomIn className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => updateActiveArtwork({ scale: Math.max(0.1, selectedArtwork[activeArtworkIndex].scale - 0.1) })}
-                      className="flex items-center justify-center px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                      title="Zoom Out"
-                    >
-                      <ZoomOut className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => updateActiveArtwork({ rotation: (selectedArtwork[activeArtworkIndex].rotation + 15) % 360 })}
-                      className="flex items-center justify-center px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                      title="Rotate"
-                    >
-                      <RotateCw className="w-4 h-4" />
-                    </button>
+                  <label className="block text-sm font-medium text-gray-900 mb-3">Transform Controls</label>
+                  <div className="space-y-3">
+                    <div>
+                      <div className="text-xs font-medium text-gray-700 mb-1">Size</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => updateActiveArtwork({ scale: selectedArtwork[activeArtworkIndex].scale + 0.1 })}
+                          className="flex items-center justify-center gap-2 px-3 py-2.5 bg-blue-50 border-2 border-blue-300 text-blue-700 rounded-lg hover:bg-blue-100 hover:border-blue-400 transition-all font-medium"
+                          title="Increase Size"
+                        >
+                          <ZoomIn className="w-5 h-5" />
+                          <span className="text-sm">Larger</span>
+                        </button>
+                        <button
+                          onClick={() => updateActiveArtwork({ scale: Math.max(0.1, selectedArtwork[activeArtworkIndex].scale - 0.1) })}
+                          className="flex items-center justify-center gap-2 px-3 py-2.5 bg-blue-50 border-2 border-blue-300 text-blue-700 rounded-lg hover:bg-blue-100 hover:border-blue-400 transition-all font-medium"
+                          title="Decrease Size"
+                        >
+                          <ZoomOut className="w-5 h-5" />
+                          <span className="text-sm">Smaller</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-medium text-gray-700 mb-1">Rotation</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => updateActiveArtwork({ rotation: (selectedArtwork[activeArtworkIndex].rotation + 15) % 360 })}
+                          className="flex items-center justify-center gap-2 px-3 py-2.5 bg-green-50 border-2 border-green-300 text-green-700 rounded-lg hover:bg-green-100 hover:border-green-400 transition-all font-medium"
+                          title="Rotate Clockwise"
+                        >
+                          <RotateCw className="w-5 h-5" />
+                          <span className="text-sm">Right</span>
+                        </button>
+                        <button
+                          onClick={() => updateActiveArtwork({ rotation: (selectedArtwork[activeArtworkIndex].rotation - 15 + 360) % 360 })}
+                          className="flex items-center justify-center gap-2 px-3 py-2.5 bg-green-50 border-2 border-green-300 text-green-700 rounded-lg hover:bg-green-100 hover:border-green-400 transition-all font-medium"
+                          title="Rotate Counter-Clockwise"
+                        >
+                          <RotateCcw className="w-5 h-5" />
+                          <span className="text-sm">Left</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}

@@ -118,10 +118,22 @@ interface QuoteImprint {
   mockups?: any[];
 }
 
+interface Proof {
+  id: string;
+  proof_number: string;
+  line_item_id: string;
+  garment_image_url: string | null;
+  garment_name: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProps) {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [quoteImprints, setQuoteImprints] = useState<QuoteImprint[]>([]);
+  const [proofs, setProofs] = useState<Proof[]>([]);
   const [loading, setLoading] = useState(true);
   const [showSendModal, setShowSendModal] = useState(false);
   const [sending, setSending] = useState(false);
@@ -187,6 +199,16 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
       if (!imprintsError) {
         setQuoteImprints(imprintsData || []);
+      }
+
+      const { data: proofsData, error: proofsError } = await supabase
+        .from('proofs')
+        .select('id, proof_number, line_item_id, garment_image_url, garment_name, status, created_at, updated_at')
+        .eq('quote_id', quoteId)
+        .order('created_at', { ascending: false });
+
+      if (!proofsError) {
+        setProofs(proofsData || []);
       }
     } catch (error) {
       console.error('Error loading quote:', error);
@@ -618,46 +640,67 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                     <tr>
                       <td colSpan={18} className="px-4 py-2">
                         <div className="flex flex-wrap gap-3">
-                          {quoteImprints.map((imprint) => (
-                            <div
-                              key={imprint.id}
-                              className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 min-w-[180px]"
-                            >
-                              <div className="space-y-1.5">
-                                <div className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">
-                                  {imprint.type_of_work}
+                          {quoteImprints.map((imprint) => {
+                            const garmentItem = lineItems.find(li => li.line_type === 'garment');
+                            const firstLineItem = garmentItem || lineItems[0];
+                            const imprintProofs = proofs.filter(p => p.line_item_id === firstLineItem?.id);
+
+                            return (
+                              <div
+                                key={imprint.id}
+                                className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 min-w-[180px]"
+                              >
+                                <div className="space-y-1.5">
+                                  <div className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">
+                                    {imprint.type_of_work}
+                                  </div>
+                                  <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                    IMPRINT - {imprint.location}
+                                  </div>
+
+                                  {imprintProofs.length > 0 && (
+                                    <div className="mt-2 space-y-1">
+                                      {imprintProofs.map((proof) => (
+                                        <div
+                                          key={proof.id}
+                                          className="flex items-center gap-2 p-2 bg-white dark:bg-slate-800 rounded border border-blue-200 dark:border-blue-700"
+                                        >
+                                          {proof.garment_image_url && (
+                                            <img
+                                              src={proof.garment_image_url}
+                                              alt={proof.garment_name || 'Proof'}
+                                              className="w-8 h-8 object-cover rounded"
+                                            />
+                                          )}
+                                          <div className="flex-1 min-w-0">
+                                            <div className="text-xs font-medium text-gray-900 dark:text-white truncate">
+                                              {proof.proof_number}
+                                            </div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                                              {proof.status}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  <button
+                                    className="w-full px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition-colors flex items-center justify-center gap-1.5 mt-2"
+                                    onClick={() => {
+                                      if (firstLineItem) {
+                                        setSelectedLineItem(firstLineItem);
+                                        setShowProofGenerator(true);
+                                      }
+                                    }}
+                                  >
+                                    <FileText className="w-3.5 h-3.5" />
+                                    {imprintProofs.length > 0 ? 'Add Proof' : 'Create Proof'}
+                                  </button>
                                 </div>
-                                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                  IMPRINT - {imprint.location}
-                                </div>
-                                <button
-                                  className="w-full px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition-colors flex items-center justify-center gap-1.5"
-                                  onClick={() => {
-                                    console.log('===== PROOF BUTTON CLICKED =====');
-                                    console.log('Total line items:', lineItems.length);
-                                    console.log('Line items:', lineItems);
-
-                                    const garmentItem = lineItems.find(li => li.line_type === 'garment');
-                                    const firstLineItem = garmentItem || lineItems[0];
-
-                                    console.log('Garment item found:', garmentItem);
-                                    console.log('Selected line item:', firstLineItem);
-
-                                    if (firstLineItem) {
-                                      console.log('Setting selectedLineItem and showProofGenerator to true');
-                                      setSelectedLineItem(firstLineItem);
-                                      setShowProofGenerator(true);
-                                    } else {
-                                      console.error('NO LINE ITEMS AVAILABLE');
-                                    }
-                                  }}
-                                >
-                                  <FileText className="w-3.5 h-3.5" />
-                                  Proof
-                                </button>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </td>
                     </tr>
