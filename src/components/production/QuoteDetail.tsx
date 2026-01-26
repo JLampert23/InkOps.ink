@@ -122,6 +122,7 @@ interface Proof {
   id: string;
   proof_number: string;
   line_item_id: string;
+  group_label: string | null;
   garment_image_url: string | null;
   garment_name: string | null;
   status: string;
@@ -140,6 +141,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
   const [converting, setConverting] = useState(false);
   const [showProofGenerator, setShowProofGenerator] = useState(false);
   const [selectedLineItem, setSelectedLineItem] = useState<LineItem | null>(null);
+  const [selectedGroupLabel, setSelectedGroupLabel] = useState<string>('');
 
   const [expiresInDays, setExpiresInDays] = useState(30);
   const [singleUse, setSingleUse] = useState(true);
@@ -203,7 +205,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
       const { data: proofsData, error: proofsError } = await supabase
         .from('proofs')
-        .select('id, proof_number, line_item_id, garment_image_url, garment_name, status, created_at, updated_at')
+        .select('id, proof_number, line_item_id, group_label, garment_image_url, garment_name, status, created_at, updated_at')
         .eq('quote_id', quoteId)
         .order('created_at', { ascending: false });
 
@@ -636,14 +638,19 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                 );
               })}
                   {/* Imprint blocks under this group */}
-                  {quoteImprints.length > 0 && (
+                  {quoteImprints.filter(imp => (imp as any).group_label === groupLabel).length > 0 && (
                     <tr>
                       <td colSpan={18} className="px-4 py-2">
                         <div className="flex flex-wrap gap-3">
-                          {quoteImprints.map((imprint) => {
-                            const garmentItem = lineItems.find(li => li.line_type === 'garment');
-                            const firstLineItem = garmentItem || lineItems[0];
-                            const imprintProofs = proofs.filter(p => p.line_item_id === firstLineItem?.id);
+                          {quoteImprints.filter(imp => (imp as any).group_label === groupLabel).map((imprint) => {
+                            // Find the first garment item in this specific group
+                            const garmentItem = groupItems.find(li => li.line_type === 'garment');
+                            const firstLineItem = garmentItem || groupItems[0];
+                            // Filter proofs to only show those for this specific group
+                            const imprintProofs = proofs.filter(p =>
+                              (p.group_label === groupLabel) ||
+                              (!p.group_label && !groupLabel) // Handle legacy proofs without group_label
+                            );
 
                             return (
                               <div
@@ -690,6 +697,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                     onClick={() => {
                                       if (firstLineItem) {
                                         setSelectedLineItem(firstLineItem);
+                                        setSelectedGroupLabel(groupLabel);
                                         setShowProofGenerator(true);
                                       }
                                     }}
@@ -888,10 +896,12 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
               customerId={quote.customer_id}
               garmentStyle={selectedLineItem.item_number}
               garmentColor={selectedLineItem.color}
+              groupLabel={selectedGroupLabel}
               onClose={() => {
                 console.log('ProofGenerator onClose called');
                 setShowProofGenerator(false);
                 setSelectedLineItem(null);
+                setSelectedGroupLabel('');
               }}
               onSave={() => {
                 console.log('ProofGenerator onSave called');

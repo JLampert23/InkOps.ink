@@ -24,6 +24,7 @@ interface ProofGeneratorProps {
   customerId?: string;
   garmentStyle?: string;
   garmentColor?: string;
+  groupLabel?: string;
   onClose: () => void;
   onSave?: () => void;
 }
@@ -73,6 +74,7 @@ export default function ProofGenerator({
   customerId,
   garmentStyle,
   garmentColor,
+  groupLabel,
   onClose,
   onSave,
 }: ProofGeneratorProps) {
@@ -314,6 +316,7 @@ export default function ProofGenerator({
             line_item_id: lineItemId,
             customer_id: customerId,
             company_id: companyId,
+            group_label: groupLabel || '',
             garment_image_url: garmentImageUrl,
             garment_name: garmentStyle && garmentColor
               ? `${garmentStyle} - ${garmentColor}`
