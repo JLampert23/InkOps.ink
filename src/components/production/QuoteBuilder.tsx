@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, GripVertical, X, Loader2, DollarSign } from 'lucide-react';
+import { Save, Plus, Trash2, GripVertical, X, Loader2, DollarSign, Settings } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -75,6 +75,8 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const [customerNotes, setCustomerNotes] = useState('');
   const [productionNotes, setProductionNotes] = useState('');
   const [customSizeOption, setCustomSizeOption] = useState('');
+  const [selectedCustomSizeOptions, setSelectedCustomSizeOptions] = useState<string[]>([]);
+  const [showCustomSizeModal, setShowCustomSizeModal] = useState(false);
 
   const [billCompany, setBillCompany] = useState('');
   const [billName, setBillName] = useState('');
@@ -268,6 +270,10 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       setCustomerNotes(quote.customer_notes || '');
       setProductionNotes(quote.production_notes || '');
       setCustomSizeOption(quote.custom_size_option || '');
+      // Parse selected custom size options (stored as comma-separated)
+      if (quote.custom_size_option) {
+        setSelectedCustomSizeOptions(quote.custom_size_option.split(',').filter((s: string) => s.trim()));
+      }
       setBillCompany(quote.bill_company || '');
       setBillName(quote.bill_name || '');
       setBillAddress1(quote.bill_address_1 || '');
@@ -562,7 +568,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         nickname: nickname || null,
         customer_notes: customerNotes || null,
         production_notes: productionNotes || null,
-        custom_size_option: customSizeOption || null,
+        custom_size_option: selectedCustomSizeOptions.length > 0 ? selectedCustomSizeOptions.join(',') : null,
         bill_company: billCompany || null,
         bill_name: billName || null,
         bill_address_1: billAddress1 || null,
@@ -980,20 +986,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                   <option value="Due on Receipt">Due on Receipt</option>
                 </select>
               </div>
-
-              <div>
-                <label className="text-sm text-gray-700 dark:text-gray-300 mb-2 block font-medium">Custom Size Option</label>
-                <select
-                  value={customSizeOption}
-                  onChange={(e) => setCustomSizeOption(e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
-                >
-                  <option value="">None</option>
-                  {(companySettings?.custom_line_item_options || []).map((option: string, idx: number) => (
-                    <option key={idx} value={option}>{option}</option>
-                  ))}
-                </select>
-              </div>
             </div>
           </div>
 
@@ -1293,30 +1285,39 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       {/* Group Actions Row */}
                       <tr key={`actions-${group.id}`}>
                         <td colSpan={23} className="p-2 border-t-2 border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => addItem(group.id)}
-                              className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2 shadow-sm"
-                            >
-                              <Plus className="w-4 h-4" />
-                              Line Item
-                            </button>
-                            <button
-                              onClick={() => setShowImprintsModal(true)}
-                              className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2 shadow-sm"
-                            >
-                              <Plus className="w-4 h-4" />
-                              Imprint(s)
-                            </button>
-                            {itemGroups[itemGroups.length - 1].id === group.id && (
+                          <div className="flex gap-2 justify-between items-center">
+                            <div className="flex gap-2">
                               <button
-                                onClick={addItemGroup}
-                                className="px-3 py-2 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-900 dark:text-white rounded text-sm flex items-center gap-2 shadow-sm"
+                                onClick={() => addItem(group.id)}
+                                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2 shadow-sm"
                               >
                                 <Plus className="w-4 h-4" />
-                                Line Item Group
+                                Line Item
                               </button>
-                            )}
+                              <button
+                                onClick={() => setShowImprintsModal(true)}
+                                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2 shadow-sm"
+                              >
+                                <Plus className="w-4 h-4" />
+                                Imprint(s)
+                              </button>
+                              {itemGroups[itemGroups.length - 1].id === group.id && (
+                                <button
+                                  onClick={addItemGroup}
+                                  className="px-3 py-2 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-900 dark:text-white rounded text-sm flex items-center gap-2 shadow-sm"
+                                >
+                                  <Plus className="w-4 h-4" />
+                                  Line Item Group
+                                </button>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => setShowCustomSizeModal(true)}
+                              className="px-3 py-2 bg-gray-600 hover:bg-gray-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded text-sm flex items-center gap-2 shadow-sm"
+                            >
+                              <Settings className="w-4 h-4" />
+                              Custom Sizes ({selectedCustomSizeOptions.length})
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -1506,6 +1507,63 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         onClose={() => setShowImprintsModal(false)}
         quoteId={quoteId}
       />
+
+      {/* Custom Size Options Modal */}
+      {showCustomSizeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl max-w-md w-full">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-slate-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Custom Size Options</h3>
+              <button
+                onClick={() => setShowCustomSizeModal(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 max-h-96 overflow-y-auto">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                Select which custom size options to include on this quote:
+              </p>
+              <div className="space-y-2">
+                {(companySettings?.custom_line_item_options || []).map((option: string, idx: number) => (
+                  <label
+                    key={idx}
+                    className="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-slate-800 rounded cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedCustomSizeOptions.includes(option)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedCustomSizeOptions([...selectedCustomSizeOptions, option]);
+                        } else {
+                          setSelectedCustomSizeOptions(selectedCustomSizeOptions.filter(o => o !== option));
+                        }
+                      }}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-900 dark:text-white">{option}</span>
+                  </label>
+                ))}
+                {(!companySettings?.custom_line_item_options || companySettings.custom_line_item_options.length === 0) && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                    No custom size options available. Add them in Account Settings.
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 p-4 border-t border-gray-200 dark:border-slate-700">
+              <button
+                onClick={() => setShowCustomSizeModal(false)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
