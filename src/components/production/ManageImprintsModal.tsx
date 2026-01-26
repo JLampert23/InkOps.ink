@@ -379,26 +379,50 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
 
   const handleDone = async () => {
     if (quoteId) {
-      await supabase.from('quote_imprints').delete().eq('quote_id', quoteId);
+      try {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('company_id')
+          .eq('id', user?.id)
+          .single();
 
-      if (imprints.length > 0) {
-        await supabase.from('quote_imprints').insert(
-          imprints.map((imp, idx) => ({
-            quote_id: quoteId,
-            sort_order: idx,
-            location: imp.location,
-            price_matrix_id: imp.price_matrix_id,
-            matrix: imp.matrix,
-            column_number: imp.column_number,
-            type_of_work: imp.type_of_work,
-            details: imp.details,
-            mockups: imp.proofs,
-            thread_ink_color: imp.thread_ink_color,
-            pricing_matrix_column: imp.pricing_matrix_column,
-          }))
-        );
+        if (!profile?.company_id) {
+          showNotification('error', 'Error', 'Company ID not found');
+          return;
+        }
+
+        await supabase.from('quote_imprints').delete().eq('quote_id', quoteId);
+
+        if (imprints.length > 0) {
+          const { error } = await supabase.from('quote_imprints').insert(
+            imprints.map((imp, idx) => ({
+              quote_id: quoteId,
+              company_id: profile.company_id,
+              sort_order: idx,
+              location: imp.location,
+              price_matrix_id: imp.price_matrix_id,
+              matrix: imp.matrix,
+              column_number: imp.column_number,
+              type_of_work: imp.type_of_work,
+              details: imp.details,
+              mockups: imp.proofs,
+              thread_ink_color: imp.thread_ink_color,
+              pricing_matrix_column: imp.pricing_matrix_column,
+            }))
+          );
+
+          if (error) {
+            console.error('Error saving imprints:', error);
+            showNotification('error', 'Save Failed', 'Failed to save imprints');
+            return;
+          }
+        }
+        showNotification('success', 'Saved', 'Imprints saved successfully');
+      } catch (err) {
+        console.error('Error in handleDone:', err);
+        showNotification('error', 'Save Failed', 'An error occurred while saving');
+        return;
       }
-      showNotification('success', 'Saved', 'Imprints saved successfully');
     }
     onClose();
   };
