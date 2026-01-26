@@ -633,9 +633,9 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                 <button
                                   className="w-full px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition-colors flex items-center justify-center gap-1.5"
                                   onClick={() => {
-                                    const lineItemForImprint = lineItems.find(li => li.id === item.id);
-                                    if (lineItemForImprint) {
-                                      setSelectedLineItem(lineItemForImprint);
+                                    const firstLineItem = lineItems.find(li => li.line_type === 'garment');
+                                    if (firstLineItem) {
+                                      setSelectedLineItem(firstLineItem);
                                       setShowProofGenerator(true);
                                     }
                                   }}
