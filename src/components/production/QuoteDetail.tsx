@@ -614,43 +614,21 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                   {quoteImprints.length > 0 && (
                     <tr>
                       <td colSpan={18} className="px-4 py-2">
-                        <div className="space-y-2">
+                        <div className="flex flex-wrap gap-3">
                           {quoteImprints.map((imprint) => (
                             <div
                               key={imprint.id}
-                              className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3"
+                              className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 min-w-[180px]"
                             >
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-3">
-                                    <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">
-                                      Imprint
-                                    </span>
-                                    <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                      {imprint.location}
-                                    </span>
-                                    <span className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded">
-                                      {imprint.type_of_work}
-                                    </span>
-                                    {imprint.thread_ink_color && (
-                                      <span className="text-xs text-gray-600 dark:text-gray-400">
-                                        Color: {imprint.thread_ink_color}
-                                      </span>
-                                    )}
-                                    {imprint.pricing_matrix_column && (
-                                      <span className="text-xs text-gray-600 dark:text-gray-400">
-                                        {imprint.matrix} - {imprint.pricing_matrix_column}
-                                      </span>
-                                    )}
-                                  </div>
-                                  {imprint.details && (
-                                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1.5 ml-16">
-                                      {imprint.details}
-                                    </p>
-                                  )}
+                              <div className="space-y-1.5">
+                                <div className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">
+                                  {imprint.type_of_work}
+                                </div>
+                                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                  IMPRINT - {imprint.location}
                                 </div>
                                 <button
-                                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition-colors flex items-center gap-1.5"
+                                  className="w-full px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition-colors flex items-center justify-center gap-1.5"
                                   onClick={() => {
                                     console.log('Open proof for imprint:', imprint.id);
                                   }}
