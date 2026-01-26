@@ -984,34 +984,37 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           <div className="space-y-2 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-200 dark:border-slate-800 p-6">
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-gray-100 dark:bg-slate-900 text-xs text-gray-700 dark:text-gray-400">
-                    <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-6"></th>
-                    <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-20">Item #</th>
-                    <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-20">Color</th>
-                    <th className="p-1 text-left border border-gray-300 dark:border-slate-800">Description</th>
-                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YXS</th>
-                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YS</th>
-                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YM</th>
-                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YL</th>
-                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YXL</th>
-                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">XS</th>
-                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">S</th>
-                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">M</th>
-                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">L</th>
-                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">XL</th>
-                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">2XL</th>
-                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">3XL</th>
-                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">4XL</th>
-                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-14">Quantity</th>
-                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-14">Items</th>
-                    <th className="p-1 text-right border border-gray-300 dark:border-slate-800 w-16">Price</th>
-                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">Taxed</th>
-                    <th className="p-1 text-right border border-gray-300 dark:border-slate-800 w-20">Total</th>
-                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-24">Options</th>
-                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-20">Actions</th>
-                  </tr>
-                </thead>
+                {/* Only show main thead when there are no group labels */}
+                {!itemGroups.some(g => g.label) && (
+                  <thead>
+                    <tr className="bg-gray-100 dark:bg-slate-900 text-xs text-gray-700 dark:text-gray-400">
+                      <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-6"></th>
+                      <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-20">Item #</th>
+                      <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-20">Color</th>
+                      <th className="p-1 text-left border border-gray-300 dark:border-slate-800">Description</th>
+                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YXS</th>
+                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YS</th>
+                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YM</th>
+                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YL</th>
+                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YXL</th>
+                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">XS</th>
+                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">S</th>
+                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">M</th>
+                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">L</th>
+                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">XL</th>
+                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">2XL</th>
+                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">3XL</th>
+                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">4XL</th>
+                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-14">Quantity</th>
+                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-14">Items</th>
+                      <th className="p-1 text-right border border-gray-300 dark:border-slate-800 w-16">Price</th>
+                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">Taxed</th>
+                      <th className="p-1 text-right border border-gray-300 dark:border-slate-800 w-20">Total</th>
+                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-24">Options</th>
+                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-20">Actions</th>
+                    </tr>
+                  </thead>
+                )}
                 <tbody>
                   {itemGroups.map((group, groupIdx) => (
                     <>
