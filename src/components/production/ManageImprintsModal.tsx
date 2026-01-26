@@ -407,20 +407,20 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between p-6 border-b border-slate-700">
-          <h2 className="text-xl font-semibold text-white">Manage Imprints & Artwork</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
+      <div className="bg-slate-900 rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700/70">
+          <h2 className="text-lg font-semibold text-white">Manage Imprints & Artwork</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-auto p-6">
-          <div className="space-y-6">
-            <div className="bg-slate-800/50 rounded-lg p-4 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+        <div className="flex-1 overflow-auto px-5 py-4">
+          <div className="space-y-3">
+            <div className="bg-slate-800/50 rounded-lg p-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">
+                  <label className="block text-xs font-medium text-gray-400 mb-1.5">
                     Type of Work <span className="text-red-400">*</span>
                   </label>
                   <select
@@ -428,9 +428,9 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                     onChange={(e) => setCurrentImprint({
                       ...currentImprint,
                       type_of_work: e.target.value,
-                      thread_ink_color: '' // Reset color when type changes
+                      thread_ink_color: ''
                     })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm"
+                    className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-600 rounded text-white text-sm"
                   >
                     <option value="">Select type of work</option>
                     {workTypes.map((workType) => (
@@ -442,13 +442,13 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                 </div>
 
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">
+                  <label className="block text-xs font-medium text-gray-400 mb-1.5">
                     Decoration Location <span className="text-red-400">*</span>
                   </label>
                   <select
                     value={currentImprint.location}
                     onChange={(e) => setCurrentImprint({ ...currentImprint, location: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm"
+                    className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-600 rounded text-white text-sm"
                   >
                     <option value="">Select location</option>
                     {decorationLocations.map((loc) => (
@@ -460,63 +460,9 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">
-                    {(() => {
-                      const workType = workTypes.find(wt => wt.work_type_name === currentImprint.type_of_work);
-                      if (!workType) return 'Color';
-                      if (workType.color_type === 'none') return 'Color';
-                      return workType.color_type === 'ink' ? 'Ink Color' : 'Thread Color';
-                    })()}
-                  </label>
-                  <select
-                    value={currentImprint.thread_ink_color}
-                    onChange={(e) => {
-                      const selectedName = e.target.value;
-                      setCurrentImprint({ ...currentImprint, thread_ink_color: selectedName });
-                    }}
-                    disabled={!currentImprint.type_of_work || (() => {
-                      const workType = workTypes.find(wt => wt.work_type_name === currentImprint.type_of_work);
-                      return workType?.color_type === 'none';
-                    })()}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <option value="">
-                      {!currentImprint.type_of_work ? 'Select type of work first' :
-                       (() => {
-                         const workType = workTypes.find(wt => wt.work_type_name === currentImprint.type_of_work);
-                         return workType?.color_type === 'none' ? 'No color needed' : 'Select color (optional)';
-                       })()}
-                    </option>
-                    {currentImprint.type_of_work && (() => {
-                      const workType = workTypes.find(wt => wt.work_type_name === currentImprint.type_of_work);
-                      if (!workType || workType.color_type === 'none') return null;
-                      const colors = workType.color_type === 'ink' ? inkColors : threadColors;
-                      return colors.map((color, idx) => (
-                        <option key={idx} value={color.name}>
-                          {color.name}
-                          {color.charge !== undefined && color.charge > 0 ? ` (+$${color.charge})` : ''}
-                        </option>
-                      ));
-                    })()}
-                  </select>
-                  {currentImprint.thread_ink_color && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Selected: {currentImprint.thread_ink_color}
-                      {(() => {
-                        const workType = workTypes.find(wt => wt.work_type_name === currentImprint.type_of_work);
-                        if (!workType || workType.color_type === 'none') return '';
-                        const colors = workType.color_type === 'ink' ? inkColors : threadColors;
-                        const selected = colors.find(c => c.name === currentImprint.thread_ink_color);
-                        return selected?.charge ? ` (Charge: $${selected.charge})` : '';
-                      })()}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-400 mb-2">Pricing Matrix</label>
+                  <label className="block text-xs font-medium text-gray-400 mb-1.5">Pricing Matrix</label>
                   <select
                     value={currentImprint.price_matrix_id}
                     onChange={(e) => {
@@ -526,11 +472,11 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                         ...currentImprint,
                         price_matrix_id: e.target.value,
                         matrix: matrix?.name || '',
-                        pricing_matrix_column: '' // Reset column when matrix changes
+                        pricing_matrix_column: ''
                       });
                       setSelectedMatrixColumns(columns);
                     }}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm"
+                    className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-600 rounded text-white text-sm"
                   >
                     <option value="">Select pricing matrix</option>
                     {priceMatrices.map((matrix) => (
@@ -540,19 +486,17 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                     ))}
                   </select>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-400 mb-2">Column</label>
+                  <label className="block text-xs font-medium text-gray-400 mb-1.5">Column</label>
                   <select
                     value={currentImprint.pricing_matrix_column}
                     onChange={(e) => setCurrentImprint({ ...currentImprint, pricing_matrix_column: e.target.value })}
                     disabled={!currentImprint.price_matrix_id || selectedMatrixColumns.length === 0}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-600 rounded text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <option value="">
-                      {!currentImprint.price_matrix_id ? 'Select a pricing matrix first' : 'Select column'}
+                      {!currentImprint.price_matrix_id ? 'Select matrix first' : 'Select column'}
                     </option>
                     {selectedMatrixColumns.map((col, idx) => (
                       <option key={idx} value={col}>
@@ -560,33 +504,26 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                       </option>
                     ))}
                   </select>
-                  {!currentImprint.price_matrix_id && (
-                    <p className="text-xs text-gray-500 mt-1">Choose a pricing matrix to see available columns</p>
-                  )}
-                </div>
-
-                <div>
-                  {/* Spacer for layout balance */}
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Details</label>
+                <label className="block text-xs font-medium text-gray-400 mb-1.5">Details</label>
                 <textarea
                   value={currentImprint.details}
                   onChange={(e) => setCurrentImprint({ ...currentImprint, details: e.target.value })}
-                  rows={3}
+                  rows={2}
                   placeholder="Enter imprint details (colors, size, special instructions)..."
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-white text-sm"
+                  className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-600 rounded text-white text-sm resize-none"
                 />
               </div>
 
-              <div className="border-t border-slate-700 pt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <label className="text-sm font-medium text-gray-300">Artwork & Proofs</label>
-                  <label className="px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm flex items-center gap-2 cursor-pointer">
-                    <Upload className="w-4 h-4" />
-                    {uploading ? 'Uploading...' : 'Upload Artwork'}
+              <div className="border-t border-slate-700 pt-3 mt-3">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-semibold text-gray-300 uppercase tracking-wide">Artwork & Proofs</label>
+                  <label className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs flex items-center gap-1.5 cursor-pointer transition-colors">
+                    <Upload className="w-3.5 h-3.5" />
+                    {uploading ? 'Uploading...' : 'Upload'}
                     <input
                       type="file"
                       multiple
@@ -599,16 +536,16 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                 </div>
 
                 {!quoteId && (
-                  <div className="bg-yellow-500/10 border border-yellow-500/20 rounded p-3 mb-3">
-                    <p className="text-sm text-yellow-400">Please save the quote first before uploading artwork</p>
+                  <div className="bg-yellow-500/10 border border-yellow-500/20 rounded p-2 mb-2">
+                    <p className="text-xs text-yellow-400">Save the quote first before uploading artwork</p>
                   </div>
                 )}
 
                 {currentImprint.proofs.length > 0 && (
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-3 gap-2">
                     {currentImprint.proofs.map((proof, idx) => (
-                      <div key={idx} className="bg-slate-900 rounded-lg overflow-hidden border border-slate-700">
-                        <div className="aspect-video bg-slate-950 flex items-center justify-center">
+                      <div key={idx} className="bg-slate-900 rounded overflow-hidden border border-slate-700">
+                        <div className="aspect-square bg-slate-950 flex items-center justify-center relative group">
                           {proof.file_type?.startsWith('image/') ? (
                             <img
                               src={proof.file_url}
@@ -616,30 +553,25 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                               className="w-full h-full object-contain"
                             />
                           ) : (
-                            <FileText className="w-12 h-12 text-gray-500" />
+                            <FileText className="w-8 h-8 text-gray-500" />
                           )}
+                          <button
+                            onClick={() => handleDeleteProof(idx)}
+                            className="absolute top-1 right-1 p-1 bg-red-600/90 hover:bg-red-500 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
                         </div>
-                        <div className="p-3">
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium text-white truncate">{proof.file_name}</p>
-                              <p className="text-xs text-gray-500">Version {proof.version}</p>
-                            </div>
-                            <button
-                              onClick={() => handleDeleteProof(idx)}
-                              className="text-red-400 hover:text-red-300 ml-2"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
+                        <div className="p-2">
+                          <p className="text-xs font-medium text-white truncate mb-0.5">{proof.file_name}</p>
                           {selectedProofForNote === idx ? (
-                            <div className="space-y-2">
+                            <div className="space-y-1">
                               <textarea
                                 value={proof.notes || ''}
                                 onChange={(e) => handleUpdateProofNote(idx, e.target.value)}
-                                placeholder="Add notes about this proof..."
+                                placeholder="Add notes..."
                                 rows={2}
-                                className="w-full px-2 py-1 bg-slate-950 border border-slate-600 rounded text-white text-xs"
+                                className="w-full px-1.5 py-1 bg-slate-950 border border-slate-600 rounded text-white text-xs resize-none"
                               />
                               <button
                                 onClick={() => setSelectedProofForNote(null)}
@@ -650,14 +582,14 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                             </div>
                           ) : (
                             <div>
-                              {proof.notes ? (
-                                <p className="text-xs text-gray-400 line-clamp-2 mb-1">{proof.notes}</p>
-                              ) : null}
+                              {proof.notes && (
+                                <p className="text-xs text-gray-400 line-clamp-1 mb-0.5">{proof.notes}</p>
+                              )}
                               <button
                                 onClick={() => setSelectedProofForNote(idx)}
                                 className="text-xs text-blue-400 hover:text-blue-300"
                               >
-                                {proof.notes ? 'Edit notes' : 'Add notes'}
+                                {proof.notes ? 'Edit' : 'Add note'}
                               </button>
                             </div>
                           )}
@@ -670,7 +602,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
 
               <button
                 onClick={handleAddImprint}
-                className="w-full px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded flex items-center justify-center gap-2"
+                className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm font-medium flex items-center justify-center gap-2 transition-colors"
               >
                 <Plus className="w-4 h-4" />
                 {editingIndex !== null ? 'Update Imprint' : 'Add Imprint'}
@@ -679,56 +611,50 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
 
             {imprints.length > 0 && (
               <div className="space-y-2">
-                <h3 className="text-sm font-medium text-gray-400">Added Imprints ({imprints.length})</h3>
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Added Imprints ({imprints.length})</h3>
                 {imprints.map((imprint, idx) => (
                   <div
                     key={idx}
-                    className="bg-slate-800 rounded-lg p-4 hover:bg-slate-750 cursor-pointer"
+                    className="bg-slate-800/70 rounded-lg p-3 hover:bg-slate-800 cursor-pointer transition-colors border border-slate-700/50"
                     onClick={() => handleEditImprint(idx)}
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-white font-medium">{imprint.location || imprint.matrix}</span>
-                          {imprint.pricing_matrix_column && (
-                            <span className="text-xs text-gray-400">
-                              {imprint.pricing_matrix_column}
-                            </span>
-                          )}
-                          <span className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className="text-white font-medium text-sm">{imprint.location || imprint.matrix}</span>
+                          <span className="text-xs px-1.5 py-0.5 bg-blue-500/20 text-blue-300 rounded">
                             {imprint.type_of_work}
                           </span>
-                          {imprint.thread_ink_color && (
-                            <span className="text-xs px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded">
-                              {imprint.thread_ink_color}
+                          {imprint.pricing_matrix_column && (
+                            <span className="text-xs text-gray-400">
+                              Col: {imprint.pricing_matrix_column}
                             </span>
                           )}
                         </div>
                         {imprint.details && (
-                          <div className="text-sm text-gray-400 mb-2 line-clamp-2">{imprint.details}</div>
+                          <p className="text-xs text-gray-400 mb-1.5 line-clamp-1">{imprint.details}</p>
                         )}
                         {imprint.proofs.length > 0 && (
-                          <div className="flex items-center gap-2 mt-2">
-                            <ImageIcon className="w-4 h-4 text-gray-500" />
-                            <span className="text-xs text-gray-500">{imprint.proofs.length} artwork file(s)</span>
-                            <div className="flex gap-1 ml-2">
-                              {imprint.proofs.slice(0, 3).map((proof, pIdx) => (
-                                <div key={pIdx} className="w-8 h-8 rounded overflow-hidden bg-slate-950">
+                          <div className="flex items-center gap-2">
+                            <div className="flex gap-1">
+                              {imprint.proofs.slice(0, 4).map((proof, pIdx) => (
+                                <div key={pIdx} className="w-6 h-6 rounded overflow-hidden bg-slate-950 border border-slate-700">
                                   {proof.file_type?.startsWith('image/') ? (
                                     <img src={proof.file_url} alt="" className="w-full h-full object-cover" />
                                   ) : (
                                     <div className="w-full h-full flex items-center justify-center">
-                                      <FileText className="w-4 h-4 text-gray-600" />
+                                      <FileText className="w-3 h-3 text-gray-600" />
                                     </div>
                                   )}
                                 </div>
                               ))}
-                              {imprint.proofs.length > 3 && (
-                                <div className="w-8 h-8 rounded bg-slate-950 flex items-center justify-center">
-                                  <span className="text-xs text-gray-500">+{imprint.proofs.length - 3}</span>
+                              {imprint.proofs.length > 4 && (
+                                <div className="w-6 h-6 rounded bg-slate-950 border border-slate-700 flex items-center justify-center">
+                                  <span className="text-xs text-gray-500">+{imprint.proofs.length - 4}</span>
                                 </div>
                               )}
                             </div>
+                            <span className="text-xs text-gray-500">{imprint.proofs.length} file{imprint.proofs.length !== 1 ? 's' : ''}</span>
                           </div>
                         )}
                       </div>
@@ -737,7 +663,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                           e.stopPropagation();
                           handleDeleteImprint(idx);
                         }}
-                        className="text-red-400 hover:text-red-300 ml-4"
+                        className="text-red-400 hover:text-red-300 flex-shrink-0"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -749,10 +675,10 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
           </div>
         </div>
 
-        <div className="p-6 border-t border-slate-700">
+        <div className="px-5 py-4 border-t border-slate-700/70">
           <button
             onClick={handleDone}
-            className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-medium"
+            className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded font-medium transition-colors shadow-lg"
           >
             Save & Close
           </button>
