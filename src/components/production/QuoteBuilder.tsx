@@ -1046,8 +1046,8 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           </td>
                         </tr>
                       )}
-                      {/* Group Column Headers - All Groups Except First */}
-                      {groupIdx > 0 && (
+                      {/* Group Column Headers - All Groups with Labels */}
+                      {(itemGroups.length > 1 || group.label) && (
                         <tr key={`columns-${group.id}`} className="bg-gray-100 dark:bg-slate-900 text-xs text-gray-700 dark:text-gray-400">
                           <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-6"></th>
                           <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-20">Item #</th>
