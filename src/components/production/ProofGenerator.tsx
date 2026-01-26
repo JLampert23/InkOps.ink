@@ -306,27 +306,26 @@ export default function ProofGenerator({
       let currentProofId = proofId;
 
       if (!currentProofId) {
-        const { data: proofNumberData } = await supabase
-          .rpc('get_next_proof_number', { p_company_id: companyId });
-
         const { data: newProof, error: proofError } = await supabase
           .from('proofs')
           .insert({
-            proof_number: proofNumberData,
             quote_id: quoteId,
             line_item_id: lineItemId,
             customer_id: customerId,
             company_id: companyId,
             garment_image_url: garmentImageUrl,
-            garment_style: garmentStyle,
-            garment_color: garmentColor,
-            garment_brand: garmentBrand,
-            garment_description: garmentDescription,
+            garment_name: garmentStyle && garmentColor
+              ? `${garmentStyle} - ${garmentColor}`
+              : garmentStyle || '',
+            created_by: user.id,
           })
           .select()
           .single();
 
-        if (proofError) throw proofError;
+        if (proofError) {
+          console.error('Error creating proof:', proofError);
+          throw proofError;
+        }
         currentProofId = newProof.id;
         setProofId(currentProofId);
       }
