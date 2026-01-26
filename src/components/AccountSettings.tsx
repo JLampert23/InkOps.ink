@@ -247,6 +247,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [workTypes, setWorkTypes] = useState<TypeOfWork[]>([]);
   const [loadingWorkTypes, setLoadingWorkTypes] = useState(false);
   const [editingWorkTypeId, setEditingWorkTypeId] = useState<string | null>(null);
+
+  const [customLineItemOptions, setCustomLineItemOptions] = useState<string[]>([]);
+  const [newLineItemOption, setNewLineItemOption] = useState('');
+  const [savingLineItemOptions, setSavingLineItemOptions] = useState(false);
   const [showAddWorkTypeModal, setShowAddWorkTypeModal] = useState(false);
   const [showBulkAddWorkTypesModal, setShowBulkAddWorkTypesModal] = useState(false);
   const [bulkWorkTypesText, setBulkWorkTypesText] = useState('');
@@ -337,6 +341,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setSmsMessageTemplate(data.sms_message_template || 'Hi {CustomerName}, your invoice {InvoiceNumber} is ready. Amount Due: ${Amount}. Pay here: {PaymentLink}. Reply STOP to unsubscribe.');
         setUseNumberPrefix(data.use_number_prefix || false);
         setNumberStartNumber(data.number_start_number || 1);
+        setCustomLineItemOptions(data.custom_line_item_options || []);
       }
     } catch (err) {
       console.error('Error loading settings:', err);
@@ -2535,6 +2540,65 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       showNotification('error', 'Save Failed', errorMessage);
     } finally {
       setSavingWorkType(false);
+    }
+  };
+
+  const addCustomLineItemOption = async () => {
+    if (!newLineItemOption.trim()) {
+      showNotification('error', 'Validation Error', 'Please enter an option name.');
+      return;
+    }
+
+    if (!companySettings?.id) {
+      showNotification('error', 'Error', 'Company settings not found.');
+      return;
+    }
+
+    try {
+      setSavingLineItemOptions(true);
+
+      const updatedOptions = [...customLineItemOptions, newLineItemOption.trim()];
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update({ custom_line_item_options: updatedOptions })
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
+
+      setCustomLineItemOptions(updatedOptions);
+      setNewLineItemOption('');
+      showNotification('success', 'Option Added', 'Custom line item option added successfully!');
+    } catch (err: any) {
+      console.error('Error adding line item option:', err);
+      showNotification('error', 'Save Failed', 'Failed to add option. Please try again.');
+    } finally {
+      setSavingLineItemOptions(false);
+    }
+  };
+
+  const removeCustomLineItemOption = async (index: number) => {
+    if (!companySettings?.id) return;
+
+    try {
+      setSavingLineItemOptions(true);
+
+      const updatedOptions = customLineItemOptions.filter((_, i) => i !== index);
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update({ custom_line_item_options: updatedOptions })
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
+
+      setCustomLineItemOptions(updatedOptions);
+      showNotification('success', 'Option Removed', 'Custom line item option removed successfully!');
+    } catch (err: any) {
+      console.error('Error removing line item option:', err);
+      showNotification('error', 'Remove Failed', 'Failed to remove option. Please try again.');
+    } finally {
+      setSavingLineItemOptions(false);
     }
   };
 
@@ -5123,6 +5187,71 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" /></div>}>
                 <InkThreadColorsManager colorType="thread" />
               </Suspense>
+
+              {/* Custom Line Item Options */}
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Line Item Options</h2>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Custom dropdown options for line items in quotes (e.g., "Other", "Special Size")</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={newLineItemOption}
+                    onChange={(e) => setNewLineItemOption(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addCustomLineItemOption();
+                      }
+                    }}
+                    placeholder="Enter option name..."
+                    className="flex-1 px-3 py-1.5 text-xs border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
+                  />
+                  <button
+                    onClick={addCustomLineItemOption}
+                    disabled={savingLineItemOptions}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:opacity-50"
+                  >
+                    {savingLineItemOptions ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Plus className="w-3 h-3" />
+                    )}
+                    Add
+                  </button>
+                </div>
+
+                {customLineItemOptions.length === 0 ? (
+                  <div className="text-center py-3 text-gray-500 dark:text-gray-400">
+                    <p className="text-xs">No custom options yet. Add options that will appear in the line item dropdown.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {customLineItemOptions.map((option, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-xs font-medium text-gray-900 dark:text-white truncate">{option}</h3>
+                        </div>
+                        <div className="flex items-center gap-0.5 ml-2">
+                          <button
+                            onClick={() => removeCustomLineItemOption(index)}
+                            className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

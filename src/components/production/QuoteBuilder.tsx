@@ -28,6 +28,7 @@ interface QuoteItem {
   total_quantity: number;
   total_price: number;
   taxed: boolean;
+  custom_option?: string;
 }
 
 interface QuoteFee {
@@ -984,30 +985,31 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="bg-gray-100 dark:bg-slate-900 text-sm text-gray-700 dark:text-gray-400">
-                    <th className="p-2 text-left border border-gray-300 dark:border-slate-800 w-8"></th>
-                    <th className="p-2 text-left border border-gray-300 dark:border-slate-800">Item #</th>
-                    <th className="p-2 text-left border border-gray-300 dark:border-slate-800">Color</th>
-                    <th className="p-2 text-left border border-gray-300 dark:border-slate-800">Description</th>
-                    <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">YXS</th>
-                    <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">YS</th>
-                    <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">YM</th>
-                    <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">YL</th>
-                    <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">YXL</th>
-                    <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">XS</th>
-                    <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">S</th>
-                    <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">M</th>
-                    <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">L</th>
-                    <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">XL</th>
-                    <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">2XL</th>
-                    <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">3XL</th>
-                    <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">4XL</th>
-                    <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-16">Quantity</th>
-                    <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-16">Items</th>
-                    <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-20">Price</th>
-                    <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">Taxed</th>
-                    <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-24">Total</th>
-                    <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-32">Actions</th>
+                  <tr className="bg-gray-100 dark:bg-slate-900 text-xs text-gray-700 dark:text-gray-400">
+                    <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-6"></th>
+                    <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-20">Item #</th>
+                    <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-20">Color</th>
+                    <th className="p-1 text-left border border-gray-300 dark:border-slate-800">Description</th>
+                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YXS</th>
+                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YS</th>
+                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YM</th>
+                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YL</th>
+                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YXL</th>
+                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">XS</th>
+                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">S</th>
+                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">M</th>
+                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">L</th>
+                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">XL</th>
+                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">2XL</th>
+                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">3XL</th>
+                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">4XL</th>
+                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-14">Quantity</th>
+                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-14">Items</th>
+                    <th className="p-1 text-right border border-gray-300 dark:border-slate-800 w-16">Price</th>
+                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">Taxed</th>
+                    <th className="p-1 text-right border border-gray-300 dark:border-slate-800 w-20">Total</th>
+                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-24">Options</th>
+                    <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-20">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1046,224 +1048,237 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       )}
                       {/* Group Column Headers */}
                       {groupIdx > 0 && (
-                        <tr key={`columns-${group.id}`} className="bg-gray-100 dark:bg-slate-900 text-sm text-gray-700 dark:text-gray-400">
-                          <th className="p-2 text-left border border-gray-300 dark:border-slate-800 w-8"></th>
-                          <th className="p-2 text-left border border-gray-300 dark:border-slate-800">Item #</th>
-                          <th className="p-2 text-left border border-gray-300 dark:border-slate-800">Color</th>
-                          <th className="p-2 text-left border border-gray-300 dark:border-slate-800">Description</th>
-                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">YXS</th>
-                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">YS</th>
-                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">YM</th>
-                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">YL</th>
-                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">YXL</th>
-                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">XS</th>
-                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">S</th>
-                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">M</th>
-                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">L</th>
-                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">XL</th>
-                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">2XL</th>
-                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">3XL</th>
-                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">4XL</th>
-                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-16">Quantity</th>
-                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-16">Items</th>
-                          <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-20">Price</th>
-                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">Taxed</th>
-                          <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-24">Total</th>
-                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-32">Actions</th>
+                        <tr key={`columns-${group.id}`} className="bg-gray-100 dark:bg-slate-900 text-xs text-gray-700 dark:text-gray-400">
+                          <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-6"></th>
+                          <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-20">Item #</th>
+                          <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-20">Color</th>
+                          <th className="p-1 text-left border border-gray-300 dark:border-slate-800">Description</th>
+                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YXS</th>
+                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YS</th>
+                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YM</th>
+                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YL</th>
+                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YXL</th>
+                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">XS</th>
+                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">S</th>
+                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">M</th>
+                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">L</th>
+                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">XL</th>
+                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">2XL</th>
+                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">3XL</th>
+                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">4XL</th>
+                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-14">Quantity</th>
+                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-14">Items</th>
+                          <th className="p-1 text-right border border-gray-300 dark:border-slate-800 w-16">Price</th>
+                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">Taxed</th>
+                          <th className="p-1 text-right border border-gray-300 dark:border-slate-800 w-20">Total</th>
+                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-24">Options</th>
+                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-20">Actions</th>
                         </tr>
                       )}
                       {/* Group Items */}
                       {group.items.map((item, itemIdx) => (
                         <tr key={`${group.id}-${itemIdx}`} className="bg-white dark:bg-slate-900/50 hover:bg-gray-50 dark:hover:bg-slate-900">
-                          <td className="p-1 border border-gray-300 dark:border-slate-800 text-center">
-                            <GripVertical className="w-4 h-4 text-gray-600 mx-auto" />
+                          <td className="p-0.5 border border-gray-300 dark:border-slate-800 text-center">
+                            <GripVertical className="w-3 h-3 text-gray-600 mx-auto" />
                           </td>
-                          <td className="p-1 border border-gray-300 dark:border-slate-800">
+                          <td className="p-0 border border-gray-300 dark:border-slate-800">
                             <input
                               type="text"
                               value={item.item_number}
                               onChange={(e) => updateItem(group.id, itemIdx, 'item_number', e.target.value)}
-                              className="w-full px-2 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs"
+                              className="w-full px-1 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs"
                               placeholder="Item #"
                             />
                           </td>
-                          <td className="p-1 border border-gray-300 dark:border-slate-800">
+                          <td className="p-0 border border-gray-300 dark:border-slate-800">
                             <input
                               type="text"
                               value={item.color}
                               onChange={(e) => updateItem(group.id, itemIdx, 'color', e.target.value)}
-                              className="w-full px-2 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs"
+                              className="w-full px-1 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs"
                             />
                           </td>
-                          <td className="p-1 border border-gray-300 dark:border-slate-800">
+                          <td className="p-0 border border-gray-300 dark:border-slate-800">
                             <input
                               type="text"
                               value={item.description}
                               onChange={(e) => updateItem(group.id, itemIdx, 'description', e.target.value)}
-                              className="w-full px-2 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs"
+                              className="w-full px-1 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs"
                             />
                           </td>
-                      <td className="p-1 border border-gray-300 dark:border-slate-800">
+                      <td className="p-0 border border-gray-300 dark:border-slate-800">
                         <input
                           type="number"
                           min="0"
                           value={item.qty_yxs || ''}
                               onChange={(e) => updateItem(group.id, itemIdx, 'qty_yxs', parseInt(e.target.value) || 0)}
-                          className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
+                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
-                      <td className="p-1 border border-gray-300 dark:border-slate-800">
+                      <td className="p-0 border border-gray-300 dark:border-slate-800">
                         <input
                           type="number"
                           min="0"
                           value={item.qty_ys || ''}
                           onChange={(e) => updateItem(group.id, itemIdx, 'qty_ys', parseInt(e.target.value) || 0)}
-                          className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
+                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
-                      <td className="p-1 border border-gray-300 dark:border-slate-800">
+                      <td className="p-0 border border-gray-300 dark:border-slate-800">
                         <input
                           type="number"
                           min="0"
                           value={item.qty_ym || ''}
                           onChange={(e) => updateItem(group.id, itemIdx, 'qty_ym', parseInt(e.target.value) || 0)}
-                          className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
+                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
-                      <td className="p-1 border border-gray-300 dark:border-slate-800">
+                      <td className="p-0 border border-gray-300 dark:border-slate-800">
                         <input
                           type="number"
                           min="0"
                           value={item.qty_yl || ''}
                           onChange={(e) => updateItem(group.id, itemIdx, 'qty_yl', parseInt(e.target.value) || 0)}
-                          className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
+                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
-                      <td className="p-1 border border-gray-300 dark:border-slate-800">
+                      <td className="p-0 border border-gray-300 dark:border-slate-800">
                         <input
                           type="number"
                           min="0"
                           value={item.qty_yxl || ''}
                           onChange={(e) => updateItem(group.id, itemIdx, 'qty_yxl', parseInt(e.target.value) || 0)}
-                          className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
+                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
-                      <td className="p-1 border border-gray-300 dark:border-slate-800">
+                      <td className="p-0 border border-gray-300 dark:border-slate-800">
                         <input
                           type="number"
                           min="0"
                           value={item.qty_xs || ''}
                           onChange={(e) => updateItem(group.id, itemIdx, 'qty_xs', parseInt(e.target.value) || 0)}
-                          className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
+                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
-                      <td className="p-1 border border-gray-300 dark:border-slate-800">
+                      <td className="p-0 border border-gray-300 dark:border-slate-800">
                         <input
                           type="number"
                           min="0"
                           value={item.qty_s || ''}
                           onChange={(e) => updateItem(group.id, itemIdx, 'qty_s', parseInt(e.target.value) || 0)}
-                          className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
+                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
-                      <td className="p-1 border border-gray-300 dark:border-slate-800">
+                      <td className="p-0 border border-gray-300 dark:border-slate-800">
                         <input
                           type="number"
                           min="0"
                           value={item.qty_m || ''}
                           onChange={(e) => updateItem(group.id, itemIdx, 'qty_m', parseInt(e.target.value) || 0)}
-                          className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
+                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
-                      <td className="p-1 border border-gray-300 dark:border-slate-800">
+                      <td className="p-0 border border-gray-300 dark:border-slate-800">
                         <input
                           type="number"
                           min="0"
                           value={item.qty_l || ''}
                           onChange={(e) => updateItem(group.id, itemIdx, 'qty_l', parseInt(e.target.value) || 0)}
-                          className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
+                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
-                      <td className="p-1 border border-gray-300 dark:border-slate-800">
+                      <td className="p-0 border border-gray-300 dark:border-slate-800">
                         <input
                           type="number"
                           min="0"
                           value={item.qty_xl || ''}
                           onChange={(e) => updateItem(group.id, itemIdx, 'qty_xl', parseInt(e.target.value) || 0)}
-                          className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
+                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
-                      <td className="p-1 border border-gray-300 dark:border-slate-800">
+                      <td className="p-0 border border-gray-300 dark:border-slate-800">
                         <input
                           type="number"
                           min="0"
                           value={item.qty_2xl || ''}
                           onChange={(e) => updateItem(group.id, itemIdx, 'qty_2xl', parseInt(e.target.value) || 0)}
-                          className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
+                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
-                      <td className="p-1 border border-gray-300 dark:border-slate-800">
+                      <td className="p-0 border border-gray-300 dark:border-slate-800">
                         <input
                           type="number"
                           min="0"
                           value={item.qty_3xl || ''}
                           onChange={(e) => updateItem(group.id, itemIdx, 'qty_3xl', parseInt(e.target.value) || 0)}
-                          className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
+                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
-                      <td className="p-1 border border-gray-300 dark:border-slate-800">
+                      <td className="p-0 border border-gray-300 dark:border-slate-800">
                         <input
                           type="number"
                           min="0"
                           value={item.qty_4xl || ''}
                           onChange={(e) => updateItem(group.id, itemIdx, 'qty_4xl', parseInt(e.target.value) || 0)}
-                          className="w-full px-1 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
+                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
-                      <td className="p-2 border border-gray-300 dark:border-slate-800 text-center text-sm text-gray-400">
+                      <td className="p-0.5 border border-gray-300 dark:border-slate-800 text-center text-xs text-gray-400">
                         {item.total_quantity}
                       </td>
-                      <td className="p-2 border border-gray-300 dark:border-slate-800 text-center text-sm text-gray-400">
+                      <td className="p-0.5 border border-gray-300 dark:border-slate-800 text-center text-xs text-gray-400">
                         {item.total_quantity}
                       </td>
-                      <td className="p-1 border border-gray-300 dark:border-slate-800">
+                      <td className="p-0 border border-gray-300 dark:border-slate-800">
                         <input
                           type="number"
                           step="0.01"
                           min="0"
                           value={item.unit_price}
                           onChange={(e) => updateItem(group.id, itemIdx, 'unit_price', parseFloat(e.target.value) || 0)}
-                          className="w-full px-2 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-right"
+                          className="w-full px-1 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-right"
                         />
                       </td>
-                      <td className="p-1 border border-gray-300 dark:border-slate-800 text-center">
+                      <td className="p-0.5 border border-gray-300 dark:border-slate-800 text-center">
                         <input
                           type="checkbox"
                           checked={item.taxed}
                           onChange={(e) => updateItem(group.id, itemIdx, 'taxed', e.target.checked)}
-                          className="w-4 h-4"
+                          className="w-3 h-3"
                         />
                       </td>
-                      <td className="p-2 border border-gray-300 dark:border-slate-800 text-right text-sm">
+                      <td className="p-0.5 border border-gray-300 dark:border-slate-800 text-right text-xs">
                         ${item.total_price.toFixed(2)}
                       </td>
-                      <td className="p-1 border border-gray-300 dark:border-slate-800">
-                        <div className="flex items-center justify-center gap-1">
+                      <td className="p-0 border border-gray-300 dark:border-slate-800">
+                        <select
+                          value={item.custom_option || ''}
+                          onChange={(e) => updateItem(group.id, itemIdx, 'custom_option', e.target.value)}
+                          className="w-full px-1 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs"
+                        >
+                          <option value="">None</option>
+                          {(companySettings?.custom_line_item_options || []).map((option: string, idx: number) => (
+                            <option key={idx} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="p-0.5 border border-gray-300 dark:border-slate-800">
+                        <div className="flex items-center justify-center gap-0.5">
                           <button
                             onClick={() => {
                               showNotification('info', 'Coming Soon', 'Refresh pricing from matrix will be available soon');
                             }}
-                            className="p-1 text-green-600 dark:text-green-500 hover:text-green-700 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-slate-800 rounded"
+                            className="p-0.5 text-green-600 dark:text-green-500 hover:text-green-700 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-slate-800 rounded"
                             title="Refresh Pricing from Matrix"
                           >
-                            <DollarSign className="w-4 h-4" />
+                            <DollarSign className="w-3 h-3" />
                           </button>
                               <button
                                 onClick={() => removeItem(group.id, itemIdx)}
-                                className="p-1 text-red-600 dark:text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-slate-800 rounded"
+                                className="p-0.5 text-red-600 dark:text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-slate-800 rounded"
                                 title="Remove Item"
                               >
-                                <X className="w-4 h-4" />
+                                <X className="w-3 h-3" />
                               </button>
                             </div>
                           </td>
