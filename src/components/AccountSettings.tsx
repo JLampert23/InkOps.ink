@@ -97,7 +97,7 @@ interface TypeOfWork {
 
 type SettingsTab =
   | 'company-info' | 'quote-invoice-settings'
-  | 'printavo-integration' | 'square-integration' | 'resend-integration' | 'twilio-integration' | 'stripe-payments'
+  | 'printavo-integration' | 'square-integration' | 'resend-integration' | 'twilio-integration' | 'stripe-payments' | 'supplier-integrations'
   | 'user-management' | 'user-security'
   | 'billing-status-filters'
   | 'automated-reports' | 'workflow-setup' | 'automations'
@@ -180,6 +180,20 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [savingTwilio, setSavingTwilio] = useState(false);
   const [testingTwilio, setTestingTwilio] = useState(false);
   const [twilioTestResult, setTwilioTestResult] = useState<any>(null);
+
+  // Supplier Integration States
+  const [sanmarEnabled, setSanmarEnabled] = useState(false);
+  const [sanmarApiKey, setSanmarApiKey] = useState('');
+  const [showSanmarApiKey, setShowSanmarApiKey] = useState(false);
+  const [sanmarCustomerId, setSanmarCustomerId] = useState('');
+  const [ssaEnabled, setSsaEnabled] = useState(false);
+  const [ssaUsername, setSsaUsername] = useState('');
+  const [ssaPassword, setSsaPassword] = useState('');
+  const [showSsaPassword, setShowSsaPassword] = useState(false);
+  const [ssaCustomerId, setSsaCustomerId] = useState('');
+  const [savingSuppliers, setSavingSuppliers] = useState(false);
+  const [testingSuppliers, setTestingSuppliers] = useState(false);
+  const [supplierTestResult, setSupplierTestResult] = useState<any>(null);
 
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -299,7 +313,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       'square-integration',
       'resend-integration',
       'twilio-integration',
-      'stripe-payments'
+      'stripe-payments',
+      'supplier-integrations'
     ];
 
     if (!canAccessIntegrations && integrationTabs.includes(activeTab)) {
@@ -1595,6 +1610,254 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       });
     } finally {
       setTestingStripe(false);
+    }
+  };
+
+  const saveSupplierIntegrations = async () => {
+    if (!sanmarEnabled && !ssaEnabled) {
+      showNotification('warning', 'No Integration Enabled', 'Please enable at least one supplier integration');
+      return;
+    }
+
+    try {
+      setSavingSuppliers(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        showNotification('error', 'Not Authenticated', 'You must be logged in to update supplier settings');
+        return;
+      }
+
+      // Get user's company_id
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!profile?.company_id) {
+        showNotification('error', 'Company Not Found', 'Could not find your company');
+        return;
+      }
+
+      // Prepare SanMar credentials
+      let sanmarCredentials = {};
+      if (sanmarEnabled) {
+        if (!sanmarApiKey.trim()) {
+          showNotification('warning', 'SanMar API Key Required', 'Please enter your SanMar API key');
+          return;
+        }
+
+        // Encrypt SanMar API key
+        const encryptResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crypto-service`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action: 'encrypt',
+            token: sanmarApiKey,
+          }),
+        });
+
+        if (!encryptResponse.ok) {
+          throw new Error('Failed to encrypt SanMar API key');
+        }
+
+        const { result: encryptedApiKey } = await encryptResponse.json();
+        sanmarCredentials = {
+          apiKey: encryptedApiKey,
+          customerId: sanmarCustomerId.trim() || undefined,
+        };
+      }
+
+      // Prepare SSActivewear credentials
+      let ssaCredentials = {};
+      if (ssaEnabled) {
+        if (!ssaUsername.trim() || !ssaPassword.trim()) {
+          showNotification('warning', 'SSActivewear Credentials Required', 'Please enter your SSActivewear username and password');
+          return;
+        }
+
+        // Encrypt SSActivewear password
+        const encryptResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crypto-service`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            action: 'encrypt',
+            token: ssaPassword,
+          }),
+        });
+
+        if (!encryptResponse.ok) {
+          throw new Error('Failed to encrypt SSActivewear password');
+        }
+
+        const { result: encryptedPassword } = await encryptResponse.json();
+        ssaCredentials = {
+          username: ssaUsername,
+          password: encryptedPassword,
+          customerId: ssaCustomerId.trim() || undefined,
+        };
+      }
+
+      // Check if integration settings already exist
+      const { data: existing } = await supabase
+        .from('integration_settings')
+        .select('id')
+        .eq('company_id', profile.company_id)
+        .maybeSingle();
+
+      const settingsData = {
+        company_id: profile.company_id,
+        sanmar_enabled: sanmarEnabled,
+        sanmar_credentials: sanmarCredentials,
+        ssactivewear_enabled: ssaEnabled,
+        ssactivewear_credentials: ssaCredentials,
+      };
+
+      if (existing) {
+        // Update existing record
+        const { error } = await supabase
+          .from('integration_settings')
+          .update(settingsData)
+          .eq('id', existing.id);
+
+        if (error) throw error;
+      } else {
+        // Insert new record
+        const { error } = await supabase
+          .from('integration_settings')
+          .insert([settingsData]);
+
+        if (error) throw error;
+      }
+
+      showNotification('success', 'Supplier Integrations Saved', 'Supplier integration settings have been saved successfully!');
+      setSanmarApiKey('');
+      setSanmarCustomerId('');
+      setSsaUsername('');
+      setSsaPassword('');
+      setSsaCustomerId('');
+      setSupplierTestResult(null);
+    } catch (err) {
+      console.error('Error saving supplier integrations:', err);
+      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save supplier integrations');
+    } finally {
+      setSavingSuppliers(false);
+    }
+  };
+
+  const testSupplierConnections = async () => {
+    try {
+      setTestingSuppliers(true);
+      setSupplierTestResult(null);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setSupplierTestResult({
+          success: false,
+          error: 'You must be logged in to test supplier connections',
+        });
+        return;
+      }
+
+      // Get user's company_id
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!profile?.company_id) {
+        setSupplierTestResult({
+          success: false,
+          error: 'Could not find your company',
+        });
+        return;
+      }
+
+      // Get integration settings
+      const { data: settings } = await supabase
+        .from('integration_settings')
+        .select('*')
+        .eq('company_id', profile.company_id)
+        .maybeSingle();
+
+      if (!settings || (!settings.sanmar_enabled && !settings.ssactivewear_enabled)) {
+        setSupplierTestResult({
+          success: false,
+          error: 'No supplier integrations enabled. Please save your credentials first.',
+        });
+        return;
+      }
+
+      const results: string[] = [];
+      let hasError = false;
+
+      // Test SanMar if enabled
+      if (settings.sanmar_enabled) {
+        try {
+          const response = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sanmar-api?action=search&style=PC54`,
+            {
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+              },
+            }
+          );
+
+          if (response.ok) {
+            results.push('SanMar: Connected successfully');
+          } else {
+            hasError = true;
+            results.push(`SanMar: Connection failed`);
+          }
+        } catch (err) {
+          hasError = true;
+          results.push(`SanMar: ${err instanceof Error ? err.message : 'Connection failed'}`);
+        }
+      }
+
+      // Test SSActivewear if enabled
+      if (settings.ssactivewear_enabled) {
+        try {
+          const response = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ssactivewear-api?action=search&style=1800`,
+            {
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+              },
+            }
+          );
+
+          if (response.ok) {
+            results.push('SSActivewear: Connected successfully');
+          } else {
+            hasError = true;
+            results.push(`SSActivewear: Connection failed`);
+          }
+        } catch (err) {
+          hasError = true;
+          results.push(`SSActivewear: ${err instanceof Error ? err.message : 'Connection failed'}`);
+        }
+      }
+
+      setSupplierTestResult({
+        success: !hasError,
+        message: results.join(' | '),
+        error: hasError ? 'One or more connections failed' : undefined,
+      });
+    } catch (err) {
+      setSupplierTestResult({
+        success: false,
+        error: err instanceof Error ? err.message : 'Connection test failed',
+      });
+    } finally {
+      setTestingSuppliers(false);
     }
   };
 
@@ -2973,6 +3236,24 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       </div>
                     </div>
                     {activeTab === 'stripe-payments' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('supplier-integrations')}
+                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                      activeTab === 'supplier-integrations'
+                        ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
+                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                    style={{ animationDelay: '70ms' }}
+                  >
+                    <Grid3x3 className={`w-4 h-4 flex-shrink-0 ${activeTab === 'supplier-integrations' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                    <div className="flex-1 text-left">
+                      <div className={`font-medium text-sm ${activeTab === 'supplier-integrations' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                        Garment Suppliers
+                      </div>
+                    </div>
+                    {activeTab === 'supplier-integrations' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
                   </button>
                 </div>
               )}
@@ -4957,6 +5238,227 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   </>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Supplier Integrations Section */}
+          {activeTab === 'supplier-integrations' && canAccessIntegrations && (
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Garment Supplier Integrations</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Configure integrations with SanMar and SSActivewear to auto-populate line items with product information, pricing, and stock availability</p>
+              </div>
+
+              {/* SanMar Integration */}
+              <div className="space-y-4 border-b border-gray-200 dark:border-gray-700 pb-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={sanmarEnabled}
+                      onChange={(e) => setSanmarEnabled(e.target.checked)}
+                      className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-lg font-semibold text-gray-900 dark:text-white">SanMar API</span>
+                  </label>
+                </div>
+
+                {sanmarEnabled && (
+                  <div className="ml-7 space-y-4 pl-4 border-l-2 border-blue-200 dark:border-blue-800">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        API Key <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showSanmarApiKey ? 'text' : 'password'}
+                          value={sanmarApiKey}
+                          onChange={(e) => setSanmarApiKey(e.target.value)}
+                          className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter your SanMar API key"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowSanmarApiKey(!showSanmarApiKey)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                          tabIndex={-1}
+                        >
+                          {showSanmarApiKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Get your API key from SanMar Developer Portal
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Customer ID
+                      </label>
+                      <input
+                        type="text"
+                        value={sanmarCustomerId}
+                        onChange={(e) => setSanmarCustomerId(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Your SanMar customer ID (optional)"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* SSActivewear Integration */}
+              <div className="space-y-4 pb-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={ssaEnabled}
+                      onChange={(e) => setSsaEnabled(e.target.checked)}
+                      className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-lg font-semibold text-gray-900 dark:text-white">SSActivewear API</span>
+                  </label>
+                </div>
+
+                {ssaEnabled && (
+                  <div className="ml-7 space-y-4 pl-4 border-l-2 border-blue-200 dark:border-blue-800">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Username <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={ssaUsername}
+                        onChange={(e) => setSsaUsername(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Your SSActivewear username"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Password <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showSsaPassword ? 'text' : 'password'}
+                          value={ssaPassword}
+                          onChange={(e) => setSsaPassword(e.target.value)}
+                          className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Your SSActivewear password"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowSsaPassword(!showSsaPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                          tabIndex={-1}
+                        >
+                          {showSsaPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Customer ID
+                      </label>
+                      <input
+                        type="text"
+                        value={ssaCustomerId}
+                        onChange={(e) => setSsaCustomerId(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Your SSActivewear customer ID (optional)"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Save Button */}
+              <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  <p>Enable at least one integration to auto-populate product information when creating quotes</p>
+                </div>
+                <button
+                  onClick={saveSupplierIntegrations}
+                  disabled={savingSuppliers || (!sanmarEnabled && !ssaEnabled)}
+                  className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {savingSuppliers ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      Save Supplier Credentials
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Connection Status */}
+              {(sanmarEnabled || ssaEnabled) && (
+                <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-blue-800 dark:text-blue-200">
+                      <Grid3x3 className="w-5 h-5" />
+                      <div>
+                        <p className="font-medium">Supplier Integrations Active</p>
+                        <p className="text-sm mt-1">
+                          {sanmarEnabled && ssaEnabled ? 'SanMar and SSActivewear are configured' :
+                           sanmarEnabled ? 'SanMar is configured' : 'SSActivewear is configured'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={testSupplierConnections}
+                      disabled={testingSuppliers}
+                      className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 disabled:opacity-50 transition-colors"
+                    >
+                      {testingSuppliers ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Testing...
+                        </>
+                      ) : (
+                        'Test Connections'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Test Results */}
+              {supplierTestResult && (
+                <div className={`p-4 rounded-lg border ${supplierTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
+                  <div className="space-y-3">
+                    {supplierTestResult.success ? (
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-bold">
+                          ✓
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-medium text-green-900 dark:text-green-100">Connections Successful!</h4>
+                          <p className="text-sm text-green-800 dark:text-green-200 mt-1">{supplierTestResult.message}</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-white text-sm font-bold">
+                          ✕
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-medium text-red-900 dark:text-red-100">Connection Failed</h4>
+                          <p className="text-sm text-red-800 dark:text-red-200 mt-1">{supplierTestResult.error}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
