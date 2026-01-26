@@ -14,6 +14,7 @@ import {
   Download,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import ProofGenerator from './ProofGenerator';
 
 interface QuoteDetailProps {
   quoteId: string;
@@ -125,6 +126,8 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
   const [showSendModal, setShowSendModal] = useState(false);
   const [sending, setSending] = useState(false);
   const [converting, setConverting] = useState(false);
+  const [showProofGenerator, setShowProofGenerator] = useState(false);
+  const [selectedLineItem, setSelectedLineItem] = useState<LineItem | null>(null);
 
   const [expiresInDays, setExpiresInDays] = useState(30);
   const [singleUse, setSingleUse] = useState(true);
@@ -630,7 +633,11 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                 <button
                                   className="w-full px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition-colors flex items-center justify-center gap-1.5"
                                   onClick={() => {
-                                    console.log('Open proof for imprint:', imprint.id);
+                                    const lineItemForImprint = lineItems.find(li => li.id === item.id);
+                                    if (lineItemForImprint) {
+                                      setSelectedLineItem(lineItemForImprint);
+                                      setShowProofGenerator(true);
+                                    }
                                   }}
                                 >
                                   <FileText className="w-3.5 h-3.5" />
@@ -804,6 +811,23 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             </div>
           </div>
         </div>
+      )}
+
+      {showProofGenerator && selectedLineItem && quote && (
+        <ProofGenerator
+          lineItemId={selectedLineItem.id}
+          quoteId={quoteId}
+          customerId={quote.customer_id}
+          garmentStyle={selectedLineItem.item_number}
+          garmentColor={selectedLineItem.color}
+          onClose={() => {
+            setShowProofGenerator(false);
+            setSelectedLineItem(null);
+          }}
+          onSave={() => {
+            loadQuoteDetails();
+          }}
+        />
       )}
     </div>
   );
