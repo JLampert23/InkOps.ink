@@ -220,6 +220,18 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
   const fees = lineItems.filter(item => item.line_type === 'fee');
   const imprints = lineItems.filter(item => item.line_type === 'imprint');
 
+  // Group items by group_label
+  const groupedItems = items.reduce((acc, item) => {
+    const groupLabel = (item as any).group_label || '';
+    if (!acc[groupLabel]) {
+      acc[groupLabel] = [];
+    }
+    acc[groupLabel].push(item);
+    return acc;
+  }, {} as Record<string, LineItem[]>);
+
+  const itemGroups = Object.entries(groupedItems);
+
   const totalQty = items.reduce((sum, item) => {
     return sum + (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) + (item.qty_yl || 0) +
            (item.qty_yxl || 0) + (item.qty_xs || 0) + (item.qty_s || 0) + (item.qty_m || 0) +
@@ -435,16 +447,59 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => {
-                const itemQty = (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) +
-                               (item.qty_yl || 0) + (item.qty_yxl || 0) + (item.qty_xs || 0) +
-                               (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) +
-                               (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
-                               (item.qty_4xl || 0);
+              {itemGroups.map(([groupLabel, groupItems], groupIdx) => (
+                <React.Fragment key={`group-${groupIdx}`}>
+                  {/* Spacer between groups */}
+                  {groupIdx > 0 && (
+                    <tr>
+                      <td colSpan={18} className="h-4 bg-transparent"></td>
+                    </tr>
+                  )}
+                  {/* Group header */}
+                  {groupLabel && (
+                    <tr className="bg-gray-100 dark:bg-slate-800 border-t-2 border-b-2 border-gray-300 dark:border-slate-600">
+                      <td colSpan={18} className="px-4 py-3">
+                        <div className="font-semibold text-gray-900 dark:text-white text-base">
+                          {groupLabel}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  {/* Repeat column headers for groups after the first */}
+                  {groupIdx > 0 && (
+                    <tr className="bg-gray-100 dark:bg-slate-700/50 border-b-2 border-gray-300 dark:border-slate-600">
+                      <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Item #</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Color</th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white min-w-[250px]">Description</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YXS</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YS</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YM</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YL</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YXL</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">XS</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">S</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">M</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">L</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">XL</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">2XL</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">3XL</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">4XL</th>
+                      <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Qty</th>
+                      <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">Price</th>
+                      <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">Total</th>
+                    </tr>
+                  )}
+                  {/* Group items */}
+                  {groupItems.map((item) => {
+                    const itemQty = (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) +
+                                   (item.qty_yl || 0) + (item.qty_yxl || 0) + (item.qty_xs || 0) +
+                                   (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) +
+                                   (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
+                                   (item.qty_4xl || 0);
 
-                return (
-                  <React.Fragment key={item.id}>
-                    <tr className="border-b border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/30">
+                    return (
+                      <React.Fragment key={item.id}>
+                        <tr className="border-b border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/30">
                       <td className="px-4 py-4 text-gray-700 dark:text-gray-300 font-mono text-xs">
                         {item.item_number || '-'}
                       </td>
@@ -509,6 +564,8 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                   </React.Fragment>
                 );
               })}
+                </React.Fragment>
+              ))}
             </tbody>
           </table>
         </div>
