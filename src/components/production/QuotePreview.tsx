@@ -510,36 +510,60 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
                     </tr>
                   </thead>
                   <tbody>
-                    {lineItems.filter(item => item.line_type === 'item' || !item.line_type).map((item, idx) => {
-                      const totalQty = (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) +
-                                      (item.qty_yl || 0) + (item.qty_yxl || 0) + (item.qty_xs || 0) +
-                                      (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) +
-                                      (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
-                                      (item.qty_4xl || 0);
-                      return (
-                        <tr key={idx}>
-                          <td className="border border-gray-400 px-1 py-0.5">{item.item_number || ''}</td>
-                          <td className="border border-gray-400 px-1 py-0.5">{item.color || ''}</td>
-                          <td className="border border-gray-400 px-1 py-0.5">{item.description}</td>
-                          <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_yxs || ''}</td>
-                          <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_ys || ''}</td>
-                          <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_ym || ''}</td>
-                          <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_yl || ''}</td>
-                          <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_yxl || ''}</td>
-                          <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_xs || ''}</td>
-                          <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_s || ''}</td>
-                          <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_m || ''}</td>
-                          <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_l || ''}</td>
-                          <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_xl || ''}</td>
-                          <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_2xl || ''}</td>
-                          <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_3xl || ''}</td>
-                          <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_4xl || ''}</td>
-                          <td className="border border-gray-400 px-1 py-0.5 text-center">{totalQty}</td>
-                          <td className="border border-gray-400 px-1 py-0.5 text-right">${(item.unit_price || 0).toFixed(2)}</td>
-                          <td className="border border-gray-400 px-1 py-0.5 text-right">${(item.total_price || 0).toFixed(2)}</td>
-                        </tr>
-                      );
-                    })}
+                    {(() => {
+                      const items = lineItems.filter(item => item.line_type === 'item' || !item.line_type);
+                      const groupedItems = items.reduce((acc, item) => {
+                        const groupLabel = (item as any).group_label || '';
+                        if (!acc[groupLabel]) {
+                          acc[groupLabel] = [];
+                        }
+                        acc[groupLabel].push(item);
+                        return acc;
+                      }, {} as Record<string, any[]>);
+                      const itemGroups = Object.entries(groupedItems);
+
+                      return itemGroups.map(([groupLabel, groupItems], groupIdx) => (
+                        <>
+                          {groupLabel && (
+                            <tr key={`group-${groupIdx}`} className="bg-gray-200">
+                              <td colSpan={18} className="border border-gray-400 px-2 py-1 font-bold text-gray-900">
+                                {groupLabel}
+                              </td>
+                            </tr>
+                          )}
+                          {groupItems.map((item, idx) => {
+                            const totalQty = (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) +
+                                            (item.qty_yl || 0) + (item.qty_yxl || 0) + (item.qty_xs || 0) +
+                                            (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) +
+                                            (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
+                                            (item.qty_4xl || 0);
+                            return (
+                              <tr key={`${groupIdx}-${idx}`}>
+                                <td className="border border-gray-400 px-1 py-0.5">{item.item_number || ''}</td>
+                                <td className="border border-gray-400 px-1 py-0.5">{item.color || ''}</td>
+                                <td className="border border-gray-400 px-1 py-0.5">{item.description}</td>
+                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_yxs || ''}</td>
+                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_ys || ''}</td>
+                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_ym || ''}</td>
+                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_yl || ''}</td>
+                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_yxl || ''}</td>
+                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_xs || ''}</td>
+                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_s || ''}</td>
+                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_m || ''}</td>
+                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_l || ''}</td>
+                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_xl || ''}</td>
+                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_2xl || ''}</td>
+                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_3xl || ''}</td>
+                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_4xl || ''}</td>
+                                <td className="border border-gray-400 px-1 py-0.5 text-center">{totalQty}</td>
+                                <td className="border border-gray-400 px-1 py-0.5 text-right">${(item.unit_price || 0).toFixed(2)}</td>
+                                <td className="border border-gray-400 px-1 py-0.5 text-right">${(item.total_price || 0).toFixed(2)}</td>
+                              </tr>
+                            );
+                          })}
+                        </>
+                      ));
+                    })()}
                   </tbody>
                 </table>
               </div>
