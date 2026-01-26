@@ -132,6 +132,26 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         .single();
 
       if (quoteError) throw quoteError;
+
+      // If quote has customer_id, fetch customer zip codes
+      if (quoteData.customer_id) {
+        const { data: customerData } = await supabase
+          .from('customers')
+          .select('billing_zip, shipping_zip')
+          .eq('id', quoteData.customer_id)
+          .maybeSingle();
+
+        if (customerData) {
+          // Merge customer zip codes into quote if quote doesn't have them
+          if (!quoteData.bill_zip && customerData.billing_zip) {
+            quoteData.bill_zip = customerData.billing_zip;
+          }
+          if (!quoteData.ship_zip && customerData.shipping_zip) {
+            quoteData.ship_zip = customerData.shipping_zip;
+          }
+        }
+      }
+
       setQuote(quoteData);
 
       const { data: itemsData, error: itemsError } = await supabase
