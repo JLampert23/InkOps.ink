@@ -423,29 +423,32 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         {/* Line Items Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-100 dark:bg-slate-700/50 border-b-2 border-gray-300 dark:border-slate-600">
-              <tr>
-                <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Item #</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Color</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white min-w-[250px]">Description</th>
-                <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YXS</th>
-                <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YS</th>
-                <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YM</th>
-                <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YL</th>
-                <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YXL</th>
-                <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">XS</th>
-                <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">S</th>
-                <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">M</th>
-                <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">L</th>
-                <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">XL</th>
-                <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">2XL</th>
-                <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">3XL</th>
-                <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">4XL</th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Qty</th>
-                <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">Price</th>
-                <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">Total</th>
-              </tr>
-            </thead>
+            {/* Only show main thead when no groups have labels */}
+            {!itemGroups.some(([label]) => label) && (
+              <thead className="bg-gray-100 dark:bg-slate-700/50 border-b-2 border-gray-300 dark:border-slate-600">
+                <tr>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Item #</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Color</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white min-w-[250px]">Description</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YXS</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YS</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YM</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YL</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YXL</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">XS</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">S</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">M</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">L</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">XL</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">2XL</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">3XL</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">4XL</th>
+                  <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Qty</th>
+                  <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">Price</th>
+                  <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">Total</th>
+                </tr>
+              </thead>
+            )}
             <tbody>
               {itemGroups.map(([groupLabel, groupItems], groupIdx) => (
                 <React.Fragment key={`group-${groupIdx}`}>
@@ -465,8 +468,8 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                       </td>
                     </tr>
                   )}
-                  {/* Repeat column headers for groups after the first */}
-                  {groupIdx > 0 && (
+                  {/* Show column headers for all groups when any group has a label */}
+                  {itemGroups.some(([label]) => label) && (
                     <tr className="bg-gray-100 dark:bg-slate-700/50 border-b-2 border-gray-300 dark:border-slate-600">
                       <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Item #</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Color</th>
