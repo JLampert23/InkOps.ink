@@ -105,9 +105,22 @@ interface LineItem {
   qty_4xl: number | null;
 }
 
+interface QuoteImprint {
+  id: string;
+  location: string;
+  type_of_work: string;
+  details?: string;
+  matrix?: string;
+  column_number?: string;
+  pricing_matrix_column?: string;
+  thread_ink_color?: string;
+  mockups?: any[];
+}
+
 export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProps) {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
+  const [quoteImprints, setQuoteImprints] = useState<QuoteImprint[]>([]);
   const [loading, setLoading] = useState(true);
   const [showSendModal, setShowSendModal] = useState(false);
   const [sending, setSending] = useState(false);
@@ -162,6 +175,16 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
       if (itemsError) throw itemsError;
       setLineItems(itemsData || []);
+
+      const { data: imprintsData, error: imprintsError } = await supabase
+        .from('quote_imprints')
+        .select('*')
+        .eq('quote_id', quoteId)
+        .order('sort_order');
+
+      if (!imprintsError) {
+        setQuoteImprints(imprintsData || []);
+      }
     } catch (error) {
       console.error('Error loading quote:', error);
     } finally {
@@ -587,6 +610,61 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                   </React.Fragment>
                 );
               })}
+                  {/* Imprint blocks under this group */}
+                  {quoteImprints.length > 0 && (
+                    <tr>
+                      <td colSpan={18} className="px-4 py-2">
+                        <div className="space-y-2">
+                          {quoteImprints.map((imprint) => (
+                            <div
+                              key={imprint.id}
+                              className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">
+                                      Imprint
+                                    </span>
+                                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                      {imprint.location}
+                                    </span>
+                                    <span className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 rounded">
+                                      {imprint.type_of_work}
+                                    </span>
+                                    {imprint.thread_ink_color && (
+                                      <span className="text-xs text-gray-600 dark:text-gray-400">
+                                        Color: {imprint.thread_ink_color}
+                                      </span>
+                                    )}
+                                    {imprint.pricing_matrix_column && (
+                                      <span className="text-xs text-gray-600 dark:text-gray-400">
+                                        {imprint.matrix} - {imprint.pricing_matrix_column}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {imprint.details && (
+                                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1.5 ml-16">
+                                      {imprint.details}
+                                    </p>
+                                  )}
+                                </div>
+                                <button
+                                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition-colors flex items-center gap-1.5"
+                                  onClick={() => {
+                                    console.log('Open proof for imprint:', imprint.id);
+                                  }}
+                                >
+                                  <FileText className="w-3.5 h-3.5" />
+                                  Proof
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                 </React.Fragment>
               ))}
             </tbody>
