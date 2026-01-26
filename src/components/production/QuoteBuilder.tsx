@@ -6,6 +6,8 @@ import { useNotification } from '../../contexts/NotificationContext';
 import CreateCustomerModal from '../accounting/CreateCustomerModal';
 import { ManageImprintsModal } from './ManageImprintsModal';
 
+type SizeMode = 'regular' | 'double' | 'youth' | 'adult';
+
 interface QuoteItem {
   id?: string;
   item_number: string;
@@ -24,11 +26,20 @@ interface QuoteItem {
   qty_2xl: number;
   qty_3xl: number;
   qty_4xl?: number;
+  qty_sm?: number;
+  qty_lxl?: number;
+  qty_ysym?: number;
+  qty_ylyxl?: number;
   unit_price: number;
   total_quantity: number;
   total_price: number;
   taxed: boolean;
   custom_option?: string;
+  size_mode?: SizeMode;
+  regular_sizes?: Record<string, number>;
+  double_sizes?: Record<string, number>;
+  youth_sizes?: Record<string, number>;
+  adult_sizes?: Record<string, number>;
 }
 
 interface QuoteFee {
@@ -47,6 +58,7 @@ interface LineItemGroup {
   items: QuoteItem[];
   taxed: boolean;
   customSizeOptions: string[];
+  sizeMode: SizeMode;
 }
 
 interface QuoteBuilderProps {
@@ -66,8 +78,10 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const [availableFees, setAvailableFees] = useState<any[]>([]);
   const [companySettings, setCompanySettings] = useState<any>(null);
 
-  // Helper to get ordered size columns for a specific group
+  // Helper to get ordered size columns for a specific group based on size mode
   const getSizeColumns = (group: LineItemGroup) => {
+    const sizeMode = group.sizeMode || 'regular';
+
     const allSizes = [
       { key: 'qty_yxs', label: 'YXS', order: 0 },
       { key: 'qty_ys', label: 'YS', order: 1 },
@@ -82,14 +96,38 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       { key: 'qty_2xl', label: '2XL', order: 10 },
       { key: 'qty_3xl', label: '3XL', order: 11 },
       { key: 'qty_4xl', label: '4XL', order: 12 },
+      { key: 'qty_sm', label: 'S/M', order: 13 },
+      { key: 'qty_lxl', label: 'L/XL', order: 14 },
+      { key: 'qty_ysym', label: 'YS/YM', order: 15 },
+      { key: 'qty_ylyxl', label: 'YL/YXL', order: 16 },
     ];
 
-    // Default sizes (always shown)
-    const defaultSizes = ['YS', 'YM', 'YL', 'YXL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'];
+    let visibleSizeLabels: string[] = [];
 
-    // Include custom sizes if selected for this group
+    switch (sizeMode) {
+      case 'regular':
+        visibleSizeLabels = ['YS', 'YM', 'YL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
+        break;
+      case 'double':
+        visibleSizeLabels = ['S/M', 'L/XL', 'YS/YM', 'YL/YXL'];
+        break;
+      case 'youth':
+        visibleSizeLabels = ['YXS', 'YS', 'YM', 'YL', 'YXL'];
+        break;
+      case 'adult':
+        visibleSizeLabels = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
+        break;
+      default:
+        visibleSizeLabels = ['YS', 'YM', 'YL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
+    }
+
+    // Include custom sizes if selected for this group (only for regular mode)
+    if (sizeMode === 'regular' && group.customSizeOptions.length > 0) {
+      visibleSizeLabels = [...visibleSizeLabels, ...group.customSizeOptions];
+    }
+
     const visibleSizes = allSizes.filter(size =>
-      defaultSizes.includes(size.label) || group.customSizeOptions.includes(size.label)
+      visibleSizeLabels.includes(size.label)
     );
 
     return visibleSizes.sort((a, b) => a.order - b.order);
@@ -124,7 +162,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const [shipZip, setShipZip] = useState('');
 
   const [itemGroups, setItemGroups] = useState<LineItemGroup[]>([
-    { id: crypto.randomUUID(), label: '', items: [], taxed: false, customSizeOptions: [] }
+    { id: crypto.randomUUID(), label: '', items: [], taxed: false, customSizeOptions: [], sizeMode: 'regular' }
   ]);
   const [fees, setFees] = useState<QuoteFee[]>([]);
 
@@ -343,12 +381,13 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           label,
           items,
           taxed: items.length > 0 && items.every(item => item.taxed),
-          customSizeOptions: []
+          customSizeOptions: [],
+          sizeMode: (items.length > 0 && items[0].size_mode) ? items[0].size_mode as SizeMode : 'regular'
         }));
 
         setItemGroups(groups);
       } else {
-        setItemGroups([{ id: crypto.randomUUID(), label: '', items: [], taxed: false, customSizeOptions: [] }]);
+        setItemGroups([{ id: crypto.randomUUID(), label: '', items: [], taxed: false, customSizeOptions: [], sizeMode: 'regular' }]);
       }
 
       const { data: quoteFees } = await supabase
@@ -381,6 +420,10 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           qty_xl: 0,
           qty_2xl: 0,
           qty_3xl: 0,
+          qty_sm: 0,
+          qty_lxl: 0,
+          qty_ysym: 0,
+          qty_ylyxl: 0,
           unit_price: 0,
           total_quantity: 0,
           total_price: 0,
@@ -425,7 +468,8 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           item.total_quantity =
             (item.qty_yxs || 0) + item.qty_ys + item.qty_ym + item.qty_yl + item.qty_yxl +
             item.qty_xs + item.qty_s + item.qty_m + item.qty_l + item.qty_xl +
-            item.qty_2xl + item.qty_3xl + (item.qty_4xl || 0);
+            item.qty_2xl + item.qty_3xl + (item.qty_4xl || 0) +
+            (item.qty_sm || 0) + (item.qty_lxl || 0) + (item.qty_ysym || 0) + (item.qty_ylyxl || 0);
           item.total_price = item.total_quantity * item.unit_price;
         }
 
@@ -442,7 +486,8 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       label: '',
       items: [],
       taxed: false,
-      customSizeOptions: []
+      customSizeOptions: [],
+      sizeMode: 'regular'
     }]);
   };
 
@@ -655,6 +700,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
             company_id: userProfile.company_id,
             sort_order: groupIdx * 1000 + itemIdx, // Group items together with spacing
             group_label: group.label || '',
+            size_mode: group.sizeMode || 'regular',
             item_number: item.item_number,
             color: item.color,
             description: item.description,
@@ -671,6 +717,10 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
             qty_2xl: item.qty_2xl,
             qty_3xl: item.qty_3xl,
             qty_4xl: item.qty_4xl || 0,
+            qty_sm: item.qty_sm || 0,
+            qty_lxl: item.qty_lxl || 0,
+            qty_ysym: item.qty_ysym || 0,
+            qty_ylyxl: item.qty_ylyxl || 0,
             unit_price: item.unit_price,
             total_quantity: item.total_quantity,
             total_price: item.total_price,
@@ -1442,49 +1492,89 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="p-6 max-h-[600px] overflow-y-auto">
+              <div className="p-6 max-h-[600px] overflow-y-auto space-y-6">
+                {/* Size Mode Selector */}
                 <div>
                   <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-                    Additional Size Columns
+                    Size Mode
                   </h4>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                    Select additional size columns to display for this line item group.
+                    Choose which size set to display for this line item group.
                   </p>
-                  <div className="space-y-2">
-                    {(companySettings?.custom_line_item_options || []).map((option: string, idx: number) => (
-                      <label
-                        key={idx}
-                        className="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-slate-800 rounded cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={editingGroup.customSizeOptions.includes(option)}
-                          onChange={(e) => {
-                            const updatedGroups = itemGroups.map(g => {
-                              if (g.id === editingGroupIdForOptions) {
-                                const newOptions = e.target.checked
-                                  ? [...g.customSizeOptions, option]
-                                  : g.customSizeOptions.filter(o => o !== option);
-                                return { ...g, customSizeOptions: newOptions };
-                              }
-                              return g;
-                            });
-                            setItemGroups(updatedGroups);
-                          }}
-                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                        />
-                        <span className="text-sm text-gray-900 dark:text-white">{option}</span>
-                      </label>
-                    ))}
-                    {(!companySettings?.custom_line_item_options || companySettings.custom_line_item_options.length === 0) && (
-                      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded p-3">
-                        <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                          No custom size options available. Add them in Account Settings.
-                        </p>
-                      </div>
-                    )}
+                  <select
+                    value={editingGroup.sizeMode || 'regular'}
+                    onChange={(e) => {
+                      const newSizeMode = e.target.value as SizeMode;
+                      const updatedGroups = itemGroups.map(g => {
+                        if (g.id === editingGroupIdForOptions) {
+                          return { ...g, sizeMode: newSizeMode };
+                        }
+                        return g;
+                      });
+                      setItemGroups(updatedGroups);
+                    }}
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                  >
+                    <option value="regular">Regular Sizes (Youth + Adult)</option>
+                    <option value="double">Double Sizes (S/M, L/XL, YS/YM, YL/YXL)</option>
+                    <option value="youth">Youth-Only Sizes (YXS, YS, YM, YL, YXL)</option>
+                    <option value="adult">Adult-Only Sizes (XS - 4XL)</option>
+                  </select>
+                  <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded">
+                    <p className="text-xs text-blue-800 dark:text-blue-200">
+                      {editingGroup.sizeMode === 'regular' && 'Displays: YS, YM, YL, XS, S, M, L, XL, 2XL, 3XL, 4XL'}
+                      {editingGroup.sizeMode === 'double' && 'Displays: S/M, L/XL, YS/YM, YL/YXL'}
+                      {editingGroup.sizeMode === 'youth' && 'Displays: YXS, YS, YM, YL, YXL'}
+                      {editingGroup.sizeMode === 'adult' && 'Displays: XS, S, M, L, XL, 2XL, 3XL, 4XL'}
+                    </p>
                   </div>
                 </div>
+
+                {/* Additional Size Columns (only for regular mode) */}
+                {editingGroup.sizeMode === 'regular' && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                      Additional Size Columns
+                    </h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                      Select additional size columns to display for this line item group.
+                    </p>
+                    <div className="space-y-2">
+                      {(companySettings?.custom_line_item_options || []).map((option: string, idx: number) => (
+                        <label
+                          key={idx}
+                          className="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-slate-800 rounded cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={editingGroup.customSizeOptions.includes(option)}
+                            onChange={(e) => {
+                              const updatedGroups = itemGroups.map(g => {
+                                if (g.id === editingGroupIdForOptions) {
+                                  const newOptions = e.target.checked
+                                    ? [...g.customSizeOptions, option]
+                                    : g.customSizeOptions.filter(o => o !== option);
+                                  return { ...g, customSizeOptions: newOptions };
+                                }
+                                return g;
+                              });
+                              setItemGroups(updatedGroups);
+                            }}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-gray-900 dark:text-white">{option}</span>
+                        </label>
+                      ))}
+                      {(!companySettings?.custom_line_item_options || companySettings.custom_line_item_options.length === 0) && (
+                        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded p-3">
+                          <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                            No custom size options available. Add them in Account Settings.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="flex justify-end gap-2 p-4 border-t border-gray-200 dark:border-slate-700">
                 <button
