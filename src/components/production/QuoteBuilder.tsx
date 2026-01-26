@@ -11,6 +11,7 @@ interface QuoteItem {
   item_number: string;
   color: string;
   description: string;
+  qty_yxs?: number;
   qty_ys: number;
   qty_ym: number;
   qty_yl: number;
@@ -22,6 +23,7 @@ interface QuoteItem {
   qty_xl: number;
   qty_2xl: number;
   qty_3xl: number;
+  qty_4xl?: number;
   unit_price: number;
   total_quantity: number;
   total_price: number;
@@ -62,6 +64,35 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(initialCustomerId || '');
   const [availableFees, setAvailableFees] = useState<any[]>([]);
   const [companySettings, setCompanySettings] = useState<any>(null);
+
+  // Helper to get ordered size columns
+  const getSizeColumns = () => {
+    const allSizes = [
+      { key: 'qty_yxs', label: 'YXS', order: 0 },
+      { key: 'qty_ys', label: 'YS', order: 1 },
+      { key: 'qty_ym', label: 'YM', order: 2 },
+      { key: 'qty_yl', label: 'YL', order: 3 },
+      { key: 'qty_yxl', label: 'YXL', order: 4 },
+      { key: 'qty_xs', label: 'XS', order: 5 },
+      { key: 'qty_s', label: 'S', order: 6 },
+      { key: 'qty_m', label: 'M', order: 7 },
+      { key: 'qty_l', label: 'L', order: 8 },
+      { key: 'qty_xl', label: 'XL', order: 9 },
+      { key: 'qty_2xl', label: '2XL', order: 10 },
+      { key: 'qty_3xl', label: '3XL', order: 11 },
+      { key: 'qty_4xl', label: '4XL', order: 12 },
+    ];
+
+    // Default sizes (always shown)
+    const defaultSizes = ['YS', 'YM', 'YL', 'YXL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'];
+
+    // Include custom sizes if selected
+    const visibleSizes = allSizes.filter(size =>
+      defaultSizes.includes(size.label) || selectedCustomSizeOptions.includes(size.label)
+    );
+
+    return visibleSizes.sort((a, b) => a.order - b.order);
+  };
 
   const [quoteNumber, setQuoteNumber] = useState('');
   const [createdDate, setCreatedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -339,28 +370,34 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const addItem = (groupId: string) => {
     const newGroups = itemGroups.map(group => {
       if (group.id === groupId) {
+        const newItem: QuoteItem = {
+          item_number: '',
+          color: '',
+          description: '',
+          qty_ys: 0,
+          qty_ym: 0,
+          qty_yl: 0,
+          qty_yxl: 0,
+          qty_xs: 0,
+          qty_s: 0,
+          qty_m: 0,
+          qty_l: 0,
+          qty_xl: 0,
+          qty_2xl: 0,
+          qty_3xl: 0,
+          unit_price: 0,
+          total_quantity: 0,
+          total_price: 0,
+          taxed: group.taxed,
+        };
+
+        // Add custom sizes if selected
+        if (selectedCustomSizeOptions.includes('YXS')) newItem.qty_yxs = 0;
+        if (selectedCustomSizeOptions.includes('4XL')) newItem.qty_4xl = 0;
+
         return {
           ...group,
-          items: [...group.items, {
-            item_number: '',
-            color: '',
-            description: '',
-            qty_ys: 0,
-            qty_ym: 0,
-            qty_yl: 0,
-            qty_yxl: 0,
-            qty_xs: 0,
-            qty_s: 0,
-            qty_m: 0,
-            qty_l: 0,
-            qty_xl: 0,
-            qty_2xl: 0,
-            qty_3xl: 0,
-            unit_price: 0,
-            total_quantity: 0,
-            total_price: 0,
-            taxed: false,
-          }]
+          items: [...group.items, newItem]
         };
       }
       return group;
@@ -390,9 +427,9 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         if (field.startsWith('qty_') || field === 'unit_price') {
           const item = newItems[itemIndex];
           item.total_quantity =
-            item.qty_ys + item.qty_ym + item.qty_yl + item.qty_yxl +
+            (item.qty_yxs || 0) + item.qty_ys + item.qty_ym + item.qty_yl + item.qty_yxl +
             item.qty_xs + item.qty_s + item.qty_m + item.qty_l + item.qty_xl +
-            item.qty_2xl + item.qty_3xl;
+            item.qty_2xl + item.qty_3xl + (item.qty_4xl || 0);
           item.total_price = item.total_quantity * item.unit_price;
         }
 
@@ -625,6 +662,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
             item_number: item.item_number,
             color: item.color,
             description: item.description,
+            qty_yxs: item.qty_yxs || 0,
             qty_ys: item.qty_ys,
             qty_ym: item.qty_ym,
             qty_yl: item.qty_yl,
@@ -636,6 +674,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
             qty_xl: item.qty_xl,
             qty_2xl: item.qty_2xl,
             qty_3xl: item.qty_3xl,
+            qty_4xl: item.qty_4xl || 0,
             unit_price: item.unit_price,
             total_quantity: item.total_quantity,
             total_price: item.total_price,
@@ -998,21 +1037,12 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-20">Item #</th>
                       <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-20">Color</th>
                       <th className="p-1 text-left border border-gray-300 dark:border-slate-800">Description</th>
-                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YS</th>
-                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YM</th>
-                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YL</th>
-                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YXL</th>
-                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">XS</th>
-                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">S</th>
-                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">M</th>
-                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">L</th>
-                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">XL</th>
-                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">2XL</th>
-                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">3XL</th>
+                      {getSizeColumns().map(size => (
+                        <th key={size.key} className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">{size.label}</th>
+                      ))}
                       <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-14">Quantity</th>
                       <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-14">Items</th>
                       <th className="p-1 text-right border border-gray-300 dark:border-slate-800 w-16">Price</th>
-                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">Taxed</th>
                       <th className="p-1 text-right border border-gray-300 dark:border-slate-800 w-20">Total</th>
                       <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-20">Actions</th>
                     </tr>
@@ -1024,14 +1054,14 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       {/* Spacer Row Between Groups */}
                       {groupIdx > 0 && (
                         <tr key={`spacer-${group.id}`} className="bg-transparent">
-                          <td colSpan={21} className="p-4 border-0"></td>
+                          <td colSpan={getSizeColumns().length + 9} className="p-4 border-0"></td>
                         </tr>
                       )}
                       {/* Group Header Row with Label - All Groups */}
                       {(itemGroups.length > 1 || group.label) && (
                         <tr key={`header-${group.id}`} className="bg-gray-200 dark:bg-slate-800">
-                          <td colSpan={21} className="p-2 border border-gray-300 dark:border-slate-800">
-                            <div className="flex items-center gap-2">
+                          <td colSpan={getSizeColumns().length + 9} className="p-2 border border-gray-300 dark:border-slate-800">
+                            <div className="flex items-center gap-4">
                               <input
                                 type="text"
                                 value={group.label}
@@ -1039,6 +1069,24 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                                 placeholder="Group Label (optional)"
                                 className="px-3 py-1 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-sm text-gray-900 dark:text-white flex-1"
                               />
+                              <label className="flex items-center gap-2 text-sm text-gray-900 dark:text-white whitespace-nowrap">
+                                <input
+                                  type="checkbox"
+                                  checked={group.taxed}
+                                  onChange={(e) => {
+                                    const updatedGroups = [...itemGroups];
+                                    const idx = updatedGroups.findIndex(g => g.id === group.id);
+                                    updatedGroups[idx].taxed = e.target.checked;
+                                    updatedGroups[idx].items = updatedGroups[idx].items.map(item => ({
+                                      ...item,
+                                      taxed: e.target.checked
+                                    }));
+                                    setItemGroups(updatedGroups);
+                                  }}
+                                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                />
+                                Tax Group
+                              </label>
                               {itemGroups.length > 1 && (
                                 <button
                                   onClick={() => removeItemGroup(group.id)}
@@ -1059,21 +1107,12 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-20">Item #</th>
                           <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-20">Color</th>
                           <th className="p-1 text-left border border-gray-300 dark:border-slate-800">Description</th>
-                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YS</th>
-                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YM</th>
-                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YL</th>
-                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YXL</th>
-                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">XS</th>
-                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">S</th>
-                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">M</th>
-                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">L</th>
-                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">XL</th>
-                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">2XL</th>
-                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">3XL</th>
+                          {getSizeColumns().map(size => (
+                            <th key={size.key} className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">{size.label}</th>
+                          ))}
                           <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-14">Quantity</th>
                           <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-14">Items</th>
                           <th className="p-1 text-right border border-gray-300 dark:border-slate-800 w-16">Price</th>
-                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">Taxed</th>
                           <th className="p-1 text-right border border-gray-300 dark:border-slate-800 w-20">Total</th>
                           <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-20">Actions</th>
                         </tr>
@@ -1109,105 +1148,17 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                               className="w-full px-1 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs"
                             />
                           </td>
-                      <td className="p-0 border border-gray-300 dark:border-slate-800">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.qty_ys || ''}
-                          onChange={(e) => updateItem(group.id, itemIdx, 'qty_ys', parseInt(e.target.value) || 0)}
-                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
-                        />
-                      </td>
-                      <td className="p-0 border border-gray-300 dark:border-slate-800">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.qty_ym || ''}
-                          onChange={(e) => updateItem(group.id, itemIdx, 'qty_ym', parseInt(e.target.value) || 0)}
-                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
-                        />
-                      </td>
-                      <td className="p-0 border border-gray-300 dark:border-slate-800">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.qty_yl || ''}
-                          onChange={(e) => updateItem(group.id, itemIdx, 'qty_yl', parseInt(e.target.value) || 0)}
-                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
-                        />
-                      </td>
-                      <td className="p-0 border border-gray-300 dark:border-slate-800">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.qty_yxl || ''}
-                          onChange={(e) => updateItem(group.id, itemIdx, 'qty_yxl', parseInt(e.target.value) || 0)}
-                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
-                        />
-                      </td>
-                      <td className="p-0 border border-gray-300 dark:border-slate-800">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.qty_xs || ''}
-                          onChange={(e) => updateItem(group.id, itemIdx, 'qty_xs', parseInt(e.target.value) || 0)}
-                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
-                        />
-                      </td>
-                      <td className="p-0 border border-gray-300 dark:border-slate-800">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.qty_s || ''}
-                          onChange={(e) => updateItem(group.id, itemIdx, 'qty_s', parseInt(e.target.value) || 0)}
-                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
-                        />
-                      </td>
-                      <td className="p-0 border border-gray-300 dark:border-slate-800">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.qty_m || ''}
-                          onChange={(e) => updateItem(group.id, itemIdx, 'qty_m', parseInt(e.target.value) || 0)}
-                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
-                        />
-                      </td>
-                      <td className="p-0 border border-gray-300 dark:border-slate-800">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.qty_l || ''}
-                          onChange={(e) => updateItem(group.id, itemIdx, 'qty_l', parseInt(e.target.value) || 0)}
-                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
-                        />
-                      </td>
-                      <td className="p-0 border border-gray-300 dark:border-slate-800">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.qty_xl || ''}
-                          onChange={(e) => updateItem(group.id, itemIdx, 'qty_xl', parseInt(e.target.value) || 0)}
-                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
-                        />
-                      </td>
-                      <td className="p-0 border border-gray-300 dark:border-slate-800">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.qty_2xl || ''}
-                          onChange={(e) => updateItem(group.id, itemIdx, 'qty_2xl', parseInt(e.target.value) || 0)}
-                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
-                        />
-                      </td>
-                      <td className="p-0 border border-gray-300 dark:border-slate-800">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.qty_3xl || ''}
-                          onChange={(e) => updateItem(group.id, itemIdx, 'qty_3xl', parseInt(e.target.value) || 0)}
-                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
-                        />
-                      </td>
+                          {getSizeColumns().map(size => (
+                            <td key={size.key} className="p-0 border border-gray-300 dark:border-slate-800">
+                              <input
+                                type="number"
+                                min="0"
+                                value={(item as any)[size.key] || ''}
+                                onChange={(e) => updateItem(group.id, itemIdx, size.key, parseInt(e.target.value) || 0)}
+                                className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
+                              />
+                            </td>
+                          ))}
                       <td className="p-0.5 border border-gray-300 dark:border-slate-800 text-center text-xs text-gray-400">
                         {item.total_quantity}
                       </td>
@@ -1222,14 +1173,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           value={item.unit_price}
                           onChange={(e) => updateItem(group.id, itemIdx, 'unit_price', parseFloat(e.target.value) || 0)}
                           className="w-full px-1 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-right"
-                        />
-                      </td>
-                      <td className="p-0.5 border border-gray-300 dark:border-slate-800 text-center">
-                        <input
-                          type="checkbox"
-                          checked={item.taxed}
-                          onChange={(e) => updateItem(group.id, itemIdx, 'taxed', e.target.checked)}
-                          className="w-3 h-3"
                         />
                       </td>
                       <td className="p-0.5 border border-gray-300 dark:border-slate-800 text-right text-xs">
@@ -1259,7 +1202,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       ))}
                       {/* Group Actions Row */}
                       <tr key={`actions-${group.id}`}>
-                        <td colSpan={21} className="p-2 border-t-2 border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
+                        <td colSpan={getSizeColumns().length + 9} className="p-2 border-t-2 border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
                           <div className="flex gap-2 justify-between items-center">
                             <div className="flex gap-2">
                               <button
