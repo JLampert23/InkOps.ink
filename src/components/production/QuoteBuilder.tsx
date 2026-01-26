@@ -11,7 +11,6 @@ interface QuoteItem {
   item_number: string;
   color: string;
   description: string;
-  qty_yxs: number;
   qty_ys: number;
   qty_ym: number;
   qty_yl: number;
@@ -23,7 +22,6 @@ interface QuoteItem {
   qty_xl: number;
   qty_2xl: number;
   qty_3xl: number;
-  qty_4xl?: number;
   unit_price: number;
   total_quantity: number;
   total_price: number;
@@ -45,6 +43,7 @@ interface LineItemGroup {
   id: string;
   label: string;
   items: QuoteItem[];
+  taxed: boolean;
 }
 
 interface QuoteBuilderProps {
@@ -95,7 +94,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const [shipZip, setShipZip] = useState('');
 
   const [itemGroups, setItemGroups] = useState<LineItemGroup[]>([
-    { id: crypto.randomUUID(), label: '', items: [] }
+    { id: crypto.randomUUID(), label: '', items: [], taxed: false }
   ]);
   const [fees, setFees] = useState<QuoteFee[]>([]);
 
@@ -317,11 +316,12 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           id: crypto.randomUUID(),
           label,
           items,
+          taxed: items.length > 0 && items.every(item => item.taxed),
         }));
 
         setItemGroups(groups);
       } else {
-        setItemGroups([{ id: crypto.randomUUID(), label: '', items: [] }]);
+        setItemGroups([{ id: crypto.randomUUID(), label: '', items: [], taxed: false }]);
       }
 
       const { data: quoteFees } = await supabase
@@ -345,7 +345,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
             item_number: '',
             color: '',
             description: '',
-            qty_yxs: 0,
             qty_ys: 0,
             qty_ym: 0,
             qty_yl: 0,
@@ -357,7 +356,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
             qty_xl: 0,
             qty_2xl: 0,
             qty_3xl: 0,
-            qty_4xl: 0,
             unit_price: 0,
             total_quantity: 0,
             total_price: 0,
@@ -392,9 +390,9 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         if (field.startsWith('qty_') || field === 'unit_price') {
           const item = newItems[itemIndex];
           item.total_quantity =
-            item.qty_yxs + item.qty_ys + item.qty_ym + item.qty_yl + item.qty_yxl +
+            item.qty_ys + item.qty_ym + item.qty_yl + item.qty_yxl +
             item.qty_xs + item.qty_s + item.qty_m + item.qty_l + item.qty_xl +
-            item.qty_2xl + item.qty_3xl + (item.qty_4xl || 0);
+            item.qty_2xl + item.qty_3xl;
           item.total_price = item.total_quantity * item.unit_price;
         }
 
@@ -409,7 +407,8 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
     setItemGroups([...itemGroups, {
       id: crypto.randomUUID(),
       label: '',
-      items: []
+      items: [],
+      taxed: false
     }]);
   };
 
@@ -626,7 +625,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
             item_number: item.item_number,
             color: item.color,
             description: item.description,
-            qty_yxs: item.qty_yxs,
             qty_ys: item.qty_ys,
             qty_ym: item.qty_ym,
             qty_yl: item.qty_yl,
@@ -638,7 +636,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
             qty_xl: item.qty_xl,
             qty_2xl: item.qty_2xl,
             qty_3xl: item.qty_3xl,
-            qty_4xl: item.qty_4xl || 0,
             unit_price: item.unit_price,
             total_quantity: item.total_quantity,
             total_price: item.total_price,
@@ -1001,7 +998,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-20">Item #</th>
                       <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-20">Color</th>
                       <th className="p-1 text-left border border-gray-300 dark:border-slate-800">Description</th>
-                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YXS</th>
                       <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YS</th>
                       <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YM</th>
                       <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YL</th>
@@ -1013,7 +1009,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">XL</th>
                       <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">2XL</th>
                       <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">3XL</th>
-                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">4XL</th>
                       <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-14">Quantity</th>
                       <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-14">Items</th>
                       <th className="p-1 text-right border border-gray-300 dark:border-slate-800 w-16">Price</th>
@@ -1029,13 +1024,13 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       {/* Spacer Row Between Groups */}
                       {groupIdx > 0 && (
                         <tr key={`spacer-${group.id}`} className="bg-transparent">
-                          <td colSpan={23} className="p-4 border-0"></td>
+                          <td colSpan={21} className="p-4 border-0"></td>
                         </tr>
                       )}
                       {/* Group Header Row with Label - All Groups */}
                       {(itemGroups.length > 1 || group.label) && (
                         <tr key={`header-${group.id}`} className="bg-gray-200 dark:bg-slate-800">
-                          <td colSpan={23} className="p-2 border border-gray-300 dark:border-slate-800">
+                          <td colSpan={21} className="p-2 border border-gray-300 dark:border-slate-800">
                             <div className="flex items-center gap-2">
                               <input
                                 type="text"
@@ -1064,7 +1059,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-20">Item #</th>
                           <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-20">Color</th>
                           <th className="p-1 text-left border border-gray-300 dark:border-slate-800">Description</th>
-                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YXS</th>
                           <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YS</th>
                           <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YM</th>
                           <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">YL</th>
@@ -1076,7 +1070,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">XL</th>
                           <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">2XL</th>
                           <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">3XL</th>
-                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">4XL</th>
                           <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-14">Quantity</th>
                           <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-14">Items</th>
                           <th className="p-1 text-right border border-gray-300 dark:border-slate-800 w-16">Price</th>
@@ -1116,15 +1109,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                               className="w-full px-1 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs"
                             />
                           </td>
-                      <td className="p-0 border border-gray-300 dark:border-slate-800">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.qty_yxs || ''}
-                              onChange={(e) => updateItem(group.id, itemIdx, 'qty_yxs', parseInt(e.target.value) || 0)}
-                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
-                        />
-                      </td>
                       <td className="p-0 border border-gray-300 dark:border-slate-800">
                         <input
                           type="number"
@@ -1224,15 +1208,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                         />
                       </td>
-                      <td className="p-0 border border-gray-300 dark:border-slate-800">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.qty_4xl || ''}
-                          onChange={(e) => updateItem(group.id, itemIdx, 'qty_4xl', parseInt(e.target.value) || 0)}
-                          className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
-                        />
-                      </td>
                       <td className="p-0.5 border border-gray-300 dark:border-slate-800 text-center text-xs text-gray-400">
                         {item.total_quantity}
                       </td>
@@ -1284,7 +1259,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       ))}
                       {/* Group Actions Row */}
                       <tr key={`actions-${group.id}`}>
-                        <td colSpan={23} className="p-2 border-t-2 border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
+                        <td colSpan={21} className="p-2 border-t-2 border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
                           <div className="flex gap-2 justify-between items-center">
                             <div className="flex gap-2">
                               <button
@@ -1316,7 +1291,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                               className="px-3 py-2 bg-gray-600 hover:bg-gray-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded text-sm flex items-center gap-2 shadow-sm"
                             >
                               <Settings className="w-4 h-4" />
-                              Custom Sizes ({selectedCustomSizeOptions.length})
+                              Line Item Options
                             </button>
                           </div>
                         </td>
@@ -1508,12 +1483,12 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         quoteId={quoteId}
       />
 
-      {/* Custom Size Options Modal */}
+      {/* Line Item Options Modal */}
       {showCustomSizeModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl max-w-md w-full">
+          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl max-w-5xl w-full">
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-slate-700">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Custom Size Options</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Line Item Options</h3>
               <button
                 onClick={() => setShowCustomSizeModal(false)}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
@@ -1521,36 +1496,87 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-4 max-h-96 overflow-y-auto">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                Select which custom size options to include on this quote:
-              </p>
-              <div className="space-y-2">
-                {(companySettings?.custom_line_item_options || []).map((option: string, idx: number) => (
-                  <label
-                    key={idx}
-                    className="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-slate-800 rounded cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedCustomSizeOptions.includes(option)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedCustomSizeOptions([...selectedCustomSizeOptions, option]);
-                        } else {
-                          setSelectedCustomSizeOptions(selectedCustomSizeOptions.filter(o => o !== option));
-                        }
-                      }}
-                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-gray-900 dark:text-white">{option}</span>
-                  </label>
-                ))}
-                {(!companySettings?.custom_line_item_options || companySettings.custom_line_item_options.length === 0) && (
-                  <p className="text-sm text-gray-500 dark:text-gray-400 italic">
-                    No custom size options available. Add them in Account Settings.
-                  </p>
-                )}
+            <div className="p-6 max-h-[600px] overflow-y-auto">
+              <div className="grid grid-cols-3 gap-6">
+                {/* Column 1: Sizes */}
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 pb-2 border-b border-gray-200 dark:border-slate-700">
+                    Sizes
+                  </h4>
+                  <div className="space-y-2">
+                    {(companySettings?.custom_line_item_options || []).map((option: string, idx: number) => (
+                      <label
+                        key={idx}
+                        className="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-slate-800 rounded cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedCustomSizeOptions.includes(option)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedCustomSizeOptions([...selectedCustomSizeOptions, option]);
+                            } else {
+                              setSelectedCustomSizeOptions(selectedCustomSizeOptions.filter(o => o !== option));
+                            }
+                          }}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-900 dark:text-white">{option}</span>
+                      </label>
+                    ))}
+                    {(!companySettings?.custom_line_item_options || companySettings.custom_line_item_options.length === 0) && (
+                      <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                        No custom size options available. Add them in Account Settings.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Column 2: Taxes */}
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 pb-2 border-b border-gray-200 dark:border-slate-700">
+                    Taxes
+                  </h4>
+                  <div className="space-y-4">
+                    {itemGroups.map((group, idx) => (
+                      <label
+                        key={group.id}
+                        className="flex items-center gap-3 p-2 hover:bg-gray-50 dark:hover:bg-slate-800 rounded cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={group.taxed}
+                          onChange={(e) => {
+                            const updatedGroups = [...itemGroups];
+                            updatedGroups[idx].taxed = e.target.checked;
+                            // Update all items in the group to match the group tax status
+                            updatedGroups[idx].items = updatedGroups[idx].items.map(item => ({
+                              ...item,
+                              taxed: e.target.checked
+                            }));
+                            setItemGroups(updatedGroups);
+                          }}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-900 dark:text-white">
+                          {group.label || `Line Item Group ${idx + 1}`}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Column 3: Reserved for future use */}
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 pb-2 border-b border-gray-200 dark:border-slate-700">
+                    &nbsp;
+                  </h4>
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                      Additional options coming soon
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
             <div className="flex justify-end gap-2 p-4 border-t border-gray-200 dark:border-slate-700">
