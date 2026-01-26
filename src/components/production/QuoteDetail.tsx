@@ -633,10 +633,22 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                 <button
                                   className="w-full px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition-colors flex items-center justify-center gap-1.5"
                                   onClick={() => {
-                                    const firstLineItem = lineItems.find(li => li.line_type === 'garment');
+                                    console.log('===== PROOF BUTTON CLICKED =====');
+                                    console.log('Total line items:', lineItems.length);
+                                    console.log('Line items:', lineItems);
+
+                                    const garmentItem = lineItems.find(li => li.line_type === 'garment');
+                                    const firstLineItem = garmentItem || lineItems[0];
+
+                                    console.log('Garment item found:', garmentItem);
+                                    console.log('Selected line item:', firstLineItem);
+
                                     if (firstLineItem) {
+                                      console.log('Setting selectedLineItem and showProofGenerator to true');
                                       setSelectedLineItem(firstLineItem);
                                       setShowProofGenerator(true);
+                                    } else {
+                                      console.error('NO LINE ITEMS AVAILABLE');
                                     }
                                   }}
                                 >
@@ -813,22 +825,40 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         </div>
       )}
 
-      {showProofGenerator && selectedLineItem && quote && (
-        <ProofGenerator
-          lineItemId={selectedLineItem.id}
-          quoteId={quoteId}
-          customerId={quote.customer_id}
-          garmentStyle={selectedLineItem.item_number}
-          garmentColor={selectedLineItem.color}
-          onClose={() => {
-            setShowProofGenerator(false);
-            setSelectedLineItem(null);
-          }}
-          onSave={() => {
-            loadQuoteDetails();
-          }}
-        />
-      )}
+      {(() => {
+        console.log('Render check - showProofGenerator:', showProofGenerator);
+        console.log('Render check - selectedLineItem:', selectedLineItem);
+        console.log('Render check - quote:', quote);
+
+        if (showProofGenerator && selectedLineItem && quote) {
+          console.log('Rendering ProofGenerator with:', {
+            lineItemId: selectedLineItem.id,
+            quoteId,
+            customerId: quote.customer_id,
+            garmentStyle: selectedLineItem.item_number,
+            garmentColor: selectedLineItem.color,
+          });
+          return (
+            <ProofGenerator
+              lineItemId={selectedLineItem.id}
+              quoteId={quoteId}
+              customerId={quote.customer_id}
+              garmentStyle={selectedLineItem.item_number}
+              garmentColor={selectedLineItem.color}
+              onClose={() => {
+                console.log('ProofGenerator onClose called');
+                setShowProofGenerator(false);
+                setSelectedLineItem(null);
+              }}
+              onSave={() => {
+                console.log('ProofGenerator onSave called');
+                loadQuoteDetails();
+              }}
+            />
+          );
+        }
+        return null;
+      })()}
     </div>
   );
 }
