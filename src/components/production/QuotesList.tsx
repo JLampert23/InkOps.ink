@@ -50,7 +50,9 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
 
   useEffect(() => {
     loadQuotes();
+  }, [statusFilter]);
 
+  useEffect(() => {
     const channel = supabase
       .channel('quotes-changes')
       .on(
@@ -69,7 +71,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [statusFilter]);
+  }, []);
 
   const loadQuotes = async () => {
     setLoading(true);

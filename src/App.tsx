@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { RefreshCw, AlertCircle, TrendingUp, Menu, X, LogOut, Loader2, Settings, CreditCard, Package, ChevronDown, ChevronUp, Send, Mail, Wallet, Users, CheckCircle, Sun, Moon, UserPlus } from 'lucide-react';
 import { AccountSettings } from './components/AccountSettings';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -41,6 +41,7 @@ function AppContent() {
   const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
   const [customersKey, setCustomersKey] = useState(0);
   const [quoteCustomerId, setQuoteCustomerId] = useState<string | undefined>(undefined);
+  const previousTabRef = useRef<Tab | null>(null);
   const { signOut, user } = useAuth();
   const { userProfile, canAccessIntegrations } = useRBAC();
   const { showNotification } = useNotification();
@@ -74,7 +75,7 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    if (activeTab !== 'settings') {
+    if (previousTabRef.current === 'settings' && activeTab !== 'settings') {
       const loadCompanySettings = async () => {
         try {
           const { data, error } = await supabase
@@ -95,6 +96,7 @@ function AppContent() {
       };
       loadCompanySettings();
     }
+    previousTabRef.current = activeTab;
   }, [activeTab]);
 
   const accountingNavItems = [
