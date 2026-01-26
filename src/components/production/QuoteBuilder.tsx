@@ -74,6 +74,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const [nickname, setNickname] = useState('');
   const [customerNotes, setCustomerNotes] = useState('');
   const [productionNotes, setProductionNotes] = useState('');
+  const [customSizeOption, setCustomSizeOption] = useState('');
 
   const [billCompany, setBillCompany] = useState('');
   const [billName, setBillName] = useState('');
@@ -266,6 +267,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       setNickname(quote.nickname || '');
       setCustomerNotes(quote.customer_notes || '');
       setProductionNotes(quote.production_notes || '');
+      setCustomSizeOption(quote.custom_size_option || '');
       setBillCompany(quote.bill_company || '');
       setBillName(quote.bill_name || '');
       setBillAddress1(quote.bill_address_1 || '');
@@ -560,6 +562,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         nickname: nickname || null,
         customer_notes: customerNotes || null,
         production_notes: productionNotes || null,
+        custom_size_option: customSizeOption || null,
         bill_company: billCompany || null,
         bill_name: billName || null,
         bill_address_1: billAddress1 || null,
@@ -977,6 +980,20 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                   <option value="Due on Receipt">Due on Receipt</option>
                 </select>
               </div>
+
+              <div>
+                <label className="text-sm text-gray-700 dark:text-gray-300 mb-2 block font-medium">Custom Size Option</label>
+                <select
+                  value={customSizeOption}
+                  onChange={(e) => setCustomSizeOption(e.target.value)}
+                  className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                >
+                  <option value="">None</option>
+                  {(companySettings?.custom_line_item_options || []).map((option: string, idx: number) => (
+                    <option key={idx} value={option}>{option}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
@@ -1010,7 +1027,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       <th className="p-1 text-right border border-gray-300 dark:border-slate-800 w-16">Price</th>
                       <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">Taxed</th>
                       <th className="p-1 text-right border border-gray-300 dark:border-slate-800 w-20">Total</th>
-                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-24">Options</th>
                       <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-20">Actions</th>
                     </tr>
                   </thead>
@@ -1021,13 +1037,13 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       {/* Spacer Row Between Groups */}
                       {groupIdx > 0 && (
                         <tr key={`spacer-${group.id}`} className="bg-transparent">
-                          <td colSpan={24} className="p-4 border-0"></td>
+                          <td colSpan={23} className="p-4 border-0"></td>
                         </tr>
                       )}
                       {/* Group Header Row with Label - All Groups */}
                       {(itemGroups.length > 1 || group.label) && (
                         <tr key={`header-${group.id}`} className="bg-gray-200 dark:bg-slate-800">
-                          <td colSpan={24} className="p-2 border border-gray-300 dark:border-slate-800">
+                          <td colSpan={23} className="p-2 border border-gray-300 dark:border-slate-800">
                             <div className="flex items-center gap-2">
                               <input
                                 type="text"
@@ -1074,7 +1090,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           <th className="p-1 text-right border border-gray-300 dark:border-slate-800 w-16">Price</th>
                           <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">Taxed</th>
                           <th className="p-1 text-right border border-gray-300 dark:border-slate-800 w-20">Total</th>
-                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-24">Options</th>
                           <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-20">Actions</th>
                         </tr>
                       )}
@@ -1253,18 +1268,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       <td className="p-0.5 border border-gray-300 dark:border-slate-800 text-right text-xs">
                         ${item.total_price.toFixed(2)}
                       </td>
-                      <td className="p-0 border border-gray-300 dark:border-slate-800">
-                        <select
-                          value={item.custom_option || ''}
-                          onChange={(e) => updateItem(group.id, itemIdx, 'custom_option', e.target.value)}
-                          className="w-full px-1 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs"
-                        >
-                          <option value="">None</option>
-                          {(companySettings?.custom_line_item_options || []).map((option: string, idx: number) => (
-                            <option key={idx} value={option}>{option}</option>
-                          ))}
-                        </select>
-                      </td>
                       <td className="p-0.5 border border-gray-300 dark:border-slate-800">
                         <div className="flex items-center justify-center gap-0.5">
                           <button
@@ -1289,7 +1292,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       ))}
                       {/* Group Actions Row */}
                       <tr key={`actions-${group.id}`}>
-                        <td colSpan={24} className="p-2 border-t-2 border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
+                        <td colSpan={23} className="p-2 border-t-2 border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
                           <div className="flex gap-2">
                             <button
                               onClick={() => addItem(group.id)}
