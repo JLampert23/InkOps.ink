@@ -57,25 +57,6 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
   // Get unique stations
   const stations = Array.from(new Set(entries.map(e => e.station).filter(Boolean)));
 
-  useEffect(() => {
-    loadWorkflowSteps();
-  }, [typeOfWork]);
-
-  useEffect(() => {
-    if (workflowSteps.length > 0 && !selectedStep) {
-      setSelectedStep(workflowSteps[0].id);
-    }
-  }, [workflowSteps]);
-
-  useEffect(() => {
-    if (selectedStep) {
-      const timer = setTimeout(() => {
-        loadScheduleEntries();
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-  }, [selectedStep, loadScheduleEntries]);
-
   const loadWorkflowSteps = async () => {
     try {
       const { data: typeData } = await supabase
@@ -143,6 +124,25 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
       setLoading(false);
     }
   }, [typeOfWork, startDate, endDate, stationFilter, customerFilter]);
+
+  useEffect(() => {
+    loadWorkflowSteps();
+  }, [typeOfWork]);
+
+  useEffect(() => {
+    if (workflowSteps.length > 0 && !selectedStep) {
+      setSelectedStep(workflowSteps[0].id);
+    }
+  }, [workflowSteps, selectedStep]);
+
+  useEffect(() => {
+    if (selectedStep) {
+      const timer = setTimeout(() => {
+        loadScheduleEntries();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedStep, loadScheduleEntries]);
 
   const updateEntry = async (entryId: string, updates: Partial<ScheduleEntry>) => {
     try {
