@@ -394,16 +394,16 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setSsaEnabled(data.ssactivewear_enabled || false);
 
         // Check if credentials exist
-        const sanmarHasCreds = data.sanmar_credentials &&
+        const sanmarHasCreds = !!(data.sanmar_credentials &&
           typeof data.sanmar_credentials === 'object' &&
           Object.keys(data.sanmar_credentials).length > 0 &&
-          data.sanmar_credentials.apiKey;
+          data.sanmar_credentials.apiKey);
 
-        const ssaHasCreds = data.ssactivewear_credentials &&
+        const ssaHasCreds = !!(data.ssactivewear_credentials &&
           typeof data.ssactivewear_credentials === 'object' &&
           Object.keys(data.ssactivewear_credentials).length > 0 &&
           data.ssactivewear_credentials.username &&
-          data.ssactivewear_credentials.password;
+          data.ssactivewear_credentials.password);
 
         setSanmarHasCredentials(sanmarHasCreds);
         setSsaHasCredentials(ssaHasCreds);
@@ -1754,10 +1754,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               'Authorization': `Bearer ${session.access_token}`,
             },
             body: JSON.stringify({
-            action: 'encrypt',
-            token: ssaPassword,
-          }),
-        });
+              action: 'encrypt',
+              token: ssaPassword,
+            }),
+          });
 
         if (!encryptResponse.ok) {
           throw new Error('Failed to encrypt SSActivewear password');
@@ -1889,13 +1889,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           );
 
           if (response.ok) {
+            const data = await response.json();
             results.push('SanMar: Connected successfully');
           } else {
             hasError = true;
-            results.push(`SanMar: Connection failed`);
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            console.error('SanMar test error:', errorData);
+            results.push(`SanMar: ${errorData.error || 'Connection failed'}`);
           }
         } catch (err) {
           hasError = true;
+          console.error('SanMar test exception:', err);
           results.push(`SanMar: ${err instanceof Error ? err.message : 'Connection failed'}`);
         }
       }
@@ -1913,13 +1917,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           );
 
           if (response.ok) {
+            const data = await response.json();
             results.push('SSActivewear: Connected successfully');
           } else {
             hasError = true;
-            results.push(`SSActivewear: Connection failed`);
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            console.error('SSActivewear test error:', errorData);
+            results.push(`SSActivewear: ${errorData.error || 'Connection failed'}`);
           }
         } catch (err) {
           hasError = true;
+          console.error('SSActivewear test exception:', err);
           results.push(`SSActivewear: ${err instanceof Error ? err.message : 'Connection failed'}`);
         }
       }
