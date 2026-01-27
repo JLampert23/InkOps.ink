@@ -224,37 +224,28 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const token = authHeader.replace("Bearer ", "");
-    console.log('Token extraction:', {
-      tokenLength: token.length,
-      tokenPrefix: token.substring(0, 20)
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: { Authorization: authHeader },
+      },
     });
 
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-    console.log('Calling getUser with token...');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    console.log('Calling getUser...');
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     console.log('Auth result:', {
       hasUser: !!user,
       userId: user?.id,
       hasError: !!authError,
-      errorName: authError?.name,
-      errorMessage: authError?.message,
-      errorStatus: authError?.status
+      errorMessage: authError?.message
     });
 
     if (authError || !user) {
-      console.error('Auth failed:', JSON.stringify(authError, null, 2));
+      console.error('Auth failed:', authError);
       return new Response(
         JSON.stringify({
-          code: 401,
-          message: "Invalid JWT",
-          error: authError?.message || "Unauthorized",
-          debug: {
-            errorName: authError?.name,
-            errorStatus: authError?.status
-          }
+          error: "Unauthorized",
+          details: authError?.message
         }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );

@@ -33,7 +33,6 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    // Get auth token from request
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
@@ -42,19 +41,17 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Create Supabase client with user's auth token
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
         headers: { Authorization: authHeader },
       },
     });
 
-    // Verify user and get company_id
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
       return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
+        JSON.stringify({ error: "Unauthorized", details: authError?.message }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
