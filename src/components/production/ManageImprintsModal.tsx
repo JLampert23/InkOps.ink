@@ -24,6 +24,7 @@ interface Imprint {
   proofs: Proof[];
   thread_ink_color?: string;
   pricing_matrix_column?: string;
+  group_label?: string;
 }
 
 interface PriceMatrix {
@@ -84,6 +85,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
     proofs: [],
     thread_ink_color: '',
     pricing_matrix_column: '',
+    group_label: '',
   });
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -215,6 +217,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
         proofs: imp.mockups || [],
         thread_ink_color: imp.thread_ink_color || '',
         pricing_matrix_column: imp.pricing_matrix_column || '',
+        group_label: imp.group_label || '',
       })));
     }
   };
@@ -336,6 +339,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
       proofs: [],
       thread_ink_color: '',
       pricing_matrix_column: '',
+      group_label: '',
     });
     setSelectedMatrixColumns([]);
     setSelectedProofForNote(null);
@@ -408,6 +412,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
               mockups: imp.proofs,
               thread_ink_color: imp.thread_ink_color,
               pricing_matrix_column: imp.pricing_matrix_column,
+              group_label: imp.group_label || null,
             }))
           );
 
@@ -442,7 +447,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
         <div className="flex-1 overflow-auto px-5 py-4">
           <div className="space-y-3">
             <div className="bg-slate-800/50 rounded-lg p-4 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-400 mb-1.5">
                     Type of Work <span className="text-red-400">*</span>
@@ -481,6 +486,19 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-1.5">
+                    Line Item Group
+                  </label>
+                  <input
+                    type="text"
+                    value={currentImprint.group_label || ''}
+                    onChange={(e) => setCurrentImprint({ ...currentImprint, group_label: e.target.value })}
+                    placeholder="e.g., Adult, Youth, Staff"
+                    className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-600 rounded text-white text-sm placeholder-gray-500"
+                  />
                 </div>
               </div>
 

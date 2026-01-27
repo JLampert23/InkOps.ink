@@ -661,7 +661,10 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
                         {/* List imprints for this group */}
                         {(() => {
-                          const groupImprints = quoteImprints.filter(imp => (imp as any).group_label === groupLabel);
+                          const groupImprints = quoteImprints.filter(imp =>
+                            (imp as any).group_label === groupLabel ||
+                            ((imp as any).group_label === null && quoteImprints.filter(i => (i as any).group_label === null).length > 0)
+                          );
                           if (groupImprints.length === 0) return null;
 
                           const garmentItem = groupItems.find(li => li.line_type === 'garment');
