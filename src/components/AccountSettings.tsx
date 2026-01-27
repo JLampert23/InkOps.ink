@@ -6,7 +6,6 @@ import { useNotification } from '../contexts/NotificationContext';
 import AutomatedReports from './automation/AutomatedReports';
 import WorkflowBuilder from './production/WorkflowBuilder';
 
-const WorkflowCustomization = lazy(() => import('./production/WorkflowCustomization').then(m => ({ default: m.WorkflowCustomization })));
 const AutomationsDashboard = lazy(() => import('./automations/AutomationsDashboard').then(m => ({ default: m.AutomationsDashboard })));
 const StripePayments = lazy(() => import('./production/StripePayments').then(m => ({ default: m.StripePayments })));
 const PriceMatricesManager = lazy(() => import('./production/PriceMatricesManager').then(m => ({ default: m.PriceMatricesManager })));
@@ -101,7 +100,7 @@ type SettingsTab =
   | 'printavo-integration' | 'square-integration' | 'resend-integration' | 'twilio-integration' | 'stripe-payments' | 'supplier-integrations'
   | 'user-management' | 'user-security'
   | 'billing-status-filters'
-  | 'automated-reports' | 'workflow-setup' | 'automations'
+  | 'automated-reports' | 'automations'
   | 'production-general' | 'scheduler-settings' | 'invoice-fees' | 'price-matrices';
 
 interface AccountSettingsProps {
@@ -3580,24 +3579,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 </button>
 
                 <button
-                  onClick={() => setActiveTab('workflow-setup')}
-                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
-                    activeTab === 'workflow-setup'
-                      ? 'bg-green-50 dark:bg-green-600/20 text-green-700 dark:text-green-400 shadow-sm'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                  style={{ animationDelay: '60ms' }}
-                >
-                  <Layers className={`w-4 h-4 flex-shrink-0 ${activeTab === 'workflow-setup' ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
-                  <div className="flex-1 text-left">
-                    <div className={`font-medium text-sm ${activeTab === 'workflow-setup' ? 'text-green-700 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                      Workflow Setup
-                    </div>
-                  </div>
-                  {activeTab === 'workflow-setup' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
-                </button>
-
-                <button
                   onClick={() => setActiveTab('automations')}
                   className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
                     activeTab === 'automations'
@@ -5229,16 +5210,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
           {activeTab === 'automated-reports' && (
             <AutomatedReports />
-          )}
-
-          {activeTab === 'workflow-setup' && (
-            <Suspense fallback={
-              <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
-                </div>
-              }>
-                <WorkflowCustomization />
-              </Suspense>
           )}
 
           {activeTab === 'automations' && (
