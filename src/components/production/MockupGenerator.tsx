@@ -496,10 +496,6 @@ export default function MockupGenerator({
       };
       img.src = garmentImageUrl;
     } else {
-      ctx.fillStyle = '#f0f0f0';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.strokeStyle = '#ccc';
-      ctx.strokeRect(0, 0, canvas.width, canvas.height);
       drawArtwork(ctx);
     }
   };
@@ -767,6 +763,16 @@ export default function MockupGenerator({
                 width={600}
                 height={700}
                 className="shadow-lg cursor-move"
+                style={{
+                  backgroundImage: `
+                    linear-gradient(45deg, #e5e7eb 25%, transparent 25%),
+                    linear-gradient(-45deg, #e5e7eb 25%, transparent 25%),
+                    linear-gradient(45deg, transparent 75%, #e5e7eb 75%),
+                    linear-gradient(-45deg, transparent 75%, #e5e7eb 75%)
+                  `,
+                  backgroundSize: '20px 20px',
+                  backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
+                }}
                 onMouseDown={handleCanvasMouseDown}
                 onMouseMove={handleCanvasMouseMove}
                 onMouseUp={handleCanvasMouseUp}

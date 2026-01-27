@@ -144,6 +144,8 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
   const [showProofGenerator, setShowProofGenerator] = useState(false);
   const [selectedLineItem, setSelectedLineItem] = useState<LineItem | null>(null);
   const [selectedGroupLabel, setSelectedGroupLabel] = useState<string>('');
+  const [showProofModal, setShowProofModal] = useState(false);
+  const [selectedProofImage, setSelectedProofImage] = useState<string>('');
 
   const [expiresInDays, setExpiresInDays] = useState(30);
   const [singleUse, setSingleUse] = useState(true);
@@ -707,7 +709,10 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                           src={matchingProof.composite_image_url || matchingProof.garment_image_url!}
                                           alt={matchingProof.garment_name || 'Proof'}
                                           className="w-full aspect-square object-cover rounded border border-gray-200 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all"
-                                          onClick={() => window.open(matchingProof.composite_image_url || matchingProof.garment_image_url!, '_blank')}
+                                          onClick={() => {
+                                            setSelectedProofImage(matchingProof.composite_image_url || matchingProof.garment_image_url!);
+                                            setShowProofModal(true);
+                                          }}
                                         />
                                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{matchingProof.proof_number}</p>
                                       </div>
@@ -920,6 +925,35 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         }
         return null;
       })()}
+
+      {showProofModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowProofModal(false)}
+        >
+          <div
+            className="relative max-w-6xl max-h-[90vh] bg-white dark:bg-slate-800 rounded-lg shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="absolute top-2 right-2 z-10">
+              <button
+                onClick={() => setShowProofModal(false)}
+                className="p-2 bg-white dark:bg-slate-700 rounded-full shadow-lg hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors"
+              >
+                <XCircle className="w-6 h-6 text-gray-700 dark:text-gray-300" />
+              </button>
+            </div>
+            <div className="p-4 max-h-[90vh] overflow-auto">
+              <img
+                src={selectedProofImage}
+                alt="Proof/Mockup"
+                className="w-full h-auto object-contain"
+                style={{ maxHeight: 'calc(90vh - 2rem)' }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
