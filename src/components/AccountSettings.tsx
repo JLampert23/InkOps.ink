@@ -5732,7 +5732,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     <p className="text-xs">No fees yet</p>
                   </div>
                 ) : (
-                  <div className="space-y-0.5">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-2">
                     {invoiceFees.map((fee, index) => (
                       <div
                         key={fee.id}
@@ -5740,37 +5740,41 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         onDragStart={() => handleFeeDragStart(index)}
                         onDragOver={(e) => handleFeeDragOver(e, index)}
                         onDragEnd={handleFeeDragEnd}
-                        className="flex items-center gap-1 p-1.5 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors cursor-move group"
+                        className="flex items-center gap-2 p-2.5 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors cursor-move group"
                       >
-                        <GripVertical className="w-3 h-3 text-gray-400 dark:text-gray-500 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <div className="flex-1 min-w-0 flex items-center gap-1">
-                          <span className="text-xs font-medium text-gray-900 dark:text-white truncate">{fee.fee_name}</span>
-                          <span className="px-1 py-0.5 text-xs font-medium rounded bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 whitespace-nowrap flex-shrink-0">
-                            {fee.amount_type === 'dollar' ? `$${fee.amount.toFixed(2)}` : `${fee.amount}%`}
-                          </span>
-                          {fee.is_taxed && (
-                            <span className="px-1 py-0.5 text-xs font-medium rounded bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 whitespace-nowrap flex-shrink-0">
-                              T
+                        <GripVertical className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">{fee.fee_name}</h3>
+                          </div>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 whitespace-nowrap">
+                              {fee.amount_type === 'dollar' ? `$${fee.amount.toFixed(2)}` : `${fee.amount}%`}
                             </span>
-                          )}
-                          {fee.show_by_default && (
-                            <span className="px-1 py-0.5 text-xs font-medium rounded bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 whitespace-nowrap flex-shrink-0">
-                              A
-                            </span>
-                          )}
+                            {fee.is_taxed && (
+                              <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 whitespace-nowrap">
+                                Taxed
+                              </span>
+                            )}
+                            {fee.show_by_default && (
+                              <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 whitespace-nowrap">
+                                Default
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-0.5 flex-shrink-0">
+                        <div className="flex flex-col gap-1 flex-shrink-0">
                           <button
                             onClick={() => openEditFeeModal(fee)}
-                            className="p-0.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                            className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
                           >
-                            <Edit className="w-3 h-3" />
+                            <Edit className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => deleteFee(fee.id)}
-                            className="p-0.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                            className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
                           >
-                            <Trash2 className="w-3 h-3" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
@@ -5813,7 +5817,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     <p className="text-xs">No locations yet</p>
                   </div>
                 ) : (
-                  <div className="space-y-0.5">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-2">
                     {decorationLocations.map((location, index) => (
                       <div
                         key={location.id}
@@ -5821,24 +5825,24 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         onDragStart={() => handleLocationDragStart(index)}
                         onDragOver={(e) => handleLocationDragOver(e, index)}
                         onDragEnd={handleLocationDragEnd}
-                        className="flex items-center gap-1 p-1.5 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors cursor-move group"
+                        className="flex items-center gap-2 p-2.5 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors cursor-move group"
                       >
-                        <GripVertical className="w-3 h-3 text-gray-400 dark:text-gray-500 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <GripVertical className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                         <div className="flex-1 min-w-0">
-                          <span className="text-xs font-medium text-gray-900 dark:text-white truncate block">{location.decoration_name}</span>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white truncate block">{location.decoration_name}</span>
                         </div>
-                        <div className="flex items-center gap-0.5 flex-shrink-0">
+                        <div className="flex flex-col gap-1 flex-shrink-0">
                           <button
                             onClick={() => openEditLocationModal(location)}
-                            className="p-0.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                            className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
                           >
-                            <Edit className="w-3 h-3" />
+                            <Edit className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => deleteLocation(location.id)}
-                            className="p-0.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                            className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
                           >
-                            <Trash2 className="w-3 h-3" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
