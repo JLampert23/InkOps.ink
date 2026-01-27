@@ -25,6 +25,7 @@ export async function lookupProductByStyle(styleNumber: string): Promise<PromoSt
       {
         headers: {
           'Authorization': `Bearer ${token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
       }
     );
@@ -55,6 +56,7 @@ export async function getProductPricing(partId: string): Promise<PromoStandardsP
       {
         headers: {
           'Authorization': `Bearer ${token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
       }
     );
@@ -85,6 +87,7 @@ export async function getProductInventory(partId: string): Promise<PromoStandard
       {
         headers: {
           'Authorization': `Bearer ${token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
       }
     );
@@ -115,6 +118,7 @@ export async function getProductMedia(partId: string): Promise<PromoStandardsMed
       {
         headers: {
           'Authorization': `Bearer ${token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
       }
     );
