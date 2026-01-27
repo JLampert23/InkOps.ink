@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Calendar, Filter, GripVertical, Save, X, Plus, Search, RefreshCw, CalendarDays } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format, startOfWeek, endOfWeek, addDays, parseISO } from 'date-fns';
+import SchedulerTabManager from './SchedulerTabManager';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ScheduleEntry {
   id: string;
@@ -35,16 +37,38 @@ interface WorkflowStep {
   }>;
 }
 
+interface SchedulerTab {
+  id: string;
+  tab_name: string;
+  is_public: boolean;
+  filters: FilterConfig;
+  sort_config: any;
+  tab_order: number;
+  user_id: string | null;
+}
+
+interface FilterConfig {
+  startDate?: string;
+  endDate?: string;
+  stationFilter?: string;
+  customerFilter?: string;
+  stepStatusFilters?: Record<string, string[]>;
+}
+
 interface ProductionSchedulerProps {
   typeOfWork: string;
 }
 
 export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerProps) {
+  const { user, companyId } = useAuth();
   const [entries, setEntries] = useState<ScheduleEntry[]>([]);
   const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([]);
   const [loading, setLoading] = useState(true);
   const [draggedEntry, setDraggedEntry] = useState<string | null>(null);
   const [editingCell, setEditingCell] = useState<{ entryId: string; field: string } | null>(null);
+
+  // Tab management
+  const [activeTab, setActiveTab] = useState<SchedulerTab | null>(null);
 
   // Filters
   const [startDate, setStartDate] = useState(format(startOfWeek(new Date()), 'yyyy-MM-dd'));
@@ -148,6 +172,33 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
       return () => clearTimeout(timer);
     }
   }, [workflowSteps.length, loadScheduleEntries]);
+
+  // Apply tab filters when tab is selected
+  useEffect(() => {
+    if (activeTab && activeTab.filters) {
+      if (activeTab.filters.startDate) setStartDate(activeTab.filters.startDate);
+      if (activeTab.filters.endDate) setEndDate(activeTab.filters.endDate);
+      if (activeTab.filters.stationFilter !== undefined) setStationFilter(activeTab.filters.stationFilter);
+      if (activeTab.filters.customerFilter !== undefined) setCustomerFilter(activeTab.filters.customerFilter);
+    }
+  }, [activeTab]);
+
+  const handleTabSelect = (tab: SchedulerTab | null) => {
+    setActiveTab(tab);
+    if (tab === null) {
+      setStartDate(format(startOfWeek(new Date()), 'yyyy-MM-dd'));
+      setEndDate(format(endOfWeek(addDays(new Date(), 14)), 'yyyy-MM-dd'));
+      setStationFilter('');
+      setCustomerFilter('');
+    }
+  };
+
+  const currentFilters: FilterConfig = {
+    startDate,
+    endDate,
+    stationFilter,
+    customerFilter,
+  };
 
   const updateEntry = async (entryId: string, updates: Partial<ScheduleEntry>) => {
     try {
@@ -276,10 +327,22 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
 
   return (
     <div className="space-y-4">
+      {/* Tabs */}
+      {companyId && user?.id && (
+        <SchedulerTabManager
+          typeOfWork={typeOfWork}
+          companyId={companyId}
+          userId={user.id}
+          currentFilters={currentFilters}
+          onSelectTab={handleTabSelect}
+          activeTabId={activeTab?.id || null}
+        />
+      )}
+
       {/* Header and Filters */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-          {typeOfWork} - List
+          {typeOfWork} Schedule
         </h3>
         <div className="flex items-center gap-2">
           <button
