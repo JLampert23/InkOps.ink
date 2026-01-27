@@ -114,29 +114,28 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
   const loadScheduleEntries = useCallback(async () => {
     setLoading(true);
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      let query = supabase
+        .from('production_schedule_entries')
+        .select('*')
+        .eq('type_of_work', typeOfWork)
+        .gte('production_due_date', startDate)
+        .lte('production_due_date', endDate)
+        .order('production_due_date', { ascending: true })
+        .order('priority_order', { ascending: true });
 
-      const params = new URLSearchParams({
-        type_of_work: typeOfWork,
-        start_date: startDate,
-        end_date: endDate,
-      });
-
-      if (stationFilter) params.append('station', stationFilter);
-      if (customerFilter) params.append('customer', customerFilter);
-
-      const response = await fetch(`${supabaseUrl}/functions/v1/production-schedule?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setEntries(data || []);
+      if (stationFilter) {
+        query = query.eq('station', stationFilter);
       }
+
+      if (customerFilter) {
+        query = query.ilike('customer_name', `%${customerFilter}%`);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      setEntries(data || []);
     } catch (error) {
       console.error('Error loading schedule entries:', error);
       setEntries([]);
@@ -147,21 +146,17 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
 
   const updateEntry = async (entryId: string, updates: Partial<ScheduleEntry>) => {
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      const { data, error } = await supabase
+        .from('production_schedule_entries')
+        .update(updates)
+        .eq('id', entryId)
+        .select()
+        .single();
 
-      const response = await fetch(`${supabaseUrl}/functions/v1/production-schedule/${entryId}`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updates),
-      });
+      if (error) throw error;
 
-      if (response.ok) {
-        const updated = await response.json();
-        setEntries(prev => prev.map(e => e.id === entryId ? updated : e));
+      if (data) {
+        setEntries(prev => prev.map(e => e.id === entryId ? data : e));
       }
     } catch (error) {
       console.error('Error updating entry:', error);
