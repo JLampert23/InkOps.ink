@@ -388,12 +388,27 @@ Deno.serve(async (req: Request) => {
 
     if (!ssaResponse.ok) {
       const errorText = await ssaResponse.text();
-      console.error("SSActivewear PromoStandards API error:", errorText);
+      console.error("SSActivewear PromoStandards API error:", {
+        status: ssaResponse.status,
+        error: errorText,
+        endpoint,
+        accountNumber: credentials.accountNumber,
+        hasApiKey: !!decryptedApiKey
+      });
+
+      let userMessage = "SSActivewear API request failed";
+      if (ssaResponse.status === 403) {
+        userMessage = "SSActivewear authentication failed. Please verify your account number and API key are correct, and that your account has PromoStandards API access enabled.";
+      } else if (ssaResponse.status === 404) {
+        userMessage = `Product ${productId || partId} not found in SSActivewear catalog`;
+      }
+
       return new Response(
         JSON.stringify({
-          error: "SSActivewear API request failed",
-          details: errorText,
-          status: ssaResponse.status
+          error: userMessage,
+          details: errorText.length > 1000 ? `${errorText.substring(0, 1000)}...` : errorText,
+          status: ssaResponse.status,
+          hint: ssaResponse.status === 403 ? "Check that your SSActivewear credentials are correct and PromoStandards API is enabled for your account" : undefined
         }),
         { status: ssaResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
