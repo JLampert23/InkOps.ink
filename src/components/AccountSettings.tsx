@@ -297,6 +297,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [numberStartNumber, setNumberStartNumber] = useState(1);
   const [savingNumberSettings, setSavingNumberSettings] = useState(false);
 
+  const [invoiceTerms, setInvoiceTerms] = useState('');
+  const [savingInvoiceTerms, setSavingInvoiceTerms] = useState(false);
+
   const [colorStitchOptions, setColorStitchOptions] = useState<ColorStitchOption[]>([]);
   const [loadingColorStitch, setLoadingColorStitch] = useState(false);
   const [editingColorStitchId, setEditingColorStitchId] = useState<string | null>(null);
@@ -428,6 +431,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setUseNumberPrefix(data.use_number_prefix || false);
         setNumberStartNumber(data.number_start_number || 1);
         setCustomLineItemOptions(data.custom_line_item_options || []);
+        setInvoiceTerms(data.invoice_terms || '');
       }
     } catch (err) {
       console.error('Error loading settings:', err);
@@ -610,6 +614,34 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save settings');
     } finally {
       setSavingNumberSettings(false);
+    }
+  };
+
+  const saveInvoiceTerms = async () => {
+    if (!companySettings) {
+      showNotification('error', 'Error', 'Company settings not loaded');
+      return;
+    }
+
+    try {
+      setSavingInvoiceTerms(true);
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update({
+          invoice_terms: invoiceTerms,
+        })
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
+
+      showNotification('success', 'Settings Saved', 'Payment terms have been updated successfully!');
+      await loadSettings();
+    } catch (err) {
+      console.error('Error saving payment terms:', err);
+      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save payment terms');
+    } finally {
+      setSavingInvoiceTerms(false);
     }
   };
 
@@ -7164,6 +7196,58 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       <>
                         <Save className="w-4 h-4" />
                         Save Numbering Settings
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Payment Terms */}
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Payment Terms</h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Set default payment terms that will appear on quotes and invoices</p>
+                </div>
+
+                <div className="space-y-4 border-t border-gray-200 dark:border-slate-700 pt-4">
+                  <div>
+                    <label htmlFor="invoice-terms" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Default Payment Terms
+                    </label>
+                    <textarea
+                      id="invoice-terms"
+                      value={invoiceTerms}
+                      onChange={(e) => setInvoiceTerms(e.target.value)}
+                      rows={4}
+                      placeholder="Enter your default payment terms, e.g., 'Payment due within 30 days of invoice date. Late payments subject to 1.5% monthly interest.'"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white resize-none"
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      These terms will be displayed on all quotes and invoices unless overridden
+                    </p>
+                  </div>
+
+                  {invoiceTerms && (
+                    <div className="bg-gray-50 dark:bg-slate-700 rounded-lg p-3 border border-gray-200 dark:border-slate-600">
+                      <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Preview:</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{invoiceTerms}</p>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={saveInvoiceTerms}
+                    disabled={savingInvoiceTerms}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {savingInvoiceTerms ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Save Payment Terms
                       </>
                     )}
                   </button>
