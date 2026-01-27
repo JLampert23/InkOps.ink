@@ -213,6 +213,36 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
     setEditingCell(null);
   };
 
+  const handleDateChange = (entryId: string, newDate: string) => {
+    updateEntry(entryId, { production_due_date: newDate });
+    setEditingCell(null);
+  };
+
+  const handleDragEnd = (e: React.DragEvent, targetEntryId: string) => {
+    e.preventDefault();
+
+    if (!draggedEntry || draggedEntry === targetEntryId) {
+      setDraggedEntry(null);
+      return;
+    }
+
+    const draggedIndex = entries.findIndex(e => e.id === draggedEntry);
+    const targetIndex = entries.findIndex(e => e.id === targetEntryId);
+
+    if (draggedIndex === -1 || targetIndex === -1) {
+      setDraggedEntry(null);
+      return;
+    }
+
+    const draggedItem = entries[draggedIndex];
+    const targetItem = entries[targetIndex];
+
+    updateEntry(draggedEntry, { priority_order: targetItem.priority_order });
+    updateEntry(targetEntryId, { priority_order: draggedItem.priority_order });
+
+    setDraggedEntry(null);
+  };
+
   const getStatusColor = (stepId: string, statusName: string) => {
     const step = workflowSteps.find(s => s.id === stepId);
     const status = step?.statuses.find(s => s.status_name === statusName);
@@ -340,16 +370,13 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
                   Quote #
                 </th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Due Date
+                  Prod Date
                 </th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Station
                 </th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Qty
-                </th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Production Time
                 </th>
                 {workflowSteps.map(step => (
                   <th key={step.id} className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -361,7 +388,7 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
             <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
               {loading ? (
                 <tr>
-                  <td colSpan={9 + workflowSteps.length} className="px-6 py-12 text-center">
+                  <td colSpan={8 + workflowSteps.length} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <RefreshCw className="w-8 h-8 text-green-600 dark:text-green-400 animate-spin" />
                       <span className="text-sm text-gray-500 dark:text-gray-400">Loading schedule...</span>
@@ -370,7 +397,7 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
                 </tr>
               ) : entries.length === 0 ? (
                 <tr>
-                  <td colSpan={9 + workflowSteps.length} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={8 + workflowSteps.length} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                     No scheduled jobs for this time period
                   </td>
                 </tr>
@@ -381,7 +408,7 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
                     draggable
                     onDragStart={(e) => handleDragStart(e, entry.id)}
                     onDragOver={handleDragOver}
-                    onDrop={(e) => handleDrop(e, entry.production_due_date, entry.station || undefined)}
+                    onDrop={(e) => handleDragEnd(e, entry.id)}
                     className={`hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors ${
                       draggedEntry === entry.id ? 'opacity-50' : ''
                     }`}
@@ -411,8 +438,24 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
                     <td className="px-3 py-3 text-sm text-gray-900 dark:text-white">
                       {entry.quote_number || '-'}
                     </td>
-                    <td className="px-3 py-3 text-sm text-gray-900 dark:text-white">
-                      {format(parseISO(entry.production_due_date), 'MMM d, yyyy')}
+                    <td className="px-3 py-3">
+                      {editingCell?.entryId === entry.id && editingCell?.field === 'prod_date' ? (
+                        <input
+                          type="date"
+                          value={entry.production_due_date}
+                          onChange={(e) => handleDateChange(entry.id, e.target.value)}
+                          onBlur={() => setEditingCell(null)}
+                          autoFocus
+                          className="w-full px-2 py-1 text-sm border border-green-500 rounded bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
+                        />
+                      ) : (
+                        <button
+                          onClick={() => setEditingCell({ entryId: entry.id, field: 'prod_date' })}
+                          className="text-sm text-gray-900 dark:text-white hover:text-green-600 dark:hover:text-green-400"
+                        >
+                          {format(parseISO(entry.production_due_date), 'MMM d, yyyy')}
+                        </button>
+                      )}
                     </td>
                     <td className="px-3 py-3">
                       {editingCell?.entryId === entry.id && editingCell?.field === 'station' ? (
@@ -441,11 +484,6 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
                     </td>
                     <td className="px-3 py-3 text-sm text-gray-900 dark:text-white">
                       {entry.quantity}
-                    </td>
-                    <td className="px-3 py-3">
-                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 border border-green-200 dark:border-green-700">
-                        NORMAL PRODUCTION
-                      </span>
                     </td>
                     {workflowSteps.map(step => {
                       const currentStatus = entry.step_statuses[step.id] || step.statuses.find(s => s.is_default)?.status_name || 'Not Started';
