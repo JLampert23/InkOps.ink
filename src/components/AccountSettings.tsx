@@ -5963,27 +5963,25 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     <p className="text-xs">No work types yet. Click "Add" to create one.</p>
                   </div>
                 ) : (
-                  <div className="space-y-1">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-1">
                     {workTypes.map((workType) => (
                       <div
                         key={workType.id}
-                        className="flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
+                        className="flex items-center gap-1 p-1.5 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
                       >
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <h3 className="text-xs font-medium text-gray-900 dark:text-white truncate">{workType.work_type_name}</h3>
-                            <span className={`px-1 py-0.5 text-xs font-medium rounded whitespace-nowrap ${
-                              workType.color_type === 'ink'
-                                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200'
-                                : workType.color_type === 'thread'
-                                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200'
-                                : 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-200'
-                            }`}>
-                              {workType.color_type === 'ink' ? 'Ink' : workType.color_type === 'thread' ? 'Thread' : 'None'}
-                            </span>
-                          </div>
+                          <h3 className="text-xs font-medium text-gray-900 dark:text-white truncate">{workType.work_type_name}</h3>
+                          <span className={`px-1 py-0.5 text-[10px] font-medium rounded whitespace-nowrap inline-block mt-0.5 ${
+                            workType.color_type === 'ink'
+                              ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200'
+                              : workType.color_type === 'thread'
+                              ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200'
+                              : 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-200'
+                          }`}>
+                            {workType.color_type === 'ink' ? 'Ink' : workType.color_type === 'thread' ? 'Thread' : 'None'}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-0.5 ml-2">
+                        <div className="flex flex-col gap-0.5 flex-shrink-0">
                           <button
                             onClick={() => openEditWorkTypeModal(workType)}
                             className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
