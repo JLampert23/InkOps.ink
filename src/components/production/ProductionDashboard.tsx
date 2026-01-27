@@ -33,7 +33,11 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
     try {
       const { data } = await supabase
         .from('type_of_work_settings')
-        .select('id, work_type_name')
+        .select(`
+          id,
+          work_type_name,
+          work_type_workflows!inner(id)
+        `)
         .order('work_type_name', { ascending: true });
 
       if (data && data.length > 0) {
@@ -82,36 +86,33 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
             {typesOfWork.length === 0 ? (
               <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-12 text-center">
                 <CalendarDays className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No Types of Work Configured</h3>
-                <p className="text-gray-600 dark:text-gray-400">Please configure types of work in Settings before using the scheduler</p>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No Workflows Configured</h3>
+                <p className="text-gray-600 dark:text-gray-400">Please configure workflow steps for your types of work in Settings before using the scheduler</p>
               </div>
             ) : (
               <>
-                {/* Type of Work Tabs */}
-                <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
-                  <div className="flex overflow-x-auto">
+                {/* Type of Work Dropdown */}
+                <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Type of Work
+                  </label>
+                  <select
+                    value={selectedScheduleType}
+                    onChange={(e) => setSelectedScheduleType(e.target.value)}
+                    className="w-full md:w-64 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
+                  >
                     {typesOfWork.map((type) => (
-                      <button
-                        key={type.id}
-                        onClick={() => setSelectedScheduleType(type.work_type_name)}
-                        className={`flex-shrink-0 px-6 py-4 text-sm font-medium transition-colors border-b-2 ${
-                          selectedScheduleType === type.work_type_name
-                            ? 'border-green-600 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20'
-                            : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-slate-700'
-                        }`}
-                      >
+                      <option key={type.id} value={type.work_type_name}>
                         {type.work_type_name}
-                      </button>
+                      </option>
                     ))}
-                  </div>
+                  </select>
                 </div>
 
                 {/* Selected Schedule */}
-                <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
-                  {selectedScheduleType && (
-                    <ProductionScheduler typeOfWork={selectedScheduleType} />
-                  )}
-                </div>
+                {selectedScheduleType && (
+                  <ProductionScheduler typeOfWork={selectedScheduleType} />
+                )}
               </>
             )}
           </div>

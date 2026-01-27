@@ -42,6 +42,7 @@ interface ProductionSchedulerProps {
 export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerProps) {
   const [entries, setEntries] = useState<ScheduleEntry[]>([]);
   const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([]);
+  const [selectedStep, setSelectedStep] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [draggedEntry, setDraggedEntry] = useState<string | null>(null);
   const [editingCell, setEditingCell] = useState<{ entryId: string; field: string } | null>(null);
@@ -58,8 +59,19 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
 
   useEffect(() => {
     loadWorkflowSteps();
-    loadScheduleEntries();
-  }, [typeOfWork, startDate, endDate, stationFilter, customerFilter]);
+  }, [typeOfWork]);
+
+  useEffect(() => {
+    if (workflowSteps.length > 0 && !selectedStep) {
+      setSelectedStep(workflowSteps[0].id);
+    }
+  }, [workflowSteps]);
+
+  useEffect(() => {
+    if (selectedStep) {
+      loadScheduleEntries();
+    }
+  }, [typeOfWork, selectedStep, startDate, endDate, stationFilter, customerFilter]);
 
   const loadWorkflowSteps = async () => {
     try {
@@ -203,7 +215,7 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
     return status?.status_color || '#6B7280';
   };
 
-  if (loading) {
+  if (loading && workflowSteps.length === 0) {
     return (
       <div className="flex items-center justify-center py-12">
         <RefreshCw className="w-8 h-8 text-green-600 dark:text-green-400 animate-spin" />
@@ -211,12 +223,55 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
     );
   }
 
+  if (workflowSteps.length === 0) {
+    return (
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-12 text-center">
+        <CalendarDays className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No Workflow Steps</h3>
+        <p className="text-gray-600 dark:text-gray-400">Configure workflow steps for {typeOfWork} in Settings to use the scheduler</p>
+      </div>
+    );
+  }
+
+  // Filter entries based on selected step
+  const filteredEntries = selectedStep
+    ? entries.filter(entry => {
+        const stepStatus = entry.step_statuses[selectedStep];
+        const step = workflowSteps.find(s => s.id === selectedStep);
+        const defaultStatus = step?.statuses.find(s => s.is_default)?.status_name;
+        const currentStatus = stepStatus || defaultStatus;
+
+        // Show entries that are in this step (not completed)
+        const completedStatuses = ['Complete', 'Completed', 'Done', 'Finished'];
+        return !completedStatuses.includes(currentStatus || '');
+      })
+    : entries;
+
   return (
     <div className="space-y-4">
+      {/* Workflow Step Tabs */}
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
+        <div className="flex overflow-x-auto">
+          {workflowSteps.map((step) => (
+            <button
+              key={step.id}
+              onClick={() => setSelectedStep(step.id)}
+              className={`flex-shrink-0 px-6 py-4 text-sm font-medium transition-colors border-b-2 ${
+                selectedStep === step.id
+                  ? 'border-green-600 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20'
+                  : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-slate-700'
+              }`}
+            >
+              {step.step_name}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Header and Filters */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-          {typeOfWork} Schedule
+          {typeOfWork} - {workflowSteps.find(s => s.id === selectedStep)?.step_name || 'Schedule'}
         </h3>
         <div className="flex items-center gap-2">
           <button
@@ -330,14 +385,14 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
-              {entries.length === 0 ? (
+              {filteredEntries.length === 0 ? (
                 <tr>
                   <td colSpan={8 + workflowSteps.length} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                     No scheduled jobs for this time period
                   </td>
                 </tr>
               ) : (
-                entries.map((entry) => (
+                filteredEntries.map((entry) => (
                   <tr
                     key={entry.id}
                     draggable
@@ -444,7 +499,7 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
 
       {/* Entry Count */}
       <div className="text-sm text-gray-600 dark:text-gray-400">
-        Showing {entries.length} scheduled {entries.length === 1 ? 'job' : 'jobs'}
+        Showing {filteredEntries.length} scheduled {filteredEntries.length === 1 ? 'job' : 'jobs'}
       </div>
     </div>
   );
