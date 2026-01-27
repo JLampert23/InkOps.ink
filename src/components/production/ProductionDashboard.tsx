@@ -43,17 +43,33 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
 
       if (!profile?.company_id) return;
 
-      // Load active work types for this company
-      const { data } = await supabase
+      // Load active work types that have workflows configured
+      const { data: workTypes } = await supabase
         .from('type_of_work_settings')
         .select('id, work_type_name')
         .eq('company_id', profile.company_id)
         .eq('is_active', true)
         .order('sort_order', { ascending: true });
 
-      if (data && data.length > 0) {
-        setTypesOfWork(data);
-        setSelectedScheduleType(data[0].work_type_name);
+      if (!workTypes) return;
+
+      // Filter to only those with workflows
+      const typesWithWorkflows = [];
+      for (const type of workTypes) {
+        const { data: workflow } = await supabase
+          .from('work_type_workflows')
+          .select('id')
+          .eq('work_type_id', type.id)
+          .maybeSingle();
+
+        if (workflow) {
+          typesWithWorkflows.push(type);
+        }
+      }
+
+      if (typesWithWorkflows.length > 0) {
+        setTypesOfWork(typesWithWorkflows);
+        setSelectedScheduleType(typesWithWorkflows[0].work_type_name);
       }
     } catch (error) {
       console.error('Error loading types of work:', error);
@@ -97,8 +113,8 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
             {typesOfWork.length === 0 ? (
               <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-12 text-center">
                 <CalendarDays className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No Types of Work Configured</h3>
-                <p className="text-gray-600 dark:text-gray-400">Please configure types of work in Settings before using the scheduler</p>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No Workflows Configured</h3>
+                <p className="text-gray-600 dark:text-gray-400">Configure workflows for your types of work to use the production scheduler</p>
               </div>
             ) : (
               <>
