@@ -199,6 +199,8 @@ Deno.serve(async (req: Request) => {
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
     const authHeader = req.headers.get("Authorization");
+    console.log('Auth header received:', authHeader ? `Bearer ${authHeader.substring(0, 20)}...` : 'MISSING');
+
     if (!authHeader) {
       return new Response(
         JSON.stringify({ error: "Missing authorization header" }),
@@ -212,10 +214,21 @@ Deno.serve(async (req: Request) => {
       },
     });
 
+    console.log('Attempting to verify user...');
     const { data: { user }, error: authError } = await supabase.auth.getUser();
+    console.log('Auth result:', {
+      hasUser: !!user,
+      userId: user?.id,
+      errorMessage: authError?.message,
+      errorCode: authError?.status
+    });
 
     if (authError || !user) {
-      console.error('Auth error:', authError);
+      console.error('Auth error details:', {
+        message: authError?.message,
+        status: authError?.status,
+        name: authError?.name
+      });
       return new Response(
         JSON.stringify({
           code: 401,

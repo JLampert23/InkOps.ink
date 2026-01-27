@@ -124,6 +124,8 @@ Deno.serve(async (req: Request) => {
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
     const authHeader = req.headers.get("Authorization");
+    console.log('Auth header received:', authHeader ? `Bearer ${authHeader.substring(0, 20)}...` : 'MISSING');
+
     if (!authHeader) {
       return new Response(
         JSON.stringify({ error: "Missing authorization header" }),
@@ -143,12 +145,28 @@ Deno.serve(async (req: Request) => {
       },
     });
 
+    console.log('Attempting to verify user...');
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    console.log('Auth result:', {
+      hasUser: !!user,
+      userId: user?.id,
+      errorMessage: userError?.message,
+      errorCode: userError?.status
+    });
 
     if (userError || !user) {
-      console.error('Auth error:', userError);
+      console.error('Auth error details:', {
+        message: userError?.message,
+        status: userError?.status,
+        name: userError?.name
+      });
       return new Response(
-        JSON.stringify({ error: "Unauthorized", details: userError?.message }),
+        JSON.stringify({
+          code: 401,
+          message: "Invalid JWT",
+          error: userError?.message || "Unauthorized",
+          details: userError
+        }),
         {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },

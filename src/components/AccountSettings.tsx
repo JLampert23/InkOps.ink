@@ -1956,15 +1956,24 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       // Test SSActivewear if enabled
       if (settings.ssactivewear_enabled) {
         try {
+          const authHeader = `Bearer ${session.access_token}`;
+          console.log('Testing SSActivewear with auth token:', {
+            tokenPrefix: authHeader.substring(0, 30) + '...',
+            tokenLength: session.access_token.length,
+            hasToken: !!session.access_token
+          });
+
           const response = await fetch(
             `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ssactivewear-api?action=product&productId=PC54`,
             {
               headers: {
-                'Authorization': `Bearer ${session.access_token}`,
+                'Authorization': authHeader,
                 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
               },
             }
           );
+
+          console.log('SSActivewear response status:', response.status);
 
           if (response.ok) {
             const data = await response.json();
