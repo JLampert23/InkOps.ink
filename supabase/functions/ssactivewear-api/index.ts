@@ -195,10 +195,27 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+
+    console.log('Environment check:', {
+      hasUrl: !!supabaseUrl,
+      hasAnonKey: !!supabaseAnonKey,
+      urlPrefix: supabaseUrl?.substring(0, 30)
+    });
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return new Response(
+        JSON.stringify({ error: "Missing Supabase configuration" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const authHeader = req.headers.get("Authorization");
+    console.log('Auth header check:', {
+      hasAuth: !!authHeader,
+      authPrefix: authHeader?.substring(0, 20)
+    });
 
     if (!authHeader) {
       return new Response(
@@ -208,21 +225,42 @@ Deno.serve(async (req: Request) => {
     }
 
     const token = authHeader.replace("Bearer ", "");
+    console.log('Token extraction:', {
+      tokenLength: token.length,
+      tokenPrefix: token.substring(0, 20)
+    });
+
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+    console.log('Calling getUser with token...');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
+    console.log('Auth result:', {
+      hasUser: !!user,
+      userId: user?.id,
+      hasError: !!authError,
+      errorName: authError?.name,
+      errorMessage: authError?.message,
+      errorStatus: authError?.status
+    });
+
     if (authError || !user) {
-      console.error('Auth error:', authError);
+      console.error('Auth failed:', JSON.stringify(authError, null, 2));
       return new Response(
         JSON.stringify({
           code: 401,
           message: "Invalid JWT",
-          error: authError?.message || "Unauthorized"
+          error: authError?.message || "Unauthorized",
+          debug: {
+            errorName: authError?.name,
+            errorStatus: authError?.status
+          }
         }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    console.log('Auth successful for user:', user.id);
 
     const { data: profile } = await supabase
       .from("user_profiles")
