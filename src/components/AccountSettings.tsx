@@ -188,10 +188,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [sanmarCustomerId, setSanmarCustomerId] = useState('');
   const [sanmarHasCredentials, setSanmarHasCredentials] = useState(false);
   const [ssaEnabled, setSsaEnabled] = useState(false);
-  const [ssaUsername, setSsaUsername] = useState('');
-  const [ssaPassword, setSsaPassword] = useState('');
-  const [showSsaPassword, setShowSsaPassword] = useState(false);
-  const [ssaCustomerId, setSsaCustomerId] = useState('');
+  const [ssaAccountNumber, setSsaAccountNumber] = useState('');
+  const [ssaApiKey, setSsaApiKey] = useState('');
+  const [showSsaApiKey, setShowSsaApiKey] = useState(false);
   const [ssaHasCredentials, setSsaHasCredentials] = useState(false);
   const [savingSuppliers, setSavingSuppliers] = useState(false);
   const [testingSuppliers, setTestingSuppliers] = useState(false);
@@ -402,8 +401,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         const ssaHasCreds = !!(data.ssactivewear_credentials &&
           typeof data.ssactivewear_credentials === 'object' &&
           Object.keys(data.ssactivewear_credentials).length > 0 &&
-          data.ssactivewear_credentials.username &&
-          data.ssactivewear_credentials.password);
+          data.ssactivewear_credentials.accountNumber &&
+          data.ssactivewear_credentials.apiKey);
 
         setSanmarHasCredentials(sanmarHasCreds);
         setSsaHasCredentials(ssaHasCreds);
@@ -1745,8 +1744,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       let ssaCredentials = existing?.ssactivewear_credentials || {};
       if (ssaEnabled) {
         // Only require new credentials if none exist yet OR if user is updating them
-        if (ssaUsername.trim() && ssaPassword.trim()) {
-          // User is providing new credentials, encrypt the password
+        if (ssaAccountNumber.trim() && ssaApiKey.trim()) {
+          // User is providing new credentials, encrypt the API key
           const encryptResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crypto-service`, {
             method: 'POST',
             headers: {
@@ -1755,29 +1754,28 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             },
             body: JSON.stringify({
               action: 'encrypt',
-              token: ssaPassword,
+              token: ssaApiKey,
             }),
           });
 
         if (!encryptResponse.ok) {
-          throw new Error('Failed to encrypt SSActivewear password');
+          throw new Error('Failed to encrypt SSActivewear API key');
         }
 
-        const { result: encryptedPassword } = await encryptResponse.json();
+        const { result: encryptedApiKey } = await encryptResponse.json();
         ssaCredentials = {
-          username: ssaUsername,
-          password: encryptedPassword,
-          customerId: ssaCustomerId.trim() || ssaCredentials.customerId,
+          accountNumber: ssaAccountNumber.trim(),
+          apiKey: encryptedApiKey,
         };
         } else if (!ssaHasCredentials) {
           // No existing credentials and no new credentials provided
-          showNotification('warning', 'SSActivewear Credentials Required', 'Please enter your SSActivewear username and password to enable this integration');
+          showNotification('warning', 'SSActivewear Credentials Required', 'Please enter your SSActivewear account number and API key to enable this integration');
           return;
-        } else if (ssaCustomerId.trim()) {
-          // Update just the customer ID while keeping existing credentials
+        } else if (ssaAccountNumber.trim()) {
+          // Update just the account number while keeping existing API key
           ssaCredentials = {
             ...ssaCredentials,
-            customerId: ssaCustomerId.trim(),
+            accountNumber: ssaAccountNumber.trim(),
           };
         }
       }
@@ -1816,9 +1814,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       showNotification('success', 'Supplier Integrations Saved', 'Supplier integration settings have been saved successfully!');
       setSanmarApiKey('');
       setSanmarCustomerId('');
-      setSsaUsername('');
-      setSsaPassword('');
-      setSsaCustomerId('');
+      setSsaAccountNumber('');
+      setSsaApiKey('');
       setSupplierTestResult(null);
       await loadSupplierIntegrationSettings();
     } catch (err) {
@@ -1908,7 +1905,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       if (settings.ssactivewear_enabled) {
         try {
           const response = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ssactivewear-api?action=search&style=1800`,
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ssactivewear-api?action=product&productId=PC54`,
             {
               headers: {
                 'Authorization': `Bearer ${session.access_token}`,
@@ -5429,61 +5426,48 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     )}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Username {!ssaHasCredentials && <span className="text-red-500">*</span>}
+                        Account Number {!ssaHasCredentials && <span className="text-red-500">*</span>}
                       </label>
                       <input
                         type="text"
-                        value={ssaUsername}
-                        onChange={(e) => setSsaUsername(e.target.value)}
+                        value={ssaAccountNumber}
+                        onChange={(e) => setSsaAccountNumber(e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder={ssaHasCredentials ? "Leave blank to keep existing" : "Your SSActivewear username"}
+                        placeholder={ssaHasCredentials ? "Leave blank to keep existing" : "Your SSActivewear account number"}
                       />
                       {ssaHasCredentials && (
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Enter a new username only if you want to update it
+                          Enter a new account number only if you want to update it
                         </p>
                       )}
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Password {!ssaHasCredentials && <span className="text-red-500">*</span>}
+                        PromoStandards API Key {!ssaHasCredentials && <span className="text-red-500">*</span>}
                       </label>
                       <div className="relative">
                         <input
-                          type={showSsaPassword ? 'text' : 'password'}
-                          value={ssaPassword}
-                          onChange={(e) => setSsaPassword(e.target.value)}
+                          type={showSsaApiKey ? 'text' : 'password'}
+                          value={ssaApiKey}
+                          onChange={(e) => setSsaApiKey(e.target.value)}
                           className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder={ssaHasCredentials ? "Leave blank to keep existing" : "Your SSActivewear password"}
+                          placeholder={ssaHasCredentials ? "Leave blank to keep existing" : "Your SSActivewear API key"}
                         />
                         <button
                           type="button"
-                          onClick={() => setShowSsaPassword(!showSsaPassword)}
+                          onClick={() => setShowSsaApiKey(!showSsaApiKey)}
                           className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                           tabIndex={-1}
                         >
-                          {showSsaPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                          {showSsaApiKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                         </button>
                       </div>
                       {ssaHasCredentials && (
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Enter a new password only if you want to update it
+                          Enter a new API key only if you want to update it
                         </p>
                       )}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Customer ID
-                      </label>
-                      <input
-                        type="text"
-                        value={ssaCustomerId}
-                        onChange={(e) => setSsaCustomerId(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Your SSActivewear customer ID (optional)"
-                      />
                     </div>
                   </div>
                 )}
