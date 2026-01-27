@@ -360,6 +360,16 @@ Deno.serve(async (req: Request) => {
     // PromoStandards uses HTTP Basic Auth
     const basicAuth = btoa(`${credentials.accountNumber}:${decryptedApiKey}`);
 
+    console.log('Making SSActivewear PromoStandards request:', {
+      endpoint,
+      accountNumber: credentials.accountNumber,
+      apiKeyLength: decryptedApiKey?.length,
+      apiKeyPrefix: decryptedApiKey?.substring(0, 10),
+      action,
+      productId,
+      soapBodyLength: soapBody.length
+    });
+
     const ssaResponse = await fetch(endpoint, {
       method: "POST",
       headers: {
@@ -368,6 +378,12 @@ Deno.serve(async (req: Request) => {
         "SOAPAction": action,
       },
       body: soapBody,
+    });
+
+    console.log('SSActivewear API response:', {
+      status: ssaResponse.status,
+      statusText: ssaResponse.statusText,
+      headers: Object.fromEntries(ssaResponse.headers.entries())
     });
 
     if (!ssaResponse.ok) {
