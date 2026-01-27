@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Calendar, Filter, GripVertical, Save, X, Plus, Search, RefreshCw, CalendarDays } from 'lucide-react';
+import { Calendar, Filter, GripVertical, Save, X, Plus, Search, RefreshCw, CalendarDays, Menu } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format, startOfWeek, endOfWeek, addDays, parseISO } from 'date-fns';
 import SchedulerTabManager from './SchedulerTabManager';
@@ -78,6 +78,8 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
   const [stationFilter, setStationFilter] = useState('');
   const [customerFilter, setCustomerFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [stepStatusFilters, setStepStatusFilters] = useState<Record<string, string[]>>({});
+  const [openColumnMenu, setOpenColumnMenu] = useState<string | null>(null);
 
   // Stations from database
   const [availableStations, setAvailableStations] = useState<Array<{ id: string; station_name: string }>>([]);
@@ -166,6 +168,18 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
     loadWorkflowSteps();
   }, [typeOfWork]);
 
+  // Close column menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (openColumnMenu) {
+        setOpenColumnMenu(null);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [openColumnMenu]);
+
   useEffect(() => {
     if (workflowSteps.length > 0) {
       const timer = setTimeout(() => {
@@ -182,6 +196,7 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
       if (activeTab.filters.endDate) setEndDate(activeTab.filters.endDate);
       if (activeTab.filters.stationFilter !== undefined) setStationFilter(activeTab.filters.stationFilter);
       if (activeTab.filters.customerFilter !== undefined) setCustomerFilter(activeTab.filters.customerFilter);
+      if (activeTab.filters.stepStatusFilters) setStepStatusFilters(activeTab.filters.stepStatusFilters);
     }
   }, [activeTab]);
 
@@ -192,6 +207,7 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
       setEndDate(format(endOfWeek(addDays(new Date(), 14)), 'yyyy-MM-dd'));
       setStationFilter('');
       setCustomerFilter('');
+      setStepStatusFilters({});
     }
   };
 
@@ -200,6 +216,24 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
     endDate,
     stationFilter,
     customerFilter,
+    stepStatusFilters,
+  };
+
+  const saveFiltersToActiveTab = async () => {
+    if (!activeTab) return;
+
+    try {
+      const { error } = await supabase
+        .from('scheduler_tabs')
+        .update({ filters: currentFilters })
+        .eq('id', activeTab.id);
+
+      if (error) throw error;
+
+      setActiveTab({ ...activeTab, filters: currentFilters });
+    } catch (error) {
+      console.error('Error saving filters to tab:', error);
+    }
   };
 
   const updateEntry = async (entryId: string, updates: Partial<ScheduleEntry>) => {
@@ -308,6 +342,25 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
     const status = step?.statuses.find(s => s.status_name === statusName);
     return status?.status_color || '#6B7280';
   };
+
+  // Apply column filters to entries
+  const filteredEntries = useMemo(() => {
+    if (Object.keys(stepStatusFilters).length === 0) {
+      return entries;
+    }
+
+    return entries.filter(entry => {
+      for (const [stepId, statuses] of Object.entries(stepStatusFilters)) {
+        if (statuses.length > 0) {
+          const entryStatus = entry.step_statuses[stepId];
+          if (!statuses.includes(entryStatus)) {
+            return false;
+          }
+        }
+      }
+      return true;
+    });
+  }, [entries, stepStatusFilters]);
 
   if (loading && workflowSteps.length === 0) {
     return (
@@ -453,8 +506,96 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
                   Qty
                 </th>
                 {workflowSteps.map(step => (
-                  <th key={step.id} className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    {step.step_name}
+                  <th key={step.id} className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider relative">
+                    <div className="flex items-center justify-between gap-2">
+                      <span>{step.step_name}</span>
+                      <div className="relative">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenColumnMenu(openColumnMenu === step.id ? null : step.id);
+                          }}
+                          className="p-1 hover:bg-gray-200 dark:hover:bg-slate-700 rounded transition-colors relative"
+                          title="Filter column"
+                        >
+                          <Menu className="w-4 h-4" />
+                          {(stepStatusFilters[step.id]?.length || 0) > 0 && (
+                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-600 rounded-full" />
+                          )}
+                        </button>
+                        {openColumnMenu === step.id && (
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute top-full right-0 mt-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg z-50 min-w-[200px]"
+                          >
+                            <div className="p-3 border-b border-gray-200 dark:border-slate-700">
+                              <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                Filter by Status
+                              </div>
+                              <div className="space-y-1 max-h-[200px] overflow-y-auto">
+                                {step.statuses.map(status => {
+                                  const isSelected = stepStatusFilters[step.id]?.includes(status.status_name);
+                                  return (
+                                    <label
+                                      key={status.status_name}
+                                      className="flex items-center gap-2 px-2 py-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded cursor-pointer"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={isSelected}
+                                        onChange={(e) => {
+                                          const currentFilters = stepStatusFilters[step.id] || [];
+                                          const newFilters = e.target.checked
+                                            ? [...currentFilters, status.status_name]
+                                            : currentFilters.filter(s => s !== status.status_name);
+
+                                          setStepStatusFilters(prev => ({
+                                            ...prev,
+                                            [step.id]: newFilters,
+                                          }));
+                                        }}
+                                        className="rounded"
+                                      />
+                                      <div
+                                        className="w-3 h-3 rounded-full"
+                                        style={{ backgroundColor: status.status_color }}
+                                      />
+                                      <span className="text-xs text-gray-900 dark:text-white">
+                                        {status.status_name}
+                                      </span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                            <div className="p-2 flex gap-2">
+                              <button
+                                onClick={() => {
+                                  setStepStatusFilters(prev => ({
+                                    ...prev,
+                                    [step.id]: [],
+                                  }));
+                                }}
+                                className="flex-1 px-2 py-1 text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
+                              >
+                                Clear
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setOpenColumnMenu(null);
+                                  if (activeTab) {
+                                    saveFiltersToActiveTab();
+                                  }
+                                }}
+                                className="flex-1 px-2 py-1 text-xs bg-green-600 text-white hover:bg-green-700 rounded"
+                              >
+                                Apply
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </th>
                 ))}
               </tr>
@@ -469,14 +610,14 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
                     </div>
                   </td>
                 </tr>
-              ) : entries.length === 0 ? (
+              ) : filteredEntries.length === 0 ? (
                 <tr>
                   <td colSpan={8 + workflowSteps.length} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                    No scheduled jobs for this time period
+                    No scheduled jobs matching filters
                   </td>
                 </tr>
               ) : (
-                entries.map((entry) => (
+                filteredEntries.map((entry) => (
                   <tr
                     key={entry.id}
                     draggable
