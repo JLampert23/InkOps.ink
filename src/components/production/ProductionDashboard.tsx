@@ -38,7 +38,7 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
       const { data: profile } = await supabase
         .from('user_profiles')
         .select('company_id')
-        .eq('user_id', user.id)
+        .eq('id', user.id)
         .maybeSingle();
 
       if (!profile?.company_id) return;
