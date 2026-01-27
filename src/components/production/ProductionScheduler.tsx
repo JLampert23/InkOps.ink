@@ -64,19 +64,32 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
   const loadWorkflowSteps = async () => {
     try {
       const { data: typeData } = await supabase
-        .from('types_of_work')
+        .from('type_of_work_settings')
         .select('id')
         .eq('work_type_name', typeOfWork)
         .maybeSingle();
 
       if (typeData) {
-        const { data: steps } = await supabase
-          .from('work_type_workflow_steps')
-          .select('*')
-          .eq('type_of_work_id', typeData.id)
-          .order('step_order', { ascending: true });
+        const { data: workflow } = await supabase
+          .from('work_type_workflows')
+          .select('steps')
+          .eq('work_type_id', typeData.id)
+          .maybeSingle();
 
-        setWorkflowSteps(steps || []);
+        if (workflow && workflow.steps) {
+          const steps = Array.isArray(workflow.steps) ? workflow.steps : [];
+          setWorkflowSteps(steps.map((step: any, index: number) => ({
+            id: step.step_name,
+            step_name: step.step_name,
+            step_color: step.statuses?.[0]?.color || '#6B7280',
+            step_order: index,
+            statuses: (step.statuses || []).map((status: any) => ({
+              status_name: status.name,
+              status_color: status.color,
+              is_default: status.is_default || false,
+            })),
+          })));
+        }
       }
     } catch (error) {
       console.error('Error loading workflow steps:', error);

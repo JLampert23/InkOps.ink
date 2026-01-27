@@ -32,7 +32,7 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
   const loadTypesOfWork = async () => {
     try {
       const { data } = await supabase
-        .from('types_of_work')
+        .from('type_of_work_settings')
         .select('id, work_type_name')
         .order('work_type_name', { ascending: true });
 
