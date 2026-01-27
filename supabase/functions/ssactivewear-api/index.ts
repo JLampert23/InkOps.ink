@@ -212,16 +212,36 @@ Deno.serve(async (req: Request) => {
 
     const token = authHeader.replace("Bearer ", "");
 
+    console.log('Auth debug:', {
+      hasToken: !!token,
+      tokenLength: token?.length,
+      tokenPrefix: token?.substring(0, 20),
+      supabaseUrl,
+      hasAnonKey: !!supabaseAnonKey,
+      anonKeyPrefix: supabaseAnonKey?.substring(0, 20)
+    });
+
     // Use ANON key to validate the user token
     const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
 
     if (authError || !user) {
-      console.error('Auth validation failed:', authError);
+      console.error('Auth validation failed:', {
+        error: authError,
+        errorMessage: authError?.message,
+        errorName: authError?.name,
+        errorStatus: authError?.status,
+        hasUser: !!user,
+        fullError: JSON.stringify(authError)
+      });
       return new Response(
         JSON.stringify({
           code: 401,
-          message: authError?.message || "Invalid JWT"
+          message: authError?.message || "Invalid JWT",
+          details: authError ? {
+            name: authError.name,
+            status: authError.status
+          } : undefined
         }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
