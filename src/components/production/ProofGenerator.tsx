@@ -463,32 +463,32 @@ export default function ProofGenerator({
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white dark:bg-slate-800 rounded-lg p-8">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        <div className="bg-white dark:bg-slate-800 rounded-lg p-6">
+          <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-7xl h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between p-6 border-b dark:border-slate-600">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Proof / Mockup Generator</h2>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-7xl h-[95vh] flex flex-col">
+        <div className="flex items-center justify-between px-4 py-3 border-b dark:border-slate-600">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Proof / Mockup Generator</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:text-gray-300 dark:hover:text-white">
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="flex-1 flex overflow-hidden">
-          <div className="w-80 bg-gray-50 dark:bg-slate-900 p-6 overflow-y-auto border-r dark:border-slate-600">
-            <div className="space-y-6">
+          <div className="w-64 bg-gray-50 dark:bg-slate-900 p-3 overflow-y-auto border-r dark:border-slate-600">
+            <div className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Upload Artwork</label>
-                <label className="flex flex-col items-center px-4 py-6 bg-white dark:bg-slate-800 border-2 border-dashed border-gray-300 dark:border-slate-600 rounded-lg cursor-pointer hover:border-blue-500">
-                  <Upload className="w-8 h-8 text-gray-400 dark:text-gray-500" />
-                  <span className="mt-2 text-sm text-gray-600 dark:text-gray-400">Click to upload</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-500 mt-1">PNG, JPG, PDF, EPS, AI, SVG</span>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Upload Artwork</label>
+                <label className="flex flex-col items-center px-3 py-3 bg-white dark:bg-slate-800 border-2 border-dashed border-gray-300 dark:border-slate-600 rounded cursor-pointer hover:border-blue-500">
+                  <Upload className="w-6 h-6 text-gray-400 dark:text-gray-500" />
+                  <span className="mt-1 text-xs text-gray-600 dark:text-gray-400">Click to upload</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-500">PNG, JPG, PDF, EPS, AI, SVG</span>
                   <input
                     type="file"
                     className="hidden"
@@ -499,8 +499,8 @@ export default function ProofGenerator({
                   />
                 </label>
                 {uploading && (
-                  <div className="mt-2 flex items-center text-sm text-blue-600">
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  <div className="mt-1 flex items-center text-xs text-blue-600">
+                    <Loader2 className="w-3 h-3 animate-spin mr-1" />
                     Uploading...
                   </div>
                 )}
@@ -508,14 +508,14 @@ export default function ProofGenerator({
 
               <button
                 onClick={() => setShowArtworkLibrary(true)}
-                className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-300"
+                className="w-full flex items-center justify-center px-3 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-xs hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-300"
               >
-                <Folder className="w-4 h-4 mr-2" />
+                <Folder className="w-3 h-3 mr-1" />
                 View All Customer Artwork
               </button>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Print Location</label>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Print Location</label>
                 <select
                   value={printLocation}
                   onChange={(e) => {
@@ -524,7 +524,7 @@ export default function ProofGenerator({
                       updateActiveArtwork({ print_location: e.target.value });
                     }
                   }}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                  className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-slate-600 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
                 >
                   {PRINT_LOCATIONS.map((loc) => (
                     <option key={loc} value={loc}>{loc}</option>
@@ -536,14 +536,14 @@ export default function ProofGenerator({
                     value={customLocation}
                     onChange={(e) => setCustomLocation(e.target.value)}
                     placeholder="Enter custom location"
-                    className="mt-2 w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                    className="mt-1 w-full px-2 py-1 text-sm border border-gray-300 dark:border-slate-600 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
                   />
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Dimensions (inches)</label>
-                <div className="grid grid-cols-2 gap-3">
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Dimensions (inches)</label>
+                <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="text-xs text-gray-600 dark:text-gray-400">Width</label>
                     <input
@@ -557,7 +557,7 @@ export default function ProofGenerator({
                           updateActiveArtwork({ width_inches: val });
                         }
                       }}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                      className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-slate-600 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
                     />
                   </div>
                   <div>
@@ -573,7 +573,7 @@ export default function ProofGenerator({
                           updateActiveArtwork({ height_inches: val });
                         }
                       }}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                      className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-slate-600 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
                     />
                   </div>
                 </div>
@@ -581,20 +581,20 @@ export default function ProofGenerator({
 
               {selectedArtwork.length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Artwork Layers</label>
-                  <div className="space-y-2">
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Artwork Layers</label>
+                  <div className="space-y-1.5">
                     {selectedArtwork.map((artwork, index) => (
                       <div
                         key={index}
-                        className={`p-3 bg-white dark:bg-slate-800 border rounded-lg cursor-pointer ${
-                          index === activeArtworkIndex ? 'border-blue-500 ring-2 ring-blue-100 dark:ring-blue-900' : 'border-gray-200 dark:border-slate-600'
+                        className={`p-2 bg-white dark:bg-slate-800 border rounded cursor-pointer ${
+                          index === activeArtworkIndex ? 'border-blue-500 ring-1 ring-blue-100 dark:ring-blue-900' : 'border-gray-200 dark:border-slate-600'
                         }`}
                         onClick={() => setActiveArtworkIndex(index)}
                       >
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <ImageIcon className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                            <span className="text-sm font-medium truncate text-gray-900 dark:text-white">{artwork.file_name || `Artwork ${index + 1}`}</span>
+                          <div className="flex items-center space-x-1.5">
+                            <ImageIcon className="w-3 h-3 text-gray-400 dark:text-gray-500" />
+                            <span className="text-xs font-medium truncate text-gray-900 dark:text-white">{artwork.file_name || `Artwork ${index + 1}`}</span>
                           </div>
                           <button
                             onClick={(e) => {
@@ -607,10 +607,10 @@ export default function ProofGenerator({
                             }}
                             className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3 h-3" />
                           </button>
                         </div>
-                        <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                           {artwork.print_location} • {artwork.width_inches}" × {artwork.height_inches}"
                         </div>
                       </div>
@@ -621,47 +621,47 @@ export default function ProofGenerator({
 
               {selectedArtwork.length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 dark:text-white mb-3">Transform Controls</label>
-                  <div className="space-y-3">
+                  <label className="block text-xs font-medium text-gray-900 dark:text-white mb-1">Transform Controls</label>
+                  <div className="space-y-2">
                     <div>
                       <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Size</div>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-2 gap-1.5">
                         <button
                           onClick={() => updateActiveArtwork({ scale: selectedArtwork[activeArtworkIndex].scale + 0.1 })}
-                          className="flex items-center justify-center gap-2 px-3 py-2.5 bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:border-blue-400 dark:hover:border-blue-600 transition-all font-medium"
+                          className="flex items-center justify-center gap-1 px-2 py-1.5 bg-blue-50 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 rounded text-xs hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:border-blue-400 dark:hover:border-blue-600 transition-all font-medium"
                           title="Increase Size"
                         >
-                          <ZoomIn className="w-5 h-5" />
-                          <span className="text-sm">Larger</span>
+                          <ZoomIn className="w-3 h-3" />
+                          <span>Larger</span>
                         </button>
                         <button
                           onClick={() => updateActiveArtwork({ scale: Math.max(0.1, selectedArtwork[activeArtworkIndex].scale - 0.1) })}
-                          className="flex items-center justify-center gap-2 px-3 py-2.5 bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:border-blue-400 dark:hover:border-blue-600 transition-all font-medium"
+                          className="flex items-center justify-center gap-1 px-2 py-1.5 bg-blue-50 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 rounded text-xs hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:border-blue-400 dark:hover:border-blue-600 transition-all font-medium"
                           title="Decrease Size"
                         >
-                          <ZoomOut className="w-5 h-5" />
-                          <span className="text-sm">Smaller</span>
+                          <ZoomOut className="w-3 h-3" />
+                          <span>Smaller</span>
                         </button>
                       </div>
                     </div>
                     <div>
                       <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Rotation</div>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-2 gap-1.5">
                         <button
                           onClick={() => updateActiveArtwork({ rotation: (selectedArtwork[activeArtworkIndex].rotation + 15) % 360 })}
-                          className="flex items-center justify-center gap-2 px-3 py-2.5 bg-green-50 dark:bg-green-900/30 border-2 border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/50 hover:border-green-400 dark:hover:border-green-600 transition-all font-medium"
+                          className="flex items-center justify-center gap-1 px-2 py-1.5 bg-green-50 dark:bg-green-900/30 border border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 rounded text-xs hover:bg-green-100 dark:hover:bg-green-900/50 hover:border-green-400 dark:hover:border-green-600 transition-all font-medium"
                           title="Rotate Clockwise"
                         >
-                          <RotateCw className="w-5 h-5" />
-                          <span className="text-sm">Right</span>
+                          <RotateCw className="w-3 h-3" />
+                          <span>Right</span>
                         </button>
                         <button
                           onClick={() => updateActiveArtwork({ rotation: (selectedArtwork[activeArtworkIndex].rotation - 15 + 360) % 360 })}
-                          className="flex items-center justify-center gap-2 px-3 py-2.5 bg-green-50 dark:bg-green-900/30 border-2 border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/50 hover:border-green-400 dark:hover:border-green-600 transition-all font-medium"
+                          className="flex items-center justify-center gap-1 px-2 py-1.5 bg-green-50 dark:bg-green-900/30 border border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 rounded text-xs hover:bg-green-100 dark:hover:bg-green-900/50 hover:border-green-400 dark:hover:border-green-600 transition-all font-medium"
                           title="Rotate Counter-Clockwise"
                         >
-                          <RotateCcw className="w-5 h-5" />
-                          <span className="text-sm">Left</span>
+                          <RotateCcw className="w-3 h-3" />
+                          <span>Left</span>
                         </button>
                       </div>
                     </div>
@@ -672,7 +672,7 @@ export default function ProofGenerator({
               <button
                 onClick={handleSave}
                 disabled={saving || selectedArtwork.length === 0}
-                className="w-full flex items-center justify-center px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-center px-3 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed"
               >
                 {saving ? (
                   <>
@@ -690,7 +690,7 @@ export default function ProofGenerator({
           </div>
 
           <div className="flex-1 flex flex-col bg-gray-100 dark:bg-slate-950">
-            <div className="flex-1 flex items-center justify-center p-8">
+            <div className="flex-1 flex items-center justify-center p-4">
               <canvas
                 ref={canvasRef}
                 width={600}
@@ -702,40 +702,40 @@ export default function ProofGenerator({
                 onMouseLeave={handleCanvasMouseUp}
               />
             </div>
-            <div className="p-4 bg-white dark:bg-slate-800 border-t dark:border-slate-600 text-center text-sm text-gray-600 dark:text-gray-400">
-              <Move className="w-4 h-4 inline mr-2" />
+            <div className="px-3 py-2 bg-white dark:bg-slate-800 border-t dark:border-slate-600 text-center text-xs text-gray-600 dark:text-gray-400">
+              <Move className="w-3 h-3 inline mr-1" />
               Drag artwork to position • Use controls to scale and rotate
             </div>
           </div>
 
-          <div className="w-80 bg-gray-50 dark:bg-slate-900 p-6 overflow-y-auto border-l dark:border-slate-600">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Garment Details</h3>
+          <div className="w-64 bg-gray-50 dark:bg-slate-900 p-3 overflow-y-auto border-l dark:border-slate-600">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Garment Details</h3>
             {garmentImageUrl && (
-              <img src={garmentImageUrl} alt="Garment" className="w-full rounded-lg mb-4" />
+              <img src={garmentImageUrl} alt="Garment" className="w-full rounded mb-2" />
             )}
-            <div className="space-y-3 text-sm">
+            <div className="space-y-2 text-xs">
               {garmentBrand && (
                 <div>
                   <span className="font-medium text-gray-700 dark:text-gray-300">Brand:</span>
-                  <span className="ml-2 text-gray-600 dark:text-gray-400">{garmentBrand}</span>
+                  <span className="ml-1 text-gray-600 dark:text-gray-400">{garmentBrand}</span>
                 </div>
               )}
               {garmentStyle && (
                 <div>
                   <span className="font-medium text-gray-700 dark:text-gray-300">Style:</span>
-                  <span className="ml-2 text-gray-600 dark:text-gray-400">{garmentStyle}</span>
+                  <span className="ml-1 text-gray-600 dark:text-gray-400">{garmentStyle}</span>
                 </div>
               )}
               {garmentColor && (
                 <div>
                   <span className="font-medium text-gray-700 dark:text-gray-300">Color:</span>
-                  <span className="ml-2 text-gray-600 dark:text-gray-400">{garmentColor}</span>
+                  <span className="ml-1 text-gray-600 dark:text-gray-400">{garmentColor}</span>
                 </div>
               )}
               {garmentDescription && (
                 <div>
                   <span className="font-medium text-gray-700 dark:text-gray-300">Description:</span>
-                  <p className="mt-1 text-gray-600 dark:text-gray-400">{garmentDescription}</p>
+                  <p className="mt-0.5 text-gray-600 dark:text-gray-400">{garmentDescription}</p>
                 </div>
               )}
             </div>
@@ -812,50 +812,50 @@ function CustomerArtworkLibraryModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] flex flex-col">
-        <div className="flex items-center justify-between p-6 border-b dark:border-slate-600">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Customer Artwork Library</h3>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-2">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[85vh] flex flex-col">
+        <div className="flex items-center justify-between px-4 py-3 border-b dark:border-slate-600">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Customer Artwork Library</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:text-gray-300 dark:hover:text-white">
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4">
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
             </div>
           ) : artwork.length === 0 ? (
-            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-              <ImageIcon className="w-12 h-12 mx-auto mb-3 text-gray-400 dark:text-gray-500" />
-              <p>No artwork uploaded yet</p>
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <ImageIcon className="w-10 h-10 mx-auto mb-2 text-gray-400 dark:text-gray-500" />
+              <p className="text-sm">No artwork uploaded yet</p>
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-4 gap-3">
               {artwork.map((item) => (
                 <div
                   key={item.id}
                   onClick={() => onSelectArtwork(item)}
-                  className="bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg p-4 cursor-pointer hover:border-blue-500 hover:shadow-md transition-all"
+                  className="bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded p-2 cursor-pointer hover:border-blue-500 hover:shadow-md transition-all"
                 >
-                  <div className="aspect-square bg-gray-100 dark:bg-slate-800 rounded-lg mb-3 flex items-center justify-center overflow-hidden">
+                  <div className="aspect-square bg-gray-100 dark:bg-slate-800 rounded mb-2 flex items-center justify-center overflow-hidden">
                     {item.file_type.startsWith('image/') ? (
                       <img src={item.file_url} alt={item.file_name} className="w-full h-full object-contain" />
                     ) : (
-                      <ImageIcon className="w-12 h-12 text-gray-400 dark:text-gray-500" />
+                      <ImageIcon className="w-8 h-8 text-gray-400 dark:text-gray-500" />
                     )}
                   </div>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{item.file_name}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <p className="text-xs font-medium text-gray-900 dark:text-white truncate">{item.file_name}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                     {item.width_inches && item.height_inches
                       ? `${item.width_inches}" × ${item.height_inches}"`
                       : 'No dimensions'}
                   </p>
                   {item.tags && item.tags.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
+                    <div className="mt-1 flex flex-wrap gap-0.5">
                       {item.tags.slice(0, 2).map((tag, i) => (
-                        <span key={i} className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded">
+                        <span key={i} className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded">
                           {tag}
                         </span>
                       ))}
