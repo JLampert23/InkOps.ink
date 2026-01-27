@@ -299,11 +299,42 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   // Helper function to get a fresh session token for edge function calls
   const getFreshSession = async () => {
-    const { data: { session }, error } = await supabase.auth.refreshSession();
-    if (error || !session) {
-      throw new Error('Unable to refresh authentication session. Please sign out and sign back in.');
+    // First try to get the current session
+    const { data: { session: currentSession } } = await supabase.auth.getSession();
+
+    if (!currentSession) {
+      console.error('No active session found');
+      throw new Error('No active session. Please sign in again.');
     }
-    return session;
+
+    // Check if the token is close to expiring (within 5 minutes)
+    const expiresAt = currentSession.expires_at || 0;
+    const now = Math.floor(Date.now() / 1000);
+    const timeUntilExpiry = expiresAt - now;
+
+    console.log('Session check:', {
+      expiresAt: new Date(expiresAt * 1000).toISOString(),
+      timeUntilExpiry,
+      hasAccessToken: !!currentSession.access_token,
+      tokenLength: currentSession.access_token?.length
+    });
+
+    // If token expires in less than 5 minutes or is already expired, refresh it
+    if (timeUntilExpiry < 300) {
+      console.log('Token expiring soon or expired, refreshing...');
+      const { data: { session: refreshedSession }, error } = await supabase.auth.refreshSession();
+      if (error) {
+        console.error('Session refresh error:', error);
+        throw new Error('Unable to refresh authentication session. Please sign out and sign back in.');
+      }
+      if (!refreshedSession) {
+        throw new Error('Session refresh returned no session.');
+      }
+      console.log('Session refreshed successfully');
+      return refreshedSession;
+    }
+
+    return currentSession;
   };
 
   useEffect(() => {
@@ -1848,13 +1879,14 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setTestingSuppliers(true);
       setSupplierTestResult(null);
 
-      // Refresh the session to get a fresh access token
-      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
-      if (sessionError || !session) {
-        console.error('Session refresh error:', sessionError);
+      // Get a fresh session token
+      let session;
+      try {
+        session = await getFreshSession();
+      } catch (err) {
         setSupplierTestResult({
           success: false,
-          error: 'Unable to refresh authentication. Please sign out and sign back in.',
+          error: err instanceof Error ? err.message : 'Authentication error',
         });
         return;
       }
