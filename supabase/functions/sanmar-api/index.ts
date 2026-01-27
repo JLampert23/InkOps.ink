@@ -73,27 +73,25 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Get SanMar credentials
+    // Get SanMar credentials from company_settings
     const { data: settings } = await supabase
-      .from("integration_settings")
-      .select("sanmar_enabled, sanmar_credentials")
-      .eq("company_id", profile.company_id)
+      .from("company_settings")
+      .select("sanmar_username, sanmar_api_key_encrypted")
+      .eq("id", profile.company_id)
       .maybeSingle();
 
-    if (!settings?.sanmar_enabled) {
-      return new Response(
-        JSON.stringify({ error: "SanMar integration not enabled" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const credentials = settings.sanmar_credentials as SanMarCredentials;
-    if (!credentials?.apiKey) {
+    if (!settings?.sanmar_username || !settings?.sanmar_api_key_encrypted) {
       return new Response(
         JSON.stringify({ error: "SanMar credentials not configured" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    const credentials = {
+      apiKey: settings.sanmar_api_key_encrypted,
+      customerId: settings.sanmar_username,
+      username: settings.sanmar_username
+    } as SanMarCredentials;
 
     // Decrypt the API key
     const decryptResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {

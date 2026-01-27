@@ -268,6 +268,8 @@ Deno.serve(async (req: Request) => {
       .eq("id", user.id)
       .maybeSingle();
 
+    console.log('Profile lookup:', { hasProfile: !!profile, companyId: profile?.company_id });
+
     if (!profile?.company_id) {
       return new Response(
         JSON.stringify({ error: "Company not found" }),
@@ -276,25 +278,28 @@ Deno.serve(async (req: Request) => {
     }
 
     const { data: settings } = await supabase
-      .from("integration_settings")
-      .select("ssactivewear_enabled, ssactivewear_credentials")
-      .eq("company_id", profile.company_id)
+      .from("company_settings")
+      .select("ssactivewear_username, ssactivewear_api_key_encrypted")
+      .eq("id", profile.company_id)
       .maybeSingle();
 
-    if (!settings?.ssactivewear_enabled) {
-      return new Response(
-        JSON.stringify({ error: "SSActivewear integration not enabled" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    console.log('Settings lookup:', {
+      hasSettings: !!settings,
+      hasUsername: !!settings?.ssactivewear_username,
+      hasApiKey: !!settings?.ssactivewear_api_key_encrypted
+    });
 
-    const credentials = settings.ssactivewear_credentials as SSActivewearCredentials;
-    if (!credentials?.accountNumber || !credentials?.apiKey) {
+    if (!settings?.ssactivewear_username || !settings?.ssactivewear_api_key_encrypted) {
       return new Response(
         JSON.stringify({ error: "SSActivewear credentials not configured" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    const credentials = {
+      accountNumber: settings.ssactivewear_username,
+      apiKey: settings.ssactivewear_api_key_encrypted
+    } as SSActivewearCredentials;
 
     const decryptResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
       method: "POST",
