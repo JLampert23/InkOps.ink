@@ -404,6 +404,7 @@ Deno.serve(async (req: Request) => {
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
         "SOAPAction": `"${soapAction}"`,
+        "Authorization": `Basic ${basicAuth}`,
       },
       body: soapBody,
     });
