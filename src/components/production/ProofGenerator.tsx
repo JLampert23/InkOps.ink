@@ -306,6 +306,37 @@ export default function ProofGenerator({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      let compositeImageUrl: string | null = null;
+
+      // Capture the canvas as a composite image
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const blob = await new Promise<Blob | null>((resolve) => {
+          canvas.toBlob((blob) => resolve(blob), 'image/png', 0.9);
+        });
+
+        if (blob) {
+          const fileName = `proof_${Date.now()}_${Math.random().toString(36).substring(7)}.png`;
+          const filePath = `${companyId}/proofs/${fileName}`;
+
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('imprint-proofs')
+            .upload(filePath, blob, {
+              contentType: 'image/png',
+              upsert: false,
+            });
+
+          if (uploadError) {
+            console.error('Error uploading composite image:', uploadError);
+          } else {
+            const { data: { publicUrl } } = supabase.storage
+              .from('imprint-proofs')
+              .getPublicUrl(filePath);
+            compositeImageUrl = publicUrl;
+          }
+        }
+      }
+
       let currentProofId = proofId;
 
       if (!currentProofId) {
@@ -318,6 +349,7 @@ export default function ProofGenerator({
             company_id: companyId,
             group_label: groupLabel || '',
             garment_image_url: garmentImageUrl,
+            composite_image_url: compositeImageUrl,
             garment_name: garmentStyle && garmentColor
               ? `${garmentStyle} - ${garmentColor}`
               : garmentStyle || '',
@@ -332,6 +364,12 @@ export default function ProofGenerator({
         }
         currentProofId = newProof.id;
         setProofId(currentProofId);
+      } else {
+        // Update existing proof with composite image
+        await supabase
+          .from('proofs')
+          .update({ composite_image_url: compositeImageUrl })
+          .eq('id', currentProofId);
       }
 
       await supabase
