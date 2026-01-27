@@ -637,128 +637,24 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                   </React.Fragment>
                 );
               })}
-                  {/* Proof generator and imprint blocks under this group */}
+                  {/* Always show Generate Proof button for this group */}
                   <tr>
-                    <td colSpan={18} className="px-4 py-2">
-                      <div className="flex flex-wrap gap-3">
-                        {/* Always show Generate Proof button for this group */}
-                        {(() => {
+                    <td colSpan={18} className="px-4 py-2 bg-gray-50 dark:bg-slate-800/50">
+                      <button
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors flex items-center gap-2"
+                        onClick={() => {
                           const garmentItem = groupItems.find(li => li.line_type === 'garment');
                           const firstLineItem = garmentItem || groupItems[0];
-                          const groupProofs = proofs.filter(p =>
-                            (p.group_label === groupLabel) ||
-                            (!p.group_label && !groupLabel)
-                          );
-
-                          return (
-                            <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-3 min-w-[180px]">
-                              <div className="space-y-1.5">
-                                <div className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide">
-                                  Mockup Generator
-                                </div>
-                                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                  {groupLabel || 'Main Group'}
-                                </div>
-
-                                {groupProofs.length > 0 && (
-                                  <div className="mt-2 space-y-1">
-                                    <div className="text-xs text-gray-600 dark:text-gray-400">
-                                      {groupProofs.length} proof{groupProofs.length !== 1 ? 's' : ''}
-                                    </div>
-                                    {groupProofs.slice(0, 3).map((proof) => (
-                                      <div
-                                        key={proof.id}
-                                        className="flex items-center gap-2 p-2 bg-white dark:bg-slate-800 rounded border border-purple-200 dark:border-purple-700"
-                                      >
-                                        {proof.garment_image_url && (
-                                          <img
-                                            src={proof.garment_image_url}
-                                            alt={proof.garment_name || 'Proof'}
-                                            className="w-8 h-8 object-cover rounded"
-                                          />
-                                        )}
-                                        <div className="flex-1 min-w-0">
-                                          <div className="text-xs font-medium text-gray-900 dark:text-white truncate">
-                                            {proof.proof_number}
-                                          </div>
-                                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                                            {proof.status}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-
-                                <button
-                                  className="w-full px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium rounded transition-colors flex items-center justify-center gap-1.5 mt-2"
-                                  onClick={() => {
-                                    if (firstLineItem) {
-                                      setSelectedLineItem(firstLineItem);
-                                      setSelectedGroupLabel(groupLabel);
-                                      setShowProofGenerator(true);
-                                    }
-                                  }}
-                                >
-                                  <FileText className="w-3.5 h-3.5" />
-                                  {groupProofs.length > 0 ? 'Add Proof' : 'Generate Proof'}
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })()}
-
-                        {/* Imprint blocks for this group */}
-                        {quoteImprints.filter(imp => (imp as any).group_label === groupLabel).map((imprint) => {
-                          const imprintProofs = proofs.filter(p =>
-                            (p.group_label === groupLabel) ||
-                            (!p.group_label && !groupLabel)
-                          );
-
-                          return (
-                            <div
-                              key={imprint.id}
-                              className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 min-w-[180px]"
-                            >
-                              <div className="space-y-1.5">
-                                <div className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">
-                                  {imprint.type_of_work}
-                                </div>
-                                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                  IMPRINT - {imprint.location}
-                                </div>
-
-                                {imprintProofs.length > 0 && (
-                                  <div className="mt-2 space-y-1">
-                                    {imprintProofs.map((proof) => (
-                                      <div
-                                        key={proof.id}
-                                        className="flex items-center gap-2 p-2 bg-white dark:bg-slate-800 rounded border border-blue-200 dark:border-blue-700"
-                                      >
-                                        {proof.garment_image_url && (
-                                          <img
-                                            src={proof.garment_image_url}
-                                            alt={proof.garment_name || 'Proof'}
-                                            className="w-8 h-8 object-cover rounded"
-                                          />
-                                        )}
-                                        <div className="flex-1 min-w-0">
-                                          <div className="text-xs font-medium text-gray-900 dark:text-white truncate">
-                                            {proof.proof_number}
-                                          </div>
-                                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                                            {proof.status}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                          if (firstLineItem) {
+                            setSelectedLineItem(firstLineItem);
+                            setSelectedGroupLabel(groupLabel);
+                            setShowProofGenerator(true);
+                          }
+                        }}
+                      >
+                        <FileText className="w-4 h-4" />
+                        Generate Proof for {groupLabel || 'this group'}
+                      </button>
                     </td>
                   </tr>
                 </React.Fragment>
