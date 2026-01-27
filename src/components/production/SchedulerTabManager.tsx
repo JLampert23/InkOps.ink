@@ -234,17 +234,6 @@ export default function SchedulerTabManager({
         </div>
       ))}
 
-      <button
-        onClick={() => {
-          setEditingTab(null);
-          setShowCreateModal(true);
-        }}
-        className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-800 border border-dashed border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 flex items-center gap-2"
-      >
-        <Plus className="w-4 h-4" />
-        Tab
-      </button>
-
       {showCreateModal && (
         <TabCreateModal
           editingTab={editingTab}
