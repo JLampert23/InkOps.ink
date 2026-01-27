@@ -170,9 +170,23 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const { data: companyData, error: companyError } = await supabase
+      .rpc('get_user_company_id', { user_id: user.id });
+
+    if (companyError || !companyData) {
+      return new Response(
+        JSON.stringify({ error: "Failed to fetch user company" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     const { data: settings, error: settingsError } = await supabase
       .from('company_settings')
       .select('printavo_username, printavo_api_token_encrypted')
+      .eq('id', companyData)
       .maybeSingle();
 
     if (settingsError) {
