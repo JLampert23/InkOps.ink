@@ -31,10 +31,25 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
 
   const loadTypesOfWork = async () => {
     try {
+      // Get current user's company_id
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (!profile?.company_id) return;
+
+      // Load active work types for this company
       const { data } = await supabase
         .from('type_of_work_settings')
         .select('id, work_type_name')
-        .order('work_type_name', { ascending: true });
+        .eq('company_id', profile.company_id)
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
 
       if (data && data.length > 0) {
         setTypesOfWork(data);
