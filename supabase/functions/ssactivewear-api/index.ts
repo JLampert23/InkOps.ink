@@ -208,6 +208,13 @@ Deno.serve(async (req: Request) => {
 
     const token = authHeader.replace("Bearer ", "");
 
+    console.log('Auth debug:', {
+      hasToken: !!token,
+      tokenLength: token.length,
+      hasServiceKey: !!supabaseServiceRoleKey,
+      serviceKeyPrefix: supabaseServiceRoleKey?.substring(0, 20)
+    });
+
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
       auth: {
         autoRefreshToken: false,
@@ -215,17 +222,29 @@ Deno.serve(async (req: Request) => {
       }
     });
 
+    console.log('About to call getUser with token...');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
+    console.log('getUser result:', {
+      hasUser: !!user,
+      userId: user?.id,
+      hasError: !!authError,
+      errorMessage: authError?.message,
+      errorStatus: authError?.status
+    });
+
     if (authError || !user) {
+      console.error('Auth validation failed:', authError);
       return new Response(
         JSON.stringify({
-          error: "Unauthorized",
-          details: authError?.message
+          code: 401,
+          message: authError?.message || "Invalid JWT"
         }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    console.log('Auth successful for user:', user.id);
 
     const { data: profile } = await supabase
       .from("user_profiles")
