@@ -2559,18 +2559,18 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         if (error) throw error;
         showNotification('success', 'Fee Updated', 'Invoice fee updated successfully!');
       } else {
-        if (!companySettings?.id) {
-          showNotification('error', 'Error', 'Company settings not found. Please refresh the page.');
+        if (!currentUserProfile?.company_id) {
+          showNotification('error', 'Error', 'Company not found. Please refresh the page.');
           setSavingFee(false);
           return;
         }
 
-        console.log('Creating invoice fee with company_id:', companySettings.id);
+        console.log('Creating invoice fee with company_id:', currentUserProfile.company_id);
 
         const { data, error } = await supabase
           .from('invoice_fees')
           .insert([{
-            company_id: companySettings.id,
+            company_id: currentUserProfile.company_id,
             fee_name: feeFormData.fee_name,
             description: feeFormData.description,
             amount: amount,
@@ -2682,7 +2682,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       }
 
       const newFees = lines.map(feeName => ({
-        company_id: companySettings.id,
+        company_id: currentUserProfile!.company_id,
         fee_name: feeName,
         description: '',
         amount: 0,
@@ -2731,7 +2731,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       }
 
       const newLocations = lines.map(locationName => ({
-        company_id: companySettings.id,
+        company_id: currentUserProfile!.company_id,
         decoration_name: locationName,
         address: '',
       }));
@@ -2776,7 +2776,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       }
 
       const newWorkTypes = lines.map(workTypeName => ({
-        company_id: companySettings.id,
+        company_id: currentUserProfile!.company_id,
         work_type_name: workTypeName,
         color_type: bulkWorkTypeColorType,
       }));
@@ -2861,8 +2861,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         if (error) throw error;
         showNotification('success', 'Location Updated', 'Decoration location updated successfully!');
       } else {
-        if (!companySettings?.id) {
-          showNotification('error', 'Error', 'Company settings not found. Please refresh the page.');
+        if (!currentUserProfile?.company_id) {
+          showNotification('error', 'Error', 'Company not found. Please refresh the page.');
           setSavingLocation(false);
           return;
         }
@@ -2870,7 +2870,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         const { error } = await supabase
           .from('decoration_locations')
           .insert([{
-            company_id: companySettings.id,
+            company_id: currentUserProfile.company_id,
             decoration_name: locationFormData.decoration_name,
             address: locationFormData.address,
           }]);
@@ -2983,8 +2983,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       return;
     }
 
-    if (!companySettings?.id) {
-      showNotification('error', 'Error', 'Company settings not found.');
+    if (!currentUserProfile?.company_id) {
+      showNotification('error', 'Error', 'Company not found.');
       return;
     }
 
@@ -3010,7 +3010,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         const { error } = await supabase
           .from('type_of_work_settings')
           .insert([{
-            company_id: companySettings.id,
+            company_id: currentUserProfile.company_id,
             work_type_name: workTypeFormData.work_type_name,
             color_type: workTypeFormData.color_type,
             sort_order: nextSortOrder,
@@ -3171,8 +3171,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       return;
     }
 
-    if (!companySettings?.id) {
-      showNotification('error', 'Error', 'Company settings not found.');
+    if (!currentUserProfile?.company_id) {
+      showNotification('error', 'Error', 'Company not found.');
       return;
     }
 
@@ -3195,7 +3195,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         const { error } = await supabase
           .from('production_stations')
           .insert([{
-            company_id: companySettings.id,
+            company_id: currentUserProfile.company_id,
             station_name: stationFormData.station_name,
             work_type_id: stationFormData.work_type_id,
             is_active: true,
@@ -3308,8 +3308,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         if (error) throw error;
         showNotification('success', 'Option Updated', 'Color/stitch option updated successfully!');
       } else {
-        if (!companySettings?.id) {
-          showNotification('error', 'Error', 'Company settings not found. Please refresh the page.');
+        if (!currentUserProfile?.company_id) {
+          showNotification('error', 'Error', 'Company not found. Please refresh the page.');
           setSavingColorStitch(false);
           return;
         }
@@ -3321,7 +3321,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         const { error } = await supabase
           .from('color_stitch_options')
           .insert([{
-            company_id: companySettings.id,
+            company_id: currentUserProfile.company_id,
             option_label: colorStitchFormData.option_label,
             option_value: colorStitchFormData.option_value,
             option_type: colorStitchFormData.option_type,
