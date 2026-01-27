@@ -447,6 +447,21 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
           </div>
         </div>
 
+        {/* Customer Information */}
+        <div className="p-8 border-b border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+          <h3 className="font-bold text-gray-900 dark:text-white mb-3 text-sm">Customer Information</h3>
+          <div className="text-sm space-y-0.5">
+            {quote.customer_company && <p className="font-semibold text-gray-900 dark:text-white">{quote.customer_company}</p>}
+            {quote.customer_name && <p className="text-gray-700 dark:text-gray-300">{quote.customer_name}</p>}
+            {quote.customer_email && (
+              <p className="text-blue-600 dark:text-blue-400">
+                <a href={`mailto:${quote.customer_email}`} className="hover:underline">{quote.customer_email}</a>
+              </p>
+            )}
+            {quote.customer_phone && <p className="text-gray-700 dark:text-gray-300">{quote.customer_phone}</p>}
+          </div>
+        </div>
+
         {/* Customer Billing and Shipping */}
         <div className="grid grid-cols-2 gap-8 p-8 border-b border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700/30">
           {/* Customer Billing */}
