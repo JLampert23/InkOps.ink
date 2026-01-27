@@ -85,6 +85,29 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Decrypt the password
+    const decryptResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": authHeader,
+      },
+      body: JSON.stringify({
+        action: "decrypt",
+        token: credentials.password,
+      }),
+    });
+
+    if (!decryptResponse.ok) {
+      console.error("Failed to decrypt SSActivewear password");
+      return new Response(
+        JSON.stringify({ error: "Failed to decrypt credentials" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { result: decryptedPassword } = await decryptResponse.json();
+
     // Parse request
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
@@ -137,8 +160,8 @@ Deno.serve(async (req: Request) => {
         );
     }
 
-    // Create Basic Auth header
-    const authString = btoa(`${credentials.username}:${credentials.password}`);
+    // Create Basic Auth header with decrypted password
+    const authString = btoa(`${credentials.username}:${decryptedPassword}`);
 
     // Make request to SSActivewear API
     const ssaHeaders: Record<string, string> = {

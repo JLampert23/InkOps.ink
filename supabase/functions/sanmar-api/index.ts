@@ -90,6 +90,29 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Decrypt the API key
+    const decryptResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": authHeader,
+      },
+      body: JSON.stringify({
+        action: "decrypt",
+        token: credentials.apiKey,
+      }),
+    });
+
+    if (!decryptResponse.ok) {
+      console.error("Failed to decrypt SanMar API key");
+      return new Response(
+        JSON.stringify({ error: "Failed to decrypt credentials" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { result: decryptedApiKey } = await decryptResponse.json();
+
     // Parse request
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
@@ -142,9 +165,9 @@ Deno.serve(async (req: Request) => {
         );
     }
 
-    // Make request to SanMar API
+    // Make request to SanMar API with decrypted key
     const sanmarHeaders: Record<string, string> = {
-      "Authorization": `Bearer ${credentials.apiKey}`,
+      "Authorization": `Bearer ${decryptedApiKey}`,
       "Content-Type": "application/json",
     };
 
