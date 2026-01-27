@@ -151,6 +151,8 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
 
   const updateEntry = async (entryId: string, updates: Partial<ScheduleEntry>) => {
     try {
+      console.log('Updating entry:', entryId, 'with updates:', updates);
+
       const { data, error } = await supabase
         .from('production_schedule_entries')
         .update(updates)
@@ -158,13 +160,18 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database update error:', error);
+        throw error;
+      }
 
       if (data) {
+        console.log('Update successful, new data:', data);
         setEntries(prev => prev.map(e => e.id === entryId ? data : e));
       }
     } catch (error) {
       console.error('Error updating entry:', error);
+      alert('Failed to update entry. Please try again.');
     }
   };
 
@@ -443,8 +450,9 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
                         <input
                           type="date"
                           value={entry.production_due_date}
-                          onChange={(e) => handleDateChange(entry.id, e.target.value)}
-                          onBlur={() => setEditingCell(null)}
+                          onChange={(e) => {
+                            handleDateChange(entry.id, e.target.value);
+                          }}
                           autoFocus
                           className="w-full px-2 py-1 text-sm border border-green-500 rounded bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
                         />
@@ -461,8 +469,9 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
                       {editingCell?.entryId === entry.id && editingCell?.field === 'station' ? (
                         <select
                           value={entry.station || ''}
-                          onChange={(e) => handleStationChange(entry.id, e.target.value)}
-                          onBlur={() => setEditingCell(null)}
+                          onChange={(e) => {
+                            handleStationChange(entry.id, e.target.value);
+                          }}
                           autoFocus
                           className="w-full px-2 py-1 text-sm border border-green-500 rounded bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
                         >
@@ -494,8 +503,9 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
                           {editingCell?.entryId === entry.id && editingCell?.field === step.id ? (
                             <select
                               value={currentStatus}
-                              onChange={(e) => handleStatusChange(entry.id, step.id, e.target.value)}
-                              onBlur={() => setEditingCell(null)}
+                              onChange={(e) => {
+                                handleStatusChange(entry.id, step.id, e.target.value);
+                              }}
                               autoFocus
                               className="w-full px-2 py-1 text-sm border border-green-500 rounded bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
                             >
