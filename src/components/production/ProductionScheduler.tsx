@@ -60,7 +60,7 @@ interface ProductionSchedulerProps {
 }
 
 export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerProps) {
-  const { user, companyId } = useAuth();
+  const { user, companySettings } = useAuth();
   const [entries, setEntries] = useState<ScheduleEntry[]>([]);
   const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +69,8 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
 
   // Tab management
   const [activeTab, setActiveTab] = useState<SchedulerTab | null>(null);
+
+  const companyId = companySettings?.company_id || null;
 
   // Filters
   const [startDate, setStartDate] = useState(format(startOfWeek(new Date()), 'yyyy-MM-dd'));
@@ -329,14 +331,16 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
     <div className="space-y-4">
       {/* Tabs */}
       {companyId && user?.id && (
-        <SchedulerTabManager
-          typeOfWork={typeOfWork}
-          companyId={companyId}
-          userId={user.id}
-          currentFilters={currentFilters}
-          onSelectTab={handleTabSelect}
-          activeTabId={activeTab?.id || null}
-        />
+        <div className="mb-4">
+          <SchedulerTabManager
+            typeOfWork={typeOfWork}
+            companyId={companyId}
+            userId={user.id}
+            currentFilters={currentFilters}
+            onSelectTab={handleTabSelect}
+            activeTabId={activeTab?.id || null}
+          />
+        </div>
       )}
 
       {/* Header and Filters */}
