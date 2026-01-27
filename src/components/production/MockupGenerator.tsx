@@ -97,8 +97,8 @@ export default function MockupGenerator({
   const [customLocation, setCustomLocation] = useState('');
 
   const [typeOfWork, setTypeOfWork] = useState<string>('');
-  const [inkColors, setInkColors] = useState<Array<{ name: string; code?: string; charge?: number }>>([]);
-  const [threadColors, setThreadColors] = useState<Array<{ name: string; code?: string; charge?: number }>>([]);
+  const [inkColors, setInkColors] = useState<Array<{ id: string; name: string; color_code: string }>>([]);
+  const [threadColors, setThreadColors] = useState<Array<{ id: string; name: string; color_code: string }>>([]);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
 
   const [showArtworkLibrary, setShowArtworkLibrary] = useState(false);
@@ -132,17 +132,25 @@ export default function MockupGenerator({
         .eq('line_item_id', lineItemId)
         .maybeSingle();
 
-      // Load production colors from settings
-      const { data: colorSettings } = await supabase
-        .from('production_color_settings')
-        .select('ink_colors, thread_colors')
+      // Load production colors from production_colors table
+      const { data: inkColorsData } = await supabase
+        .from('production_colors')
+        .select('id, name, color_code')
         .eq('company_id', profile.company_id)
-        .maybeSingle();
+        .eq('type_of_work', 'screen_printing')
+        .eq('is_active', true)
+        .order('sort_order');
 
-      if (colorSettings) {
-        setInkColors(colorSettings.ink_colors || []);
-        setThreadColors(colorSettings.thread_colors || []);
-      }
+      const { data: threadColorsData } = await supabase
+        .from('production_colors')
+        .select('id, name, color_code')
+        .eq('company_id', profile.company_id)
+        .eq('type_of_work', 'embroidery')
+        .eq('is_active', true)
+        .order('sort_order');
+
+      setInkColors(inkColorsData || []);
+      setThreadColors(threadColorsData || []);
 
       if (existingProof) {
         setProofId(existingProof.id);
@@ -824,11 +832,11 @@ export default function MockupGenerator({
                   {typeOfWork === 'Embroidery' ? 'Thread Colors' : 'Ink Colors'}
                 </h3>
                 <div className="grid grid-cols-4 gap-2">
-                  {(typeOfWork === 'Embroidery' ? threadColors : inkColors).map((color, idx) => {
+                  {(typeOfWork === 'Embroidery' ? threadColors : inkColors).map((color) => {
                     const isSelected = selectedColors.includes(color.name);
                     return (
                       <button
-                        key={idx}
+                        key={color.id}
                         onClick={() => {
                           if (isSelected) {
                             setSelectedColors(selectedColors.filter(c => c !== color.name));
@@ -841,7 +849,7 @@ export default function MockupGenerator({
                             ? 'border-blue-500 ring-2 ring-blue-300 dark:ring-blue-600'
                             : 'border-gray-300 dark:border-slate-600 hover:border-gray-400'
                         }`}
-                        style={{ backgroundColor: color.code || '#cccccc' }}
+                        style={{ backgroundColor: color.color_code || '#cccccc' }}
                         title={color.name}
                       >
                         {isSelected && (
