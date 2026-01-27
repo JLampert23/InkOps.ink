@@ -95,6 +95,17 @@ interface TypeOfWork {
   updated_at: string;
 }
 
+interface ProductionStation {
+  id: string;
+  company_id: string;
+  work_type_id: string;
+  station_name: string;
+  is_active: boolean;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 type SettingsTab =
   | 'company-info' | 'quote-invoice-settings'
   | 'printavo-integration' | 'square-integration' | 'resend-integration' | 'twilio-integration' | 'stripe-payments' | 'supplier-integrations'
@@ -303,6 +314,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [showWorkflowBuilder, setShowWorkflowBuilder] = useState(false);
   const [selectedWorkTypeForWorkflow, setSelectedWorkTypeForWorkflow] = useState<TypeOfWork | null>(null);
 
+  const [stations, setStations] = useState<ProductionStation[]>([]);
+  const [loadingStations, setLoadingStations] = useState(false);
+  const [editingStationId, setEditingStationId] = useState<string | null>(null);
+  const [showAddStationModal, setShowAddStationModal] = useState(false);
+  const [selectedWorkTypeForStation, setSelectedWorkTypeForStation] = useState<string | null>(null);
+  const [stationFormData, setStationFormData] = useState({
+    station_name: '',
+    work_type_id: '',
+  });
+  const [savingStation, setSavingStation] = useState(false);
+
   // Helper function to get a fresh session token for edge function calls
   const getFreshSession = async () => {
     // First try to get the current session
@@ -352,6 +374,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     loadDecorationLocations();
     loadWorkTypes();
     loadColorStitchOptions();
+    loadStations();
     loadSupplierIntegrationSettings();
   }, []);
 
@@ -3089,6 +3112,133 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     } catch (err) {
       console.error('Error deleting work type:', err);
       showNotification('error', 'Delete Failed', 'Failed to delete work type. Please try again.');
+    }
+  };
+
+  const loadStations = async () => {
+    try {
+      setLoadingStations(true);
+      const { data, error } = await supabase
+        .from('production_stations')
+        .select('*, type_of_work_settings(work_type_name)')
+        .eq('is_active', true)
+        .order('work_type_id')
+        .order('display_order');
+
+      if (error) throw error;
+      setStations(data || []);
+    } catch (err) {
+      console.error('Error loading stations:', err);
+      showNotification('error', 'Load Failed', 'Failed to load stations.');
+    } finally {
+      setLoadingStations(false);
+    }
+  };
+
+  const resetStationForm = () => {
+    setStationFormData({
+      station_name: '',
+      work_type_id: '',
+    });
+    setEditingStationId(null);
+  };
+
+  const openAddStationModal = (workTypeId?: string) => {
+    resetStationForm();
+    if (workTypeId) {
+      setStationFormData(prev => ({ ...prev, work_type_id: workTypeId }));
+    }
+    setShowAddStationModal(true);
+  };
+
+  const openEditStationModal = (station: ProductionStation) => {
+    setStationFormData({
+      station_name: station.station_name,
+      work_type_id: station.work_type_id,
+    });
+    setEditingStationId(station.id);
+    setShowAddStationModal(true);
+  };
+
+  const saveStation = async () => {
+    if (!stationFormData.station_name.trim()) {
+      showNotification('error', 'Validation Error', 'Please enter a station name.');
+      return;
+    }
+
+    if (!stationFormData.work_type_id) {
+      showNotification('error', 'Validation Error', 'Please select a type of work.');
+      return;
+    }
+
+    if (!companySettings?.id) {
+      showNotification('error', 'Error', 'Company settings not found.');
+      return;
+    }
+
+    try {
+      setSavingStation(true);
+
+      if (editingStationId) {
+        const { error } = await supabase
+          .from('production_stations')
+          .update({
+            station_name: stationFormData.station_name,
+            work_type_id: stationFormData.work_type_id,
+          })
+          .eq('id', editingStationId);
+
+        if (error) throw error;
+
+        showNotification('success', 'Station Updated', 'Station updated successfully!');
+      } else {
+        const { error } = await supabase
+          .from('production_stations')
+          .insert([{
+            company_id: companySettings.id,
+            station_name: stationFormData.station_name,
+            work_type_id: stationFormData.work_type_id,
+            is_active: true,
+            display_order: 0,
+          }]);
+
+        if (error) throw error;
+
+        showNotification('success', 'Station Created', 'Station created successfully!');
+      }
+
+      setShowAddStationModal(false);
+      resetStationForm();
+      loadStations();
+    } catch (err) {
+      console.error('Error saving station:', err);
+      showNotification('error', 'Save Failed', 'Failed to save station. Please try again.');
+    } finally {
+      setSavingStation(false);
+    }
+  };
+
+  const deleteStation = async (stationId: string) => {
+    const confirmed = await confirm(
+      'Delete Station?',
+      'Are you sure you want to delete this station? This action cannot be undone.'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from('production_stations')
+        .update({ is_active: false })
+        .eq('id', stationId);
+
+      if (error) throw error;
+
+      showNotification('success', 'Station Deleted', 'Station deleted successfully!');
+      loadStations();
+    } catch (err) {
+      console.error('Error deleting station:', err);
+      showNotification('error', 'Delete Failed', 'Failed to delete station. Please try again.');
     }
   };
 
@@ -5987,6 +6137,83 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   </div>
                 )}
               </div>
+
+              {/* Production Stations */}
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Production Stations</h2>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Define stations for each type of work</p>
+                  </div>
+                  <button
+                    onClick={() => openAddStationModal()}
+                    className="flex items-center gap-1 px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Add Station
+                  </button>
+                </div>
+
+                {loadingStations ? (
+                  <div className="flex items-center justify-center py-3">
+                    <Loader2 className="w-5 h-5 text-blue-600 dark:text-blue-400 animate-spin" />
+                  </div>
+                ) : stations.length === 0 ? (
+                  <div className="text-center py-3 text-gray-500 dark:text-gray-400">
+                    <p className="text-xs">No stations yet. Click "Add Station" to create one.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {workTypes.map((workType) => {
+                      const workTypeStations = stations.filter(s => s.work_type_id === workType.id);
+                      if (workTypeStations.length === 0) return null;
+
+                      return (
+                        <div key={workType.id} className="border border-gray-200 dark:border-slate-700 rounded p-2">
+                          <div className="flex items-center justify-between mb-2">
+                            <h3 className="text-xs font-semibold text-gray-900 dark:text-white">{workType.work_type_name}</h3>
+                            <button
+                              onClick={() => openAddStationModal(workType.id)}
+                              className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                            >
+                              <Plus className="w-2.5 h-2.5" />
+                              Add
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-1">
+                            {workTypeStations.map((station) => (
+                              <div
+                                key={station.id}
+                                className="flex items-center gap-1 p-1.5 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="text-xs font-medium text-gray-900 dark:text-white truncate">{station.station_name}</h4>
+                                </div>
+                                <div className="flex gap-0.5 flex-shrink-0">
+                                  <button
+                                    onClick={() => openEditStationModal(station)}
+                                    className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                                    title="Edit"
+                                  >
+                                    <Edit className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    onClick={() => deleteStation(station.id)}
+                                    className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                                    title="Delete"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -6409,6 +6636,96 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         <>
                           <Save className="w-4 h-4" />
                           {editingWorkTypeId ? 'Update Work Type' : 'Create Work Type'}
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Add/Edit Station Modal */}
+          {showAddStationModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                <div className="p-6 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                      {editingStationId ? 'Edit Station' : 'Add Station'}
+                    </h2>
+                    <button
+                      onClick={() => setShowAddStationModal(false)}
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                    >
+                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Type of Work <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={stationFormData.work_type_id}
+                        onChange={(e) => setStationFormData({ ...stationFormData, work_type_id: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                      >
+                        <option value="">Select a type of work</option>
+                        {workTypes.map((workType) => (
+                          <option key={workType.id} value={workType.id}>
+                            {workType.work_type_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Station Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={stationFormData.station_name}
+                        onChange={(e) => setStationFormData({ ...stationFormData, station_name: e.target.value })}
+                        placeholder="e.g., Station A, Press 1, Machine 3"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                      <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">About Stations</h3>
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        Stations help you organize and schedule production by specific equipment or work areas. Each station is linked to a type of work.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-slate-700">
+                    <button
+                      onClick={() => setShowAddStationModal(false)}
+                      disabled={savingStation}
+                      className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={saveStation}
+                      disabled={savingStation}
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {savingStation ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4" />
+                          {editingStationId ? 'Update Station' : 'Create Station'}
                         </>
                       )}
                     </button>

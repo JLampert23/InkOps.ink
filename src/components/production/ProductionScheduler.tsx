@@ -54,8 +54,8 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
   const [customerFilter, setCustomerFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
-  // Get unique stations
-  const stations = Array.from(new Set(entries.map(e => e.station).filter(Boolean)));
+  // Stations from database
+  const [availableStations, setAvailableStations] = useState<Array<{ id: string; station_name: string }>>([]);
 
   const loadWorkflowSteps = async () => {
     try {
@@ -85,6 +85,18 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
               is_default: status.is_default || false,
             })),
           })));
+        }
+
+        // Load stations for this work type
+        const { data: stationsData } = await supabase
+          .from('production_stations')
+          .select('id, station_name')
+          .eq('work_type_id', typeData.id)
+          .eq('is_active', true)
+          .order('display_order');
+
+        if (stationsData) {
+          setAvailableStations(stationsData);
         }
       }
     } catch (error) {
@@ -325,8 +337,8 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
                 className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
               >
                 <option value="">All Stations</option>
-                {stations.map(station => (
-                  <option key={station} value={station}>{station}</option>
+                {availableStations.map(station => (
+                  <option key={station.id} value={station.station_name}>{station.station_name}</option>
                 ))}
               </select>
             </div>
@@ -441,14 +453,20 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
                     </td>
                     <td className="px-3 py-3">
                       {editingCell?.entryId === entry.id && editingCell?.field === 'station' ? (
-                        <input
-                          type="text"
+                        <select
                           value={entry.station || ''}
                           onChange={(e) => handleStationChange(entry.id, e.target.value)}
                           onBlur={() => setEditingCell(null)}
                           autoFocus
                           className="w-full px-2 py-1 text-sm border border-green-500 rounded bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
-                        />
+                        >
+                          <option value="">Select station</option>
+                          {availableStations.map(station => (
+                            <option key={station.id} value={station.station_name}>
+                              {station.station_name}
+                            </option>
+                          ))}
+                        </select>
                       ) : (
                         <button
                           onClick={() => setEditingCell({ entryId: entry.id, field: 'station' })}
