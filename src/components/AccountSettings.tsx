@@ -101,7 +101,7 @@ type SettingsTab =
   | 'user-management' | 'user-security'
   | 'billing-status-filters'
   | 'automated-reports' | 'workflow-setup' | 'automations'
-  | 'production-general' | 'invoice-fees' | 'price-matrices';
+  | 'production-general' | 'scheduler-settings' | 'invoice-fees' | 'price-matrices';
 
 interface AccountSettingsProps {
   initialTab?: SettingsTab;
@@ -3513,13 +3513,31 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 </button>
 
                 <button
+                  onClick={() => setActiveTab('scheduler-settings')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'scheduler-settings'
+                      ? 'bg-green-50 dark:bg-green-600/20 text-green-700 dark:text-green-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                  style={{ animationDelay: '40ms' }}
+                >
+                  <Clock className={`w-4 h-4 flex-shrink-0 ${activeTab === 'scheduler-settings' ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'scheduler-settings' ? 'text-green-700 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      Scheduler Settings
+                    </div>
+                  </div>
+                  {activeTab === 'scheduler-settings' && <div className="w-1 h-6 bg-green-600 dark:bg-green-500 rounded-full absolute right-0" />}
+                </button>
+
+                <button
                   onClick={() => setActiveTab('workflow-setup')}
                   className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
                     activeTab === 'workflow-setup'
                       ? 'bg-green-50 dark:bg-green-600/20 text-green-700 dark:text-green-400 shadow-sm'
                       : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
                   }`}
-                  style={{ animationDelay: '40ms' }}
+                  style={{ animationDelay: '60ms' }}
                 >
                   <Layers className={`w-4 h-4 flex-shrink-0 ${activeTab === 'workflow-setup' ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                   <div className="flex-1 text-left">
@@ -3537,7 +3555,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       ? 'bg-green-50 dark:bg-green-600/20 text-green-700 dark:text-green-400 shadow-sm'
                       : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
                   }`}
-                  style={{ animationDelay: '60ms' }}
+                  style={{ animationDelay: '80ms' }}
                 >
                   <Zap className={`w-4 h-4 flex-shrink-0 ${activeTab === 'automations' ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                   <div className="flex-1 text-left">
@@ -3555,7 +3573,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       ? 'bg-green-50 dark:bg-green-600/20 text-green-700 dark:text-green-400 shadow-sm'
                       : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
                   }`}
-                  style={{ animationDelay: '80ms' }}
+                  style={{ animationDelay: '100ms' }}
                 >
                   <Grid3x3 className={`w-4 h-4 flex-shrink-0 ${activeTab === 'price-matrices' ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                   <div className="flex-1 text-left">
@@ -5776,80 +5794,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 )}
               </div>
 
-              {/* Type of Work */}
-              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Type of Work</h2>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">Decoration methods (Screen Print, Embroidery, DTG)</p>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => setShowBulkAddWorkTypesModal(true)}
-                      className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                    >
-                      <Plus className="w-3 h-3" />
-                      Bulk
-                    </button>
-                    <button
-                      onClick={openAddWorkTypeModal}
-                      className="flex items-center gap-1 px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-                    >
-                      <Plus className="w-3 h-3" />
-                      Add
-                    </button>
-                  </div>
-                </div>
-
-                {loadingWorkTypes ? (
-                  <div className="flex items-center justify-center py-3">
-                    <Loader2 className="w-5 h-5 text-blue-600 dark:text-blue-400 animate-spin" />
-                  </div>
-                ) : workTypes.length === 0 ? (
-                  <div className="text-center py-3 text-gray-500 dark:text-gray-400">
-                    <p className="text-xs">No work types yet. Click "Add" to create one.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    {workTypes.map((workType) => (
-                      <div
-                        key={workType.id}
-                        className="flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <h3 className="text-xs font-medium text-gray-900 dark:text-white truncate">{workType.work_type_name}</h3>
-                            <span className={`px-1 py-0.5 text-xs font-medium rounded whitespace-nowrap ${
-                              workType.color_type === 'ink'
-                                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200'
-                                : workType.color_type === 'thread'
-                                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200'
-                                : 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-200'
-                            }`}>
-                              {workType.color_type === 'ink' ? 'Ink' : workType.color_type === 'thread' ? 'Thread' : 'None'}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-0.5 ml-2">
-                          <button
-                            onClick={() => openEditWorkTypeModal(workType)}
-                            className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
-                          >
-                            <Edit className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={() => deleteWorkType(workType.id)}
-                            className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
               {/* Ink Colors */}
               <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" /></div>}>
                 <InkThreadColorsManager colorType="ink" />
@@ -5914,6 +5858,85 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         <div className="flex items-center gap-0.5 ml-2">
                           <button
                             onClick={() => removeCustomLineItemOption(index)}
+                            className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Scheduler Settings Section */}
+          {activeTab === 'scheduler-settings' && (
+            <div className="space-y-3">
+              {/* Type of Work */}
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Type of Work</h2>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Decoration methods (Screen Print, Embroidery, DTG)</p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setShowBulkAddWorkTypesModal(true)}
+                      className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Bulk
+                    </button>
+                    <button
+                      onClick={openAddWorkTypeModal}
+                      className="flex items-center gap-1 px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />
+                      Add
+                    </button>
+                  </div>
+                </div>
+
+                {loadingWorkTypes ? (
+                  <div className="flex items-center justify-center py-3">
+                    <Loader2 className="w-5 h-5 text-blue-600 dark:text-blue-400 animate-spin" />
+                  </div>
+                ) : workTypes.length === 0 ? (
+                  <div className="text-center py-3 text-gray-500 dark:text-gray-400">
+                    <p className="text-xs">No work types yet. Click "Add" to create one.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {workTypes.map((workType) => (
+                      <div
+                        key={workType.id}
+                        className="flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <h3 className="text-xs font-medium text-gray-900 dark:text-white truncate">{workType.work_type_name}</h3>
+                            <span className={`px-1 py-0.5 text-xs font-medium rounded whitespace-nowrap ${
+                              workType.color_type === 'ink'
+                                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200'
+                                : workType.color_type === 'thread'
+                                ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200'
+                                : 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-200'
+                            }`}>
+                              {workType.color_type === 'ink' ? 'Ink' : workType.color_type === 'thread' ? 'Thread' : 'None'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-0.5 ml-2">
+                          <button
+                            onClick={() => openEditWorkTypeModal(workType)}
+                            className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                          >
+                            <Edit className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => deleteWorkType(workType.id)}
                             className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
                           >
                             <Trash2 className="w-3 h-3" />
