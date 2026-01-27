@@ -766,7 +766,7 @@ export default function MockupGenerator({
                 ref={canvasRef}
                 width={600}
                 height={700}
-                className="bg-white dark:bg-slate-900 shadow-lg cursor-move"
+                className="shadow-lg cursor-move"
                 onMouseDown={handleCanvasMouseDown}
                 onMouseMove={handleCanvasMouseMove}
                 onMouseUp={handleCanvasMouseUp}
