@@ -15,7 +15,7 @@ import {
   Plus,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import ProofGenerator from './ProofGenerator';
+import MockupGenerator from './MockupGenerator';
 
 interface QuoteDetailProps {
   quoteId: string;
@@ -639,7 +639,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                   </React.Fragment>
                 );
               })}
-                  {/* Always show Generate Proof button and imprints list for this group */}
+                  {/* Always show Generate Mockup button and imprints list for this group */}
                   <tr>
                     <td colSpan={18} className="px-4 py-2 bg-gray-50 dark:bg-slate-800/50">
                       <div className="space-y-3">
@@ -656,7 +656,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                           }}
                         >
                           <Plus className="w-4 h-4" />
-                          Proof
+                          Mockup
                         </button>
 
                         {/* List imprints for this group */}
@@ -898,7 +898,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             garmentColor: selectedLineItem.color,
           });
           return (
-            <ProofGenerator
+            <MockupGenerator
               lineItemId={selectedLineItem.id}
               quoteId={quoteId}
               customerId={quote.customer_id}
@@ -906,13 +906,13 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
               garmentColor={selectedLineItem.color}
               groupLabel={selectedGroupLabel}
               onClose={() => {
-                console.log('ProofGenerator onClose called');
+                console.log('MockupGenerator onClose called');
                 setShowProofGenerator(false);
                 setSelectedLineItem(null);
                 setSelectedGroupLabel('');
               }}
               onSave={() => {
-                console.log('ProofGenerator onSave called');
+                console.log('MockupGenerator onSave called');
                 loadQuoteDetails();
               }}
             />
