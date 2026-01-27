@@ -357,11 +357,14 @@ Deno.serve(async (req: Request) => {
         );
     }
 
+    // PromoStandards uses HTTP Basic Auth
+    const basicAuth = btoa(`${credentials.accountNumber}:${decryptedApiKey}`);
+
     const ssaResponse = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
-        "Authorization": `Bearer ${decryptedApiKey}`,
+        "Authorization": `Basic ${basicAuth}`,
         "SOAPAction": action,
       },
       body: soapBody,
