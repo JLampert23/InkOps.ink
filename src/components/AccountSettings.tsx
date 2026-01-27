@@ -305,6 +305,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     loadDecorationLocations();
     loadWorkTypes();
     loadColorStitchOptions();
+    loadSupplierIntegrationSettings();
   }, []);
 
   useEffect(() => {
@@ -362,6 +363,37 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       console.error('Error loading settings:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadSupplierIntegrationSettings = async () => {
+    try {
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user?.id)
+        .maybeSingle();
+
+      if (!profile?.company_id) return;
+
+      const { data, error } = await supabase
+        .from('integration_settings')
+        .select('*')
+        .eq('company_id', profile.company_id)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error loading supplier integration settings:', error);
+        return;
+      }
+
+      if (data) {
+        setSanmarEnabled(data.sanmar_enabled || false);
+        setSsaEnabled(data.ssactivewear_enabled || false);
+        console.log('Loaded supplier integration settings:', data);
+      }
+    } catch (err) {
+      console.error('Error loading supplier integration settings:', err);
     }
   };
 
@@ -1719,20 +1751,26 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         ssactivewear_credentials: ssaCredentials,
       };
 
+      console.log('Saving integration settings:', { existing, settingsData });
+
       if (existing) {
         // Update existing record
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('integration_settings')
           .update(settingsData)
-          .eq('id', existing.id);
+          .eq('id', existing.id)
+          .select();
 
+        console.log('Update result:', { data, error });
         if (error) throw error;
       } else {
         // Insert new record
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('integration_settings')
-          .insert([settingsData]);
+          .insert([settingsData])
+          .select();
 
+        console.log('Insert result:', { data, error });
         if (error) throw error;
       }
 
@@ -1743,6 +1781,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setSsaPassword('');
       setSsaCustomerId('');
       setSupplierTestResult(null);
+      await loadSupplierIntegrationSettings();
     } catch (err) {
       console.error('Error saving supplier integrations:', err);
       showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save supplier integrations');
