@@ -197,6 +197,7 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const authHeader = req.headers.get("Authorization");
 
     if (!authHeader) {
@@ -208,30 +209,9 @@ Deno.serve(async (req: Request) => {
 
     const token = authHeader.replace("Bearer ", "");
 
-    console.log('Auth debug:', {
-      hasToken: !!token,
-      tokenLength: token.length,
-      hasServiceKey: !!supabaseServiceRoleKey,
-      serviceKeyPrefix: supabaseServiceRoleKey?.substring(0, 20)
-    });
-
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
-
-    console.log('About to call getUser with token...');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-
-    console.log('getUser result:', {
-      hasUser: !!user,
-      userId: user?.id,
-      hasError: !!authError,
-      errorMessage: authError?.message,
-      errorStatus: authError?.status
-    });
+    // Use ANON key to validate the user token
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
 
     if (authError || !user) {
       console.error('Auth validation failed:', authError);
@@ -244,7 +224,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    console.log('Auth successful for user:', user.id);
+    // Use service role key for database operations
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
     const { data: profile } = await supabase
       .from("user_profiles")
