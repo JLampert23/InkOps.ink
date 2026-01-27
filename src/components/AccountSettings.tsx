@@ -1974,14 +1974,24 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           );
 
           console.log('SSActivewear response status:', response.status);
+          console.log('SSActivewear response headers:', Object.fromEntries(response.headers.entries()));
 
           if (response.ok) {
             const data = await response.json();
             results.push('SSActivewear: Connected successfully');
           } else {
             hasError = true;
-            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-            console.error('SSActivewear test error:', errorData);
+            const errorText = await response.text();
+            console.error('SSActivewear test error (raw):', errorText);
+
+            let errorData;
+            try {
+              errorData = JSON.parse(errorText);
+            } catch {
+              errorData = { error: 'Non-JSON response', details: errorText.substring(0, 500) };
+            }
+
+            console.error('SSActivewear test error (parsed):', errorData);
             results.push(`SSActivewear: ${errorData.error || 'Connection failed'}`);
           }
         } catch (err) {
