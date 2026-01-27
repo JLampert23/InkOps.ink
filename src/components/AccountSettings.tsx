@@ -297,6 +297,15 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   });
   const [savingColorStitch, setSavingColorStitch] = useState(false);
 
+  // Helper function to get a fresh session token for edge function calls
+  const getFreshSession = async () => {
+    const { data: { session }, error } = await supabase.auth.refreshSession();
+    if (error || !session) {
+      throw new Error('Unable to refresh authentication session. Please sign out and sign back in.');
+    }
+    return session;
+  };
+
   useEffect(() => {
     loadSettings();
     loadUsers();
@@ -548,10 +557,23 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     try {
       setLoadingStatuses(true);
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        // Session not ready yet, silently skip
-        return [];
+      // Refresh the session to get a fresh access token
+      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
+      if (sessionError || !session) {
+        console.warn('Unable to refresh session for status loading, falling back to local data');
+        const { data, error } = await supabase
+          .from('printavo_invoices_calculated')
+          .select('status')
+          .not('status', 'is', null);
+
+        if (error) throw error;
+
+        const uniqueStatuses = Array.from(
+          new Set(data?.map(item => item.status).filter(status => status && status.trim() !== '') || [])
+        ).sort();
+
+        setAvailableStatuses(uniqueStatuses);
+        return uniqueStatuses;
       }
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/printavo-company`, {
@@ -559,6 +581,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
       });
 
@@ -931,15 +954,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setTestingConnection(true);
       setTestResult(null);
 
-      // Get session to check auth
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setTestResult({
-          success: false,
-          error: 'You must be logged in to test the connection',
-        });
-        return;
-      }
+      // Get fresh session token
+      const session = await getFreshSession();
 
       // Call the edge function with manual fetch to get full error details
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-printavo`, {
@@ -947,6 +963,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({}),
       });
@@ -1831,11 +1848,13 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setTestingSuppliers(true);
       setSupplierTestResult(null);
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      // Refresh the session to get a fresh access token
+      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
+      if (sessionError || !session) {
+        console.error('Session refresh error:', sessionError);
         setSupplierTestResult({
           success: false,
-          error: 'You must be logged in to test supplier connections',
+          error: 'Unable to refresh authentication. Please sign out and sign back in.',
         });
         return;
       }
@@ -1881,6 +1900,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             {
               headers: {
                 'Authorization': `Bearer ${session.access_token}`,
+                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
               },
             }
           );
