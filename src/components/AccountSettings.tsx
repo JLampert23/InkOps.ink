@@ -1,9 +1,10 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, CreditCard as Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, RefreshCw, Bug, MessageSquare, Eye, EyeOff, Grid3x3, FileText, CheckCircle, GripVertical } from 'lucide-react';
+import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, CreditCard as Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, RefreshCw, Bug, MessageSquare, Eye, EyeOff, Grid3x3, FileText, CheckCircle, GripVertical, Workflow } from 'lucide-react';
 import { supabase } from '../lib/supabase-client';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import AutomatedReports from './automation/AutomatedReports';
+import WorkflowBuilder from './production/WorkflowBuilder';
 
 const WorkflowCustomization = lazy(() => import('./production/WorkflowCustomization').then(m => ({ default: m.WorkflowCustomization })));
 const AutomationsDashboard = lazy(() => import('./automations/AutomationsDashboard').then(m => ({ default: m.AutomationsDashboard })));
@@ -299,6 +300,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   const [draggedFeeIndex, setDraggedFeeIndex] = useState<number | null>(null);
   const [draggedLocationIndex, setDraggedLocationIndex] = useState<number | null>(null);
+
+  const [showWorkflowBuilder, setShowWorkflowBuilder] = useState(false);
+  const [selectedWorkTypeForWorkflow, setSelectedWorkTypeForWorkflow] = useState<TypeOfWork | null>(null);
 
   // Helper function to get a fresh session token for edge function calls
   const getFreshSession = async () => {
@@ -5981,16 +5985,28 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                             {workType.color_type === 'ink' ? 'Ink' : workType.color_type === 'thread' ? 'Thread' : 'None'}
                           </span>
                         </div>
-                        <div className="flex flex-col gap-0.5 flex-shrink-0">
+                        <div className="flex gap-0.5 flex-shrink-0">
+                          <button
+                            onClick={() => {
+                              setSelectedWorkTypeForWorkflow(workType);
+                              setShowWorkflowBuilder(true);
+                            }}
+                            className="p-1 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 rounded transition-colors"
+                            title="Configure Workflow"
+                          >
+                            <Workflow className="w-3 h-3" />
+                          </button>
                           <button
                             onClick={() => openEditWorkTypeModal(workType)}
                             className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                            title="Edit"
                           >
                             <Edit className="w-3 h-3" />
                           </button>
                           <button
                             onClick={() => deleteWorkType(workType.id)}
                             className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                            title="Delete"
                           >
                             <Trash2 className="w-3 h-3" />
                           </button>
@@ -6900,6 +6916,19 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
         </div>
       </div>
+
+      {/* Workflow Builder Modal */}
+      {showWorkflowBuilder && selectedWorkTypeForWorkflow && companySettings && (
+        <WorkflowBuilder
+          workTypeId={selectedWorkTypeForWorkflow.id}
+          workTypeName={selectedWorkTypeForWorkflow.work_type_name}
+          companyId={companySettings.id}
+          onClose={() => {
+            setShowWorkflowBuilder(false);
+            setSelectedWorkTypeForWorkflow(null);
+          }}
+        />
+      )}
     </div>
   );
 }
