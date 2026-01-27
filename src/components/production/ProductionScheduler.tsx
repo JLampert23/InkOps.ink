@@ -42,7 +42,6 @@ interface ProductionSchedulerProps {
 export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerProps) {
   const [entries, setEntries] = useState<ScheduleEntry[]>([]);
   const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([]);
-  const [selectedStep, setSelectedStep] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [draggedEntry, setDraggedEntry] = useState<string | null>(null);
   const [editingCell, setEditingCell] = useState<{ entryId: string; field: string } | null>(null);
@@ -142,19 +141,13 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
   }, [typeOfWork]);
 
   useEffect(() => {
-    if (workflowSteps.length > 0 && !selectedStep) {
-      setSelectedStep(workflowSteps[0].id);
-    }
-  }, [workflowSteps, selectedStep]);
-
-  useEffect(() => {
-    if (selectedStep) {
+    if (workflowSteps.length > 0) {
       const timer = setTimeout(() => {
         loadScheduleEntries();
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [selectedStep, loadScheduleEntries]);
+  }, [workflowSteps.length, loadScheduleEntries]);
 
   const updateEntry = async (entryId: string, updates: Partial<ScheduleEntry>) => {
     try {
@@ -244,45 +237,12 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
     );
   }
 
-  // Filter entries based on selected step
-  const filteredEntries = selectedStep
-    ? entries.filter(entry => {
-        const stepStatus = entry.step_statuses[selectedStep];
-        const step = workflowSteps.find(s => s.id === selectedStep);
-        const defaultStatus = step?.statuses.find(s => s.is_default)?.status_name;
-        const currentStatus = stepStatus || defaultStatus;
-
-        // Show entries that are in this step (not completed)
-        const completedStatuses = ['Complete', 'Completed', 'Done', 'Finished'];
-        return !completedStatuses.includes(currentStatus || '');
-      })
-    : entries;
-
   return (
     <div className="space-y-4">
-      {/* Workflow Step Tabs */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
-        <div className="flex overflow-x-auto">
-          {workflowSteps.map((step) => (
-            <button
-              key={step.id}
-              onClick={() => setSelectedStep(step.id)}
-              className={`flex-shrink-0 px-6 py-4 text-sm font-medium transition-colors border-b-2 ${
-                selectedStep === step.id
-                  ? 'border-green-600 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20'
-                  : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-slate-700'
-              }`}
-            >
-              {step.step_name}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Header and Filters */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-          {typeOfWork} - {workflowSteps.find(s => s.id === selectedStep)?.step_name || 'Schedule'}
+          {typeOfWork} - List
         </h3>
         <div className="flex items-center gap-2">
           <button
@@ -388,6 +348,9 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Qty
                 </th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Production Time
+                </th>
                 {workflowSteps.map(step => (
                   <th key={step.id} className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     {step.step_name}
@@ -398,21 +361,21 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
             <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
               {loading ? (
                 <tr>
-                  <td colSpan={8 + workflowSteps.length} className="px-6 py-12 text-center">
+                  <td colSpan={9 + workflowSteps.length} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <RefreshCw className="w-8 h-8 text-green-600 dark:text-green-400 animate-spin" />
                       <span className="text-sm text-gray-500 dark:text-gray-400">Loading schedule...</span>
                     </div>
                   </td>
                 </tr>
-              ) : filteredEntries.length === 0 ? (
+              ) : entries.length === 0 ? (
                 <tr>
-                  <td colSpan={8 + workflowSteps.length} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={9 + workflowSteps.length} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                     No scheduled jobs for this time period
                   </td>
                 </tr>
               ) : (
-                filteredEntries.map((entry) => (
+                entries.map((entry) => (
                   <tr
                     key={entry.id}
                     draggable
@@ -479,6 +442,11 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
                     <td className="px-3 py-3 text-sm text-gray-900 dark:text-white">
                       {entry.quantity}
                     </td>
+                    <td className="px-3 py-3">
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 border border-green-200 dark:border-green-700">
+                        NORMAL PRODUCTION
+                      </span>
+                    </td>
                     {workflowSteps.map(step => {
                       const currentStatus = entry.step_statuses[step.id] || step.statuses.find(s => s.is_default)?.status_name || 'Not Started';
                       const statusColor = getStatusColor(step.id, currentStatus);
@@ -525,7 +493,7 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
 
       {/* Entry Count */}
       <div className="text-sm text-gray-600 dark:text-gray-400">
-        Showing {filteredEntries.length} scheduled {filteredEntries.length === 1 ? 'job' : 'jobs'}
+        Showing {entries.length} scheduled {entries.length === 1 ? 'job' : 'jobs'}
       </div>
     </div>
   );
