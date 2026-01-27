@@ -212,6 +212,53 @@ Deno.serve(async (req: Request) => {
           }]);
       }
 
+      // Create production schedule entries for approved quotes
+      if (body.approved) {
+        try {
+          // Get quote details
+          const { data: quote } = await supabase
+            .from("quotes")
+            .select("*, customer:customers(*)")
+            .eq("id", approval.quote_id)
+            .single();
+
+          if (quote) {
+            // Get all imprints for this quote
+            const { data: imprints } = await supabase
+              .from("quote_imprints")
+              .select("*, line_item:quote_line_items(quantity)")
+              .eq("quote_id", approval.quote_id);
+
+            if (imprints && imprints.length > 0) {
+              // Create schedule entry for each imprint
+              const scheduleEntries = imprints.map(imprint => ({
+                company_id: approval.company_id,
+                quote_id: approval.quote_id,
+                line_item_id: imprint.line_item_id,
+                imprint_id: imprint.id,
+                type_of_work: imprint.type_of_work,
+                imprint_number: imprint.imprint_number || null,
+                artwork_thumb_url: imprint.artwork_url || null,
+                production_due_date: quote.production_due_date || quote.due_date,
+                station: null,
+                quantity: imprint.line_item?.quantity || 0,
+                step_statuses: {},
+                priority_order: 0,
+                customer_name: quote.customer?.customer_name || quote.customer_name || null,
+                quote_number: quote.quote_number || null,
+              }));
+
+              await supabase
+                .from("production_schedule_entries")
+                .insert(scheduleEntries);
+            }
+          }
+        } catch (scheduleError) {
+          console.error("Error creating schedule entries:", scheduleError);
+          // Don't fail the approval if schedule creation fails
+        }
+      }
+
       // TODO: Send notification email to company
       // This would integrate with the send-email function
 

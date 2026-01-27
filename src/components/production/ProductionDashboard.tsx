@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { FileText, ClipboardList, CalendarDays, Package, Users } from 'lucide-react';
 import { QuotesManager } from './QuotesManager';
+import ProductionScheduler from './ProductionScheduler';
+import { supabase } from '../../lib/supabase-client';
 
 type ProductionTab = 'quotes' | 'work-orders' | 'scheduling' | 'manage-goods';
 
@@ -13,6 +15,8 @@ interface ProductionDashboardProps {
 export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, onCustomerIdConsumed }: ProductionDashboardProps) {
   const [activeTab, setActiveTab] = useState<ProductionTab>('quotes');
   const [customerIdForQuote, setCustomerIdForQuote] = useState<string | undefined>(initialCustomerId);
+  const [typesOfWork, setTypesOfWork] = useState<Array<{ id: string; work_type_name: string }>>([]);
+  const [selectedScheduleType, setSelectedScheduleType] = useState<string>('');
 
   useEffect(() => {
     if (initialCustomerId) {
@@ -20,6 +24,26 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
       setCustomerIdForQuote(initialCustomerId);
     }
   }, [initialCustomerId]);
+
+  useEffect(() => {
+    loadTypesOfWork();
+  }, []);
+
+  const loadTypesOfWork = async () => {
+    try {
+      const { data } = await supabase
+        .from('types_of_work')
+        .select('id, work_type_name')
+        .order('work_type_name', { ascending: true });
+
+      if (data && data.length > 0) {
+        setTypesOfWork(data);
+        setSelectedScheduleType(data[0].work_type_name);
+      }
+    } catch (error) {
+      console.error('Error loading types of work:', error);
+    }
+  };
 
   const tabs = [
     { id: 'quotes' as ProductionTab, label: 'Quotes', icon: FileText, description: 'Quote management & approvals' },
@@ -54,10 +78,42 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
         );
       case 'scheduling':
         return (
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-12 text-center">
-            <CalendarDays className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Scheduling</h3>
-            <p className="text-gray-600 dark:text-gray-400">Production scheduling coming soon</p>
+          <div className="space-y-4">
+            {typesOfWork.length === 0 ? (
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-12 text-center">
+                <CalendarDays className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No Types of Work Configured</h3>
+                <p className="text-gray-600 dark:text-gray-400">Please configure types of work in Settings before using the scheduler</p>
+              </div>
+            ) : (
+              <>
+                {/* Type of Work Tabs */}
+                <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
+                  <div className="flex overflow-x-auto">
+                    {typesOfWork.map((type) => (
+                      <button
+                        key={type.id}
+                        onClick={() => setSelectedScheduleType(type.work_type_name)}
+                        className={`flex-shrink-0 px-6 py-4 text-sm font-medium transition-colors border-b-2 ${
+                          selectedScheduleType === type.work_type_name
+                            ? 'border-green-600 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20'
+                            : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-slate-700'
+                        }`}
+                      >
+                        {type.work_type_name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Selected Schedule */}
+                <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
+                  {selectedScheduleType && (
+                    <ProductionScheduler typeOfWork={selectedScheduleType} />
+                  )}
+                </div>
+              </>
+            )}
           </div>
         );
       case 'manage-goods':
