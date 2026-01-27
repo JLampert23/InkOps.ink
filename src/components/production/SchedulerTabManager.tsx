@@ -151,21 +151,9 @@ export default function SchedulerTabManager({
     }
   };
 
-  console.log('SchedulerTabManager rendering:', {
-    typeOfWork,
-    companyId,
-    userId,
-    tabs: tabs.length,
-    activeTabId,
-  });
-
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border-4 border-blue-500 dark:border-blue-600 p-4 mb-4">
-      <div className="text-xs text-blue-600 dark:text-blue-400 mb-2 font-mono">
-        DEBUG: SchedulerTabManager - Tabs: {tabs.length} | Type: {typeOfWork}
-      </div>
-      <div className="flex items-center gap-2 flex-wrap">
-        <button
+    <div className="flex items-center gap-2">
+      <button
         onClick={() => onSelectTab(null)}
         className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
           activeTabId === null
@@ -274,7 +262,6 @@ export default function SchedulerTabManager({
           loading={loading}
         />
       )}
-      </div>
     </div>
   );
 }

@@ -70,7 +70,7 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
   // Tab management
   const [activeTab, setActiveTab] = useState<SchedulerTab | null>(null);
 
-  const companyId = companySettings?.company_id || null;
+  const companyId = companySettings?.id || null;
 
   // Filters
   const [startDate, setStartDate] = useState(format(startOfWeek(new Date()), 'yyyy-MM-dd'));
@@ -327,24 +327,10 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
     );
   }
 
-  console.log('ProductionScheduler render check:', {
-    companyId,
-    userId: user?.id,
-    companySettings,
-    willRenderTabs: !!(companyId && user?.id),
-  });
-
   return (
     <div className="space-y-4">
-      {/* DEBUG INFO */}
-      <div className="bg-yellow-100 dark:bg-yellow-900 border-2 border-yellow-500 rounded p-3 text-xs font-mono">
-        <div>CompanyId: {companyId || 'NULL'}</div>
-        <div>UserId: {user?.id || 'NULL'}</div>
-        <div>Will Render Tabs: {(companyId && user?.id) ? 'YES' : 'NO'}</div>
-      </div>
-
       {/* Tabs */}
-      {companyId && user?.id ? (
+      {companyId && user?.id && (
         <div className="mb-4">
           <SchedulerTabManager
             typeOfWork={typeOfWork}
@@ -354,10 +340,6 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
             onSelectTab={handleTabSelect}
             activeTabId={activeTab?.id || null}
           />
-        </div>
-      ) : (
-        <div className="bg-red-100 dark:bg-red-900 border-2 border-red-500 rounded p-3 text-sm">
-          Tab Manager NOT rendered - Missing companyId or userId
         </div>
       )}
 
