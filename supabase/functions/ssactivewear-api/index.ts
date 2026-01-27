@@ -14,60 +14,63 @@ interface SSActivewearCredentials {
   apiKey: string;
 }
 
-function createSoapEnvelope(action: string, body: string): string {
+function createSoapEnvelope(body: string): string {
   return `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/">
-  <soap:Header>
-    <ns:wsVersion>2.0.0</ns:wsVersion>
-  </soap:Header>
-  <soap:Body>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+  <soapenv:Header/>
+  <soapenv:Body>
     ${body}
-  </soap:Body>
-</soap:Envelope>`;
+  </soapenv:Body>
+</soapenv:Envelope>`;
 }
 
-function createProductDataRequest(productId: string, accountNumber: string): string {
-  const body = `<ns:GetProductRequest>
-  <ns:productId>${productId}</ns:productId>
-  <ns:localizationCountry>US</ns:localizationCountry>
-  <ns:localizationLanguage>en</ns:localizationLanguage>
+function createProductDataRequest(productId: string, accountNumber: string, apiKey: string): string {
+  const body = `<ns:GetProductRequest xmlns:ns="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects">
+  <shar:wsVersion>2.0.0</shar:wsVersion>
+  <shar:id>${accountNumber}</shar:id>
+  <shar:password>${apiKey}</shar:password>
+  <shar:localizationCountry>US</shar:localizationCountry>
+  <shar:localizationLanguage>en</shar:localizationLanguage>
+  <shar:productId>${productId}</shar:productId>
 </ns:GetProductRequest>`;
-  return createSoapEnvelope("GetProduct", body);
+  return createSoapEnvelope(body);
 }
 
-function createPricingRequest(partId: string, accountNumber: string, quantity?: number): string {
-  const body = `<ns:GetConfigurationAndPricingRequest xmlns:ns="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/">
-  <ns:wsVersion>1.0.0</ns:wsVersion>
-  <ns:id>${accountNumber}</ns:id>
-  <ns:productId>${partId}</ns:productId>
-  <ns:localizationCountry>US</ns:localizationCountry>
-  <ns:localizationLanguage>en</ns:localizationLanguage>
-  ${quantity ? `<ns:configurationType>Quantity</ns:configurationType>` : ''}
+function createPricingRequest(partId: string, accountNumber: string, apiKey: string, quantity?: number): string {
+  const body = `<ns:GetConfigurationAndPricingRequest xmlns:ns="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects">
+  <shar:wsVersion>1.0.0</shar:wsVersion>
+  <shar:id>${accountNumber}</shar:id>
+  <shar:password>${apiKey}</shar:password>
+  <shar:productId>${partId}</shar:productId>
+  <shar:currency>USD</shar:currency>
+  <shar:fobId>IL</shar:fobId>
+  <shar:priceType>Customer</shar:priceType>
+  <shar:localizationCountry>US</shar:localizationCountry>
+  <shar:localizationLanguage>en</shar:localizationLanguage>
+  <shar:configurationType>Blank</shar:configurationType>
 </ns:GetConfigurationAndPricingRequest>`;
-  return createSoapEnvelope("GetConfigurationAndPricing", body);
+  return createSoapEnvelope(body);
 }
 
-function createInventoryRequest(partId: string, accountNumber: string): string {
-  const body = `<ns:GetInventoryLevelsRequest xmlns:ns="http://www.promostandards.org/WSDL/InventoryService/2.0.0/">
-  <ns:wsVersion>2.0.0</ns:wsVersion>
-  <ns:id>${accountNumber}</ns:id>
-  <ns:productId>${partId}</ns:productId>
-  <ns:localizationCountry>US</ns:localizationCountry>
-  <ns:localizationLanguage>en</ns:localizationLanguage>
+function createInventoryRequest(partId: string, accountNumber: string, apiKey: string): string {
+  const body = `<ns:GetInventoryLevelsRequest xmlns:ns="http://www.promostandards.org/WSDL/Inventory/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/Inventory/2.0.0/SharedObjects/">
+  <shar:wsVersion>2.0.0</shar:wsVersion>
+  <shar:id>${accountNumber}</shar:id>
+  <shar:password>${apiKey}</shar:password>
+  <shar:productId>${partId}</shar:productId>
 </ns:GetInventoryLevelsRequest>`;
-  return createSoapEnvelope("GetInventoryLevels", body);
+  return createSoapEnvelope(body);
 }
 
-function createMediaContentRequest(partId: string, accountNumber: string): string {
-  const body = `<ns:GetMediaContentRequest xmlns:ns="http://www.promostandards.org/WSDL/MediaService/1.0.0/">
-  <ns:wsVersion>1.0.0</ns:wsVersion>
-  <ns:id>${accountNumber}</ns:id>
-  <ns:productId>${partId}</ns:productId>
-  <ns:localizationCountry>US</ns:localizationCountry>
-  <ns:localizationLanguage>en</ns:localizationLanguage>
-  <ns:mediaType>Image</ns:mediaType>
+function createMediaContentRequest(partId: string, accountNumber: string, apiKey: string): string {
+  const body = `<ns:GetMediaContentRequest xmlns:ns="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects">
+  <shar:wsVersion>1.0.0</shar:wsVersion>
+  <shar:id>${accountNumber}</shar:id>
+  <shar:password>${apiKey}</shar:password>
+  <shar:mediaType>Image</shar:mediaType>
+  <shar:productId>${partId}</shar:productId>
 </ns:GetMediaContentRequest>`;
-  return createSoapEnvelope("GetMediaContent", body);
+  return createSoapEnvelope(body);
 }
 
 function parseXmlValue(xml: string, tagName: string): string | null {
@@ -300,6 +303,8 @@ Deno.serve(async (req: Request) => {
     let soapBody = "";
     let parseFunction: ((xml: string) => any) | null = null;
 
+    let soapAction = "";
+
     switch (action) {
       case "product":
       case "colors":
@@ -310,7 +315,8 @@ Deno.serve(async (req: Request) => {
           );
         }
         endpoint = `${PROMO_STANDARDS_BASE}/v2/productdata/`;
-        soapBody = createProductDataRequest(productId, credentials.accountNumber);
+        soapBody = createProductDataRequest(productId, credentials.accountNumber, decryptedApiKey);
+        soapAction = "http://www.promostandards.org/WSDL/ProductDataService/2.0.0/GetProduct";
         parseFunction = parseProductData;
         break;
 
@@ -322,7 +328,8 @@ Deno.serve(async (req: Request) => {
           );
         }
         endpoint = `${PROMO_STANDARDS_BASE}/v1/pricing/`;
-        soapBody = createPricingRequest(partId, credentials.accountNumber);
+        soapBody = createPricingRequest(partId, credentials.accountNumber, decryptedApiKey);
+        soapAction = "http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/GetConfigurationAndPricing";
         parseFunction = parsePricingData;
         break;
 
@@ -334,7 +341,8 @@ Deno.serve(async (req: Request) => {
           );
         }
         endpoint = `${PROMO_STANDARDS_BASE}/v2/inventory/`;
-        soapBody = createInventoryRequest(partId, credentials.accountNumber);
+        soapBody = createInventoryRequest(partId, credentials.accountNumber, decryptedApiKey);
+        soapAction = "http://www.promostandards.org/WSDL/Inventory/2.0.0/GetInventoryLevels";
         parseFunction = parseInventoryData;
         break;
 
@@ -346,7 +354,8 @@ Deno.serve(async (req: Request) => {
           );
         }
         endpoint = `${PROMO_STANDARDS_BASE}/v1/media/`;
-        soapBody = createMediaContentRequest(partId, credentials.accountNumber);
+        soapBody = createMediaContentRequest(partId, credentials.accountNumber, decryptedApiKey);
+        soapAction = "http://www.promostandards.org/WSDL/MediaService/1.0.0/GetMediaContent";
         parseFunction = parseMediaData;
         break;
 
@@ -374,8 +383,7 @@ Deno.serve(async (req: Request) => {
       method: "POST",
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
-        "Authorization": `Basic ${basicAuth}`,
-        "SOAPAction": action,
+        "SOAPAction": `"${soapAction}"`,
       },
       body: soapBody,
     });
