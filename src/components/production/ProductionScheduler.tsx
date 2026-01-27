@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar, Filter, GripVertical, Save, X, Plus, Search, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Calendar, Filter, GripVertical, Save, X, Plus, Search, RefreshCw, CalendarDays } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format, startOfWeek, endOfWeek, addDays, parseISO } from 'date-fns';
 
@@ -69,9 +69,12 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
 
   useEffect(() => {
     if (selectedStep) {
-      loadScheduleEntries();
+      const timer = setTimeout(() => {
+        loadScheduleEntries();
+      }, 300);
+      return () => clearTimeout(timer);
     }
-  }, [typeOfWork, selectedStep, startDate, endDate, stationFilter, customerFilter]);
+  }, [selectedStep, loadScheduleEntries]);
 
   const loadWorkflowSteps = async () => {
     try {
@@ -108,7 +111,7 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
     }
   };
 
-  const loadScheduleEntries = async () => {
+  const loadScheduleEntries = useCallback(async () => {
     setLoading(true);
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -132,14 +135,15 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
 
       if (response.ok) {
         const data = await response.json();
-        setEntries(data);
+        setEntries(data || []);
       }
     } catch (error) {
       console.error('Error loading schedule entries:', error);
+      setEntries([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [typeOfWork, startDate, endDate, stationFilter, customerFilter]);
 
   const updateEntry = async (entryId: string, updates: Partial<ScheduleEntry>) => {
     try {
@@ -385,7 +389,16 @@ export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerP
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
-              {filteredEntries.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={8 + workflowSteps.length} className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <RefreshCw className="w-8 h-8 text-green-600 dark:text-green-400 animate-spin" />
+                      <span className="text-sm text-gray-500 dark:text-gray-400">Loading schedule...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredEntries.length === 0 ? (
                 <tr>
                   <td colSpan={8 + workflowSteps.length} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                     No scheduled jobs for this time period
