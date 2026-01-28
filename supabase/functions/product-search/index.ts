@@ -306,10 +306,10 @@ function transformSSActivewearData(data: any, style: string): ProductResult[] {
 
       products.push({
         supplier: "ssactivewear",
-        style: item.styleID || item.style || style,
-        brand: item.brandName || item.brand || "",
-        description: item.title || item.styleName || item.description || "",
-        category: item.categoryName || item.category || "",
+        style: String(item.styleID || item.style || style),
+        brand: String(item.brandName || item.brand || ""),
+        description: String(item.title || item.styleName || item.description || ""),
+        category: String(item.categoryName || item.category || ""),
         colors,
         raw_data: item,
       });
