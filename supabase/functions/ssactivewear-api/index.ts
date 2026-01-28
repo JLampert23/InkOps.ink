@@ -7,12 +7,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-// PromoStandards SOAP endpoints
+// PromoStandards SOAP endpoints - SSActivewear uses ws.ssactivewear.com subdomain
 const PROMOSTANDARDS_ENDPOINTS = {
-  productData: "https://promostandards.ssactivewear.com/productdata/v2/productdataservicev2.svc",
-  inventory: "https://promostandards.ssactivewear.com/inventory/v2/inventoryservice.svc",
-  pricing: "https://promostandards.ssactivewear.com/pricingandconfiguration/v1/pricingandconfigurationservice.svc",
-  media: "https://promostandards.ssactivewear.com/mediacontent/v1/mediacontentservice.svc",
+  productData: "https://ws.ssactivewear.com/v2/productdata/",
+  inventory: "https://ws.ssactivewear.com/v2/inventory/",
+  pricing: "https://ws.ssactivewear.com/v1/pricingandconfiguration/",
+  media: "https://ws.ssactivewear.com/v1/mediacontent/",
 };
 
 interface SSActivewearCredentials {
@@ -21,89 +21,80 @@ interface SSActivewearCredentials {
 }
 
 function buildProductDataSOAP(productId: string, accountNumber: string, apiKey: string, useJWT: boolean = false): string {
-  const authFields = useJWT ? '' : `
-      <ns:id>${accountNumber}</ns:id>
-      <ns:password>${apiKey}</ns:password>`;
-
   return `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
-  <soap:Body>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
+  <soapenv:Header/>
+  <soapenv:Body>
     <ns:GetProductRequest>
-      <ns:wsVersion>2.0.0</ns:wsVersion>${authFields}
-      <ns:localizationCountry>US</ns:localizationCountry>
-      <ns:localizationLanguage>en</ns:localizationLanguage>
-      <ns:productId>${productId}</ns:productId>
+      <shar:wsVersion>2.0.0</shar:wsVersion>
+      <shar:id>${accountNumber}</shar:id>
+      <shar:password>${apiKey}</shar:password>
+      <shar:localizationCountry>US</shar:localizationCountry>
+      <shar:localizationLanguage>en</shar:localizationLanguage>
+      <shar:productId>${productId}</shar:productId>
     </ns:GetProductRequest>
-  </soap:Body>
-</soap:Envelope>`;
+  </soapenv:Body>
+</soapenv:Envelope>`;
 }
 
 function buildInventorySOAP(productId: string, accountNumber: string, apiKey: string, useJWT: boolean = false): string {
-  const authFields = useJWT ? '' : `
-      <ns:id>${accountNumber}</ns:id>
-      <ns:password>${apiKey}</ns:password>`;
-
   return `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.promostandards.org/WSDL/InventoryService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/InventoryService/2.0.0/SharedObjects/">
-  <soap:Body>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.promostandards.org/WSDL/InventoryService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/InventoryService/2.0.0/SharedObjects/">
+  <soapenv:Header/>
+  <soapenv:Body>
     <ns:GetInventoryLevelsRequest>
-      <ns:wsVersion>2.0.0</ns:wsVersion>${authFields}
-      <ns:productId>${productId}</ns:productId>
+      <shar:wsVersion>2.0.0</shar:wsVersion>
+      <shar:id>${accountNumber}</shar:id>
+      <shar:password>${apiKey}</shar:password>
+      <shar:productId>${productId}</shar:productId>
     </ns:GetInventoryLevelsRequest>
-  </soap:Body>
-</soap:Envelope>`;
+  </soapenv:Body>
+</soapenv:Envelope>`;
 }
 
 function buildPricingSOAP(productId: string, accountNumber: string, apiKey: string, useJWT: boolean = false): string {
-  const authFields = useJWT ? '' : `
-      <ns:id>${accountNumber}</ns:id>
-      <ns:password>${apiKey}</ns:password>`;
-
   return `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
-  <soap:Body>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
+  <soapenv:Header/>
+  <soapenv:Body>
     <ns:GetConfigurationAndPricingRequest>
-      <ns:wsVersion>1.0.0</ns:wsVersion>${authFields}
-      <ns:productId>${productId}</ns:productId>
-      <ns:currency>USD</ns:currency>
-      <ns:fobId>ALL</ns:fobId>
-      <ns:priceType>Customer</ns:priceType>
-      <ns:localizationCountry>US</ns:localizationCountry>
-      <ns:localizationLanguage>en</ns:localizationLanguage>
+      <shar:wsVersion>1.0.0</shar:wsVersion>
+      <shar:id>${accountNumber}</shar:id>
+      <shar:password>${apiKey}</shar:password>
+      <shar:productId>${productId}</shar:productId>
+      <shar:currency>USD</shar:currency>
+      <shar:fobId>ALL</shar:fobId>
+      <shar:priceType>Customer</shar:priceType>
+      <shar:localizationCountry>US</shar:localizationCountry>
+      <shar:localizationLanguage>en</shar:localizationLanguage>
     </ns:GetConfigurationAndPricingRequest>
-  </soap:Body>
-</soap:Envelope>`;
+  </soapenv:Body>
+</soapenv:Envelope>`;
 }
 
 function buildMediaContentSOAP(productId: string, accountNumber: string, apiKey: string, useJWT: boolean = false): string {
-  const authFields = useJWT ? '' : `
-      <ns:id>${accountNumber}</ns:id>
-      <ns:password>${apiKey}</ns:password>`;
-
   return `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
-  <soap:Body>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
+  <soapenv:Header/>
+  <soapenv:Body>
     <ns:GetMediaContentRequest>
-      <ns:wsVersion>1.0.0</ns:wsVersion>${authFields}
-      <ns:productId>${productId}</ns:productId>
-      <ns:mediaType>Image</ns:mediaType>
-      <ns:localizationCountry>US</ns:localizationCountry>
-      <ns:localizationLanguage>en</ns:localizationLanguage>
+      <shar:wsVersion>1.0.0</shar:wsVersion>
+      <shar:id>${accountNumber}</shar:id>
+      <shar:password>${apiKey}</shar:password>
+      <shar:productId>${productId}</shar:productId>
+      <shar:mediaType>Image</shar:mediaType>
+      <shar:localizationCountry>US</shar:localizationCountry>
+      <shar:localizationLanguage>en</shar:localizationLanguage>
     </ns:GetMediaContentRequest>
-  </soap:Body>
-</soap:Envelope>`;
+  </soapenv:Body>
+</soapenv:Envelope>`;
 }
 
-async function makeSOAPRequest(endpoint: string, soapXML: string, jwtToken?: string) {
+async function makeSOAPRequest(endpoint: string, soapXML: string, soapAction: string) {
   const headers: Record<string, string> = {
     "Content-Type": "text/xml; charset=utf-8",
-    "SOAPAction": "",
+    "SOAPAction": `"${soapAction}"`,
   };
-
-  // Add JWT authorization if provided
-  if (jwtToken) {
-    headers["Authorization"] = `Bearer ${jwtToken}`;
-  }
 
   const response = await fetch(endpoint, {
     method: "POST",
@@ -304,9 +295,12 @@ Deno.serve(async (req: Request) => {
 
         const soapXML = buildProductDataSOAP(productId, credentials.accountNumber, decryptedApiKey, useJWT);
         console.log('SOAP Request XML (first 500 chars):', soapXML.substring(0, 500));
-        console.log('Will send Authorization header:', useJWT ? 'YES' : 'NO');
 
-        const responseXML = await makeSOAPRequest(PROMOSTANDARDS_ENDPOINTS.productData, soapXML, useJWT ? decryptedApiKey : undefined);
+        const responseXML = await makeSOAPRequest(
+          PROMOSTANDARDS_ENDPOINTS.productData,
+          soapXML,
+          "http://www.promostandards.org/WSDL/ProductDataService/2.0.0/GetProduct"
+        );
         const parsedData = parseProductDataXML(responseXML);
 
         return new Response(
@@ -334,7 +328,11 @@ Deno.serve(async (req: Request) => {
         }
 
         const soapXML = buildInventorySOAP(targetId, credentials.accountNumber, decryptedApiKey, useJWT);
-        const responseXML = await makeSOAPRequest(PROMOSTANDARDS_ENDPOINTS.inventory, soapXML, useJWT ? decryptedApiKey : undefined);
+        const responseXML = await makeSOAPRequest(
+          PROMOSTANDARDS_ENDPOINTS.inventory,
+          soapXML,
+          "http://www.promostandards.org/WSDL/InventoryService/2.0.0/GetInventoryLevels"
+        );
 
         return new Response(
           JSON.stringify({
@@ -360,7 +358,11 @@ Deno.serve(async (req: Request) => {
         }
 
         const soapXML = buildPricingSOAP(targetId, credentials.accountNumber, decryptedApiKey, useJWT);
-        const responseXML = await makeSOAPRequest(PROMOSTANDARDS_ENDPOINTS.pricing, soapXML, useJWT ? decryptedApiKey : undefined);
+        const responseXML = await makeSOAPRequest(
+          PROMOSTANDARDS_ENDPOINTS.pricing,
+          soapXML,
+          "http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/GetConfigurationAndPricing"
+        );
 
         return new Response(
           JSON.stringify({
@@ -386,7 +388,11 @@ Deno.serve(async (req: Request) => {
         }
 
         const soapXML = buildMediaContentSOAP(targetId, credentials.accountNumber, decryptedApiKey, useJWT);
-        const responseXML = await makeSOAPRequest(PROMOSTANDARDS_ENDPOINTS.media, soapXML, useJWT ? decryptedApiKey : undefined);
+        const responseXML = await makeSOAPRequest(
+          PROMOSTANDARDS_ENDPOINTS.media,
+          soapXML,
+          "http://www.promostandards.org/WSDL/MediaService/1.0.0/GetMediaContent"
+        );
 
         return new Response(
           JSON.stringify({
