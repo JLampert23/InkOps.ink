@@ -105,6 +105,17 @@ async function makeSOAPRequest(endpoint: string, soapXML: string) {
     bodyPreview: responseText.substring(0, 500)
   });
 
+  // Check for SOAP faults in the response
+  if (responseText.includes('faultcode') || responseText.includes('Fault')) {
+    console.error('SOAP Fault detected:', responseText.substring(0, 1000));
+
+    // Extract fault message if available
+    const faultMatch = responseText.match(/<faultstring[^>]*>([^<]+)<\/faultstring>/i);
+    const faultMessage = faultMatch ? faultMatch[1] : 'Unknown SOAP fault';
+
+    throw new Error(`SOAP Fault: ${faultMessage}`);
+  }
+
   if (!response.ok) {
     throw new Error(`SOAP request failed: ${response.status} ${response.statusText}`);
   }
@@ -234,6 +245,9 @@ Deno.serve(async (req: Request) => {
     }
 
     const { result: decryptedApiKey } = await decryptResponse.json();
+
+    console.log('Decrypted API key first 10 chars:', decryptedApiKey?.substring(0, 10));
+    console.log('Account number:', credentials.accountNumber);
 
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
