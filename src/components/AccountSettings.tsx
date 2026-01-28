@@ -442,11 +442,18 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setSelectedStatuses(data.selected_invoice_statuses || []);
         setBillingSelectedStatuses(data.billing_selected_invoice_statuses || []);
         setPrintavoUsername(data.printavo_username || '');
+        setPrintavoToken(data.printavo_api_token_encrypted ? '••••••••••••••••' : '');
         setSquareEnvironment(data.square_environment || 'production');
+        setSquareAccessToken(data.square_access_token ? '••••••••••••••••' : '');
+        setSquareApplicationId(data.square_application_id || '');
+        setSquareLocationId(data.square_location_id || '');
         setEmailFromAddress(data.email_from_address || '');
-        setStripePublicKey(data.stripe_public_key || '');
-        setStripeSecretKey(data.stripe_secret_key || '');
-        setStripeWebhookSecret(data.stripe_webhook_secret || '');
+        setResendApiKey(data.resend_api_key ? '••••••••••••••••' : '');
+        setStripePublicKey(data.stripe_public_key ? '••••••••••••••••' : '');
+        setStripeSecretKey(data.stripe_secret_key ? '••••••••••••••••' : '');
+        setStripeWebhookSecret(data.stripe_webhook_secret ? '••••••••••••••••' : '');
+        setTwilioAccountSid(data.twilio_account_sid || '');
+        setTwilioAuthToken(data.twilio_auth_token ? '••••••••••••••••' : '');
         setTwilioPhoneNumber(data.twilio_phone_number || '');
         setTwilioEnabled(data.twilio_enabled || false);
         setDefaultSendMethod(data.default_send_method || 'email');
@@ -474,6 +481,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setSsaEnabled(ssaHasCreds);
       setSanmarHasCredentials(sanmarHasCreds);
       setSsaHasCredentials(ssaHasCreds);
+
+      setSanmarApiKey(sanmarHasCreds ? '••••••••••••••••' : '');
+      setSanmarCustomerId(companySettings.sanmar_username || '');
+      setSsaApiKey(ssaHasCreds ? '••••••••••••••••' : '');
+      setSsaAccountNumber(companySettings.ssactivewear_username || '');
 
       console.log('Loaded supplier integration settings:', {
         sanmarEnabled: sanmarHasCreds,
@@ -1155,7 +1167,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       if (error) throw error;
 
       showNotification('success', 'Printavo Connected', 'Integration settings have been saved successfully!');
-      setPrintavoToken('');
+      setPrintavoToken('••••••••••••••••');
       setTestResult(null);
       await loadSettings();
       await loadAvailableStatuses();
@@ -1234,7 +1246,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       if (error) throw error;
 
       showNotification('success', 'Square Connected', 'Integration settings have been saved successfully!');
-      setSquareAccessToken('');
+      setSquareAccessToken('••••••••••••••••');
       setSquareTestResult(null);
       await loadSettings();
     } catch (err) {
@@ -1312,7 +1324,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       if (error) throw error;
 
       showNotification('success', 'Resend Connected', 'Integration settings have been saved successfully!');
-      setResendApiKey('');
+      setResendApiKey('••••••••••••••••');
       setResendTestResult(null);
       await loadSettings();
     } catch (err) {
@@ -1443,9 +1455,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       if (error) throw error;
 
       showNotification('success', 'Stripe Connected', 'Integration settings have been saved successfully!');
-      setStripePublicKey('');
-      setStripeSecretKey('');
-      setStripeWebhookSecret('');
+      setStripePublicKey('••••••••••••••••');
+      setStripeSecretKey('••••••••••••••••');
+      setStripeWebhookSecret('••••••••••••••••');
       setStripeTestResult(null);
       await loadSettings();
     } catch (err) {
@@ -1559,8 +1571,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       if (error) throw error;
 
       showNotification('success', 'Twilio Connected', 'Integration settings have been saved successfully!');
-      setTwilioAccountSid('');
-      setTwilioAuthToken('');
+      setTwilioAccountSid(twilioAccountSid.trim() ? '••••••••••••••••' : '');
+      setTwilioAuthToken('••••••••••••••••');
       setTwilioTestResult(null);
       await loadSettings();
     } catch (err) {
@@ -1809,10 +1821,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       if (error) throw error;
 
       showNotification('success', 'Supplier Integrations Saved', 'Supplier integration settings have been saved successfully!');
-      setSanmarApiKey('');
-      setSanmarCustomerId('');
-      setSsaAccountNumber('');
-      setSsaApiKey('');
+      setSanmarApiKey(sanmarApiKey.trim() ? '••••••••••••••••' : '');
+      setSanmarCustomerId(sanmarCustomerId.trim() ? sanmarCustomerId : '');
+      setSsaAccountNumber(ssaAccountNumber.trim() ? ssaAccountNumber : '');
+      setSsaApiKey(ssaApiKey.trim() ? '••••••••••••••••' : '');
       setSupplierTestResult(null);
       await loadSettings();
     } catch (err) {
@@ -4123,10 +4135,46 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Connect your Square account to access payment data</p>
               </div>
 
+              {companySettings?.square_access_token && (
+                <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
+                      <CheckCircle className="w-5 h-5" />
+                      <div>
+                        <p className="font-medium">Square Integration Active</p>
+                        <p className="text-sm mt-1">Credentials are securely stored and encrypted</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={testSquareConnection}
+                      disabled={testingSquare}
+                      className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/30 disabled:opacity-50 transition-colors"
+                    >
+                      {testingSquare ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Testing...
+                        </>
+                      ) : (
+                        'Test Connection'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Square Access Token <span className="text-red-500">*</span>
+                    <div className="flex items-center gap-2">
+                      Square Access Token <span className="text-red-500">*</span>
+                      {companySettings?.square_access_token && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs rounded-full">
+                          <CheckCircle className="w-3 h-3" />
+                          Saved
+                        </span>
+                      )}
+                    </div>
                   </label>
                   <div className="relative">
                     <input
@@ -4215,35 +4263,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   </button>
                 </div>
 
-                {companySettings?.square_access_token && (
-                  <>
-                    <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
-                          <Key className="w-5 h-5" />
-                          <div>
-                            <p className="font-medium">Square Integration Active</p>
-                            <p className="text-sm mt-1">Environment: {companySettings.square_environment || 'production'}</p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={testSquareConnection}
-                          disabled={testingSquare}
-                          className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/30 disabled:opacity-50 transition-colors"
-                        >
-                          {testingSquare ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Testing...
-                            </>
-                          ) : (
-                            'Test Connection'
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    {squareTestResult && (
+                {squareTestResult && (
                       <div className={`p-4 rounded-lg border ${squareTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
                         <div className="space-y-3">
                           {squareTestResult.success ? (
@@ -4292,8 +4312,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           </div>
                         </div>
                       </div>
-                    )}
-                  </>
                 )}
               </div>
             </div>
@@ -4306,10 +4324,46 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Connect Resend to send transactional emails</p>
               </div>
 
+              {companySettings?.resend_api_key && (
+                <div className="p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-purple-800 dark:text-purple-200">
+                      <CheckCircle className="w-5 h-5" />
+                      <div>
+                        <p className="font-medium">Resend Integration Active</p>
+                        <p className="text-sm mt-1">Email credentials are securely stored and encrypted</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={testResendConnection}
+                      disabled={testingResend}
+                      className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/30 disabled:opacity-50 transition-colors"
+                    >
+                      {testingResend ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Testing...
+                        </>
+                      ) : (
+                        'Test Connection'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Resend API Key <span className="text-red-500">*</span>
+                    <div className="flex items-center gap-2">
+                      Resend API Key <span className="text-red-500">*</span>
+                      {companySettings?.resend_api_key && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs rounded-full">
+                          <CheckCircle className="w-3 h-3" />
+                          Saved
+                        </span>
+                      )}
+                    </div>
                   </label>
                   <div className="relative">
                     <input
@@ -4385,35 +4439,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   </button>
                 </div>
 
-                {companySettings?.resend_api_key && (
-                  <>
-                    <div className="mt-6 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-purple-800 dark:text-purple-200">
-                          <Key className="w-5 h-5" />
-                          <div>
-                            <p className="font-medium">Resend Integration Active</p>
-                            <p className="text-sm mt-1">Email sending is configured and ready to use</p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={testResendConnection}
-                          disabled={testingResend}
-                          className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/30 disabled:opacity-50 transition-colors"
-                        >
-                          {testingResend ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Testing...
-                            </>
-                          ) : (
-                            'Test Connection'
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    {resendTestResult && (
+                {resendTestResult && (
                       <div className={`p-4 rounded-lg border ${resendTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
                         <div className="space-y-3">
                           {resendTestResult.success ? (
@@ -4453,8 +4479,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           </div>
                         </div>
                       </div>
-                    )}
-                  </>
                 )}
 
                 <div className="mt-6 p-4 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg">
