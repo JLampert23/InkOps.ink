@@ -1,9 +1,9 @@
 /*
   COMPLETE PRODUCTION MIGRATION SCRIPT
-  
+
   This file combines all migrations in chronological order.
   Apply this to your production database at:
-  https://supabase.com/dashboard/project/cuaukcvccxvfpuxaciac/sql/new
+  https://supabase.com/dashboard/project/gccvdsxiqgbxhdyamzaa/sql/new
 
   IMPORTANT:
   1. Run this in the SQL Editor
