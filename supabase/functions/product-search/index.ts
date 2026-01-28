@@ -40,9 +40,7 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get auth token from request
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
@@ -51,19 +49,26 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Verify user and get company_id
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    // Create Supabase client with service role for database queries
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Verify the JWT using service role client
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
 
     if (authError || !user) {
+      console.error("Auth error:", authError);
       return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
+        JSON.stringify({ error: "Unauthorized", message: authError?.message || "Invalid JWT" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    console.log("Authenticated user:", user.id);
+
     // Get user's company_id
-    const { data: profile } = await supabase
+    const { data: profile } = await supabaseAdmin
       .from("user_profiles")
       .select("company_id")
       .eq("id", user.id)
@@ -77,7 +82,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Get integration settings
-    const { data: settings, error: settingsError } = await supabase
+    const { data: settings, error: settingsError } = await supabaseAdmin
       .from("integration_settings")
       .select("*")
       .eq("company_id", profile.company_id)
@@ -143,17 +148,20 @@ Deno.serve(async (req: Request) => {
 
         if (ssaResponse.ok) {
           const ssaData = await ssaResponse.json();
-          console.log("SSActivewear response:", JSON.stringify(ssaData).slice(0, 500));
+          console.log("SSActivewear response data count:", ssaData?.data?.length || 0);
+          console.log("SSActivewear first item:", ssaData?.data?.[0]);
           if (ssaData.success && ssaData.data) {
             const ssaProducts = transformSSActivewearData(ssaData.data, style);
+            console.log("Transformed products count:", ssaProducts.length);
+            console.log("First transformed product:", ssaProducts[0]);
+            // Don't filter here - let the client do it so we can see what's coming through
             results.push(...ssaProducts);
           }
         } else {
           const errorText = await ssaResponse.text();
+          console.error("SSActivewear error response status:", ssaResponse.status);
           console.error("SSActivewear error response:", errorText);
-          if (!errorText.includes("not found")) {
-            errors.push(`SSActivewear: ${errorText}`);
-          }
+          errors.push(`SSActivewear error (${ssaResponse.status}): ${errorText}`);
         }
       } catch (error: any) {
         console.error("SSActivewear search error:", error);
@@ -254,37 +262,53 @@ function transformSanMarData(data: any, style: string): ProductResult[] {
 function transformSSActivewearData(data: any, style: string): ProductResult[] {
   const products: ProductResult[] = [];
 
-  // SSActivewear /styles/ endpoint returns style objects with color info
+  // PromoStandards SOAP response format
   if (Array.isArray(data) && data.length > 0) {
     for (const item of data) {
       const colors: ColorOption[] = [];
 
-      // SSA styles endpoint returns colorArray or similar
-      if (item.colors && Array.isArray(item.colors)) {
-        for (const color of item.colors) {
-          colors.push({
-            name: color.colorName || color.name || "Default",
-            code: color.colorCode || "",
-            image_url: color.colorFrontImage || color.colorSwatchImage || color.imageUrl || "",
-            pricing: {
-              wholesale: parseFloat(color.customerPrice) || parseFloat(color.piecePrice) || 0,
-              retail: parseFloat(color.msrp) || 0,
-            },
-            sizes: color.sizes || [],
-            stock: {},
-          });
+      // PromoStandards returns 'parts' array with color/size combinations
+      if (item.parts && Array.isArray(item.parts)) {
+        // Group parts by color to create unique color options
+        const colorMap = new Map<string, ColorOption>();
+
+        for (const part of item.parts) {
+          const colorName = part.colorName || "Default";
+
+          if (!colorMap.has(colorName)) {
+            colorMap.set(colorName, {
+              name: colorName,
+              code: part.partId || "",
+              image_url: "",
+              pricing: {
+                wholesale: 0,
+                retail: 0,
+              },
+              sizes: [],
+              stock: {},
+            });
+          }
+
+          // Add size if not already in the list
+          const colorOption = colorMap.get(colorName)!;
+          if (part.labelSize && !colorOption.sizes?.includes(part.labelSize)) {
+            colorOption.sizes = colorOption.sizes || [];
+            colorOption.sizes.push(part.labelSize);
+          }
         }
+
+        colors.push(...Array.from(colorMap.values()));
       }
 
-      // If no colors array, create a default entry from the item itself
+      // If no parts/colors found, create a default entry
       if (colors.length === 0) {
         colors.push({
-          name: item.colorName || "Default",
-          code: item.colorCode || "",
-          image_url: item.styleImage || item.brandImage || "",
+          name: "Default",
+          code: "",
+          image_url: "",
           pricing: {
-            wholesale: parseFloat(item.basePrice) || 0,
-            retail: parseFloat(item.msrp) || 0,
+            wholesale: 0,
+            retail: 0,
           },
           sizes: [],
           stock: {},
@@ -293,10 +317,10 @@ function transformSSActivewearData(data: any, style: string): ProductResult[] {
 
       products.push({
         supplier: "ssactivewear",
-        style: item.styleID || item.style || style,
-        brand: item.brandName || item.brand || "",
-        description: item.title || item.styleName || item.description || "",
-        category: item.categoryName || item.category || "",
+        style: String(item.productId || style),
+        brand: String(item.productBrand || ""),
+        description: String(item.productName || item.description || ""),
+        category: "",
         colors,
         raw_data: item,
       });
