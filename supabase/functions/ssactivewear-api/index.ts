@@ -217,19 +217,13 @@ Deno.serve(async (req: Request) => {
       tokenLength: token?.length,
       tokenPrefix: token?.substring(0, 20),
       supabaseUrl,
-      hasAnonKey: !!supabaseAnonKey,
-      anonKeyPrefix: supabaseAnonKey?.substring(0, 20)
+      hasServiceRole: !!supabaseServiceRoleKey,
+      serviceRolePrefix: supabaseServiceRoleKey?.substring(0, 20)
     });
 
-    // Use ANON key to validate the user token
-    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          Authorization: authHeader!
-        }
-      }
-    });
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    // Use service role key to validate the user token
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey);
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
 
     if (authError || !user) {
       console.error('Auth validation failed:', {
