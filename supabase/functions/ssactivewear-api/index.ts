@@ -20,14 +20,16 @@ interface SSActivewearCredentials {
   apiKey: string;
 }
 
-function buildProductDataSOAP(productId: string, accountNumber: string, apiKey: string): string {
+function buildProductDataSOAP(productId: string, accountNumber: string, apiKey: string, useJWT: boolean = false): string {
+  const authFields = useJWT ? '' : `
+      <ns:id>${accountNumber}</ns:id>
+      <ns:password>${apiKey}</ns:password>`;
+
   return `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
   <soap:Body>
     <ns:GetProductRequest>
-      <ns:wsVersion>2.0.0</ns:wsVersion>
-      <ns:id>${accountNumber}</ns:id>
-      <ns:password>${apiKey}</ns:password>
+      <ns:wsVersion>2.0.0</ns:wsVersion>${authFields}
       <ns:localizationCountry>US</ns:localizationCountry>
       <ns:localizationLanguage>en</ns:localizationLanguage>
       <ns:productId>${productId}</ns:productId>
@@ -36,28 +38,32 @@ function buildProductDataSOAP(productId: string, accountNumber: string, apiKey: 
 </soap:Envelope>`;
 }
 
-function buildInventorySOAP(productId: string, accountNumber: string, apiKey: string): string {
+function buildInventorySOAP(productId: string, accountNumber: string, apiKey: string, useJWT: boolean = false): string {
+  const authFields = useJWT ? '' : `
+      <ns:id>${accountNumber}</ns:id>
+      <ns:password>${apiKey}</ns:password>`;
+
   return `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.promostandards.org/WSDL/InventoryService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/InventoryService/2.0.0/SharedObjects/">
   <soap:Body>
     <ns:GetInventoryLevelsRequest>
-      <ns:wsVersion>2.0.0</ns:wsVersion>
-      <ns:id>${accountNumber}</ns:id>
-      <ns:password>${apiKey}</ns:password>
+      <ns:wsVersion>2.0.0</ns:wsVersion>${authFields}
       <ns:productId>${productId}</ns:productId>
     </ns:GetInventoryLevelsRequest>
   </soap:Body>
 </soap:Envelope>`;
 }
 
-function buildPricingSOAP(productId: string, accountNumber: string, apiKey: string): string {
+function buildPricingSOAP(productId: string, accountNumber: string, apiKey: string, useJWT: boolean = false): string {
+  const authFields = useJWT ? '' : `
+      <ns:id>${accountNumber}</ns:id>
+      <ns:password>${apiKey}</ns:password>`;
+
   return `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
   <soap:Body>
     <ns:GetConfigurationAndPricingRequest>
-      <ns:wsVersion>1.0.0</ns:wsVersion>
-      <ns:id>${accountNumber}</ns:id>
-      <ns:password>${apiKey}</ns:password>
+      <ns:wsVersion>1.0.0</ns:wsVersion>${authFields}
       <ns:productId>${productId}</ns:productId>
       <ns:currency>USD</ns:currency>
       <ns:fobId>ALL</ns:fobId>
@@ -69,14 +75,16 @@ function buildPricingSOAP(productId: string, accountNumber: string, apiKey: stri
 </soap:Envelope>`;
 }
 
-function buildMediaContentSOAP(productId: string, accountNumber: string, apiKey: string): string {
+function buildMediaContentSOAP(productId: string, accountNumber: string, apiKey: string, useJWT: boolean = false): string {
+  const authFields = useJWT ? '' : `
+      <ns:id>${accountNumber}</ns:id>
+      <ns:password>${apiKey}</ns:password>`;
+
   return `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
   <soap:Body>
     <ns:GetMediaContentRequest>
-      <ns:wsVersion>1.0.0</ns:wsVersion>
-      <ns:id>${accountNumber}</ns:id>
-      <ns:password>${apiKey}</ns:password>
+      <ns:wsVersion>1.0.0</ns:wsVersion>${authFields}
       <ns:productId>${productId}</ns:productId>
       <ns:mediaType>Image</ns:mediaType>
       <ns:localizationCountry>US</ns:localizationCountry>
@@ -86,13 +94,20 @@ function buildMediaContentSOAP(productId: string, accountNumber: string, apiKey:
 </soap:Envelope>`;
 }
 
-async function makeSOAPRequest(endpoint: string, soapXML: string) {
+async function makeSOAPRequest(endpoint: string, soapXML: string, jwtToken?: string) {
+  const headers: Record<string, string> = {
+    "Content-Type": "text/xml; charset=utf-8",
+    "SOAPAction": "",
+  };
+
+  // Add JWT authorization if provided
+  if (jwtToken) {
+    headers["Authorization"] = `Bearer ${jwtToken}`;
+  }
+
   const response = await fetch(endpoint, {
     method: "POST",
-    headers: {
-      "Content-Type": "text/xml; charset=utf-8",
-      "SOAPAction": "",
-    },
+    headers,
     body: soapXML,
   });
 
@@ -249,6 +264,10 @@ Deno.serve(async (req: Request) => {
     console.log('Decrypted API key first 10 chars:', decryptedApiKey?.substring(0, 10));
     console.log('Account number:', credentials.accountNumber);
 
+    // Determine if we're using JWT authentication
+    const useJWT = settings.ssactivewear_credentials.authType === 'jwt' || decryptedApiKey.includes('-');
+    console.log('Using JWT authentication:', useJWT);
+
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
     const productId = url.searchParams.get("productId") || url.searchParams.get("style");
@@ -268,8 +287,8 @@ Deno.serve(async (req: Request) => {
           );
         }
 
-        const soapXML = buildProductDataSOAP(productId, credentials.accountNumber, decryptedApiKey);
-        const responseXML = await makeSOAPRequest(PROMOSTANDARDS_ENDPOINTS.productData, soapXML);
+        const soapXML = buildProductDataSOAP(productId, credentials.accountNumber, decryptedApiKey, useJWT);
+        const responseXML = await makeSOAPRequest(PROMOSTANDARDS_ENDPOINTS.productData, soapXML, useJWT ? decryptedApiKey : undefined);
         const parsedData = parseProductDataXML(responseXML);
 
         return new Response(
@@ -296,8 +315,8 @@ Deno.serve(async (req: Request) => {
           );
         }
 
-        const soapXML = buildInventorySOAP(targetId, credentials.accountNumber, decryptedApiKey);
-        const responseXML = await makeSOAPRequest(PROMOSTANDARDS_ENDPOINTS.inventory, soapXML);
+        const soapXML = buildInventorySOAP(targetId, credentials.accountNumber, decryptedApiKey, useJWT);
+        const responseXML = await makeSOAPRequest(PROMOSTANDARDS_ENDPOINTS.inventory, soapXML, useJWT ? decryptedApiKey : undefined);
 
         return new Response(
           JSON.stringify({
@@ -322,8 +341,8 @@ Deno.serve(async (req: Request) => {
           );
         }
 
-        const soapXML = buildPricingSOAP(targetId, credentials.accountNumber, decryptedApiKey);
-        const responseXML = await makeSOAPRequest(PROMOSTANDARDS_ENDPOINTS.pricing, soapXML);
+        const soapXML = buildPricingSOAP(targetId, credentials.accountNumber, decryptedApiKey, useJWT);
+        const responseXML = await makeSOAPRequest(PROMOSTANDARDS_ENDPOINTS.pricing, soapXML, useJWT ? decryptedApiKey : undefined);
 
         return new Response(
           JSON.stringify({
@@ -348,8 +367,8 @@ Deno.serve(async (req: Request) => {
           );
         }
 
-        const soapXML = buildMediaContentSOAP(targetId, credentials.accountNumber, decryptedApiKey);
-        const responseXML = await makeSOAPRequest(PROMOSTANDARDS_ENDPOINTS.media, soapXML);
+        const soapXML = buildMediaContentSOAP(targetId, credentials.accountNumber, decryptedApiKey, useJWT);
+        const responseXML = await makeSOAPRequest(PROMOSTANDARDS_ENDPOINTS.media, soapXML, useJWT ? decryptedApiKey : undefined);
 
         return new Response(
           JSON.stringify({
