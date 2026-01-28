@@ -160,9 +160,9 @@ Deno.serve(async (req: Request) => {
     const { data: roleData, error: roleError } = await supabase
       .rpc('get_user_role', { user_id: user.id });
 
-    if (roleError || roleData !== 'super_admin') {
+    if (roleError || !['super_admin', 'admin'].includes(roleData)) {
       return new Response(
-        JSON.stringify({ error: "Access denied. Super Admin role required." }),
+        JSON.stringify({ error: "Access denied. Admin role required." }),
         {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
