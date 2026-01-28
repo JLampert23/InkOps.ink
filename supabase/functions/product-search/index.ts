@@ -159,10 +159,9 @@ Deno.serve(async (req: Request) => {
           }
         } else {
           const errorText = await ssaResponse.text();
+          console.error("SSActivewear error response status:", ssaResponse.status);
           console.error("SSActivewear error response:", errorText);
-          if (!errorText.includes("not found")) {
-            errors.push(`SSActivewear: ${errorText}`);
-          }
+          errors.push(`SSActivewear error (${ssaResponse.status}): ${errorText}`);
         }
       } catch (error: any) {
         console.error("SSActivewear search error:", error);
