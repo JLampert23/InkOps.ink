@@ -634,10 +634,14 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
             debugCount++;
           }
 
-          // Check if any field contains the search term
-          return resultStyle.includes(searchTerm) ||
-                 resultBrand.includes(searchTerm) ||
-                 resultDesc.includes(searchTerm);
+          // For style numbers, require exact match or starts with search term (not just contains)
+          // This prevents "5000" from matching "15000"
+          const styleMatches = resultStyle === searchTerm || resultStyle.startsWith(searchTerm);
+
+          // For brand and description, loose matching is OK
+          const brandOrDescMatches = resultBrand.includes(searchTerm) || resultDesc.includes(searchTerm);
+
+          return styleMatches || brandOrDescMatches;
         });
 
         console.log('Found results after filtering:', filteredResults.length, 'from', data.results.length);
