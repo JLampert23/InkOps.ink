@@ -77,11 +77,18 @@ Deno.serve(async (req: Request) => {
     }
 
     // Get integration settings
-    const { data: settings } = await supabase
+    const { data: settings, error: settingsError } = await supabase
       .from("integration_settings")
       .select("*")
       .eq("company_id", profile.company_id)
       .maybeSingle();
+
+    console.log("Integration settings:", {
+      company_id: profile.company_id,
+      settings,
+      settingsError,
+      ssactivewear_enabled: settings?.ssactivewear_enabled,
+    });
 
     // Parse request
     const url = new URL(req.url);

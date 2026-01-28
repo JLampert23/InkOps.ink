@@ -601,14 +601,18 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       );
 
       const data = await response.json();
+      console.log('Product search response:', data);
 
       if (data.success && data.results) {
+        console.log('Found results:', data.results.length, data.results);
         setProductSearchResults(data.results);
         setShowProductDropdown(data.results.length > 0);
       } else if (data.error) {
-        if (!data.error.includes('No supplier integrations')) {
-          console.log('Product search:', data.error);
-        }
+        console.log('Product search error:', data.error);
+        setProductSearchResults([]);
+        setShowProductDropdown(false);
+      } else {
+        console.log('Unknown response format:', data);
         setProductSearchResults([]);
         setShowProductDropdown(false);
       }
