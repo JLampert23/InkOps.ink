@@ -127,7 +127,7 @@ Deno.serve(async (req: Request) => {
     // Search SSActivewear if enabled
     if (settings?.ssactivewear_enabled) {
       try {
-        const ssaUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=search&style=${encodeURIComponent(style)}`;
+        const ssaUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=product&style=${encodeURIComponent(style)}`;
         const ssaResponse = await fetch(ssaUrl, {
           headers: {
             "Authorization": authHeader,
@@ -136,14 +136,17 @@ Deno.serve(async (req: Request) => {
 
         if (ssaResponse.ok) {
           const ssaData = await ssaResponse.json();
+          console.log("SSActivewear response:", JSON.stringify(ssaData).slice(0, 500));
           if (ssaData.success && ssaData.data) {
-            // Transform SSActivewear data to common format
             const ssaProducts = transformSSActivewearData(ssaData.data, style);
             results.push(...ssaProducts);
           }
         } else {
           const errorText = await ssaResponse.text();
-          errors.push(`SSActivewear: ${errorText}`);
+          console.error("SSActivewear error response:", errorText);
+          if (!errorText.includes("not found")) {
+            errors.push(`SSActivewear: ${errorText}`);
+          }
         }
       } catch (error: any) {
         console.error("SSActivewear search error:", error);
@@ -242,53 +245,60 @@ function transformSanMarData(data: any, style: string): ProductResult[] {
 }
 
 function transformSSActivewearData(data: any, style: string): ProductResult[] {
-  // Transform SSActivewear API response to common format
-  // This is a placeholder - adjust based on actual SSActivewear API response structure
   const products: ProductResult[] = [];
 
-  if (Array.isArray(data)) {
+  // SSActivewear /products endpoint returns an array of product variants
+  // Each item in the array represents a color/size variant
+  // We need to group them by style and aggregate colors
+  if (Array.isArray(data) && data.length > 0) {
+    // Group products by style number
+    const styleMap = new Map<string, any[]>();
+
     for (const item of data) {
-      products.push({
-        supplier: "ssactivewear",
-        style: item.style || style,
-        brand: item.brandName || item.brand || "",
-        description: item.styleName || item.description || "",
-        category: item.categoryName || item.category,
-        colors: (item.colors || []).map((color: any) => ({
-          name: color.colorName || color.name,
-          code: color.colorCode || color.code,
-          image_url: color.colorFrontImage || color.image,
-          pricing: {
-            wholesale: color.wholesalePrice || color.price,
-            retail: color.retailPrice || color.msrp,
-          },
-          stock: color.wareHouseInventory || {},
-          sizes: color.sizes || [],
-        })),
-        raw_data: item,
-      });
+      const itemStyle = item.styleID || item.style || style;
+      if (!styleMap.has(itemStyle)) {
+        styleMap.set(itemStyle, []);
+      }
+      styleMap.get(itemStyle)!.push(item);
     }
-  } else if (data.Style || data.Styles) {
-    const product = data.Style || data.Styles[0];
-    if (product) {
+
+    // Process each style group
+    for (const [styleId, items] of styleMap) {
+      const firstItem = items[0];
+
+      // Group by color to aggregate sizes
+      const colorMap = new Map<string, any>();
+      for (const item of items) {
+        const colorName = item.colorName || item.color1 || "Default";
+        if (!colorMap.has(colorName)) {
+          colorMap.set(colorName, {
+            name: colorName,
+            code: item.colorCode || "",
+            image_url: item.colorFrontImage || item.colorSwatchImage || "",
+            pricing: {
+              wholesale: parseFloat(item.customerPrice) || parseFloat(item.casePrice) || 0,
+              retail: parseFloat(item.msrp) || 0,
+            },
+            sizes: [],
+            stock: {},
+          });
+        }
+        const colorEntry = colorMap.get(colorName)!;
+        if (item.sizeName && !colorEntry.sizes.includes(item.sizeName)) {
+          colorEntry.sizes.push(item.sizeName);
+        }
+        if (item.qty !== undefined) {
+          colorEntry.stock[item.sizeName || "OS"] = parseInt(item.qty) || 0;
+        }
+      }
+
       products.push({
         supplier: "ssactivewear",
-        style: product.style || style,
-        brand: product.brandName || product.brand || "",
-        description: product.styleName || product.description || "",
-        category: product.categoryName || product.category,
-        colors: (product.colors || []).map((color: any) => ({
-          name: color.colorName || color.name,
-          code: color.colorCode || color.code,
-          image_url: color.colorFrontImage || color.image,
-          pricing: {
-            wholesale: color.wholesalePrice || color.price,
-            retail: color.retailPrice || color.msrp,
-          },
-          stock: color.wareHouseInventory || {},
-          sizes: color.sizes || [],
-        })),
-        raw_data: product,
+        style: styleId,
+        brand: firstItem.brandName || firstItem.brand || "",
+        description: firstItem.styleName || firstItem.title || firstItem.description || "",
+        category: firstItem.categoryName || firstItem.category || "",
+        colors: Array.from(colorMap.values()),
       });
     }
   }
