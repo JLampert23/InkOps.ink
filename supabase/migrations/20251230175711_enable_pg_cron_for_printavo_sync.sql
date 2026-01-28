@@ -42,5 +42,5 @@ SELECT cron.schedule(
 
 -- Store Supabase URL and anon key as settings for the cron job to use
 -- Note: These need to be set manually via SQL or done through app code
--- ALTER DATABASE postgres SET app.settings.supabase_url = 'https://gccvdsxiqgbxhdyamzaa.supabase.co';
+-- ALTER DATABASE postgres SET app.settings.supabase_url = 'https://cuaukcvccxvfpuxaciac.supabase.co';
 -- ALTER DATABASE postgres SET app.settings.supabase_anon_key = 'your-anon-key';

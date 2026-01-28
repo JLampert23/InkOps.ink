@@ -16,7 +16,7 @@ Write-Host "Loaded migration file: $($sql.Length) characters" -ForegroundColor G
 
 Write-Host ""
 Write-Host "Open your Supabase SQL Editor to apply:" -ForegroundColor Yellow
-Write-Host "https://supabase.com/dashboard/project/gccvdsxiqgbxhdyamzaa/sql/new" -ForegroundColor Cyan
+Write-Host "https://supabase.com/dashboard/project/cuaukcvccxvfpuxaciac/sql/new" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "The migration SQL has been copied to your clipboard!" -ForegroundColor Green
 Write-Host ""

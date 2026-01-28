@@ -3,7 +3,7 @@
 
   This file combines all migrations in chronological order.
   Apply this to your production database at:
-  https://supabase.com/dashboard/project/gccvdsxiqgbxhdyamzaa/sql/new
+  https://supabase.com/dashboard/project/cuaukcvccxvfpuxaciac/sql/new
 
   IMPORTANT:
   1. Run this in the SQL Editor
@@ -263,7 +263,7 @@ SELECT cron.schedule(
 
 -- Store Supabase URL and anon key as settings for the cron job to use
 -- Note: These need to be set manually via SQL or done through app code
--- ALTER DATABASE postgres SET app.settings.supabase_url = 'https://gccvdsxiqgbxhdyamzaa.supabase.co';
+-- ALTER DATABASE postgres SET app.settings.supabase_url = 'https://cuaukcvccxvfpuxaciac.supabase.co';
 -- ALTER DATABASE postgres SET app.settings.supabase_anon_key = 'your-anon-key';
 
 -- ============================================================================
@@ -308,8 +308,8 @@ CREATE TABLE IF NOT EXISTS printavo_sync_config (
 -- Insert config (will be updated by application)
 INSERT INTO printavo_sync_config (supabase_url, supabase_anon_key)
 VALUES (
-  'https://gccvdsxiqgbxhdyamzaa.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdjY3Zkc3hpcWdieGhkeWFtemFhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwODMzNDQsImV4cCI6MjA4MTY1OTM0NH0.DdClhHGBlvS4WUvomGWULtU2hlniTxQNCUxqB1XYzm4'
+  'https://cuaukcvccxvfpuxaciac.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1YXVrY3ZjY3h2ZnB1eGFjaWFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU1Nzg2MDUsImV4cCI6MjA1MTE1NDYwNX0.zuT3Tcu4SLmHciYZ-zEj1zVCWOqvl0BpLV9fDLAor5w'
 )
 ON CONFLICT (id) DO NOTHING;
 
