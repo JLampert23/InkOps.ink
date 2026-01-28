@@ -1,75 +1,60 @@
-// Script to update SSActivewear credentials
-// Account Number: 54074
-// API Key: 1adb78cb-cbf0-46e7-878d-6fd87f08d3f4
+import { createClient } from '@supabase/supabase-js';
+import { readFileSync } from 'fs';
 
-const SUPABASE_URL = 'https://cuaukcvccxvfpuxaciac.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1YXVrY3ZjY3h2ZnB1eGFjaWFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1NjA4NTQsImV4cCI6MjA4MjEzNjg1NH0.I-FDsR0oezVPxKcWgFmV-MMolV6E-lYcoA7Ew8ZgKYU';
+const envContent = readFileSync('.env', 'utf8');
+const envVars = {};
+envContent.split('\n').forEach(line => {
+  const match = line.match(/^([^=]+)=(.*)$/);
+  if (match) {
+    envVars[match[1].trim()] = match[2].trim();
+  }
+});
+
+const supabaseUrl = envVars.VITE_SUPABASE_URL;
+const supabaseAnonKey = envVars.VITE_SUPABASE_ANON_KEY;
+
+const CORRECT_API_KEY = '1adb78cb-cbf0-46e7-878d-6fd87f08d3f4';
+const CORRECT_ACCOUNT_NUMBER = '54074';
 
 async function updateCredentials() {
-  try {
-    // You'll need to provide a valid session token
-    // This script should be run from the browser console where you're logged in
-    console.log('Please run this in the browser console where you are logged in');
-    console.log('');
-    console.log('Copy and paste this code:');
-    console.log('');
-    console.log(`
-const accountNumber = '54074';
-const apiKey = '1adb78cb-cbf0-46e7-878d-6fd87f08d3f4';
+  console.log('\n=== Updating SSActivewear Credentials ===\n');
+  console.log('API Key to store:', CORRECT_API_KEY);
+  console.log('Account Number:', CORRECT_ACCOUNT_NUMBER);
 
-// Get current session
-const { data: { session } } = await window.supabase.auth.getSession();
-
-if (!session) {
-  console.error('Not logged in!');
-} else {
-  console.log('Encrypting API key...');
-
-  // Encrypt the API key
-  const encryptResponse = await fetch('${SUPABASE_URL}/functions/v1/crypto-service', {
+  // First, let's encrypt the API key using the crypto service
+  console.log('\nEncrypting API key...');
+  
+  const encryptResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + session.access_token
+      'apikey': supabaseAnonKey,
     },
     body: JSON.stringify({
       action: 'encrypt',
-      token: apiKey
-    })
+      value: CORRECT_API_KEY,
+    }),
   });
 
   if (!encryptResponse.ok) {
-    console.error('Failed to encrypt:', await encryptResponse.text());
-    throw new Error('Encryption failed');
+    const errorText = await encryptResponse.text();
+    console.error('Encryption failed:', errorText);
+    return;
   }
 
-  const { result: encryptedApiKey } = await encryptResponse.json();
-  console.log('Encrypted API key:', encryptedApiKey);
+  const { result: encryptedKey } = await encryptResponse.json();
+  console.log('✅ API key encrypted successfully');
+  console.log('Encrypted value length:', encryptedKey.length);
 
-  // Update the integration settings
-  const { data, error } = await window.supabase
-    .from('integration_settings')
-    .update({
-      ssactivewear_enabled: true,
-      ssactivewear_credentials: {
-        accountNumber: accountNumber,
-        apiKey: encryptedApiKey
-      }
-    })
-    .eq('company_id', (await window.supabase.from('user_profiles').select('company_id').single()).data.company_id);
-
-  if (error) {
-    console.error('Update error:', error);
-  } else {
-    console.log('✅ SSActivewear credentials updated successfully!');
-    console.log('Account Number:', accountNumber);
-    console.log('API Key:', apiKey);
-  }
-}
-`);
-  } catch (error) {
-    console.error('Error:', error);
-  }
+  console.log('\n📋 Next steps:');
+  console.log('1. Log in to your app');
+  console.log('2. Go to Account Settings');
+  console.log('3. Scroll to Supplier Integrations > SSActivewear');
+  console.log('4. Enter these credentials:');
+  console.log('   - Account Number: ' + CORRECT_ACCOUNT_NUMBER);
+  console.log('   - API Key: ' + CORRECT_API_KEY);
+  console.log('5. Enable the integration and click Save');
+  console.log('6. Click "Test Connection" to verify');
 }
 
 updateCredentials();
