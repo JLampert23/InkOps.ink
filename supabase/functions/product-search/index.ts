@@ -146,7 +146,13 @@ Deno.serve(async (req: Request) => {
           console.log("SSActivewear response:", JSON.stringify(ssaData).slice(0, 500));
           if (ssaData.success && ssaData.data) {
             const ssaProducts = transformSSActivewearData(ssaData.data, style);
-            results.push(...ssaProducts);
+            // Filter products to only include those matching the search term
+            const filteredProducts = ssaProducts.filter(product => {
+              const productStyle = (product.style || '').toLowerCase();
+              const searchTerm = style.toLowerCase().trim();
+              return productStyle.includes(searchTerm) || productStyle.startsWith(searchTerm);
+            });
+            results.push(...filteredProducts);
           }
         } else {
           const errorText = await ssaResponse.text();

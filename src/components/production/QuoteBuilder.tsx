@@ -604,9 +604,16 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       console.log('Product search response:', data);
 
       if (data.success && data.results) {
-        console.log('Found results:', data.results.length, data.results);
-        setProductSearchResults(data.results);
-        setShowProductDropdown(data.results.length > 0);
+        // Filter results to only include products that match the search term
+        const filteredResults = data.results.filter((result: any) => {
+          const resultStyle = (result.style || '').toLowerCase();
+          const searchTerm = styleNumber.toLowerCase().trim();
+          return resultStyle.includes(searchTerm) || resultStyle.startsWith(searchTerm);
+        });
+
+        console.log('Found results:', filteredResults.length, filteredResults);
+        setProductSearchResults(filteredResults);
+        setShowProductDropdown(filteredResults.length > 0);
       } else if (data.error) {
         console.log('Product search error:', data.error);
         setProductSearchResults([]);
