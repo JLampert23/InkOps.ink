@@ -7,162 +7,43 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-// PromoStandards SOAP endpoints - SSActivewear uses ws.ssactivewear.com subdomain
-const PROMOSTANDARDS_ENDPOINTS = {
-  productData: "https://ws.ssactivewear.com/v2/productdata/",
-  inventory: "https://ws.ssactivewear.com/v2/inventory/",
-  pricing: "https://ws.ssactivewear.com/v1/pricingandconfiguration/",
-  media: "https://ws.ssactivewear.com/v1/mediacontent/",
-};
+// SSActivewear REST API endpoints
+const SSA_REST_API_BASE = "https://api.ssactivewear.com/v2";
 
 interface SSActivewearCredentials {
   accountNumber: string;
   apiKey: string;
 }
 
-function buildProductDataSOAP(productId: string, accountNumber: string, apiKey: string, useJWT: boolean = false): string {
-  return `<?xml version="1.0" encoding="utf-8"?>
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
-  <soapenv:Header/>
-  <soapenv:Body>
-    <ns:GetProductRequest>
-      <shar:wsVersion>2.0.0</shar:wsVersion>
-      <shar:id>${accountNumber}</shar:id>
-      <shar:password>${apiKey}</shar:password>
-      <shar:localizationCountry>US</shar:localizationCountry>
-      <shar:localizationLanguage>en</shar:localizationLanguage>
-      <shar:productId>${productId}</shar:productId>
-    </ns:GetProductRequest>
-  </soapenv:Body>
-</soapenv:Envelope>`;
-}
+async function makeRestApiRequest(endpoint: string, accountNumber: string, apiKey: string) {
+  const basicAuth = btoa(`${accountNumber}:${apiKey}`);
 
-function buildInventorySOAP(productId: string, accountNumber: string, apiKey: string, useJWT: boolean = false): string {
-  return `<?xml version="1.0" encoding="utf-8"?>
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.promostandards.org/WSDL/InventoryService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/InventoryService/2.0.0/SharedObjects/">
-  <soapenv:Header/>
-  <soapenv:Body>
-    <ns:GetInventoryLevelsRequest>
-      <shar:wsVersion>2.0.0</shar:wsVersion>
-      <shar:id>${accountNumber}</shar:id>
-      <shar:password>${apiKey}</shar:password>
-      <shar:productId>${productId}</shar:productId>
-    </ns:GetInventoryLevelsRequest>
-  </soapenv:Body>
-</soapenv:Envelope>`;
-}
-
-function buildPricingSOAP(productId: string, accountNumber: string, apiKey: string, useJWT: boolean = false): string {
-  return `<?xml version="1.0" encoding="utf-8"?>
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
-  <soapenv:Header/>
-  <soapenv:Body>
-    <ns:GetConfigurationAndPricingRequest>
-      <shar:wsVersion>1.0.0</shar:wsVersion>
-      <shar:id>${accountNumber}</shar:id>
-      <shar:password>${apiKey}</shar:password>
-      <shar:productId>${productId}</shar:productId>
-      <shar:currency>USD</shar:currency>
-      <shar:fobId>ALL</shar:fobId>
-      <shar:priceType>Customer</shar:priceType>
-      <shar:localizationCountry>US</shar:localizationCountry>
-      <shar:localizationLanguage>en</shar:localizationLanguage>
-    </ns:GetConfigurationAndPricingRequest>
-  </soapenv:Body>
-</soapenv:Envelope>`;
-}
-
-function buildMediaContentSOAP(productId: string, accountNumber: string, apiKey: string, useJWT: boolean = false): string {
-  return `<?xml version="1.0" encoding="utf-8"?>
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
-  <soapenv:Header/>
-  <soapenv:Body>
-    <ns:GetMediaContentRequest>
-      <shar:wsVersion>1.0.0</shar:wsVersion>
-      <shar:id>${accountNumber}</shar:id>
-      <shar:password>${apiKey}</shar:password>
-      <shar:productId>${productId}</shar:productId>
-      <shar:mediaType>Image</shar:mediaType>
-      <shar:localizationCountry>US</shar:localizationCountry>
-      <shar:localizationLanguage>en</shar:localizationLanguage>
-    </ns:GetMediaContentRequest>
-  </soapenv:Body>
-</soapenv:Envelope>`;
-}
-
-async function makeSOAPRequest(endpoint: string, soapXML: string, soapAction: string) {
   const headers: Record<string, string> = {
-    "Content-Type": "text/xml; charset=utf-8",
-    "SOAPAction": `"${soapAction}"`,
+    "Authorization": `Basic ${basicAuth}`,
+    "Accept": "application/json",
   };
 
+  console.log('Making REST API request to:', endpoint);
+
   const response = await fetch(endpoint, {
-    method: "POST",
+    method: "GET",
     headers,
-    body: soapXML,
   });
 
   const responseText = await response.text();
 
-  console.log('SOAP Response:', {
+  console.log('REST API Response:', {
     status: response.status,
     statusText: response.statusText,
     bodyLength: responseText.length,
     bodyPreview: responseText.substring(0, 500)
   });
 
-  // Check for SOAP faults in the response
-  if (responseText.includes('faultcode') || responseText.includes('Fault')) {
-    console.error('SOAP Fault detected:', responseText.substring(0, 1000));
-
-    // Extract fault message if available
-    const faultMatch = responseText.match(/<faultstring[^>]*>([^<]+)<\/faultstring>/i);
-    const faultMessage = faultMatch ? faultMatch[1] : 'Unknown SOAP fault';
-
-    throw new Error(`SOAP Fault: ${faultMessage}`);
-  }
-
   if (!response.ok) {
-    throw new Error(`SOAP request failed: ${response.status} ${response.statusText}`);
+    throw new Error(`REST API request failed: ${response.status} ${response.statusText} - ${responseText}`);
   }
 
-  return responseText;
-}
-
-function parseProductDataXML(xml: string): any {
-  // Simple XML parsing - extract key product information
-  const productIdMatch = xml.match(/<productId[^>]*>([^<]+)<\/productId>/i);
-  const productNameMatch = xml.match(/<productName[^>]*>([^<]+)<\/productName>/i);
-  const descriptionMatch = xml.match(/<description[^>]*>([^<]+)<\/description>/i);
-  const productBrandMatch = xml.match(/<productBrand[^>]*>([^<]+)<\/productBrand>/i);
-
-  // Extract all part information (colors/sizes)
-  const partRegex = /<Part>([\s\S]*?)<\/Part>/gi;
-  const parts = [];
-  let partMatch;
-
-  while ((partMatch = partRegex.exec(xml)) !== null) {
-    const partXML = partMatch[1];
-    const partIdMatch = partXML.match(/<partId[^>]*>([^<]+)<\/partId>/i);
-    const colorNameMatch = partXML.match(/<colorName[^>]*>([^<]+)<\/colorName>/i);
-    const labelSizeMatch = partXML.match(/<labelSize[^>]*>([^<]+)<\/labelSize>/i);
-
-    if (partIdMatch) {
-      parts.push({
-        partId: partIdMatch[1],
-        colorName: colorNameMatch ? colorNameMatch[1] : '',
-        labelSize: labelSizeMatch ? labelSizeMatch[1] : '',
-      });
-    }
-  }
-
-  return {
-    productId: productIdMatch ? productIdMatch[1] : '',
-    productName: productNameMatch ? productNameMatch[1] : '',
-    description: descriptionMatch ? descriptionMatch[1] : '',
-    productBrand: productBrandMatch ? productBrandMatch[1] : '',
-    parts,
-  };
+  return JSON.parse(responseText);
 }
 
 Deno.serve(async (req: Request) => {
@@ -269,19 +150,13 @@ Deno.serve(async (req: Request) => {
     console.log('Decrypted API key first 10 chars:', decryptedApiKey?.substring(0, 10));
     console.log('Account number:', credentials.accountNumber);
 
-    // SSActivewear PromoStandards endpoints use SOAP envelope authentication, not JWT Bearer tokens
-    // Always use SOAP authentication regardless of credential format
-    const useJWT = false;
-    console.log('Using SOAP envelope authentication');
-
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
     const productId = url.searchParams.get("productId") || url.searchParams.get("style");
-    const partId = url.searchParams.get("partId");
 
-    console.log('SSActivewear API Request:', { action, productId, partId });
+    console.log('SSActivewear REST API Request:', { action, productId });
 
-    // Handle different actions
+    // Handle different actions using REST API
     switch (action) {
       case "product":
       case "search":
@@ -293,23 +168,39 @@ Deno.serve(async (req: Request) => {
           );
         }
 
-        const soapXML = buildProductDataSOAP(productId, credentials.accountNumber, decryptedApiKey, useJWT);
-        console.log('SOAP Request XML (first 500 chars):', soapXML.substring(0, 500));
+        // Get product details from REST API
+        const endpoint = `${SSA_REST_API_BASE}/products/?style=${encodeURIComponent(productId)}`;
+        const productData = await makeRestApiRequest(endpoint, credentials.accountNumber, decryptedApiKey);
 
-        const responseXML = await makeSOAPRequest(
-          PROMOSTANDARDS_ENDPOINTS.productData,
-          soapXML,
-          "http://www.promostandards.org/WSDL/ProductDataService/2.0.0/GetProduct"
-        );
-        const parsedData = parseProductDataXML(responseXML);
+        console.log('Product data received:', {
+          count: Array.isArray(productData) ? productData.length : 'not array',
+          firstItem: Array.isArray(productData) && productData.length > 0 ? productData[0] : null
+        });
+
+        // Transform to consistent format
+        const transformedData = Array.isArray(productData)
+          ? productData.map((product: any) => ({
+              productId: product.styleID || product.style,
+              productName: product.styleName || product.description,
+              description: product.description || product.styleName,
+              productBrand: product.brandName || product.brand,
+              parts: (product.colors || []).map((color: any) => ({
+                partId: color.colorID || color.color,
+                colorName: color.colorName || color.color,
+                labelSize: color.size || '',
+              })),
+              colors: product.colors || [],
+              categories: product.categories || [],
+              raw: product,
+            }))
+          : [];
 
         return new Response(
           JSON.stringify({
             success: true,
             supplier: "ssactivewear",
             action,
-            data: [parsedData], // Return as array for compatibility
-            rawXML: responseXML,
+            data: transformedData,
           }),
           {
             status: 200,
@@ -319,27 +210,22 @@ Deno.serve(async (req: Request) => {
       }
 
       case "inventory": {
-        const targetId = partId || productId;
-        if (!targetId) {
+        if (!productId) {
           return new Response(
-            JSON.stringify({ error: "Product ID or Part ID required" }),
+            JSON.stringify({ error: "Product ID required" }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
 
-        const soapXML = buildInventorySOAP(targetId, credentials.accountNumber, decryptedApiKey, useJWT);
-        const responseXML = await makeSOAPRequest(
-          PROMOSTANDARDS_ENDPOINTS.inventory,
-          soapXML,
-          "http://www.promostandards.org/WSDL/InventoryService/2.0.0/GetInventoryLevels"
-        );
+        const endpoint = `${SSA_REST_API_BASE}/products/${encodeURIComponent(productId)}/inventory`;
+        const inventoryData = await makeRestApiRequest(endpoint, credentials.accountNumber, decryptedApiKey);
 
         return new Response(
           JSON.stringify({
             success: true,
             supplier: "ssactivewear",
             action,
-            data: responseXML,
+            data: inventoryData,
           }),
           {
             status: 200,
@@ -349,57 +235,22 @@ Deno.serve(async (req: Request) => {
       }
 
       case "pricing": {
-        const targetId = partId || productId;
-        if (!targetId) {
+        if (!productId) {
           return new Response(
-            JSON.stringify({ error: "Product ID or Part ID required" }),
+            JSON.stringify({ error: "Product ID required" }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
 
-        const soapXML = buildPricingSOAP(targetId, credentials.accountNumber, decryptedApiKey, useJWT);
-        const responseXML = await makeSOAPRequest(
-          PROMOSTANDARDS_ENDPOINTS.pricing,
-          soapXML,
-          "http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/GetConfigurationAndPricing"
-        );
+        const endpoint = `${SSA_REST_API_BASE}/products/?style=${encodeURIComponent(productId)}`;
+        const productData = await makeRestApiRequest(endpoint, credentials.accountNumber, decryptedApiKey);
 
         return new Response(
           JSON.stringify({
             success: true,
             supplier: "ssactivewear",
             action,
-            data: responseXML,
-          }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" }
-          }
-        );
-      }
-
-      case "media": {
-        const targetId = partId || productId;
-        if (!targetId) {
-          return new Response(
-            JSON.stringify({ error: "Product ID or Part ID required" }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        const soapXML = buildMediaContentSOAP(targetId, credentials.accountNumber, decryptedApiKey, useJWT);
-        const responseXML = await makeSOAPRequest(
-          PROMOSTANDARDS_ENDPOINTS.media,
-          soapXML,
-          "http://www.promostandards.org/WSDL/MediaService/1.0.0/GetMediaContent"
-        );
-
-        return new Response(
-          JSON.stringify({
-            success: true,
-            supplier: "ssactivewear",
-            action,
-            data: responseXML,
+            data: productData,
           }),
           {
             status: 200,
@@ -410,7 +261,7 @@ Deno.serve(async (req: Request) => {
 
       default:
         return new Response(
-          JSON.stringify({ error: "Invalid action. Use: product, inventory, pricing, or media" }),
+          JSON.stringify({ error: "Invalid action. Use: product, search, inventory, or pricing" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
