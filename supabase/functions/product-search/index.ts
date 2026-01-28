@@ -254,58 +254,51 @@ function transformSanMarData(data: any, style: string): ProductResult[] {
 function transformSSActivewearData(data: any, style: string): ProductResult[] {
   const products: ProductResult[] = [];
 
-  // SSActivewear /products endpoint returns an array of product variants
-  // Each item in the array represents a color/size variant
-  // We need to group them by style and aggregate colors
+  // SSActivewear /styles/ endpoint returns style objects with color info
   if (Array.isArray(data) && data.length > 0) {
-    // Group products by style number
-    const styleMap = new Map<string, any[]>();
-
     for (const item of data) {
-      const itemStyle = item.styleID || item.style || style;
-      if (!styleMap.has(itemStyle)) {
-        styleMap.set(itemStyle, []);
-      }
-      styleMap.get(itemStyle)!.push(item);
-    }
+      const colors: ColorOption[] = [];
 
-    // Process each style group
-    for (const [styleId, items] of styleMap) {
-      const firstItem = items[0];
-
-      // Group by color to aggregate sizes
-      const colorMap = new Map<string, any>();
-      for (const item of items) {
-        const colorName = item.colorName || item.color1 || "Default";
-        if (!colorMap.has(colorName)) {
-          colorMap.set(colorName, {
-            name: colorName,
-            code: item.colorCode || "",
-            image_url: item.colorFrontImage || item.colorSwatchImage || "",
+      // SSA styles endpoint returns colorArray or similar
+      if (item.colors && Array.isArray(item.colors)) {
+        for (const color of item.colors) {
+          colors.push({
+            name: color.colorName || color.name || "Default",
+            code: color.colorCode || "",
+            image_url: color.colorFrontImage || color.colorSwatchImage || color.imageUrl || "",
             pricing: {
-              wholesale: parseFloat(item.customerPrice) || parseFloat(item.casePrice) || 0,
-              retail: parseFloat(item.msrp) || 0,
+              wholesale: parseFloat(color.customerPrice) || parseFloat(color.piecePrice) || 0,
+              retail: parseFloat(color.msrp) || 0,
             },
-            sizes: [],
+            sizes: color.sizes || [],
             stock: {},
           });
         }
-        const colorEntry = colorMap.get(colorName)!;
-        if (item.sizeName && !colorEntry.sizes.includes(item.sizeName)) {
-          colorEntry.sizes.push(item.sizeName);
-        }
-        if (item.qty !== undefined) {
-          colorEntry.stock[item.sizeName || "OS"] = parseInt(item.qty) || 0;
-        }
+      }
+
+      // If no colors array, create a default entry from the item itself
+      if (colors.length === 0) {
+        colors.push({
+          name: item.colorName || "Default",
+          code: item.colorCode || "",
+          image_url: item.styleImage || item.brandImage || "",
+          pricing: {
+            wholesale: parseFloat(item.basePrice) || 0,
+            retail: parseFloat(item.msrp) || 0,
+          },
+          sizes: [],
+          stock: {},
+        });
       }
 
       products.push({
         supplier: "ssactivewear",
-        style: styleId,
-        brand: firstItem.brandName || firstItem.brand || "",
-        description: firstItem.styleName || firstItem.title || firstItem.description || "",
-        category: firstItem.categoryName || firstItem.category || "",
-        colors: Array.from(colorMap.values()),
+        style: item.styleID || item.style || style,
+        brand: item.brandName || item.brand || "",
+        description: item.title || item.styleName || item.description || "",
+        category: item.categoryName || item.category || "",
+        colors,
+        raw_data: item,
       });
     }
   }

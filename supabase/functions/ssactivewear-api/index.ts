@@ -118,19 +118,20 @@ Deno.serve(async (req: Request) => {
     switch (action) {
       case "product":
       case "colors":
+      case "search":
         if (!productId) {
           return new Response(
             JSON.stringify({ error: "Product ID (style number) required" }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-        endpoint = `${SSA_REST_API_BASE}/products/?style=${encodeURIComponent(productId)}`;
+        endpoint = `${SSA_REST_API_BASE}/styles/?style=${encodeURIComponent(productId)}`;
         break;
 
       case "styles":
         endpoint = `${SSA_REST_API_BASE}/styles/`;
         if (productId) {
-          endpoint = `${SSA_REST_API_BASE}/styles/${encodeURIComponent(productId)}`;
+          endpoint = `${SSA_REST_API_BASE}/styles/?style=${encodeURIComponent(productId)}`;
         }
         break;
 
