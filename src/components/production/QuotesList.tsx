@@ -27,11 +27,11 @@ interface QuotesListProps {
 
 interface Quote {
   id: string;
-  quote_number: string;
-  customer_name: string;
-  customer_company: string;
-  customer_email: string;
-  total: number;
+  quote_number: string | null;
+  customer_name: string | null;
+  customer_company: string | null;
+  customer_email: string | null;
+  total: number | null;
   status: string;
   created_at: string;
   sent_at: string | null;
@@ -337,12 +337,12 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <FileText className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm font-semibold text-gray-900 dark:text-white">{quote.quote_number}</span>
+                          <span className="text-sm font-semibold text-gray-900 dark:text-white">{quote.quote_number || 'N/A'}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">{quote.customer_name}</div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">{quote.customer_name || 'N/A'}</div>
                           {quote.customer_company && (
                             <div className="text-xs text-gray-500 dark:text-gray-400">{quote.customer_company}</div>
                           )}
@@ -358,7 +358,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="text-sm font-semibold text-gray-900 dark:text-white">${quote.total.toFixed(2)}</div>
+                        <div className="text-sm font-semibold text-gray-900 dark:text-white">${(quote.total ?? 0).toFixed(2)}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-600 dark:text-gray-400">
@@ -401,7 +401,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
                             )}
                           </button>
                           <button
-                            onClick={() => handleDelete(quote.id, quote.quote_number)}
+                            onClick={() => handleDelete(quote.id, quote.quote_number || 'N/A')}
                             disabled={deleting === quote.id}
                             className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
                             title="Delete Quote"
