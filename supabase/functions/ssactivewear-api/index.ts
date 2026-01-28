@@ -264,9 +264,10 @@ Deno.serve(async (req: Request) => {
     console.log('Decrypted API key first 10 chars:', decryptedApiKey?.substring(0, 10));
     console.log('Account number:', credentials.accountNumber);
 
-    // Determine if we're using JWT authentication
-    const useJWT = settings.ssactivewear_credentials.authType === 'jwt' || decryptedApiKey.includes('-');
-    console.log('Using JWT authentication:', useJWT);
+    // SSActivewear PromoStandards endpoints use SOAP envelope authentication, not JWT Bearer tokens
+    // Always use SOAP authentication regardless of credential format
+    const useJWT = false;
+    console.log('Using SOAP envelope authentication');
 
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
