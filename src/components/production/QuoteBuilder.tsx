@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, GripVertical, X, Loader2, DollarSign, Settings } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Save, Plus, Trash2, GripVertical, X, Loader2, DollarSign, Settings, Search } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -7,6 +7,22 @@ import CreateCustomerModal from '../accounting/CreateCustomerModal';
 import { ManageImprintsModal } from './ManageImprintsModal';
 
 type SizeMode = 'regular' | 'double' | 'youth' | 'adult';
+
+interface ProductSearchResult {
+  supplier: 'sanmar' | 'ssactivewear';
+  style: string;
+  brand: string;
+  description: string;
+  category?: string;
+  colors: {
+    name: string;
+    code: string;
+    image_url?: string;
+    pricing?: { wholesale?: number; retail?: number };
+    stock?: Record<string, number>;
+    sizes?: string[];
+  }[];
+}
 
 interface QuoteItem {
   id?: string;
@@ -173,6 +189,13 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
   const [showImprintsModal, setShowImprintsModal] = useState(false);
   const [editingGroupIdForOptions, setEditingGroupIdForOptions] = useState<string | null>(null);
+
+  const [productSearchResults, setProductSearchResults] = useState<ProductSearchResult[]>([]);
+  const [productSearchLoading, setProductSearchLoading] = useState(false);
+  const [activeSearchItem, setActiveSearchItem] = useState<{ groupId: string; itemIdx: number } | null>(null);
+  const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadCompanySettings();
@@ -551,6 +574,102 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const handleCustomerCreated = () => {
     loadCustomers();
   };
+
+  const searchProductByStyle = useCallback(async (styleNumber: string) => {
+    if (!styleNumber || styleNumber.length < 2) {
+      setProductSearchResults([]);
+      setShowProductDropdown(false);
+      return;
+    }
+
+    setProductSearchLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        showNotification('error', 'Auth Error', 'You must be logged in');
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/product-search?style=${encodeURIComponent(styleNumber)}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.success && data.results) {
+        setProductSearchResults(data.results);
+        setShowProductDropdown(data.results.length > 0);
+      } else if (data.error) {
+        if (!data.error.includes('No supplier integrations')) {
+          console.log('Product search:', data.error);
+        }
+        setProductSearchResults([]);
+        setShowProductDropdown(false);
+      }
+    } catch (err) {
+      console.error('Product search error:', err);
+    } finally {
+      setProductSearchLoading(false);
+    }
+  }, [showNotification]);
+
+  const handleStyleNumberChange = (groupId: string, itemIdx: number, value: string) => {
+    updateItem(groupId, itemIdx, 'item_number', value);
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    setActiveSearchItem({ groupId, itemIdx });
+
+    searchTimeoutRef.current = setTimeout(() => {
+      searchProductByStyle(value);
+    }, 500);
+  };
+
+  const selectProductColor = (product: ProductSearchResult, colorIdx: number) => {
+    if (!activeSearchItem) return;
+
+    const { groupId, itemIdx } = activeSearchItem;
+    const color = colorIdx >= 0 ? product.colors[colorIdx] : null;
+
+    const newGroups = itemGroups.map(group => {
+      if (group.id === groupId) {
+        const newItems = [...group.items];
+        newItems[itemIdx] = {
+          ...newItems[itemIdx],
+          item_number: product.style,
+          color: color?.name || '',
+          description: `${product.brand} ${product.description}`,
+          unit_price: color?.pricing?.wholesale || 0,
+        };
+        return { ...group, items: newItems };
+      }
+      return group;
+    });
+
+    setItemGroups(newGroups);
+    setShowProductDropdown(false);
+    setProductSearchResults([]);
+    setActiveSearchItem(null);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowProductDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const calculateTotals = () => {
     const allItems = itemGroups.flatMap(group => group.items);
@@ -1169,14 +1288,106 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           <td className="p-0.5 border border-gray-300 dark:border-slate-800 text-center">
                             <GripVertical className="w-3 h-3 text-gray-600 mx-auto" />
                           </td>
-                          <td className="p-0 border border-gray-300 dark:border-slate-800">
-                            <input
-                              type="text"
-                              value={item.item_number}
-                              onChange={(e) => updateItem(group.id, itemIdx, 'item_number', e.target.value)}
-                              className="w-full px-1 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs"
-                              placeholder="Item #"
-                            />
+                          <td className="p-0 border border-gray-300 dark:border-slate-800 relative">
+                            <div className="relative">
+                              <input
+                                type="text"
+                                value={item.item_number}
+                                onChange={(e) => handleStyleNumberChange(group.id, itemIdx, e.target.value)}
+                                onFocus={() => {
+                                  setActiveSearchItem({ groupId: group.id, itemIdx });
+                                  if (item.item_number && item.item_number.length >= 2) {
+                                    searchProductByStyle(item.item_number);
+                                  }
+                                }}
+                                className="w-full px-1 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs pr-5"
+                                placeholder="Style #"
+                              />
+                              {productSearchLoading && activeSearchItem?.groupId === group.id && activeSearchItem?.itemIdx === itemIdx && (
+                                <div className="absolute right-1 top-1/2 -translate-y-1/2">
+                                  <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
+                                </div>
+                              )}
+                              {!productSearchLoading && item.item_number && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveSearchItem({ groupId: group.id, itemIdx });
+                                    searchProductByStyle(item.item_number);
+                                  }}
+                                  className="absolute right-1 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-500"
+                                  title="Search suppliers"
+                                >
+                                  <Search className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                            {showProductDropdown && activeSearchItem?.groupId === group.id && activeSearchItem?.itemIdx === itemIdx && productSearchResults.length > 0 && (
+                              <div
+                                ref={dropdownRef}
+                                className="absolute z-50 left-0 top-full mt-1 w-80 max-h-96 overflow-auto bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg shadow-xl"
+                              >
+                                <div className="p-2 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
+                                  <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                                    {productSearchResults.length} product(s) found
+                                  </p>
+                                </div>
+                                {productSearchResults.map((product, pIdx) => (
+                                  <div key={pIdx} className="border-b border-gray-200 dark:border-slate-700 last:border-0">
+                                    <div className="px-3 py-2 bg-gray-50 dark:bg-slate-900/50">
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-xs font-semibold text-gray-900 dark:text-white">
+                                          {product.brand} {product.style}
+                                        </span>
+                                        <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 uppercase">
+                                          {product.supplier}
+                                        </span>
+                                      </div>
+                                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 line-clamp-1">
+                                        {product.description}
+                                      </p>
+                                    </div>
+                                    <div className="max-h-48 overflow-y-auto">
+                                      {product.colors.map((color, cIdx) => (
+                                        <button
+                                          key={cIdx}
+                                          type="button"
+                                          onClick={() => selectProductColor(product, cIdx)}
+                                          className="w-full px-3 py-2 text-left hover:bg-blue-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors"
+                                        >
+                                          {color.image_url && (
+                                            <img
+                                              src={color.image_url}
+                                              alt={color.name}
+                                              className="w-10 h-10 object-cover rounded border border-gray-200 dark:border-slate-600"
+                                            />
+                                          )}
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-medium text-gray-900 dark:text-white truncate">
+                                              {color.name}
+                                            </p>
+                                            {color.pricing?.wholesale && (
+                                              <p className="text-xs text-green-600 dark:text-green-400">
+                                                ${color.pricing.wholesale.toFixed(2)}
+                                              </p>
+                                            )}
+                                          </div>
+                                        </button>
+                                      ))}
+                                      {product.colors.length === 0 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => selectProductColor(product, -1)}
+                                          className="w-full px-3 py-2 text-left hover:bg-blue-50 dark:hover:bg-slate-700 text-xs text-gray-600 dark:text-gray-400"
+                                        >
+                                          Select without color
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </td>
                           <td className="p-0 border border-gray-300 dark:border-slate-800">
                             <input
