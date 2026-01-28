@@ -394,9 +394,11 @@ Deno.serve(async (req: Request) => {
       accountNumber: credentials.accountNumber,
       apiKeyLength: decryptedApiKey?.length,
       apiKeyPrefix: decryptedApiKey?.substring(0, 10),
+      apiKeyFull: decryptedApiKey, // TEMPORARY: Show full key for debugging
       action,
       productId,
-      soapBodyLength: soapBody.length
+      soapBodyLength: soapBody.length,
+      basicAuthHeader: basicAuth.substring(0, 30) + '...',
     });
 
     const ssaResponse = await fetch(endpoint, {
