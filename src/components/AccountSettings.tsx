@@ -2025,7 +2025,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           });
 
           const response = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ssactivewear-api?action=product&productId=PC54`,
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ssactivewear-api?action=brands`,
             {
               headers: {
                 'Authorization': authHeader,
