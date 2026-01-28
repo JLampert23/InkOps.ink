@@ -143,16 +143,14 @@ Deno.serve(async (req: Request) => {
 
         if (ssaResponse.ok) {
           const ssaData = await ssaResponse.json();
-          console.log("SSActivewear response:", JSON.stringify(ssaData).slice(0, 500));
+          console.log("SSActivewear response data count:", ssaData?.data?.length || 0);
+          console.log("SSActivewear first item:", ssaData?.data?.[0]);
           if (ssaData.success && ssaData.data) {
             const ssaProducts = transformSSActivewearData(ssaData.data, style);
-            // Filter products to only include those matching the search term
-            const filteredProducts = ssaProducts.filter(product => {
-              const productStyle = (product.style || '').toLowerCase();
-              const searchTerm = style.toLowerCase().trim();
-              return productStyle.includes(searchTerm) || productStyle.startsWith(searchTerm);
-            });
-            results.push(...filteredProducts);
+            console.log("Transformed products count:", ssaProducts.length);
+            console.log("First transformed product:", ssaProducts[0]);
+            // Don't filter here - let the client do it so we can see what's coming through
+            results.push(...ssaProducts);
           }
         } else {
           const errorText = await ssaResponse.text();

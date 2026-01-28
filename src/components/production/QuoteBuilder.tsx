@@ -604,14 +604,32 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       console.log('Product search response:', data);
 
       if (data.success && data.results) {
+        // Log first result to see structure
+        if (data.results.length > 0) {
+          console.log('Sample raw result:', data.results[0]);
+        }
+
         // Filter results to only include products that match the search term
+        const searchTerm = styleNumber.toLowerCase().trim();
+        let debugCount = 0;
         const filteredResults = data.results.filter((result: any) => {
           const resultStyle = (result.style || '').toLowerCase();
-          const searchTerm = styleNumber.toLowerCase().trim();
-          return resultStyle.includes(searchTerm) || resultStyle.startsWith(searchTerm);
+          const resultBrand = (result.brand || '').toLowerCase();
+          const resultDesc = (result.description || '').toLowerCase();
+
+          // Log first few for debugging
+          if (debugCount < 3) {
+            console.log('Comparing:', { resultStyle, resultBrand, resultDesc, searchTerm });
+            debugCount++;
+          }
+
+          // Check if any field contains the search term
+          return resultStyle.includes(searchTerm) ||
+                 resultBrand.includes(searchTerm) ||
+                 resultDesc.includes(searchTerm);
         });
 
-        console.log('Found results:', filteredResults.length, filteredResults);
+        console.log('Found results after filtering:', filteredResults.length, 'from', data.results.length);
         setProductSearchResults(filteredResults);
         setShowProductDropdown(filteredResults.length > 0);
       } else if (data.error) {
