@@ -183,11 +183,17 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    console.log("=== SSActivewear API Request Started ===");
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const authHeader = req.headers.get("Authorization");
 
+    console.log("Has auth header:", !!authHeader);
+    console.log("Auth header length:", authHeader?.length);
+
     if (!authHeader) {
+      console.error("Missing authorization header");
       return new Response(
         JSON.stringify({ error: "Missing authorization header" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -195,16 +201,24 @@ Deno.serve(async (req: Request) => {
     }
 
     const token = authHeader.replace("Bearer ", "");
+    console.log("Token length:", token.length);
+    console.log("Token first 20 chars:", token.substring(0, 20));
 
     const supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey);
+    console.log("Verifying JWT...");
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
 
+    console.log("Auth result:", { hasUser: !!user, hasError: !!authError, errorMessage: authError?.message });
+
     if (authError || !user) {
+      console.error("Authentication failed:", authError?.message);
       return new Response(
-        JSON.stringify({ error: authError?.message || "Invalid JWT" }),
+        JSON.stringify({ code: 401, message: "Invalid JWT", details: authError?.message }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    console.log("User authenticated:", user.id);
 
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
@@ -397,8 +411,14 @@ Deno.serve(async (req: Request) => {
 
   } catch (error: any) {
     console.error("SSActivewear API function error:", error);
+    console.error("Error stack:", error.stack);
+    console.error("Error details:", JSON.stringify(error, null, 2));
     return new Response(
-      JSON.stringify({ error: error.message || "Internal server error" }),
+      JSON.stringify({
+        error: error.message || "Internal server error",
+        details: error.toString(),
+        type: error.constructor.name
+      }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
