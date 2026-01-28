@@ -267,37 +267,53 @@ function transformSanMarData(data: any, style: string): ProductResult[] {
 function transformSSActivewearData(data: any, style: string): ProductResult[] {
   const products: ProductResult[] = [];
 
-  // SSActivewear /styles/ endpoint returns style objects with color info
+  // PromoStandards SOAP response format
   if (Array.isArray(data) && data.length > 0) {
     for (const item of data) {
       const colors: ColorOption[] = [];
 
-      // SSA styles endpoint returns colorArray or similar
-      if (item.colors && Array.isArray(item.colors)) {
-        for (const color of item.colors) {
-          colors.push({
-            name: color.colorName || color.name || "Default",
-            code: color.colorCode || "",
-            image_url: color.colorFrontImage || color.colorSwatchImage || color.imageUrl || "",
-            pricing: {
-              wholesale: parseFloat(color.customerPrice) || parseFloat(color.piecePrice) || 0,
-              retail: parseFloat(color.msrp) || 0,
-            },
-            sizes: color.sizes || [],
-            stock: {},
-          });
+      // PromoStandards returns 'parts' array with color/size combinations
+      if (item.parts && Array.isArray(item.parts)) {
+        // Group parts by color to create unique color options
+        const colorMap = new Map<string, ColorOption>();
+
+        for (const part of item.parts) {
+          const colorName = part.colorName || "Default";
+
+          if (!colorMap.has(colorName)) {
+            colorMap.set(colorName, {
+              name: colorName,
+              code: part.partId || "",
+              image_url: "",
+              pricing: {
+                wholesale: 0,
+                retail: 0,
+              },
+              sizes: [],
+              stock: {},
+            });
+          }
+
+          // Add size if not already in the list
+          const colorOption = colorMap.get(colorName)!;
+          if (part.labelSize && !colorOption.sizes?.includes(part.labelSize)) {
+            colorOption.sizes = colorOption.sizes || [];
+            colorOption.sizes.push(part.labelSize);
+          }
         }
+
+        colors.push(...Array.from(colorMap.values()));
       }
 
-      // If no colors array, create a default entry from the item itself
+      // If no parts/colors found, create a default entry
       if (colors.length === 0) {
         colors.push({
-          name: item.colorName || "Default",
-          code: item.colorCode || "",
-          image_url: item.styleImage || item.brandImage || "",
+          name: "Default",
+          code: "",
+          image_url: "",
           pricing: {
-            wholesale: parseFloat(item.basePrice) || 0,
-            retail: parseFloat(item.msrp) || 0,
+            wholesale: 0,
+            retail: 0,
           },
           sizes: [],
           stock: {},
@@ -306,10 +322,10 @@ function transformSSActivewearData(data: any, style: string): ProductResult[] {
 
       products.push({
         supplier: "ssactivewear",
-        style: String(item.styleID || item.style || style),
-        brand: String(item.brandName || item.brand || ""),
-        description: String(item.title || item.styleName || item.description || ""),
-        category: String(item.categoryName || item.category || ""),
+        style: String(item.productId || style),
+        brand: String(item.productBrand || ""),
+        description: String(item.productName || item.description || ""),
+        category: "",
         colors,
         raw_data: item,
       });
