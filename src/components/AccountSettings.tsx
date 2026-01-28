@@ -128,10 +128,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [currentUserProfile, setCurrentUserProfile] = useState<UserProfile | null>(null);
 
-  const [integrationsExpanded, setIntegrationsExpanded] = useState(false);
+  const [integrationsExpanded, setIntegrationsExpanded] = useState(true);
   const [productionExpanded, setProductionExpanded] = useState(false);
   const [accountingExpanded, setAccountingExpanded] = useState(false);
-  const [companySettingsExpanded, setCompanySettingsExpanded] = useState(false);
+  const [companySettingsExpanded, setCompanySettingsExpanded] = useState(true);
 
   const [companyName, setCompanyName] = useState('');
   const [companyAddress, setCompanyAddress] = useState('');
