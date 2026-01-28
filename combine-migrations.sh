@@ -9,10 +9,10 @@ OUTPUT_FILE="PRODUCTION_COMPLETE_MIGRATION.sql"
 cat > "$OUTPUT_FILE" << 'EOF'
 /*
   COMPLETE PRODUCTION MIGRATION SCRIPT
-  
+
   This file combines all migrations in chronological order.
   Apply this to your production database at:
-  https://supabase.com/dashboard/project/cuaukcvccxvfpuxaciac/sql/new
+  https://supabase.com/dashboard/project/gccvdsxiqgbxhdyamzaa/sql/new
 
   IMPORTANT:
   1. Run this in the SQL Editor
@@ -52,7 +52,7 @@ echo ""
 echo "=== Migration file created: $OUTPUT_FILE ==="
 echo ""
 echo "Next steps:"
-echo "1. Open: https://supabase.com/dashboard/project/cuaukcvccxvfpuxaciac/sql/new"
+echo "1. Open: https://supabase.com/dashboard/project/gccvdsxiqgbxhdyamzaa/sql/new"
 echo "2. Copy the contents of: $OUTPUT_FILE"
 echo "3. Paste into the SQL Editor and click 'Run'"
 echo "4. Wait 30 seconds for schema reload"
