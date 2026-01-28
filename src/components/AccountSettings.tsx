@@ -29,6 +29,10 @@ interface CompanySettings {
   stripe_public_key: string | null;
   stripe_secret_key: string | null;
   stripe_webhook_secret: string | null;
+  sanmar_username: string | null;
+  sanmar_api_key_encrypted: string | null;
+  ssactivewear_username: string | null;
+  ssactivewear_api_key_encrypted: string | null;
 }
 
 interface UserProfile {
@@ -461,51 +465,22 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   const loadSupplierIntegrationSettings = async () => {
     try {
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('company_id')
-        .eq('id', user?.id)
-        .maybeSingle();
+      if (!companySettings?.id) return;
 
-      if (!profile?.company_id) return;
+      const sanmarHasCreds = !!(companySettings.sanmar_api_key_encrypted);
+      const ssaHasCreds = !!(companySettings.ssactivewear_api_key_encrypted);
 
-      const { data, error } = await supabase
-        .from('integration_settings')
-        .select('*')
-        .eq('company_id', profile.company_id)
-        .maybeSingle();
+      setSanmarEnabled(sanmarHasCreds);
+      setSsaEnabled(ssaHasCreds);
+      setSanmarHasCredentials(sanmarHasCreds);
+      setSsaHasCredentials(ssaHasCreds);
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error loading supplier integration settings:', error);
-        return;
-      }
-
-      if (data) {
-        setSanmarEnabled(data.sanmar_enabled || false);
-        setSsaEnabled(data.ssactivewear_enabled || false);
-
-        // Check if credentials exist
-        const sanmarHasCreds = !!(data.sanmar_credentials &&
-          typeof data.sanmar_credentials === 'object' &&
-          Object.keys(data.sanmar_credentials).length > 0 &&
-          data.sanmar_credentials.apiKey);
-
-        const ssaHasCreds = !!(data.ssactivewear_credentials &&
-          typeof data.ssactivewear_credentials === 'object' &&
-          Object.keys(data.ssactivewear_credentials).length > 0 &&
-          data.ssactivewear_credentials.accountNumber &&
-          data.ssactivewear_credentials.apiKey);
-
-        setSanmarHasCredentials(sanmarHasCreds);
-        setSsaHasCredentials(ssaHasCreds);
-
-        console.log('Loaded supplier integration settings:', {
-          sanmarEnabled: data.sanmar_enabled,
-          ssaEnabled: data.ssactivewear_enabled,
-          sanmarHasCreds,
-          ssaHasCreds
-        });
-      }
+      console.log('Loaded supplier integration settings:', {
+        sanmarEnabled: sanmarHasCreds,
+        ssaEnabled: ssaHasCreds,
+        sanmarHasCreds,
+        ssaHasCreds
+      });
     } catch (err) {
       console.error('Error loading supplier integration settings:', err);
     }
@@ -1750,31 +1725,16 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
-      // Get user's company_id
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (!profile?.company_id) {
-        showNotification('error', 'Company Not Found', 'Could not find your company');
+      if (!companySettings?.id) {
+        showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
         return;
       }
 
-      // Check if integration settings already exist
-      const { data: existing } = await supabase
-        .from('integration_settings')
-        .select('*')
-        .eq('company_id', profile.company_id)
-        .maybeSingle();
+      const settingsData: any = {};
 
-      // Prepare SanMar credentials
-      let sanmarCredentials = existing?.sanmar_credentials || {};
+      // Handle SanMar credentials
       if (sanmarEnabled) {
-        // Only require new API key if no credentials exist yet OR if user is updating them
         if (sanmarApiKey.trim()) {
-          // User is providing a new API key, encrypt it
           const encryptResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crypto-service`, {
             method: 'POST',
             headers: {
@@ -1792,29 +1752,23 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           }
 
           const { result: encryptedApiKey } = await encryptResponse.json();
-          sanmarCredentials = {
-            apiKey: encryptedApiKey,
-            customerId: sanmarCustomerId.trim() || sanmarCredentials.customerId,
-          };
+          settingsData.sanmar_api_key_encrypted = encryptedApiKey;
         } else if (!sanmarHasCredentials) {
-          // No existing credentials and no new credentials provided
           showNotification('warning', 'SanMar API Key Required', 'Please enter your SanMar API key to enable this integration');
           return;
-        } else if (sanmarCustomerId.trim()) {
-          // Update just the customer ID while keeping existing API key
-          sanmarCredentials = {
-            ...sanmarCredentials,
-            customerId: sanmarCustomerId.trim(),
-          };
         }
+
+        if (sanmarCustomerId.trim()) {
+          settingsData.sanmar_username = sanmarCustomerId.trim();
+        }
+      } else {
+        settingsData.sanmar_api_key_encrypted = null;
+        settingsData.sanmar_username = null;
       }
 
-      // Prepare SSActivewear credentials
-      let ssaCredentials = existing?.ssactivewear_credentials || {};
+      // Handle SSActivewear credentials
       if (ssaEnabled) {
-        // Only require new credentials if none exist yet OR if user is updating them
         if (ssaAccountNumber.trim() && ssaApiKey.trim()) {
-          // User is providing new credentials, encrypt the API key
           const encryptResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crypto-service`, {
             method: 'POST',
             headers: {
@@ -1827,58 +1781,32 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             }),
           });
 
-        if (!encryptResponse.ok) {
-          throw new Error('Failed to encrypt SSActivewear API key');
-        }
+          if (!encryptResponse.ok) {
+            throw new Error('Failed to encrypt SSActivewear API key');
+          }
 
-        const { result: encryptedApiKey } = await encryptResponse.json();
-        ssaCredentials = {
-          accountNumber: ssaAccountNumber.trim(),
-          apiKey: encryptedApiKey,
-        };
+          const { result: encryptedApiKey } = await encryptResponse.json();
+          settingsData.ssactivewear_api_key_encrypted = encryptedApiKey;
+          settingsData.ssactivewear_username = ssaAccountNumber.trim();
         } else if (!ssaHasCredentials) {
-          // No existing credentials and no new credentials provided
           showNotification('warning', 'SSActivewear Credentials Required', 'Please enter your SSActivewear account number and API key to enable this integration');
           return;
         } else if (ssaAccountNumber.trim()) {
-          // Update just the account number while keeping existing API key
-          ssaCredentials = {
-            ...ssaCredentials,
-            accountNumber: ssaAccountNumber.trim(),
-          };
+          settingsData.ssactivewear_username = ssaAccountNumber.trim();
         }
-      }
-
-      const settingsData = {
-        company_id: profile.company_id,
-        sanmar_enabled: sanmarEnabled,
-        sanmar_credentials: sanmarCredentials,
-        ssactivewear_enabled: ssaEnabled,
-        ssactivewear_credentials: ssaCredentials,
-      };
-
-      console.log('Saving integration settings:', { existing, settingsData });
-
-      if (existing) {
-        // Update existing record
-        const { data, error } = await supabase
-          .from('integration_settings')
-          .update(settingsData)
-          .eq('id', existing.id)
-          .select();
-
-        console.log('Update result:', { data, error });
-        if (error) throw error;
       } else {
-        // Insert new record
-        const { data, error } = await supabase
-          .from('integration_settings')
-          .insert([settingsData])
-          .select();
-
-        console.log('Insert result:', { data, error });
-        if (error) throw error;
+        settingsData.ssactivewear_api_key_encrypted = null;
+        settingsData.ssactivewear_username = null;
       }
+
+      console.log('Saving supplier credentials to company_settings:', settingsData);
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update(settingsData)
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
 
       showNotification('success', 'Supplier Integrations Saved', 'Supplier integration settings have been saved successfully!');
       setSanmarApiKey('');
@@ -1886,7 +1814,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setSsaAccountNumber('');
       setSsaApiKey('');
       setSupplierTestResult(null);
-      await loadSupplierIntegrationSettings();
+      await loadSettings();
     } catch (err) {
       console.error('Error saving supplier integrations:', err);
       showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save supplier integrations');
@@ -1912,29 +1840,18 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
-      // Get user's company_id
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (!profile?.company_id) {
+      if (!companySettings?.id) {
         setSupplierTestResult({
           success: false,
-          error: 'Could not find your company',
+          error: 'Company settings not loaded. Please refresh the page.',
         });
         return;
       }
 
-      // Get integration settings
-      const { data: settings } = await supabase
-        .from('integration_settings')
-        .select('*')
-        .eq('company_id', profile.company_id)
-        .maybeSingle();
+      const sanmarHasCreds = !!(companySettings.sanmar_api_key_encrypted);
+      const ssaHasCreds = !!(companySettings.ssactivewear_api_key_encrypted);
 
-      if (!settings || (!settings.sanmar_enabled && !settings.ssactivewear_enabled)) {
+      if (!sanmarHasCreds && !ssaHasCreds) {
         setSupplierTestResult({
           success: false,
           error: 'No supplier integrations enabled. Please save your credentials first.',
@@ -1946,7 +1863,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       let hasError = false;
 
       // Test SanMar if enabled
-      if (settings.sanmar_enabled) {
+      if (sanmarHasCreds) {
         try {
           const response = await fetch(
             `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sanmar-api?action=search&style=PC54`,
@@ -1975,7 +1892,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       }
 
       // Test SSActivewear if enabled
-      if (settings.ssactivewear_enabled) {
+      if (ssaHasCreds) {
         try {
           const authHeader = `Bearer ${session.access_token}`;
           console.log('Testing SSActivewear with auth token:', {
