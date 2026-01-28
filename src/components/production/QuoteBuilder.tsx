@@ -614,6 +614,12 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       const data = await response.json();
       console.log('Product search response:', data);
 
+      // Log errors if present
+      if (data.errors && data.errors.length > 0) {
+        console.error('Product search errors:', data.errors);
+        showNotification(`Product search errors: ${data.errors.join(', ')}`, 'error');
+      }
+
       if (data.success && data.results) {
         // Log first result to see structure
         if (data.results.length > 0) {
