@@ -399,9 +399,28 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const loadSettings = async () => {
     try {
       setLoading(true);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('No authenticated user found');
+        return;
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profileError || !profile?.company_id) {
+        console.error('Error fetching user profile or company_id:', profileError);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('company_settings')
         .select('*')
+        .eq('id', profile.company_id)
         .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
@@ -1007,26 +1026,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         company_logo_secondary_url: secondaryLogoUrl,
       };
 
-      if (companySettings?.id) {
-        const { error } = await supabase
-          .from('company_settings')
-          .update(settingsData)
-          .eq('id', companySettings.id);
-
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from('company_settings')
-          .insert([{
-            ...settingsData,
-            owner_id: user.id
-          }])
-          .select()
-          .single();
-
-        if (error) throw error;
-        setCompanySettings(data);
+      if (!companySettings?.id) {
+        showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
+        return;
       }
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update(settingsData)
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
 
       showNotification('success', 'Settings Saved', 'Company settings have been updated successfully!');
       setLogoFile(null);
@@ -1157,27 +1167,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         encryption_key_version: 'v1',
       };
 
-      if (companySettings?.id) {
-        const { error } = await supabase
-          .from('company_settings')
-          .update(settingsData)
-          .eq('id', companySettings.id);
-
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from('company_settings')
-          .insert([{
-            company_name: companyName || '',
-            owner_id: user.id,
-            ...settingsData
-          }])
-          .select()
-          .single();
-
-        if (error) throw error;
-        setCompanySettings(data);
+      if (!companySettings?.id) {
+        showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
+        return;
       }
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update(settingsData)
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
 
       showNotification('success', 'Printavo Connected', 'Integration settings have been saved successfully!');
       setPrintavoToken('');
@@ -1246,27 +1246,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         settingsData.square_access_token = encryptedToken;
       }
 
-      if (companySettings?.id) {
-        const { error } = await supabase
-          .from('company_settings')
-          .update(settingsData)
-          .eq('id', companySettings.id);
-
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from('company_settings')
-          .insert([{
-            company_name: companyName || '',
-            owner_id: user.id,
-            ...settingsData
-          }])
-          .select()
-          .single();
-
-        if (error) throw error;
-        setCompanySettings(data);
+      if (!companySettings?.id) {
+        showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
+        return;
       }
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update(settingsData)
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
 
       showNotification('success', 'Square Connected', 'Integration settings have been saved successfully!');
       setSquareAccessToken('');
@@ -1334,27 +1324,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         settingsData.email_from_address = emailFromAddress.trim();
       }
 
-      if (companySettings?.id) {
-        const { error } = await supabase
-          .from('company_settings')
-          .update(settingsData)
-          .eq('id', companySettings.id);
-
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from('company_settings')
-          .insert([{
-            company_name: companyName || '',
-            owner_id: user.id,
-            ...settingsData
-          }])
-          .select()
-          .single();
-
-        if (error) throw error;
-        setCompanySettings(data);
+      if (!companySettings?.id) {
+        showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
+        return;
       }
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update(settingsData)
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
 
       showNotification('success', 'Resend Connected', 'Integration settings have been saved successfully!');
       setResendApiKey('');
@@ -1475,27 +1455,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
-      if (companySettings?.id) {
-        const { error } = await supabase
-          .from('company_settings')
-          .update(settingsData)
-          .eq('id', companySettings.id);
-
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from('company_settings')
-          .insert([{
-            company_name: companyName || '',
-            owner_id: user.id,
-            ...settingsData
-          }])
-          .select()
-          .single();
-
-        if (error) throw error;
-        setCompanySettings(data);
+      if (!companySettings?.id) {
+        showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
+        return;
       }
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update(settingsData)
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
 
       showNotification('success', 'Stripe Connected', 'Integration settings have been saved successfully!');
       setStripePublicKey('');
@@ -1601,27 +1571,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
-      if (companySettings?.id) {
-        const { error } = await supabase
-          .from('company_settings')
-          .update(settingsData)
-          .eq('id', companySettings.id);
-
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from('company_settings')
-          .insert([{
-            company_name: companyName || '',
-            owner_id: user.id,
-            ...settingsData
-          }])
-          .select()
-          .single();
-
-        if (error) throw error;
-        setCompanySettings(data);
+      if (!companySettings?.id) {
+        showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
+        return;
       }
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update(settingsData)
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
 
       showNotification('success', 'Twilio Connected', 'Integration settings have been saved successfully!');
       setTwilioAccountSid('');
@@ -2371,27 +2331,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         selected_invoice_statuses: selectedStatuses,
       };
 
-      if (companySettings?.id) {
-        const { error } = await supabase
-          .from('company_settings')
-          .update(settingsData)
-          .eq('id', companySettings.id);
-
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from('company_settings')
-          .insert([{
-            company_name: companyName || '',
-            owner_id: user.id,
-            ...settingsData
-          }])
-          .select()
-          .single();
-
-        if (error) throw error;
-        setCompanySettings(data);
+      if (!companySettings?.id) {
+        showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
+        return;
       }
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update(settingsData)
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
 
       showNotification('success', 'Status Preferences Saved', 'Status preferences saved successfully!');
     } catch (err) {
@@ -2418,27 +2368,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         billing_selected_invoice_statuses: billingSelectedStatuses,
       };
 
-      if (companySettings?.id) {
-        const { error } = await supabase
-          .from('company_settings')
-          .update(settingsData)
-          .eq('id', companySettings.id);
-
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from('company_settings')
-          .insert([{
-            company_name: companyName || '',
-            owner_id: user.id,
-            ...settingsData
-          }])
-          .select()
-          .single();
-
-        if (error) throw error;
-        setCompanySettings(data);
+      if (!companySettings?.id) {
+        showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
+        return;
       }
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update(settingsData)
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
 
       showNotification('success', 'Billing Status Saved', 'Billing status preferences saved successfully!');
     } catch (err) {
