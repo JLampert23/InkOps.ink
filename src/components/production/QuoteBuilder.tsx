@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Save, Plus, Trash2, GripVertical, X, Loader2, DollarSign, Settings, Search } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
@@ -85,7 +85,7 @@ interface QuoteBuilderProps {
 }
 
 export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: QuoteBuilderProps) {
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const { showNotification } = useNotification();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -582,30 +582,19 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       return;
     }
 
-    // Get fresh session
-    const { data: { session: freshSession }, error: sessionError } = await supabase.auth.getSession();
-
-    if (sessionError || !freshSession) {
-      showNotification('error', 'Auth Error', 'You must be logged in');
-      return;
-    }
-
-    console.log('Session check:', {
-      hasSession: !!freshSession,
-      hasAccessToken: !!freshSession.access_token,
-      tokenLength: freshSession.access_token?.length,
-      expiresAt: freshSession.expires_at,
-      now: Math.floor(Date.now() / 1000)
-    });
-
     setProductSearchLoading(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        showNotification('error', 'Auth Error', 'You must be logged in');
+        return;
+      }
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/product-search?style=${encodeURIComponent(styleNumber)}`,
         {
           headers: {
-            'Authorization': `Bearer ${freshSession.access_token}`,
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
         }
@@ -614,46 +603,10 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       const data = await response.json();
       console.log('Product search response:', data);
 
-      // Log errors if present
-      if (data.errors && data.errors.length > 0) {
-        console.error('Product search errors:', data.errors);
-        showNotification(`Product search errors: ${data.errors.join(', ')}`, 'error');
-      }
-
       if (data.success && data.results) {
-        // Log first result to see structure
-        if (data.results.length > 0) {
-          console.log('Sample raw result:', data.results[0]);
-        }
-
-        // Filter results to only include products that match the search term
-        const searchTerm = styleNumber.toLowerCase().trim();
-        let debugCount = 0;
-        const filteredResults = data.results.filter((result: any) => {
-          // Convert to string first since style might be a number
-          const resultStyle = String(result.style || '').toLowerCase();
-          const resultBrand = String(result.brand || '').toLowerCase();
-          const resultDesc = String(result.description || '').toLowerCase();
-
-          // Log first few for debugging
-          if (debugCount < 3) {
-            console.log('Comparing:', { resultStyle, resultBrand, resultDesc, searchTerm });
-            debugCount++;
-          }
-
-          // For style numbers, require exact match or starts with search term (not just contains)
-          // This prevents "5000" from matching "15000"
-          const styleMatches = resultStyle === searchTerm || resultStyle.startsWith(searchTerm);
-
-          // For brand and description, loose matching is OK
-          const brandOrDescMatches = resultBrand.includes(searchTerm) || resultDesc.includes(searchTerm);
-
-          return styleMatches || brandOrDescMatches;
-        });
-
-        console.log('Found results after filtering:', filteredResults.length, 'from', data.results.length);
-        setProductSearchResults(filteredResults);
-        setShowProductDropdown(filteredResults.length > 0);
+        console.log('Found results:', data.results.length, data.results);
+        setProductSearchResults(data.results);
+        setShowProductDropdown(data.results.length > 0);
       } else if (data.error) {
         console.log('Product search error:', data.error);
         setProductSearchResults([]);
@@ -1266,7 +1219,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                 )}
                 <tbody>
                   {itemGroups.map((group, groupIdx) => (
-                    <React.Fragment key={group.id}>
+                    <>
                       {/* Spacer Row Between Groups */}
                       {groupIdx > 0 && (
                         <tr key={`spacer-${group.id}`} className="bg-transparent">
@@ -1547,7 +1500,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           </div>
                         </td>
                       </tr>
-                    </React.Fragment>
+                    </>
                   ))}
                 </tbody>
               </table>
