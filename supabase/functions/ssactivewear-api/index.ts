@@ -289,6 +289,9 @@ Deno.serve(async (req: Request) => {
         }
 
         const soapXML = buildProductDataSOAP(productId, credentials.accountNumber, decryptedApiKey, useJWT);
+        console.log('SOAP Request XML (first 500 chars):', soapXML.substring(0, 500));
+        console.log('Will send Authorization header:', useJWT ? 'YES' : 'NO');
+
         const responseXML = await makeSOAPRequest(PROMOSTANDARDS_ENDPOINTS.productData, soapXML, useJWT ? decryptedApiKey : undefined);
         const parsedData = parseProductDataXML(responseXML);
 
