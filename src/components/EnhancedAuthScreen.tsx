@@ -55,7 +55,8 @@ export function EnhancedAuthScreen() {
         if (error) {
           setError(error.message);
         } else {
-          setSuccessMessage('Company account created successfully! Please sign in to set up your integrations.');
+          setSuccessMessage('Account created! You can now sign in.');
+          setIsSignUp(false);
         }
       } else {
         const { error } = await signIn(email, password);
@@ -84,14 +85,14 @@ export function EnhancedAuthScreen() {
               />
             </div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">
-              {isForgotPassword ? 'Reset Password' : isSignUp ? 'Create Company Account' : 'Welcome Back'}
+              {isForgotPassword ? 'Reset Password' : isSignUp ? 'Create Account' : 'Sign In'}
             </h1>
             <p className="text-gray-600 dark:text-gray-400 text-base leading-relaxed">
               {isForgotPassword
                 ? 'Enter your email to receive a password reset link'
                 : isSignUp
-                ? 'Set up your InkOps account'
-                : 'Sign in to InkOps'}
+                ? 'Get started with InkOps'
+                : 'Welcome back'}
             </p>
           </div>
 
@@ -200,11 +201,11 @@ export function EnhancedAuthScreen() {
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
                   <span>
-                    {isForgotPassword ? 'Sending Reset Link...' : isSignUp ? 'Creating Account...' : 'Signing In...'}
+                    {isForgotPassword ? 'Sending...' : isSignUp ? 'Creating...' : 'Signing In...'}
                   </span>
                 </>
               ) : (
-                <span>{isForgotPassword ? 'Send Reset Link' : isSignUp ? 'Create Company Account' : 'Sign In'}</span>
+                <span>{isForgotPassword ? 'Send Reset Link' : isSignUp ? 'Create Account' : 'Sign In'}</span>
               )}
             </button>
           </form>
@@ -253,21 +254,13 @@ export function EnhancedAuthScreen() {
               ) : (
                 <>
                   Don't have an account?{' '}
-                  <span className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">Create company account</span>
+                  <span className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">Sign up</span>
                 </>
               )}
             </button>
           </div>
         </div>
 
-        <div className="text-center mt-8 space-y-2">
-          <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">
-            Secure multi-tenant authentication powered by Supabase
-          </p>
-          <p className="text-xs text-gray-500 dark:text-gray-500">
-            All API tokens are encrypted with AES-256-GCM
-          </p>
-        </div>
       </div>
     </div>
   );
