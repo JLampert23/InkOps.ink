@@ -624,9 +624,10 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         const searchTerm = styleNumber.toLowerCase().trim();
         let debugCount = 0;
         const filteredResults = data.results.filter((result: any) => {
-          const resultStyle = (result.style || '').toLowerCase();
-          const resultBrand = (result.brand || '').toLowerCase();
-          const resultDesc = (result.description || '').toLowerCase();
+          // Convert to string first since style might be a number
+          const resultStyle = String(result.style || '').toLowerCase();
+          const resultBrand = String(result.brand || '').toLowerCase();
+          const resultDesc = String(result.description || '').toLowerCase();
 
           // Log first few for debugging
           if (debugCount < 3) {
