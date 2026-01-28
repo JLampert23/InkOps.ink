@@ -582,10 +582,21 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       return;
     }
 
-    if (!session) {
+    // Get fresh session
+    const { data: { session: freshSession }, error: sessionError } = await supabase.auth.getSession();
+
+    if (sessionError || !freshSession) {
       showNotification('error', 'Auth Error', 'You must be logged in');
       return;
     }
+
+    console.log('Session check:', {
+      hasSession: !!freshSession,
+      hasAccessToken: !!freshSession.access_token,
+      tokenLength: freshSession.access_token?.length,
+      expiresAt: freshSession.expires_at,
+      now: Math.floor(Date.now() / 1000)
+    });
 
     setProductSearchLoading(true);
     try {
@@ -593,7 +604,8 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/product-search?style=${encodeURIComponent(styleNumber)}`,
         {
           headers: {
-            'Authorization': `Bearer ${session.access_token}`,
+            'Authorization': `Bearer ${freshSession.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
             'Content-Type': 'application/json',
           },
         }
@@ -645,7 +657,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
     } finally {
       setProductSearchLoading(false);
     }
-  }, [session, showNotification]);
+  }, [showNotification]);
 
   const handleStyleNumberChange = (groupId: string, itemIdx: number, value: string) => {
     updateItem(groupId, itemIdx, 'item_number', value);
