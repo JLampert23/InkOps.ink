@@ -7,43 +7,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-// SSActivewear REST API endpoints
 const SSA_REST_API_BASE = "https://api.ssactivewear.com/v2";
 
 interface SSActivewearCredentials {
   accountNumber: string;
   apiKey: string;
-}
-
-async function makeRestApiRequest(endpoint: string, accountNumber: string, apiKey: string) {
-  const basicAuth = btoa(`${accountNumber}:${apiKey}`);
-
-  const headers: Record<string, string> = {
-    "Authorization": `Basic ${basicAuth}`,
-    "Accept": "application/json",
-  };
-
-  console.log('Making REST API request to:', endpoint);
-
-  const response = await fetch(endpoint, {
-    method: "GET",
-    headers,
-  });
-
-  const responseText = await response.text();
-
-  console.log('REST API Response:', {
-    status: response.status,
-    statusText: response.statusText,
-    bodyLength: responseText.length,
-    bodyPreview: responseText.substring(0, 500)
-  });
-
-  if (!response.ok) {
-    throw new Error(`REST API request failed: ${response.status} ${response.statusText} - ${responseText}`);
-  }
-
-  return JSON.parse(responseText);
 }
 
 Deno.serve(async (req: Request) => {
@@ -55,17 +23,11 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    console.log("=== SSActivewear API Request Started ===");
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const authHeader = req.headers.get("Authorization");
 
-    console.log("Has auth header:", !!authHeader);
-    console.log("Auth header length:", authHeader?.length);
-
     if (!authHeader) {
-      console.error("Missing authorization header");
       return new Response(
         JSON.stringify({ error: "Missing authorization header" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -73,24 +35,16 @@ Deno.serve(async (req: Request) => {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    console.log("Token length:", token.length);
-    console.log("Token first 20 chars:", token.substring(0, 20));
 
     const supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey);
-    console.log("Verifying JWT...");
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
 
-    console.log("Auth result:", { hasUser: !!user, hasError: !!authError, errorMessage: authError?.message });
-
     if (authError || !user) {
-      console.error("Authentication failed:", authError?.message);
       return new Response(
-        JSON.stringify({ code: 401, message: "Invalid JWT", details: authError?.message }),
+        JSON.stringify({ error: authError?.message || "Invalid JWT" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    console.log("User authenticated:", user.id);
 
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
@@ -109,8 +63,8 @@ Deno.serve(async (req: Request) => {
 
     const { data: settings } = await supabase
       .from("integration_settings")
-      .eq("company_id", profile.company_id)
       .select("ssactivewear_enabled, ssactivewear_credentials")
+      .eq("company_id", profile.company_id)
       .maybeSingle();
 
     if (!settings?.ssactivewear_enabled || !settings?.ssactivewear_credentials) {
@@ -125,7 +79,6 @@ Deno.serve(async (req: Request) => {
       apiKey: settings.ssactivewear_credentials.apiKey
     } as SSActivewearCredentials;
 
-    // Decrypt the API key
     const decryptResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
       method: "POST",
       headers: {
@@ -147,135 +100,129 @@ Deno.serve(async (req: Request) => {
 
     const { result: decryptedApiKey } = await decryptResponse.json();
 
-    console.log('Decrypted API key first 10 chars:', decryptedApiKey?.substring(0, 10));
-    console.log('Account number:', credentials.accountNumber);
-
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
     const productId = url.searchParams.get("productId") || url.searchParams.get("style");
+    const sku = url.searchParams.get("sku");
 
-    console.log('SSActivewear REST API Request:', { action, productId });
+    const basicAuth = btoa(`${credentials.accountNumber}:${decryptedApiKey}`);
 
-    // Handle different actions using REST API
+    const ssaHeaders = {
+      "Authorization": `Basic ${basicAuth}`,
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+    };
+
+    let endpoint = "";
+
     switch (action) {
       case "product":
+      case "colors":
       case "search":
-      case "colors": {
         if (!productId) {
           return new Response(
             JSON.stringify({ error: "Product ID (style number) required" }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
+        endpoint = `${SSA_REST_API_BASE}/styles/?style=${encodeURIComponent(productId)}`;
+        break;
 
-        // Get product details from REST API
-        const endpoint = `${SSA_REST_API_BASE}/products/?style=${encodeURIComponent(productId)}`;
-        const productData = await makeRestApiRequest(endpoint, credentials.accountNumber, decryptedApiKey);
+      case "styles":
+        endpoint = `${SSA_REST_API_BASE}/styles/`;
+        if (productId) {
+          endpoint = `${SSA_REST_API_BASE}/styles/?style=${encodeURIComponent(productId)}`;
+        }
+        break;
 
-        console.log('Product data received:', {
-          count: Array.isArray(productData) ? productData.length : 'not array',
-          firstItem: Array.isArray(productData) && productData.length > 0 ? productData[0] : null
-        });
-
-        // Transform to consistent format
-        const transformedData = Array.isArray(productData)
-          ? productData.map((product: any) => ({
-              productId: product.styleID || product.style,
-              productName: product.styleName || product.description,
-              description: product.description || product.styleName,
-              productBrand: product.brandName || product.brand,
-              parts: (product.colors || []).map((color: any) => ({
-                partId: color.colorID || color.color,
-                colorName: color.colorName || color.color,
-                labelSize: color.size || '',
-              })),
-              colors: product.colors || [],
-              categories: product.categories || [],
-              raw: product,
-            }))
-          : [];
-
-        return new Response(
-          JSON.stringify({
-            success: true,
-            supplier: "ssactivewear",
-            action,
-            data: transformedData,
-          }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" }
-          }
-        );
-      }
-
-      case "inventory": {
-        if (!productId) {
+      case "inventory":
+        if (sku) {
+          endpoint = `${SSA_REST_API_BASE}/inventory/?sku=${encodeURIComponent(sku)}`;
+        } else if (productId) {
+          endpoint = `${SSA_REST_API_BASE}/inventory/?style=${encodeURIComponent(productId)}`;
+        } else {
           return new Response(
-            JSON.stringify({ error: "Product ID required" }),
+            JSON.stringify({ error: "SKU or style number required for inventory" }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
+        break;
 
-        const endpoint = `${SSA_REST_API_BASE}/products/${encodeURIComponent(productId)}/inventory`;
-        const inventoryData = await makeRestApiRequest(endpoint, credentials.accountNumber, decryptedApiKey);
+      case "categories":
+        endpoint = `${SSA_REST_API_BASE}/categories/`;
+        break;
 
-        return new Response(
-          JSON.stringify({
-            success: true,
-            supplier: "ssactivewear",
-            action,
-            data: inventoryData,
-          }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" }
-          }
-        );
-      }
-
-      case "pricing": {
-        if (!productId) {
-          return new Response(
-            JSON.stringify({ error: "Product ID required" }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        const endpoint = `${SSA_REST_API_BASE}/products/?style=${encodeURIComponent(productId)}`;
-        const productData = await makeRestApiRequest(endpoint, credentials.accountNumber, decryptedApiKey);
-
-        return new Response(
-          JSON.stringify({
-            success: true,
-            supplier: "ssactivewear",
-            action,
-            data: productData,
-          }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" }
-          }
-        );
-      }
+      case "brands":
+        endpoint = `${SSA_REST_API_BASE}/brands/`;
+        break;
 
       default:
         return new Response(
-          JSON.stringify({ error: "Invalid action. Use: product, search, inventory, or pricing" }),
+          JSON.stringify({ error: "Invalid action. Use: product, styles, inventory, categories, or brands" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
 
-  } catch (error: any) {
-    console.error("SSActivewear API function error:", error);
-    console.error("Error stack:", error.stack);
-    console.error("Error details:", JSON.stringify(error, null, 2));
+    console.log('Making SSActivewear REST API request:', {
+      endpoint,
+      accountNumber: credentials.accountNumber,
+      action,
+      productId,
+    });
+
+    const ssaResponse = await fetch(endpoint, {
+      method: "GET",
+      headers: ssaHeaders,
+    });
+
+    console.log('SSActivewear API response:', {
+      status: ssaResponse.status,
+      statusText: ssaResponse.statusText,
+    });
+
+    if (!ssaResponse.ok) {
+      const errorText = await ssaResponse.text();
+      console.error("SSActivewear REST API error:", {
+        status: ssaResponse.status,
+        error: errorText,
+        endpoint,
+      });
+
+      let userMessage = "SSActivewear API request failed";
+      if (ssaResponse.status === 401 || ssaResponse.status === 403) {
+        userMessage = "SSActivewear authentication failed. Please verify your account number and API key are correct.";
+      } else if (ssaResponse.status === 404) {
+        userMessage = `Product ${productId || sku} not found in SSActivewear catalog`;
+      }
+
+      return new Response(
+        JSON.stringify({
+          error: userMessage,
+          status: ssaResponse.status,
+        }),
+        { status: ssaResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const data = await ssaResponse.json();
+
     return new Response(
       JSON.stringify({
-        error: error.message || "Internal server error",
-        details: error.toString(),
-        type: error.constructor.name
+        success: true,
+        supplier: "ssactivewear",
+        action,
+        data,
       }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      }
+    );
+
+  } catch (error: any) {
+    console.error("SSActivewear API function error:", error);
+    return new Response(
+      JSON.stringify({ error: error.message || "Internal server error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
