@@ -39,9 +39,9 @@ Deno.serve(async (req: Request) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Get auth token from request
+    // Get auth token from request (already verified by edge function runtime with verify_jwt: true)
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
@@ -50,27 +50,29 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Create client with anon key and user's JWT for RLS
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: {
-          Authorization: authHeader,
-        },
-      },
+    // Create Supabase client with service role for database queries
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Create a client with user's JWT to get user info
+    const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } }
     });
 
-    // Get authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Get authenticated user from their JWT
+    const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
 
     if (authError || !user) {
+      console.error("Auth error:", authError);
       return new Response(
         JSON.stringify({ error: "Unauthorized", message: authError?.message }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    console.log("Authenticated user:", user.id);
+
     // Get user's company_id
-    const { data: profile } = await supabase
+    const { data: profile } = await supabaseAdmin
       .from("user_profiles")
       .select("company_id")
       .eq("id", user.id)
@@ -84,7 +86,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Get integration settings
-    const { data: settings, error: settingsError } = await supabase
+    const { data: settings, error: settingsError } = await supabaseAdmin
       .from("integration_settings")
       .select("*")
       .eq("company_id", profile.company_id)

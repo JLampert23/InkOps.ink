@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Save, Plus, Trash2, GripVertical, X, Loader2, DollarSign, Settings, Search } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
@@ -1255,7 +1255,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                 )}
                 <tbody>
                   {itemGroups.map((group, groupIdx) => (
-                    <>
+                    <React.Fragment key={group.id}>
                       {/* Spacer Row Between Groups */}
                       {groupIdx > 0 && (
                         <tr key={`spacer-${group.id}`} className="bg-transparent">
@@ -1536,7 +1536,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           </div>
                         </td>
                       </tr>
-                    </>
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>
