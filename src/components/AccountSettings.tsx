@@ -31,8 +31,10 @@ interface CompanySettings {
   stripe_webhook_secret: string | null;
   sanmar_username: string | null;
   sanmar_api_key_encrypted: string | null;
+  sanmar_enabled: boolean | null;
   ssactivewear_username: string | null;
   ssactivewear_api_key_encrypted: string | null;
+  ssactivewear_enabled: boolean | null;
 }
 
 interface UserProfile {
@@ -477,8 +479,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       const sanmarHasCreds = !!(companySettings.sanmar_api_key_encrypted);
       const ssaHasCreds = !!(companySettings.ssactivewear_api_key_encrypted);
 
-      setSanmarEnabled(sanmarHasCreds);
-      setSsaEnabled(ssaHasCreds);
+      setSanmarEnabled(companySettings.sanmar_enabled || false);
+      setSsaEnabled(companySettings.ssactivewear_enabled || false);
       setSanmarHasCredentials(sanmarHasCreds);
       setSsaHasCredentials(ssaHasCreds);
 
@@ -488,8 +490,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setSsaAccountNumber(companySettings.ssactivewear_username || '');
 
       console.log('Loaded supplier integration settings:', {
-        sanmarEnabled: sanmarHasCreds,
-        ssaEnabled: ssaHasCreds,
+        sanmarEnabled: companySettings.sanmar_enabled,
+        ssaEnabled: companySettings.ssactivewear_enabled,
         sanmarHasCreds,
         ssaHasCreds
       });
@@ -1724,11 +1726,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   };
 
   const saveSupplierIntegrations = async () => {
-    if (!sanmarEnabled && !ssaEnabled) {
-      showNotification('warning', 'No Integration Enabled', 'Please enable at least one supplier integration');
-      return;
-    }
-
     try {
       setSavingSuppliers(true);
       const { data: { session } } = await supabase.auth.getSession();
@@ -1742,11 +1739,14 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
-      const settingsData: any = {};
+      const settingsData: any = {
+        sanmar_enabled: sanmarEnabled,
+        ssactivewear_enabled: ssaEnabled,
+      };
 
       // Handle SanMar credentials
       if (sanmarEnabled) {
-        if (sanmarApiKey.trim()) {
+        if (sanmarApiKey.trim() && sanmarApiKey !== '••••••••••••••••') {
           const encryptResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crypto-service`, {
             method: 'POST',
             headers: {
@@ -1765,9 +1765,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
           const { result: encryptedApiKey } = await encryptResponse.json();
           settingsData.sanmar_api_key_encrypted = encryptedApiKey;
-        } else if (!sanmarHasCredentials) {
-          showNotification('warning', 'SanMar API Key Required', 'Please enter your SanMar API key to enable this integration');
-          return;
         }
 
         if (sanmarCustomerId.trim()) {
@@ -1780,7 +1777,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
       // Handle SSActivewear credentials
       if (ssaEnabled) {
-        if (ssaAccountNumber.trim() && ssaApiKey.trim()) {
+        if (ssaApiKey.trim() && ssaApiKey !== '••••••••••••••••') {
           const encryptResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crypto-service`, {
             method: 'POST',
             headers: {
@@ -1799,16 +1796,25 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
           const { result: encryptedApiKey } = await encryptResponse.json();
           settingsData.ssactivewear_api_key_encrypted = encryptedApiKey;
-          settingsData.ssactivewear_username = ssaAccountNumber.trim();
-        } else if (!ssaHasCredentials) {
-          showNotification('warning', 'SSActivewear Credentials Required', 'Please enter your SSActivewear account number and API key to enable this integration');
-          return;
-        } else if (ssaAccountNumber.trim()) {
+        }
+
+        if (ssaAccountNumber.trim()) {
           settingsData.ssactivewear_username = ssaAccountNumber.trim();
         }
       } else {
         settingsData.ssactivewear_api_key_encrypted = null;
         settingsData.ssactivewear_username = null;
+      }
+
+      // Validate that if enabled, there are credentials (either existing or new)
+      if (sanmarEnabled && !sanmarHasCredentials && !settingsData.sanmar_api_key_encrypted) {
+        showNotification('warning', 'SanMar API Key Required', 'Please enter your SanMar API key to enable this integration');
+        return;
+      }
+
+      if (ssaEnabled && !ssaHasCredentials && !settingsData.ssactivewear_api_key_encrypted) {
+        showNotification('warning', 'SSActivewear Credentials Required', 'Please enter your SSActivewear account number and API key to enable this integration');
+        return;
       }
 
       console.log('Saving supplier credentials to company_settings:', settingsData);
@@ -5649,11 +5655,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               {/* Save Button */}
               <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
                 <div className="text-xs text-gray-500 dark:text-gray-400">
-                  <p>Enable at least one integration to auto-populate product information when creating quotes</p>
+                  <p>Enable integrations to auto-populate product information when creating quotes</p>
                 </div>
                 <button
                   onClick={saveSupplierIntegrations}
-                  disabled={savingSuppliers || (!sanmarEnabled && !ssaEnabled)}
+                  disabled={savingSuppliers}
                   className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                 >
                   {savingSuppliers ? (
@@ -5664,7 +5670,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   ) : (
                     <>
                       <Save className="w-4 h-4" />
-                      Save Supplier Credentials
+                      Save Supplier Settings
                     </>
                   )}
                 </button>
