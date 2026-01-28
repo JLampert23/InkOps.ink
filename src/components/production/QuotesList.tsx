@@ -180,8 +180,8 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
 
   const filteredQuotes = quotes.filter(
     (quote) =>
-      quote.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      quote.quote_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (quote.customer_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (quote.quote_number || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (quote.customer_company || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (quote.customer_email || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
