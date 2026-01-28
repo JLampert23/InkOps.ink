@@ -271,55 +271,6 @@ function parseGarmentMetadata(description: string | null | undefined, name: stri
   };
 }
 
-async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
-  const encoder = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(password),
-    'PBKDF2',
-    false,
-    ['deriveBits', 'deriveKey']
-  );
-
-  return crypto.subtle.deriveKey(
-    {
-      name: 'PBKDF2',
-      salt: salt,
-      iterations: 100000,
-      hash: 'SHA-256',
-    },
-    keyMaterial,
-    { name: 'AES-GCM', length: 256 },
-    true,
-    ['encrypt', 'decrypt']
-  );
-}
-
-async function decryptToken(encryptedToken: string, encryptionKey: string): Promise<string> {
-  try {
-    const combined = new Uint8Array(
-      atob(encryptedToken).split('').map(c => c.charCodeAt(0))
-    );
-
-    const salt = combined.slice(0, 16);
-    const iv = combined.slice(16, 28);
-    const encryptedData = combined.slice(28);
-
-    const key = await deriveKey(encryptionKey, salt);
-
-    const decryptedData = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: iv },
-      key,
-      encryptedData
-    );
-
-    const decoder = new TextDecoder();
-    return decoder.decode(decryptedData);
-  } catch (error) {
-    console.error('Decryption error:', error);
-    throw new Error('Failed to decrypt token');
-  }
-}
 
 async function fetchFromPrintavo(
   query: string,
@@ -1342,17 +1293,18 @@ Deno.serve(async (req: Request) => {
     // Use service role client for the actual sync operations
     const supabase = serviceSupabase;
 
-    const { data: settings, error: settingsError } = await supabase
-      .from('company_settings')
-      .select('id, printavo_username, printavo_api_token_encrypted')
-      .eq('id', companyId)
+    const { data: integrationSettings, error: settingsError } = await supabase
+      .from('integration_settings')
+      .select('config, is_enabled')
+      .eq('company_id', companyId)
+      .eq('provider_name', 'printavo')
       .maybeSingle();
 
-    if (settingsError || !settings || !settings.printavo_username || !settings.printavo_api_token_encrypted) {
-      console.error('Failed to fetch Printavo credentials from company_settings:', settingsError);
+    if (settingsError) {
+      console.error('Failed to fetch Printavo settings:', settingsError);
       return new Response(
         JSON.stringify({
-          error: "Printavo credentials not configured. Please configure in Account Settings.",
+          error: "Failed to load Printavo settings. Please configure in Account Settings.",
         }),
         {
           status: 500,
@@ -1361,8 +1313,36 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const printavoEmail = settings.printavo_username;
-    const printavoToken = await decryptToken(settings.printavo_api_token_encrypted, encryptionKey);
+    if (!integrationSettings?.is_enabled) {
+      console.error('Printavo integration not enabled');
+      return new Response(
+        JSON.stringify({
+          error: "Printavo integration not enabled. Please enable in Account Settings.",
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const config = integrationSettings.config as any;
+
+    if (!config?.email || !config?.api_token) {
+      console.error('Printavo credentials missing from integration_settings');
+      return new Response(
+        JSON.stringify({
+          error: "Printavo credentials incomplete. Please configure email and API token in Account Settings.",
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const printavoEmail = config.email;
+    const printavoToken = config.api_token;
 
     console.log('Credentials check:', {
       supabaseUrlSet: !!supabaseUrl,
@@ -1371,19 +1351,6 @@ Deno.serve(async (req: Request) => {
       tokenSet: !!printavoToken,
       email: printavoEmail || 'NOT SET'
     });
-
-    if (!printavoEmail || !printavoToken) {
-      console.error('Printavo credentials missing from company_settings');
-      return new Response(
-        JSON.stringify({
-          error: "Printavo credentials incomplete. Please configure in Account Settings.",
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
 
     await supabase
       .from("printavo_sync_log")

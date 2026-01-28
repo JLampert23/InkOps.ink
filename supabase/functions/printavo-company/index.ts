@@ -17,28 +17,6 @@ interface PrintavoStatus {
   type: string | null;
 }
 
-async function decryptToken(encryptedToken: string, supabaseUrl: string, serviceRoleKey: string): Promise<string> {
-  const response = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${serviceRoleKey}`,
-    },
-    body: JSON.stringify({
-      action: 'decrypt',
-      token: encryptedToken,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(`Decryption failed: ${error.error || 'Unknown error'}`);
-  }
-
-  const data = await response.json();
-  return data.result;
-}
-
 async function fetchAllStatuses(email: string, token: string): Promise<PrintavoStatus[]> {
   const query = `
     query GetAllStatuses {
@@ -183,17 +161,18 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: settings, error: settingsError } = await supabase
-      .from('company_settings')
-      .select('printavo_username, printavo_api_token_encrypted')
-      .eq('id', companyData)
+    const { data: integrationSettings, error: settingsError } = await supabase
+      .from('integration_settings')
+      .select('config, is_enabled')
+      .eq('company_id', companyData)
+      .eq('provider_name', 'printavo')
       .maybeSingle();
 
     if (settingsError) {
       console.error('Settings error:', settingsError);
       return new Response(
         JSON.stringify({
-          error: "Failed to fetch company settings",
+          error: "Failed to fetch Printavo settings",
           details: settingsError.message,
         }),
         {
@@ -203,11 +182,11 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (!settings || !settings.printavo_username || !settings.printavo_api_token_encrypted) {
+    if (!integrationSettings?.is_enabled) {
       return new Response(
         JSON.stringify({
-          error: "Printavo credentials not configured",
-          message: "Please configure Printavo credentials in Account Settings",
+          error: "Printavo integration not enabled",
+          message: "Please enable and configure Printavo credentials in Account Settings",
         }),
         {
           status: 400,
@@ -216,12 +195,23 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const printavoEmail = settings.printavo_username;
-    const printavoToken = await decryptToken(
-      settings.printavo_api_token_encrypted,
-      supabaseUrl,
-      supabaseServiceRoleKey
-    );
+    const config = integrationSettings.config as any;
+
+    if (!config?.email || !config?.api_token) {
+      return new Response(
+        JSON.stringify({
+          error: "Printavo credentials not configured",
+          message: "Please configure Printavo email and API token in Account Settings",
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const printavoEmail = config.email;
+    const printavoToken = config.api_token;
 
     const statuses = await fetchAllStatuses(printavoEmail, printavoToken);
 
