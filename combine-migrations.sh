@@ -9,7 +9,7 @@ OUTPUT_FILE="PRODUCTION_COMPLETE_MIGRATION.sql"
 cat > "$OUTPUT_FILE" << 'EOF'
 /*
   COMPLETE PRODUCTION MIGRATION SCRIPT
-  
+
   This file combines all migrations in chronological order.
   Apply this to your production database at:
   https://supabase.com/dashboard/project/cuaukcvccxvfpuxaciac/sql/new
