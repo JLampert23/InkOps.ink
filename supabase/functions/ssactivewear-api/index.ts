@@ -125,13 +125,13 @@ Deno.serve(async (req: Request) => {
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-        endpoint = `${SSA_REST_API_BASE}/styles/?style=${encodeURIComponent(productId)}`;
+        endpoint = `${SSA_REST_API_BASE}/products/?style=${encodeURIComponent(productId)}`;
         break;
 
       case "styles":
         endpoint = `${SSA_REST_API_BASE}/styles/`;
         if (productId) {
-          endpoint = `${SSA_REST_API_BASE}/styles/?style=${encodeURIComponent(productId)}`;
+          endpoint = `${SSA_REST_API_BASE}/products/?style=${encodeURIComponent(productId)}`;
         }
         break;
 
