@@ -74,41 +74,44 @@ Deno.serve(async (req: Request) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { data: settings, error: settingsError } = await supabase
-      .from('company_settings')
-      .select('resend_api_key, email_from_address')
+    const { data: userProfile } = await supabase
+      .from('user_profiles')
+      .select('company_id')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (!userProfile?.company_id) {
+      throw new Error('User company not found');
+    }
+
+    const { data: integrationSettings, error: settingsError } = await supabase
+      .from('integration_settings')
+      .select('config, is_enabled')
+      .eq('company_id', userProfile.company_id)
+      .eq('provider_name', 'resend')
       .maybeSingle();
 
     if (settingsError) {
-      throw new Error(`Failed to load settings: ${settingsError.message}`);
+      throw new Error(`Failed to load Resend settings: ${settingsError.message}`);
     }
 
-    if (!settings?.resend_api_key) {
+    if (!integrationSettings?.is_enabled) {
+      throw new Error('Resend integration is not enabled. Please enable it in Settings → Integrations.');
+    }
+
+    const config = integrationSettings.config as any;
+
+    if (!config?.api_key) {
       throw new Error('Resend API key not configured. Please add it in Settings → Integrations.');
     }
 
-    if (!settings?.email_from_address) {
+    if (!config?.from_email) {
       throw new Error('From email address not configured. Please add it in Settings → Integrations.');
     }
 
-    const cryptoResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${supabaseServiceKey}`,
-      },
-      body: JSON.stringify({
-        action: 'decrypt',
-        token: settings.resend_api_key,
-      }),
-    });
-
-    if (!cryptoResponse.ok) {
-      const errorData = await cryptoResponse.json();
-      throw new Error(`Failed to decrypt API key: ${errorData.error || 'Unknown error'}`);
-    }
-
-    const { result: RESEND_API_KEY } = await cryptoResponse.json();
+    const RESEND_API_KEY = config.api_key;
+    const fromEmail = config.from_email;
+    const fromName = config.from_name || '';
 
     const emailRequest: EmailRequest = await req.json();
     const { to, subject, template, data, html: customHtml, attachments } = emailRequest;
@@ -131,8 +134,10 @@ Deno.serve(async (req: Request) => {
 
     const toArray = Array.isArray(to) ? to : [to];
 
+    const fromAddress = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
+
     const emailPayload: any = {
-      from: data?.from || settings.email_from_address,
+      from: data?.from || fromAddress,
       to: toArray,
       subject: subject,
       html: html,
