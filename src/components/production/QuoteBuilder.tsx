@@ -85,7 +85,7 @@ interface QuoteBuilderProps {
 }
 
 export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: QuoteBuilderProps) {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const { showNotification } = useNotification();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -582,14 +582,13 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       return;
     }
 
+    if (!session) {
+      showNotification('error', 'Auth Error', 'You must be logged in');
+      return;
+    }
+
     setProductSearchLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        showNotification('error', 'Auth Error', 'You must be logged in');
-        return;
-      }
-
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/product-search?style=${encodeURIComponent(styleNumber)}`,
         {
@@ -646,7 +645,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
     } finally {
       setProductSearchLoading(false);
     }
-  }, [showNotification]);
+  }, [session, showNotification]);
 
   const handleStyleNumberChange = (groupId: string, itemIdx: number, value: string) => {
     updateItem(groupId, itemIdx, 'item_number', value);
