@@ -36,8 +36,8 @@ CREATE TABLE IF NOT EXISTS printavo_sync_config (
 -- Insert config (will be updated by application)
 INSERT INTO printavo_sync_config (supabase_url, supabase_anon_key)
 VALUES (
-  'https://cuaukcvccxvfpuxaciac.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1YXVrY3ZjY3h2ZnB1eGFjaWFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1NjA4NTQsImV4cCI6MjA4MjEzNjg1NH0.I-FDsR0oezVPxKcWgFmV-MMolV6E-lYcoA7Ew8ZgKYU'
+  'https://gccvdsxiqgbxhdyamzaa.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdjY3Zkc3hpcWdieGhkeWFtemFhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwODMzNDQsImV4cCI6MjA4MTY1OTM0NH0.DdClhHGBlvS4WUvomGWULtU2hlniTxQNCUxqB1XYzm4'
 )
 ON CONFLICT (id) DO NOTHING;
 
