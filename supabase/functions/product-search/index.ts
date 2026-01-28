@@ -41,7 +41,6 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Get auth token from request (already verified by edge function runtime with verify_jwt: true)
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
@@ -50,21 +49,18 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const token = authHeader.replace("Bearer ", "");
+
     // Create Supabase client with service role for database queries
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Create a client with user's JWT to get user info
-    const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } }
-    });
-
-    // Get authenticated user from their JWT
-    const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
+    // Verify the JWT using service role client
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
 
     if (authError || !user) {
       console.error("Auth error:", authError);
       return new Response(
-        JSON.stringify({ error: "Unauthorized", message: authError?.message }),
+        JSON.stringify({ error: "Unauthorized", message: authError?.message || "Invalid JWT" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
