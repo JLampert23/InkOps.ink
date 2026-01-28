@@ -32,7 +32,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RBACPermissions> = {
     canAccessSettings: true,
   },
   admin: {
-    canAccessIntegrations: false,
+    canAccessIntegrations: true,
     canAccessDashboard: true,
     canAccessAccounting: true,
     canAccessProduction: true,
