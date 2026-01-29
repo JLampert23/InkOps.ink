@@ -215,6 +215,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [savingSuppliers, setSavingSuppliers] = useState(false);
   const [testingSuppliers, setTestingSuppliers] = useState(false);
   const [supplierTestResult, setSupplierTestResult] = useState<any>(null);
+  const [testingSanmar, setTestingSanmar] = useState(false);
+  const [sanmarTestResult, setSanmarTestResult] = useState<any>(null);
+  const [testingSSA, setTestingSSA] = useState(false);
+  const [ssaTestResult, setSsaTestResult] = useState<any>(null);
 
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -1984,6 +1988,148 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       });
     } finally {
       setTestingSuppliers(false);
+    }
+  };
+
+  const testSanmarConnection = async () => {
+    try {
+      setTestingSanmar(true);
+      setSanmarTestResult(null);
+
+      let session;
+      try {
+        session = await getFreshSession();
+      } catch (err) {
+        setSanmarTestResult({
+          success: false,
+          error: err instanceof Error ? err.message : 'Authentication error',
+        });
+        return;
+      }
+
+      if (!companySettings?.id) {
+        setSanmarTestResult({
+          success: false,
+          error: 'Company settings not loaded. Please refresh the page.',
+        });
+        return;
+      }
+
+      const sanmarHasCreds = !!(companySettings.sanmar_account_number && companySettings.sanmar_username && companySettings.sanmar_password_encrypted);
+
+      if (!sanmarHasCreds) {
+        setSanmarTestResult({
+          success: false,
+          error: 'SanMar credentials not saved. Please save your credentials first.',
+        });
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sanmar-api?action=search&style=PC54`,
+        {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setSanmarTestResult({
+          success: true,
+          message: 'Connected successfully! Found product data.',
+        });
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        setSanmarTestResult({
+          success: false,
+          error: errorData.error || 'Connection failed',
+        });
+      }
+    } catch (err) {
+      console.error('SanMar test exception:', err);
+      setSanmarTestResult({
+        success: false,
+        error: err instanceof Error ? err.message : 'Connection failed',
+      });
+    } finally {
+      setTestingSanmar(false);
+    }
+  };
+
+  const testSSAConnection = async () => {
+    try {
+      setTestingSSA(true);
+      setSsaTestResult(null);
+
+      let session;
+      try {
+        session = await getFreshSession();
+      } catch (err) {
+        setSsaTestResult({
+          success: false,
+          error: err instanceof Error ? err.message : 'Authentication error',
+        });
+        return;
+      }
+
+      if (!companySettings?.id) {
+        setSsaTestResult({
+          success: false,
+          error: 'Company settings not loaded. Please refresh the page.',
+        });
+        return;
+      }
+
+      const ssaHasCreds = !!(companySettings.ssactivewear_api_key_encrypted);
+
+      if (!ssaHasCreds) {
+        setSsaTestResult({
+          success: false,
+          error: 'SSActivewear credentials not saved. Please save your credentials first.',
+        });
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ssactivewear-api?action=brands`,
+        {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setSsaTestResult({
+          success: true,
+          message: 'Connected successfully! Retrieved brand list.',
+        });
+      } else {
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText || 'Unknown error' };
+        }
+        setSsaTestResult({
+          success: false,
+          error: errorData.error || 'Connection failed',
+        });
+      }
+    } catch (err) {
+      console.error('SSActivewear test exception:', err);
+      setSsaTestResult({
+        success: false,
+        error: err instanceof Error ? err.message : 'Connection failed',
+      });
+    } finally {
+      setTestingSSA(false);
     }
   };
 
@@ -5626,6 +5772,46 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         {sanmarHasCredentials ? 'Enter a new password only if you want to update it' : 'Your SanMar API password'}
                       </p>
                     </div>
+
+                    {sanmarHasCredentials && (
+                      <>
+                        <button
+                          onClick={testSanmarConnection}
+                          disabled={testingSanmar}
+                          className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                        >
+                          {testingSanmar ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              Testing Connection...
+                            </>
+                          ) : (
+                            <>
+                              <Zap className="w-4 h-4" />
+                              Test SanMar Connection
+                            </>
+                          )}
+                        </button>
+
+                        {sanmarTestResult && (
+                          <div className={`p-4 rounded-lg border ${sanmarTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
+                            <div className="flex items-start gap-3">
+                              <div className={`flex-shrink-0 w-6 h-6 rounded-full ${sanmarTestResult.success ? 'bg-green-500' : 'bg-red-500'} flex items-center justify-center text-white text-sm font-bold`}>
+                                {sanmarTestResult.success ? '✓' : '✕'}
+                              </div>
+                              <div className="flex-1">
+                                <h4 className={`font-medium ${sanmarTestResult.success ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'}`}>
+                                  {sanmarTestResult.success ? 'Connection Successful!' : 'Connection Failed'}
+                                </h4>
+                                <p className={`text-sm mt-1 ${sanmarTestResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
+                                  {sanmarTestResult.message || sanmarTestResult.error}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -5710,6 +5896,46 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         </p>
                       )}
                     </div>
+
+                    {ssaHasCredentials && (
+                      <>
+                        <button
+                          onClick={testSSAConnection}
+                          disabled={testingSSA}
+                          className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                        >
+                          {testingSSA ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              Testing Connection...
+                            </>
+                          ) : (
+                            <>
+                              <Zap className="w-4 h-4" />
+                              Test SSActivewear Connection
+                            </>
+                          )}
+                        </button>
+
+                        {ssaTestResult && (
+                          <div className={`p-4 rounded-lg border ${ssaTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
+                            <div className="flex items-start gap-3">
+                              <div className={`flex-shrink-0 w-6 h-6 rounded-full ${ssaTestResult.success ? 'bg-green-500' : 'bg-red-500'} flex items-center justify-center text-white text-sm font-bold`}>
+                                {ssaTestResult.success ? '✓' : '✕'}
+                              </div>
+                              <div className="flex-1">
+                                <h4 className={`font-medium ${ssaTestResult.success ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'}`}>
+                                  {ssaTestResult.success ? 'Connection Successful!' : 'Connection Failed'}
+                                </h4>
+                                <p className={`text-sm mt-1 ${ssaTestResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
+                                  {ssaTestResult.message || ssaTestResult.error}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
               </div>
