@@ -1620,18 +1620,8 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                         className="w-full px-2 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                       />
                     </td>
-                    <td className="p-1 border border-gray-300 dark:border-slate-800">
-                      <div className="flex items-center">
-                        <span className="text-gray-900 dark:text-white text-xs px-1">$</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={fee.unit_amount}
-                          onChange={(e) => updateFee(idx, 'unit_amount', parseFloat(e.target.value) || 0)}
-                          className="w-full px-2 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-right"
-                        />
-                      </div>
+                    <td className="p-2 border border-gray-300 dark:border-slate-800 text-right text-sm text-gray-900 dark:text-white">
+                      ${fee.unit_amount.toFixed(2)}
                     </td>
                     <td className="p-2 border border-gray-300 dark:border-slate-800 text-right text-sm">
                       ${fee.total_amount.toFixed(2)}
