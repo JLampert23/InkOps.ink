@@ -166,7 +166,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: settings, error: settingsError } = await supabase
       .from('company_settings')
-      .select('printavo_email, printavo_token')
+      .select('printavo_username, printavo_api_token_encrypted')
       .eq('id', profile.company_id)
       .maybeSingle();
 
@@ -184,11 +184,11 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (!settings?.printavo_email || !settings?.printavo_token) {
+    if (!settings?.printavo_username || !settings?.printavo_api_token_encrypted) {
       return new Response(
         JSON.stringify({
           error: "Printavo credentials not configured",
-          message: "Please configure Printavo email and API token in Account Settings",
+          message: "Please configure Printavo username and API token in Account Settings",
         }),
         {
           status: 400,
@@ -197,8 +197,29 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const printavoEmail = settings.printavo_email;
-    const printavoToken = settings.printavo_token;
+    const decryptResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": authHeader,
+      },
+      body: JSON.stringify({
+        action: "decrypt",
+        token: settings.printavo_api_token_encrypted,
+      }),
+    });
+
+    if (!decryptResponse.ok) {
+      return new Response(
+        JSON.stringify({ error: "Failed to decrypt Printavo credentials" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { result: decryptedToken } = await decryptResponse.json();
+
+    const printavoEmail = settings.printavo_username;
+    const printavoToken = decryptedToken;
 
     const statuses = await fetchAllStatuses(printavoEmail, printavoToken);
 
