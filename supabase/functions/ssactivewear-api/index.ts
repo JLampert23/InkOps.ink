@@ -146,8 +146,8 @@ Deno.serve(async (req: Request) => {
 
     const { data: settings } = await supabase
       .from("company_settings")
-      .eq("id", profile.company_id)
       .select("ssactivewear_enabled, ssactivewear_username, ssactivewear_api_key_encrypted")
+      .eq("id", profile.company_id)
       .maybeSingle();
 
     if (!settings?.ssactivewear_enabled || !settings?.ssactivewear_api_key_encrypted || !settings?.ssactivewear_username) {

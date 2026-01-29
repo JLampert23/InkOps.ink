@@ -148,24 +148,26 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: companyData, error: companyError } = await supabase
-      .rpc('get_user_company_id', { user_id: user.id });
+    const { data: profile } = await supabase
+      .from("user_profiles")
+      .select("company_id")
+      .eq("id", user.id)
+      .maybeSingle();
 
-    if (companyError || !companyData) {
+    if (!profile?.company_id) {
       return new Response(
-        JSON.stringify({ error: "Failed to fetch user company" }),
+        JSON.stringify({ error: "Company not found" }),
         {
-          status: 500,
+          status: 404,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
     }
 
-    const { data: integrationSettings, error: settingsError } = await supabase
-      .from('integration_settings')
-      .select('config, is_enabled')
-      .eq('company_id', companyData)
-      .eq('provider_name', 'printavo')
+    const { data: settings, error: settingsError } = await supabase
+      .from('company_settings')
+      .select('printavo_email, printavo_token')
+      .eq('id', profile.company_id)
       .maybeSingle();
 
     if (settingsError) {
@@ -182,22 +184,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (!integrationSettings?.is_enabled) {
-      return new Response(
-        JSON.stringify({
-          error: "Printavo integration not enabled",
-          message: "Please enable and configure Printavo credentials in Account Settings",
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    const config = integrationSettings.config as any;
-
-    if (!config?.email || !config?.api_token) {
+    if (!settings?.printavo_email || !settings?.printavo_token) {
       return new Response(
         JSON.stringify({
           error: "Printavo credentials not configured",
@@ -210,8 +197,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const printavoEmail = config.email;
-    const printavoToken = config.api_token;
+    const printavoEmail = settings.printavo_email;
+    const printavoToken = settings.printavo_token;
 
     const statuses = await fetchAllStatuses(printavoEmail, printavoToken);
 
