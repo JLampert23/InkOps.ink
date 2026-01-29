@@ -1616,17 +1616,17 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                 </tbody>
               </table>
             </div>
+          </div>
 
-            {/* Add Line Item Group Button */}
-            <div className="mt-4">
-              <button
-                onClick={addItemGroup}
-                className="px-4 py-2 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-900 dark:text-white rounded text-sm flex items-center gap-2 shadow-sm"
-              >
-                <Plus className="w-4 h-4" />
-                Line Item Group
-              </button>
-            </div>
+          {/* Add Line Item Group Button */}
+          <div className="mb-6">
+            <button
+              onClick={addItemGroup}
+              className="px-4 py-2 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-900 dark:text-white rounded text-sm flex items-center gap-2 shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Line Item Group
+            </button>
           </div>
 
           {/* Fees Table */}
