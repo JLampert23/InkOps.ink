@@ -1833,6 +1833,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setSsaApiKey(ssaApiKey.trim() ? '••••••••••••••••' : '');
       setSupplierTestResult(null);
       await loadSettings();
+      await loadSupplierIntegrationSettings();
     } catch (err) {
       console.error('Error saving supplier integrations:', err);
       showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save supplier integrations');
@@ -3411,7 +3412,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 <div className="mt-1 ml-2 space-y-1 collapsible-section collapsible-section-enter">
                   <button
                     onClick={() => setActiveTab('printavo-integration')}
-                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group relative ${
                       activeTab === 'printavo-integration'
                         ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
                         : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
@@ -3419,8 +3420,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   >
                     <Key className={`w-4 h-4 flex-shrink-0 ${activeTab === 'printavo-integration' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                     <div className="flex-1 text-left">
-                      <div className={`font-medium text-sm ${activeTab === 'printavo-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      <div className={`font-medium text-sm flex items-center gap-2 ${activeTab === 'printavo-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                         Printavo
+                        {companySettings?.printavo_api_token_encrypted && (
+                          <div className="w-2 h-2 bg-green-500 rounded-full" title="Credentials saved" />
+                        )}
                       </div>
                     </div>
                     {activeTab === 'printavo-integration' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
@@ -3428,7 +3432,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                   <button
                     onClick={() => setActiveTab('square-integration')}
-                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group relative ${
                       activeTab === 'square-integration'
                         ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
                         : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
@@ -3437,8 +3441,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   >
                     <CreditCard className={`w-4 h-4 flex-shrink-0 ${activeTab === 'square-integration' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                     <div className="flex-1 text-left">
-                      <div className={`font-medium text-sm ${activeTab === 'square-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      <div className={`font-medium text-sm flex items-center gap-2 ${activeTab === 'square-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                         Square
+                        {companySettings?.square_access_token && (
+                          <div className="w-2 h-2 bg-green-500 rounded-full" title="Credentials saved" />
+                        )}
                       </div>
                     </div>
                     {activeTab === 'square-integration' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
@@ -3446,7 +3453,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                   <button
                     onClick={() => setActiveTab('resend-integration')}
-                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group relative ${
                       activeTab === 'resend-integration'
                         ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
                         : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
@@ -3455,8 +3462,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   >
                     <SettingsIcon className={`w-4 h-4 flex-shrink-0 ${activeTab === 'resend-integration' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                     <div className="flex-1 text-left">
-                      <div className={`font-medium text-sm ${activeTab === 'resend-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      <div className={`font-medium text-sm flex items-center gap-2 ${activeTab === 'resend-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                         Resend Email
+                        {companySettings?.resend_api_key && (
+                          <div className="w-2 h-2 bg-green-500 rounded-full" title="Credentials saved" />
+                        )}
                       </div>
                     </div>
                     {activeTab === 'resend-integration' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
@@ -3464,7 +3474,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                   <button
                     onClick={() => setActiveTab('twilio-integration')}
-                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group relative ${
                       activeTab === 'twilio-integration'
                         ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
                         : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
@@ -3473,8 +3483,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   >
                     <MessageSquare className={`w-4 h-4 flex-shrink-0 ${activeTab === 'twilio-integration' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                     <div className="flex-1 text-left">
-                      <div className={`font-medium text-sm ${activeTab === 'twilio-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      <div className={`font-medium text-sm flex items-center gap-2 ${activeTab === 'twilio-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                         Twilio SMS
+                        {companySettings?.twilio_auth_token && (
+                          <div className="w-2 h-2 bg-green-500 rounded-full" title="Credentials saved" />
+                        )}
                       </div>
                     </div>
                     {activeTab === 'twilio-integration' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
@@ -3482,7 +3495,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                   <button
                     onClick={() => setActiveTab('stripe-payments')}
-                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group relative ${
                       activeTab === 'stripe-payments'
                         ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
                         : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
@@ -3491,8 +3504,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   >
                     <CreditCard className={`w-4 h-4 flex-shrink-0 ${activeTab === 'stripe-payments' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                     <div className="flex-1 text-left">
-                      <div className={`font-medium text-sm ${activeTab === 'stripe-payments' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      <div className={`font-medium text-sm flex items-center gap-2 ${activeTab === 'stripe-payments' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                         Stripe
+                        {(companySettings?.stripe_public_key && companySettings?.stripe_secret_key) && (
+                          <div className="w-2 h-2 bg-green-500 rounded-full" title="Credentials saved" />
+                        )}
                       </div>
                     </div>
                     {activeTab === 'stripe-payments' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
@@ -3500,7 +3516,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                   <button
                     onClick={() => setActiveTab('supplier-integrations')}
-                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group relative ${
                       activeTab === 'supplier-integrations'
                         ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
                         : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
@@ -3509,8 +3525,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   >
                     <Grid3x3 className={`w-4 h-4 flex-shrink-0 ${activeTab === 'supplier-integrations' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                     <div className="flex-1 text-left">
-                      <div className={`font-medium text-sm ${activeTab === 'supplier-integrations' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      <div className={`font-medium text-sm flex items-center gap-2 ${activeTab === 'supplier-integrations' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                         Garment Suppliers
+                        {(companySettings?.sanmar_api_key_encrypted || companySettings?.ssactivewear_api_key_encrypted) && (
+                          <div className="w-2 h-2 bg-green-500 rounded-full" title="Credentials saved" />
+                        )}
                       </div>
                     </div>
                     {activeTab === 'supplier-integrations' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
