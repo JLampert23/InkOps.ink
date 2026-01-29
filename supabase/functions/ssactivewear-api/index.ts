@@ -208,7 +208,7 @@ Deno.serve(async (req: Request) => {
           );
         }
 
-        const soapBody = `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/">
+        const soapBody = `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/SharedObjects/v2.0.0/">
   <shar:wsVersion>2.0.0</shar:wsVersion>
   <shar:id>${credentials.accountNumber}</shar:id>
   <shar:password>${decryptedApiKey}</shar:password>
@@ -271,7 +271,7 @@ Deno.serve(async (req: Request) => {
           );
         }
 
-        const soapBody = `<ns2:GetInventoryLevelsRequest xmlns:ns2="http://www.promostandards.org/WSDL/InventoryService/2.0.0/">
+        const soapBody = `<ns2:GetInventoryLevelsRequest xmlns:ns2="http://www.promostandards.org/WSDL/InventoryService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/SharedObjects/v2.0.0/">
   <shar:wsVersion>2.0.0</shar:wsVersion>
   <shar:id>${credentials.accountNumber}</shar:id>
   <shar:password>${decryptedApiKey}</shar:password>
@@ -318,7 +318,7 @@ Deno.serve(async (req: Request) => {
           );
         }
 
-        const soapBody = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/">
+        const soapBody = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/SharedObjects/v2.0.0/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${credentials.accountNumber}</shar:id>
   <shar:password>${decryptedApiKey}</shar:password>
