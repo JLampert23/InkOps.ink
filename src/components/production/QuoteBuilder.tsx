@@ -382,6 +382,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         .from('quote_line_items')
         .select('*')
         .eq('quote_id', quoteId)
+        .is('line_type', null)
         .order('sort_order');
 
       // Group items by group_label
@@ -884,8 +885,9 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       }
 
       if (savedQuoteId) {
-        // Delete existing line items
+        // Delete existing line items and fees
         await supabase.from('quote_line_items').delete().eq('quote_id', savedQuoteId);
+        await supabase.from('quote_fees').delete().eq('quote_id', savedQuoteId);
 
         // Insert new line items with group labels
         const allItems = itemGroups.flatMap((group, groupIdx) =>
@@ -926,10 +928,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           const { error: itemsError } = await supabase.from('quote_line_items').insert(allItems);
           if (itemsError) throw itemsError;
         }
-
-        // Delete existing fees from both tables for backward compatibility
-        await supabase.from('quote_fees').delete().eq('quote_id', savedQuoteId);
-        await supabase.from('quote_line_items').delete().eq('quote_id', savedQuoteId).eq('line_type', 'fee');
 
         // Insert new fees as line items with line_type='fee'
         if (fees.length > 0) {
