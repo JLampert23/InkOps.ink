@@ -730,42 +730,47 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
         {/* Fees Section */}
         {fees.length > 0 && (
-          <div className="p-6 border-t border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800">
-            <h3 className="text-base font-bold text-gray-900 dark:text-white mb-3">Additional Fees</h3>
+          <div className="px-8 py-4 border-t border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2">Additional Fees</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-100 dark:bg-slate-700/50 border-b border-gray-300 dark:border-slate-600">
                   <tr>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-900 dark:text-white">Fee</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-900 dark:text-white">Description</th>
-                    <th className="px-3 py-2 text-center font-semibold text-gray-900 dark:text-white">Quantity</th>
-                    <th className="px-3 py-2 text-right font-semibold text-gray-900 dark:text-white">Unit Price</th>
-                    <th className="px-3 py-2 text-right font-semibold text-gray-900 dark:text-white">Total</th>
+                    <th className="px-2 py-1.5 text-left font-semibold text-gray-900 dark:text-white text-xs">Fee</th>
+                    <th className="px-2 py-1.5 text-left font-semibold text-gray-900 dark:text-white text-xs">Description</th>
+                    <th className="px-2 py-1.5 text-center font-semibold text-gray-900 dark:text-white text-xs">Quantity</th>
+                    <th className="px-2 py-1.5 text-right font-semibold text-gray-900 dark:text-white text-xs">Unit Price</th>
+                    <th className="px-2 py-1.5 text-right font-semibold text-gray-900 dark:text-white text-xs">Total</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {fees.map((fee) => (
-                    <tr key={fee.id} className="border-b border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/30">
-                      <td className="px-3 py-2 text-gray-700 dark:text-gray-300 font-mono text-xs">
-                        {fee.item_number || '-'}
-                      </td>
-                      <td className="px-3 py-2 text-gray-900 dark:text-white">
-                        {fee.description}
-                        {fee.notes && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic">{fee.notes}</p>
-                        )}
-                      </td>
-                      <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">
-                        {(fee as any).quantity || 1}
-                      </td>
-                      <td className="px-3 py-2 text-right text-gray-700 dark:text-gray-300">
-                        ${fee.unit_price.toFixed(2)}
-                      </td>
-                      <td className="px-3 py-2 text-right text-gray-900 dark:text-white font-semibold">
-                        ${fee.total_price.toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
+                  {fees.map((fee) => {
+                    const feeName = fee.description.includes(' - ') ? fee.description.split(' - ')[0] : fee.description;
+                    const feeDescription = fee.description.includes(' - ') ? fee.description.split(' - ').slice(1).join(' - ') : '';
+
+                    return (
+                      <tr key={fee.id} className="border-b border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/30">
+                        <td className="px-2 py-1.5 text-gray-900 dark:text-white text-xs">
+                          {feeName}
+                        </td>
+                        <td className="px-2 py-1.5 text-gray-700 dark:text-gray-300 text-xs">
+                          {feeDescription}
+                          {fee.notes && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 italic">{fee.notes}</p>
+                          )}
+                        </td>
+                        <td className="px-2 py-1.5 text-center text-gray-700 dark:text-gray-300 text-xs">
+                          {(fee as any).quantity || 1}
+                        </td>
+                        <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-300 text-xs">
+                          ${fee.unit_price.toFixed(2)}
+                        </td>
+                        <td className="px-2 py-1.5 text-right text-gray-900 dark:text-white font-semibold text-xs">
+                          ${fee.total_price.toFixed(2)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -797,7 +802,17 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
         {/* Totals Summary */}
         <div className="p-8 border-t border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700/30">
-          <div className="flex justify-end">
+          <div className="flex justify-between items-start">
+            {/* Left: Creation Date */}
+            <div className="text-sm">
+              <div className="text-gray-600 dark:text-gray-400">
+                Created: <span className="font-medium text-gray-900 dark:text-white">
+                  {quote.created_date ? format(new Date(quote.created_date), 'MMMM d, yyyy') : format(new Date(quote.created_at), 'MMMM d, yyyy')}
+                </span>
+              </div>
+            </div>
+
+            {/* Right: Totals */}
             <div className="w-80 space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="font-semibold text-gray-900 dark:text-white">Total Quantity</span>
