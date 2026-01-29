@@ -32,7 +32,7 @@ interface CompanySettings {
 }
 
 function AppContent() {
-  const [activeTab, setActiveTab] = useState<Tab>('accounting-dashboard');
+  const [activeTab, setActiveTab] = useState<Tab>('production');
   const [accountingExpanded, setAccountingExpanded] = useState(true);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [settingsInitialTab, setSettingsInitialTab] = useState<string | undefined>(undefined);
@@ -205,7 +205,38 @@ function AppContent() {
         {/* Navigation */}
         <nav className="p-4 space-y-2 overflow-y-auto pb-32" style={{ height: 'calc(100vh - 220px)' }}>
 
-          {/* 1. ACCOUNTING - Collapsible section (NEW - AT TOP) */}
+          {/* 1. PRODUCTION DASHBOARD - Top-level link */}
+          <div className="space-y-1">
+            {productionNavItems.map(item => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
+                    isActive
+                      ? 'bg-orange-50 dark:bg-blue-600/20 text-orange-700 dark:text-blue-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                  aria-label="Production Dashboard"
+                >
+                  <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-orange-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-bold text-xs uppercase tracking-wide leading-tight ${isActive ? 'text-orange-700 dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'}`}>
+                      Production<br />Dashboard
+                    </div>
+                  </div>
+                  {isActive && <div className="w-1 h-8 bg-orange-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Separator */}
+          <div className="border-t border-gray-200 dark:border-slate-700 my-3" />
+
+          {/* 2. ACCOUNTING - Collapsible section */}
           <div>
             {/* Accounting Header - Collapsible trigger */}
             <button
@@ -262,37 +293,6 @@ function AppContent() {
                 })}
               </div>
             )}
-          </div>
-
-          {/* Separator */}
-          <div className="border-t border-gray-200 dark:border-slate-700 my-3" />
-
-          {/* 2. PRODUCTION DASHBOARD - Top-level link */}
-          <div className="space-y-1">
-            {productionNavItems.map(item => {
-              const Icon = item.icon;
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
-                    isActive
-                      ? 'bg-orange-50 dark:bg-blue-600/20 text-orange-700 dark:text-blue-400 shadow-sm'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                  aria-label="Production Dashboard"
-                >
-                  <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-orange-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
-                  <div className="flex-1 text-left">
-                    <div className={`font-bold text-xs uppercase tracking-wide leading-tight ${isActive ? 'text-orange-700 dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'}`}>
-                      Production<br />Dashboard
-                    </div>
-                  </div>
-                  {isActive && <div className="w-1 h-8 bg-orange-600 dark:bg-blue-500 rounded-full absolute right-0" />}
-                </button>
-              );
-            })}
           </div>
 
           {/* Separator */}
