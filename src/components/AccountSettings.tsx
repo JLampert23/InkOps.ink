@@ -29,8 +29,9 @@ interface CompanySettings {
   stripe_public_key: string | null;
   stripe_secret_key: string | null;
   stripe_webhook_secret: string | null;
+  sanmar_account_number: string | null;
   sanmar_username: string | null;
-  sanmar_api_key_encrypted: string | null;
+  sanmar_password_encrypted: string | null;
   sanmar_enabled: boolean | null;
   ssactivewear_username: string | null;
   ssactivewear_api_key_encrypted: string | null;
@@ -200,13 +201,15 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   // Supplier Integration States
   const [sanmarEnabled, setSanmarEnabled] = useState(false);
-  const [sanmarApiKey, setSanmarApiKey] = useState('');
-  const [showSanmarApiKey, setShowSanmarApiKey] = useState(false);
-  const [sanmarCustomerId, setSanmarCustomerId] = useState('');
+  const [sanmarAccountNumber, setSanmarAccountNumber] = useState('');
+  const [sanmarUsername, setSanmarUsername] = useState('');
+  const [sanmarPassword, setSanmarPassword] = useState('');
+  const [showSanmarPassword, setShowSanmarPassword] = useState(false);
   const [sanmarHasCredentials, setSanmarHasCredentials] = useState(false);
   const [ssaEnabled, setSsaEnabled] = useState(false);
   const [ssaAccountNumber, setSsaAccountNumber] = useState('');
   const [ssaApiKey, setSsaApiKey] = useState('');
+  const [showSsaAccountNumber, setShowSsaAccountNumber] = useState(false);
   const [showSsaApiKey, setShowSsaApiKey] = useState(false);
   const [ssaHasCredentials, setSsaHasCredentials] = useState(false);
   const [savingSuppliers, setSavingSuppliers] = useState(false);
@@ -402,6 +405,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     }
   }, [activeTab, canAccessIntegrations]);
 
+  useEffect(() => {
+    if (companySettings?.id) {
+      loadSupplierIntegrationSettings();
+    }
+  }, [companySettings]);
+
   const loadSettings = async () => {
     try {
       setLoading(true);
@@ -476,7 +485,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     try {
       if (!companySettings?.id) return;
 
-      const sanmarHasCreds = !!(companySettings.sanmar_api_key_encrypted);
+      const sanmarHasCreds = !!(companySettings.sanmar_account_number && companySettings.sanmar_username && companySettings.sanmar_password_encrypted);
       const ssaHasCreds = !!(companySettings.ssactivewear_api_key_encrypted);
 
       setSanmarEnabled(companySettings.sanmar_enabled || false);
@@ -484,10 +493,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setSanmarHasCredentials(sanmarHasCreds);
       setSsaHasCredentials(ssaHasCreds);
 
-      setSanmarApiKey(sanmarHasCreds ? '••••••••••••••••' : '');
-      setSanmarCustomerId(companySettings.sanmar_username || '');
+      setSanmarAccountNumber(companySettings.sanmar_account_number || '');
+      setSanmarUsername(companySettings.sanmar_username || '');
+      setSanmarPassword(sanmarHasCreds ? '••••••••••••••••' : '');
       setSsaApiKey(ssaHasCreds ? '••••••••••••••••' : '');
-      setSsaAccountNumber(companySettings.ssactivewear_username || '');
+      setSsaAccountNumber(ssaHasCreds ? '••••••••••••••••' : '');
 
       console.log('Loaded supplier integration settings:', {
         sanmarEnabled: companySettings.sanmar_enabled,
@@ -1746,7 +1756,15 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
       // Handle SanMar credentials
       if (sanmarEnabled) {
-        if (sanmarApiKey.trim() && sanmarApiKey !== '••••••••••••••••') {
+        if (sanmarAccountNumber.trim()) {
+          settingsData.sanmar_account_number = sanmarAccountNumber.trim();
+        }
+
+        if (sanmarUsername.trim()) {
+          settingsData.sanmar_username = sanmarUsername.trim();
+        }
+
+        if (sanmarPassword.trim() && sanmarPassword !== '••••••••••••••••') {
           const encryptResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crypto-service`, {
             method: 'POST',
             headers: {
@@ -1755,24 +1773,21 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             },
             body: JSON.stringify({
               action: 'encrypt',
-              token: sanmarApiKey,
+              token: sanmarPassword,
             }),
           });
 
           if (!encryptResponse.ok) {
-            throw new Error('Failed to encrypt SanMar API key');
+            throw new Error('Failed to encrypt SanMar password');
           }
 
-          const { result: encryptedApiKey } = await encryptResponse.json();
-          settingsData.sanmar_api_key_encrypted = encryptedApiKey;
-        }
-
-        if (sanmarCustomerId.trim()) {
-          settingsData.sanmar_username = sanmarCustomerId.trim();
+          const { result: encryptedPassword } = await encryptResponse.json();
+          settingsData.sanmar_password_encrypted = encryptedPassword;
         }
       } else {
-        settingsData.sanmar_api_key_encrypted = null;
+        settingsData.sanmar_account_number = null;
         settingsData.sanmar_username = null;
+        settingsData.sanmar_password_encrypted = null;
       }
 
       // Handle SSActivewear credentials
@@ -1807,8 +1822,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       }
 
       // Validate that if enabled, there are credentials (either existing or new)
-      if (sanmarEnabled && !sanmarHasCredentials && !settingsData.sanmar_api_key_encrypted) {
-        showNotification('warning', 'SanMar API Key Required', 'Please enter your SanMar API key to enable this integration');
+      if (sanmarEnabled && !sanmarHasCredentials && (!settingsData.sanmar_account_number || !settingsData.sanmar_username || !settingsData.sanmar_password_encrypted)) {
+        showNotification('warning', 'SanMar Credentials Required', 'Please enter Account Number, Username, and Password to enable SanMar integration');
         return;
       }
 
@@ -1827,9 +1842,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       if (error) throw error;
 
       showNotification('success', 'Supplier Integrations Saved', 'Supplier integration settings have been saved successfully!');
-      setSanmarApiKey(sanmarApiKey.trim() ? '••••••••••••••••' : '');
-      setSanmarCustomerId(sanmarCustomerId.trim() ? sanmarCustomerId : '');
-      setSsaAccountNumber(ssaAccountNumber.trim() ? ssaAccountNumber : '');
+      setSanmarPassword(sanmarPassword.trim() ? '••••••••••••••••' : '');
+      setSsaAccountNumber(ssaAccountNumber.trim() && ssaAccountNumber !== '••••••••••••••••' ? '••••••••••••••••' : (ssaHasCredentials ? '••••••••••••••••' : ''));
       setSsaApiKey(ssaApiKey.trim() ? '••••••••••••••••' : '');
       setSupplierTestResult(null);
       await loadSettings();
@@ -1867,7 +1881,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
-      const sanmarHasCreds = !!(companySettings.sanmar_api_key_encrypted);
+      const sanmarHasCreds = !!(companySettings.sanmar_account_number && companySettings.sanmar_username && companySettings.sanmar_password_encrypted);
       const ssaHasCreds = !!(companySettings.ssactivewear_api_key_encrypted);
 
       if (!sanmarHasCreds && !ssaHasCreds) {
@@ -3422,9 +3436,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     <div className="flex-1 text-left">
                       <div className={`font-medium text-sm flex items-center gap-2 ${activeTab === 'printavo-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                         Printavo
-                        {companySettings?.printavo_api_token_encrypted && (
-                          <div className="w-2 h-2 bg-green-500 rounded-full" title="Credentials saved" />
-                        )}
+                        <div
+                          className={`w-2 h-2 rounded-full ${companySettings?.printavo_api_token_encrypted ? 'bg-green-500' : 'bg-red-500'}`}
+                          title={companySettings?.printavo_api_token_encrypted ? "Credentials saved" : "Credentials missing"}
+                        />
                       </div>
                     </div>
                     {activeTab === 'printavo-integration' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
@@ -3443,9 +3458,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     <div className="flex-1 text-left">
                       <div className={`font-medium text-sm flex items-center gap-2 ${activeTab === 'square-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                         Square
-                        {companySettings?.square_access_token && (
-                          <div className="w-2 h-2 bg-green-500 rounded-full" title="Credentials saved" />
-                        )}
+                        <div
+                          className={`w-2 h-2 rounded-full ${companySettings?.square_access_token ? 'bg-green-500' : 'bg-red-500'}`}
+                          title={companySettings?.square_access_token ? "Credentials saved" : "Credentials missing"}
+                        />
                       </div>
                     </div>
                     {activeTab === 'square-integration' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
@@ -3464,9 +3480,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     <div className="flex-1 text-left">
                       <div className={`font-medium text-sm flex items-center gap-2 ${activeTab === 'resend-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                         Resend Email
-                        {companySettings?.resend_api_key && (
-                          <div className="w-2 h-2 bg-green-500 rounded-full" title="Credentials saved" />
-                        )}
+                        <div
+                          className={`w-2 h-2 rounded-full ${companySettings?.resend_api_key ? 'bg-green-500' : 'bg-red-500'}`}
+                          title={companySettings?.resend_api_key ? "Credentials saved" : "Credentials missing"}
+                        />
                       </div>
                     </div>
                     {activeTab === 'resend-integration' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
@@ -3485,9 +3502,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     <div className="flex-1 text-left">
                       <div className={`font-medium text-sm flex items-center gap-2 ${activeTab === 'twilio-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                         Twilio SMS
-                        {companySettings?.twilio_auth_token && (
-                          <div className="w-2 h-2 bg-green-500 rounded-full" title="Credentials saved" />
-                        )}
+                        <div
+                          className={`w-2 h-2 rounded-full ${companySettings?.twilio_auth_token ? 'bg-green-500' : 'bg-red-500'}`}
+                          title={companySettings?.twilio_auth_token ? "Credentials saved" : "Credentials missing"}
+                        />
                       </div>
                     </div>
                     {activeTab === 'twilio-integration' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
@@ -3506,9 +3524,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     <div className="flex-1 text-left">
                       <div className={`font-medium text-sm flex items-center gap-2 ${activeTab === 'stripe-payments' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                         Stripe
-                        {(companySettings?.stripe_public_key && companySettings?.stripe_secret_key) && (
-                          <div className="w-2 h-2 bg-green-500 rounded-full" title="Credentials saved" />
-                        )}
+                        <div
+                          className={`w-2 h-2 rounded-full ${(companySettings?.stripe_public_key && companySettings?.stripe_secret_key) ? 'bg-green-500' : 'bg-red-500'}`}
+                          title={(companySettings?.stripe_public_key && companySettings?.stripe_secret_key) ? "Credentials saved" : "Credentials missing"}
+                        />
                       </div>
                     </div>
                     {activeTab === 'stripe-payments' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
@@ -3527,9 +3546,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     <div className="flex-1 text-left">
                       <div className={`font-medium text-sm flex items-center gap-2 ${activeTab === 'supplier-integrations' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                         Garment Suppliers
-                        {(companySettings?.sanmar_api_key_encrypted || companySettings?.ssactivewear_api_key_encrypted) && (
-                          <div className="w-2 h-2 bg-green-500 rounded-full" title="Credentials saved" />
-                        )}
+                        <div
+                          className={`w-2 h-2 rounded-full ${((companySettings?.sanmar_account_number && companySettings?.sanmar_username && companySettings?.sanmar_password_encrypted) || companySettings?.ssactivewear_api_key_encrypted) ? 'bg-green-500' : 'bg-red-500'}`}
+                          title={((companySettings?.sanmar_account_number && companySettings?.sanmar_username && companySettings?.sanmar_password_encrypted) || companySettings?.ssactivewear_api_key_encrypted) ? "Credentials saved" : "Credentials missing"}
+                        />
                       </div>
                     </div>
                     {activeTab === 'supplier-integrations' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
@@ -5551,47 +5571,60 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
                         <div className="flex-1">
                           <p className="text-sm font-medium text-green-800 dark:text-green-300">Credentials Saved</p>
-                          <p className="text-xs text-green-700 dark:text-green-400 mt-0.5">Leave fields blank to keep existing credentials, or enter new values to update</p>
+                          <p className="text-xs text-green-700 dark:text-green-400 mt-0.5">Leave password blank to keep existing, or enter new password to update</p>
                         </div>
                       </div>
                     )}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        API Key {!sanmarHasCredentials && <span className="text-red-500">*</span>}
+                        Account Number {!sanmarHasCredentials && <span className="text-red-500">*</span>}
                       </label>
-                      <div className="relative">
-                        <input
-                          type={showSanmarApiKey ? 'text' : 'password'}
-                          value={sanmarApiKey}
-                          onChange={(e) => setSanmarApiKey(e.target.value)}
-                          className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder={sanmarHasCredentials ? "Leave blank to keep existing" : "Enter your SanMar API key"}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowSanmarApiKey(!showSanmarApiKey)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                          tabIndex={-1}
-                        >
-                          {showSanmarApiKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                        </button>
-                      </div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        {sanmarHasCredentials ? 'Enter a new API key only if you want to update it' : 'Get your API key from SanMar Developer Portal'}
-                      </p>
+                      <input
+                        type="text"
+                        value={sanmarAccountNumber}
+                        onChange={(e) => setSanmarAccountNumber(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Your SanMar account number"
+                      />
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Customer ID
+                        Username {!sanmarHasCredentials && <span className="text-red-500">*</span>}
                       </label>
                       <input
                         type="text"
-                        value={sanmarCustomerId}
-                        onChange={(e) => setSanmarCustomerId(e.target.value)}
+                        value={sanmarUsername}
+                        onChange={(e) => setSanmarUsername(e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Your SanMar customer ID (optional)"
+                        placeholder="Your SanMar username"
                       />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Password {!sanmarHasCredentials && <span className="text-red-500">*</span>}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showSanmarPassword ? 'text' : 'password'}
+                          value={sanmarPassword}
+                          onChange={(e) => setSanmarPassword(e.target.value)}
+                          className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder={sanmarHasCredentials ? "Leave blank to keep existing" : "Enter your SanMar password"}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowSanmarPassword(!showSanmarPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                          tabIndex={-1}
+                        >
+                          {showSanmarPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {sanmarHasCredentials ? 'Enter a new password only if you want to update it' : 'Your SanMar API password'}
+                      </p>
                     </div>
                   </div>
                 )}
@@ -5626,13 +5659,23 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Account Number {!ssaHasCredentials && <span className="text-red-500">*</span>}
                       </label>
-                      <input
-                        type="text"
-                        value={ssaAccountNumber}
-                        onChange={(e) => setSsaAccountNumber(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder={ssaHasCredentials ? "Leave blank to keep existing" : "Your SSActivewear account number"}
-                      />
+                      <div className="relative">
+                        <input
+                          type={showSsaAccountNumber ? 'text' : 'password'}
+                          value={ssaAccountNumber}
+                          onChange={(e) => setSsaAccountNumber(e.target.value)}
+                          className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder={ssaHasCredentials ? "Leave blank to keep existing" : "Your SSActivewear account number"}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowSsaAccountNumber(!showSsaAccountNumber)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                          tabIndex={-1}
+                        >
+                          {showSsaAccountNumber ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
+                      </div>
                       {ssaHasCredentials && (
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                           Enter a new account number only if you want to update it
