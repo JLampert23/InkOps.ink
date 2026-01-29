@@ -37,7 +37,8 @@ async function makePromoStandardsRequest(
   console.log('Making PromoStandards SOAP request:', {
     endpoint,
     soapAction,
-    accountNumber: accountNumber.substring(0, 4) + '***'
+    accountNumber: accountNumber.substring(0, 4) + '***',
+    soapBodyPreview: soapBody.substring(0, 300)
   });
 
   const response = await fetch(endpoint, {
