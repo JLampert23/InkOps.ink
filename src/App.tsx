@@ -371,30 +371,31 @@ function AppContent() {
                  activeTab === 'paid-invoices' ? 'Paid Invoices' :
                  activeTab === 'customers' ? 'Customers' :
                  activeTab === 'payments' ? 'Payments' :
+                 activeTab === 'production' ? 'Production Dashboard' :
                  [...accountingNavItems, ...squareNavItems, ...productionNavItems].find(item => item.id === activeTab)?.name ||
                  (activeTab === 'settings' ? 'Account Settings' : 'Dashboard')}
               </h2>
-              <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mt-0.5 truncate">
-                {activeTab === 'accounting-dashboard' ? (
-                  'Manage invoices, send payments, and track billing'
-                ) : activeTab === 'accounts-receivable' ? (
-                  'Aging reports and outstanding invoices'
-                ) : activeTab === 'paid-invoices' ? (
-                  'View completed and paid invoices'
-                ) : activeTab === 'customers' ? (
-                  'Customer billing summary and payment history'
-                ) : activeTab === 'payments' ? (
-                  'Payment history and Stripe transaction records'
-                ) : activeTab === 'square' ? (
-                  'Square payment data and reports'
-                ) : activeTab === 'production' ? (
-                  'Manage quotes, proofs, invoicing, and production workflow'
-                ) : activeTab === 'settings' ? (
-                  'Configure your integrations and preferences'
-                ) : (
-                  'Financial management dashboard'
-                )}
-              </p>
+              {activeTab !== 'production' && (
+                <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                  {activeTab === 'accounting-dashboard' ? (
+                    'Manage invoices, send payments, and track billing'
+                  ) : activeTab === 'accounts-receivable' ? (
+                    'Aging reports and outstanding invoices'
+                  ) : activeTab === 'paid-invoices' ? (
+                    'View completed and paid invoices'
+                  ) : activeTab === 'customers' ? (
+                    'Customer billing summary and payment history'
+                  ) : activeTab === 'payments' ? (
+                    'Payment history and Stripe transaction records'
+                  ) : activeTab === 'square' ? (
+                    'Square payment data and reports'
+                  ) : activeTab === 'settings' ? (
+                    'Configure your integrations and preferences'
+                  ) : (
+                    'Financial management dashboard'
+                  )}
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-3">
               {/* Sync to Printavo button - Only show on accounting pages */}
