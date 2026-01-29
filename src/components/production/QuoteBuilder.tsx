@@ -413,14 +413,34 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         setItemGroups([{ id: crypto.randomUUID(), label: '', items: [], taxed: false, customSizeOptions: [], sizeMode: 'regular' }]);
       }
 
-      const { data: quoteFees } = await supabase
-        .from('quote_fees')
+      // Load fees from quote_line_items (new format)
+      const { data: lineItemFees } = await supabase
+        .from('quote_line_items')
         .select('*')
-        .eq('quote_id', quoteId);
-      setFees(quoteFees?.map(fee => ({
-        ...fee,
-        taxed: fee.taxed || false,
-      })) || []);
+        .eq('quote_id', quoteId)
+        .eq('line_type', 'fee');
+
+      if (lineItemFees && lineItemFees.length > 0) {
+        setFees(lineItemFees.map(fee => ({
+          id: fee.id,
+          fee_name: fee.description.split(' - ')[0],
+          description: fee.notes || fee.description.split(' - ')[1] || fee.description,
+          quantity: fee.quantity || 1,
+          unit_amount: fee.unit_price,
+          total_amount: fee.total_price,
+          taxed: false,
+        })));
+      } else {
+        // Fallback to old quote_fees table for backward compatibility
+        const { data: quoteFees } = await supabase
+          .from('quote_fees')
+          .select('*')
+          .eq('quote_id', quoteId);
+        setFees(quoteFees?.map(fee => ({
+          ...fee,
+          taxed: fee.taxed || false,
+        })) || []);
+      }
     }
     setLoading(false);
   };
@@ -903,20 +923,23 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           if (itemsError) throw itemsError;
         }
 
-        // Delete existing fees
+        // Delete existing fees from both tables for backward compatibility
         await supabase.from('quote_fees').delete().eq('quote_id', savedQuoteId);
+        await supabase.from('quote_line_items').delete().eq('quote_id', savedQuoteId).eq('line_type', 'fee');
 
-        // Insert new fees
+        // Insert new fees as line items with line_type='fee'
         if (fees.length > 0) {
-          const { error: feesError } = await supabase.from('quote_fees').insert(
-            fees.map(fee => ({
+          const { error: feesError } = await supabase.from('quote_line_items').insert(
+            fees.map((fee, index) => ({
               quote_id: savedQuoteId,
-              fee_name: fee.fee_name,
-              description: fee.description,
+              company_id: userProfile.company_id,
+              line_number: 9000 + index,
+              line_type: 'fee',
+              description: fee.fee_name + (fee.description && fee.description !== fee.fee_name ? ` - ${fee.description}` : ''),
               quantity: fee.quantity,
-              unit_amount: fee.unit_amount,
-              total_amount: fee.total_amount,
-              taxed: fee.taxed,
+              unit_price: fee.unit_amount,
+              total_price: fee.total_amount,
+              notes: fee.description !== fee.fee_name ? fee.description : null,
             }))
           );
 

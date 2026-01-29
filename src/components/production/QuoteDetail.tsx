@@ -738,6 +738,46 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
           </table>
         </div>
 
+        {/* Fees Section */}
+        {fees.length > 0 && (
+          <div className="p-8 border-t border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Additional Fees</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-100 dark:bg-slate-700/50 border-b-2 border-gray-300 dark:border-slate-600">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Description</th>
+                    <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Quantity</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">Unit Price</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fees.map((fee) => (
+                    <tr key={fee.id} className="border-b border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/30">
+                      <td className="px-4 py-4 text-gray-900 dark:text-white">
+                        {fee.description}
+                        {fee.notes && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic">{fee.notes}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 text-center text-gray-700 dark:text-gray-300">
+                        {fee.quantity || 1}
+                      </td>
+                      <td className="px-4 py-4 text-right text-gray-700 dark:text-gray-300">
+                        ${fee.unit_price.toFixed(2)}
+                      </td>
+                      <td className="px-4 py-4 text-right text-gray-900 dark:text-white font-semibold">
+                        ${fee.total_price.toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* Imprints Section */}
         {imprints.length > 0 && (
           <div className="p-8 border-t border-gray-300 dark:border-slate-600">
