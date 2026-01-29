@@ -1331,32 +1331,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                                 />
                               </div>
                               <div className="flex items-center gap-3">
-                                {group.label && (
-                                  <div className="flex flex-col gap-1.5">
-                                    <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                                      Added Imprints ({getGroupImprints(group.label).length})
-                                    </div>
-                                    {getGroupImprints(group.label).length > 0 && (
-                                      <div className="flex flex-wrap items-center gap-1.5">
-                                        {getGroupImprints(group.label).map((imprint, idx) => (
-                                          <div key={idx} className="flex items-center gap-1.5 px-2 py-1 bg-blue-500/10 dark:bg-blue-500/20 rounded border border-blue-300 dark:border-blue-700 text-xs">
-                                            <span className="text-gray-900 dark:text-white font-medium">
-                                              {imprint.location || imprint.matrix}
-                                            </span>
-                                            <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-700 dark:text-blue-300 rounded">
-                                              {imprint.type_of_work}
-                                            </span>
-                                            {imprint.pricing_matrix_column && (
-                                              <span className="text-gray-600 dark:text-gray-400">
-                                                Col {imprint.pricing_matrix_column}
-                                              </span>
-                                            )}
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
                                 <label className="flex items-center gap-2 text-sm text-gray-900 dark:text-white whitespace-nowrap">
                                   <input
                                     type="checkbox"
@@ -1584,30 +1558,72 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       {/* Group Actions Row */}
                       <tr key={`actions-${group.id}`}>
                         <td colSpan={getSizeColumns(group).length + 9} className="p-2 border-t-2 border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
-                          <div className="flex gap-2 justify-between items-center">
-                            <div className="flex gap-2">
+                          <div className="space-y-3">
+                            <div className="flex gap-2 justify-between items-center">
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => addItem(group.id)}
+                                  className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2 shadow-sm"
+                                >
+                                  <Plus className="w-4 h-4" />
+                                  Line Item
+                                </button>
+                                <button
+                                  onClick={() => setShowImprintsModal(true)}
+                                  className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2 shadow-sm"
+                                >
+                                  <Plus className="w-4 h-4" />
+                                  Imprint(s)
+                                </button>
+                              </div>
                               <button
-                                onClick={() => addItem(group.id)}
-                                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2 shadow-sm"
+                                onClick={() => setEditingGroupIdForOptions(group.id)}
+                                className="px-3 py-2 bg-gray-600 hover:bg-gray-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded text-sm flex items-center gap-2 shadow-sm"
                               >
-                                <Plus className="w-4 h-4" />
-                                Line Item
-                              </button>
-                              <button
-                                onClick={() => setShowImprintsModal(true)}
-                                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2 shadow-sm"
-                              >
-                                <Plus className="w-4 h-4" />
-                                Imprint(s)
+                                <Settings className="w-4 h-4" />
+                                Line Item Options
                               </button>
                             </div>
-                            <button
-                              onClick={() => setEditingGroupIdForOptions(group.id)}
-                              className="px-3 py-2 bg-gray-600 hover:bg-gray-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded text-sm flex items-center gap-2 shadow-sm"
-                            >
-                              <Settings className="w-4 h-4" />
-                              Line Item Options
-                            </button>
+
+                            {/* Imprint Display Blocks */}
+                            {group.label && getGroupImprints(group.label).length > 0 && (
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 mt-3">
+                                {getGroupImprints(group.label).map((imprint, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="bg-white dark:bg-slate-800/70 rounded-lg p-3 border border-gray-200 dark:border-slate-700/50 hover:border-blue-400 dark:hover:border-blue-600 transition-colors"
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                                          <span className="text-gray-900 dark:text-white font-medium text-sm truncate">
+                                            {imprint.location || imprint.matrix}
+                                          </span>
+                                          <span className="text-xs px-1.5 py-0.5 bg-blue-500/20 text-blue-700 dark:text-blue-300 rounded whitespace-nowrap">
+                                            {imprint.type_of_work}
+                                          </span>
+                                          {imprint.pricing_matrix_column && (
+                                            <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                              Col: {imprint.pricing_matrix_column}
+                                            </span>
+                                          )}
+                                        </div>
+                                        {imprint.details && (
+                                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1.5 line-clamp-2">
+                                            {imprint.details}
+                                          </p>
+                                        )}
+                                        {imprint.thread_ink_color && (
+                                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                                            Color: {imprint.thread_ink_color}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </td>
                       </tr>
