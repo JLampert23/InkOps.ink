@@ -382,7 +382,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         .from('quote_line_items')
         .select('*')
         .eq('quote_id', quoteId)
-        .is('line_type', null)
+        .or('line_type.is.null,line_type.eq.item')
         .order('sort_order');
 
       // Group items by group_label
