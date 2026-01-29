@@ -28,13 +28,7 @@ async function makePromoStandardsRequest(
 ) {
   const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:shar="http://www.promostandards.org/WSDL/SharedObjects/v2.0.0/">
-  <soap:Header>
-    <shar:AuthenticationInfo>
-      <shar:wsVersion>2.0.0</shar:wsVersion>
-      <shar:id>${accountNumber}</shar:id>
-      <shar:password>${apiKey}</shar:password>
-    </shar:AuthenticationInfo>
-  </soap:Header>
+  <soap:Header/>
   <soap:Body>
     ${soapBody}
   </soap:Body>
@@ -215,7 +209,10 @@ Deno.serve(async (req: Request) => {
         }
 
         const soapBody = `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/">
-  <ns2:productId>${productId}</ns2:productId>
+  <shar:wsVersion>2.0.0</shar:wsVersion>
+  <shar:id>${credentials.accountNumber}</shar:id>
+  <shar:password>${decryptedApiKey}</shar:password>
+  <shar:productId>${productId}</shar:productId>
 </ns2:GetProductRequest>`;
 
         const xmlResponse = await makePromoStandardsRequest(
@@ -275,7 +272,10 @@ Deno.serve(async (req: Request) => {
         }
 
         const soapBody = `<ns2:GetInventoryLevelsRequest xmlns:ns2="http://www.promostandards.org/WSDL/InventoryService/2.0.0/">
-  <ns2:productId>${productId}</ns2:productId>
+  <shar:wsVersion>2.0.0</shar:wsVersion>
+  <shar:id>${credentials.accountNumber}</shar:id>
+  <shar:password>${decryptedApiKey}</shar:password>
+  <shar:productId>${productId}</shar:productId>
 </ns2:GetInventoryLevelsRequest>`;
 
         const xmlResponse = await makePromoStandardsRequest(
@@ -319,7 +319,10 @@ Deno.serve(async (req: Request) => {
         }
 
         const soapBody = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/">
-  <ns2:productId>${productId}</ns2:productId>
+  <shar:wsVersion>1.0.0</shar:wsVersion>
+  <shar:id>${credentials.accountNumber}</shar:id>
+  <shar:password>${decryptedApiKey}</shar:password>
+  <shar:productId>${productId}</shar:productId>
 </ns2:GetConfigurationAndPricingRequest>`;
 
         const xmlResponse = await makePromoStandardsRequest(
