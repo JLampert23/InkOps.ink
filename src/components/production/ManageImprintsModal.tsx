@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Upload, FileText, Image as ImageIcon } from 'lucide-react';
+import { X, Plus, Trash2, FileText, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -560,94 +560,27 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                 />
               </div>
 
-              <div className="border-t border-slate-700 pt-3 mt-3">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-semibold text-gray-300 uppercase tracking-wide">Artwork & Proofs</label>
-                  <label className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs flex items-center gap-1.5 cursor-pointer transition-colors">
-                    <Upload className="w-3.5 h-3.5" />
-                    {uploading ? 'Uploading...' : 'Upload'}
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*,.pdf"
-                      onChange={handleFileUpload}
-                      disabled={uploading || !quoteId}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
+            </div>
 
-                {!quoteId && (
-                  <div className="bg-yellow-500/10 border border-yellow-500/20 rounded p-2 mb-2">
-                    <p className="text-xs text-yellow-400">Save the quote first before uploading artwork</p>
-                  </div>
-                )}
-
-                {currentImprint.proofs.length > 0 && (
-                  <div className="grid grid-cols-3 gap-2">
-                    {currentImprint.proofs.map((proof, idx) => (
-                      <div key={idx} className="bg-slate-900 rounded overflow-hidden border border-slate-700">
-                        <div className="aspect-square bg-slate-950 flex items-center justify-center relative group">
-                          {proof.file_type?.startsWith('image/') ? (
-                            <img
-                              src={proof.file_url}
-                              alt={proof.file_name}
-                              className="w-full h-full object-contain"
-                            />
-                          ) : (
-                            <FileText className="w-8 h-8 text-gray-500" />
-                          )}
-                          <button
-                            onClick={() => handleDeleteProof(idx)}
-                            className="absolute top-1 right-1 p-1 bg-red-600/90 hover:bg-red-500 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                        <div className="p-2">
-                          <p className="text-xs font-medium text-white truncate mb-0.5">{proof.file_name}</p>
-                          {selectedProofForNote === idx ? (
-                            <div className="space-y-1">
-                              <textarea
-                                value={proof.notes || ''}
-                                onChange={(e) => handleUpdateProofNote(idx, e.target.value)}
-                                placeholder="Add notes..."
-                                rows={2}
-                                className="w-full px-1.5 py-1 bg-slate-950 border border-slate-600 rounded text-white text-xs resize-none"
-                              />
-                              <button
-                                onClick={() => setSelectedProofForNote(null)}
-                                className="text-xs text-blue-400 hover:text-blue-300"
-                              >
-                                Done
-                              </button>
-                            </div>
-                          ) : (
-                            <div>
-                              {proof.notes && (
-                                <p className="text-xs text-gray-400 line-clamp-1 mb-0.5">{proof.notes}</p>
-                              )}
-                              <button
-                                onClick={() => setSelectedProofForNote(idx)}
-                                className="text-xs text-blue-400 hover:text-blue-300"
-                              >
-                                {proof.notes ? 'Edit' : 'Add note'}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
+            <div className="flex items-center gap-2">
               <button
                 onClick={handleAddImprint}
-                className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm font-medium flex items-center justify-center gap-2 transition-colors"
+                className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-medium flex items-center gap-1.5 transition-colors"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-3.5 h-3.5" />
                 {editingIndex !== null ? 'Update Imprint' : 'Add Imprint'}
+              </button>
+              <button
+                onClick={handleDone}
+                className="px-2.5 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded text-xs font-medium transition-colors"
+              >
+                Save
+              </button>
+              <button
+                onClick={onClose}
+                className="px-2.5 py-1.5 bg-slate-600 hover:bg-slate-500 text-white rounded text-xs font-medium transition-colors"
+              >
+                Close
               </button>
             </div>
 
@@ -715,15 +648,6 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
               </div>
             )}
           </div>
-        </div>
-
-        <div className="px-5 py-4 border-t border-slate-700/70">
-          <button
-            onClick={handleDone}
-            className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded font-medium transition-colors shadow-lg"
-          >
-            Save & Close
-          </button>
         </div>
       </div>
     </div>
