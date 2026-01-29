@@ -402,12 +402,6 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             {/* Right: Key Dates */}
             <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6 min-w-[320px]">
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Created</span>
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {quote.created_date ? format(new Date(quote.created_date), 'MMMM d, yyyy') : format(new Date(quote.created_at), 'MMMM d, yyyy')}
-                  </span>
-                </div>
                 {quote.customer_due_date && (
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-400">Customer Due Date</span>
@@ -803,16 +797,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
         {/* Totals Summary */}
         <div className="p-8 border-t border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700/30">
-          <div className="flex justify-between items-start">
-            {/* Left: Creation Date */}
-            <div className="text-sm">
-              <div className="text-gray-600 dark:text-gray-400">
-                Created: <span className="font-medium text-gray-900 dark:text-white">
-                  {quote.created_date ? format(new Date(quote.created_date), 'MMMM d, yyyy') : format(new Date(quote.created_at), 'MMMM d, yyyy')}
-                </span>
-              </div>
-            </div>
-
+          <div className="flex justify-end">
             {/* Right: Totals */}
             <div className="w-80 space-y-2 text-sm">
               <div className="flex justify-between">
@@ -857,14 +842,14 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
           </div>
         </div>
 
-        {/* Terms and Conditions */}
-        {quote.terms && (
-          <div className="p-8 border-t border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800">
-            <div className="text-xs text-gray-600 dark:text-gray-400 space-y-2">
-              <p className="whitespace-pre-wrap">{quote.terms}</p>
-            </div>
+        {/* Invoice Creation Date */}
+        <div className="p-8 border-t border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            Created: <span className="font-medium text-gray-900 dark:text-white">
+              {quote.created_date ? format(new Date(quote.created_date), 'MMMM d, yyyy') : format(new Date(quote.created_at), 'MMMM d, yyyy')}
+            </span>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Send Modal */}
