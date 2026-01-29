@@ -53,15 +53,11 @@ Deno.serve(async (req: Request) => {
     const token = authHeader.replace("Bearer ", "");
     console.log("Token received (first 20 chars):", token.substring(0, 20));
 
-    // Create Supabase client with the user's token for auth validation
-    const supabase = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: {
-        headers: { Authorization: authHeader }
-      }
-    });
+    // Create Supabase client with service role for both auth verification and database queries
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify the JWT by getting the current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Verify the JWT by getting the user with the token
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
 
     if (authError || !user) {
       console.error("Auth error:", authError?.message, authError);
@@ -72,9 +68,6 @@ Deno.serve(async (req: Request) => {
     }
 
     console.log("Authenticated user:", user.id);
-
-    // Now use service role client for database queries
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get user's company_id
     const { data: profile } = await supabaseAdmin
