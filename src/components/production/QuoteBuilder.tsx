@@ -1357,15 +1357,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                                     )}
                                   </div>
                                 )}
-                                {itemGroups[itemGroups.length - 1].id === group.id && (
-                                  <button
-                                    onClick={addItemGroup}
-                                    className="px-3 py-1.5 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-600 text-gray-900 dark:text-white rounded text-xs flex items-center gap-1.5 shadow-sm whitespace-nowrap"
-                                  >
-                                    <Plus className="w-3.5 h-3.5" />
-                                    Line Item Group
-                                  </button>
-                                )}
                                 <label className="flex items-center gap-2 text-sm text-gray-900 dark:text-white whitespace-nowrap">
                                   <input
                                     type="checkbox"
@@ -1624,6 +1615,17 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* Add Line Item Group Button */}
+            <div className="mt-4">
+              <button
+                onClick={addItemGroup}
+                className="px-4 py-2 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-900 dark:text-white rounded text-sm flex items-center gap-2 shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                Line Item Group
+              </button>
             </div>
           </div>
 
