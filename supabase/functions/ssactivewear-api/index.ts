@@ -69,18 +69,27 @@ async function makePromoStandardsRequest(
   return responseText;
 }
 
-function parseXmlResponse(xmlText: string): any {
-  const parser = new DOMParser();
-  const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+function getXmlValue(xmlText: string, tagName: string): string | null {
+  const regex = new RegExp(`<${tagName}[^>]*>([^<]*)</${tagName}>`, 'i');
+  const match = xmlText.match(regex);
+  return match ? match[1] : null;
+}
 
-  const errorElement = xmlDoc.querySelector("ServiceMessage");
-  if (errorElement) {
-    const code = errorElement.querySelector("code")?.textContent;
-    const description = errorElement.querySelector("description")?.textContent;
-    throw new Error(`PromoStandards Error ${code}: ${description}`);
+function getXmlValues(xmlText: string, tagName: string): string[] {
+  const regex = new RegExp(`<${tagName}[^>]*>([^<]*)</${tagName}>`, 'gi');
+  const matches = xmlText.matchAll(regex);
+  return Array.from(matches, m => m[1]);
+}
+
+function parseXmlResponse(xmlText: string): string {
+  const errorCode = getXmlValue(xmlText, 'code');
+  const errorDesc = getXmlValue(xmlText, 'description');
+
+  if (errorCode && errorDesc) {
+    throw new Error(`PromoStandards Error ${errorCode}: ${errorDesc}`);
   }
 
-  return xmlDoc;
+  return xmlText;
 }
 
 Deno.serve(async (req: Request) => {
@@ -221,24 +230,23 @@ Deno.serve(async (req: Request) => {
 
         const xmlDoc = parseXmlResponse(xmlResponse);
 
-        const productIdNode = xmlDoc.querySelector("productId");
-        const productName = xmlDoc.querySelector("productName")?.textContent || "";
-        const description = xmlDoc.querySelector("description")?.textContent || "";
-        const productBrand = xmlDoc.querySelector("productBrand")?.textContent || "";
+        const productName = getXmlValue(xmlDoc, "productName") || "";
+        const description = getXmlValue(xmlDoc, "description") || "";
+        const productBrand = getXmlValue(xmlDoc, "productBrand") || "";
 
-        const colorArray = Array.from(xmlDoc.querySelectorAll("Color")).map((color) => ({
-          colorName: color.querySelector("colorName")?.textContent || "",
-          approximatePms: color.querySelector("approximatePms")?.textContent || "",
-        }));
+        const colorNames = getXmlValues(xmlDoc, "colorName");
+        const partIds = getXmlValues(xmlDoc, "partId");
+        const labelSizes = getXmlValues(xmlDoc, "labelSize");
 
-        const partsArray = Array.from(xmlDoc.querySelectorAll("Part")).map((part) => ({
-          partId: part.querySelector("partId")?.textContent || "",
-          colorName: part.querySelector("colorName")?.textContent || "",
-          labelSize: part.querySelector("labelSize")?.textContent || "",
+        const colorArray = colorNames.map(name => ({ colorName: name }));
+        const partsArray = partIds.map((id, i) => ({
+          partId: id,
+          colorName: colorNames[i] || "",
+          labelSize: labelSizes[i] || "",
         }));
 
         const transformedData = [{
-          productId: productIdNode?.textContent || productId,
+          productId,
           productName,
           description,
           productBrand,
@@ -282,9 +290,12 @@ Deno.serve(async (req: Request) => {
 
         const xmlDoc = parseXmlResponse(xmlResponse);
 
-        const inventoryArray = Array.from(xmlDoc.querySelectorAll("Inventory")).map((inv) => ({
-          partId: inv.querySelector("partId")?.textContent || "",
-          quantityAvailable: parseInt(inv.querySelector("quantityAvailable")?.textContent || "0"),
+        const partIds = getXmlValues(xmlDoc, "partId");
+        const quantities = getXmlValues(xmlDoc, "quantityAvailable");
+
+        const inventoryArray = partIds.map((id, i) => ({
+          partId: id,
+          quantityAvailable: parseInt(quantities[i] || "0"),
         }));
 
         return new Response(
@@ -323,17 +334,17 @@ Deno.serve(async (req: Request) => {
 
         const xmlDoc = parseXmlResponse(xmlResponse);
 
-        const partArray = Array.from(xmlDoc.querySelectorAll("Part")).map((part) => {
-          const priceArray = Array.from(part.querySelectorAll("Price")).map((price) => ({
-            quantity: parseInt(price.querySelector("quantity")?.textContent || "0"),
-            price: parseFloat(price.querySelector("price")?.textContent || "0"),
-          }));
+        const partIds = getXmlValues(xmlDoc, "partId");
+        const quantities = getXmlValues(xmlDoc, "quantity");
+        const prices = getXmlValues(xmlDoc, "price");
 
-          return {
-            partId: part.querySelector("partId")?.textContent || "",
-            prices: priceArray,
-          };
-        });
+        const partArray = partIds.map((id) => ({
+          partId: id,
+          prices: prices.map((price, i) => ({
+            quantity: parseInt(quantities[i] || "0"),
+            price: parseFloat(price),
+          })),
+        }));
 
         return new Response(
           JSON.stringify({
