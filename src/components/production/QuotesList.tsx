@@ -199,7 +199,6 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Quotes & Approvals</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Create and manage customer quotes</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -219,6 +218,8 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
           </button>
         </div>
       </div>
+
+      <p className="text-sm text-gray-600 dark:text-gray-400">Create and manage customer quotes</p>
 
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
