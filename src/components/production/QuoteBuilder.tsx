@@ -189,6 +189,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
   const [showImprintsModal, setShowImprintsModal] = useState(false);
   const [editingGroupIdForOptions, setEditingGroupIdForOptions] = useState<string | null>(null);
+  const [quoteImprints, setQuoteImprints] = useState<any[]>([]);
 
   const [productSearchResults, setProductSearchResults] = useState<ProductSearchResult[]>([]);
   const [productSearchLoading, setProductSearchLoading] = useState(false);
@@ -447,7 +448,24 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         })) || []);
       }
     }
+
+    // Load imprints for the quote
+    const { data: imprints } = await supabase
+      .from('quote_imprints')
+      .select('*')
+      .eq('quote_id', quoteId)
+      .order('sort_order');
+
+    if (imprints) {
+      setQuoteImprints(imprints);
+    }
+
     setLoading(false);
+  };
+
+  const getGroupImprints = (groupLabel: string) => {
+    if (!groupLabel) return [];
+    return quoteImprints.filter(imp => imp.group_label === groupLabel);
   };
 
   const addItem = (groupId: string) => {
@@ -1302,41 +1320,68 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       {(itemGroups.length > 1 || group.label) && (
                         <tr key={`header-${group.id}`} className="bg-gray-200 dark:bg-slate-800">
                           <td colSpan={getSizeColumns(group).length + 9} className="p-2 border border-gray-300 dark:border-slate-800">
-                            <div className="flex items-center gap-4">
-                              <input
-                                type="text"
-                                value={group.label}
-                                onChange={(e) => updateGroupLabel(group.id, e.target.value)}
-                                placeholder="Group Label (optional)"
-                                className="px-3 py-1 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-sm text-gray-900 dark:text-white flex-1"
-                              />
-                              <label className="flex items-center gap-2 text-sm text-gray-900 dark:text-white whitespace-nowrap">
+                            <div className="flex items-center justify-between gap-4">
+                              <div className="flex items-center gap-4 flex-1">
                                 <input
-                                  type="checkbox"
-                                  checked={group.taxed}
-                                  onChange={(e) => {
-                                    const updatedGroups = [...itemGroups];
-                                    const idx = updatedGroups.findIndex(g => g.id === group.id);
-                                    updatedGroups[idx].taxed = e.target.checked;
-                                    updatedGroups[idx].items = updatedGroups[idx].items.map(item => ({
-                                      ...item,
-                                      taxed: e.target.checked
-                                    }));
-                                    setItemGroups(updatedGroups);
-                                  }}
-                                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                  type="text"
+                                  value={group.label}
+                                  onChange={(e) => updateGroupLabel(group.id, e.target.value)}
+                                  placeholder="Group Label (optional)"
+                                  className="px-3 py-1 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-sm text-gray-900 dark:text-white flex-1"
                                 />
-                                Tax Group
-                              </label>
-                              {itemGroups.length > 1 && (
-                                <button
-                                  onClick={() => removeItemGroup(group.id)}
-                                  className="px-2 py-1 text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-slate-700 rounded whitespace-nowrap"
-                                  title="Remove Group"
-                                >
-                                  Remove Group
-                                </button>
-                              )}
+                                {group.label && getGroupImprints(group.label).length > 0 && (
+                                  <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                                    {getGroupImprints(group.label).map((imprint, idx) => (
+                                      <div key={idx} className="flex items-center gap-1.5 px-2 py-1 bg-blue-500/10 dark:bg-blue-500/20 rounded border border-blue-300 dark:border-blue-700">
+                                        <span className="text-gray-900 dark:text-white font-medium">
+                                          {imprint.location || imprint.matrix}
+                                        </span>
+                                        <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-700 dark:text-blue-300 rounded">
+                                          {imprint.type_of_work}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {itemGroups[itemGroups.length - 1].id === group.id && (
+                                  <button
+                                    onClick={addItemGroup}
+                                    className="px-3 py-1.5 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-600 text-gray-900 dark:text-white rounded text-xs flex items-center gap-1.5 shadow-sm whitespace-nowrap"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    Line Item Group
+                                  </button>
+                                )}
+                                <label className="flex items-center gap-2 text-sm text-gray-900 dark:text-white whitespace-nowrap">
+                                  <input
+                                    type="checkbox"
+                                    checked={group.taxed}
+                                    onChange={(e) => {
+                                      const updatedGroups = [...itemGroups];
+                                      const idx = updatedGroups.findIndex(g => g.id === group.id);
+                                      updatedGroups[idx].taxed = e.target.checked;
+                                      updatedGroups[idx].items = updatedGroups[idx].items.map(item => ({
+                                        ...item,
+                                        taxed: e.target.checked
+                                      }));
+                                      setItemGroups(updatedGroups);
+                                    }}
+                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                  />
+                                  Tax Group
+                                </label>
+                                {itemGroups.length > 1 && (
+                                  <button
+                                    onClick={() => removeItemGroup(group.id)}
+                                    className="px-2 py-1 text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-slate-700 rounded whitespace-nowrap"
+                                    title="Remove Group"
+                                  >
+                                    Remove Group
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </td>
                         </tr>
@@ -1552,15 +1597,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                                 <Plus className="w-4 h-4" />
                                 Imprint(s)
                               </button>
-                              {itemGroups[itemGroups.length - 1].id === group.id && (
-                                <button
-                                  onClick={addItemGroup}
-                                  className="px-3 py-2 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-900 dark:text-white rounded text-sm flex items-center gap-2 shadow-sm"
-                                >
-                                  <Plus className="w-4 h-4" />
-                                  Line Item Group
-                                </button>
-                              )}
                             </div>
                             <button
                               onClick={() => setEditingGroupIdForOptions(group.id)}
@@ -1739,7 +1775,20 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       {/* Manage Imprints Modal */}
       <ManageImprintsModal
         isOpen={showImprintsModal}
-        onClose={() => setShowImprintsModal(false)}
+        onClose={() => {
+          setShowImprintsModal(false);
+          if (quoteId) {
+            // Reload imprints after modal closes
+            supabase
+              .from('quote_imprints')
+              .select('*')
+              .eq('quote_id', quoteId)
+              .order('sort_order')
+              .then(({ data }) => {
+                if (data) setQuoteImprints(data);
+              });
+          }
+        }}
         quoteId={quoteId}
       />
 
