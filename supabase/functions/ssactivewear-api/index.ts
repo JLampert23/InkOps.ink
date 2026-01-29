@@ -105,6 +105,7 @@ Deno.serve(async (req: Request) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const authHeader = req.headers.get("Authorization");
 
     if (!authHeader) {
@@ -116,29 +117,19 @@ Deno.serve(async (req: Request) => {
 
     const token = authHeader.replace("Bearer ", "");
 
-    console.log('Auth validation started:', {
-      hasToken: !!token,
-      tokenLength: token.length,
-      tokenPrefix: token.substring(0, 20) + '...'
-    });
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
 
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-
-    console.log('Auth validation result:', {
-      hasUser: !!user,
-      userId: user?.id,
-      errorMessage: authError?.message,
-      errorStatus: authError?.status
-    });
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
 
     if (authError || !user) {
+      console.error('Auth error:', authError);
       return new Response(
         JSON.stringify({ code: 401, message: "Invalid JWT", details: authError?.message }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
     const { data: profile } = await supabase
       .from("user_profiles")
