@@ -76,9 +76,15 @@ Deno.serve(async (req: Request) => {
     console.log("Token length:", token.length);
     console.log("Token first 20 chars:", token.substring(0, 20));
 
-    const supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey);
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
+
     console.log("Verifying JWT...");
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
     console.log("Auth result:", { hasUser: !!user, hasError: !!authError, errorMessage: authError?.message });
 
@@ -91,8 +97,6 @@ Deno.serve(async (req: Request) => {
     }
 
     console.log("User authenticated:", user.id);
-
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
     const { data: profile } = await supabase
       .from("user_profiles")
@@ -158,6 +162,25 @@ Deno.serve(async (req: Request) => {
 
     // Handle different actions using REST API
     switch (action) {
+      case "brands": {
+        // Get list of brands
+        const endpoint = `${SSA_REST_API_BASE}/categories/?type=Brand`;
+        const brandsData = await makeRestApiRequest(endpoint, credentials.accountNumber, decryptedApiKey);
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            supplier: "ssactivewear",
+            action,
+            data: brandsData,
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          }
+        );
+      }
+
       case "product":
       case "search":
       case "colors": {
