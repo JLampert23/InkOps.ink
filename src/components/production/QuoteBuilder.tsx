@@ -395,6 +395,10 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           }
           groupMap.get(groupLabel)!.push({
             ...item,
+            item_number: item.item_number || '',
+            color: item.color || '',
+            description: item.description || '',
+            notes: item.notes || '',
             taxed: item.taxed || false,
           });
         });

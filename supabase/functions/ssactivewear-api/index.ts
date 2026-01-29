@@ -27,7 +27,7 @@ async function makePromoStandardsRequest(
   apiKey: string
 ) {
   const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:shar="http://www.promostandards.org/WSDL/SharedObjects/v2/">
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:shar="http://www.promostandards.org/WSDL/SharedObjects/v2.0.0/">
   <soap:Header>
     <shar:wsVersion>2.0.0</shar:wsVersion>
     <shar:id>${accountNumber}</shar:id>
