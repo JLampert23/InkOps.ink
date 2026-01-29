@@ -108,12 +108,12 @@ Deno.serve(async (req: Request) => {
     }
 
     const { data: settings } = await supabase
-      .from("integration_settings")
-      .eq("company_id", profile.company_id)
-      .select("ssactivewear_enabled, ssactivewear_credentials")
+      .from("company_settings")
+      .eq("id", profile.company_id)
+      .select("ssactivewear_enabled, ssactivewear_username, ssactivewear_api_key_encrypted")
       .maybeSingle();
 
-    if (!settings?.ssactivewear_enabled || !settings?.ssactivewear_credentials) {
+    if (!settings?.ssactivewear_enabled || !settings?.ssactivewear_api_key_encrypted || !settings?.ssactivewear_username) {
       return new Response(
         JSON.stringify({ error: "SSActivewear credentials not configured" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -121,8 +121,8 @@ Deno.serve(async (req: Request) => {
     }
 
     const credentials = {
-      accountNumber: settings.ssactivewear_credentials.accountNumber,
-      apiKey: settings.ssactivewear_credentials.apiKey
+      accountNumber: settings.ssactivewear_username,
+      apiKey: settings.ssactivewear_api_key_encrypted
     } as SSActivewearCredentials;
 
     // Decrypt the API key
