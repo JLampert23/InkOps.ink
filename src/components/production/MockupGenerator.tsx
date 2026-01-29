@@ -275,7 +275,7 @@ export default function MockupGenerator({
 
         if (dbError) throw dbError;
 
-        const newArtwork: ProofArtwork = {
+        const newArtwork: MockupArtwork = {
           id: '',
           customer_artwork_id: artworkRecord.id,
           artwork_url: publicUrl,
@@ -442,7 +442,7 @@ export default function MockupGenerator({
     }
   };
 
-  const updateActiveArtwork = (updates: Partial<ProofArtwork>) => {
+  const updateActiveArtwork = (updates: Partial<MockupArtwork>) => {
     const updated = [...selectedArtwork];
     updated[activeArtworkIndex] = { ...updated[activeArtworkIndex], ...updates };
     setSelectedArtwork(updated);
