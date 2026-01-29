@@ -81,11 +81,11 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Get integration settings
+    // Get integration settings from company_settings
     const { data: settings, error: settingsError } = await supabaseAdmin
-      .from("integration_settings")
-      .select("*")
-      .eq("company_id", profile.company_id)
+      .from("company_settings")
+      .select("sanmar_enabled, ssactivewear_enabled")
+      .eq("id", profile.company_id)
       .maybeSingle();
 
     console.log("Integration settings:", {
@@ -93,6 +93,7 @@ Deno.serve(async (req: Request) => {
       settings,
       settingsError,
       ssactivewear_enabled: settings?.ssactivewear_enabled,
+      sanmar_enabled: settings?.sanmar_enabled,
     });
 
     // Parse request
