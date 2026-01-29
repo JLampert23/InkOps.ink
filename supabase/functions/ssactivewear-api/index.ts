@@ -116,14 +116,22 @@ Deno.serve(async (req: Request) => {
 
     const token = authHeader.replace("Bearer ", "");
 
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
+    console.log('Auth validation started:', {
+      hasToken: !!token,
+      tokenLength: token.length,
+      tokenPrefix: token.substring(0, 20) + '...'
     });
 
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
+
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    console.log('Auth validation result:', {
+      hasUser: !!user,
+      userId: user?.id,
+      errorMessage: authError?.message,
+      errorStatus: authError?.status
+    });
 
     if (authError || !user) {
       return new Response(
