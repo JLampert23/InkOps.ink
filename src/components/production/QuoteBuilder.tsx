@@ -1329,22 +1329,34 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                                   placeholder="Group Label (optional)"
                                   className="px-3 py-1 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-sm text-gray-900 dark:text-white flex-1"
                                 />
-                                {group.label && getGroupImprints(group.label).length > 0 && (
-                                  <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                                    {getGroupImprints(group.label).map((imprint, idx) => (
-                                      <div key={idx} className="flex items-center gap-1.5 px-2 py-1 bg-blue-500/10 dark:bg-blue-500/20 rounded border border-blue-300 dark:border-blue-700">
-                                        <span className="text-gray-900 dark:text-white font-medium">
-                                          {imprint.location || imprint.matrix}
-                                        </span>
-                                        <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-700 dark:text-blue-300 rounded">
-                                          {imprint.type_of_work}
-                                        </span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                {group.label && (
+                                  <div className="flex flex-col gap-1.5">
+                                    <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                                      Added Imprints ({getGroupImprints(group.label).length})
+                                    </div>
+                                    {getGroupImprints(group.label).length > 0 && (
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        {getGroupImprints(group.label).map((imprint, idx) => (
+                                          <div key={idx} className="flex items-center gap-1.5 px-2 py-1 bg-blue-500/10 dark:bg-blue-500/20 rounded border border-blue-300 dark:border-blue-700 text-xs">
+                                            <span className="text-gray-900 dark:text-white font-medium">
+                                              {imprint.location || imprint.matrix}
+                                            </span>
+                                            <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-700 dark:text-blue-300 rounded">
+                                              {imprint.type_of_work}
+                                            </span>
+                                            {imprint.pricing_matrix_column && (
+                                              <span className="text-gray-600 dark:text-gray-400">
+                                                Col {imprint.pricing_matrix_column}
+                                              </span>
+                                            )}
+                                          </div>
+                                        ))}
                                       </div>
-                                    ))}
+                                    )}
                                   </div>
                                 )}
-                              </div>
-                              <div className="flex items-center gap-2">
                                 {itemGroups[itemGroups.length - 1].id === group.id && (
                                   <button
                                     onClick={addItemGroup}
