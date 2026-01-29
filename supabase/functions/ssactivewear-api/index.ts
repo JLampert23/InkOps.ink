@@ -90,7 +90,10 @@ function parseXmlResponse(xmlText: string): string {
 }
 
 Deno.serve(async (req: Request) => {
+  console.log("🚀 FUNCTION INVOKED - Method:", req.method, "URL:", req.url);
+
   if (req.method === "OPTIONS") {
+    console.log("✅ OPTIONS request - returning CORS headers");
     return new Response(null, {
       status: 200,
       headers: corsHeaders,
