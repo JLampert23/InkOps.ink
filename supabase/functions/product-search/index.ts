@@ -43,6 +43,7 @@ Deno.serve(async (req: Request) => {
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
+      console.error("Missing authorization header");
       return new Response(
         JSON.stringify({ error: "Missing authorization header" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -50,15 +51,20 @@ Deno.serve(async (req: Request) => {
     }
 
     const token = authHeader.replace("Bearer ", "");
+    console.log("Token received (first 20 chars):", token.substring(0, 20));
 
-    // Create Supabase client with service role for database queries
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    // Create Supabase client with the user's token for auth validation
+    const supabase = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: {
+        headers: { Authorization: authHeader }
+      }
+    });
 
-    // Verify the JWT using service role client
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    // Verify the JWT by getting the current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      console.error("Auth error:", authError);
+      console.error("Auth error:", authError?.message, authError);
       return new Response(
         JSON.stringify({ error: "Unauthorized", message: authError?.message || "Invalid JWT" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -66,6 +72,9 @@ Deno.serve(async (req: Request) => {
     }
 
     console.log("Authenticated user:", user.id);
+
+    // Now use service role client for database queries
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get user's company_id
     const { data: profile } = await supabaseAdmin
