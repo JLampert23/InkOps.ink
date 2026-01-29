@@ -432,7 +432,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         </div>
 
         {/* Customer Billing and Shipping */}
-        <div className="grid grid-cols-2 gap-8 p-8 border-b border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700/30">
+        <div className="grid grid-cols-2 gap-8 px-8 py-6 border-b border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800">
           {/* Customer Billing */}
           <div>
             <h3 className="font-bold text-gray-900 dark:text-white mb-3 text-sm">Customer Billing</h3>
