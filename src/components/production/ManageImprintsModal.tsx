@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, FileText, Image as ImageIcon } from 'lucide-react';
+import { X, Plus, Trash2, FileText, Image as ImageIcon, Palette } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import MockupGenerator from './MockupGenerator';
 
 interface Proof {
   id?: string;
@@ -91,6 +92,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
   const [uploading, setUploading] = useState(false);
   const [selectedProofForNote, setSelectedProofForNote] = useState<number | null>(null);
   const [selectedMatrixColumns, setSelectedMatrixColumns] = useState<string[]>([]);
+  const [mockupImprintIndex, setMockupImprintIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -633,15 +635,27 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                           </div>
                         )}
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteImprint(idx);
-                        }}
-                        className="text-red-400 hover:text-red-300 flex-shrink-0"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMockupImprintIndex(idx);
+                          }}
+                          className="text-blue-400 hover:text-blue-300 flex-shrink-0"
+                          title="Create Mockup"
+                        >
+                          <Palette className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteImprint(idx);
+                          }}
+                          className="text-red-400 hover:text-red-300 flex-shrink-0"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -650,6 +664,22 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
           </div>
         </div>
       </div>
+
+      {mockupImprintIndex !== null && quoteId && (
+        <MockupGenerator
+          lineItemId={imprints[mockupImprintIndex].id || `temp-${mockupImprintIndex}`}
+          quoteId={quoteId}
+          customerId=""
+          garmentStyle=""
+          garmentColor=""
+          groupLabel={imprints[mockupImprintIndex].group_label || ''}
+          onClose={() => setMockupImprintIndex(null)}
+          onSave={() => {
+            setMockupImprintIndex(null);
+            showNotification('success', 'Mockup Saved', 'Mockup has been saved successfully');
+          }}
+        />
+      )}
     </div>
   );
 }
