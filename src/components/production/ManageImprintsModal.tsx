@@ -63,9 +63,10 @@ interface ManageImprintsModalProps {
   isOpen: boolean;
   onClose: () => void;
   quoteId?: string;
+  initialGroupLabel?: string;
 }
 
-export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprintsModalProps) {
+export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabel }: ManageImprintsModalProps) {
   const { user } = useAuth();
   const { showNotification } = useNotification();
   const [imprints, setImprints] = useState<Imprint[]>([]);
@@ -104,8 +105,28 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
       if (quoteId) {
         loadImprints();
       }
+      if (initialGroupLabel) {
+        setCurrentImprint(prev => ({
+          ...prev,
+          group_label: initialGroupLabel
+        }));
+      }
+    } else {
+      setCurrentImprint({
+        location: '',
+        price_matrix_id: '',
+        matrix: '',
+        column_number: '',
+        type_of_work: '',
+        details: '',
+        proofs: [],
+        thread_ink_color: '',
+        pricing_matrix_column: '',
+        group_label: '',
+      });
+      setEditingIndex(null);
     }
-  }, [isOpen, quoteId]);
+  }, [isOpen, quoteId, initialGroupLabel]);
 
   const loadPriceMatrices = async () => {
     const { data, error } = await supabase
@@ -499,7 +520,8 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId }: ManageImprints
                     value={currentImprint.group_label || ''}
                     onChange={(e) => setCurrentImprint({ ...currentImprint, group_label: e.target.value })}
                     placeholder="e.g., Adult, Youth, Staff"
-                    className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-600 rounded text-white text-sm placeholder-gray-500"
+                    readOnly={!!initialGroupLabel}
+                    className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-600 rounded text-white text-sm placeholder-gray-500 disabled:opacity-50 read-only:opacity-50 read-only:cursor-not-allowed"
                   />
                 </div>
               </div>

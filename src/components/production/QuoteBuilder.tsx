@@ -187,7 +187,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const [salesTaxRate, setSalesTaxRate] = useState(6.25);
 
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
-  const [showImprintsModal, setShowImprintsModal] = useState(false);
+  const [showImprintsModal, setShowImprintsModal] = useState<string | null>(null);
   const [editingGroupIdForOptions, setEditingGroupIdForOptions] = useState<string | null>(null);
   const [quoteImprints, setQuoteImprints] = useState<any[]>([]);
 
@@ -1569,7 +1569,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                                   Line Item
                                 </button>
                                 <button
-                                  onClick={() => setShowImprintsModal(true)}
+                                  onClick={() => setShowImprintsModal(group.label)}
                                   className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2 shadow-sm"
                                 >
                                   <Plus className="w-4 h-4" />
@@ -1804,9 +1804,9 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
 
       {/* Manage Imprints Modal */}
       <ManageImprintsModal
-        isOpen={showImprintsModal}
+        isOpen={showImprintsModal !== null}
         onClose={() => {
-          setShowImprintsModal(false);
+          setShowImprintsModal(null);
           if (quoteId) {
             // Reload imprints after modal closes
             supabase
@@ -1820,6 +1820,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           }
         }}
         quoteId={quoteId}
+        initialGroupLabel={showImprintsModal || ''}
       />
 
       {/* Line Item Options Modal */}
