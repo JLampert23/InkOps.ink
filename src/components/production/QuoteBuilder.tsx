@@ -1345,8 +1345,8 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       {(itemGroups.length > 1 || group.label) && (
                         <tr key={`columns-${group.id}`} className="bg-gray-100 dark:bg-slate-900 text-xs text-gray-700 dark:text-gray-400">
                           <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-6"></th>
-                          <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-20">Item #</th>
-                          <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-20">Color</th>
+                          <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-40">Item #</th>
+                          <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-40">Color</th>
                           <th className="p-1 text-left border border-gray-300 dark:border-slate-800">Description</th>
                           {getSizeColumns(group).map(size => (
                             <th key={size.key} className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">{size.label}</th>
@@ -1376,7 +1376,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                                     searchProductByStyle(item.item_number);
                                   }
                                 }}
-                                className="w-full px-1 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs pr-5"
+                                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-sm pr-8"
                                 placeholder="Style #"
                               />
                               {productSearchLoading && activeSearchItem?.groupId === group.id && activeSearchItem?.itemIdx === itemIdx && (
@@ -1470,7 +1470,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                               type="text"
                               value={item.color}
                               onChange={(e) => updateItem(group.id, itemIdx, 'color', e.target.value)}
-                              className="w-full px-1 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs"
+                              className="w-full px-3 py-2 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-sm"
                             />
                           </td>
                           <td className="p-0 border border-gray-300 dark:border-slate-800">
@@ -1580,7 +1580,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           </div>
 
           {/* Fees Table */}
-          <div className="max-w-4xl space-y-2 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-200 dark:border-slate-800 p-6">
+          <div className="max-w-4xl ml-auto space-y-2 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-200 dark:border-slate-800 p-6">
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-gray-100 dark:bg-slate-900 text-sm text-gray-700 dark:text-gray-400">
@@ -1588,7 +1588,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                   <th className="p-2 text-left border border-gray-300 dark:border-slate-800">Description</th>
                   <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-20">Qty</th>
                   <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-24">Amount</th>
-                  <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-16">Taxed</th>
                   <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-24">Total</th>
                   <th className="p-2 border border-gray-300 dark:border-slate-800 w-8"></th>
                 </tr>
@@ -1622,22 +1621,17 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       />
                     </td>
                     <td className="p-1 border border-gray-300 dark:border-slate-800">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={fee.unit_amount}
-                        onChange={(e) => updateFee(idx, 'unit_amount', parseFloat(e.target.value) || 0)}
-                        className="w-full px-2 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-right"
-                      />
-                    </td>
-                    <td className="p-1 border border-gray-300 dark:border-slate-800 text-center">
-                      <input
-                        type="checkbox"
-                        checked={fee.taxed}
-                        onChange={(e) => updateFee(idx, 'taxed', e.target.checked)}
-                        className="w-4 h-4"
-                      />
+                      <div className="flex items-center">
+                        <span className="text-gray-900 dark:text-white text-xs px-1">$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={fee.unit_amount}
+                          onChange={(e) => updateFee(idx, 'unit_amount', parseFloat(e.target.value) || 0)}
+                          className="w-full px-2 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-right"
+                        />
+                      </div>
                     </td>
                     <td className="p-2 border border-gray-300 dark:border-slate-800 text-right text-sm">
                       ${fee.total_amount.toFixed(2)}
