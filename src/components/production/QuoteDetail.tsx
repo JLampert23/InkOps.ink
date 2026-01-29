@@ -399,7 +399,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
               </div>
             </div>
 
-            {/* Right: Key Dates and Totals */}
+            {/* Right: Key Dates */}
             <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6 min-w-[320px]">
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
@@ -432,16 +432,6 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                     </span>
                   </div>
                 )}
-                <div className="border-t border-gray-300 dark:border-slate-600 pt-2 mt-3">
-                  <div className="flex justify-between text-base">
-                    <span className="font-semibold text-gray-900 dark:text-white">Total</span>
-                    <span className="font-bold text-gray-900 dark:text-white">${quote.total.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-base mt-1">
-                    <span className="font-semibold text-gray-900 dark:text-white">Outstanding</span>
-                    <span className="font-bold text-blue-600 dark:text-blue-400">${quote.total.toFixed(2)}</span>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
@@ -740,34 +730,38 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
         {/* Fees Section */}
         {fees.length > 0 && (
-          <div className="p-8 border-t border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Additional Fees</h3>
+          <div className="p-6 border-t border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+            <h3 className="text-base font-bold text-gray-900 dark:text-white mb-3">Additional Fees</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-gray-100 dark:bg-slate-700/50 border-b-2 border-gray-300 dark:border-slate-600">
+                <thead className="bg-gray-100 dark:bg-slate-700/50 border-b border-gray-300 dark:border-slate-600">
                   <tr>
-                    <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Description</th>
-                    <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Quantity</th>
-                    <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">Unit Price</th>
-                    <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">Total</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-900 dark:text-white">Fee</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-900 dark:text-white">Description</th>
+                    <th className="px-3 py-2 text-center font-semibold text-gray-900 dark:text-white">Quantity</th>
+                    <th className="px-3 py-2 text-right font-semibold text-gray-900 dark:text-white">Unit Price</th>
+                    <th className="px-3 py-2 text-right font-semibold text-gray-900 dark:text-white">Total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {fees.map((fee) => (
                     <tr key={fee.id} className="border-b border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/30">
-                      <td className="px-4 py-4 text-gray-900 dark:text-white">
+                      <td className="px-3 py-2 text-gray-700 dark:text-gray-300 font-mono text-xs">
+                        {fee.item_number || '-'}
+                      </td>
+                      <td className="px-3 py-2 text-gray-900 dark:text-white">
                         {fee.description}
                         {fee.notes && (
                           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic">{fee.notes}</p>
                         )}
                       </td>
-                      <td className="px-4 py-4 text-center text-gray-700 dark:text-gray-300">
-                        {fee.quantity || 1}
+                      <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">
+                        {(fee as any).quantity || 1}
                       </td>
-                      <td className="px-4 py-4 text-right text-gray-700 dark:text-gray-300">
+                      <td className="px-3 py-2 text-right text-gray-700 dark:text-gray-300">
                         ${fee.unit_price.toFixed(2)}
                       </td>
-                      <td className="px-4 py-4 text-right text-gray-900 dark:text-white font-semibold">
+                      <td className="px-3 py-2 text-right text-gray-900 dark:text-white font-semibold">
                         ${fee.total_price.toFixed(2)}
                       </td>
                     </tr>
