@@ -222,11 +222,16 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
   const loadImprints = async () => {
     if (!quoteId) return;
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('quote_imprints')
       .select('*')
-      .eq('quote_id', quoteId)
-      .order('sort_order');
+      .eq('quote_id', quoteId);
+
+    if (initialGroupLabel) {
+      query = query.eq('group_label', initialGroupLabel);
+    }
+
+    const { data, error } = await query.order('sort_order');
 
     if (data && !error) {
       setImprints(data.map(imp => ({
@@ -362,7 +367,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
       proofs: [],
       thread_ink_color: '',
       pricing_matrix_column: '',
-      group_label: '',
+      group_label: initialGroupLabel || '',
     });
     setSelectedMatrixColumns([]);
     setSelectedProofForNote(null);
@@ -418,7 +423,15 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
           return;
         }
 
-        await supabase.from('quote_imprints').delete().eq('quote_id', quoteId);
+        if (initialGroupLabel) {
+          await supabase
+            .from('quote_imprints')
+            .delete()
+            .eq('quote_id', quoteId)
+            .eq('group_label', initialGroupLabel);
+        } else {
+          await supabase.from('quote_imprints').delete().eq('quote_id', quoteId);
+        }
 
         if (imprints.length > 0) {
           const { error } = await supabase.from('quote_imprints').insert(
@@ -461,7 +474,9 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
       <div className="bg-slate-900 rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700/70">
-          <h2 className="text-lg font-semibold text-white">Manage Imprints & Artwork</h2>
+          <h2 className="text-lg font-semibold text-white">
+            Manage Imprints & Artwork{initialGroupLabel ? ` - ${initialGroupLabel}` : ''}
+          </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
             <X className="w-5 h-5" />
           </button>
@@ -610,7 +625,9 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
 
             {imprints.length > 0 && (
               <div className="space-y-2">
-                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Added Imprints ({imprints.length})</h3>
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+                  Added Imprints{initialGroupLabel ? ` for ${initialGroupLabel}` : ''} ({imprints.length})
+                </h3>
                 {imprints.map((imprint, idx) => (
                   <div
                     key={idx}
