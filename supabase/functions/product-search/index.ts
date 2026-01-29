@@ -54,7 +54,12 @@ Deno.serve(async (req: Request) => {
     console.log("Token received (first 20 chars):", token.substring(0, 20));
 
     // Create Supabase client with service role for both auth verification and database queries
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
 
     // Verify the JWT by getting the user with the token
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
