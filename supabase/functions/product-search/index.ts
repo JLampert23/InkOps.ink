@@ -162,18 +162,53 @@ Deno.serve(async (req: Request) => {
                   const product = ssaProducts[0];
                   const mediaContent = mediaData.data.mediaContent || [];
 
-                  // Map media to colors by matching color names or part IDs
-                  for (const media of mediaContent) {
-                    const matchingColor = product.colors.find((c: any) =>
-                      c.name === media.colorName || c.code === media.partId
-                    );
-                    if (matchingColor && media.url) {
-                      matchingColor.image_url = media.url;
+                  console.log(`Processing ${mediaContent.length} media items for ${product.colors.length} colors`);
+
+                  // Map media to colors by matching color names
+                  // Priority: Front images > Back images > Side images
+                  for (const color of product.colors) {
+                    // Find all media for this color
+                    const colorMedia = mediaContent.filter((media: any) => {
+                      // Match by color name (case-insensitive, trim whitespace)
+                      const mediaColorName = (media.colorName || '').trim().toLowerCase();
+                      const productColorName = (color.name || '').trim().toLowerCase();
+                      return mediaColorName === productColorName;
+                    });
+
+                    console.log(`Found ${colorMedia.length} media items for color: ${color.name}`);
+
+                    if (colorMedia.length > 0) {
+                      // Try to find a front image first
+                      let frontImage = colorMedia.find((m: any) =>
+                        (m.classType || '').toLowerCase().includes('front')
+                      );
+
+                      // If no front image, try back image
+                      if (!frontImage) {
+                        frontImage = colorMedia.find((m: any) =>
+                          (m.classType || '').toLowerCase().includes('back')
+                        );
+                      }
+
+                      // If still no image, use the first available image
+                      if (!frontImage) {
+                        frontImage = colorMedia[0];
+                      }
+
+                      if (frontImage && frontImage.url) {
+                        color.image_url = frontImage.url;
+                        console.log(`Assigned image to ${color.name}: ${frontImage.url.substring(0, 80)}...`);
+                      }
+                    } else {
+                      console.warn(`No media found for color: ${color.name}`);
                     }
                   }
 
                   console.log("Updated product with media:", product);
                 }
+              } else {
+                const errorText = await mediaResponse.text();
+                console.error("Media API error:", errorText);
               }
             } catch (mediaError: any) {
               console.warn("Failed to fetch media for SSActivewear product:", mediaError.message);

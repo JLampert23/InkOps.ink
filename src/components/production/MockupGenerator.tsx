@@ -392,6 +392,42 @@ export default function MockupGenerator({
             setGarmentImageUrl(matchingColor.image_url);
             setGarmentBrand(product.brand || product.supplier);
             setGarmentDescription(product.description);
+
+            // Save the fetched image to the database for future use
+            if (lineItemId && lineItemId.trim()) {
+              console.log('Saving garment image to line item:', lineItemId);
+              const { error: updateError } = await supabase
+                .from('quote_line_items')
+                .update({
+                  garment_front_image_url: matchingColor.image_url,
+                  brand: product.brand || null,
+                })
+                .eq('id', lineItemId);
+
+              if (updateError) {
+                console.error('Error saving garment image to line item:', updateError);
+              } else {
+                console.log('Successfully saved garment image to line item');
+              }
+            }
+
+            // Also update the proof if one exists
+            if (proofId) {
+              console.log('Saving garment image to proof:', proofId);
+              const { error: proofUpdateError } = await supabase
+                .from('proofs')
+                .update({
+                  garment_image_url: matchingColor.image_url,
+                  garment_name: product.description || null,
+                })
+                .eq('id', proofId);
+
+              if (proofUpdateError) {
+                console.error('Error saving garment image to proof:', proofUpdateError);
+              } else {
+                console.log('Successfully saved garment image to proof');
+              }
+            }
           } else {
             console.warn('No image URL found in product colors');
           }

@@ -413,19 +413,53 @@ Deno.serve(async (req: Request) => {
 
         const xmlDoc = parseXmlResponse(xmlResponse);
 
+        console.log("Media XML Response Preview:", xmlDoc.substring(0, 2000));
+
         const urls = getXmlValues(xmlDoc, "url");
         const classTypes = getXmlValues(xmlDoc, "classType");
         const mediaTypes = getXmlValues(xmlDoc, "mediaType");
-        const colorNames = getXmlValues(xmlDoc, "color");
-        const partIds = getXmlValues(xmlDoc, "partId");
 
-        const mediaArray = urls.map((url, i) => ({
-          url,
-          classType: classTypes[i] || "",
-          mediaType: mediaTypes[i] || "",
-          colorName: colorNames[i] || "",
-          partId: partIds[i] || "",
-        }));
+        // Try different XML tag names for color
+        let colorNames = getXmlValues(xmlDoc, "color");
+        if (colorNames.length === 0) {
+          colorNames = getXmlValues(xmlDoc, "colorName");
+        }
+
+        const partIds = getXmlValues(xmlDoc, "partId");
+        const descriptions = getXmlValues(xmlDoc, "description");
+        const fileTypes = getXmlValues(xmlDoc, "fileType");
+
+        console.log(`Parsed media data: ${urls.length} URLs, ${classTypes.length} classTypes, ${colorNames.length} colors`);
+
+        const mediaArray = urls.map((url, i) => {
+          const classType = classTypes[i] || "";
+          const fileType = fileTypes[i] || "";
+          const description = descriptions[i] || "";
+
+          // Check if this is an actual image URL
+          const isImageUrl =
+            url.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/i) ||
+            fileType.toLowerCase() === 'jpg' ||
+            fileType.toLowerCase() === 'jpeg' ||
+            fileType.toLowerCase() === 'png' ||
+            classType.toLowerCase().includes('image');
+
+          return {
+            url,
+            classType,
+            mediaType: mediaTypes[i] || "",
+            colorName: colorNames[i] || "",
+            partId: partIds[i] || "",
+            description,
+            fileType,
+            isImage: isImageUrl,
+          };
+        }).filter(item => item.isImage); // Only return actual images
+
+        console.log(`Filtered to ${mediaArray.length} actual images`);
+        if (mediaArray.length > 0) {
+          console.log("First image:", mediaArray[0]);
+        }
 
         return new Response(
           JSON.stringify({
