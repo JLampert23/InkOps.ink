@@ -206,6 +206,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         .order('sort_order');
 
       if (!imprintsError) {
+        console.log('Loaded imprints:', imprintsData);
         setQuoteImprints(imprintsData || []);
       }
 
@@ -216,6 +217,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         .order('created_at', { ascending: false });
 
       if (!proofsError) {
+        console.log('Loaded proofs:', proofsData);
         setProofs(proofsData || []);
       }
     } catch (error) {
@@ -631,9 +633,27 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                           return (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                               {groupImprints.map((imprint, idx) => {
-                                const matchingProof = proofs.find(proof =>
-                                  proof.imprint_id === imprint.id
-                                );
+                                const matchingProof = proofs.find(proof => {
+                                  if (proof.imprint_id && proof.imprint_id === imprint.id) {
+                                    return true;
+                                  }
+                                  if (proof.group_label && imprint.group_label &&
+                                      proof.group_label === imprint.group_label &&
+                                      !proof.imprint_id) {
+                                    return true;
+                                  }
+                                  return false;
+                                });
+
+                                console.log('Matching proof for imprint:', {
+                                  imprintId: imprint.id,
+                                  imprintGroupLabel: imprint.group_label,
+                                  matchingProof: matchingProof ? {
+                                    id: matchingProof.id,
+                                    imprint_id: matchingProof.imprint_id,
+                                    group_label: matchingProof.group_label
+                                  } : 'none'
+                                });
 
                                 return (
                                   <div
