@@ -9,10 +9,38 @@ import {
 const EDGE_FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ssactivewear-api`;
 
 async function getAuthToken(): Promise<string> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) {
-    throw new Error('Not authenticated');
+  const { data: { session }, error } = await supabase.auth.getSession();
+
+  console.log('Getting auth token:', {
+    hasSession: !!session,
+    hasAccessToken: !!session?.access_token,
+    error,
+    expiresAt: session?.expires_at,
+    isExpired: session?.expires_at ? new Date(session.expires_at * 1000) < new Date() : null
+  });
+
+  if (error) {
+    console.error('Error getting session:', error);
+    throw new Error('Failed to get session: ' + error.message);
   }
+
+  if (!session?.access_token) {
+    throw new Error('Not authenticated - no access token in session');
+  }
+
+  // Check if token is expired
+  if (session.expires_at && new Date(session.expires_at * 1000) < new Date()) {
+    console.warn('Access token has expired, attempting to refresh...');
+    const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+
+    if (refreshError || !refreshedSession?.access_token) {
+      throw new Error('Session expired and refresh failed. Please log in again.');
+    }
+
+    console.log('Session refreshed successfully');
+    return refreshedSession.access_token;
+  }
+
   return session.access_token;
 }
 

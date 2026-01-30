@@ -222,22 +222,33 @@ export default function MockupGenerator({
       } else {
         // Check if line item has garment images stored
         if (lineItemId && lineItemId.trim()) {
-          const { data: lineItemData } = await supabase
+          console.log('Checking for stored garment images in line item:', lineItemId);
+
+          const { data: lineItemData, error: lineItemError } = await supabase
             .from('quote_line_items')
             .select('garment_front_image_url, garment_back_image_url, garment_sleeve_image_url, garment_images_data, item_number, description')
             .eq('id', lineItemId)
             .maybeSingle();
 
+          if (lineItemError) {
+            console.error('Error fetching line item data:', lineItemError);
+          }
+
+          console.log('Line item data:', lineItemData);
+
           if (lineItemData && lineItemData.garment_front_image_url) {
             // Use stored garment images
+            console.log('Using stored garment image:', lineItemData.garment_front_image_url);
             setGarmentImageUrl(lineItemData.garment_front_image_url);
             setGarmentBrand('');
             setGarmentDescription(lineItemData.description || '');
           } else {
             // Fall back to fetching from API
+            console.log('No stored garment image found, fetching from API...');
             await fetchGarmentImage();
           }
         } else {
+          console.log('No line item ID provided, fetching garment image from API...');
           await fetchGarmentImage();
         }
 
@@ -258,13 +269,40 @@ export default function MockupGenerator({
   };
 
   const fetchGarmentImage = async () => {
-    if (!garmentStyle) return;
+    if (!garmentStyle) {
+      console.log('No garment style provided, skipping image fetch');
+      return;
+    }
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      console.log('Fetching garment image for:', { garmentStyle, garmentColor });
+
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        console.error('Error getting session:', sessionError);
+        return;
+      }
+
+      if (!session?.access_token) {
+        console.error('No access token available');
+        return;
+      }
+
+      // Check if token is expired and refresh if needed
+      if (session.expires_at && new Date(session.expires_at * 1000) < new Date()) {
+        console.log('Token expired, refreshing...');
+        const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError || !refreshedSession?.access_token) {
+          console.error('Failed to refresh session:', refreshError);
+          return;
+        }
+        session.access_token = refreshedSession.access_token;
+      }
 
       const searchUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/product-search`;
+      console.log('Making product search request to:', searchUrl);
+
       const response = await fetch(searchUrl, {
         method: 'POST',
         headers: {
@@ -277,14 +315,26 @@ export default function MockupGenerator({
         }),
       });
 
+      console.log('Product search response status:', response.status);
+
       if (response.ok) {
         const data = await response.json();
+        console.log('Product search results:', data);
+
         if (data.results && data.results.length > 0) {
           const product = data.results[0];
-          setGarmentImageUrl(product.imageUrl || product.frontImageUrl);
+          const imageUrl = product.imageUrl || product.frontImageUrl;
+          console.log('Setting garment image:', imageUrl);
+
+          setGarmentImageUrl(imageUrl);
           setGarmentBrand(product.brand || data.supplier);
           setGarmentDescription(product.description || product.name);
+        } else {
+          console.warn('No product results found');
         }
+      } else {
+        const errorText = await response.text();
+        console.error('Product search failed:', response.status, errorText);
       }
     } catch (error) {
       console.error('Error fetching garment image:', error);
@@ -545,21 +595,48 @@ export default function MockupGenerator({
 
   const drawCanvas = () => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {
+      console.warn('Canvas ref not available');
+      return;
+    }
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {
+      console.warn('Canvas context not available');
+      return;
+    }
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (garmentImageUrl) {
+      console.log('Drawing garment image to canvas:', garmentImageUrl);
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
+        console.log('Garment image loaded successfully, drawing to canvas');
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        drawArtwork(ctx);
+      };
+      img.onerror = (error) => {
+        console.error('Failed to load garment image:', error, garmentImageUrl);
+        // Draw a placeholder or message
+        ctx.fillStyle = '#f3f4f6';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#6b7280';
+        ctx.textAlign = 'center';
+        ctx.font = '14px sans-serif';
+        ctx.fillText('Garment image failed to load', canvas.width / 2, canvas.height / 2);
         drawArtwork(ctx);
       };
       img.src = garmentImageUrl;
     } else {
+      console.log('No garment image URL, drawing placeholder');
+      // Draw a light gray background when no garment image
+      ctx.fillStyle = '#f3f4f6';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#9ca3af';
+      ctx.textAlign = 'center';
+      ctx.font = '14px sans-serif';
+      ctx.fillText('No garment image', canvas.width / 2, canvas.height / 2);
       drawArtwork(ctx);
     }
   };
@@ -776,8 +853,24 @@ export default function MockupGenerator({
 
           <div className="w-64 bg-gray-50 dark:bg-slate-900 p-3 overflow-y-auto border-l dark:border-slate-600">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Details</h3>
-            {garmentImageUrl && (
-              <img src={garmentImageUrl} alt="Garment" className="w-full rounded mb-3 border border-gray-200 dark:border-slate-700" />
+            {garmentImageUrl ? (
+              <img
+                src={garmentImageUrl}
+                alt="Garment"
+                className="w-full rounded mb-3 border border-gray-200 dark:border-slate-700"
+                onLoad={() => console.log('Sidebar garment image loaded successfully')}
+                onError={(e) => {
+                  console.error('Sidebar garment image failed to load:', garmentImageUrl);
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            ) : (
+              <div className="w-full h-48 rounded mb-3 border border-gray-200 dark:border-slate-700 bg-gray-100 dark:bg-slate-800 flex items-center justify-center">
+                <div className="text-center">
+                  <ImageIcon className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                  <p className="text-xs text-gray-500 dark:text-gray-400">No garment image</p>
+                </div>
+              </div>
             )}
             <div className="space-y-3 text-xs">
               {/* Garment Information */}

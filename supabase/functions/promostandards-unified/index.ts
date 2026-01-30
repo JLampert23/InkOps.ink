@@ -95,14 +95,26 @@ Deno.serve(async (req: Request) => {
       }
     });
 
+    console.log('Validating JWT token...');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
-    if (authError || !user) {
+    if (authError) {
+      console.error('JWT validation error:', authError);
       return new Response(
-        JSON.stringify({ error: "Invalid JWT" }),
+        JSON.stringify({ error: "Invalid JWT", details: authError.message }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    if (!user) {
+      console.error('No user found in JWT');
+      return new Response(
+        JSON.stringify({ error: "Invalid JWT - no user found" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log('JWT validated successfully for user:', user.id);
 
     const { data: profile } = await supabase
       .from("user_profiles")
