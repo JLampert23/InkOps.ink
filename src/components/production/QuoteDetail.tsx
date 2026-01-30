@@ -647,19 +647,35 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                         {imprint.type_of_work}
                                       </span>
                                     </div>
-                                    <div className="text-sm font-medium text-gray-900 dark:text-white mb-1">
-                                      {imprint.location}
+                                    <div className="flex items-start justify-between mb-1">
+                                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                        {imprint.location}
+                                      </div>
+                                      {imprint.thread_ink_color && (
+                                        <div className="flex items-center gap-1 flex-wrap justify-end ml-2">
+                                          {(() => {
+                                            const colors = imprint.thread_ink_color.split(',').map(c => c.trim());
+                                            return colors.map((color, colorIdx) => (
+                                              <div
+                                                key={colorIdx}
+                                                className="w-4 h-4 rounded border border-gray-400 dark:border-gray-500 shadow-sm"
+                                                style={{ backgroundColor: color }}
+                                                title={color}
+                                              />
+                                            ));
+                                          })()}
+                                        </div>
+                                      )}
                                     </div>
-                                    {imprint.thread_ink_color && (
+                                    {imprint.details && (
                                       <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                                        Color: {imprint.thread_ink_color}
+                                        {imprint.details}
                                       </div>
                                     )}
 
                                     {matchingProof && (matchingProof.composite_image_url || matchingProof.garment_image_url) && (
                                       <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
-                                        <div className="flex items-center justify-between mb-2">
-                                          <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">Proof / Mockup</p>
+                                        <div className="flex items-center justify-end mb-2">
                                           <button
                                             onClick={() => {
                                               setSelectedGroupLabel(groupLabel);
