@@ -95,6 +95,19 @@ export default function MockupGenerator({
   const [garmentBrand, setGarmentBrand] = useState<string>('');
   const [garmentDescription, setGarmentDescription] = useState<string>('');
 
+  const [garmentStyles, setGarmentStyles] = useState<Array<{
+    lineItemId: string;
+    style: string;
+    color: string;
+    description: string;
+    itemNumber: string;
+    frontImage: string;
+    backImage: string;
+    sleeveImage: string;
+    imagesData: any;
+  }>>([]);
+  const [activeGarmentIndex, setActiveGarmentIndex] = useState(0);
+
   const [selectedArtwork, setSelectedArtwork] = useState<MockupArtwork[]>([]);
   const [activeArtworkIndex, setActiveArtworkIndex] = useState<number>(0);
   const [printLocation, setPrintLocation] = useState('Front');
@@ -154,6 +167,36 @@ export default function MockupGenerator({
 
       if (!profile) throw new Error('Profile not found');
       setCompanyId(profile.company_id);
+
+      // Load all garment styles in this group
+      if (groupLabel && quoteId) {
+        const { data: lineItems } = await supabase
+          .from('quote_line_items')
+          .select('id, item_number, description, garment_color, garment_front_image_url, garment_back_image_url, garment_sleeve_image_url, garment_images_data')
+          .eq('quote_id', quoteId)
+          .eq('group_label', groupLabel)
+          .order('sort_order');
+
+        if (lineItems && lineItems.length > 0) {
+          setGarmentStyles(lineItems.map(item => ({
+            lineItemId: item.id,
+            style: item.item_number || '',
+            color: item.garment_color || '',
+            description: item.description || '',
+            itemNumber: item.item_number || '',
+            frontImage: item.garment_front_image_url || '',
+            backImage: item.garment_back_image_url || '',
+            sleeveImage: item.garment_sleeve_image_url || '',
+            imagesData: item.garment_images_data || null,
+          })));
+
+          // Set the initial garment image from the first item
+          if (lineItems[0].garment_front_image_url) {
+            setGarmentImageUrl(lineItems[0].garment_front_image_url);
+            setGarmentDescription(lineItems[0].description || '');
+          }
+        }
+      }
 
       let existingProof = null;
 
@@ -1074,6 +1117,102 @@ export default function MockupGenerator({
 
           <div className="w-64 bg-gray-50 dark:bg-slate-900 p-3 overflow-y-auto border-l dark:border-slate-600">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Details</h3>
+
+            {/* Garment Styles Selector */}
+            {garmentStyles.length > 0 && (
+              <div className="mb-3">
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Garment Styles in Group</label>
+                <div className="space-y-2">
+                  {garmentStyles.map((garmentStyle, index) => {
+                    const colorVariants = garmentStyle.imagesData?.colorVariants || [];
+                    const hasColorVariants = colorVariants.length > 0;
+
+                    return (
+                      <div
+                        key={garmentStyle.lineItemId}
+                        className={`bg-white dark:bg-slate-800 rounded-lg border-2 transition-colors ${
+                          activeGarmentIndex === index
+                            ? 'border-blue-500'
+                            : 'border-gray-200 dark:border-slate-700'
+                        }`}
+                      >
+                        <div
+                          className="p-2 cursor-pointer"
+                          onClick={() => {
+                            setActiveGarmentIndex(index);
+                            if (garmentStyle.frontImage) {
+                              setGarmentImageUrl(garmentStyle.frontImage);
+                              setGarmentDescription(garmentStyle.description);
+                            }
+                          }}
+                        >
+                          <div className="flex items-start gap-2">
+                            {garmentStyle.frontImage && (
+                              <img
+                                src={garmentStyle.frontImage}
+                                alt={garmentStyle.style}
+                                className="w-16 h-16 object-contain rounded border border-gray-200 dark:border-slate-600 bg-white"
+                              />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs font-semibold text-gray-900 dark:text-white truncate">
+                                {garmentStyle.itemNumber}
+                              </div>
+                              <div className="text-xs text-gray-600 dark:text-gray-400">
+                                {garmentStyle.color}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Color Thumbnails */}
+                          {hasColorVariants && (
+                            <div className="mt-2 pt-2 border-t border-gray-200 dark:border-slate-600">
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Available Colors:</div>
+                              <div className="grid grid-cols-4 gap-1">
+                                {colorVariants.map((variant: any, vIdx: number) => (
+                                  <button
+                                    key={vIdx}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (variant.front_image) {
+                                        setGarmentImageUrl(variant.front_image);
+                                        // Update the garment style with new color
+                                        const updated = [...garmentStyles];
+                                        updated[index] = {
+                                          ...updated[index],
+                                          color: variant.color_name,
+                                          frontImage: variant.front_image,
+                                          backImage: variant.back_image || '',
+                                          sleeveImage: variant.sleeve_image || '',
+                                        };
+                                        setGarmentStyles(updated);
+                                      }
+                                    }}
+                                    className={`relative aspect-square rounded border-2 overflow-hidden transition-all hover:scale-105 ${
+                                      garmentStyle.frontImage === variant.front_image
+                                        ? 'border-blue-500 ring-2 ring-blue-300'
+                                        : 'border-gray-300 dark:border-slate-600'
+                                    }`}
+                                    title={variant.color_name}
+                                  >
+                                    <img
+                                      src={variant.front_image}
+                                      alt={variant.color_name}
+                                      className="w-full h-full object-contain bg-white"
+                                    />
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {garmentImageUrl ? (
               <img
                 src={garmentImageUrl}
