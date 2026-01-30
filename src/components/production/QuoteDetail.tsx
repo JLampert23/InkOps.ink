@@ -623,7 +623,15 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                 (imp as any).group_label === groupLabel ||
                                 ((imp as any).group_label === null && quoteImprints.filter(i => (i as any).group_label === null).length > 0)
                               );
-                          if (groupImprints.length === 0) return null;
+
+                          // Get proofs for this group (even if no imprints)
+                          const groupProofs = proofs.filter(proof =>
+                            proof.group_label === groupLabel ||
+                            (proof.group_label === '' && groupLabel === '') ||
+                            (proof.group_label === null && groupLabel === '')
+                          );
+
+                          if (groupImprints.length === 0 && groupProofs.length === 0) return null;
 
                           const garmentItem = groupItems.find(li => li.line_type === 'garment');
                           const firstLineItem = garmentItem || groupItems[0];
@@ -632,7 +640,8 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                               {groupImprints.map((imprint, idx) => {
                                 const matchingProof = proofs.find(proof =>
-                                  proof.imprint_id === imprint.id
+                                  proof.imprint_id === imprint.id ||
+                                  (proof.group_label === groupLabel && proof.imprint_id === null)
                                 );
 
                                 return (
@@ -705,6 +714,51 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                   </div>
                                 );
                               })}
+
+                              {/* Show proofs without imprints */}
+                              {groupProofs.filter(proof => !proof.imprint_id).map((proof) => (
+                                <div
+                                  key={proof.id}
+                                  className="bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-3"
+                                >
+                                  <div className="flex items-start justify-between mb-2">
+                                    <span className="text-xs font-bold text-gray-900 dark:text-white">
+                                      {proof.proof_number}
+                                    </span>
+                                    <span className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded">
+                                      {proof.status}
+                                    </span>
+                                  </div>
+
+                                  {proof.composite_image_url || proof.garment_image_url ? (
+                                    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
+                                      <div className="flex items-center justify-end mb-2">
+                                        <button
+                                          onClick={() => {
+                                            setSelectedGroupLabel(groupLabel);
+                                            setShowManageImprints(true);
+                                          }}
+                                          className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded border border-blue-200 dark:border-blue-800 transition-colors"
+                                          title="Edit Proof"
+                                        >
+                                          <Pencil className="w-3 h-3" />
+                                          Edit
+                                        </button>
+                                      </div>
+                                      <img
+                                        src={proof.composite_image_url || proof.garment_image_url!}
+                                        alt={proof.garment_name || 'Proof'}
+                                        className="w-full h-48 object-contain rounded border border-gray-200 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800"
+                                        onClick={() => {
+                                          setSelectedProofImage(proof.composite_image_url || proof.garment_image_url!);
+                                          setShowProofModal(true);
+                                        }}
+                                      />
+                                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{proof.proof_number}</p>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              ))}
                             </div>
                           );
                         })()}
