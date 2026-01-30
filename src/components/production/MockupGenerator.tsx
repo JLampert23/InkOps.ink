@@ -349,19 +349,16 @@ export default function MockupGenerator({
         session.access_token = refreshedSession.access_token;
       }
 
-      const searchUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/product-search`;
+      const trimmedStyle = garmentStyle.trim();
+      const searchUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/product-search?style=${encodeURIComponent(trimmedStyle)}`;
       console.log('Making product search request to:', searchUrl);
 
       const response = await fetch(searchUrl, {
-        method: 'POST',
+        method: 'GET',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          styleNumber: garmentStyle,
-          color: garmentColor,
-        }),
       });
 
       console.log('Product search response status:', response.status);
@@ -372,12 +369,34 @@ export default function MockupGenerator({
 
         if (data.results && data.results.length > 0) {
           const product = data.results[0];
-          const imageUrl = product.imageUrl || product.frontImageUrl;
-          console.log('Setting garment image:', imageUrl);
+          console.log('First product:', product);
 
-          setGarmentImageUrl(imageUrl);
-          setGarmentBrand(product.brand || data.supplier);
-          setGarmentDescription(product.description || product.name);
+          // Find matching color or use first color
+          let matchingColor = null;
+          if (product.colors && product.colors.length > 0) {
+            if (garmentColor) {
+              // Try to find matching color
+              matchingColor = product.colors.find((c: any) =>
+                c.name?.toLowerCase().includes(garmentColor.toLowerCase()) ||
+                garmentColor.toLowerCase().includes(c.name?.toLowerCase())
+              );
+            }
+            // Fall back to first color if no match
+            if (!matchingColor) {
+              matchingColor = product.colors[0];
+            }
+          }
+
+          console.log('Matching color:', matchingColor);
+
+          if (matchingColor?.image_url) {
+            console.log('Setting garment image from color:', matchingColor.image_url);
+            setGarmentImageUrl(matchingColor.image_url);
+            setGarmentBrand(product.brand || product.supplier);
+            setGarmentDescription(product.description);
+          } else {
+            console.warn('No image URL found in product colors');
+          }
         } else {
           console.warn('No product results found');
         }
