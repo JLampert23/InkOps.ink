@@ -649,9 +649,14 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                     className="bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-3"
                                   >
                                     <div className="flex items-start justify-between mb-2">
-                                      <span className="text-xs font-bold text-gray-900 dark:text-white">
-                                        {quote.quote_number}-{String(idx + 1).padStart(2, '0')}
-                                      </span>
+                                      <div className="flex flex-col gap-1">
+                                        <span className="text-xs font-bold text-gray-900 dark:text-white">
+                                          {quote.quote_number}-{String(idx + 1).padStart(2, '0')}
+                                        </span>
+                                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                                          Imprint #{idx + 1}
+                                        </span>
+                                      </div>
                                       <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded">
                                         {imprint.type_of_work}
                                       </span>
