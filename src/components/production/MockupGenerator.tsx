@@ -168,27 +168,35 @@ export default function MockupGenerator({
       if (!profile) throw new Error('Profile not found');
       setCompanyId(profile.company_id);
 
-      // Load all garment styles in this group
-      if (groupLabel && quoteId) {
-        console.log('Loading all garment styles for group:', groupLabel, 'in quote:', quoteId);
-        const { data: lineItems, error: lineItemsError } = await supabase
+      // Load all garment styles in this group (or all if no group specified)
+      if (quoteId) {
+        console.log('Loading garment styles for quote:', quoteId, 'group:', groupLabel || '(all)');
+
+        let query = supabase
           .from('quote_line_items')
-          .select('id, item_number, description, garment_color, garment_front_image_url, garment_back_image_url, garment_sleeve_image_url, garment_images_data')
+          .select('id, item_number, description, color, garment_front_image_url, garment_back_image_url, garment_sleeve_image_url, garment_images_data')
           .eq('quote_id', quoteId)
-          .eq('group_label', groupLabel)
+          .not('item_number', 'is', null) // Only load items with item numbers (exclude fees)
           .order('sort_order');
+
+        // If group label is provided and not empty, filter by it
+        if (groupLabel && groupLabel.trim() !== '') {
+          query = query.eq('group_label', groupLabel);
+        }
+
+        const { data: lineItems, error: lineItemsError } = await query;
 
         if (lineItemsError) {
           console.error('Error loading line items:', lineItemsError);
         }
 
-        console.log('Found line items for group:', lineItems);
+        console.log('Found line items:', lineItems);
 
         if (lineItems && lineItems.length > 0) {
           const styles = lineItems.map(item => ({
             lineItemId: item.id,
             style: item.item_number || '',
-            color: item.garment_color || '',
+            color: item.color || '',
             description: item.description || '',
             itemNumber: item.item_number || '',
             frontImage: item.garment_front_image_url || '',
@@ -206,10 +214,10 @@ export default function MockupGenerator({
             setGarmentDescription(lineItems[0].description || '');
           }
         } else {
-          console.warn('No line items found for group:', groupLabel);
+          console.warn('No garment line items found');
         }
       } else {
-        console.log('Not loading garment styles - missing groupLabel or quoteId:', { groupLabel, quoteId });
+        console.log('Not loading garment styles - missing quoteId');
       }
 
       let existingProof = null;
@@ -1200,7 +1208,7 @@ export default function MockupGenerator({
                           {hasColorVariants && (
                             <div className="mt-2 pt-2 border-t border-gray-200 dark:border-slate-600">
                               <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Available Colors:</div>
-                              <div className="grid grid-cols-4 gap-1">
+                              <div className="grid grid-cols-6 gap-1">
                                 {colorVariants.map((variant: any, vIdx: number) => (
                                   <button
                                     key={vIdx}
@@ -1241,6 +1249,77 @@ export default function MockupGenerator({
                       </div>
                     );
                   })}
+                </div>
+              </div>
+            )}
+
+            {/* Garment View Thumbnails */}
+            {garmentStyles.length > 0 && garmentStyles[activeGarmentIndex] && (
+              <div className="mb-3">
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  Garment Views
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {garmentStyles[activeGarmentIndex].frontImage && (
+                    <button
+                      onClick={() => setGarmentImageUrl(garmentStyles[activeGarmentIndex].frontImage)}
+                      className={`relative aspect-square rounded border-2 overflow-hidden transition-all hover:scale-105 ${
+                        garmentImageUrl === garmentStyles[activeGarmentIndex].frontImage
+                          ? 'border-blue-500 ring-2 ring-blue-300'
+                          : 'border-gray-300 dark:border-slate-600'
+                      }`}
+                      title="Front View"
+                    >
+                      <img
+                        src={garmentStyles[activeGarmentIndex].frontImage}
+                        alt="Front"
+                        className="w-full h-full object-contain bg-white"
+                      />
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[10px] text-center py-0.5">
+                        Front
+                      </div>
+                    </button>
+                  )}
+                  {garmentStyles[activeGarmentIndex].backImage && (
+                    <button
+                      onClick={() => setGarmentImageUrl(garmentStyles[activeGarmentIndex].backImage)}
+                      className={`relative aspect-square rounded border-2 overflow-hidden transition-all hover:scale-105 ${
+                        garmentImageUrl === garmentStyles[activeGarmentIndex].backImage
+                          ? 'border-blue-500 ring-2 ring-blue-300'
+                          : 'border-gray-300 dark:border-slate-600'
+                      }`}
+                      title="Back View"
+                    >
+                      <img
+                        src={garmentStyles[activeGarmentIndex].backImage}
+                        alt="Back"
+                        className="w-full h-full object-contain bg-white"
+                      />
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[10px] text-center py-0.5">
+                        Back
+                      </div>
+                    </button>
+                  )}
+                  {garmentStyles[activeGarmentIndex].sleeveImage && (
+                    <button
+                      onClick={() => setGarmentImageUrl(garmentStyles[activeGarmentIndex].sleeveImage)}
+                      className={`relative aspect-square rounded border-2 overflow-hidden transition-all hover:scale-105 ${
+                        garmentImageUrl === garmentStyles[activeGarmentIndex].sleeveImage
+                          ? 'border-blue-500 ring-2 ring-blue-300'
+                          : 'border-gray-300 dark:border-slate-600'
+                      }`}
+                      title="Sleeve View"
+                    >
+                      <img
+                        src={garmentStyles[activeGarmentIndex].sleeveImage}
+                        alt="Sleeve"
+                        className="w-full h-full object-contain bg-white"
+                      />
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[10px] text-center py-0.5">
+                        Sleeve
+                      </div>
+                    </button>
+                  )}
                 </div>
               </div>
             )}
