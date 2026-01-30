@@ -359,80 +359,8 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
       {/* Traditional Invoice Layout */}
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
-        {/* Header Section - Logo, Company Info, Key Dates */}
-        <div className="p-8 border-b border-gray-300 dark:border-slate-600">
-          <div className="flex items-start justify-between gap-8">
-            {/* Left: Company Logo and Info */}
-            <div className="flex items-start gap-6 flex-1">
-              {quote.company_logo_url && (
-                <img
-                  src={quote.company_logo_url}
-                  alt={quote.company_name || 'Company Logo'}
-                  className="h-24 w-auto object-contain"
-                />
-              )}
-              <div className="text-sm">
-                {quote.company_name && (
-                  <p className="font-bold text-lg text-gray-900 dark:text-white mb-2">{quote.company_name}</p>
-                )}
-                {quote.company_address && <p className="text-gray-700 dark:text-gray-300">{quote.company_address}</p>}
-                {quote.company_city && (
-                  <p className="text-gray-700 dark:text-gray-300">
-                    {quote.company_city}, {quote.company_state} {quote.company_zip}
-                  </p>
-                )}
-                {quote.company_phone && <p className="text-gray-700 dark:text-gray-300 mt-1">{quote.company_phone}</p>}
-                {quote.company_website && (
-                  <p className="text-blue-600 dark:text-blue-400 mt-1">
-                    <a href={quote.company_website} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                      {quote.company_website}
-                    </a>
-                  </p>
-                )}
-                {quote.company_email && (
-                  <p className="text-blue-600 dark:text-blue-400">
-                    <a href={`mailto:${quote.company_email}`} className="hover:underline">
-                      {quote.company_email}
-                    </a>
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Right: Key Dates */}
-            <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6 min-w-[320px]">
-              <div className="space-y-2 text-sm">
-                {quote.customer_due_date && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Customer Due Date</span>
-                    <span className="font-medium text-gray-900 dark:text-white">
-                      {format(new Date(quote.customer_due_date), 'MMMM d, yyyy')}
-                    </span>
-                  </div>
-                )}
-                {quote.invoice_date && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Invoice Date</span>
-                    <span className="font-medium text-gray-900 dark:text-white">
-                      {format(new Date(quote.invoice_date), 'MMMM d, yyyy')}
-                    </span>
-                  </div>
-                )}
-                {quote.payment_due_date && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Payment Due Date</span>
-                    <span className="font-medium text-gray-900 dark:text-white">
-                      {format(new Date(quote.payment_due_date), 'MMMM d, yyyy')}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Customer Billing and Shipping */}
-        <div className="grid grid-cols-2 gap-8 px-8 py-6 border-b border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+        <div className="grid grid-cols-2 gap-8 p-8 border-b border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800">
           {/* Customer Billing */}
           <div>
             <h3 className="font-bold text-gray-900 dark:text-white mb-3 text-sm">Customer Billing</h3>
