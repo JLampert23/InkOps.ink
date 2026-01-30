@@ -326,31 +326,23 @@ export default function MockupGenerator({
     try {
       console.log('Fetching garment image for:', { garmentStyle, garmentColor });
 
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      // Try to refresh session first to ensure we have a valid token
+      const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
 
-      if (sessionError) {
-        console.error('Error getting session:', sessionError);
+      if (refreshError) {
+        console.error('Error refreshing session:', refreshError);
+        showNotification('error', 'Session expired. Please refresh the page and log in again.');
         return;
       }
 
       if (!session?.access_token) {
-        console.error('No access token available');
+        console.error('No access token available after refresh');
+        showNotification('error', 'Authentication required. Please refresh the page and log in again.');
         return;
       }
 
-      // Get the access token to use (handle refresh if needed)
-      let accessToken = session.access_token;
-
-      // Check if token is expired and refresh if needed
-      if (session.expires_at && new Date(session.expires_at * 1000) < new Date()) {
-        console.log('Token expired, refreshing...');
-        const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
-        if (refreshError || !refreshedSession?.access_token) {
-          console.error('Failed to refresh session:', refreshError);
-          return;
-        }
-        accessToken = refreshedSession.access_token;
-      }
+      const accessToken = session.access_token;
+      console.log('Using access token (first 20 chars):', accessToken.substring(0, 20) + '...');
 
       const trimmedStyle = garmentStyle.trim();
       const searchUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/product-search?style=${encodeURIComponent(trimmedStyle)}`;
