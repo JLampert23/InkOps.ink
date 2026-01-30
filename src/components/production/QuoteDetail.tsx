@@ -132,7 +132,6 @@ interface Proof {
   status: string;
   created_at: string;
   updated_at: string;
-  selected_colors?: Array<{ name: string; hex: string }>;
 }
 
 export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProps) {
@@ -211,7 +210,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
       const { data: proofsData, error: proofsError } = await supabase
         .from('proofs')
-        .select('id, proof_number, line_item_id, imprint_id, group_label, garment_image_url, composite_image_url, garment_name, status, created_at, updated_at, selected_colors')
+        .select('id, proof_number, line_item_id, imprint_id, group_label, garment_image_url, composite_image_url, garment_name, status, created_at, updated_at')
         .eq('quote_id', quoteId)
         .order('created_at', { ascending: false });
 
@@ -652,16 +651,19 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                       <div className="text-sm font-medium text-gray-900 dark:text-white">
                                         {imprint.location}
                                       </div>
-                                      {matchingProof?.selected_colors && matchingProof.selected_colors.length > 0 && (
+                                      {imprint.thread_ink_color && (
                                         <div className="flex items-center gap-1 flex-wrap justify-end ml-2">
-                                          {matchingProof.selected_colors.map((color, colorIdx) => (
-                                            <div
-                                              key={colorIdx}
-                                              className="w-4 h-4 rounded border border-gray-400 dark:border-gray-500 shadow-sm"
-                                              style={{ backgroundColor: color.hex }}
-                                              title={color.name}
-                                            />
-                                          ))}
+                                          {(() => {
+                                            const colors = imprint.thread_ink_color.split(',').map(c => c.trim());
+                                            return colors.map((color, colorIdx) => (
+                                              <div
+                                                key={colorIdx}
+                                                className="w-4 h-4 rounded border border-gray-400 dark:border-gray-500 shadow-sm"
+                                                style={{ backgroundColor: color }}
+                                                title={color}
+                                              />
+                                            ));
+                                          })()}
                                         </div>
                                       )}
                                     </div>
