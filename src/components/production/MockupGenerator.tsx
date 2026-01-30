@@ -338,6 +338,9 @@ export default function MockupGenerator({
         return;
       }
 
+      // Get the access token to use (handle refresh if needed)
+      let accessToken = session.access_token;
+
       // Check if token is expired and refresh if needed
       if (session.expires_at && new Date(session.expires_at * 1000) < new Date()) {
         console.log('Token expired, refreshing...');
@@ -346,7 +349,7 @@ export default function MockupGenerator({
           console.error('Failed to refresh session:', refreshError);
           return;
         }
-        session.access_token = refreshedSession.access_token;
+        accessToken = refreshedSession.access_token;
       }
 
       const trimmedStyle = garmentStyle.trim();
@@ -356,7 +359,7 @@ export default function MockupGenerator({
       const response = await fetch(searchUrl, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
       });
