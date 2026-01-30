@@ -327,17 +327,30 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   };
 
   const loadAvailableFees = async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('QuoteBuilder: No user available for loadAvailableFees');
+      return;
+    }
 
     try {
-      const { data: userProfile } = await supabase
+      console.log('QuoteBuilder: Loading fees for user:', user.id);
+      const { data: userProfile, error: profileError } = await supabase
         .from('user_profiles')
         .select('company_id')
         .eq('id', user.id)
         .maybeSingle();
 
-      if (!userProfile?.company_id) return;
+      if (profileError) {
+        console.error('Error loading user profile:', profileError);
+        return;
+      }
 
+      if (!userProfile?.company_id) {
+        console.log('QuoteBuilder: No company_id found for user');
+        return;
+      }
+
+      console.log('QuoteBuilder: Loading fees for company:', userProfile.company_id);
       const { data, error } = await supabase
         .from('invoice_fees')
         .select('*')
@@ -345,7 +358,12 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         .eq('is_active', true)
         .order('fee_name');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading invoice_fees:', error);
+        throw error;
+      }
+
+      console.log('QuoteBuilder: Loaded fees:', data);
       setAvailableFees(data || []);
     } catch (err) {
       console.error('Error loading available fees:', err);
@@ -1760,6 +1778,18 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                 ))}
               </tbody>
             </table>
+
+            {/* Debug Info - Shows number of fees loaded */}
+            {availableFees.length > 0 && (
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                {availableFees.length} fee template(s) available
+              </div>
+            )}
+            {availableFees.length === 0 && (
+              <div className="text-xs text-amber-600 dark:text-amber-400 mb-2 p-2 bg-amber-50 dark:bg-amber-900/20 rounded">
+                No fee templates found. Add fees in Account Settings → Production → General Settings.
+              </div>
+            )}
 
             <div className="flex gap-2">
               <select
