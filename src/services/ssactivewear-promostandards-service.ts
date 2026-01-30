@@ -268,6 +268,8 @@ export async function getUnifiedProductData(
       url += `&partId=${encodeURIComponent(partId)}`;
     }
 
+    console.log('Fetching unified product data:', { styleNumber, partId, url });
+
     const response = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -275,19 +277,35 @@ export async function getUnifiedProductData(
       },
     });
 
+    console.log('Unified API response status:', response.status);
+
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to fetch unified product data');
+      const errorText = await response.text();
+      console.error('Unified API error response:', errorText);
+      let error;
+      try {
+        error = JSON.parse(errorText);
+      } catch {
+        error = { error: errorText };
+      }
+      throw new Error(error.error || `Failed to fetch unified product data: ${response.status} ${response.statusText}`);
     }
 
     const result = await response.json();
+    console.log('Unified API response data:', result);
+
     if (!result.success) {
-      throw new Error('Unified product data fetch failed');
+      throw new Error('Unified product data fetch failed: ' + JSON.stringify(result));
     }
 
     return result;
-  } catch (error) {
-    console.error('Error fetching unified product data:', error);
+  } catch (error: any) {
+    console.error('Error fetching unified product data:', {
+      message: error.message,
+      styleNumber,
+      partId,
+      error
+    });
     throw error;
   }
 }
