@@ -4,7 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
   "Access-Control-Max-Age": "86400",
 };
 
@@ -443,11 +443,17 @@ Deno.serve(async (req: Request) => {
           );
         }
 
+        const partId = url.searchParams.get("partId");
+
+        const partIdTag = partId ? `<shar:partId>${partId}</shar:partId>` : '';
+
         const soapBody = `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${credentials.accountNumber}</shar:id>
   <shar:password>${decryptedApiKey}</shar:password>
+  <shar:mediaType>Image</shar:mediaType>
   <shar:productId>${productId}</shar:productId>
+  ${partIdTag}
 </ns2:GetMediaContentRequest>`;
 
         const xmlResponse = await makePromoStandardsRequest(
@@ -481,6 +487,7 @@ Deno.serve(async (req: Request) => {
             action,
             data: {
               productId,
+              partId: partId || null,
               mediaContent: mediaArray,
             },
           }),
