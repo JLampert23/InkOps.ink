@@ -909,9 +909,9 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
           });
           return (
             <MockupGenerator
-              lineItemId={selectedLineItem.id}
-              quoteId={quoteId}
-              customerId={quote.customer_id}
+              lineItemId={selectedLineItem.id || undefined}
+              quoteId={quoteId || undefined}
+              customerId={quote.customer_id || undefined}
               garmentStyle={selectedLineItem.item_number}
               garmentColor={selectedLineItem.color}
               groupLabel={selectedGroupLabel}

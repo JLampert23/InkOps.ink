@@ -19,8 +19,8 @@ import {
 } from 'lucide-react';
 
 interface MockupGeneratorProps {
-  lineItemId: string;
-  quoteId: string;
+  lineItemId?: string;
+  quoteId?: string;
   customerId?: string;
   garmentStyle?: string;
   garmentColor?: string;
@@ -130,11 +130,15 @@ export default function MockupGenerator({
       if (!profile) throw new Error('Profile not found');
       setCompanyId(profile.company_id);
 
-      const { data: existingProof } = await supabase
-        .from('proofs')
-        .select('*')
-        .eq('line_item_id', lineItemId)
-        .maybeSingle();
+      let existingProof = null;
+      if (lineItemId && lineItemId.trim()) {
+        const { data } = await supabase
+          .from('proofs')
+          .select('*')
+          .eq('line_item_id', lineItemId)
+          .maybeSingle();
+        existingProof = data;
+      }
 
       // Load production colors from production_colors table
       const { data: inkColorsData } = await supabase
@@ -382,9 +386,9 @@ export default function MockupGenerator({
         const { data: newProof, error: proofError } = await supabase
           .from('proofs')
           .insert({
-            quote_id: quoteId || null,
-            line_item_id: lineItemId || null,
-            customer_id: customerId || null,
+            quote_id: quoteId && quoteId.trim() ? quoteId : null,
+            line_item_id: lineItemId && lineItemId.trim() ? lineItemId : null,
+            customer_id: customerId && customerId.trim() ? customerId : null,
             company_id: companyId,
             group_label: groupLabel || '',
             garment_image_url: garmentImageUrl,
