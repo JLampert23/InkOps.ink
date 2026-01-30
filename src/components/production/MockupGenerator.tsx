@@ -110,7 +110,10 @@ export default function MockupGenerator({
   const [showArtworkLibrary, setShowArtworkLibrary] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeHandle, setResizeHandle] = useState<string | null>(null);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [initialScale, setInitialScale] = useState(1);
 
   useEffect(() => {
     console.log('MockupGenerator initialized with props:', {
@@ -679,31 +682,98 @@ export default function MockupGenerator({
     setSelectedArtwork(updated);
   };
 
+  const getHandleAtPosition = (x: number, y: number): string | null => {
+    if (selectedArtwork.length === 0) return null;
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+
+    const artwork = selectedArtwork[activeArtworkIndex];
+    const centerX = artwork.position_x + canvas.width / 2;
+    const centerY = artwork.position_y + canvas.height / 2;
+
+    // Use fixed base size matching the drawing logic
+    const baseSize = 120;
+    // We need to load the image to get aspect ratio - use a reasonable default for now
+    const artworkWidth = baseSize * artwork.scale;
+    const artworkHeight = baseSize * artwork.scale;
+
+    const handleSize = 10;
+    const handles = [
+      { name: 'nw', x: centerX - artworkWidth / 2, y: centerY - artworkHeight / 2 },
+      { name: 'ne', x: centerX + artworkWidth / 2, y: centerY - artworkHeight / 2 },
+      { name: 'sw', x: centerX - artworkWidth / 2, y: centerY + artworkHeight / 2 },
+      { name: 'se', x: centerX + artworkWidth / 2, y: centerY + artworkHeight / 2 },
+    ];
+
+    for (const handle of handles) {
+      if (Math.abs(x - handle.x) <= handleSize && Math.abs(y - handle.y) <= handleSize) {
+        return handle.name;
+      }
+    }
+
+    return null;
+  };
+
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (selectedArtwork.length === 0) return;
-    setIsDragging(true);
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
-    setDragStart({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const handle = getHandleAtPosition(x, y);
+    if (handle) {
+      setIsResizing(true);
+      setResizeHandle(handle);
+      setInitialScale(selectedArtwork[activeArtworkIndex].scale);
+      setDragStart({ x, y });
+    } else {
+      setIsDragging(true);
+      setDragStart({ x, y });
+    }
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDragging || selectedArtwork.length === 0) return;
+    if (selectedArtwork.length === 0) return;
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    const dx = x - dragStart.x;
-    const dy = y - dragStart.y;
-    updateActiveArtwork({
-      position_x: selectedArtwork[activeArtworkIndex].position_x + dx,
-      position_y: selectedArtwork[activeArtworkIndex].position_y + dy,
-    });
-    setDragStart({ x, y });
+
+    if (isResizing && resizeHandle) {
+      const dx = x - dragStart.x;
+      const dy = y - dragStart.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const direction = resizeHandle.includes('e') ? 1 : -1;
+      const scaleFactor = 1 + (direction * distance / 100);
+      const newScale = Math.max(0.1, initialScale * scaleFactor);
+
+      updateActiveArtwork({ scale: newScale });
+    } else if (isDragging) {
+      const dx = x - dragStart.x;
+      const dy = y - dragStart.y;
+      updateActiveArtwork({
+        position_x: selectedArtwork[activeArtworkIndex].position_x + dx,
+        position_y: selectedArtwork[activeArtworkIndex].position_y + dy,
+      });
+      setDragStart({ x, y });
+    } else {
+      // Update cursor based on hover
+      const handle = getHandleAtPosition(x, y);
+      if (handle && canvasRef.current) {
+        canvasRef.current.style.cursor = handle.includes('n') && handle.includes('w') || handle.includes('s') && handle.includes('e') ? 'nwse-resize' :
+          'nesw-resize';
+      } else if (canvasRef.current) {
+        canvasRef.current.style.cursor = 'move';
+      }
+    }
   };
 
   const handleCanvasMouseUp = () => {
     setIsDragging(false);
+    setIsResizing(false);
+    setResizeHandle(null);
   };
 
   useEffect(() => {
@@ -770,14 +840,48 @@ export default function MockupGenerator({
         );
         ctx.rotate((artwork.rotation * Math.PI) / 180);
         ctx.scale(artwork.scale, artwork.scale);
-        const artworkWidth = artwork.width_inches * 30;
-        const artworkHeight = artwork.height_inches * 30;
+
+        // Use fixed base size for visual representation (not affected by dimension inputs)
+        const baseSize = 120; // Base size in pixels for visual display
+        const aspectRatio = img.width / img.height;
+        const artworkWidth = aspectRatio >= 1 ? baseSize : baseSize * aspectRatio;
+        const artworkHeight = aspectRatio >= 1 ? baseSize / aspectRatio : baseSize;
+
         ctx.drawImage(img, -artworkWidth / 2, -artworkHeight / 2, artworkWidth, artworkHeight);
 
         if (index === activeArtworkIndex) {
+          // Draw selection box
           ctx.strokeStyle = '#3b82f6';
           ctx.lineWidth = 2;
           ctx.strokeRect(-artworkWidth / 2, -artworkHeight / 2, artworkWidth, artworkHeight);
+
+          // Draw resize handles
+          const handleSize = 10 / artwork.scale; // Scale handle size inversely
+          const handles = [
+            { x: -artworkWidth / 2, y: -artworkHeight / 2 }, // nw
+            { x: artworkWidth / 2, y: -artworkHeight / 2 },  // ne
+            { x: -artworkWidth / 2, y: artworkHeight / 2 },  // sw
+            { x: artworkWidth / 2, y: artworkHeight / 2 },   // se
+          ];
+
+          ctx.fillStyle = '#3b82f6';
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2 / artwork.scale;
+
+          handles.forEach(handle => {
+            ctx.fillRect(
+              handle.x - handleSize / 2,
+              handle.y - handleSize / 2,
+              handleSize,
+              handleSize
+            );
+            ctx.strokeRect(
+              handle.x - handleSize / 2,
+              handle.y - handleSize / 2,
+              handleSize,
+              handleSize
+            );
+          });
         }
         ctx.restore();
       };
@@ -1051,12 +1155,13 @@ export default function MockupGenerator({
                     <input
                       type="number"
                       step="0.1"
-                      value={widthInches}
+                      value={selectedArtwork.length > 0 ? selectedArtwork[activeArtworkIndex].width_inches : widthInches}
                       onChange={(e) => {
                         const val = parseFloat(e.target.value);
-                        setWidthInches(val);
                         if (selectedArtwork.length > 0) {
                           updateActiveArtwork({ width_inches: val });
+                        } else {
+                          setWidthInches(val);
                         }
                       }}
                       className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-slate-600 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
@@ -1067,12 +1172,13 @@ export default function MockupGenerator({
                     <input
                       type="number"
                       step="0.1"
-                      value={heightInches}
+                      value={selectedArtwork.length > 0 ? selectedArtwork[activeArtworkIndex].height_inches : heightInches}
                       onChange={(e) => {
                         const val = parseFloat(e.target.value);
-                        setHeightInches(val);
                         if (selectedArtwork.length > 0) {
                           updateActiveArtwork({ height_inches: val });
+                        } else {
+                          setHeightInches(val);
                         }
                       }}
                       className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-slate-600 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
