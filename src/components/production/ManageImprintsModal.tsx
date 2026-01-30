@@ -796,7 +796,12 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
       {mockupImprintIndex !== null && quoteId && (() => {
         const currentImprint = imprints[mockupImprintIndex];
         const groupLabel = currentImprint.group_label || '';
-        const firstLineItem = lineItems?.find(item => item.group_label === groupLabel);
+
+        // Try to find line item by group_label, fallback to first line item if not found
+        let firstLineItem = lineItems?.find(item => item.group_label === groupLabel);
+        if (!firstLineItem && lineItems && lineItems.length > 0) {
+          firstLineItem = lineItems[0];
+        }
 
         console.log('Opening MockupGenerator with:', {
           currentImprint,
@@ -804,7 +809,8 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
           firstLineItem,
           garmentStyle: firstLineItem?.item_number,
           garmentColor: firstLineItem?.color,
-          lineItemsCount: lineItems?.length
+          lineItemsCount: lineItems?.length,
+          allLineItems: lineItems
         });
 
         return (

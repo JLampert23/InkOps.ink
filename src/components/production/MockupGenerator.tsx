@@ -357,10 +357,13 @@ export default function MockupGenerator({
       });
 
       console.log('Product search response status:', response.status);
+      console.log('Product search response headers:', Object.fromEntries(response.headers.entries()));
 
       if (response.ok) {
         const data = await response.json();
         console.log('Product search results:', data);
+        console.log('Results count:', data.results?.length || 0);
+        console.log('Errors in response:', data.errors);
 
         if (data.results && data.results.length > 0) {
           const product = data.results[0];
@@ -396,11 +399,25 @@ export default function MockupGenerator({
           console.warn('No product results found');
         }
       } else {
-        const errorText = await response.text();
-        console.error('Product search failed:', response.status, errorText);
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          errorData = { error: await response.text() };
+        }
+        console.error('Product search failed:', response.status, errorData);
+        console.error('Full error details:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: searchUrl,
+          headers: Object.fromEntries(response.headers.entries()),
+          body: errorData
+        });
+        showNotification('error', `Failed to fetch garment image: ${errorData.error || errorData.message || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('Error fetching garment image:', error);
+      showNotification('error', 'Error fetching garment image: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   };
 
