@@ -630,17 +630,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
                           return (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                              {groupImprints.filter((imprint) => {
-                                const matchingProof = proofs.find(proof =>
-                                  proof.imprint_id === imprint.id ||
-                                  (proof.group_label === groupLabel && proof.imprint_id === null)
-                                );
-                                return matchingProof && (
-                                  (matchingProof.selected_colors && matchingProof.selected_colors.length > 0) ||
-                                  matchingProof.composite_image_url ||
-                                  matchingProof.garment_image_url
-                                );
-                              }).map((imprint, idx) => {
+                              {groupImprints.map((imprint, idx) => {
                                 const matchingProof = proofs.find(proof =>
                                   proof.imprint_id === imprint.id ||
                                   (proof.group_label === groupLabel && proof.imprint_id === null)
