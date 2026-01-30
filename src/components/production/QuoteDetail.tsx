@@ -608,26 +608,10 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                   </React.Fragment>
                 );
               })}
-                  {/* Always show Generate Mockup button and imprints list for this group */}
+                  {/* List imprints for this group */}
                   <tr>
                     <td colSpan={18} className="px-4 py-2 bg-gray-50 dark:bg-slate-800/50">
                       <div className="space-y-3">
-                        <button
-                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors flex items-center gap-2"
-                          onClick={() => {
-                            const garmentItem = groupItems.find(li => li.line_type === 'garment');
-                            const firstLineItem = garmentItem || groupItems[0];
-                            if (firstLineItem) {
-                              setSelectedLineItem(firstLineItem);
-                              setSelectedGroupLabel(groupLabel);
-                              setShowProofGenerator(true);
-                            }
-                          }}
-                        >
-                          <Plus className="w-4 h-4" />
-                          Mockup
-                        </button>
-
                         {/* List imprints for this group */}
                         {(() => {
                           // If there's only one group, show all imprints
