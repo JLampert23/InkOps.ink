@@ -199,6 +199,8 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!user) return;
+
     loadCompanySettings();
     loadCustomers();
     loadAvailableFees();
@@ -207,7 +209,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
     } else {
       loadDefaultFees();
     }
-  }, [quoteId]);
+  }, [quoteId, user]);
 
   useEffect(() => {
     if (selectedCustomerId && !quoteId) {
@@ -216,10 +218,21 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   }, [selectedCustomerId, quoteId]);
 
   const loadCompanySettings = async () => {
+    if (!user) return;
+
     try {
+      const { data: userProfile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!userProfile?.company_id) return;
+
       const { data, error } = await supabase
         .from('company_settings')
         .select('*')
+        .eq('id', userProfile.company_id)
         .maybeSingle();
 
       if (error) throw error;
@@ -259,11 +272,26 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   };
 
   const loadCustomers = async () => {
-    const { data } = await supabase
-      .from('customers')
-      .select('*')
-      .order('company_name');
-    setCustomers(data || []);
+    if (!user) return;
+
+    try {
+      const { data: userProfile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!userProfile?.company_id) return;
+
+      const { data } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('company_id', userProfile.company_id)
+        .order('company_name');
+      setCustomers(data || []);
+    } catch (err) {
+      console.error('Error loading customers:', err);
+    }
   };
 
   const loadCustomerDetails = async (customerId: string) => {
@@ -299,10 +327,21 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   };
 
   const loadAvailableFees = async () => {
+    if (!user) return;
+
     try {
+      const { data: userProfile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!userProfile?.company_id) return;
+
       const { data, error } = await supabase
         .from('invoice_fees')
         .select('*')
+        .eq('company_id', userProfile.company_id)
         .eq('is_active', true)
         .order('fee_name');
 
@@ -314,10 +353,21 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   };
 
   const loadDefaultFees = async () => {
+    if (!user) return;
+
     try {
+      const { data: userProfile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!userProfile?.company_id) return;
+
       const { data: defaultFees, error } = await supabase
         .from('invoice_fees')
         .select('*')
+        .eq('company_id', userProfile.company_id)
         .eq('is_active', true)
         .eq('show_by_default', true)
         .eq('amount_type', 'dollar');
