@@ -43,8 +43,15 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     const authHeader = req.headers.get("Authorization");
-    // Temporarily skip auth verification for testing
     console.log("Auth header present:", !!authHeader);
+
+    // Verify authentication
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ code: 401, message: "Missing Authorization header" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Create admin client for database queries
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
@@ -54,20 +61,42 @@ Deno.serve(async (req: Request) => {
       }
     });
 
-    // For now, get the first company (temporarily skip user verification)
-    const { data: profiles } = await supabaseAdmin
-      .from("user_profiles")
-      .select("company_id")
-      .limit(1);
+    // Verify the user's JWT and get their info
+    const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      },
+      global: {
+        headers: {
+          Authorization: authHeader
+        }
+      }
+    });
 
-    if (!profiles || profiles.length === 0 || !profiles[0]?.company_id) {
+    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
+    if (userError || !user) {
+      console.error("Auth error:", userError);
       return new Response(
-        JSON.stringify({ error: "Company not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ code: 401, message: "Invalid JWT" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const profile = profiles[0];
+    // Get the user's company from their profile
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from("user_profiles")
+      .select("company_id")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileError || !profile || !profile.company_id) {
+      console.error("Profile error:", profileError);
+      return new Response(
+        JSON.stringify({ error: "Company not found for user" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Get integration settings from company_settings
     const { data: settings, error: settingsError } = await supabaseAdmin
@@ -104,7 +133,7 @@ Deno.serve(async (req: Request) => {
         const sanmarUrl = `${supabaseUrl}/functions/v1/sanmar-api?action=search&style=${encodeURIComponent(style)}`;
         const sanmarResponse = await fetch(sanmarUrl, {
           headers: {
-            "Authorization": authHeader,
+            "Authorization": `Bearer ${supabaseServiceKey}`,
           },
         });
 
@@ -131,7 +160,7 @@ Deno.serve(async (req: Request) => {
         const ssaUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=product&style=${encodeURIComponent(style)}`;
         const ssaResponse = await fetch(ssaUrl, {
           headers: {
-            "Authorization": authHeader,
+            "Authorization": `Bearer ${supabaseServiceKey}`,
           },
         });
 
@@ -148,7 +177,7 @@ Deno.serve(async (req: Request) => {
               console.log("Fetching media from:", mediaUrl);
               const mediaResponse = await fetch(mediaUrl, {
                 headers: {
-                  "Authorization": authHeader,
+                  "Authorization": `Bearer ${supabaseServiceKey}`,
                 },
               });
 
