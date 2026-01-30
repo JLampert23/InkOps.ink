@@ -170,15 +170,22 @@ export default function MockupGenerator({
 
       // Load all garment styles in this group
       if (groupLabel && quoteId) {
-        const { data: lineItems } = await supabase
+        console.log('Loading all garment styles for group:', groupLabel, 'in quote:', quoteId);
+        const { data: lineItems, error: lineItemsError } = await supabase
           .from('quote_line_items')
           .select('id, item_number, description, garment_color, garment_front_image_url, garment_back_image_url, garment_sleeve_image_url, garment_images_data')
           .eq('quote_id', quoteId)
           .eq('group_label', groupLabel)
           .order('sort_order');
 
+        if (lineItemsError) {
+          console.error('Error loading line items:', lineItemsError);
+        }
+
+        console.log('Found line items for group:', lineItems);
+
         if (lineItems && lineItems.length > 0) {
-          setGarmentStyles(lineItems.map(item => ({
+          const styles = lineItems.map(item => ({
             lineItemId: item.id,
             style: item.item_number || '',
             color: item.garment_color || '',
@@ -188,14 +195,21 @@ export default function MockupGenerator({
             backImage: item.garment_back_image_url || '',
             sleeveImage: item.garment_sleeve_image_url || '',
             imagesData: item.garment_images_data || null,
-          })));
+          }));
+
+          console.log('Setting garment styles:', styles);
+          setGarmentStyles(styles);
 
           // Set the initial garment image from the first item
           if (lineItems[0].garment_front_image_url) {
             setGarmentImageUrl(lineItems[0].garment_front_image_url);
             setGarmentDescription(lineItems[0].description || '');
           }
+        } else {
+          console.warn('No line items found for group:', groupLabel);
         }
+      } else {
+        console.log('Not loading garment styles - missing groupLabel or quoteId:', { groupLabel, quoteId });
       }
 
       let existingProof = null;
@@ -1118,10 +1132,24 @@ export default function MockupGenerator({
           <div className="w-64 bg-gray-50 dark:bg-slate-900 p-3 overflow-y-auto border-l dark:border-slate-600">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Details</h3>
 
+            {/* Debug Info */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="mb-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs">
+                <div className="font-semibold text-yellow-800 dark:text-yellow-200 mb-1">Debug Info:</div>
+                <div className="text-yellow-700 dark:text-yellow-300 space-y-0.5">
+                  <div>Styles loaded: {garmentStyles.length}</div>
+                  <div>Quote ID: {quoteId || 'none'}</div>
+                  <div>Group: {groupLabel || 'none'}</div>
+                </div>
+              </div>
+            )}
+
             {/* Garment Styles Selector */}
             {garmentStyles.length > 0 && (
               <div className="mb-3">
-                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Garment Styles in Group</label>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  Garment Styles in Group ({garmentStyles.length})
+                </label>
                 <div className="space-y-2">
                   {garmentStyles.map((garmentStyle, index) => {
                     const colorVariants = garmentStyle.imagesData?.colorVariants || [];
@@ -1147,12 +1175,16 @@ export default function MockupGenerator({
                           }}
                         >
                           <div className="flex items-start gap-2">
-                            {garmentStyle.frontImage && (
+                            {garmentStyle.frontImage ? (
                               <img
                                 src={garmentStyle.frontImage}
                                 alt={garmentStyle.style}
                                 className="w-16 h-16 object-contain rounded border border-gray-200 dark:border-slate-600 bg-white"
                               />
+                            ) : (
+                              <div className="w-16 h-16 flex items-center justify-center rounded border border-gray-300 dark:border-slate-600 bg-gray-100 dark:bg-slate-700">
+                                <ImageIcon className="w-6 h-6 text-gray-400" />
+                              </div>
                             )}
                             <div className="flex-1 min-w-0">
                               <div className="text-xs font-semibold text-gray-900 dark:text-white truncate">
