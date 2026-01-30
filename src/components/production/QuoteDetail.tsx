@@ -122,7 +122,7 @@ interface QuoteImprint {
 interface Proof {
   id: string;
   proof_number: string;
-  line_item_id: string | null;
+  line_item_id: string;
   imprint_id: string | null;
   group_label: string | null;
   garment_image_url: string | null;
@@ -657,7 +657,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                       </div>
                                     )}
 
-                                    {matchingProof && (matchingProof.composite_image_url || matchingProof.garment_image_url) ? (
+                                    {matchingProof && (matchingProof.composite_image_url || matchingProof.garment_image_url) && (
                                       <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
                                         <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">Proof / Mockup</p>
                                         <img
@@ -670,37 +670,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                           }}
                                         />
                                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{matchingProof.proof_number}</p>
-                                        <button
-                                          onClick={() => {
-                                            const garmentItem = groupItems.find(li => li.line_type === 'garment');
-                                            if (garmentItem) {
-                                              setSelectedLineItem(garmentItem);
-                                              setSelectedGroupLabel(groupLabel);
-                                              setSelectedImprintId(imprint.id);
-                                              setShowProofGenerator(true);
-                                            }
-                                          }}
-                                          className="mt-2 w-full px-2 py-1 text-xs bg-gray-100 dark:bg-slate-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-slate-500 transition-colors"
-                                        >
-                                          Edit Proof
-                                        </button>
                                       </div>
-                                    ) : (
-                                      <button
-                                        onClick={() => {
-                                          const garmentItem = groupItems.find(li => li.line_type === 'garment');
-                                          if (garmentItem) {
-                                            setSelectedLineItem(garmentItem);
-                                            setSelectedGroupLabel(groupLabel);
-                                            setSelectedImprintId(imprint.id);
-                                            setShowProofGenerator(true);
-                                          }
-                                        }}
-                                        className="mt-3 w-full px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors flex items-center justify-center gap-2"
-                                      >
-                                        <Plus className="w-4 h-4" />
-                                        Create Proof
-                                      </button>
                                     )}
                                   </div>
                                 );
