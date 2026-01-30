@@ -463,7 +463,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
         {/* Line Items Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-base">
             {/* Only show main thead when no groups have labels */}
             {!itemGroups.some(([label]) => label) && (
               <thead className="bg-gray-100 dark:bg-slate-700/50 border-b-2 border-gray-300 dark:border-slate-600">
@@ -471,19 +471,19 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                   <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Item #</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Color</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white min-w-[250px]">Description</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YXS</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YS</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YM</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YL</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YXL</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">XS</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">S</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">M</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">L</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">XL</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">2XL</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">3XL</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">4XL</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">YXS</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">YS</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">YM</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">YL</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">YXL</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">XS</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">S</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">M</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">L</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">XL</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">2XL</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">3XL</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">4XL</th>
                   <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Qty</th>
                   <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">Price</th>
                   <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">Total</th>
@@ -515,19 +515,19 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                       <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Item #</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Color</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white min-w-[250px]">Description</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YXS</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YS</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YM</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YL</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YXL</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">XS</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">S</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">M</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">L</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">XL</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">2XL</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">3XL</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">4XL</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">YXS</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">YS</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">YM</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">YL</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">YXL</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">XS</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">S</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">M</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">L</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">XL</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">2XL</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">3XL</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">4XL</th>
                       <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Qty</th>
                       <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">Price</th>
                       <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">Total</th>
@@ -544,64 +544,64 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                     return (
                       <React.Fragment key={item.id}>
                         <tr className="border-b border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/30">
-                      <td className="px-4 py-4 text-gray-700 dark:text-gray-300 font-mono text-xs">
+                      <td className="px-4 py-4 text-gray-700 dark:text-gray-300 font-mono text-base">
                         {item.item_number || '-'}
                       </td>
-                      <td className="px-4 py-4 text-gray-700 dark:text-gray-300">
+                      <td className="px-4 py-4 text-gray-700 dark:text-gray-300 text-base">
                         {item.color || '-'}
                       </td>
-                      <td className="px-4 py-4 text-gray-900 dark:text-white">
+                      <td className="px-4 py-4 text-gray-900 dark:text-white text-base">
                         {item.description}
                         {item.notes && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic">{item.notes}</p>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 italic">{item.notes}</p>
                         )}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_yxs || ''}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_ys || ''}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_ym || ''}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_yl || ''}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_yxl || ''}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_xs || ''}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_s || ''}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_m || ''}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_l || ''}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_xl || ''}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_2xl || ''}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_3xl || ''}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_4xl || ''}
                       </td>
-                      <td className="px-4 py-4 text-center text-gray-900 dark:text-white font-semibold">
+                      <td className="px-4 py-4 text-center text-gray-900 dark:text-white font-semibold text-base">
                         {itemQty}
                       </td>
-                      <td className="px-4 py-4 text-right text-gray-700 dark:text-gray-300">
+                      <td className="px-4 py-4 text-right text-gray-700 dark:text-gray-300 text-base">
                         ${item.unit_price.toFixed(2)}
                       </td>
-                      <td className="px-4 py-4 text-right text-gray-900 dark:text-white font-semibold">
+                      <td className="px-4 py-4 text-right text-gray-900 dark:text-white font-semibold text-base">
                         ${item.total_price.toFixed(2)}
                       </td>
                     </tr>
