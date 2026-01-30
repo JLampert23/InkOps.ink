@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Download,
   Plus,
+  Pencil,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import MockupGenerator from './MockupGenerator';
@@ -659,7 +660,22 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
                                     {matchingProof && (matchingProof.composite_image_url || matchingProof.garment_image_url) && (
                                       <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
-                                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">Proof / Mockup</p>
+                                        <div className="flex items-center justify-between mb-2">
+                                          <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">Proof / Mockup</p>
+                                          <button
+                                            onClick={() => {
+                                              setSelectedLineItem(firstLineItem);
+                                              setSelectedGroupLabel(groupLabel);
+                                              setSelectedImprintId(imprint.id);
+                                              setShowProofGenerator(true);
+                                            }}
+                                            className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded border border-blue-200 dark:border-blue-800 transition-colors"
+                                            title="Edit Proof"
+                                          >
+                                            <Pencil className="w-3 h-3" />
+                                            Edit
+                                          </button>
+                                        </div>
                                         <img
                                           src={matchingProof.composite_image_url || matchingProof.garment_image_url!}
                                           alt={matchingProof.garment_name || 'Proof'}
