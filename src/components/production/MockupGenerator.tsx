@@ -45,7 +45,7 @@ interface CustomerArtwork {
 
 interface MockupArtwork {
   id: string;
-  customer_artwork_id: string;
+  customer_artwork_id: string | null;
   artwork_url: string;
   print_location: string;
   width_inches: number;
@@ -289,7 +289,7 @@ export default function MockupGenerator({
 
         const newArtwork: MockupArtwork = {
           id: '',
-          customer_artwork_id: artworkRecord.id,
+          customer_artwork_id: artworkRecord?.id || null,
           artwork_url: publicUrl,
           print_location: printLocation,
           width_inches: width || widthInches,
@@ -382,9 +382,9 @@ export default function MockupGenerator({
         const { data: newProof, error: proofError } = await supabase
           .from('proofs')
           .insert({
-            quote_id: quoteId,
-            line_item_id: lineItemId,
-            customer_id: customerId,
+            quote_id: quoteId || null,
+            line_item_id: lineItemId || null,
+            customer_id: customerId || null,
             company_id: companyId,
             group_label: groupLabel || '',
             garment_image_url: garmentImageUrl,
@@ -428,7 +428,7 @@ export default function MockupGenerator({
           .from('proof_artwork')
           .insert({
             proof_id: currentProofId,
-            customer_artwork_id: artwork.customer_artwork_id,
+            customer_artwork_id: artwork.customer_artwork_id || null,
             company_id: companyId,
             artwork_url: artwork.artwork_url,
             artwork_name: artwork.file_name || '',
@@ -894,7 +894,7 @@ export default function MockupGenerator({
           onSelectArtwork={(artwork) => {
             const newArtwork: MockupArtwork = {
               id: '',
-              customer_artwork_id: artwork.id,
+              customer_artwork_id: artwork?.id || null,
               artwork_url: artwork.file_url,
               print_location: printLocation,
               width_inches: artwork.width_inches || widthInches,
