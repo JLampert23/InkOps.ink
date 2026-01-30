@@ -76,11 +76,11 @@ Deno.serve(async (req: Request) => {
     // Get SanMar credentials from company_settings
     const { data: settings } = await supabase
       .from("company_settings")
-      .select("sanmar_account_number, sanmar_password_encrypted")
+      .select("sanmar_account_number, sanmar_username, sanmar_password_encrypted")
       .eq("id", profile.company_id)
       .maybeSingle();
 
-    if (!settings?.sanmar_account_number || !settings?.sanmar_password_encrypted) {
+    if (!settings?.sanmar_account_number || !settings?.sanmar_username || !settings?.sanmar_password_encrypted) {
       return new Response(
         JSON.stringify({ error: "SanMar credentials not configured" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -112,6 +112,7 @@ Deno.serve(async (req: Request) => {
 
     const credentials = {
       accountNumber: settings.sanmar_account_number,
+      username: settings.sanmar_username,
       password: decryptedPassword
     };
 
