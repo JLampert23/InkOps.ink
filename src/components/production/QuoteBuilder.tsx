@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Save, Plus, Trash2, GripVertical, X, Loader2, DollarSign, Settings, Search } from 'lucide-react';
+import { Save, Plus, Trash2, GripVertical, X, Loader2, DollarSign, Settings, Search, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -827,16 +827,36 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
     // If SSActivewear, fetch unified product data with garment images
     if (product.supplier === 'ssactivewear' && color?.code) {
       try {
+        console.log('Fetching garment images for:', { style: product.style, partId: color.code });
         const unifiedData = await getUnifiedProductData(product.style, color.code);
+        console.log('Unified data received:', unifiedData);
+
         if (unifiedData.success && unifiedData.media?.views) {
           garmentImages.garment_front_image_url = unifiedData.media.views.front || undefined;
           garmentImages.garment_back_image_url = unifiedData.media.views.back || undefined;
           garmentImages.garment_sleeve_image_url = unifiedData.media.views.left || unifiedData.media.views.right || undefined;
           garmentImages.garment_images_data = unifiedData.media.images || undefined;
+          console.log('Garment images extracted:', {
+            front: garmentImages.garment_front_image_url,
+            back: garmentImages.garment_back_image_url,
+            sleeve: garmentImages.garment_sleeve_image_url,
+          });
+        } else {
+          console.warn('No media views in unified data:', unifiedData);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching garment images:', error);
-        // Continue without images - non-blocking
+        console.error('Error details:', {
+          message: error.message,
+          supplier: product.supplier,
+          style: product.style,
+          colorCode: color.code,
+        });
+
+        // Check if it's a credentials error
+        if (error.message?.includes('credentials not configured')) {
+          console.warn('SSActivewear credentials not configured. Garment images will not be available.');
+        }
       }
     }
 
@@ -1406,6 +1426,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                   <thead>
                     <tr className="bg-gray-100 dark:bg-slate-900 text-sm font-semibold text-gray-700 dark:text-gray-300">
                       <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-6"></th>
+                      <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">Image</th>
                       <th className="p-2 text-left border border-gray-300 dark:border-slate-800 w-20">Item #</th>
                       <th className="p-2 text-left border border-gray-300 dark:border-slate-800 w-20">Color</th>
                       <th className="p-2 text-left border border-gray-300 dark:border-slate-800">Description</th>
@@ -1425,13 +1446,13 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       {/* Spacer Row Between Groups */}
                       {groupIdx > 0 && (
                         <tr key={`spacer-${group.id}`} className="bg-transparent">
-                          <td colSpan={getSizeColumns(group).length + 8} className="p-4 border-0"></td>
+                          <td colSpan={getSizeColumns(group).length + 9} className="p-4 border-0"></td>
                         </tr>
                       )}
                       {/* Group Header Row with Label - All Groups */}
                       {(itemGroups.length > 1 || group.label) && (
                         <tr key={`header-${group.id}`} className="bg-gray-200 dark:bg-slate-800">
-                          <td colSpan={getSizeColumns(group).length + 8} className="p-2 border border-gray-300 dark:border-slate-800">
+                          <td colSpan={getSizeColumns(group).length + 9} className="p-2 border border-gray-300 dark:border-slate-800">
                             <div className="flex items-center justify-between gap-4">
                               <div className="flex items-center gap-4 flex-1">
                                 <input
@@ -1479,6 +1500,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       {(itemGroups.length > 1 || group.label) && (
                         <tr key={`columns-${group.id}`} className="bg-gray-100 dark:bg-slate-900 text-sm font-semibold text-gray-700 dark:text-gray-300">
                           <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-6"></th>
+                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-12">Image</th>
                           <th className="p-2 text-left border border-gray-300 dark:border-slate-800 w-40">Item #</th>
                           <th className="p-2 text-left border border-gray-300 dark:border-slate-800 w-40">Color</th>
                           <th className="p-2 text-left border border-gray-300 dark:border-slate-800">Description</th>
@@ -1496,6 +1518,20 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                         <tr key={`${group.id}-${itemIdx}`} className="bg-white dark:bg-slate-900/50 hover:bg-gray-50 dark:hover:bg-slate-900">
                           <td className="p-0.5 border border-gray-300 dark:border-slate-800 text-center">
                             <GripVertical className="w-3 h-3 text-gray-600 mx-auto" />
+                          </td>
+                          <td className="p-1 border border-gray-300 dark:border-slate-800 text-center">
+                            {item.garment_front_image_url ? (
+                              <img
+                                src={item.garment_front_image_url}
+                                alt="Garment"
+                                className="w-10 h-10 object-cover rounded border border-gray-200 dark:border-slate-600 mx-auto"
+                                title="Garment image loaded from supplier"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 flex items-center justify-center bg-gray-100 dark:bg-slate-800 rounded border border-gray-200 dark:border-slate-600 mx-auto">
+                                <ImageIcon className="w-4 h-4 text-gray-400" />
+                              </div>
+                            )}
                           </td>
                           <td className="p-0 border border-gray-300 dark:border-slate-800 relative">
                             <div className="relative">
@@ -1665,7 +1701,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       ))}
                       {/* Group Actions Row */}
                       <tr key={`actions-${group.id}`}>
-                        <td colSpan={getSizeColumns(group).length + 8} className="p-2 border-t-2 border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
+                        <td colSpan={getSizeColumns(group).length + 9} className="p-2 border-t-2 border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
                           <div className="space-y-3">
                             <div className="flex gap-2 justify-between items-center">
                               <div className="flex gap-2">
