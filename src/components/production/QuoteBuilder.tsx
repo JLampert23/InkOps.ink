@@ -465,8 +465,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
 
   const getGroupImprints = (groupLabel: string) => {
     // If there's only one group, show all imprints
-    const uniqueGroups = new Set(lineItems.map(li => li.group_label || ''));
-    if (uniqueGroups.size === 1) {
+    if (itemGroups.length === 1) {
       return quoteImprints;
     }
 
