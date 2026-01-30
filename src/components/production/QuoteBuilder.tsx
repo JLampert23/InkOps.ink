@@ -464,7 +464,13 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   };
 
   const getGroupImprints = (groupLabel: string) => {
-    // Treat empty string, null, and undefined as equivalent
+    // If there's only one group, show all imprints
+    const uniqueGroups = new Set(lineItems.map(li => li.group_label || ''));
+    if (uniqueGroups.size === 1) {
+      return quoteImprints;
+    }
+
+    // Otherwise, treat empty string, null, and undefined as equivalent
     const normalizedGroupLabel = groupLabel || null;
     return quoteImprints.filter(imp => {
       const normalizedImprintLabel = imp.group_label || null;
