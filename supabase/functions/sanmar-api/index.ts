@@ -76,24 +76,18 @@ Deno.serve(async (req: Request) => {
     // Get SanMar credentials from company_settings
     const { data: settings } = await supabase
       .from("company_settings")
-      .select("sanmar_username, sanmar_api_key_encrypted")
+      .select("sanmar_account_number, sanmar_password_encrypted")
       .eq("id", profile.company_id)
       .maybeSingle();
 
-    if (!settings?.sanmar_username || !settings?.sanmar_api_key_encrypted) {
+    if (!settings?.sanmar_account_number || !settings?.sanmar_password_encrypted) {
       return new Response(
         JSON.stringify({ error: "SanMar credentials not configured" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const credentials = {
-      apiKey: settings.sanmar_api_key_encrypted,
-      customerId: settings.sanmar_username,
-      username: settings.sanmar_username
-    } as SanMarCredentials;
-
-    // Decrypt the API key
+    // Decrypt the password
     const decryptResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
       method: "POST",
       headers: {
@@ -102,19 +96,24 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify({
         action: "decrypt",
-        token: credentials.apiKey,
+        token: settings.sanmar_password_encrypted,
       }),
     });
 
     if (!decryptResponse.ok) {
-      console.error("Failed to decrypt SanMar API key");
+      console.error("Failed to decrypt SanMar password");
       return new Response(
         JSON.stringify({ error: "Failed to decrypt credentials" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const { result: decryptedApiKey } = await decryptResponse.json();
+    const { result: decryptedPassword } = await decryptResponse.json();
+
+    const credentials = {
+      accountNumber: settings.sanmar_account_number,
+      password: decryptedPassword
+    };
 
     // Parse request
     const url = new URL(req.url);
@@ -168,15 +167,12 @@ Deno.serve(async (req: Request) => {
         );
     }
 
-    // Make request to SanMar API with decrypted key
+    // Make request to SanMar API with basic auth
+    const basicAuth = btoa(`${credentials.accountNumber}:${credentials.password}`);
     const sanmarHeaders: Record<string, string> = {
-      "Authorization": `Bearer ${decryptedApiKey}`,
+      "Authorization": `Basic ${basicAuth}`,
       "Content-Type": "application/json",
     };
-
-    if (credentials.customerId) {
-      sanmarHeaders["X-Customer-Id"] = credentials.customerId;
-    }
 
     const sanmarResponse = await fetch(sanmarUrl, {
       method,
