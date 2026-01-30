@@ -39,6 +39,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     const authHeader = req.headers.get("Authorization");
@@ -50,21 +51,24 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const token = authHeader.replace("Bearer ", "");
-    console.log("Token received (first 20 chars):", token.substring(0, 20));
-    console.log("Token length:", token.length);
+    console.log("Auth header present");
 
-    // Create Supabase client with service role for both auth verification and database queries
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+    // Create a client with the user's token to verify authentication
+    const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: authHeader,
+        },
+      },
       auth: {
         autoRefreshToken: false,
         persistSession: false
       }
     });
 
-    // Verify the JWT by getting the user with the token
+    // Verify the JWT by trying to get the authenticated user
     console.log("Attempting to verify JWT...");
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
 
     if (authError || !user) {
       console.error("Auth verification failed");
@@ -72,20 +76,26 @@ Deno.serve(async (req: Request) => {
         message: authError?.message,
         status: authError?.status,
         name: authError?.name,
-        code: (authError as any)?.code,
       });
       return new Response(
         JSON.stringify({
           code: 401,
           error: "Unauthorized",
           message: authError?.message || "Invalid JWT",
-          details: authError?.status ? `Status: ${authError.status}` : undefined
         }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     console.log("Authenticated user:", user.id);
+
+    // Create admin client for database queries
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
 
     // Get user's company_id
     const { data: profile } = await supabaseAdmin
