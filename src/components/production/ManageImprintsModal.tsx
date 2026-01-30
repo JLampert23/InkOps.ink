@@ -411,6 +411,63 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
     }
   };
 
+  const handleSaveImprintBeforeMockup = async (index: number) => {
+    const imprint = imprints[index];
+
+    if (imprint.id) {
+      setMockupImprintIndex(index);
+      return;
+    }
+
+    try {
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user?.id)
+        .single();
+
+      if (!profile?.company_id) {
+        showNotification('error', 'Error', 'Company ID not found');
+        return;
+      }
+
+      const { data: savedImprint, error } = await supabase
+        .from('quote_imprints')
+        .insert({
+          quote_id: quoteId,
+          company_id: profile.company_id,
+          sort_order: index,
+          location: imprint.location,
+          price_matrix_id: imprint.price_matrix_id,
+          matrix: imprint.matrix,
+          column_number: imprint.column_number,
+          type_of_work: imprint.type_of_work,
+          details: imprint.details,
+          mockups: imprint.proofs,
+          thread_ink_color: imprint.thread_ink_color,
+          pricing_matrix_column: imprint.pricing_matrix_column,
+          group_label: imprint.group_label || null,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error saving imprint:', error);
+        showNotification('error', 'Save Failed', 'Failed to save imprint before creating mockup');
+        return;
+      }
+
+      const updatedImprints = [...imprints];
+      updatedImprints[index] = { ...imprint, id: savedImprint.id };
+      setImprints(updatedImprints);
+
+      setMockupImprintIndex(index);
+    } catch (err) {
+      console.error('Error in handleSaveImprintBeforeMockup:', err);
+      showNotification('error', 'Error', 'Failed to save imprint');
+    }
+  };
+
   const handleDone = async () => {
     if (quoteId) {
       try {
@@ -664,9 +721,9 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
                       </div>
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={(e) => {
+                          onClick={async (e) => {
                             e.stopPropagation();
-                            setMockupImprintIndex(idx);
+                            await handleSaveImprintBeforeMockup(idx);
                           }}
                           className="text-blue-400 hover:text-blue-300 flex-shrink-0"
                           title="Create Mockup"
