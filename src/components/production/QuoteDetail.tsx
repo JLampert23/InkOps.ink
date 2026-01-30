@@ -916,6 +916,8 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         }}
         quoteId={quoteId}
         initialGroupLabel={selectedGroupLabel}
+        quote={quote}
+        lineItems={lineItems}
       />
 
       {showProofModal && (

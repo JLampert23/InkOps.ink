@@ -64,9 +64,11 @@ interface ManageImprintsModalProps {
   onClose: () => void;
   quoteId?: string;
   initialGroupLabel?: string;
+  quote?: any;
+  lineItems?: any[];
 }
 
-export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabel }: ManageImprintsModalProps) {
+export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabel, quote, lineItems }: ManageImprintsModalProps) {
   const { user } = useAuth();
   const { showNotification } = useNotification();
   const [imprints, setImprints] = useState<Imprint[]>([]);
@@ -690,24 +692,30 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
         </div>
       </div>
 
-      {mockupImprintIndex !== null && quoteId && (
-        <MockupGenerator
-          lineItemId=""
-          quoteId={quoteId}
-          customerId=""
-          garmentStyle=""
-          garmentColor=""
-          groupLabel={imprints[mockupImprintIndex].group_label || ''}
-          imprintId={imprints[mockupImprintIndex].id || ''}
-          imprintLocation={imprints[mockupImprintIndex].location}
-          imprintTypeOfWork={imprints[mockupImprintIndex].type_of_work}
-          onClose={() => setMockupImprintIndex(null)}
-          onSave={() => {
-            setMockupImprintIndex(null);
-            showNotification('success', 'Mockup Saved', 'Mockup has been saved successfully');
-          }}
-        />
-      )}
+      {mockupImprintIndex !== null && quoteId && (() => {
+        const currentImprint = imprints[mockupImprintIndex];
+        const groupLabel = currentImprint.group_label || '';
+        const firstLineItem = lineItems?.find(item => item.group_label === groupLabel);
+
+        return (
+          <MockupGenerator
+            lineItemId={firstLineItem?.id || ''}
+            quoteId={quoteId}
+            customerId={quote?.customer_id || ''}
+            garmentStyle={firstLineItem?.item_number || ''}
+            garmentColor={firstLineItem?.color || ''}
+            groupLabel={groupLabel}
+            imprintId={currentImprint.id || ''}
+            imprintLocation={currentImprint.location}
+            imprintTypeOfWork={currentImprint.type_of_work}
+            onClose={() => setMockupImprintIndex(null)}
+            onSave={() => {
+              setMockupImprintIndex(null);
+              showNotification('success', 'Mockup Saved', 'Mockup has been saved successfully');
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }
