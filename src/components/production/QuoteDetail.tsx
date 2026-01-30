@@ -629,7 +629,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                           const firstLineItem = garmentItem || groupItems[0];
 
                           return (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                               {groupImprints.map((imprint, idx) => {
                                 const matchingProof = proofs.find(proof => {
                                   if (proof.imprint_id && proof.imprint_id === imprint.id) {
