@@ -45,13 +45,30 @@ Deno.serve(async (req: Request) => {
     const authHeader = req.headers.get("Authorization");
     console.log("Auth header present:", !!authHeader);
 
-    // Verify authentication
-    if (!authHeader) {
+    // Create client that will use the user's JWT for verification
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      },
+      global: {
+        headers: {
+          Authorization: authHeader || ""
+        }
+      }
+    });
+
+    // Verify the JWT by getting the user
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    if (userError || !user) {
+      console.error("Auth verification failed:", userError);
       return new Response(
-        JSON.stringify({ code: 401, message: "Missing Authorization header" }),
+        JSON.stringify({ code: 401, message: "Invalid JWT" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    console.log("Authenticated user:", user.id);
 
     // Create admin client for database queries
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
@@ -60,28 +77,6 @@ Deno.serve(async (req: Request) => {
         persistSession: false
       }
     });
-
-    // Verify the user's JWT and get their info
-    const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      },
-      global: {
-        headers: {
-          Authorization: authHeader
-        }
-      }
-    });
-
-    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
-    if (userError || !user) {
-      console.error("Auth error:", userError);
-      return new Response(
-        JSON.stringify({ code: 401, message: "Invalid JWT" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
 
     // Get the user's company from their profile
     const { data: profile, error: profileError } = await supabaseAdmin
