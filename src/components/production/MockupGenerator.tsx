@@ -114,7 +114,7 @@ export default function MockupGenerator({
 
   useEffect(() => {
     loadProofData();
-  }, [lineItemId]);
+  }, [lineItemId, imprintId, quoteId, groupLabel]);
 
   const loadProofData = async () => {
     try {
@@ -133,11 +133,31 @@ export default function MockupGenerator({
       setCompanyId(profile.company_id);
 
       let existingProof = null;
-      if (lineItemId && lineItemId.trim()) {
+
+      if (imprintId && imprintId.trim()) {
+        const { data } = await supabase
+          .from('proofs')
+          .select('*')
+          .eq('imprint_id', imprintId)
+          .maybeSingle();
+        existingProof = data;
+      }
+
+      if (!existingProof && lineItemId && lineItemId.trim()) {
         const { data } = await supabase
           .from('proofs')
           .select('*')
           .eq('line_item_id', lineItemId)
+          .maybeSingle();
+        existingProof = data;
+      }
+
+      if (!existingProof && quoteId && quoteId.trim() && groupLabel) {
+        const { data } = await supabase
+          .from('proofs')
+          .select('*')
+          .eq('quote_id', quoteId)
+          .eq('group_label', groupLabel)
           .maybeSingle();
         existingProof = data;
       }
