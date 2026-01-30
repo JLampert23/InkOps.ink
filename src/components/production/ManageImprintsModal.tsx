@@ -692,7 +692,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
 
       {mockupImprintIndex !== null && quoteId && (
         <MockupGenerator
-          lineItemId={imprints[mockupImprintIndex].id || `temp-${mockupImprintIndex}`}
+          lineItemId=""
           quoteId={quoteId}
           customerId=""
           garmentStyle=""
