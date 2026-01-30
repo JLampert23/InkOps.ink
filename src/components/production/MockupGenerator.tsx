@@ -25,6 +25,8 @@ interface MockupGeneratorProps {
   garmentStyle?: string;
   garmentColor?: string;
   groupLabel?: string;
+  imprintLocation?: string;
+  imprintTypeOfWork?: string;
   onClose: () => void;
   onSave?: () => void;
 }
@@ -75,6 +77,8 @@ export default function MockupGenerator({
   garmentStyle,
   garmentColor,
   groupLabel,
+  imprintLocation,
+  imprintTypeOfWork,
   onClose,
   onSave,
 }: MockupGeneratorProps) {
@@ -185,6 +189,14 @@ export default function MockupGenerator({
         }
       } else {
         await fetchGarmentImage();
+
+        // Auto-populate from imprint data if provided
+        if (imprintTypeOfWork) {
+          setTypeOfWork(imprintTypeOfWork);
+        }
+        if (imprintLocation) {
+          setPrintLocation(imprintLocation);
+        }
       }
     } catch (error) {
       console.error('Error loading proof:', error);
@@ -786,38 +798,54 @@ export default function MockupGenerator({
           </div>
 
           <div className="w-64 bg-gray-50 dark:bg-slate-900 p-3 overflow-y-auto border-l dark:border-slate-600">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Garment Details</h3>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Details</h3>
             {garmentImageUrl && (
-              <img src={garmentImageUrl} alt="Garment" className="w-full rounded mb-2" />
+              <img src={garmentImageUrl} alt="Garment" className="w-full rounded mb-3 border border-gray-200 dark:border-slate-700" />
             )}
-            <div className="space-y-2 text-xs">
-              {garmentBrand && (
-                <div>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">Brand:</span>
-                  <span className="ml-1 text-gray-600 dark:text-gray-400">{garmentBrand}</span>
+            <div className="space-y-3 text-xs">
+              {/* Garment Information */}
+              <div className="bg-white dark:bg-slate-800 rounded-lg p-2 border border-gray-200 dark:border-slate-700">
+                <h4 className="text-xs font-semibold text-gray-900 dark:text-white mb-1.5">Garment</h4>
+                <div className="space-y-1">
+                  {garmentBrand && (
+                    <div>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Brand:</span>
+                      <span className="ml-1 text-gray-600 dark:text-gray-400">{garmentBrand}</span>
+                    </div>
+                  )}
+                  {garmentStyle && (
+                    <div>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Style:</span>
+                      <span className="ml-1 text-gray-600 dark:text-gray-400">{garmentStyle}</span>
+                    </div>
+                  )}
+                  {garmentColor && (
+                    <div>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Color:</span>
+                      <span className="ml-1 text-gray-600 dark:text-gray-400">{garmentColor}</span>
+                    </div>
+                  )}
+                  {garmentDescription && (
+                    <div>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">Description:</span>
+                      <p className="mt-0.5 text-gray-600 dark:text-gray-400 text-xs leading-relaxed">{garmentDescription}</p>
+                    </div>
+                  )}
                 </div>
-              )}
-              {garmentStyle && (
-                <div>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">Style:</span>
-                  <span className="ml-1 text-gray-600 dark:text-gray-400">{garmentStyle}</span>
-                </div>
-              )}
-              {garmentColor && (
-                <div>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">Color:</span>
-                  <span className="ml-1 text-gray-600 dark:text-gray-400">{garmentColor}</span>
-                </div>
-              )}
-              {garmentDescription && (
-                <div>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">Description:</span>
-                  <p className="mt-0.5 text-gray-600 dark:text-gray-400">{garmentDescription}</p>
+              </div>
+
+              {/* Print Location */}
+              {printLocation && (
+                <div className="bg-white dark:bg-slate-800 rounded-lg p-2 border border-gray-200 dark:border-slate-700">
+                  <h4 className="text-xs font-semibold text-gray-900 dark:text-white mb-1.5">Print Location</h4>
+                  <div className="px-2 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs font-medium">
+                    {printLocation}
+                  </div>
                 </div>
               )}
             </div>
 
-            <div className="mt-4 pt-4 border-t dark:border-slate-700">
+            <div className="mt-3 pt-3 border-t dark:border-slate-700">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Decoration Method</h3>
               <select
                 value={typeOfWork}
@@ -835,10 +863,10 @@ export default function MockupGenerator({
             {typeOfWork && (
               <div className="mt-3">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
-                  {typeOfWork === 'Embroidery' ? 'Thread Colors' : 'Ink Colors'}
+                  {typeOfWork === 'Embroidery' || typeOfWork.toLowerCase().includes('embroid') ? 'Thread Colors' : 'Ink Colors'}
                 </h3>
                 <div className="grid grid-cols-4 gap-2">
-                  {(typeOfWork === 'Embroidery' ? threadColors : inkColors).map((color) => {
+                  {(typeOfWork === 'Embroidery' || typeOfWork.toLowerCase().includes('embroid') ? threadColors : inkColors).map((color) => {
                     const isSelected = selectedColors.includes(color.name);
                     return (
                       <button
