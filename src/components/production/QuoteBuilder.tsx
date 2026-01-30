@@ -1368,19 +1368,18 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                 {/* Only show main thead when there is a single group with no label */}
                 {itemGroups.length === 1 && !itemGroups[0].label && (
                   <thead>
-                    <tr className="bg-gray-100 dark:bg-slate-900 text-xs text-gray-700 dark:text-gray-400">
+                    <tr className="bg-gray-100 dark:bg-slate-900 text-sm font-semibold text-gray-700 dark:text-gray-300">
                       <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-6"></th>
-                      <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-20">Item #</th>
-                      <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-20">Color</th>
-                      <th className="p-1 text-left border border-gray-300 dark:border-slate-800">Description</th>
+                      <th className="p-2 text-left border border-gray-300 dark:border-slate-800 w-20">Item #</th>
+                      <th className="p-2 text-left border border-gray-300 dark:border-slate-800 w-20">Color</th>
+                      <th className="p-2 text-left border border-gray-300 dark:border-slate-800">Description</th>
                       {getSizeColumns(itemGroups[0]).map(size => (
-                        <th key={size.key} className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">{size.label}</th>
+                        <th key={size.key} className="p-2 text-center border border-gray-300 dark:border-slate-800 w-10">{size.label}</th>
                       ))}
-                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-14">Quantity</th>
-                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-14">Items</th>
-                      <th className="p-1 text-right border border-gray-300 dark:border-slate-800 w-16">Price</th>
-                      <th className="p-1 text-right border border-gray-300 dark:border-slate-800 w-20">Total</th>
-                      <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-20">Actions</th>
+                      <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-14">Qty</th>
+                      <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-16">Price</th>
+                      <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-20">Total</th>
+                      <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-20">Actions</th>
                     </tr>
                   </thead>
                 )}
@@ -1390,13 +1389,13 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       {/* Spacer Row Between Groups */}
                       {groupIdx > 0 && (
                         <tr key={`spacer-${group.id}`} className="bg-transparent">
-                          <td colSpan={getSizeColumns(group).length + 9} className="p-4 border-0"></td>
+                          <td colSpan={getSizeColumns(group).length + 8} className="p-4 border-0"></td>
                         </tr>
                       )}
                       {/* Group Header Row with Label - All Groups */}
                       {(itemGroups.length > 1 || group.label) && (
                         <tr key={`header-${group.id}`} className="bg-gray-200 dark:bg-slate-800">
-                          <td colSpan={getSizeColumns(group).length + 9} className="p-2 border border-gray-300 dark:border-slate-800">
+                          <td colSpan={getSizeColumns(group).length + 8} className="p-2 border border-gray-300 dark:border-slate-800">
                             <div className="flex items-center justify-between gap-4">
                               <div className="flex items-center gap-4 flex-1">
                                 <input
@@ -1442,19 +1441,18 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       )}
                       {/* Group Column Headers - All Groups with Labels */}
                       {(itemGroups.length > 1 || group.label) && (
-                        <tr key={`columns-${group.id}`} className="bg-gray-100 dark:bg-slate-900 text-xs text-gray-700 dark:text-gray-400">
+                        <tr key={`columns-${group.id}`} className="bg-gray-100 dark:bg-slate-900 text-sm font-semibold text-gray-700 dark:text-gray-300">
                           <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-6"></th>
-                          <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-40">Item #</th>
-                          <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-40">Color</th>
-                          <th className="p-1 text-left border border-gray-300 dark:border-slate-800">Description</th>
+                          <th className="p-2 text-left border border-gray-300 dark:border-slate-800 w-40">Item #</th>
+                          <th className="p-2 text-left border border-gray-300 dark:border-slate-800 w-40">Color</th>
+                          <th className="p-2 text-left border border-gray-300 dark:border-slate-800">Description</th>
                           {getSizeColumns(group).map(size => (
-                            <th key={size.key} className="p-1 text-center border border-gray-300 dark:border-slate-800 w-10">{size.label}</th>
+                            <th key={size.key} className="p-2 text-center border border-gray-300 dark:border-slate-800 w-10">{size.label}</th>
                           ))}
-                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-14">Quantity</th>
-                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-14">Items</th>
-                          <th className="p-1 text-right border border-gray-300 dark:border-slate-800 w-16">Price</th>
-                          <th className="p-1 text-right border border-gray-300 dark:border-slate-800 w-20">Total</th>
-                          <th className="p-1 text-center border border-gray-300 dark:border-slate-800 w-20">Actions</th>
+                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-14">Qty</th>
+                          <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-16">Price</th>
+                          <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-20">Total</th>
+                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-20">Actions</th>
                         </tr>
                       )}
                       {/* Group Items */}
@@ -1569,7 +1567,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                               type="text"
                               value={item.color}
                               onChange={(e) => updateItem(group.id, itemIdx, 'color', e.target.value)}
-                              className="w-full px-3 py-2 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-sm"
+                              className="w-full px-2 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-sm"
                             />
                           </td>
                           <td className="p-0 border border-gray-300 dark:border-slate-800">
@@ -1577,7 +1575,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                               type="text"
                               value={item.description}
                               onChange={(e) => updateItem(group.id, itemIdx, 'description', e.target.value)}
-                              className="w-full px-1 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs"
+                              className="w-full px-2 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-sm"
                             />
                           </td>
                           {getSizeColumns(group).map(size => (
@@ -1587,14 +1585,11 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                                 min="0"
                                 value={(item as any)[size.key] || ''}
                                 onChange={(e) => updateItem(group.id, itemIdx, size.key, parseInt(e.target.value) || 0)}
-                                className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
+                                className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-sm text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               />
                             </td>
                           ))}
-                      <td className="p-0.5 border border-gray-300 dark:border-slate-800 text-center text-xs text-gray-400">
-                        {item.total_quantity}
-                      </td>
-                      <td className="p-0.5 border border-gray-300 dark:border-slate-800 text-center text-xs text-gray-400">
+                      <td className="p-0.5 border border-gray-300 dark:border-slate-800 text-center text-sm text-gray-900 dark:text-white font-medium">
                         {item.total_quantity}
                       </td>
                       <td className="p-0 border border-gray-300 dark:border-slate-800">
@@ -1604,10 +1599,10 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           min="0"
                           value={item.unit_price}
                           onChange={(e) => updateItem(group.id, itemIdx, 'unit_price', parseFloat(e.target.value) || 0)}
-                          className="w-full px-1 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-right"
+                          className="w-full px-2 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-sm text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                       </td>
-                      <td className="p-0.5 border border-gray-300 dark:border-slate-800 text-right text-xs">
+                      <td className="p-1 border border-gray-300 dark:border-slate-800 text-right text-sm font-medium text-gray-900 dark:text-white">
                         ${item.total_price.toFixed(2)}
                       </td>
                       <td className="p-0.5 border border-gray-300 dark:border-slate-800">
@@ -1634,7 +1629,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       ))}
                       {/* Group Actions Row */}
                       <tr key={`actions-${group.id}`}>
-                        <td colSpan={getSizeColumns(group).length + 9} className="p-2 border-t-2 border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
+                        <td colSpan={getSizeColumns(group).length + 8} className="p-2 border-t-2 border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
                           <div className="space-y-3">
                             <div className="flex gap-2 justify-between items-center">
                               <div className="flex gap-2">
