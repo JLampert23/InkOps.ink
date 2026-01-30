@@ -16,7 +16,7 @@ import {
   Pencil,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import MockupGenerator from './MockupGenerator';
+import { ManageImprintsModal } from './ManageImprintsModal';
 
 interface QuoteDetailProps {
   quoteId: string;
@@ -143,10 +143,8 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
   const [showSendModal, setShowSendModal] = useState(false);
   const [sending, setSending] = useState(false);
   const [converting, setConverting] = useState(false);
-  const [showProofGenerator, setShowProofGenerator] = useState(false);
-  const [selectedLineItem, setSelectedLineItem] = useState<LineItem | null>(null);
+  const [showManageImprints, setShowManageImprints] = useState(false);
   const [selectedGroupLabel, setSelectedGroupLabel] = useState<string>('');
-  const [selectedImprintId, setSelectedImprintId] = useState<string>('');
   const [showProofModal, setShowProofModal] = useState(false);
   const [selectedProofImage, setSelectedProofImage] = useState<string>('');
 
@@ -664,10 +662,8 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                           <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">Proof / Mockup</p>
                                           <button
                                             onClick={() => {
-                                              setSelectedLineItem(firstLineItem);
                                               setSelectedGroupLabel(groupLabel);
-                                              setSelectedImprintId(imprint.id);
-                                              setShowProofGenerator(true);
+                                              setShowManageImprints(true);
                                             }}
                                             className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded border border-blue-200 dark:border-blue-800 transition-colors"
                                             title="Edit Proof"
@@ -911,44 +907,16 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         </div>
       )}
 
-      {(() => {
-        console.log('Render check - showProofGenerator:', showProofGenerator);
-        console.log('Render check - selectedLineItem:', selectedLineItem);
-        console.log('Render check - quote:', quote);
-
-        if (showProofGenerator && selectedLineItem && quote) {
-          console.log('Rendering ProofGenerator with:', {
-            lineItemId: selectedLineItem.id,
-            quoteId,
-            customerId: quote.customer_id,
-            garmentStyle: selectedLineItem.item_number,
-            garmentColor: selectedLineItem.color,
-          });
-          return (
-            <MockupGenerator
-              lineItemId={selectedLineItem.id || undefined}
-              quoteId={quoteId || undefined}
-              customerId={quote.customer_id || undefined}
-              garmentStyle={selectedLineItem.item_number}
-              garmentColor={selectedLineItem.color}
-              groupLabel={selectedGroupLabel}
-              imprintId={selectedImprintId || undefined}
-              onClose={() => {
-                console.log('MockupGenerator onClose called');
-                setShowProofGenerator(false);
-                setSelectedLineItem(null);
-                setSelectedGroupLabel('');
-                setSelectedImprintId('');
-              }}
-              onSave={() => {
-                console.log('MockupGenerator onSave called');
-                loadQuoteDetails();
-              }}
-            />
-          );
-        }
-        return null;
-      })()}
+      <ManageImprintsModal
+        isOpen={showManageImprints}
+        onClose={() => {
+          setShowManageImprints(false);
+          setSelectedGroupLabel('');
+          loadQuoteDetails();
+        }}
+        quoteId={quoteId}
+        initialGroupLabel={selectedGroupLabel}
+      />
 
       {showProofModal && (
         <div
