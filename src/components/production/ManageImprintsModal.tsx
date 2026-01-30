@@ -798,6 +798,15 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
         const groupLabel = currentImprint.group_label || '';
         const firstLineItem = lineItems?.find(item => item.group_label === groupLabel);
 
+        console.log('Opening MockupGenerator with:', {
+          currentImprint,
+          groupLabel,
+          firstLineItem,
+          garmentStyle: firstLineItem?.item_number,
+          garmentColor: firstLineItem?.color,
+          lineItemsCount: lineItems?.length
+        });
+
         return (
           <MockupGenerator
             lineItemId={firstLineItem?.id || ''}

@@ -113,12 +113,32 @@ export default function MockupGenerator({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
+    console.log('MockupGenerator initialized with props:', {
+      lineItemId,
+      quoteId,
+      customerId,
+      garmentStyle,
+      garmentColor,
+      groupLabel,
+      imprintId,
+      imprintLocation,
+      imprintTypeOfWork
+    });
     loadProofData();
   }, [lineItemId, imprintId, quoteId, groupLabel]);
 
   const loadProofData = async () => {
     try {
       setLoading(true);
+
+      console.log('loadProofData called with:', {
+        lineItemId,
+        garmentStyle,
+        garmentColor,
+        imprintId,
+        quoteId,
+        groupLabel
+      });
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
