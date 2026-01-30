@@ -2043,9 +2043,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         });
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('SanMar API error response:', errorData);
+        console.error('Response status:', response.status);
         setSanmarTestResult({
           success: false,
-          error: errorData.error || 'Connection failed',
+          error: errorData.error || `Connection failed (${response.status})`,
         });
       }
     } catch (err) {

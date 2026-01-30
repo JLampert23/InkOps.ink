@@ -31,6 +31,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     const authHeader = req.headers.get("Authorization");
@@ -41,18 +42,21 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const token = authHeader.replace("Bearer ", "");
-
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
+    // Create client with anon key and auth header for user validation
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: { Authorization: authHeader },
+      },
     });
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    // Create admin client for privileged operations
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+    // Get authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
+      console.error("Auth error:", authError);
       return new Response(
         JSON.stringify({ error: "Unauthorized", details: authError?.message }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -60,7 +64,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Get user's company_id
-    const { data: profile } = await supabase
+    const { data: profile } = await supabaseAdmin
       .from("user_profiles")
       .select("company_id")
       .eq("id", user.id)
@@ -74,7 +78,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Get SanMar credentials from company_settings
-    const { data: settings } = await supabase
+    const { data: settings } = await supabaseAdmin
       .from("company_settings")
       .select("sanmar_account_number, sanmar_username, sanmar_password_encrypted")
       .eq("id", profile.company_id)
