@@ -654,14 +654,18 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                       </div>
                                       {matchingProof?.selected_colors && matchingProof.selected_colors.length > 0 && (
                                         <div className="flex items-center gap-1 flex-wrap justify-end ml-2">
-                                          {matchingProof.selected_colors.map((color, colorIdx) => (
-                                            <div
-                                              key={colorIdx}
-                                              className="w-4 h-4 rounded border border-gray-400 dark:border-gray-500 shadow-sm"
-                                              style={{ backgroundColor: color.hex }}
-                                              title={color.name}
-                                            />
-                                          ))}
+                                          {matchingProof.selected_colors.map((color, colorIdx) => {
+                                            const colorHex = typeof color === 'string' ? '#cccccc' : (color.hex || '#cccccc');
+                                            const colorName = typeof color === 'string' ? color : (color.name || 'Unknown');
+                                            return (
+                                              <div
+                                                key={colorIdx}
+                                                className="w-4 h-4 rounded border border-gray-400 dark:border-gray-500 shadow-sm"
+                                                style={{ backgroundColor: colorHex }}
+                                                title={colorName}
+                                              />
+                                            );
+                                          })}
                                         </div>
                                       )}
                                     </div>
