@@ -236,19 +236,47 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
     const { data, error } = await query.order('sort_order');
 
     if (data && !error) {
-      setImprints(data.map(imp => ({
-        id: imp.id,
-        location: imp.location || '',
-        price_matrix_id: imp.price_matrix_id || '',
-        matrix: imp.matrix || '',
-        column_number: imp.column_number || '',
-        type_of_work: imp.type_of_work || '',
-        details: imp.details || '',
-        proofs: imp.mockups || [],
-        thread_ink_color: imp.thread_ink_color || '',
-        pricing_matrix_column: imp.pricing_matrix_column || '',
-        group_label: imp.group_label || '',
-      })));
+      const imprintsWithProofs = await Promise.all(
+        data.map(async (imp) => {
+          let proofs = imp.mockups || [];
+
+          if (imp.id) {
+            const { data: proofsData } = await supabase
+              .from('proofs')
+              .select('id, composite_image_url, garment_image_url, created_at')
+              .eq('imprint_id', imp.id)
+              .order('created_at', { ascending: false });
+
+            if (proofsData && proofsData.length > 0) {
+              const formattedProofs = proofsData.map((proof, idx) => ({
+                id: proof.id,
+                file_url: proof.composite_image_url || proof.garment_image_url || '',
+                file_name: `Mockup ${idx + 1}`,
+                file_type: 'image/png',
+                version: idx + 1,
+                notes: '',
+              }));
+              proofs = [...formattedProofs, ...proofs];
+            }
+          }
+
+          return {
+            id: imp.id,
+            location: imp.location || '',
+            price_matrix_id: imp.price_matrix_id || '',
+            matrix: imp.matrix || '',
+            column_number: imp.column_number || '',
+            type_of_work: imp.type_of_work || '',
+            details: imp.details || '',
+            proofs,
+            thread_ink_color: imp.thread_ink_color || '',
+            pricing_matrix_column: imp.pricing_matrix_column || '',
+            group_label: imp.group_label || '',
+          };
+        })
+      );
+
+      setImprints(imprintsWithProofs);
     }
   };
 
@@ -766,7 +794,8 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
             imprintLocation={currentImprint.location}
             imprintTypeOfWork={currentImprint.type_of_work}
             onClose={() => setMockupImprintIndex(null)}
-            onSave={() => {
+            onSave={async () => {
+              await loadImprints();
               setMockupImprintIndex(null);
               showNotification('success', 'Mockup Saved', 'Mockup has been saved successfully');
             }}
