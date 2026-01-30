@@ -396,7 +396,8 @@ export default function MockupGenerator({
             console.warn('No image URL found in product colors');
           }
         } else {
-          console.warn('No product results found');
+          console.warn('No product results found - supplier integrations may not be configured');
+          showNotification('warning', 'No garment images found. Configure supplier integrations in Account Settings to fetch garment images automatically.');
         }
       } else {
         let errorData;
