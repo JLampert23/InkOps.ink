@@ -762,29 +762,6 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
                         {imprint.details && (
                           <p className="text-xs text-gray-400 mb-1.5 line-clamp-1">{imprint.details}</p>
                         )}
-                        {imprint.proofs.length > 0 && (
-                          <div className="flex items-center gap-2">
-                            <div className="flex gap-1">
-                              {imprint.proofs.slice(0, 4).map((proof, pIdx) => (
-                                <div key={pIdx} className="w-6 h-6 rounded overflow-hidden bg-slate-950 border border-slate-700">
-                                  {proof.file_type?.startsWith('image/') ? (
-                                    <img src={proof.file_url} alt="" className="w-full h-full object-cover" />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center">
-                                      <FileText className="w-3 h-3 text-gray-600" />
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                              {imprint.proofs.length > 4 && (
-                                <div className="w-6 h-6 rounded bg-slate-950 border border-slate-700 flex items-center justify-center">
-                                  <span className="text-xs text-gray-500">+{imprint.proofs.length - 4}</span>
-                                </div>
-                              )}
-                            </div>
-                            <span className="text-xs text-gray-500">{imprint.proofs.length} file{imprint.proofs.length !== 1 ? 's' : ''}</span>
-                          </div>
-                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <button
