@@ -162,7 +162,42 @@ Deno.serve(async (req: Request) => {
             const ssaProducts = transformSSActivewearData(ssaData.data, style);
             console.log("Transformed products count:", ssaProducts.length);
             console.log("First transformed product:", ssaProducts[0]);
-            // Don't filter here - let the client do it so we can see what's coming through
+
+            // Fetch media/images for the product
+            try {
+              const mediaUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=media&productId=${encodeURIComponent(style)}`;
+              const mediaResponse = await fetch(mediaUrl, {
+                headers: {
+                  "Authorization": authHeader,
+                },
+              });
+
+              if (mediaResponse.ok) {
+                const mediaData = await mediaResponse.json();
+                console.log("SSActivewear media response:", mediaData);
+
+                if (mediaData.success && mediaData.data && ssaProducts.length > 0) {
+                  // Add media URLs to the product colors
+                  const product = ssaProducts[0];
+                  const mediaContent = mediaData.data.mediaContent || [];
+
+                  // Map media to colors by matching color names or part IDs
+                  for (const media of mediaContent) {
+                    const matchingColor = product.colors.find((c: any) =>
+                      c.name === media.colorName || c.code === media.partId
+                    );
+                    if (matchingColor && media.url) {
+                      matchingColor.image_url = media.url;
+                    }
+                  }
+
+                  console.log("Updated product with media:", product);
+                }
+              }
+            } catch (mediaError: any) {
+              console.warn("Failed to fetch media for SSActivewear product:", mediaError.message);
+            }
+
             results.push(...ssaProducts);
           }
         } else {

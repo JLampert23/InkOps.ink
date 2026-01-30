@@ -435,9 +435,65 @@ Deno.serve(async (req: Request) => {
         );
       }
 
+      case "media": {
+        if (!productId) {
+          return new Response(
+            JSON.stringify({ error: "Product ID required" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const soapBody = `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
+  <shar:wsVersion>1.0.0</shar:wsVersion>
+  <shar:id>${credentials.accountNumber}</shar:id>
+  <shar:password>${decryptedApiKey}</shar:password>
+  <shar:productId>${productId}</shar:productId>
+</ns2:GetMediaContentRequest>`;
+
+        const xmlResponse = await makePromoStandardsRequest(
+          PROMOSTANDARDS_ENDPOINTS.media,
+          "getMediaContent",
+          soapBody,
+          credentials.accountNumber,
+          decryptedApiKey
+        );
+
+        const xmlDoc = parseXmlResponse(xmlResponse);
+
+        const urls = getXmlValues(xmlDoc, "url");
+        const classTypes = getXmlValues(xmlDoc, "classType");
+        const mediaTypes = getXmlValues(xmlDoc, "mediaType");
+        const colorNames = getXmlValues(xmlDoc, "color");
+        const partIds = getXmlValues(xmlDoc, "partId");
+
+        const mediaArray = urls.map((url, i) => ({
+          url,
+          classType: classTypes[i] || "",
+          mediaType: mediaTypes[i] || "",
+          colorName: colorNames[i] || "",
+          partId: partIds[i] || "",
+        }));
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            supplier: "ssactivewear",
+            action,
+            data: {
+              productId,
+              mediaContent: mediaArray,
+            },
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          }
+        );
+      }
+
       default:
         return new Response(
-          JSON.stringify({ error: "Invalid action. Use: brands, product, search, inventory, or pricing" }),
+          JSON.stringify({ error: "Invalid action. Use: brands, product, search, inventory, pricing, or media" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
