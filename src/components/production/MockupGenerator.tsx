@@ -593,71 +593,6 @@ export default function MockupGenerator({
                 View All Customer Artwork
               </button>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Print Location</label>
-                <select
-                  value={printLocation}
-                  onChange={(e) => {
-                    setPrintLocation(e.target.value);
-                    if (selectedArtwork.length > 0) {
-                      updateActiveArtwork({ print_location: e.target.value });
-                    }
-                  }}
-                  className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-slate-600 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
-                >
-                  {PRINT_LOCATIONS.map((loc) => (
-                    <option key={loc} value={loc}>{loc}</option>
-                  ))}
-                </select>
-                {printLocation === 'Custom' && (
-                  <input
-                    type="text"
-                    value={customLocation}
-                    onChange={(e) => setCustomLocation(e.target.value)}
-                    placeholder="Enter custom location"
-                    className="mt-1 w-full px-2 py-1 text-sm border border-gray-300 dark:border-slate-600 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-                  />
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Dimensions (inches)</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-xs text-gray-600 dark:text-gray-400">Width</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={widthInches}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value);
-                        setWidthInches(val);
-                        if (selectedArtwork.length > 0) {
-                          updateActiveArtwork({ width_inches: val });
-                        }
-                      }}
-                      className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-slate-600 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-600 dark:text-gray-400">Height</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={heightInches}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value);
-                        setHeightInches(val);
-                        if (selectedArtwork.length > 0) {
-                          updateActiveArtwork({ height_inches: val });
-                        }
-                      }}
-                      className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-slate-600 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
-                    />
-                  </div>
-                </div>
-              </div>
-
               {selectedArtwork.length > 0 && (
                 <div>
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Artwork Layers</label>
@@ -843,25 +778,59 @@ export default function MockupGenerator({
                   </div>
                 </div>
               )}
-            </div>
 
-            <div className="mt-3 pt-3 border-t dark:border-slate-700">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Decoration Method</h3>
-              <select
-                value={typeOfWork}
-                onChange={(e) => setTypeOfWork(e.target.value)}
-                className="w-full px-2 py-1.5 text-xs bg-white dark:bg-slate-800 border dark:border-slate-600 rounded text-gray-900 dark:text-white"
-              >
-                <option value="">Select Method</option>
-                <option value="Screen Printing">Screen Printing</option>
-                <option value="Embroidery">Embroidery</option>
-                <option value="Heat Transfer">Heat Transfer</option>
-                <option value="Direct to Garment">Direct to Garment</option>
-              </select>
+              {/* Decoration Method */}
+              {typeOfWork && (
+                <div className="bg-white dark:bg-slate-800 rounded-lg p-2 border border-gray-200 dark:border-slate-700">
+                  <h4 className="text-xs font-semibold text-gray-900 dark:text-white mb-1.5">Decoration Method</h4>
+                  <div className="px-2 py-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded text-xs font-medium">
+                    {typeOfWork}
+                  </div>
+                </div>
+              )}
+
+              {/* Dimensions */}
+              <div className="bg-white dark:bg-slate-800 rounded-lg p-2 border border-gray-200 dark:border-slate-700">
+                <h4 className="text-xs font-semibold text-gray-900 dark:text-white mb-1.5">Dimensions (inches)</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs text-gray-600 dark:text-gray-400 block mb-0.5">Width</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={widthInches}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setWidthInches(val);
+                        if (selectedArtwork.length > 0) {
+                          updateActiveArtwork({ width_inches: val });
+                        }
+                      }}
+                      className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-slate-600 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600 dark:text-gray-400 block mb-0.5">Height</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={heightInches}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setHeightInches(val);
+                        if (selectedArtwork.length > 0) {
+                          updateActiveArtwork({ height_inches: val });
+                        }
+                      }}
+                      className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-slate-600 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
             {typeOfWork && (
-              <div className="mt-3">
+              <div className="mt-3 pt-3 border-t dark:border-slate-700">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
                   {typeOfWork === 'Embroidery' || typeOfWork.toLowerCase().includes('embroid') ? 'Thread Colors' : 'Ink Colors'}
                 </h3>
