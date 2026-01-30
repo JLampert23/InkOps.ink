@@ -60,8 +60,20 @@ export function QuotesManager({ initialCustomerId, onCustomerIdConsumed }: Quote
       <QuoteBuilder
         quoteId={selectedQuoteId || undefined}
         initialCustomerId={preselectedCustomerId}
-        onSave={handleBack}
-        onCancel={handleBack}
+        onSave={() => {
+          if (view === 'edit' && selectedQuoteId) {
+            setView('detail');
+          } else {
+            handleBack();
+          }
+        }}
+        onCancel={() => {
+          if (view === 'edit' && selectedQuoteId) {
+            setView('detail');
+          } else {
+            handleBack();
+          }
+        }}
       />
     );
   }
