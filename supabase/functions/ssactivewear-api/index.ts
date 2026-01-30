@@ -254,6 +254,15 @@ Deno.serve(async (req: Request) => {
         const partIds = getXmlValues(xmlDoc, "partId");
         const labelSizes = getXmlValues(xmlDoc, "labelSize");
 
+        console.log("Product data parsed:", {
+          productName,
+          productBrand,
+          colorCount: colorNames.length,
+          partCount: partIds.length
+        });
+
+        // DO NOT extract image URLs from product data - those are spec sheets
+        // Images will come from the Media Content API only
         const colorArray = colorNames.map(name => ({ colorName: name }));
         const partsArray = partIds.map((id, i) => ({
           partId: id,
@@ -437,12 +446,13 @@ Deno.serve(async (req: Request) => {
           const description = descriptions[i] || "";
 
           // Check if this is an actual image URL
-          const isImageUrl =
-            url.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/i) ||
-            fileType.toLowerCase() === 'jpg' ||
-            fileType.toLowerCase() === 'jpeg' ||
-            fileType.toLowerCase() === 'png' ||
-            classType.toLowerCase().includes('image');
+          // Must have image extension OR explicit fileType indicating it's an image
+          // Exclude any .aspx, .html, .htm, .php pages
+          const hasImageExtension = url.match(/\.(jpg|jpeg|png|gif|webp|bmp|tiff)(\?|$)/i);
+          const hasImageFileType = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff'].includes(fileType.toLowerCase());
+          const isWebPage = url.match(/\.(aspx|html|htm|php|jsp|asp)(\?|$)/i);
+
+          const isImageUrl = !isWebPage && (hasImageExtension || hasImageFileType);
 
           return {
             url,

@@ -138,15 +138,14 @@ Deno.serve(async (req: Request) => {
         if (ssaResponse.ok) {
           const ssaData = await ssaResponse.json();
           console.log("SSActivewear response data count:", ssaData?.data?.length || 0);
-          console.log("SSActivewear first item:", ssaData?.data?.[0]);
           if (ssaData.success && ssaData.data) {
             const ssaProducts = transformSSActivewearData(ssaData.data, style);
             console.log("Transformed products count:", ssaProducts.length);
-            console.log("First transformed product:", ssaProducts[0]);
 
-            // Fetch media/images for the product
+            // Fetch media/images for the product BEFORE returning
             try {
               const mediaUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=media&productId=${encodeURIComponent(style)}`;
+              console.log("Fetching media from:", mediaUrl);
               const mediaResponse = await fetch(mediaUrl, {
                 headers: {
                   "Authorization": authHeader,
@@ -155,7 +154,10 @@ Deno.serve(async (req: Request) => {
 
               if (mediaResponse.ok) {
                 const mediaData = await mediaResponse.json();
-                console.log("SSActivewear media response:", mediaData);
+                console.log("Media API response:", {
+                  success: mediaData.success,
+                  mediaContentCount: mediaData.data?.mediaContent?.length || 0
+                });
 
                 if (mediaData.success && mediaData.data && ssaProducts.length > 0) {
                   // Add media URLs to the product colors
