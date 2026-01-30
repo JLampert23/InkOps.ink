@@ -220,7 +220,26 @@ export default function MockupGenerator({
           setHeightInches(artworkData[0].height_inches || 4);
         }
       } else {
-        await fetchGarmentImage();
+        // Check if line item has garment images stored
+        if (lineItemId && lineItemId.trim()) {
+          const { data: lineItemData } = await supabase
+            .from('quote_line_items')
+            .select('garment_front_image_url, garment_back_image_url, garment_sleeve_image_url, garment_images_data, item_number, description')
+            .eq('id', lineItemId)
+            .maybeSingle();
+
+          if (lineItemData && lineItemData.garment_front_image_url) {
+            // Use stored garment images
+            setGarmentImageUrl(lineItemData.garment_front_image_url);
+            setGarmentBrand('');
+            setGarmentDescription(lineItemData.description || '');
+          } else {
+            // Fall back to fetching from API
+            await fetchGarmentImage();
+          }
+        } else {
+          await fetchGarmentImage();
+        }
 
         // Auto-populate from imprint data if provided
         if (imprintTypeOfWork) {

@@ -194,3 +194,100 @@ export async function getCompleteProductData(styleNumber: string, partId: string
     media: media.status === 'fulfilled' ? media.value : null,
   };
 }
+
+export interface UnifiedProductData {
+  success: boolean;
+  styleNumber: string;
+  partId: string | null;
+  product: {
+    productName: string;
+    description: string;
+    productBrand: string;
+    parts: Array<{
+      partId: string;
+      colorName: string;
+      labelSize: string;
+      hex?: string;
+      approximatePmsColor?: string;
+    }>;
+    colors: Array<{
+      colorName: string;
+      hex?: string;
+      approximatePmsColor?: string;
+      partIds: Array<{
+        partId: string;
+        size: string;
+      }>;
+    }>;
+  };
+  inventory: {
+    items: Array<{
+      partId: string;
+      quantityAvailable: number;
+      warehouseName: string;
+      postalCode: string;
+    }>;
+  };
+  pricing: {
+    parts: Array<{
+      partId: string;
+      prices: Array<{
+        minQuantity: number;
+        price: number;
+        discountCode?: string;
+      }>;
+    }>;
+  };
+  media: {
+    images: Array<{
+      url: string;
+      partId: string;
+      description: string;
+      fileType: string;
+      classType: string;
+      singlePart: boolean;
+    }>;
+    views: {
+      front: string | null;
+      back: string | null;
+      left: string | null;
+      right: string | null;
+    };
+  };
+}
+
+export async function getUnifiedProductData(
+  styleNumber: string,
+  partId?: string
+): Promise<UnifiedProductData> {
+  try {
+    const token = await getAuthToken();
+
+    let url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/promostandards-unified?styleNumber=${encodeURIComponent(styleNumber)}`;
+    if (partId) {
+      url += `&partId=${encodeURIComponent(partId)}`;
+    }
+
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch unified product data');
+    }
+
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error('Unified product data fetch failed');
+    }
+
+    return result;
+  } catch (error) {
+    console.error('Error fetching unified product data:', error);
+    throw error;
+  }
+}

@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import CreateCustomerModal from '../accounting/CreateCustomerModal';
 import { ManageImprintsModal } from './ManageImprintsModal';
+import { getUnifiedProductData } from '../../services/ssactivewear-promostandards-service';
 
 type SizeMode = 'regular' | 'double' | 'youth' | 'adult';
 
@@ -56,6 +57,11 @@ interface QuoteItem {
   double_sizes?: Record<string, number>;
   youth_sizes?: Record<string, number>;
   adult_sizes?: Record<string, number>;
+  garment_front_image_url?: string;
+  garment_back_image_url?: string;
+  garment_sleeve_image_url?: string;
+  garment_images_data?: any;
+  supplier_partid?: string;
 }
 
 interface QuoteFee {
@@ -804,11 +810,35 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
     }, 500);
   };
 
-  const selectProductColor = (product: ProductSearchResult, colorIdx: number) => {
+  const selectProductColor = async (product: ProductSearchResult, colorIdx: number) => {
     if (!activeSearchItem) return;
 
     const { groupId, itemIdx } = activeSearchItem;
     const color = colorIdx >= 0 ? product.colors[colorIdx] : null;
+
+    let garmentImages = {
+      garment_front_image_url: undefined as string | undefined,
+      garment_back_image_url: undefined as string | undefined,
+      garment_sleeve_image_url: undefined as string | undefined,
+      garment_images_data: undefined as any,
+      supplier_partid: color?.code as string | undefined,
+    };
+
+    // If SSActivewear, fetch unified product data with garment images
+    if (product.supplier === 'ssactivewear' && color?.code) {
+      try {
+        const unifiedData = await getUnifiedProductData(product.style, color.code);
+        if (unifiedData.success && unifiedData.media?.views) {
+          garmentImages.garment_front_image_url = unifiedData.media.views.front || undefined;
+          garmentImages.garment_back_image_url = unifiedData.media.views.back || undefined;
+          garmentImages.garment_sleeve_image_url = unifiedData.media.views.left || unifiedData.media.views.right || undefined;
+          garmentImages.garment_images_data = unifiedData.media.images || undefined;
+        }
+      } catch (error) {
+        console.error('Error fetching garment images:', error);
+        // Continue without images - non-blocking
+      }
+    }
 
     const newGroups = itemGroups.map(group => {
       if (group.id === groupId) {
@@ -819,6 +849,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           color: color?.name || '',
           description: `${product.brand} ${product.description}`,
           unit_price: color?.pricing?.wholesale || 0,
+          ...garmentImages,
         };
         return { ...group, items: newItems };
       }
@@ -1016,6 +1047,11 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
             total_quantity: item.total_quantity,
             total_price: item.total_price,
             taxed: item.taxed,
+            garment_front_image_url: item.garment_front_image_url || null,
+            garment_back_image_url: item.garment_back_image_url || null,
+            garment_sleeve_image_url: item.garment_sleeve_image_url || null,
+            garment_images_data: item.garment_images_data || null,
+            supplier_partid: item.supplier_partid || null,
           }))
         );
 
