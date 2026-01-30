@@ -632,8 +632,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                               {groupImprints.map((imprint, idx) => {
                                 const matchingProof = proofs.find(proof =>
-                                  proof.imprint_id === imprint.id ||
-                                  (proof.group_label === groupLabel && proof.imprint_id === null)
+                                  proof.imprint_id === imprint.id
                                 );
 
                                 return (
