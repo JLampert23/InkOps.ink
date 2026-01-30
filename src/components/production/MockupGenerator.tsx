@@ -105,7 +105,7 @@ export default function MockupGenerator({
   const [typeOfWork, setTypeOfWork] = useState<string>('');
   const [inkColors, setInkColors] = useState<Array<{ id: string; name: string; color_code: string }>>([]);
   const [threadColors, setThreadColors] = useState<Array<{ id: string; name: string; color_code: string }>>([]);
-  const [selectedColors, setSelectedColors] = useState<Array<{ name: string; hex: string }>>([]);
+  const [selectedColors, setSelectedColors] = useState<string[]>([]);
 
   const [showArtworkLibrary, setShowArtworkLibrary] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -188,13 +188,7 @@ export default function MockupGenerator({
         setGarmentBrand(existingProof.garment_brand || '');
         setGarmentDescription(existingProof.garment_description || '');
         setTypeOfWork(existingProof.type_of_work || '');
-
-        const colors = existingProof.selected_colors || [];
-        if (colors.length > 0 && typeof colors[0] === 'string') {
-          setSelectedColors([]);
-        } else {
-          setSelectedColors(colors);
-        }
+        setSelectedColors(existingProof.selected_colors || []);
 
         const { data: artworkData } = await supabase
           .from('proof_artwork')
@@ -859,15 +853,15 @@ export default function MockupGenerator({
                 </h3>
                 <div className="grid grid-cols-4 gap-2">
                   {(typeOfWork === 'Embroidery' || typeOfWork.toLowerCase().includes('embroid') ? threadColors : inkColors).map((color) => {
-                    const isSelected = selectedColors.some(c => c.name === color.name);
+                    const isSelected = selectedColors.includes(color.name);
                     return (
                       <button
                         key={color.id}
                         onClick={() => {
                           if (isSelected) {
-                            setSelectedColors(selectedColors.filter(c => c.name !== color.name));
+                            setSelectedColors(selectedColors.filter(c => c !== color.name));
                           } else {
-                            setSelectedColors([...selectedColors, { name: color.name, hex: color.color_code }]);
+                            setSelectedColors([...selectedColors, color.name]);
                           }
                         }}
                         className={`relative h-10 rounded border-2 transition-all ${
@@ -893,12 +887,12 @@ export default function MockupGenerator({
                   <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
                     <div className="font-medium mb-1">Selected:</div>
                     <div className="flex flex-wrap gap-1">
-                      {selectedColors.map((color, idx) => (
+                      {selectedColors.map((colorName, idx) => (
                         <span
                           key={idx}
                           className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded"
                         >
-                          {color.name}
+                          {colorName}
                         </span>
                       ))}
                     </div>
