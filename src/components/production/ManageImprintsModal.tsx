@@ -475,7 +475,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
       <div className="bg-slate-900 rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700/70">
           <h2 className="text-lg font-semibold text-white">
-            Manage Imprints & Artwork{initialGroupLabel ? ` - ${initialGroupLabel}` : ''}
+            Imprints and Proofs{initialGroupLabel ? ` - ${initialGroupLabel}` : ''}
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
             <X className="w-5 h-5" />
@@ -485,7 +485,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
         <div className="flex-1 overflow-auto px-5 py-4">
           <div className="space-y-3">
             <div className="bg-slate-800/50 rounded-lg p-4 space-y-3">
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-400 mb-1.5">
                     Type of Work <span className="text-red-400">*</span>
@@ -524,20 +524,6 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
                       </option>
                     ))}
                   </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1.5">
-                    Line Item Group
-                  </label>
-                  <input
-                    type="text"
-                    value={currentImprint.group_label || ''}
-                    onChange={(e) => setCurrentImprint({ ...currentImprint, group_label: e.target.value })}
-                    placeholder="e.g., Adult, Youth, Staff"
-                    readOnly={!!initialGroupLabel}
-                    className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-600 rounded text-white text-sm placeholder-gray-500 disabled:opacity-50 read-only:opacity-50 read-only:cursor-not-allowed"
-                  />
                 </div>
               </div>
 
