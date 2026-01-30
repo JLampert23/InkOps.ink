@@ -1473,7 +1473,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                                     searchProductByStyle(item.item_number);
                                   }
                                 }}
-                                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-sm pr-8"
+                                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-base pr-8"
                                 placeholder="Style #"
                               />
                               {productSearchLoading && activeSearchItem?.groupId === group.id && activeSearchItem?.itemIdx === itemIdx && (
@@ -1567,7 +1567,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                               type="text"
                               value={item.color}
                               onChange={(e) => updateItem(group.id, itemIdx, 'color', e.target.value)}
-                              className="w-full px-2 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-sm"
+                              className="w-full px-2 py-2 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-base"
                             />
                           </td>
                           <td className="p-0 border border-gray-300 dark:border-slate-800">
@@ -1575,7 +1575,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                               type="text"
                               value={item.description}
                               onChange={(e) => updateItem(group.id, itemIdx, 'description', e.target.value)}
-                              className="w-full px-2 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-sm"
+                              className="w-full px-2 py-2 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-base"
                             />
                           </td>
                           {getSizeColumns(group).map(size => (
@@ -1585,11 +1585,11 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                                 min="0"
                                 value={(item as any)[size.key] || ''}
                                 onChange={(e) => updateItem(group.id, itemIdx, size.key, parseInt(e.target.value) || 0)}
-                                className="w-full px-0.5 py-0.5 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-sm text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                className="w-full px-1 py-2 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-base text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               />
                             </td>
                           ))}
-                      <td className="p-0.5 border border-gray-300 dark:border-slate-800 text-center text-sm text-gray-900 dark:text-white font-medium">
+                      <td className="p-1 border border-gray-300 dark:border-slate-800 text-center text-base text-gray-900 dark:text-white font-semibold">
                         {item.total_quantity}
                       </td>
                       <td className="p-0 border border-gray-300 dark:border-slate-800">
@@ -1599,10 +1599,10 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                           min="0"
                           value={item.unit_price}
                           onChange={(e) => updateItem(group.id, itemIdx, 'unit_price', parseFloat(e.target.value) || 0)}
-                          className="w-full px-2 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-sm text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          className="w-full px-2 py-2 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-base text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                       </td>
-                      <td className="p-1 border border-gray-300 dark:border-slate-800 text-right text-sm font-medium text-gray-900 dark:text-white">
+                      <td className="p-1 border border-gray-300 dark:border-slate-800 text-right text-base font-semibold text-gray-900 dark:text-white">
                         ${item.total_price.toFixed(2)}
                       </td>
                       <td className="p-0.5 border border-gray-300 dark:border-slate-800">
