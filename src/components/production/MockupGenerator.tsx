@@ -1043,7 +1043,8 @@ export default function MockupGenerator({
 
               {/* Dimensions */}
               <div className="bg-white dark:bg-slate-800 rounded-lg p-2 border border-gray-200 dark:border-slate-700">
-                <h4 className="text-xs font-semibold text-gray-900 dark:text-white mb-1.5">Dimensions (inches)</h4>
+                <h4 className="text-xs font-semibold text-gray-900 dark:text-white mb-1.5">Print Size (inches)</h4>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Size of the decoration on the garment</p>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="text-xs text-gray-600 dark:text-gray-400 block mb-0.5">Width</label>
@@ -1086,7 +1087,7 @@ export default function MockupGenerator({
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
                   {typeOfWork === 'Embroidery' || typeOfWork.toLowerCase().includes('embroid') ? 'Thread Colors' : 'Ink Colors'}
                 </h3>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-6 gap-1.5">
                   {(typeOfWork === 'Embroidery' || typeOfWork.toLowerCase().includes('embroid') ? threadColors : inkColors).map((color) => {
                     const isSelected = selectedColors.some(c => c.name === color.name);
                     return (
@@ -1099,9 +1100,9 @@ export default function MockupGenerator({
                             setSelectedColors([...selectedColors, { name: color.name, hex: color.color_code }]);
                           }
                         }}
-                        className={`relative h-10 rounded border-2 transition-all ${
+                        className={`relative h-6 rounded border-2 transition-all ${
                           isSelected
-                            ? 'border-blue-500 ring-2 ring-blue-300 dark:ring-blue-600'
+                            ? 'border-blue-500 ring-1 ring-blue-300 dark:ring-blue-600'
                             : 'border-gray-300 dark:border-slate-600 hover:border-gray-400'
                         }`}
                         style={{ backgroundColor: color.color_code || '#cccccc' }}
@@ -1109,8 +1110,8 @@ export default function MockupGenerator({
                       >
                         {isSelected && (
                           <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="w-4 h-4 bg-white rounded-full flex items-center justify-center">
-                              <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                            <div className="w-2.5 h-2.5 bg-white rounded-full flex items-center justify-center">
+                              <div className="w-1 h-1 bg-blue-500 rounded-full" />
                             </div>
                           </div>
                         )}
