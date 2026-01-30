@@ -52,6 +52,7 @@ Deno.serve(async (req: Request) => {
 
     const token = authHeader.replace("Bearer ", "");
     console.log("Token received (first 20 chars):", token.substring(0, 20));
+    console.log("Token length:", token.length);
 
     // Create Supabase client with service role for both auth verification and database queries
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
@@ -62,12 +63,24 @@ Deno.serve(async (req: Request) => {
     });
 
     // Verify the JWT by getting the user with the token
+    console.log("Attempting to verify JWT...");
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
 
     if (authError || !user) {
-      console.error("Auth error:", authError?.message, authError);
+      console.error("Auth verification failed");
+      console.error("Auth error details:", {
+        message: authError?.message,
+        status: authError?.status,
+        name: authError?.name,
+        code: (authError as any)?.code,
+      });
       return new Response(
-        JSON.stringify({ error: "Unauthorized", message: authError?.message || "Invalid JWT" }),
+        JSON.stringify({
+          code: 401,
+          error: "Unauthorized",
+          message: authError?.message || "Invalid JWT",
+          details: authError?.status ? `Status: ${authError.status}` : undefined
+        }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
