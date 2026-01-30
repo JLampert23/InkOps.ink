@@ -262,7 +262,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
     }
   };
 
-  const handleDownloadQuote = () => {
+  const handleDownloadQuote = async () => {
     if (!quote) return;
 
     const quotePDFData: QuotePDFData = {
@@ -277,7 +277,12 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
       })),
     };
 
-    generateQuotePDF(quotePDFData);
+    try {
+      await generateQuotePDF(quotePDFData);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF');
+    }
   };
 
   const getStatusColor = (status: string) => {

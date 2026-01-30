@@ -80,6 +80,10 @@ export interface QuotePDFData {
     custom_size_1_name?: string | null;
     custom_size_2_name?: string | null;
     custom_size_3_name?: string | null;
+    garment_front_image_url?: string | null;
+    garment_back_image_url?: string | null;
+    garment_sleeve_image_url?: string | null;
+    garment_image_url?: string | null;
   }>;
   imprints?: Array<{
     type_of_work: string;
@@ -111,7 +115,31 @@ function capitalizeStatus(status: string): string {
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
-export function generateQuotePDF(quote: QuotePDFData): void {
+async function loadImage(url: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
+export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
+  // Preload all images
+  const imageUrls = quote.line_items
+    .map(item => item.garment_front_image_url || item.garment_image_url)
+    .filter(url => url) as string[];
+
+  const imagePromises = imageUrls.map(url => loadImage(url));
+  const loadedImages = await Promise.all(imagePromises);
+
+  const imageMap = new Map<string, HTMLImageElement>();
+  imageUrls.forEach((url, index) => {
+    if (loadedImages[index]) {
+      imageMap.set(url, loadedImages[index]!);
+    }
+  });
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -277,8 +305,10 @@ export function generateQuotePDF(quote: QuotePDFData): void {
 
   yPosition = Math.max(billY, shipY) + 8;
 
-  // LINE ITEMS TABLE
-  const tableData = quote.line_items.map((item) => {
+  // LINE ITEMS TABLE WITH IMAGES
+  const tableData: any[] = [];
+
+  for (const item of quote.line_items) {
     const sizes: string[] = [];
     const sizeFields = [
       { qty: item.qty_yxs, label: 'YXS' },
@@ -318,22 +348,26 @@ export function generateQuotePDF(quote: QuotePDFData): void {
     if (sizes.length > 0) description += `\nSizes: ${sizes.join(', ')}`;
     if (item.notes) description += `\nNotes: ${item.notes}`;
 
-    return [
+    const imageUrl = item.garment_front_image_url || item.garment_image_url;
+
+    tableData.push({
+      image: imageUrl || '',
       description,
-      formatCurrency(item.unit_price),
-      formatCurrency(item.total_price),
-    ];
-  });
+      unit_price: formatCurrency(item.unit_price),
+      total_price: formatCurrency(item.total_price),
+    });
+  }
 
   autoTable(doc, {
     startY: yPosition,
-    head: [['Description', 'Unit Price', 'Amount']],
-    body: tableData,
+    head: [['Image', 'Description', 'Unit Price', 'Amount']],
+    body: tableData.map(item => [item.image, item.description, item.unit_price, item.total_price]),
     theme: 'plain',
     styles: {
       fontSize: 9,
       cellPadding: 3,
       textColor: [17, 24, 39],
+      minCellHeight: 20,
     },
     headStyles: {
       fillColor: [249, 250, 251],
@@ -343,9 +377,27 @@ export function generateQuotePDF(quote: QuotePDFData): void {
       lineColor: [229, 231, 235],
     },
     columnStyles: {
-      0: { cellWidth: 'auto' },
-      1: { cellWidth: 30, halign: 'right' },
+      0: { cellWidth: 20, halign: 'center' },
+      1: { cellWidth: 'auto' },
       2: { cellWidth: 30, halign: 'right' },
+      3: { cellWidth: 30, halign: 'right' },
+    },
+    didDrawCell: (data: any) => {
+      if (data.section === 'body' && data.column.index === 0) {
+        const imageUrl = tableData[data.row.index]?.image;
+        if (imageUrl && imageMap.has(imageUrl)) {
+          try {
+            const cellX = data.cell.x + 2;
+            const cellY = data.cell.y + 2;
+            const imgWidth = 16;
+            const imgHeight = 16;
+
+            doc.addImage(imageUrl, 'JPEG', cellX, cellY, imgWidth, imgHeight);
+          } catch (error) {
+            console.warn('Failed to add image to PDF:', imageUrl);
+          }
+        }
+      }
     },
     margin: { left: margin, right: margin },
   });
@@ -438,75 +490,6 @@ export function generateQuotePDF(quote: QuotePDFData): void {
   const totalValue = formatCurrency(quote.total);
   const totalValueWidth = doc.getTextWidth(totalValue);
   doc.text(totalValue, pageWidth - margin - totalValueWidth, yPosition);
-
-  yPosition += 10;
-
-  // NOTES SECTION
-  if (quote.notes || quote.customer_notes || quote.production_notes) {
-    if (yPosition > pageHeight - 60) {
-      doc.addPage();
-      yPosition = margin;
-    }
-
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(17, 24, 39);
-    doc.text('Notes', margin, yPosition);
-    yPosition += 6;
-
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(107, 114, 128);
-
-    if (quote.customer_notes) {
-      doc.text('Customer Notes:', margin, yPosition);
-      yPosition += 4.5;
-      const lines = doc.splitTextToSize(quote.customer_notes, pageWidth - 2 * margin);
-      doc.text(lines, margin + 5, yPosition);
-      yPosition += lines.length * 4.5 + 3;
-    }
-
-    if (quote.notes) {
-      doc.text('Internal Notes:', margin, yPosition);
-      yPosition += 4.5;
-      const lines = doc.splitTextToSize(quote.notes, pageWidth - 2 * margin);
-      doc.text(lines, margin + 5, yPosition);
-      yPosition += lines.length * 4.5 + 3;
-    }
-
-    if (quote.production_notes) {
-      doc.text('Production Notes:', margin, yPosition);
-      yPosition += 4.5;
-      const lines = doc.splitTextToSize(quote.production_notes, pageWidth - 2 * margin);
-      doc.text(lines, margin + 5, yPosition);
-      yPosition += lines.length * 4.5 + 3;
-    }
-  }
-
-  // TERMS
-  if (quote.terms) {
-    if (yPosition > pageHeight - 40) {
-      doc.addPage();
-      yPosition = margin;
-    }
-
-    yPosition += 5;
-    doc.setDrawColor(229, 231, 235);
-    doc.line(margin, yPosition, pageWidth - margin, yPosition);
-    yPosition += 8;
-
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(17, 24, 39);
-    doc.text('Terms & Conditions', margin, yPosition);
-    yPosition += 6;
-
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(107, 114, 128);
-    const termLines = doc.splitTextToSize(quote.terms, pageWidth - 2 * margin);
-    doc.text(termLines, margin, yPosition);
-  }
 
   const fileName = `Quote_${quote.quote_number.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
   doc.save(fileName);
