@@ -698,6 +698,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
           garmentStyle=""
           garmentColor=""
           groupLabel={imprints[mockupImprintIndex].group_label || ''}
+          imprintId={imprints[mockupImprintIndex].id || ''}
           imprintLocation={imprints[mockupImprintIndex].location}
           imprintTypeOfWork={imprints[mockupImprintIndex].type_of_work}
           onClose={() => setMockupImprintIndex(null)}

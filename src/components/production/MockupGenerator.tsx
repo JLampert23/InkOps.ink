@@ -25,6 +25,7 @@ interface MockupGeneratorProps {
   garmentStyle?: string;
   garmentColor?: string;
   groupLabel?: string;
+  imprintId?: string;
   imprintLocation?: string;
   imprintTypeOfWork?: string;
   onClose: () => void;
@@ -77,6 +78,7 @@ export default function MockupGenerator({
   garmentStyle,
   garmentColor,
   groupLabel,
+  imprintId,
   imprintLocation,
   imprintTypeOfWork,
   onClose,
@@ -388,6 +390,7 @@ export default function MockupGenerator({
           .insert({
             quote_id: quoteId && quoteId.trim() ? quoteId : null,
             line_item_id: lineItemId && lineItemId.trim() ? lineItemId : null,
+            imprint_id: imprintId && imprintId.trim() ? imprintId : null,
             customer_id: customerId && customerId.trim() ? customerId : null,
             company_id: companyId,
             group_label: groupLabel || '',

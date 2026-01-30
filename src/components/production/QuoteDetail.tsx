@@ -123,6 +123,7 @@ interface Proof {
   id: string;
   proof_number: string;
   line_item_id: string;
+  imprint_id: string | null;
   group_label: string | null;
   garment_image_url: string | null;
   composite_image_url: string | null;
@@ -144,6 +145,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
   const [showProofGenerator, setShowProofGenerator] = useState(false);
   const [selectedLineItem, setSelectedLineItem] = useState<LineItem | null>(null);
   const [selectedGroupLabel, setSelectedGroupLabel] = useState<string>('');
+  const [selectedImprintId, setSelectedImprintId] = useState<string>('');
   const [showProofModal, setShowProofModal] = useState(false);
   const [selectedProofImage, setSelectedProofImage] = useState<string>('');
 
@@ -209,7 +211,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
       const { data: proofsData, error: proofsError } = await supabase
         .from('proofs')
-        .select('id, proof_number, line_item_id, group_label, garment_image_url, composite_image_url, garment_name, status, created_at, updated_at')
+        .select('id, proof_number, line_item_id, imprint_id, group_label, garment_image_url, composite_image_url, garment_name, status, created_at, updated_at')
         .eq('quote_id', quoteId)
         .order('created_at', { ascending: false });
 
@@ -630,8 +632,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                               {groupImprints.map((imprint, idx) => {
                                 const matchingProof = proofs.find(proof =>
-                                  proof.group_label === groupLabel &&
-                                  proof.line_item_id === firstLineItem.id
+                                  proof.imprint_id === imprint.id
                                 );
 
                                 return (
@@ -662,7 +663,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                         <img
                                           src={matchingProof.composite_image_url || matchingProof.garment_image_url!}
                                           alt={matchingProof.garment_name || 'Proof'}
-                                          className="w-full aspect-square object-cover rounded border border-gray-200 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all"
+                                          className="w-full h-48 object-contain rounded border border-gray-200 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800"
                                           onClick={() => {
                                             setSelectedProofImage(matchingProof.composite_image_url || matchingProof.garment_image_url!);
                                             setShowProofModal(true);
@@ -915,11 +916,13 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
               garmentStyle={selectedLineItem.item_number}
               garmentColor={selectedLineItem.color}
               groupLabel={selectedGroupLabel}
+              imprintId={selectedImprintId || undefined}
               onClose={() => {
                 console.log('MockupGenerator onClose called');
                 setShowProofGenerator(false);
                 setSelectedLineItem(null);
                 setSelectedGroupLabel('');
+                setSelectedImprintId('');
               }}
               onSave={() => {
                 console.log('MockupGenerator onSave called');
