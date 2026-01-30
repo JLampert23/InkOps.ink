@@ -203,8 +203,8 @@ export default function MockupGenerator({
       setThreadColors(threadColorsData || []);
 
       if (existingProof) {
+        console.log('Found existing proof:', existingProof);
         setProofId(existingProof.id);
-        setGarmentImageUrl(existingProof.garment_image_url);
         setGarmentBrand(existingProof.garment_brand || '');
         setGarmentDescription(existingProof.garment_description || '');
         setTypeOfWork(existingProof.type_of_work || '');
@@ -238,6 +238,35 @@ export default function MockupGenerator({
           setPrintLocation(artworkData[0].print_location || 'Front');
           setWidthInches(artworkData[0].width_inches || 4);
           setHeightInches(artworkData[0].height_inches || 4);
+        }
+
+        // Check if proof has garment image, if not, fetch it
+        if (existingProof.garment_image_url) {
+          console.log('Using garment image from existing proof:', existingProof.garment_image_url);
+          setGarmentImageUrl(existingProof.garment_image_url);
+        } else {
+          console.log('Existing proof has no garment image, fetching...');
+          // Try to get from line item first
+          if (lineItemId && lineItemId.trim()) {
+            const { data: lineItemData } = await supabase
+              .from('quote_line_items')
+              .select('garment_front_image_url, garment_back_image_url, garment_sleeve_image_url, garment_images_data, item_number, description')
+              .eq('id', lineItemId)
+              .maybeSingle();
+
+            console.log('Line item data for garment image:', lineItemData);
+
+            if (lineItemData && lineItemData.garment_front_image_url) {
+              console.log('Using stored garment image from line item:', lineItemData.garment_front_image_url);
+              setGarmentImageUrl(lineItemData.garment_front_image_url);
+            } else {
+              console.log('No stored garment image, fetching from API...');
+              await fetchGarmentImage();
+            }
+          } else {
+            console.log('No line item ID, fetching garment image from API...');
+            await fetchGarmentImage();
+          }
         }
       } else {
         // Check if line item has garment images stored
