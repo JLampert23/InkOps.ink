@@ -411,13 +411,6 @@ export default function MockupGenerator({
       let currentProofId = proofId;
 
       if (!currentProofId) {
-        console.log('Creating new proof with:', {
-          quote_id: quoteId,
-          line_item_id: lineItemId,
-          imprint_id: imprintId,
-          group_label: groupLabel
-        });
-
         const { data: newProof, error: proofError } = await supabase
           .from('proofs')
           .insert({
@@ -443,7 +436,6 @@ export default function MockupGenerator({
           console.error('Error creating proof:', proofError);
           throw proofError;
         }
-        console.log('Created proof:', newProof);
         currentProofId = newProof.id;
         setProofId(currentProofId);
       } else {

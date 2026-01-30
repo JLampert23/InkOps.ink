@@ -206,7 +206,6 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         .order('sort_order');
 
       if (!imprintsError) {
-        console.log('Loaded imprints:', imprintsData);
         setQuoteImprints(imprintsData || []);
       }
 
@@ -217,7 +216,6 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         .order('created_at', { ascending: false });
 
       if (!proofsError) {
-        console.log('Loaded proofs:', proofsData);
         setProofs(proofsData || []);
       }
     } catch (error) {
@@ -643,16 +641,6 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                     return true;
                                   }
                                   return false;
-                                });
-
-                                console.log('Matching proof for imprint:', {
-                                  imprintId: imprint.id,
-                                  imprintGroupLabel: imprint.group_label,
-                                  matchingProof: matchingProof ? {
-                                    id: matchingProof.id,
-                                    imprint_id: matchingProof.imprint_id,
-                                    group_label: matchingProof.group_label
-                                  } : 'none'
                                 });
 
                                 return (

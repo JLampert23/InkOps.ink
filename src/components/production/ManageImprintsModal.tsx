@@ -510,41 +510,80 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
           return;
         }
 
-        if (initialGroupLabel) {
-          await supabase
-            .from('quote_imprints')
-            .delete()
-            .eq('quote_id', quoteId)
-            .eq('group_label', initialGroupLabel);
+        const existingImprintIds = imprints.filter(imp => imp.id).map(imp => imp.id);
+
+        if (existingImprintIds.length > 0) {
+          if (initialGroupLabel) {
+            await supabase
+              .from('quote_imprints')
+              .delete()
+              .eq('quote_id', quoteId)
+              .eq('group_label', initialGroupLabel)
+              .not('id', 'in', `(${existingImprintIds.join(',')})`);
+          } else {
+            await supabase
+              .from('quote_imprints')
+              .delete()
+              .eq('quote_id', quoteId)
+              .not('id', 'in', `(${existingImprintIds.join(',')})`);
+          }
         } else {
-          await supabase.from('quote_imprints').delete().eq('quote_id', quoteId);
-        }
-
-        if (imprints.length > 0) {
-          const { error } = await supabase.from('quote_imprints').insert(
-            imprints.map((imp, idx) => ({
-              quote_id: quoteId,
-              company_id: profile.company_id,
-              sort_order: idx,
-              location: imp.location,
-              price_matrix_id: imp.price_matrix_id,
-              matrix: imp.matrix,
-              column_number: imp.column_number,
-              type_of_work: imp.type_of_work,
-              details: imp.details,
-              mockups: imp.proofs,
-              thread_ink_color: imp.thread_ink_color,
-              pricing_matrix_column: imp.pricing_matrix_column,
-              group_label: imp.group_label || null,
-            }))
-          );
-
-          if (error) {
-            console.error('Error saving imprints:', error);
-            showNotification('error', 'Save Failed', 'Failed to save imprints');
-            return;
+          if (initialGroupLabel) {
+            await supabase
+              .from('quote_imprints')
+              .delete()
+              .eq('quote_id', quoteId)
+              .eq('group_label', initialGroupLabel);
+          } else {
+            await supabase
+              .from('quote_imprints')
+              .delete()
+              .eq('quote_id', quoteId);
           }
         }
+
+        for (let idx = 0; idx < imprints.length; idx++) {
+          const imp = imprints[idx];
+          const imprintData = {
+            quote_id: quoteId,
+            company_id: profile.company_id,
+            sort_order: idx,
+            location: imp.location,
+            price_matrix_id: imp.price_matrix_id,
+            matrix: imp.matrix,
+            column_number: imp.column_number,
+            type_of_work: imp.type_of_work,
+            details: imp.details,
+            mockups: imp.proofs,
+            thread_ink_color: imp.thread_ink_color,
+            pricing_matrix_column: imp.pricing_matrix_column,
+            group_label: imp.group_label || null,
+          };
+
+          if (imp.id) {
+            const { error } = await supabase
+              .from('quote_imprints')
+              .update(imprintData)
+              .eq('id', imp.id);
+
+            if (error) {
+              console.error('Error updating imprint:', error);
+              showNotification('error', 'Update Failed', 'Failed to update imprint');
+              return;
+            }
+          } else {
+            const { error } = await supabase
+              .from('quote_imprints')
+              .insert(imprintData);
+
+            if (error) {
+              console.error('Error inserting imprint:', error);
+              showNotification('error', 'Insert Failed', 'Failed to insert imprint');
+              return;
+            }
+          }
+        }
+
         showNotification('success', 'Saved', 'Imprints saved successfully');
       } catch (err) {
         console.error('Error in handleDone:', err);
