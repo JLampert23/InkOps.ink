@@ -359,8 +359,8 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
       {/* Traditional Invoice Layout */}
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
-        {/* Customer Billing and Shipping */}
-        <div className="grid grid-cols-2 gap-8 p-8 border-b border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+        {/* Customer Info and Quote Details */}
+        <div className="grid grid-cols-3 gap-6 p-8 border-b border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800">
           {/* Customer Billing */}
           <div>
             <h3 className="font-bold text-gray-900 dark:text-white mb-3 text-sm">Customer Billing</h3>
@@ -407,6 +407,55 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
               )}
               {!quote.ship_company && !quote.ship_name && !quote.ship_address_1 && (
                 <p className="text-gray-500 dark:text-gray-400 italic">No shipping address provided</p>
+              )}
+            </div>
+          </div>
+
+          {/* Quote Details */}
+          <div>
+            <h3 className="font-bold text-gray-900 dark:text-white mb-3 text-sm">Quote Details</h3>
+            <div className="text-sm space-y-2">
+              {quote.po_number && (
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">PO #: </span>
+                  <span className="text-gray-900 dark:text-white font-medium">{quote.po_number}</span>
+                </div>
+              )}
+              {quote.delivery_method && (
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">Delivery: </span>
+                  <span className="text-gray-900 dark:text-white font-medium">{quote.delivery_method}</span>
+                </div>
+              )}
+              {quote.customer_due_date && (
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">Customer Due: </span>
+                  <span className="text-gray-900 dark:text-white font-medium">
+                    {format(new Date(quote.customer_due_date), 'MMM d, yyyy')}
+                  </span>
+                </div>
+              )}
+              {quote.invoice_date && (
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">Invoice Date: </span>
+                  <span className="text-gray-900 dark:text-white font-medium">
+                    {format(new Date(quote.invoice_date), 'MMM d, yyyy')}
+                  </span>
+                </div>
+              )}
+              {quote.payment_due_date && (
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">Payment Due: </span>
+                  <span className="text-gray-900 dark:text-white font-medium">
+                    {format(new Date(quote.payment_due_date), 'MMM d, yyyy')}
+                  </span>
+                </div>
+              )}
+              {quote.terms && (
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">Terms: </span>
+                  <span className="text-gray-900 dark:text-white font-medium">{quote.terms}</span>
+                </div>
               )}
             </div>
           </div>
