@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ManageImprintsModal } from './ManageImprintsModal';
+import { generateQuotePDF, QuotePDFData } from '../../utils/quote-pdf-export';
 
 interface QuoteDetailProps {
   quoteId: string;
@@ -261,6 +262,24 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
     }
   };
 
+  const handleDownloadQuote = () => {
+    if (!quote) return;
+
+    const quotePDFData: QuotePDFData = {
+      ...quote,
+      line_items: lineItems,
+      imprints: quoteImprints.map(imprint => ({
+        type_of_work: imprint.type_of_work,
+        location: imprint.location,
+        num_colors: imprint.num_colors,
+        description: imprint.description || '',
+        artwork_description: imprint.artwork_description,
+      })),
+    };
+
+    generateQuotePDF(quotePDFData);
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'draft': return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
@@ -347,6 +366,13 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
               Edit Quote
             </button>
           )}
+          <button
+            onClick={handleDownloadQuote}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors shadow-sm"
+          >
+            <Download className="w-4 h-4" />
+            Download PDF
+          </button>
           {quote.status === 'draft' && (
             <button
               onClick={() => setShowSendModal(true)}
