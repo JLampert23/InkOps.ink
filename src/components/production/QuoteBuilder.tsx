@@ -464,8 +464,12 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   };
 
   const getGroupImprints = (groupLabel: string) => {
-    if (!groupLabel) return [];
-    return quoteImprints.filter(imp => imp.group_label === groupLabel);
+    // Treat empty string, null, and undefined as equivalent
+    const normalizedGroupLabel = groupLabel || null;
+    return quoteImprints.filter(imp => {
+      const normalizedImprintLabel = imp.group_label || null;
+      return normalizedImprintLabel === normalizedGroupLabel;
+    });
   };
 
   const addItem = (groupId: string) => {
@@ -1586,7 +1590,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                             </div>
 
                             {/* Imprint Display Blocks */}
-                            {group.label && getGroupImprints(group.label).length > 0 && (
+                            {getGroupImprints(group.label).length > 0 && (
                               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 mt-3">
                                 {getGroupImprints(group.label).map((imprint, idx) => (
                                   <div
