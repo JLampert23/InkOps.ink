@@ -1987,6 +1987,12 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         }}
         quoteId={quoteId}
         initialGroupLabel={showImprintsModal || ''}
+        lineItems={itemGroups.flatMap(group =>
+          group.items.map(item => ({
+            ...item,
+            group_label: group.label
+          }))
+        )}
       />
 
       {/* Line Item Options Modal */}
