@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
 import CreateCustomerModal from '../accounting/CreateCustomerModal';
 import { ManageImprintsModal } from './ManageImprintsModal';
+import MockupGenerator from './MockupGenerator';
 import { getUnifiedProductData } from '../../services/ssactivewear-promostandards-service';
 
 type SizeMode = 'regular' | 'double' | 'youth' | 'adult';
@@ -198,6 +199,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
   const [showImprintsModal, setShowImprintsModal] = useState<string | null>(null);
   const [editingGroupIdForOptions, setEditingGroupIdForOptions] = useState<string | null>(null);
+  const [showMockupForGroup, setShowMockupForGroup] = useState<string | null>(null);
   const [quoteImprints, setQuoteImprints] = useState<any[]>([]);
 
   const [productSearchResults, setProductSearchResults] = useState<ProductSearchResult[]>([]);
@@ -1737,6 +1739,13 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                                 <Settings className="w-4 h-4" />
                                 Line Item Options
                               </button>
+                              <button
+                                onClick={() => setShowMockupForGroup(group.label)}
+                                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2 shadow-sm"
+                              >
+                                <Plus className="w-4 h-4" />
+                                Mockup
+                              </button>
                             </div>
 
                             {/* Imprint Display Blocks */}
@@ -1994,6 +2003,33 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           }))
         )}
       />
+
+      {/* Mockup Generator Modal */}
+      {showMockupForGroup && (() => {
+        const mockupGroup = itemGroups.find(g => g.label === showMockupForGroup);
+        if (!mockupGroup || mockupGroup.items.length === 0) return null;
+
+        const firstItem = mockupGroup.items[0];
+
+        return (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-7xl max-h-[95vh] overflow-hidden">
+              <MockupGenerator
+                quoteId={quoteId}
+                customerId={selectedCustomerId}
+                garmentStyle={firstItem.item_number}
+                garmentColor={firstItem.color}
+                groupLabel={showMockupForGroup}
+                onClose={() => setShowMockupForGroup(null)}
+                onSave={() => {
+                  setShowMockupForGroup(null);
+                  showNotification('success', 'Mockup saved successfully!');
+                }}
+              />
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Line Item Options Modal */}
       {editingGroupIdForOptions && (() => {
