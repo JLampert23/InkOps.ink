@@ -277,9 +277,9 @@ export interface UnifiedProductData {
     }>;
     views: {
       front: string | null;
-      back: string | null;
-      left: string | null;
-      right: string | null;
+      rear: string | null;
+      side: string | null;
+      lifestyle: string | null;
     };
   };
 }

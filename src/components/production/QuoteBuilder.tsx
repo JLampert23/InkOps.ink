@@ -840,9 +840,9 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           garmentImages.garment_rear_image_url = unifiedData.media.views.rear || undefined;
           garmentImages.garment_side_image_url = unifiedData.media.views.side || undefined;
           garmentImages.garment_lifestyle_image_url = unifiedData.media.views.lifestyle || undefined;
-          // Backward compatibility: populate old fields if new ones exist
-          garmentImages.garment_back_image_url = unifiedData.media.views.rear || unifiedData.media.views.back || undefined;
-          garmentImages.garment_sleeve_image_url = unifiedData.media.views.side || unifiedData.media.views.left || unifiedData.media.views.right || undefined;
+          // Backward compatibility: populate old fields with new values
+          garmentImages.garment_back_image_url = unifiedData.media.views.rear || undefined;
+          garmentImages.garment_sleeve_image_url = unifiedData.media.views.side || undefined;
           garmentImages.garment_images_data = unifiedData.media.images || undefined;
         }
       } catch (error: any) {
