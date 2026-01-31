@@ -117,14 +117,17 @@ Deno.serve(async (req: Request) => {
 
     // Parse request
     const url = new URL(req.url);
-    const style = url.searchParams.get("style");
+    const rawStyle = url.searchParams.get("style");
 
-    if (!style) {
+    if (!rawStyle) {
       return new Response(
         JSON.stringify({ error: "Style number required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Trim whitespace from style number
+    const style = rawStyle.trim();
 
     const results: ProductResult[] = [];
     const errors: string[] = [];
@@ -132,7 +135,7 @@ Deno.serve(async (req: Request) => {
     // Search SanMar if enabled
     if (settings?.sanmar_enabled) {
       try {
-        const sanmarUrl = `${supabaseUrl}/functions/v1/sanmar-api?action=search&style=${encodeURIComponent(style)}`;
+        const sanmarUrl = `${supabaseUrl}/functions/v1/sanmar-api?action=search&style=${encodeURIComponent(style)}&companyId=${encodeURIComponent(profile.company_id)}`;
         const sanmarResponse = await fetch(sanmarUrl, {
           headers: {
             "Authorization": `Bearer ${supabaseServiceKey}`,

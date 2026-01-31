@@ -800,6 +800,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   }, [showNotification]);
 
   const handleStyleNumberChange = (groupId: string, itemIdx: number, value: string) => {
+    // Store the original value but trim for searching
     updateItem(groupId, itemIdx, 'item_number', value);
 
     if (searchTimeoutRef.current) {
@@ -808,9 +809,13 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
 
     setActiveSearchItem({ groupId, itemIdx });
 
-    searchTimeoutRef.current = setTimeout(() => {
-      searchProductByStyle(value);
-    }, 500);
+    // Trim whitespace before searching
+    const trimmedValue = value.trim();
+    if (trimmedValue) {
+      searchTimeoutRef.current = setTimeout(() => {
+        searchProductByStyle(trimmedValue);
+      }, 500);
+    }
   };
 
   const selectProductColor = async (product: ProductSearchResult, colorIdx: number) => {
@@ -854,9 +859,9 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         const newItems = [...group.items];
         newItems[itemIdx] = {
           ...newItems[itemIdx],
-          item_number: product.style,
-          color: color?.name || '',
-          description: `${product.brand} ${product.description}`,
+          item_number: product.style.trim(),
+          color: color?.name?.trim() || '',
+          description: `${product.brand} ${product.description}`.trim(),
           unit_price: color?.pricing?.wholesale || 0,
           ...garmentImages,
         };

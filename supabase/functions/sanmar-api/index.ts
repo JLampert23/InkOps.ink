@@ -31,7 +31,6 @@ Deno.serve(async (req: Request) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     const authHeader = req.headers.get("Authorization");
@@ -42,46 +41,64 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Create client with anon key and auth header for user validation
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: { Authorization: authHeader },
-      },
+    // Check if it's a service role key (internal call) or user JWT
+    const token = authHeader.replace("Bearer ", "");
+    const isServiceRoleKey = token === supabaseServiceRoleKey;
+
+    // Create admin client for all operations
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
     });
 
-    // Create admin client for privileged operations
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
+    let companyId: string;
 
-    // Get authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (isServiceRoleKey) {
+      // Internal call from another edge function - get company_id from query params
+      const url = new URL(req.url);
+      const companyIdParam = url.searchParams.get("companyId");
+      if (!companyIdParam) {
+        return new Response(
+          JSON.stringify({ error: "Company ID required for service calls" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      companyId = companyIdParam;
+    } else {
+      // User JWT - validate and get company_id from profile
+      const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
 
-    if (authError || !user) {
-      console.error("Auth error:", authError);
-      return new Response(
-        JSON.stringify({ error: "Unauthorized", details: authError?.message }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+      if (authError || !user) {
+        console.error("Auth error:", authError);
+        return new Response(
+          JSON.stringify({ error: "Unauthorized", details: authError?.message }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
-    // Get user's company_id
-    const { data: profile } = await supabaseAdmin
-      .from("user_profiles")
-      .select("company_id")
-      .eq("id", user.id)
-      .maybeSingle();
+      // Get user's company_id
+      const { data: profile } = await supabaseAdmin
+        .from("user_profiles")
+        .select("company_id")
+        .eq("id", user.id)
+        .maybeSingle();
 
-    if (!profile?.company_id) {
-      return new Response(
-        JSON.stringify({ error: "Company not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (!profile?.company_id) {
+        return new Response(
+          JSON.stringify({ error: "Company not found" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      companyId = profile.company_id;
     }
 
     // Get SanMar credentials from company_settings
     const { data: settings } = await supabaseAdmin
       .from("company_settings")
       .select("sanmar_account_number, sanmar_username, sanmar_password_encrypted")
-      .eq("id", profile.company_id)
+      .eq("id", companyId)
       .maybeSingle();
 
     if (!settings?.sanmar_account_number || !settings?.sanmar_username || !settings?.sanmar_password_encrypted) {

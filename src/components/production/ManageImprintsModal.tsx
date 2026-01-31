@@ -803,23 +803,47 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
           firstLineItem = lineItems[0];
         }
 
+        // Validate required data before opening MockupGenerator
+        if (!firstLineItem) {
+          console.error('Cannot open MockupGenerator: No line items available');
+          showNotification('error', 'Missing Data', 'No line items found for this quote');
+          setMockupImprintIndex(null);
+          return null;
+        }
+
+        const garmentStyle = firstLineItem.item_number?.trim();
+        const garmentColor = firstLineItem.color?.trim();
+
+        if (!garmentStyle) {
+          console.error('Cannot open MockupGenerator: Missing garment style');
+          showNotification('error', 'Missing Data', 'Line item is missing a style number');
+          setMockupImprintIndex(null);
+          return null;
+        }
+
+        if (!garmentColor) {
+          console.error('Cannot open MockupGenerator: Missing garment color');
+          showNotification('error', 'Missing Data', 'Line item is missing a color');
+          setMockupImprintIndex(null);
+          return null;
+        }
+
         console.log('Opening MockupGenerator with:', {
           currentImprint,
           groupLabel,
           firstLineItem,
-          garmentStyle: firstLineItem?.item_number,
-          garmentColor: firstLineItem?.color,
+          garmentStyle,
+          garmentColor,
           lineItemsCount: lineItems?.length,
-          allLineItems: lineItems
         });
 
         return (
           <MockupGenerator
-            lineItemId={firstLineItem?.id || ''}
+            lineItemId={firstLineItem.id || ''}
             quoteId={quoteId}
             customerId={quote?.customer_id || ''}
-            garmentStyle={firstLineItem?.item_number || ''}
-            garmentColor={firstLineItem?.color || ''}
+            garmentStyle={garmentStyle}
+            garmentColor={garmentColor}
             groupLabel={groupLabel}
             imprintId={currentImprint.id || ''}
             imprintLocation={currentImprint.location}
