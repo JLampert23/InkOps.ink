@@ -859,9 +859,8 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
             imprintTypeOfWork={currentImprint.type_of_work}
             onClose={() => setMockupImprintIndex(null)}
             onSave={async () => {
+              // Reload imprints to get updated mockups (but keep modal open)
               await loadImprints();
-              setMockupImprintIndex(null);
-              showNotification('success', 'Mockup Saved', 'Mockup has been saved successfully');
             }}
           />
         );

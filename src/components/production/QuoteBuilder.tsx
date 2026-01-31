@@ -2032,8 +2032,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           groupLabel={showMockupForGroup}
           onClose={() => setShowMockupForGroup(null)}
           onSave={async () => {
-            setShowMockupForGroup(null);
-            // Reload imprints to get updated mockups
+            // Reload imprints to get updated mockups (but keep modal open)
             if (quoteId) {
               const { data } = await supabase
                 .from('quote_imprints')
@@ -2042,7 +2041,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                 .order('sort_order');
               if (data) setQuoteImprints(data);
             }
-            showNotification('success', 'Mockup saved successfully!');
           }}
         />
       )}
