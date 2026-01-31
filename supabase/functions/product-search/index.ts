@@ -190,18 +190,23 @@ Deno.serve(async (req: Request) => {
 
                   console.log(`Processing ${mediaContent.length} media items for ${product.colors.length} colors`);
 
-                  // Map media to colors by matching color names
+                  // Map media to colors by matching partId (more reliable than color name)
                   // Priority: Front images > Back images > Side images
                   for (const color of product.colors) {
-                    // Find all media for this color
+                    // Find all media for this color by matching partId
                     const colorMedia = mediaContent.filter((media: any) => {
-                      // Match by color name (case-insensitive, trim whitespace)
+                      // Match by partId first (most reliable)
+                      if (media.partId && color.partIds && Array.isArray(color.partIds)) {
+                        return color.partIds.includes(media.partId);
+                      }
+
+                      // Fallback: Match by color name (case-insensitive, trim whitespace)
                       const mediaColorName = (media.colorName || '').trim().toLowerCase();
                       const productColorName = (color.name || '').trim().toLowerCase();
                       return mediaColorName === productColorName;
                     });
 
-                    console.log(`Found ${colorMedia.length} media items for color: ${color.name}`);
+                    console.log(`Found ${colorMedia.length} media items for color: ${color.name} (partIds: ${color.partIds?.join(', ')})`);
 
                     if (colorMedia.length > 0) {
                       // Try to find a front image first
@@ -212,7 +217,8 @@ Deno.serve(async (req: Request) => {
                       // If no front image, try back image
                       if (!frontImage) {
                         frontImage = colorMedia.find((m: any) =>
-                          (m.classType || '').toLowerCase().includes('back')
+                          (m.classType || '').toLowerCase().includes('back') ||
+                          (m.classType || '').toLowerCase().includes('rear')
                         );
                       }
 
@@ -355,7 +361,7 @@ function transformSSActivewearData(data: any, style: string): ProductResult[] {
       // PromoStandards returns 'parts' array with color/size combinations
       if (item.parts && Array.isArray(item.parts)) {
         // Group parts by color to create unique color options
-        const colorMap = new Map<string, ColorOption>();
+        const colorMap = new Map<string, any>();
 
         for (const part of item.parts) {
           const colorName = part.colorName || "Default";
@@ -364,6 +370,7 @@ function transformSSActivewearData(data: any, style: string): ProductResult[] {
             colorMap.set(colorName, {
               name: colorName,
               code: part.partId || "",
+              partIds: [part.partId], // Store all partIds for this color
               image_url: "",
               pricing: {
                 wholesale: 0,
@@ -372,6 +379,12 @@ function transformSSActivewearData(data: any, style: string): ProductResult[] {
               sizes: [],
               stock: {},
             });
+          } else {
+            // Add this partId to the existing color
+            const colorOption = colorMap.get(colorName)!;
+            if (part.partId && !colorOption.partIds.includes(part.partId)) {
+              colorOption.partIds.push(part.partId);
+            }
           }
 
           // Add size if not already in the list
@@ -390,6 +403,7 @@ function transformSSActivewearData(data: any, style: string): ProductResult[] {
         colors.push({
           name: "Default",
           code: "",
+          partIds: [],
           image_url: "",
           pricing: {
             wholesale: 0,
