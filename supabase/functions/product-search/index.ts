@@ -45,21 +45,26 @@ Deno.serve(async (req: Request) => {
     const authHeader = req.headers.get("Authorization");
     console.log("Auth header present:", !!authHeader);
 
-    // Create client that will use the user's JWT for verification
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ code: 401, message: "Missing Authorization header" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Extract JWT token from Bearer header
+    const token = authHeader.replace("Bearer ", "");
+
+    // Create client for auth verification
     const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false
-      },
-      global: {
-        headers: {
-          Authorization: authHeader || ""
-        }
       }
     });
 
-    // Verify the JWT by getting the user
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    // Verify the JWT by passing the token explicitly
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
     if (userError || !user) {
       console.error("Auth verification failed:", userError);
       return new Response(
