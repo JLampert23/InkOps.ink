@@ -111,6 +111,13 @@ export default function MockupGenerator({
     imagesData: any;
   }>>([]);
   const [activeGarmentIndex, setActiveGarmentIndex] = useState(0);
+  const [imprints, setImprints] = useState<Array<{
+    id: string;
+    location: string;
+    type_of_work: string;
+    details: string;
+    thread_ink_color: string;
+  }>>([]);
 
   const [selectedArtwork, setSelectedArtwork] = useState<MockupArtwork[]>([]);
   const [activeArtworkIndex, setActiveArtworkIndex] = useState<number>(0);
@@ -202,6 +209,28 @@ export default function MockupGenerator({
           if (lineItems[0].garment_front_image_url) {
             setGarmentImageUrl(lineItems[0].garment_front_image_url);
             setGarmentDescription(lineItems[0].description || '');
+          }
+        }
+
+        // Load imprints for this group
+        if (groupLabel && groupLabel.trim() !== '') {
+          const { data: imprintsData, error: imprintsError } = await supabase
+            .from('quote_imprints')
+            .select('id, location, type_of_work, details, thread_ink_color')
+            .eq('quote_id', quoteId)
+            .eq('group_label', groupLabel)
+            .order('sort_order');
+
+          if (imprintsError) {
+            console.error('MockupGenerator: Error loading imprints:', imprintsError);
+          } else if (imprintsData) {
+            setImprints(imprintsData.map(imp => ({
+              id: imp.id,
+              location: imp.location || '',
+              type_of_work: imp.type_of_work || '',
+              details: imp.details || '',
+              thread_ink_color: imp.thread_ink_color || '',
+            })));
           }
         }
       }
@@ -1030,39 +1059,35 @@ export default function MockupGenerator({
                 </div>
               )}
 
-              {selectedArtwork.length > 0 && (
+              {imprints.length > 0 && (
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Artwork Layers</label>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Imprints</label>
                   <div className="space-y-1.5">
-                    {selectedArtwork.map((artwork, index) => (
+                    {imprints.map((imprint) => (
                       <div
-                        key={index}
-                        className={`p-2 bg-white dark:bg-slate-800 border rounded cursor-pointer ${
-                          index === activeArtworkIndex ? 'border-blue-500 ring-1 ring-blue-100 dark:ring-blue-900' : 'border-gray-200 dark:border-slate-600'
-                        }`}
-                        onClick={() => setActiveArtworkIndex(index)}
+                        key={imprint.id}
+                        className="p-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded"
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-1.5">
-                            <ImageIcon className="w-3 h-3 text-gray-400 dark:text-gray-500" />
-                            <span className="text-xs font-medium truncate text-gray-900 dark:text-white">{artwork.file_name || `Artwork ${index + 1}`}</span>
+                        <div className="flex items-start space-x-1.5">
+                          <ImageIcon className="w-3 h-3 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-medium text-gray-900 dark:text-white truncate">
+                              {imprint.location || 'No location'}
+                            </div>
+                            <div className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                              {imprint.type_of_work}
+                            </div>
+                            {imprint.details && (
+                              <div className="text-xs text-gray-500 dark:text-gray-500 mt-0.5 line-clamp-2">
+                                {imprint.details}
+                              </div>
+                            )}
+                            {imprint.thread_ink_color && (
+                              <div className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+                                {imprint.thread_ink_color}
+                              </div>
+                            )}
                           </div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const updated = selectedArtwork.filter((_, i) => i !== index);
-                              setSelectedArtwork(updated);
-                              if (activeArtworkIndex >= updated.length) {
-                                setActiveArtworkIndex(Math.max(0, updated.length - 1));
-                              }
-                            }}
-                            className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                        <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                          {artwork.print_location} • {artwork.width_inches}" × {artwork.height_inches}"
                         </div>
                       </div>
                     ))}
