@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Update Garment Images</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <h1>Updating Garment Images...</h1>
+  <div id="output"></div>
+
+  <script type="module">
+    const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+    const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const output = document.getElementById('output');
+
+    function log(msg) {
+      output.innerHTML += msg + '<br>';
+      console.log(msg);
+    }
+
+    async function updateImages() {
+      const quoteId = 'd77adbda-cd90-4ac6-be44-e3ac3f6f8416';
+
+      // Get line items
+      const { data: items, error } = await supabase
+        .from('quote_line_items')
+        .select('id, item_number, color, supplier_partid')
+        .eq('quote_id', quoteId)
+        .not('item_number', 'is', null);
+
+      if (error) {
+        log('Error: ' + error.message);
+        return;
+      }
+
+      log(`Found ${items.length} items`);
+
+      for (const item of items) {
+        log(`<br><strong>${item.item_number} - ${item.color}</strong>`);
+
+        if (!item.supplier_partid) {
+          log('  No part ID, skipping');
+          continue;
+        }
+
+        try {
+          const url = `${SUPABASE_URL}/functions/v1/promostandards-unified?style=${encodeURIComponent(item.item_number.trim())}&partId=${encodeURIComponent(item.supplier_partid)}`;
+
+          const response = await fetch(url, {
+            headers: {
+              'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            },
+          });
+
+          const data = await response.json();
+
+          if (data.success && data.media?.views) {
+            log(`  Front: ${data.media.views.front ? '✓' : '✗'}`);
+            log(`  Back: ${data.media.views.back ? '✓' : '✗'}`);
+            log(`  Sleeve: ${data.media.views.left || data.media.views.right ? '✓' : '✗'}`);
+            log(`  Total images: ${data.media.images?.length || 0}`);
+
+            const { error: updateError } = await supabase
+              .from('quote_line_items')
+              .update({
+                garment_front_image_url: data.media.views.front || null,
+                garment_back_image_url: data.media.views.back || null,
+                garment_sleeve_image_url: data.media.views.left || data.media.views.right || null,
+                garment_images_data: data.media.images || null,
+              })
+              .eq('id', item.id);
+
+            if (updateError) {
+              log(`  Error updating: ${updateError.message}`);
+            } else {
+              log('  ✅ Updated!');
+            }
+          } else {
+            log('  No media data available');
+          }
+        } catch (err) {
+          log(`  Error: ${err.message}`);
+        }
+      }
+
+      log('<br><strong>✅ Complete!</strong>');
+    }
+
+    updateImages();
+  </script>
+</body>
+</html>
