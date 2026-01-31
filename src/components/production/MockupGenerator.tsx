@@ -584,6 +584,11 @@ export default function MockupGenerator({
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
+    if (!companyId || companyId.trim() === '') {
+      showNotification('error', 'Company ID not loaded. Please refresh the page and try again.');
+      return;
+    }
+
     setUploadingImprintId(imprintId);
     try {
       const uploadedArtwork: CustomerArtwork[] = [];
@@ -615,7 +620,7 @@ export default function MockupGenerator({
         const { data: artworkRecord, error: dbError } = await supabase
           .from('customer_artwork')
           .insert({
-            customer_id: customerId,
+            customer_id: customerId && customerId.trim() ? customerId : null,
             company_id: companyId,
             file_name: file.name,
             file_url: publicUrl,
