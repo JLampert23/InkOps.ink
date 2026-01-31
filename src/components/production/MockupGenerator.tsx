@@ -1032,24 +1032,20 @@ export default function MockupGenerator({
           </div>
 
           <div className="w-64 bg-gray-50 dark:bg-slate-900 p-3 overflow-y-auto border-l dark:border-slate-600">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Details</h3>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Styles</h3>
 
-            {/* Garment Styles Selector */}
+            {/* Garment Styles Accordion */}
             {garmentStyles.length > 0 && (
               <div className="mb-3">
-                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  Garment Styles in Group ({garmentStyles.length})
-                </label>
                 <div className="space-y-2">
                   {garmentStyles.map((garmentStyle, index) => {
-                    const colorVariants = garmentStyle.imagesData?.colorVariants || [];
-                    const hasColorVariants = colorVariants.length > 0;
+                    const isActive = activeGarmentIndex === index;
 
                     return (
                       <div
                         key={garmentStyle.lineItemId}
                         className={`bg-white dark:bg-slate-800 rounded-lg border-2 transition-colors ${
-                          activeGarmentIndex === index
+                          isActive
                             ? 'border-blue-500'
                             : 'border-gray-200 dark:border-slate-700'
                         }`}
@@ -1069,11 +1065,11 @@ export default function MockupGenerator({
                               <img
                                 src={garmentStyle.frontImage}
                                 alt={garmentStyle.style}
-                                className="w-16 h-16 object-contain rounded border border-gray-200 dark:border-slate-600 bg-white"
+                                className="w-10 h-10 object-contain rounded border border-gray-200 dark:border-slate-600 bg-white"
                               />
                             ) : (
-                              <div className="w-16 h-16 flex items-center justify-center rounded border border-gray-300 dark:border-slate-600 bg-gray-100 dark:bg-slate-700">
-                                <ImageIcon className="w-6 h-6 text-gray-400" />
+                              <div className="w-10 h-10 flex items-center justify-center rounded border border-gray-300 dark:border-slate-600 bg-gray-100 dark:bg-slate-700">
+                                <ImageIcon className="w-4 h-4 text-gray-400" />
                               </div>
                             )}
                             <div className="flex-1 min-w-0">
@@ -1085,49 +1081,76 @@ export default function MockupGenerator({
                               </div>
                             </div>
                           </div>
-
-                          {/* Color Thumbnails */}
-                          {hasColorVariants && (
-                            <div className="mt-2 pt-2 border-t border-gray-200 dark:border-slate-600">
-                              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Available Colors:</div>
-                              <div className="grid grid-cols-6 gap-1">
-                                {colorVariants.map((variant: any, vIdx: number) => (
-                                  <button
-                                    key={vIdx}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (variant.front_image) {
-                                        setGarmentImageUrl(variant.front_image);
-                                        // Update the garment style with new color
-                                        const updated = [...garmentStyles];
-                                        updated[index] = {
-                                          ...updated[index],
-                                          color: variant.color_name,
-                                          frontImage: variant.front_image,
-                                          backImage: variant.back_image || '',
-                                          sleeveImage: variant.sleeve_image || '',
-                                        };
-                                        setGarmentStyles(updated);
-                                      }
-                                    }}
-                                    className={`relative aspect-square rounded border-2 overflow-hidden transition-all hover:scale-105 ${
-                                      garmentStyle.frontImage === variant.front_image
-                                        ? 'border-blue-500 ring-2 ring-blue-300'
-                                        : 'border-gray-300 dark:border-slate-600'
-                                    }`}
-                                    title={variant.color_name}
-                                  >
-                                    <img
-                                      src={variant.front_image}
-                                      alt={variant.color_name}
-                                      className="w-full h-full object-contain bg-white"
-                                    />
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
                         </div>
+
+                        {/* Expanded View Options */}
+                        {isActive && (
+                          <div className="px-2 pb-2 border-t border-gray-200 dark:border-slate-600 mt-2 pt-2">
+                            <div className="text-[10px] text-gray-500 dark:text-gray-400 mb-1.5 font-medium">Views:</div>
+                            <div className="grid grid-cols-3 gap-1.5">
+                              {garmentStyle.frontImage && (
+                                <button
+                                  onClick={() => setGarmentImageUrl(garmentStyle.frontImage)}
+                                  className={`relative aspect-square rounded border-2 overflow-hidden transition-all hover:scale-105 ${
+                                    garmentImageUrl === garmentStyle.frontImage
+                                      ? 'border-blue-500 ring-1 ring-blue-300'
+                                      : 'border-gray-300 dark:border-slate-600'
+                                  }`}
+                                  title="Front View"
+                                >
+                                  <img
+                                    src={garmentStyle.frontImage}
+                                    alt="Front"
+                                    className="w-full h-full object-contain bg-white"
+                                  />
+                                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[9px] text-center py-0.5">
+                                    Front
+                                  </div>
+                                </button>
+                              )}
+                              {garmentStyle.backImage && (
+                                <button
+                                  onClick={() => setGarmentImageUrl(garmentStyle.backImage)}
+                                  className={`relative aspect-square rounded border-2 overflow-hidden transition-all hover:scale-105 ${
+                                    garmentImageUrl === garmentStyle.backImage
+                                      ? 'border-blue-500 ring-1 ring-blue-300'
+                                      : 'border-gray-300 dark:border-slate-600'
+                                  }`}
+                                  title="Back View"
+                                >
+                                  <img
+                                    src={garmentStyle.backImage}
+                                    alt="Back"
+                                    className="w-full h-full object-contain bg-white"
+                                  />
+                                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[9px] text-center py-0.5">
+                                    Back
+                                  </div>
+                                </button>
+                              )}
+                              {garmentStyle.sleeveImage && (
+                                <button
+                                  onClick={() => setGarmentImageUrl(garmentStyle.sleeveImage)}
+                                  className={`relative aspect-square rounded border-2 overflow-hidden transition-all hover:scale-105 ${
+                                    garmentImageUrl === garmentStyle.sleeveImage
+                                      ? 'border-blue-500 ring-1 ring-blue-300'
+                                      : 'border-gray-300 dark:border-slate-600'
+                                  }`}
+                                  title="Sleeve View"
+                                >
+                                  <img
+                                    src={garmentStyle.sleeveImage}
+                                    alt="Sleeve"
+                                    className="w-full h-full object-contain bg-white"
+                                  />
+                                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[9px] text-center py-0.5">
+                                    Sleeve
+                                  </div>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -1135,94 +1158,6 @@ export default function MockupGenerator({
               </div>
             )}
 
-            {/* Garment View Thumbnails */}
-            {garmentStyles.length > 0 && garmentStyles[activeGarmentIndex] && (
-              <div className="mb-3">
-                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  Garment Views
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {garmentStyles[activeGarmentIndex].frontImage && (
-                    <button
-                      onClick={() => setGarmentImageUrl(garmentStyles[activeGarmentIndex].frontImage)}
-                      className={`relative aspect-square rounded border-2 overflow-hidden transition-all hover:scale-105 ${
-                        garmentImageUrl === garmentStyles[activeGarmentIndex].frontImage
-                          ? 'border-blue-500 ring-2 ring-blue-300'
-                          : 'border-gray-300 dark:border-slate-600'
-                      }`}
-                      title="Front View"
-                    >
-                      <img
-                        src={garmentStyles[activeGarmentIndex].frontImage}
-                        alt="Front"
-                        className="w-full h-full object-contain bg-white"
-                      />
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[10px] text-center py-0.5">
-                        Front
-                      </div>
-                    </button>
-                  )}
-                  {garmentStyles[activeGarmentIndex].backImage && (
-                    <button
-                      onClick={() => setGarmentImageUrl(garmentStyles[activeGarmentIndex].backImage)}
-                      className={`relative aspect-square rounded border-2 overflow-hidden transition-all hover:scale-105 ${
-                        garmentImageUrl === garmentStyles[activeGarmentIndex].backImage
-                          ? 'border-blue-500 ring-2 ring-blue-300'
-                          : 'border-gray-300 dark:border-slate-600'
-                      }`}
-                      title="Back View"
-                    >
-                      <img
-                        src={garmentStyles[activeGarmentIndex].backImage}
-                        alt="Back"
-                        className="w-full h-full object-contain bg-white"
-                      />
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[10px] text-center py-0.5">
-                        Back
-                      </div>
-                    </button>
-                  )}
-                  {garmentStyles[activeGarmentIndex].sleeveImage && (
-                    <button
-                      onClick={() => setGarmentImageUrl(garmentStyles[activeGarmentIndex].sleeveImage)}
-                      className={`relative aspect-square rounded border-2 overflow-hidden transition-all hover:scale-105 ${
-                        garmentImageUrl === garmentStyles[activeGarmentIndex].sleeveImage
-                          ? 'border-blue-500 ring-2 ring-blue-300'
-                          : 'border-gray-300 dark:border-slate-600'
-                      }`}
-                      title="Sleeve View"
-                    >
-                      <img
-                        src={garmentStyles[activeGarmentIndex].sleeveImage}
-                        alt="Sleeve"
-                        className="w-full h-full object-contain bg-white"
-                      />
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[10px] text-center py-0.5">
-                        Sleeve
-                      </div>
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {garmentImageUrl ? (
-              <img
-                src={garmentImageUrl}
-                alt="Garment"
-                className="w-full rounded mb-3 border border-gray-200 dark:border-slate-700"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
-            ) : (
-              <div className="w-full h-48 rounded mb-3 border border-gray-200 dark:border-slate-700 bg-gray-100 dark:bg-slate-800 flex items-center justify-center">
-                <div className="text-center">
-                  <ImageIcon className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                  <p className="text-xs text-gray-500 dark:text-gray-400">No garment image</p>
-                </div>
-              </div>
-            )}
             <div className="space-y-3 text-xs">
               {/* Garment Information */}
               <div className="bg-white dark:bg-slate-800 rounded-lg p-2 border border-gray-200 dark:border-slate-700">
