@@ -807,55 +807,120 @@ export default function MockupGenerator({
           });
       }
 
-      // Update the corresponding quote_imprint with the composite image thumbnail
-      if (compositeImageUrl && imprintId && imprintId.trim()) {
-        const { data: existingImprint } = await supabase
-          .from('quote_imprints')
-          .select('mockups')
-          .eq('id', imprintId)
-          .maybeSingle();
+      // Update the corresponding quote_imprint(s) with the composite image thumbnail
+      if (compositeImageUrl) {
+        // If we have a specific imprintId, update just that imprint
+        if (imprintId && imprintId.trim()) {
+          const { data: existingImprint } = await supabase
+            .from('quote_imprints')
+            .select('mockups')
+            .eq('id', imprintId)
+            .maybeSingle();
 
-        if (existingImprint) {
-          const existingMockups = existingImprint.mockups || [];
+          if (existingImprint) {
+            const existingMockups = existingImprint.mockups || [];
 
-          // Check if this composite image is already in the mockups array
-          const imageExists = existingMockups.some((mockup: any) =>
-            typeof mockup === 'string' ? mockup === compositeImageUrl : mockup?.url === compositeImageUrl
-          );
+            // Check if this composite image is already in the mockups array
+            const imageExists = existingMockups.some((mockup: any) =>
+              typeof mockup === 'string' ? mockup === compositeImageUrl : mockup?.url === compositeImageUrl
+            );
 
-          if (!imageExists) {
-            // Add the new mockup with metadata
-            const updatedMockups = [
-              ...existingMockups,
-              {
-                url: compositeImageUrl,
-                created_at: new Date().toISOString(),
-                proof_id: currentProofId,
-              }
-            ];
-
-            await supabase
-              .from('quote_imprints')
-              .update({ mockups: updatedMockups })
-              .eq('id', imprintId);
-          } else {
-            // Update the existing mockup entry with the new proof_id
-            const updatedMockups = existingMockups.map((mockup: any) => {
-              const mockupUrl = typeof mockup === 'string' ? mockup : mockup?.url;
-              if (mockupUrl === compositeImageUrl) {
-                return {
+            if (!imageExists) {
+              // Add the new mockup with metadata
+              const updatedMockups = [
+                ...existingMockups,
+                {
                   url: compositeImageUrl,
-                  created_at: typeof mockup === 'string' ? new Date().toISOString() : mockup.created_at,
+                  created_at: new Date().toISOString(),
                   proof_id: currentProofId,
-                };
-              }
-              return mockup;
-            });
+                }
+              ];
 
-            await supabase
-              .from('quote_imprints')
-              .update({ mockups: updatedMockups })
-              .eq('id', imprintId);
+              await supabase
+                .from('quote_imprints')
+                .update({ mockups: updatedMockups })
+                .eq('id', imprintId);
+            } else {
+              // Update the existing mockup entry with the new proof_id
+              const updatedMockups = existingMockups.map((mockup: any) => {
+                const mockupUrl = typeof mockup === 'string' ? mockup : mockup?.url;
+                if (mockupUrl === compositeImageUrl) {
+                  return {
+                    url: compositeImageUrl,
+                    created_at: typeof mockup === 'string' ? new Date().toISOString() : mockup.created_at,
+                    proof_id: currentProofId,
+                  };
+                }
+                return mockup;
+              });
+
+              await supabase
+                .from('quote_imprints')
+                .update({ mockups: updatedMockups })
+                .eq('id', imprintId);
+            }
+          }
+        }
+        // If we have a quoteId and groupLabel but no specific imprintId,
+        // update ALL imprints in that group with the mockup
+        else if (quoteId && quoteId.trim() && groupLabel) {
+          let imprintsQuery = supabase
+            .from('quote_imprints')
+            .select('id, mockups')
+            .eq('quote_id', quoteId);
+
+          // Filter by group label
+          if (groupLabel.trim() !== '') {
+            imprintsQuery = imprintsQuery.eq('group_label', groupLabel);
+          }
+
+          const { data: imprintsToUpdate, error: imprintsError } = await imprintsQuery;
+
+          if (!imprintsError && imprintsToUpdate && imprintsToUpdate.length > 0) {
+            // Update each imprint with the mockup
+            for (const imprint of imprintsToUpdate) {
+              const existingMockups = imprint.mockups || [];
+
+              // Check if this composite image is already in the mockups array
+              const imageExists = existingMockups.some((mockup: any) =>
+                typeof mockup === 'string' ? mockup === compositeImageUrl : mockup?.url === compositeImageUrl
+              );
+
+              if (!imageExists) {
+                // Add the new mockup with metadata
+                const updatedMockups = [
+                  ...existingMockups,
+                  {
+                    url: compositeImageUrl,
+                    created_at: new Date().toISOString(),
+                    proof_id: currentProofId,
+                  }
+                ];
+
+                await supabase
+                  .from('quote_imprints')
+                  .update({ mockups: updatedMockups })
+                  .eq('id', imprint.id);
+              } else {
+                // Update the existing mockup entry with the new proof_id
+                const updatedMockups = existingMockups.map((mockup: any) => {
+                  const mockupUrl = typeof mockup === 'string' ? mockup : mockup?.url;
+                  if (mockupUrl === compositeImageUrl) {
+                    return {
+                      url: compositeImageUrl,
+                      created_at: typeof mockup === 'string' ? new Date().toISOString() : mockup.created_at,
+                      proof_id: currentProofId,
+                    };
+                  }
+                  return mockup;
+                });
+
+                await supabase
+                  .from('quote_imprints')
+                  .update({ mockups: updatedMockups })
+                  .eq('id', imprint.id);
+              }
+            }
           }
         }
       }
