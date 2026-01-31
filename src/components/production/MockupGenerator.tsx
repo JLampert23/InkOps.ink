@@ -58,6 +58,7 @@ interface MockupArtwork {
   scale: number;
   rotation: number;
   file_name?: string;
+  imprint_id?: string | null;
 }
 
 const PRINT_LOCATIONS = [
@@ -346,6 +347,7 @@ export default function MockupGenerator({
             position_y: a.position_y || 0,
             scale: a.scale || 1,
             rotation: a.rotation || 0,
+            imprint_id: a.imprint_id || null,
           })));
           setPrintLocation(artworkData[0].print_location || 'Front');
           setWidthInches(artworkData[0].width_inches || 4);
@@ -570,6 +572,7 @@ export default function MockupGenerator({
           scale: 1,
           rotation: 0,
           file_name: file.name,
+          imprint_id: null,
         };
 
         setSelectedArtwork([...selectedArtwork, newArtwork]);
@@ -649,6 +652,7 @@ export default function MockupGenerator({
           scale: 1,
           rotation: 0,
           file_name: file.name,
+          imprint_id: imprintId,
         };
 
         setSelectedArtwork([...selectedArtwork, newArtwork]);
@@ -818,6 +822,7 @@ export default function MockupGenerator({
             scale: artwork.scale,
             rotation: artwork.rotation,
             sort_order: i,
+            imprint_id: artwork.imprint_id || null,
           });
       }
 
@@ -1148,6 +1153,70 @@ export default function MockupGenerator({
                 </div>
               )}
 
+              {selectedArtwork.length > 0 && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-900 dark:text-white mb-2">Uploaded Artwork ({selectedArtwork.length})</label>
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {selectedArtwork.map((artwork, index) => {
+                      const linkedImprint = artwork.imprint_id ? imprints.find(imp => imp.id === artwork.imprint_id) : null;
+                      const isActive = activeArtworkIndex === index;
+
+                      return (
+                        <div
+                          key={index}
+                          onClick={() => setActiveArtworkIndex(index)}
+                          className={`p-2 rounded border-2 cursor-pointer transition-all ${
+                            isActive
+                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                              : 'border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 hover:border-blue-300'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2">
+                            <div className="w-10 h-10 bg-gray-100 dark:bg-slate-700 rounded border border-gray-200 dark:border-slate-600 flex items-center justify-center overflow-hidden flex-shrink-0">
+                              {artwork.artwork_url ? (
+                                <img src={artwork.artwork_url} alt={artwork.file_name} className="w-full h-full object-contain" />
+                              ) : (
+                                <ImageIcon className="w-4 h-4 text-gray-400" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs font-medium text-gray-900 dark:text-white truncate">
+                                {artwork.file_name || 'Untitled'}
+                              </div>
+                              <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+                                {artwork.print_location}
+                              </div>
+                              {linkedImprint && (
+                                <div className="flex items-center gap-1 mt-1">
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-700">
+                                    <ImageIcon className="w-2.5 h-2.5 mr-0.5" />
+                                    {linkedImprint.location}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const updated = selectedArtwork.filter((_, i) => i !== index);
+                                setSelectedArtwork(updated);
+                                if (activeArtworkIndex >= updated.length) {
+                                  setActiveArtworkIndex(Math.max(0, updated.length - 1));
+                                }
+                              }}
+                              className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 p-1"
+                              title="Remove artwork"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Imprints</label>
                 <div className="space-y-1.5">
@@ -1160,8 +1229,13 @@ export default function MockupGenerator({
                         <div className="flex items-start space-x-1.5">
                           <ImageIcon className="w-3 h-3 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <div className="text-xs font-medium text-gray-900 dark:text-white truncate">
-                              {imprint.location || 'No location'}
+                            <div className="flex items-center justify-between gap-1 mb-0.5">
+                              <div className="text-xs font-medium text-gray-900 dark:text-white truncate">
+                                {imprint.location || 'No location'}
+                              </div>
+                              <div className="text-[10px] text-gray-400 dark:text-gray-500 font-mono flex-shrink-0">
+                                ID: {imprint.id.slice(0, 8)}
+                              </div>
                             </div>
                             <div className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
                               {imprint.type_of_work}
@@ -1534,6 +1608,7 @@ export default function MockupGenerator({
               scale: 1,
               rotation: 0,
               file_name: artwork.file_name,
+              imprint_id: null,
             };
             setSelectedArtwork([...selectedArtwork, newArtwork]);
             setActiveArtworkIndex(selectedArtwork.length);
