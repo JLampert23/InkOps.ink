@@ -212,26 +212,33 @@ export default function MockupGenerator({
           }
         }
 
-        // Load imprints for this group
-        if (groupLabel && groupLabel.trim() !== '') {
-          const { data: imprintsData, error: imprintsError } = await supabase
-            .from('quote_imprints')
-            .select('id, location, type_of_work, details, thread_ink_color')
-            .eq('quote_id', quoteId)
-            .eq('group_label', groupLabel)
-            .order('sort_order');
+        // Load imprints for this group or quote
+        let imprintsQuery = supabase
+          .from('quote_imprints')
+          .select('id, location, type_of_work, details, thread_ink_color')
+          .eq('quote_id', quoteId)
+          .order('sort_order');
 
-          if (imprintsError) {
-            console.error('MockupGenerator: Error loading imprints:', imprintsError);
-          } else if (imprintsData) {
-            setImprints(imprintsData.map(imp => ({
-              id: imp.id,
-              location: imp.location || '',
-              type_of_work: imp.type_of_work || '',
-              details: imp.details || '',
-              thread_ink_color: imp.thread_ink_color || '',
-            })));
-          }
+        // If group label is provided and not empty, filter by it
+        if (groupLabel && groupLabel.trim() !== '') {
+          imprintsQuery = imprintsQuery.eq('group_label', groupLabel);
+        }
+
+        const { data: imprintsData, error: imprintsError } = await imprintsQuery;
+
+        if (imprintsError) {
+          console.error('MockupGenerator: Error loading imprints:', imprintsError);
+        } else if (imprintsData) {
+          console.log('MockupGenerator: Loaded imprints:', imprintsData);
+          setImprints(imprintsData.map(imp => ({
+            id: imp.id,
+            location: imp.location || '',
+            type_of_work: imp.type_of_work || '',
+            details: imp.details || '',
+            thread_ink_color: imp.thread_ink_color || '',
+          })));
+        } else {
+          console.log('MockupGenerator: No imprints found for quote:', quoteId, 'groupLabel:', groupLabel);
         }
       }
 
@@ -1059,11 +1066,11 @@ export default function MockupGenerator({
                 </div>
               )}
 
-              {imprints.length > 0 && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Imprints</label>
-                  <div className="space-y-1.5">
-                    {imprints.map((imprint) => (
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Imprints</label>
+                <div className="space-y-1.5">
+                  {imprints.length > 0 ? (
+                    imprints.map((imprint) => (
                       <div
                         key={imprint.id}
                         className="p-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded"
@@ -1090,10 +1097,14 @@ export default function MockupGenerator({
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    ))
+                  ) : (
+                    <div className="p-3 bg-gray-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-600 rounded text-center">
+                      <p className="text-xs text-gray-500 dark:text-gray-400">No imprints found for this quote</p>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
 
             <div className="space-y-2 mt-3 pt-3 border-t dark:border-slate-700">
