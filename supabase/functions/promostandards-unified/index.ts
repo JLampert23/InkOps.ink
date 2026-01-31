@@ -87,6 +87,8 @@ Deno.serve(async (req: Request) => {
     }
 
     const token = authHeader.replace("Bearer ", "");
+
+    // Create service role client for database operations
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
       auth: {
         autoRefreshToken: false,
@@ -95,12 +97,13 @@ Deno.serve(async (req: Request) => {
     });
 
     console.log('Validating JWT token...');
+    // Use the service role client with getUser to validate the user's JWT
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
     if (authError) {
       console.error('JWT validation error:', authError);
       return new Response(
-        JSON.stringify({ error: "Invalid JWT", details: authError.message }),
+        JSON.stringify({ code: 401, message: "Invalid JWT", details: authError.message }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -108,7 +111,7 @@ Deno.serve(async (req: Request) => {
     if (!user) {
       console.error('No user found in JWT');
       return new Response(
-        JSON.stringify({ error: "Invalid JWT - no user found" }),
+        JSON.stringify({ code: 401, message: "Invalid JWT" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
