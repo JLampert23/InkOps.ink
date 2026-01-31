@@ -1034,18 +1034,6 @@ export default function MockupGenerator({
           <div className="w-64 bg-gray-50 dark:bg-slate-900 p-3 overflow-y-auto border-l dark:border-slate-600">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Details</h3>
 
-            {/* Debug Info */}
-            {process.env.NODE_ENV === 'development' && (
-              <div className="mb-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs">
-                <div className="font-semibold text-yellow-800 dark:text-yellow-200 mb-1">Debug Info:</div>
-                <div className="text-yellow-700 dark:text-yellow-300 space-y-0.5">
-                  <div>Styles loaded: {garmentStyles.length}</div>
-                  <div>Quote ID: {quoteId || 'none'}</div>
-                  <div>Group: {groupLabel || 'none'}</div>
-                </div>
-              </div>
-            )}
-
             {/* Garment Styles Selector */}
             {garmentStyles.length > 0 && (
               <div className="mb-3">
