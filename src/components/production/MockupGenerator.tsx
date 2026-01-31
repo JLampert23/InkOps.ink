@@ -114,6 +114,7 @@ export default function MockupGenerator({
   const [activeGarmentIndex, setActiveGarmentIndex] = useState(0);
   const [imprints, setImprints] = useState<Array<{
     id: string;
+    imprint_number: string;
     location: string;
     type_of_work: string;
     details: string;
@@ -218,7 +219,7 @@ export default function MockupGenerator({
         // Load imprints for this group or quote
         let imprintsQuery = supabase
           .from('quote_imprints')
-          .select('id, location, type_of_work, details, thread_ink_color')
+          .select('id, imprint_number, location, type_of_work, details, thread_ink_color')
           .eq('quote_id', quoteId)
           .order('sort_order');
 
@@ -235,6 +236,7 @@ export default function MockupGenerator({
           console.log('MockupGenerator: Loaded imprints:', imprintsData);
           setImprints(imprintsData.map(imp => ({
             id: imp.id,
+            imprint_number: imp.imprint_number || '',
             location: imp.location || '',
             type_of_work: imp.type_of_work || '',
             details: imp.details || '',
@@ -1157,20 +1159,19 @@ export default function MockupGenerator({
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Imprints</label>
                 <div className="space-y-1.5">
                   {imprints.length > 0 ? (
-                    imprints.map((imprint) => (
+                    imprints.map((imprint, index) => (
                       <div
                         key={imprint.id}
                         className="p-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded"
                       >
                         <div className="flex items-start space-x-1.5">
-                          <ImageIcon className="w-3 h-3 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
+                          <div className="flex-shrink-0 min-w-[65px] px-2 py-0.5 flex items-center justify-center bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-[10px] font-bold">
+                            {imprint.imprint_number || `#${index + 1}`}
+                          </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-1 mb-0.5">
                               <div className="text-xs font-medium text-gray-900 dark:text-white truncate">
                                 {imprint.location || 'No location'}
-                              </div>
-                              <div className="text-[10px] text-gray-700 dark:text-gray-300 font-mono flex-shrink-0 bg-gray-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">
-                                {imprint.id.slice(0, 8)}
                               </div>
                             </div>
                             <div className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
