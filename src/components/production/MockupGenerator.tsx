@@ -721,6 +721,7 @@ export default function MockupGenerator({
       if (!user) throw new Error('Not authenticated');
 
       let compositeImageUrl: string | null = null;
+      let imprintsUpdated = false;
 
       // Capture the canvas as a composite image
       const canvas = canvasRef.current;
@@ -900,6 +901,7 @@ export default function MockupGenerator({
                 throw updateError;
               }
               console.log('MockupGenerator: Successfully added mockup to imprint');
+              imprintsUpdated = true;
             } else {
               console.log('MockupGenerator: Mockup already exists, updating proof_id');
               // Update the existing mockup entry with the new proof_id
@@ -925,24 +927,21 @@ export default function MockupGenerator({
                 throw updateError;
               }
               console.log('MockupGenerator: Successfully updated existing mockup');
+              imprintsUpdated = true;
             }
           } else {
             console.warn('MockupGenerator: Imprint not found:', imprintId);
           }
         }
-        // If we have a quoteId and groupLabel but no specific imprintId,
-        // update ALL imprints in that group with the mockup
-        else if (quoteId && quoteId.trim() && groupLabel) {
+        // If we have a quoteId but no specific imprintId,
+        // update ALL imprints in that group with the mockup (including empty string group labels)
+        else if (quoteId && quoteId.trim()) {
           console.log('MockupGenerator: Updating all imprints in group:', { quoteId, groupLabel });
           let imprintsQuery = supabase
             .from('quote_imprints')
             .select('id, mockups')
-            .eq('quote_id', quoteId);
-
-          // Filter by group label
-          if (groupLabel.trim() !== '') {
-            imprintsQuery = imprintsQuery.eq('group_label', groupLabel);
-          }
+            .eq('quote_id', quoteId)
+            .eq('group_label', groupLabel || '');
 
           const { data: imprintsToUpdate, error: imprintsError } = await imprintsQuery;
 
@@ -984,6 +983,7 @@ export default function MockupGenerator({
                   console.error('MockupGenerator: Error adding mockup to imprint:', updateError);
                   throw updateError;
                 }
+                imprintsUpdated = true;
               } else {
                 // Update the existing mockup entry with the new proof_id
                 const updatedMockups = existingMockups.map((mockup: any) => {
@@ -1008,19 +1008,23 @@ export default function MockupGenerator({
                   throw updateError;
                 }
                 console.log('MockupGenerator: Successfully updated imprint:', imprint.id);
+                imprintsUpdated = true;
               }
             }
             console.log('MockupGenerator: All group imprints updated successfully');
           } else {
             console.warn('MockupGenerator: No imprints found to update for group');
+            showNotification('warning', 'Mockup saved but not linked to any imprints', 'Create imprints first using the "+ Imprint(s)" button, then create mockups.');
           }
         } else {
-          console.warn('MockupGenerator: No compositeImageUrl or insufficient data to update imprints');
+          console.warn('MockupGenerator: Missing quoteId - cannot link mockup to imprints');
         }
       }
 
       console.log('MockupGenerator: Save completed successfully');
-      showNotification('success', 'Mockup saved successfully');
+      if (imprintsUpdated) {
+        showNotification('success', 'Mockup saved and linked to imprints');
+      }
       onSave?.();
     } catch (error: any) {
       console.error('MockupGenerator: Save error:', error);
