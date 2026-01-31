@@ -960,9 +960,9 @@ export default function MockupGenerator({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2">
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-7xl h-[95vh] flex flex-col">
-        <div className="flex items-center justify-between px-4 py-3 border-b dark:border-slate-600">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-[95vw] h-[98vh] flex flex-col">
+        <div className="flex items-center justify-between px-3 py-2 border-b dark:border-slate-600">
           <h2 className="text-lg font-bold text-gray-900 dark:text-white">Mockup Generator</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:text-gray-300 dark:hover:text-white">
             <X className="w-5 h-5" />
@@ -970,7 +970,7 @@ export default function MockupGenerator({
         </div>
 
         <div className="flex-1 flex overflow-hidden">
-          <div className="w-80 bg-gray-50 dark:bg-slate-900 p-3 overflow-y-auto border-r dark:border-slate-600 flex flex-col">
+          <div className="w-96 bg-gray-50 dark:bg-slate-900 p-2 overflow-y-auto border-r dark:border-slate-600 flex flex-col">
             <div className="space-y-3 flex-1">
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -1149,13 +1149,13 @@ export default function MockupGenerator({
                 onMouseLeave={handleCanvasMouseUp}
               />
             </div>
-            <div className="px-3 py-2 bg-white dark:bg-slate-800 border-t dark:border-slate-600 text-center text-xs text-gray-600 dark:text-gray-400">
+            <div className="px-2 py-1.5 bg-white dark:bg-slate-800 border-t dark:border-slate-600 text-center text-xs text-gray-600 dark:text-gray-400">
               <Move className="w-3 h-3 inline mr-1" />
               Drag artwork to position • Use controls to scale and rotate
             </div>
           </div>
 
-          <div className="w-80 bg-gray-50 dark:bg-slate-900 p-3 overflow-y-auto border-l dark:border-slate-600">
+          <div className="w-96 bg-gray-50 dark:bg-slate-900 p-2 overflow-y-auto border-l dark:border-slate-600">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Styles</h3>
 
             {/* Garment Styles Accordion */}
