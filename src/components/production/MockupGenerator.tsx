@@ -241,6 +241,26 @@ export default function MockupGenerator({
             details: imp.details || '',
             thread_ink_color: imp.thread_ink_color || '',
           })));
+
+          // Load artwork tagged for each imprint
+          if (customerId && imprintsData.length > 0) {
+            const artworkByImprint: Record<string, CustomerArtwork[]> = {};
+
+            for (const imprint of imprintsData) {
+              const { data: taggedArtwork } = await supabase
+                .from('customer_artwork')
+                .select('*')
+                .eq('customer_id', customerId)
+                .contains('tags', [`imprint:${imprint.id}`])
+                .order('uploaded_at', { ascending: false });
+
+              if (taggedArtwork && taggedArtwork.length > 0) {
+                artworkByImprint[imprint.id] = taggedArtwork;
+              }
+            }
+
+            setImprintArtwork(artworkByImprint);
+          }
         } else {
           console.log('MockupGenerator: No imprints found for quote:', quoteId, 'groupLabel:', groupLabel);
         }
@@ -354,7 +374,7 @@ export default function MockupGenerator({
           setWidthInches(artworkData[0].width_inches || 4);
           setHeightInches(artworkData[0].height_inches || 4);
 
-          // Load customer artwork details for thumbnails
+          // Load customer artwork details for thumbnails - merge with any tagged artwork
           const artworkIds = artworkData
             .map(a => a.customer_artwork_id)
             .filter(id => id !== null);
@@ -380,7 +400,23 @@ export default function MockupGenerator({
                   }
                 }
               });
-              setImprintArtwork(artworkByImprint);
+              setImprintArtwork(prev => {
+                // Merge with existing tagged artwork
+                const merged = { ...prev };
+                Object.keys(artworkByImprint).forEach(imprintId => {
+                  if (!merged[imprintId]) {
+                    merged[imprintId] = artworkByImprint[imprintId];
+                  } else {
+                    // Add any artwork that's not already in the list
+                    artworkByImprint[imprintId].forEach(art => {
+                      if (!merged[imprintId].find(a => a.id === art.id)) {
+                        merged[imprintId].push(art);
+                      }
+                    });
+                  }
+                });
+                return merged;
+              });
             }
           }
         }
@@ -587,6 +623,7 @@ export default function MockupGenerator({
             file_size: file.size,
             width_inches: width,
             height_inches: height,
+            tags: [`imprint:${imprintId}`],
           })
           .select()
           .single();
