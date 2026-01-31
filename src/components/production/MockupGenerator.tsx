@@ -562,28 +562,8 @@ export default function MockupGenerator({
 
         if (dbError) throw dbError;
 
-        const newArtwork: MockupArtwork = {
-          id: '',
-          customer_artwork_id: artworkRecord?.id || null,
-          artwork_url: publicUrl,
-          print_location: printLocation,
-          width_inches: width || widthInches,
-          height_inches: height || heightInches,
-          position_x: 0,
-          position_y: 0,
-          scale: 1,
-          rotation: 0,
-          file_name: file.name,
-          imprint_id: null,
-        };
-
-        setSelectedArtwork([...selectedArtwork, newArtwork]);
-        setActiveArtworkIndex(selectedArtwork.length);
-
-        if (width && height) {
-          setWidthInches(width);
-          setHeightInches(height);
-        }
+        // Don't automatically add to canvas - just store in library
+        // User can add from artwork library or imprint upload buttons
       }
 
       showNotification('success', 'Artwork uploaded successfully');
@@ -1061,34 +1041,7 @@ export default function MockupGenerator({
         <div className="flex-1 flex overflow-hidden">
           <div className="w-96 bg-gray-50 dark:bg-slate-900 p-2 overflow-y-auto border-r dark:border-slate-600 flex flex-col">
             <div className="space-y-3 flex-1">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => artworkFileInputRef.current?.click()}
-                    disabled={uploading}
-                    className="w-full flex items-center justify-center px-3 py-2 bg-blue-500 text-white rounded text-sm font-medium hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {uploading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>
-                        <Upload className="w-4 h-4 mr-1.5" />
-                        Artwork
-                      </>
-                    )}
-                  </button>
-                  <input
-                    ref={artworkFileInputRef}
-                    type="file"
-                    className="hidden"
-                    accept=".png,.jpg,.jpeg,.pdf,.eps,.ai,.svg"
-                    multiple
-                    onChange={handleFileUpload}
-                    disabled={uploading}
-                  />
-                </div>
-
+              <div className="grid grid-cols-1 gap-2">
                 <div>
                   <button
                     type="button"
@@ -1119,7 +1072,7 @@ export default function MockupGenerator({
               {selectedArtwork.length > 0 && (
                 <div>
                   <label className="block text-xs font-medium text-gray-900 dark:text-white mb-2">Transform Controls</label>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <div className="text-xs font-medium text-gray-700 dark:text-gray-300">Size</div>
                     <button
                       onClick={() => updateActiveArtwork({ scale: selectedArtwork[activeArtworkIndex].scale + 0.1 })}
@@ -1150,6 +1103,21 @@ export default function MockupGenerator({
                       title="Rotate Counter-Clockwise"
                     >
                       <RotateCcw className="w-4 h-4" />
+                    </button>
+
+                    <div className="flex-1"></div>
+                    <button
+                      onClick={() => {
+                        const updated = selectedArtwork.filter((_, i) => i !== activeArtworkIndex);
+                        setSelectedArtwork(updated);
+                        if (activeArtworkIndex >= updated.length) {
+                          setActiveArtworkIndex(Math.max(0, updated.length - 1));
+                        }
+                      }}
+                      className="w-8 h-8 flex items-center justify-center bg-red-50 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 rounded hover:bg-red-100 dark:hover:bg-red-900/50 hover:border-red-400 dark:hover:border-red-600 transition-all"
+                      title="Delete Artwork"
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
