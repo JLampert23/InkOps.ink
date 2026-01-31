@@ -833,9 +833,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
     // If SSActivewear, fetch unified product data with garment images
     if (product.supplier === 'ssactivewear' && color?.code) {
       try {
-        console.log('Fetching garment images for:', { style: product.style, partId: color.code });
         const unifiedData = await getUnifiedProductData(product.style, color.code);
-        console.log('Unified data received:', unifiedData);
 
         if (unifiedData.success && unifiedData.media?.views) {
           garmentImages.garment_front_image_url = unifiedData.media.views.front || undefined;
@@ -846,28 +844,8 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           garmentImages.garment_back_image_url = unifiedData.media.views.rear || unifiedData.media.views.back || undefined;
           garmentImages.garment_sleeve_image_url = unifiedData.media.views.side || unifiedData.media.views.left || unifiedData.media.views.right || undefined;
           garmentImages.garment_images_data = unifiedData.media.images || undefined;
-          console.log('Garment images extracted:', {
-            front: garmentImages.garment_front_image_url,
-            rear: garmentImages.garment_rear_image_url,
-            side: garmentImages.garment_side_image_url,
-            lifestyle: garmentImages.garment_lifestyle_image_url,
-          });
-        } else {
-          console.warn('No media views in unified data:', unifiedData);
         }
       } catch (error: any) {
-        console.error('Error fetching garment images:', error);
-        console.error('Error details:', {
-          message: error.message,
-          supplier: product.supplier,
-          style: product.style,
-          colorCode: color.code,
-        });
-
-        // Check if it's a credentials error
-        if (error.message?.includes('credentials not configured')) {
-          console.warn('SSActivewear credentials not configured. Garment images will not be available.');
-        }
       }
     }
 
