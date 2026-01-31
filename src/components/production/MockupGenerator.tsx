@@ -90,7 +90,6 @@ export default function MockupGenerator({
   const { showNotification } = useNotification();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [uploadingGarment, setUploadingGarment] = useState(false);
   const [companyId, setCompanyId] = useState<string>('');
 
@@ -136,7 +135,6 @@ export default function MockupGenerator({
   const [showArtworkLibrary, setShowArtworkLibrary] = useState(false);
   const [uploadingImprintId, setUploadingImprintId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const artworkFileInputRef = useRef<HTMLInputElement>(null);
   const garmentFileInputRef = useRef<HTMLInputElement>(null);
   const imprintFileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [isDragging, setIsDragging] = useState(false);
@@ -515,86 +513,6 @@ export default function MockupGenerator({
     }
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-
-    setUploading(true);
-    try {
-      for (const file of Array.from(files)) {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-        const filePath = `${companyId}/${customerId || 'general'}/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('customer-artwork')
-          .upload(filePath, file);
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('customer-artwork')
-          .getPublicUrl(filePath);
-
-        let width = null;
-        let height = null;
-
-        if (file.type.startsWith('image/')) {
-          const dimensions = await getImageDimensions(file);
-          width = dimensions.width;
-          height = dimensions.height;
-        }
-
-        const { data: artworkRecord, error: dbError } = await supabase
-          .from('customer_artwork')
-          .insert({
-            customer_id: customerId,
-            company_id: companyId,
-            file_name: file.name,
-            file_url: publicUrl,
-            file_type: file.type,
-            file_size: file.size,
-            width_inches: width,
-            height_inches: height,
-          })
-          .select()
-          .single();
-
-        if (dbError) throw dbError;
-
-        const newArtwork: MockupArtwork = {
-          id: '',
-          customer_artwork_id: artworkRecord?.id || null,
-          artwork_url: publicUrl,
-          print_location: printLocation,
-          width_inches: width || widthInches,
-          height_inches: height || heightInches,
-          position_x: 0,
-          position_y: 0,
-          scale: 1,
-          rotation: 0,
-          file_name: file.name,
-          imprint_id: null,
-        };
-
-        setSelectedArtwork([...selectedArtwork, newArtwork]);
-        setActiveArtworkIndex(selectedArtwork.length);
-
-        if (width && height) {
-          setWidthInches(width);
-          setHeightInches(height);
-        }
-      }
-
-      showNotification('success', 'Artwork uploaded successfully');
-    } catch (error: any) {
-      showNotification('error', 'Failed to upload artwork', error.message);
-    } finally {
-      setUploading(false);
-      event.target.value = '';
-    }
-  };
-
   const handleImprintArtworkUpload = async (event: React.ChangeEvent<HTMLInputElement>, imprintId: string, imprintLocation: string) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
@@ -641,33 +559,9 @@ export default function MockupGenerator({
           .single();
 
         if (dbError) throw dbError;
-
-        const newArtwork: MockupArtwork = {
-          id: '',
-          customer_artwork_id: artworkRecord?.id || null,
-          artwork_url: publicUrl,
-          print_location: imprintLocation || 'Front',
-          width_inches: width || widthInches,
-          height_inches: height || heightInches,
-          position_x: 0,
-          position_y: 0,
-          scale: 1,
-          rotation: 0,
-          file_name: file.name,
-          imprint_id: imprintId,
-        };
-
-        setSelectedArtwork([...selectedArtwork, newArtwork]);
-        setActiveArtworkIndex(selectedArtwork.length);
-        setPrintLocation(imprintLocation || 'Front');
-
-        if (width && height) {
-          setWidthInches(width);
-          setHeightInches(height);
-        }
       }
 
-      showNotification('success', `Artwork uploaded for ${imprintLocation}`);
+      showNotification('success', `Artwork uploaded to library for ${imprintLocation}. Select it from the library to add to canvas.`);
     } catch (error: any) {
       showNotification('error', 'Failed to upload artwork', error.message);
     } finally {
@@ -844,6 +738,36 @@ export default function MockupGenerator({
     setSelectedArtwork(updated);
   };
 
+  const getDeleteButtonAtPosition = (x: number, y: number): number | null => {
+    if (selectedArtwork.length === 0) return null;
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+
+    for (let index = 0; index < selectedArtwork.length; index++) {
+      const artwork = selectedArtwork[index];
+      const centerX = artwork.position_x + canvas.width / 2;
+      const centerY = artwork.position_y + canvas.height / 2;
+
+      const baseSize = 120;
+      const artworkWidth = baseSize * artwork.scale;
+      const artworkHeight = baseSize * artwork.scale;
+
+      const deleteButtonSize = 24;
+      const deleteButtonX = centerX + artworkWidth / 2 - deleteButtonSize / 2;
+      const deleteButtonY = centerY - artworkHeight / 2 - deleteButtonSize / 2;
+
+      const distance = Math.sqrt(
+        Math.pow(x - deleteButtonX, 2) + Math.pow(y - deleteButtonY, 2)
+      );
+
+      if (distance <= deleteButtonSize / 2) {
+        return index;
+      }
+    }
+
+    return null;
+  };
+
   const getHandleAtPosition = (x: number, y: number): string | null => {
     if (selectedArtwork.length === 0) return null;
     const canvas = canvasRef.current;
@@ -883,6 +807,16 @@ export default function MockupGenerator({
 
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+
+    const deleteIndex = getDeleteButtonAtPosition(x, y);
+    if (deleteIndex !== null) {
+      const updated = selectedArtwork.filter((_, i) => i !== deleteIndex);
+      setSelectedArtwork(updated);
+      if (activeArtworkIndex >= updated.length) {
+        setActiveArtworkIndex(Math.max(0, updated.length - 1));
+      }
+      return;
+    }
 
     const handle = getHandleAtPosition(x, y);
     if (handle) {
@@ -990,10 +924,10 @@ export default function MockupGenerator({
       img.crossOrigin = 'anonymous';
       img.onload = () => {
         ctx.save();
-        ctx.translate(
-          artwork.position_x + (canvasRef.current!.width / 2),
-          artwork.position_y + (canvasRef.current!.height / 2)
-        );
+        const centerX = artwork.position_x + (canvasRef.current!.width / 2);
+        const centerY = artwork.position_y + (canvasRef.current!.height / 2);
+
+        ctx.translate(centerX, centerY);
         ctx.rotate((artwork.rotation * Math.PI) / 180);
         ctx.scale(artwork.scale, artwork.scale);
 
@@ -1032,6 +966,30 @@ export default function MockupGenerator({
             ctx.stroke();
           });
         }
+
+        // Draw X button to delete artwork (top-right corner)
+        const deleteButtonSize = 24 / artwork.scale;
+        const deleteButtonX = artworkWidth / 2 - deleteButtonSize / 2;
+        const deleteButtonY = -artworkHeight / 2 - deleteButtonSize / 2;
+
+        // Draw red circle background
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(deleteButtonX, deleteButtonY, deleteButtonSize / 2, 0, 2 * Math.PI);
+        ctx.fill();
+
+        // Draw white X
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 3 / artwork.scale;
+        ctx.lineCap = 'round';
+        const crossSize = deleteButtonSize / 3;
+        ctx.beginPath();
+        ctx.moveTo(deleteButtonX - crossSize, deleteButtonY - crossSize);
+        ctx.lineTo(deleteButtonX + crossSize, deleteButtonY + crossSize);
+        ctx.moveTo(deleteButtonX + crossSize, deleteButtonY - crossSize);
+        ctx.lineTo(deleteButtonX - crossSize, deleteButtonY + crossSize);
+        ctx.stroke();
+
         ctx.restore();
       };
       img.src = artwork.artwork_url;
@@ -1061,59 +1019,30 @@ export default function MockupGenerator({
         <div className="flex-1 flex overflow-hidden">
           <div className="w-96 bg-gray-50 dark:bg-slate-900 p-2 overflow-y-auto border-r dark:border-slate-600 flex flex-col">
             <div className="space-y-3 flex-1">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => artworkFileInputRef.current?.click()}
-                    disabled={uploading}
-                    className="w-full flex items-center justify-center px-3 py-2 bg-blue-500 text-white rounded text-sm font-medium hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {uploading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>
-                        <Upload className="w-4 h-4 mr-1.5" />
-                        Artwork
-                      </>
-                    )}
-                  </button>
-                  <input
-                    ref={artworkFileInputRef}
-                    type="file"
-                    className="hidden"
-                    accept=".png,.jpg,.jpeg,.pdf,.eps,.ai,.svg"
-                    multiple
-                    onChange={handleFileUpload}
-                    disabled={uploading}
-                  />
-                </div>
-
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => garmentFileInputRef.current?.click()}
-                    disabled={uploadingGarment}
-                    className="w-full flex items-center justify-center px-3 py-2 bg-green-500 text-white rounded text-sm font-medium hover:bg-green-600 disabled:bg-green-300 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {uploadingGarment ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>
-                        <ImageIcon className="w-4 h-4 mr-1.5" />
-                        Garment
-                      </>
-                    )}
-                  </button>
-                  <input
-                    ref={garmentFileInputRef}
-                    type="file"
-                    className="hidden"
-                    accept=".png,.jpg,.jpeg"
-                    onChange={handleGarmentUpload}
-                    disabled={uploadingGarment}
-                  />
-                </div>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => garmentFileInputRef.current?.click()}
+                  disabled={uploadingGarment}
+                  className="w-full flex items-center justify-center px-3 py-2 bg-green-500 text-white rounded text-sm font-medium hover:bg-green-600 disabled:bg-green-300 disabled:cursor-not-allowed transition-colors"
+                >
+                  {uploadingGarment ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <ImageIcon className="w-4 h-4 mr-1.5" />
+                      Upload Garment Image
+                    </>
+                  )}
+                </button>
+                <input
+                  ref={garmentFileInputRef}
+                  type="file"
+                  className="hidden"
+                  accept=".png,.jpg,.jpeg"
+                  onChange={handleGarmentUpload}
+                  disabled={uploadingGarment}
+                />
               </div>
 
               {selectedArtwork.length > 0 && (
