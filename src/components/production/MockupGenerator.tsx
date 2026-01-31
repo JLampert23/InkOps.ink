@@ -134,6 +134,7 @@ export default function MockupGenerator({
 
   const [showArtworkLibrary, setShowArtworkLibrary] = useState(false);
   const [uploadingImprintId, setUploadingImprintId] = useState<string | null>(null);
+  const [imprintArtwork, setImprintArtwork] = useState<Record<string, CustomerArtwork[]>>({});
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const garmentFileInputRef = useRef<HTMLInputElement>(null);
   const imprintFileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -352,6 +353,36 @@ export default function MockupGenerator({
           setPrintLocation(artworkData[0].print_location || 'Front');
           setWidthInches(artworkData[0].width_inches || 4);
           setHeightInches(artworkData[0].height_inches || 4);
+
+          // Load customer artwork details for thumbnails
+          const artworkIds = artworkData
+            .map(a => a.customer_artwork_id)
+            .filter(id => id !== null);
+
+          if (artworkIds.length > 0) {
+            const { data: customerArtworkData } = await supabase
+              .from('customer_artwork')
+              .select('*')
+              .in('id', artworkIds);
+
+            if (customerArtworkData) {
+              const artworkByImprint: Record<string, CustomerArtwork[]> = {};
+              artworkData.forEach(a => {
+                if (a.imprint_id && a.customer_artwork_id) {
+                  const customerArt = customerArtworkData.find(ca => ca.id === a.customer_artwork_id);
+                  if (customerArt) {
+                    if (!artworkByImprint[a.imprint_id]) {
+                      artworkByImprint[a.imprint_id] = [];
+                    }
+                    if (!artworkByImprint[a.imprint_id].find(art => art.id === customerArt.id)) {
+                      artworkByImprint[a.imprint_id].push(customerArt);
+                    }
+                  }
+                }
+              });
+              setImprintArtwork(artworkByImprint);
+            }
+          }
         }
 
         // Check if proof has garment image, if not, fetch it
@@ -519,6 +550,8 @@ export default function MockupGenerator({
 
     setUploadingImprintId(imprintId);
     try {
+      const uploadedArtwork: CustomerArtwork[] = [];
+
       for (const file of Array.from(files)) {
         const fileExt = file.name.split('.').pop();
         const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
@@ -559,9 +592,19 @@ export default function MockupGenerator({
           .single();
 
         if (dbError) throw dbError;
+
+        if (artworkRecord) {
+          uploadedArtwork.push(artworkRecord);
+        }
       }
 
-      showNotification('success', `Artwork uploaded to library for ${imprintLocation}. Select it from the library to add to canvas.`);
+      // Add uploaded artwork to the imprint artwork state
+      setImprintArtwork(prev => ({
+        ...prev,
+        [imprintId]: [...(prev[imprintId] || []), ...uploadedArtwork],
+      }));
+
+      showNotification('success', `Artwork uploaded for ${imprintLocation}. Click to add to canvas.`);
     } catch (error: any) {
       showNotification('error', 'Failed to upload artwork', error.message);
     } finally {
@@ -1144,52 +1187,66 @@ export default function MockupGenerator({
                           </button>
                         </div>
 
-                        {/* Show thumbnails of artwork for this imprint */}
-                        {selectedArtwork.filter(a => a.imprint_id === imprint.id).length > 0 && (
+                        {/* Show thumbnails of uploaded artwork for this imprint */}
+                        {imprintArtwork[imprint.id] && imprintArtwork[imprint.id].length > 0 && (
                           <div className="mt-2 pt-2 border-t border-gray-200 dark:border-slate-700">
                             <div className="text-[10px] text-gray-600 dark:text-gray-400 mb-1.5 font-medium">
-                              Artwork ({selectedArtwork.filter(a => a.imprint_id === imprint.id).length})
+                              Uploaded Artwork ({imprintArtwork[imprint.id].length})
                             </div>
                             <div className="flex flex-wrap gap-1.5">
-                              {selectedArtwork
-                                .map((artwork, idx) => ({ artwork, originalIndex: idx }))
-                                .filter(({ artwork }) => artwork.imprint_id === imprint.id)
-                                .map(({ artwork, originalIndex }) => (
+                              {imprintArtwork[imprint.id].map((artwork) => (
+                                <div
+                                  key={artwork.id}
+                                  className="relative group"
+                                >
                                   <div
-                                    key={originalIndex}
-                                    className="relative group"
+                                    onClick={() => {
+                                      // Add artwork to canvas
+                                      const newArtwork: MockupArtwork = {
+                                        id: '',
+                                        customer_artwork_id: artwork.id,
+                                        artwork_url: artwork.file_url,
+                                        print_location: imprint.location || 'Front',
+                                        width_inches: artwork.width_inches || widthInches,
+                                        height_inches: artwork.height_inches || heightInches,
+                                        position_x: 0,
+                                        position_y: 0,
+                                        scale: 1,
+                                        rotation: 0,
+                                        file_name: artwork.file_name,
+                                        imprint_id: imprint.id,
+                                      };
+                                      setSelectedArtwork([...selectedArtwork, newArtwork]);
+                                      setActiveArtworkIndex(selectedArtwork.length);
+                                      setPrintLocation(imprint.location || 'Front');
+                                      showNotification('success', 'Artwork added to canvas');
+                                    }}
+                                    className="relative w-12 h-12 bg-gray-100 dark:bg-slate-700 rounded border-2 overflow-hidden cursor-pointer transition-all hover:scale-105 border-gray-300 dark:border-slate-600 hover:border-blue-500"
+                                    title={`Click to add ${artwork.file_name} to canvas`}
                                   >
-                                    <div
-                                      onClick={() => setActiveArtworkIndex(originalIndex)}
-                                      className={`relative w-12 h-12 bg-gray-100 dark:bg-slate-700 rounded border-2 overflow-hidden cursor-pointer transition-all hover:scale-105 ${
-                                        activeArtworkIndex === originalIndex
-                                          ? 'border-blue-500 ring-1 ring-blue-300'
-                                          : 'border-gray-300 dark:border-slate-600'
-                                      }`}
-                                      title={artwork.file_name || 'Artwork'}
-                                    >
-                                      <img
-                                        src={artwork.artwork_url}
-                                        alt={artwork.file_name}
-                                        className="w-full h-full object-contain"
-                                      />
-                                    </div>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        const updated = selectedArtwork.filter((_, i) => i !== originalIndex);
-                                        setSelectedArtwork(updated);
-                                        if (activeArtworkIndex >= updated.length) {
-                                          setActiveArtworkIndex(Math.max(0, updated.length - 1));
-                                        }
-                                      }}
-                                      className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                                      title="Remove artwork"
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </button>
+                                    <img
+                                      src={artwork.file_url}
+                                      alt={artwork.file_name}
+                                      className="w-full h-full object-contain"
+                                    />
                                   </div>
-                                ))}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (confirm('Remove this artwork from the list?')) {
+                                        setImprintArtwork(prev => ({
+                                          ...prev,
+                                          [imprint.id]: prev[imprint.id].filter(a => a.id !== artwork.id),
+                                        }));
+                                      }
+                                    }}
+                                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                                    title="Remove from list"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         )}
