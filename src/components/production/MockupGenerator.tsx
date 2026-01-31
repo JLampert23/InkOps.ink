@@ -126,6 +126,8 @@ export default function MockupGenerator({
 
   const [showArtworkLibrary, setShowArtworkLibrary] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const artworkFileInputRef = useRef<HTMLInputElement>(null);
+  const garmentFileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [resizeHandle, setResizeHandle] = useState<string | null>(null);
@@ -935,8 +937,10 @@ export default function MockupGenerator({
           <div className="w-64 bg-gray-50 dark:bg-slate-900 p-3 overflow-y-auto border-r dark:border-slate-600">
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-2">
-                <label className="relative">
+                <div>
                   <button
+                    type="button"
+                    onClick={() => artworkFileInputRef.current?.click()}
                     disabled={uploading}
                     className="w-full flex items-center justify-center px-3 py-2 bg-blue-500 text-white rounded text-sm font-medium hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors"
                   >
@@ -950,6 +954,7 @@ export default function MockupGenerator({
                     )}
                   </button>
                   <input
+                    ref={artworkFileInputRef}
                     type="file"
                     className="hidden"
                     accept=".png,.jpg,.jpeg,.pdf,.eps,.ai,.svg"
@@ -957,10 +962,12 @@ export default function MockupGenerator({
                     onChange={handleFileUpload}
                     disabled={uploading}
                   />
-                </label>
+                </div>
 
-                <label className="relative">
+                <div>
                   <button
+                    type="button"
+                    onClick={() => garmentFileInputRef.current?.click()}
                     disabled={uploadingGarment}
                     className="w-full flex items-center justify-center px-3 py-2 bg-green-500 text-white rounded text-sm font-medium hover:bg-green-600 disabled:bg-green-300 disabled:cursor-not-allowed transition-colors"
                   >
@@ -974,13 +981,14 @@ export default function MockupGenerator({
                     )}
                   </button>
                   <input
+                    ref={garmentFileInputRef}
                     type="file"
                     className="hidden"
                     accept=".png,.jpg,.jpeg"
                     onChange={handleGarmentUpload}
                     disabled={uploadingGarment}
                   />
-                </label>
+                </div>
               </div>
 
               <button
@@ -989,6 +997,24 @@ export default function MockupGenerator({
               >
                 <Folder className="w-3 h-3 mr-1" />
                 View All Customer Artwork
+              </button>
+
+              <button
+                onClick={handleSave}
+                disabled={saving || selectedArtwork.length === 0}
+                className="w-full flex items-center justify-center px-3 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5 mr-2" />
+                    Save Proof
+                  </>
+                )}
               </button>
 
               {selectedArtwork.length > 0 && (
@@ -1069,24 +1095,6 @@ export default function MockupGenerator({
                   </div>
                 </div>
               )}
-
-              <button
-                onClick={handleSave}
-                disabled={saving || selectedArtwork.length === 0}
-                className="w-full flex items-center justify-center px-3 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed"
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-5 h-5 mr-2" />
-                    Save Proof
-                  </>
-                )}
-              </button>
             </div>
           </div>
 
