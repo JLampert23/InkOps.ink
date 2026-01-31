@@ -970,7 +970,7 @@ export default function MockupGenerator({
         </div>
 
         <div className="flex-1 flex overflow-hidden">
-          <div className="w-64 bg-gray-50 dark:bg-slate-900 p-3 overflow-y-auto border-r dark:border-slate-600 flex flex-col">
+          <div className="w-80 bg-gray-50 dark:bg-slate-900 p-3 overflow-y-auto border-r dark:border-slate-600 flex flex-col">
             <div className="space-y-3 flex-1">
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -1137,7 +1137,7 @@ export default function MockupGenerator({
           </div>
 
           <div className="flex-1 flex flex-col bg-gray-100 dark:bg-slate-950">
-            <div className="flex-1 flex items-center justify-center p-4">
+            <div className="flex-1 flex items-center justify-center">
               <canvas
                 ref={canvasRef}
                 width={600}
@@ -1155,7 +1155,7 @@ export default function MockupGenerator({
             </div>
           </div>
 
-          <div className="w-64 bg-gray-50 dark:bg-slate-900 p-3 overflow-y-auto border-l dark:border-slate-600">
+          <div className="w-80 bg-gray-50 dark:bg-slate-900 p-3 overflow-y-auto border-l dark:border-slate-600">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Styles</h3>
 
             {/* Garment Styles Accordion */}
