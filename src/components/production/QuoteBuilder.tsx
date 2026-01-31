@@ -1740,7 +1740,13 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                                 Line Item Options
                               </button>
                               <button
-                                onClick={() => setShowMockupForGroup(group.label)}
+                                onClick={() => {
+                                  if (!quoteId) {
+                                    showNotification('warning', 'Please save the quote first before creating mockups');
+                                    return;
+                                  }
+                                  setShowMockupForGroup(group.label);
+                                }}
                                 className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2 shadow-sm"
                               >
                                 <Plus className="w-4 h-4" />
@@ -2012,22 +2018,18 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         const firstItem = mockupGroup.items[0];
 
         return (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-7xl max-h-[95vh] overflow-hidden">
-              <MockupGenerator
-                quoteId={quoteId}
-                customerId={selectedCustomerId}
-                garmentStyle={firstItem.item_number}
-                garmentColor={firstItem.color}
-                groupLabel={showMockupForGroup}
-                onClose={() => setShowMockupForGroup(null)}
-                onSave={() => {
-                  setShowMockupForGroup(null);
-                  showNotification('success', 'Mockup saved successfully!');
-                }}
-              />
-            </div>
-          </div>
+          <MockupGenerator
+            quoteId={quoteId}
+            customerId={selectedCustomerId}
+            garmentStyle={firstItem.item_number}
+            garmentColor={firstItem.color}
+            groupLabel={showMockupForGroup}
+            onClose={() => setShowMockupForGroup(null)}
+            onSave={() => {
+              setShowMockupForGroup(null);
+              showNotification('success', 'Mockup saved successfully!');
+            }}
+          />
         );
       })()}
 
