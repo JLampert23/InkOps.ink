@@ -2015,16 +2015,16 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       {/* Mockup Generator Modal */}
       {showMockupForGroup && (() => {
         const mockupGroup = itemGroups.find(g => g.label === showMockupForGroup);
-        if (!mockupGroup || mockupGroup.items.length === 0) return null;
+        if (!mockupGroup) return null;
 
-        const firstItem = mockupGroup.items[0];
+        const firstItem = mockupGroup.items.length > 0 ? mockupGroup.items[0] : null;
 
         return (
           <MockupGenerator
             quoteId={quoteId}
             customerId={selectedCustomerId}
-            garmentStyle={firstItem.item_number}
-            garmentColor={firstItem.color}
+            garmentStyle={firstItem?.item_number || ''}
+            garmentColor={firstItem?.color || ''}
             groupLabel={showMockupForGroup}
             onClose={() => setShowMockupForGroup(null)}
             onSave={() => {
