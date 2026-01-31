@@ -795,6 +795,15 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
 
       {mockupImprintIndex !== null && quoteId && (() => {
         const currentImprint = imprints[mockupImprintIndex];
+
+        // Validate that the imprint exists
+        if (!currentImprint) {
+          console.error('Cannot open MockupGenerator: Invalid imprint index');
+          showNotification('error', 'Missing Data', 'Selected imprint not found');
+          setMockupImprintIndex(null);
+          return null;
+        }
+
         const groupLabel = currentImprint.group_label || '';
 
         // Try to find line item by group_label, fallback to first line item if not found
