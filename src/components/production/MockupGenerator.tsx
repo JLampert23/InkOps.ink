@@ -94,6 +94,7 @@ export default function MockupGenerator({
   const [companyId, setCompanyId] = useState<string>('');
 
   const [proofId, setProofId] = useState<string | null>(null);
+  const [imprintNumber, setImprintNumber] = useState<string | null>(null);
   const [garmentImageUrl, setGarmentImageUrl] = useState<string | null>(null);
   const [garmentBrand, setGarmentBrand] = useState<string>('');
   const [garmentDescription, setGarmentDescription] = useState<string>('');
@@ -241,6 +242,14 @@ export default function MockupGenerator({
             details: imp.details || '',
             thread_ink_color: imp.thread_ink_color || '',
           })));
+
+          // If imprintId is provided, find and set the imprint number
+          if (imprintId) {
+            const matchingImprint = imprintsData.find(imp => imp.id === imprintId);
+            if (matchingImprint) {
+              setImprintNumber(matchingImprint.imprint_number || null);
+            }
+          }
 
           // Load artwork tagged for each imprint
           if (customerId && imprintsData.length > 0) {
@@ -1316,7 +1325,14 @@ export default function MockupGenerator({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-[95vw] h-[98vh] flex flex-col">
         <div className="flex items-center justify-between px-3 py-2 border-b dark:border-slate-600">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Mockup Generator</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Mockup Generator</h2>
+            {imprintNumber && (
+              <span className="text-xs px-2 py-1 bg-blue-600 text-white rounded font-mono">
+                #{imprintNumber}
+              </span>
+            )}
+          </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:text-gray-300 dark:hover:text-white">
             <X className="w-5 h-5" />
           </button>
