@@ -16,6 +16,8 @@ import {
   Trash2,
   Download,
   Loader2,
+  Plus,
+  Minus,
 } from 'lucide-react';
 
 interface MockupGeneratorProps {
@@ -88,6 +90,7 @@ export default function MockupGenerator({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingGarment, setUploadingGarment] = useState(false);
   const [companyId, setCompanyId] = useState<string>('');
 
   const [proofId, setProofId] = useState<string | null>(null);
@@ -547,6 +550,36 @@ export default function MockupGenerator({
     }
   };
 
+  const handleGarmentUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploadingGarment(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `garment_${Date.now()}.${fileExt}`;
+      const filePath = `${companyId}/garments/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('customer-artwork')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('customer-artwork')
+        .getPublicUrl(filePath);
+
+      setGarmentImageUrl(publicUrl);
+      showNotification('success', 'Garment image uploaded successfully');
+    } catch (error: any) {
+      showNotification('error', 'Failed to upload garment image', error.message);
+    } finally {
+      setUploadingGarment(false);
+      event.target.value = '';
+    }
+  };
+
   const getImageDimensions = (file: File): Promise<{ width: number; height: number }> => {
     return new Promise((resolve) => {
       const img = new Image();
@@ -699,7 +732,7 @@ export default function MockupGenerator({
     const artworkWidth = baseSize * artwork.scale;
     const artworkHeight = baseSize * artwork.scale;
 
-    const handleSize = 10;
+    const handleSize = 20; // Increased from 10 to 20 for better responsiveness
     const handles = [
       { name: 'nw', x: centerX - artworkWidth / 2, y: centerY - artworkHeight / 2 },
       { name: 'ne', x: centerX + artworkWidth / 2, y: centerY - artworkHeight / 2 },
@@ -848,11 +881,11 @@ export default function MockupGenerator({
         if (index === activeArtworkIndex) {
           // Draw selection box
           ctx.strokeStyle = '#3b82f6';
-          ctx.lineWidth = 2;
+          ctx.lineWidth = 3;
           ctx.strokeRect(-artworkWidth / 2, -artworkHeight / 2, artworkWidth, artworkHeight);
 
-          // Draw resize handles
-          const handleSize = 10 / artwork.scale; // Scale handle size inversely
+          // Draw resize handles - larger and more visible
+          const handleSize = 16 / artwork.scale; // Increased from 10 to 16
           const handles = [
             { x: -artworkWidth / 2, y: -artworkHeight / 2 }, // nw
             { x: artworkWidth / 2, y: -artworkHeight / 2 },  // ne
@@ -862,21 +895,14 @@ export default function MockupGenerator({
 
           ctx.fillStyle = '#3b82f6';
           ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 2 / artwork.scale;
+          ctx.lineWidth = 3 / artwork.scale;
 
           handles.forEach(handle => {
-            ctx.fillRect(
-              handle.x - handleSize / 2,
-              handle.y - handleSize / 2,
-              handleSize,
-              handleSize
-            );
-            ctx.strokeRect(
-              handle.x - handleSize / 2,
-              handle.y - handleSize / 2,
-              handleSize,
-              handleSize
-            );
+            // Draw circle handles instead of squares for better visibility
+            ctx.beginPath();
+            ctx.arc(handle.x, handle.y, handleSize / 2, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.stroke();
           });
         }
         ctx.restore();
@@ -908,12 +934,21 @@ export default function MockupGenerator({
         <div className="flex-1 flex overflow-hidden">
           <div className="w-64 bg-gray-50 dark:bg-slate-900 p-3 overflow-y-auto border-r dark:border-slate-600">
             <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Upload Artwork</label>
-                <label className="flex flex-col items-center px-3 py-3 bg-white dark:bg-slate-800 border-2 border-dashed border-gray-300 dark:border-slate-600 rounded cursor-pointer hover:border-blue-500">
-                  <Upload className="w-6 h-6 text-gray-400 dark:text-gray-500" />
-                  <span className="mt-1 text-xs text-gray-600 dark:text-gray-400">Click to upload</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-500">PNG, JPG, PDF, EPS, AI, SVG</span>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="relative">
+                  <button
+                    disabled={uploading}
+                    className="w-full flex items-center justify-center px-3 py-2 bg-blue-500 text-white rounded text-sm font-medium hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {uploading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4 mr-1.5" />
+                        Artwork
+                      </>
+                    )}
+                  </button>
                   <input
                     type="file"
                     className="hidden"
@@ -923,12 +958,29 @@ export default function MockupGenerator({
                     disabled={uploading}
                   />
                 </label>
-                {uploading && (
-                  <div className="mt-1 flex items-center text-xs text-blue-600">
-                    <Loader2 className="w-3 h-3 animate-spin mr-1" />
-                    Uploading...
-                  </div>
-                )}
+
+                <label className="relative">
+                  <button
+                    disabled={uploadingGarment}
+                    className="w-full flex items-center justify-center px-3 py-2 bg-green-500 text-white rounded text-sm font-medium hover:bg-green-600 disabled:bg-green-300 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {uploadingGarment ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <ImageIcon className="w-4 h-4 mr-1.5" />
+                        Garment
+                      </>
+                    )}
+                  </button>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept=".png,.jpg,.jpeg"
+                    onChange={handleGarmentUpload}
+                    disabled={uploadingGarment}
+                  />
+                </label>
               </div>
 
               <button
@@ -981,49 +1033,41 @@ export default function MockupGenerator({
 
               {selectedArtwork.length > 0 && (
                 <div>
-                  <label className="block text-xs font-medium text-gray-900 dark:text-white mb-1">Transform Controls</label>
+                  <label className="block text-xs font-medium text-gray-900 dark:text-white mb-2">Transform Controls</label>
                   <div className="space-y-2">
-                    <div>
-                      <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Size</div>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <button
-                          onClick={() => updateActiveArtwork({ scale: selectedArtwork[activeArtworkIndex].scale + 0.1 })}
-                          className="flex items-center justify-center gap-1 px-2 py-1.5 bg-blue-50 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 rounded text-xs hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:border-blue-400 dark:hover:border-blue-600 transition-all font-medium"
-                          title="Increase Size"
-                        >
-                          <ZoomIn className="w-3 h-3" />
-                          <span>Larger</span>
-                        </button>
-                        <button
-                          onClick={() => updateActiveArtwork({ scale: Math.max(0.1, selectedArtwork[activeArtworkIndex].scale - 0.1) })}
-                          className="flex items-center justify-center gap-1 px-2 py-1.5 bg-blue-50 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 rounded text-xs hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:border-blue-400 dark:hover:border-blue-600 transition-all font-medium"
-                          title="Decrease Size"
-                        >
-                          <ZoomOut className="w-3 h-3" />
-                          <span>Smaller</span>
-                        </button>
-                      </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="text-xs font-medium text-gray-700 dark:text-gray-300 w-16">Size</div>
+                      <button
+                        onClick={() => updateActiveArtwork({ scale: selectedArtwork[activeArtworkIndex].scale + 0.1 })}
+                        className="w-8 h-8 flex items-center justify-center bg-blue-50 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:border-blue-400 dark:hover:border-blue-600 transition-all"
+                        title="Increase Size"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => updateActiveArtwork({ scale: Math.max(0.1, selectedArtwork[activeArtworkIndex].scale - 0.1) })}
+                        className="w-8 h-8 flex items-center justify-center bg-blue-50 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:border-blue-400 dark:hover:border-blue-600 transition-all"
+                        title="Decrease Size"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
                     </div>
-                    <div>
-                      <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Rotation</div>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <button
-                          onClick={() => updateActiveArtwork({ rotation: (selectedArtwork[activeArtworkIndex].rotation + 15) % 360 })}
-                          className="flex items-center justify-center gap-1 px-2 py-1.5 bg-green-50 dark:bg-green-900/30 border border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 rounded text-xs hover:bg-green-100 dark:hover:bg-green-900/50 hover:border-green-400 dark:hover:border-green-600 transition-all font-medium"
-                          title="Rotate Clockwise"
-                        >
-                          <RotateCw className="w-3 h-3" />
-                          <span>Right</span>
-                        </button>
-                        <button
-                          onClick={() => updateActiveArtwork({ rotation: (selectedArtwork[activeArtworkIndex].rotation - 15 + 360) % 360 })}
-                          className="flex items-center justify-center gap-1 px-2 py-1.5 bg-green-50 dark:bg-green-900/30 border border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 rounded text-xs hover:bg-green-100 dark:hover:bg-green-900/50 hover:border-green-400 dark:hover:border-green-600 transition-all font-medium"
-                          title="Rotate Counter-Clockwise"
-                        >
-                          <RotateCcw className="w-3 h-3" />
-                          <span>Left</span>
-                        </button>
-                      </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="text-xs font-medium text-gray-700 dark:text-gray-300 w-16">Rotation</div>
+                      <button
+                        onClick={() => updateActiveArtwork({ rotation: (selectedArtwork[activeArtworkIndex].rotation + 15) % 360 })}
+                        className="w-8 h-8 flex items-center justify-center bg-green-50 dark:bg-green-900/30 border border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 rounded hover:bg-green-100 dark:hover:bg-green-900/50 hover:border-green-400 dark:hover:border-green-600 transition-all"
+                        title="Rotate Clockwise"
+                      >
+                        <RotateCw className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => updateActiveArtwork({ rotation: (selectedArtwork[activeArtworkIndex].rotation - 15 + 360) % 360 })}
+                        className="w-8 h-8 flex items-center justify-center bg-green-50 dark:bg-green-900/30 border border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 rounded hover:bg-green-100 dark:hover:bg-green-900/50 hover:border-green-400 dark:hover:border-green-600 transition-all"
+                        title="Rotate Counter-Clockwise"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 </div>
