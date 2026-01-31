@@ -1159,37 +1159,6 @@ export default function MockupGenerator({
             )}
 
             <div className="space-y-3 text-xs">
-              {/* Garment Information */}
-              <div className="bg-white dark:bg-slate-800 rounded-lg p-2 border border-gray-200 dark:border-slate-700">
-                <h4 className="text-xs font-semibold text-gray-900 dark:text-white mb-1.5">Garment</h4>
-                <div className="space-y-1">
-                  {garmentBrand && (
-                    <div>
-                      <span className="font-medium text-gray-700 dark:text-gray-300">Brand:</span>
-                      <span className="ml-1 text-gray-600 dark:text-gray-400">{garmentBrand}</span>
-                    </div>
-                  )}
-                  {garmentStyle && (
-                    <div>
-                      <span className="font-medium text-gray-700 dark:text-gray-300">Style:</span>
-                      <span className="ml-1 text-gray-600 dark:text-gray-400">{garmentStyle}</span>
-                    </div>
-                  )}
-                  {garmentColor && (
-                    <div>
-                      <span className="font-medium text-gray-700 dark:text-gray-300">Color:</span>
-                      <span className="ml-1 text-gray-600 dark:text-gray-400">{garmentColor}</span>
-                    </div>
-                  )}
-                  {garmentDescription && (
-                    <div>
-                      <span className="font-medium text-gray-700 dark:text-gray-300">Description:</span>
-                      <p className="mt-0.5 text-gray-600 dark:text-gray-400 text-xs leading-relaxed">{garmentDescription}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
               {/* Print Location */}
               {printLocation && (
                 <div className="bg-white dark:bg-slate-800 rounded-lg p-2 border border-gray-200 dark:border-slate-700">
