@@ -1152,28 +1152,30 @@ export default function MockupGenerator({
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Imprints</label>
                 <div className="space-y-1.5">
                   {imprints.length > 0 ? (
-                    imprints.map((imprint) => (
+                    imprints.map((imprint, index) => (
                       <div
                         key={imprint.id}
-                        className="p-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded"
+                        className="p-3 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded"
                       >
-                        <div className="flex items-start space-x-1.5">
-                          <ImageIcon className="w-3 h-3 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
+                        <div className="flex items-start space-x-2">
+                          <div className="flex items-center justify-center w-6 h-6 bg-blue-500 text-white rounded-full text-xs font-bold flex-shrink-0">
+                            {index + 1}
+                          </div>
                           <div className="flex-1 min-w-0">
-                            <div className="text-xs font-medium text-gray-900 dark:text-white truncate">
+                            <div className="text-sm font-bold text-gray-900 dark:text-white truncate">
                               {imprint.location || 'No location'}
                             </div>
-                            <div className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                            <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mt-1">
                               {imprint.type_of_work}
                             </div>
                             {imprint.details && (
-                              <div className="text-xs text-gray-500 dark:text-gray-500 mt-0.5 line-clamp-2">
+                              <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
                                 {imprint.details}
                               </div>
                             )}
                             {imprint.thread_ink_color && (
-                              <div className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
-                                {imprint.thread_ink_color}
+                              <div className="text-xs font-semibold text-blue-600 dark:text-blue-400 mt-1">
+                                Colors: {imprint.thread_ink_color}
                               </div>
                             )}
                           </div>
