@@ -705,6 +705,16 @@ export default function MockupGenerator({
       return;
     }
 
+    console.log('MockupGenerator: Starting save...', {
+      quoteId,
+      lineItemId,
+      imprintId,
+      groupLabel,
+      customerId,
+      companyId,
+      artworkCount: selectedArtwork.length,
+    });
+
     setSaving(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -715,11 +725,13 @@ export default function MockupGenerator({
       // Capture the canvas as a composite image
       const canvas = canvasRef.current;
       if (canvas) {
+        console.log('MockupGenerator: Capturing canvas...');
         const blob = await new Promise<Blob | null>((resolve) => {
           canvas.toBlob((blob) => resolve(blob), 'image/png', 0.9);
         });
 
         if (blob) {
+          console.log('MockupGenerator: Canvas captured, uploading to storage...');
           const fileName = `proof_${Date.now()}_${Math.random().toString(36).substring(7)}.png`;
           const filePath = `${companyId}/proofs/${fileName}`;
 
@@ -730,18 +742,27 @@ export default function MockupGenerator({
               upsert: false,
             });
 
+          if (uploadError) {
+            console.error('MockupGenerator: Storage upload error:', uploadError);
+            throw new Error(`Storage upload failed: ${uploadError.message}`);
+          }
+
           if (!uploadError) {
             const { data: { publicUrl } } = supabase.storage
               .from('imprint-proofs')
               .getPublicUrl(filePath);
             compositeImageUrl = publicUrl;
+            console.log('MockupGenerator: Image uploaded successfully:', compositeImageUrl);
           }
+        } else {
+          console.warn('MockupGenerator: Failed to capture canvas blob');
         }
       }
 
       let currentProofId = proofId;
 
       if (!currentProofId) {
+        console.log('MockupGenerator: Creating new proof record...');
         const { data: newProof, error: proofError } = await supabase
           .from('proofs')
           .insert({
@@ -764,13 +785,15 @@ export default function MockupGenerator({
           .single();
 
         if (proofError) {
+          console.error('MockupGenerator: Proof creation error:', proofError);
           throw proofError;
         }
         currentProofId = newProof.id;
         setProofId(currentProofId);
+        console.log('MockupGenerator: Proof created:', currentProofId);
       } else {
-        // Update existing proof with composite image and colors
-        await supabase
+        console.log('MockupGenerator: Updating existing proof:', currentProofId);
+        const { error: updateError } = await supabase
           .from('proofs')
           .update({
             composite_image_url: compositeImageUrl,
@@ -778,16 +801,27 @@ export default function MockupGenerator({
             selected_colors: selectedColors,
           })
           .eq('id', currentProofId);
+
+        if (updateError) {
+          console.error('MockupGenerator: Proof update error:', updateError);
+          throw updateError;
+        }
+        console.log('MockupGenerator: Proof updated successfully');
       }
 
-      await supabase
+      console.log('MockupGenerator: Saving proof artwork...');
+      const { error: deleteError } = await supabase
         .from('proof_artwork')
         .delete()
         .eq('proof_id', currentProofId);
 
+      if (deleteError) {
+        console.error('MockupGenerator: Error deleting old artwork:', deleteError);
+      }
+
       for (let i = 0; i < selectedArtwork.length; i++) {
         const artwork = selectedArtwork[i];
-        await supabase
+        const { error: insertError } = await supabase
           .from('proof_artwork')
           .insert({
             proof_id: currentProofId,
@@ -805,19 +839,39 @@ export default function MockupGenerator({
             sort_order: i,
             imprint_id: artwork.imprint_id || null,
           });
+
+        if (insertError) {
+          console.error('MockupGenerator: Error inserting artwork:', insertError);
+          throw insertError;
+        }
       }
+      console.log('MockupGenerator: Proof artwork saved successfully');
 
       // Update the corresponding quote_imprint(s) with the composite image thumbnail
       if (compositeImageUrl) {
+        console.log('MockupGenerator: Updating quote_imprints with mockup...', {
+          compositeImageUrl,
+          imprintId,
+          quoteId,
+          groupLabel,
+        });
+
         // If we have a specific imprintId, update just that imprint
         if (imprintId && imprintId.trim()) {
-          const { data: existingImprint } = await supabase
+          console.log('MockupGenerator: Updating specific imprint:', imprintId);
+          const { data: existingImprint, error: fetchError } = await supabase
             .from('quote_imprints')
             .select('mockups')
             .eq('id', imprintId)
             .maybeSingle();
 
+          if (fetchError) {
+            console.error('MockupGenerator: Error fetching imprint:', fetchError);
+            throw fetchError;
+          }
+
           if (existingImprint) {
+            console.log('MockupGenerator: Found existing imprint, current mockups:', existingImprint.mockups);
             const existingMockups = existingImprint.mockups || [];
 
             // Check if this composite image is already in the mockups array
@@ -836,11 +890,18 @@ export default function MockupGenerator({
                 }
               ];
 
-              await supabase
+              const { error: updateError } = await supabase
                 .from('quote_imprints')
                 .update({ mockups: updatedMockups })
                 .eq('id', imprintId);
+
+              if (updateError) {
+                console.error('MockupGenerator: Error updating imprint with new mockup:', updateError);
+                throw updateError;
+              }
+              console.log('MockupGenerator: Successfully added mockup to imprint');
             } else {
+              console.log('MockupGenerator: Mockup already exists, updating proof_id');
               // Update the existing mockup entry with the new proof_id
               const updatedMockups = existingMockups.map((mockup: any) => {
                 const mockupUrl = typeof mockup === 'string' ? mockup : mockup?.url;
@@ -854,16 +915,25 @@ export default function MockupGenerator({
                 return mockup;
               });
 
-              await supabase
+              const { error: updateError } = await supabase
                 .from('quote_imprints')
                 .update({ mockups: updatedMockups })
                 .eq('id', imprintId);
+
+              if (updateError) {
+                console.error('MockupGenerator: Error updating existing mockup:', updateError);
+                throw updateError;
+              }
+              console.log('MockupGenerator: Successfully updated existing mockup');
             }
+          } else {
+            console.warn('MockupGenerator: Imprint not found:', imprintId);
           }
         }
         // If we have a quoteId and groupLabel but no specific imprintId,
         // update ALL imprints in that group with the mockup
         else if (quoteId && quoteId.trim() && groupLabel) {
+          console.log('MockupGenerator: Updating all imprints in group:', { quoteId, groupLabel });
           let imprintsQuery = supabase
             .from('quote_imprints')
             .select('id, mockups')
@@ -876,9 +946,17 @@ export default function MockupGenerator({
 
           const { data: imprintsToUpdate, error: imprintsError } = await imprintsQuery;
 
+          if (imprintsError) {
+            console.error('MockupGenerator: Error fetching imprints for group:', imprintsError);
+            throw imprintsError;
+          }
+
+          console.log('MockupGenerator: Found imprints to update:', imprintsToUpdate?.length);
+
           if (!imprintsError && imprintsToUpdate && imprintsToUpdate.length > 0) {
             // Update each imprint with the mockup
             for (const imprint of imprintsToUpdate) {
+              console.log('MockupGenerator: Updating imprint:', imprint.id);
               const existingMockups = imprint.mockups || [];
 
               // Check if this composite image is already in the mockups array
@@ -897,10 +975,15 @@ export default function MockupGenerator({
                   }
                 ];
 
-                await supabase
+                const { error: updateError } = await supabase
                   .from('quote_imprints')
                   .update({ mockups: updatedMockups })
                   .eq('id', imprint.id);
+
+                if (updateError) {
+                  console.error('MockupGenerator: Error adding mockup to imprint:', updateError);
+                  throw updateError;
+                }
               } else {
                 // Update the existing mockup entry with the new proof_id
                 const updatedMockups = existingMockups.map((mockup: any) => {
@@ -915,21 +998,33 @@ export default function MockupGenerator({
                   return mockup;
                 });
 
-                await supabase
+                const { error: updateError } = await supabase
                   .from('quote_imprints')
                   .update({ mockups: updatedMockups })
                   .eq('id', imprint.id);
+
+                if (updateError) {
+                  console.error('MockupGenerator: Error updating imprint mockups:', updateError);
+                  throw updateError;
+                }
+                console.log('MockupGenerator: Successfully updated imprint:', imprint.id);
               }
             }
+            console.log('MockupGenerator: All group imprints updated successfully');
+          } else {
+            console.warn('MockupGenerator: No imprints found to update for group');
           }
+        } else {
+          console.warn('MockupGenerator: No compositeImageUrl or insufficient data to update imprints');
         }
       }
 
+      console.log('MockupGenerator: Save completed successfully');
       showNotification('success', 'Mockup saved successfully');
       onSave?.();
-      onClose();
     } catch (error: any) {
-      showNotification('error', 'Failed to save proof', error.message);
+      console.error('MockupGenerator: Save error:', error);
+      showNotification('error', 'Failed to save mockup: ' + (error.message || 'Unknown error'));
     } finally {
       setSaving(false);
     }
@@ -1455,23 +1550,33 @@ export default function MockupGenerator({
                 </button>
               )}
 
-              <button
-                onClick={handleSave}
-                disabled={saving || selectedArtwork.length === 0}
-                className="w-full flex items-center justify-center px-3 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed"
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-5 h-5 mr-2" />
-                    Save Proof
-                  </>
-                )}
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={handleSave}
+                  disabled={saving || selectedArtwork.length === 0}
+                  className="flex items-center justify-center px-3 py-2 bg-blue-500 text-white rounded text-sm font-medium hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed transition-colors"
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-1.5" />
+                      Save Mockup
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={onClose}
+                  disabled={saving}
+                  className="flex items-center justify-center px-3 py-2 bg-green-500 text-white rounded text-sm font-medium hover:bg-green-600 disabled:bg-gray-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed transition-colors"
+                >
+                  <X className="w-4 h-4 mr-1.5" />
+                  Close
+                </button>
+              </div>
             </div>
           </div>
 
