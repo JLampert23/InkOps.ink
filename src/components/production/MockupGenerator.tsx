@@ -132,9 +132,11 @@ export default function MockupGenerator({
   const [selectedColors, setSelectedColors] = useState<Array<{ name: string; hex: string }>>([]);
 
   const [showArtworkLibrary, setShowArtworkLibrary] = useState(false);
+  const [uploadingImprintId, setUploadingImprintId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const artworkFileInputRef = useRef<HTMLInputElement>(null);
   const garmentFileInputRef = useRef<HTMLInputElement>(null);
+  const imprintFileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [resizeHandle, setResizeHandle] = useState<string | null>(null);
@@ -584,6 +586,86 @@ export default function MockupGenerator({
       showNotification('error', 'Failed to upload artwork', error.message);
     } finally {
       setUploading(false);
+      event.target.value = '';
+    }
+  };
+
+  const handleImprintArtworkUpload = async (event: React.ChangeEvent<HTMLInputElement>, imprintId: string, imprintLocation: string) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadingImprintId(imprintId);
+    try {
+      for (const file of Array.from(files)) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `${companyId}/${customerId || 'general'}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('customer-artwork')
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('customer-artwork')
+          .getPublicUrl(filePath);
+
+        let width = null;
+        let height = null;
+
+        if (file.type.startsWith('image/')) {
+          const dimensions = await getImageDimensions(file);
+          width = dimensions.width;
+          height = dimensions.height;
+        }
+
+        const { data: artworkRecord, error: dbError } = await supabase
+          .from('customer_artwork')
+          .insert({
+            customer_id: customerId,
+            company_id: companyId,
+            file_name: file.name,
+            file_url: publicUrl,
+            file_type: file.type,
+            file_size: file.size,
+            width_inches: width,
+            height_inches: height,
+          })
+          .select()
+          .single();
+
+        if (dbError) throw dbError;
+
+        const newArtwork: MockupArtwork = {
+          id: '',
+          customer_artwork_id: artworkRecord?.id || null,
+          artwork_url: publicUrl,
+          print_location: imprintLocation || 'Front',
+          width_inches: width || widthInches,
+          height_inches: height || heightInches,
+          position_x: 0,
+          position_y: 0,
+          scale: 1,
+          rotation: 0,
+          file_name: file.name,
+        };
+
+        setSelectedArtwork([...selectedArtwork, newArtwork]);
+        setActiveArtworkIndex(selectedArtwork.length);
+        setPrintLocation(imprintLocation || 'Front');
+
+        if (width && height) {
+          setWidthInches(width);
+          setHeightInches(height);
+        }
+      }
+
+      showNotification('success', `Artwork uploaded for ${imprintLocation}`);
+    } catch (error: any) {
+      showNotification('error', 'Failed to upload artwork', error.message);
+    } finally {
+      setUploadingImprintId(null);
       event.target.value = '';
     }
   };
@@ -1096,6 +1178,37 @@ export default function MockupGenerator({
                             )}
                           </div>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const input = imprintFileInputRefs.current[imprint.id];
+                            if (input) input.click();
+                          }}
+                          disabled={uploadingImprintId === imprint.id}
+                          className="w-full mt-2 flex items-center justify-center px-2 py-1.5 bg-blue-500 text-white rounded text-xs font-medium hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {uploadingImprintId === imprint.id ? (
+                            <>
+                              <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                              Uploading...
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="w-3 h-3 mr-1" />
+                              Upload Artwork
+                            </>
+                          )}
+                        </button>
+                        <input
+                          ref={(el) => {
+                            if (el) imprintFileInputRefs.current[imprint.id] = el;
+                          }}
+                          type="file"
+                          className="hidden"
+                          accept=".png,.jpg,.jpeg,.pdf,.eps,.ai,.svg"
+                          multiple
+                          onChange={(e) => handleImprintArtworkUpload(e, imprint.id, imprint.location)}
+                        />
                       </div>
                     ))
                   ) : (
