@@ -1734,12 +1734,17 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                               </div>
                               <div className="flex flex-col gap-2 items-end">
                                 <button
-                                  onClick={() => {
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    console.log('Mockup button clicked!', { quoteId, groupLabel: group.label });
                                     if (!quoteId) {
                                       showNotification('warning', 'Please save the quote first before creating mockups');
                                       return;
                                     }
+                                    console.log('Setting showMockupForGroup to:', group.label);
                                     setShowMockupForGroup(group.label);
+                                    console.log('State should be set now');
                                   }}
                                   className="w-32 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center justify-center gap-2 shadow-sm"
                                 >
@@ -2013,20 +2018,31 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       />
 
       {/* Mockup Generator Modal */}
-      {showMockupForGroup && (
-        <MockupGenerator
-          quoteId={quoteId}
-          customerId={selectedCustomerId}
-          garmentStyle=""
-          garmentColor=""
-          groupLabel={showMockupForGroup}
-          onClose={() => setShowMockupForGroup(null)}
-          onSave={() => {
-            setShowMockupForGroup(null);
-            showNotification('success', 'Mockup saved successfully!');
-          }}
-        />
-      )}
+      {(() => {
+        console.log('Checking showMockupForGroup:', showMockupForGroup);
+        if (showMockupForGroup) {
+          console.log('Rendering MockupGenerator for group:', showMockupForGroup);
+          return (
+            <MockupGenerator
+              quoteId={quoteId}
+              customerId={selectedCustomerId}
+              garmentStyle=""
+              garmentColor=""
+              groupLabel={showMockupForGroup}
+              onClose={() => {
+                console.log('Closing MockupGenerator');
+                setShowMockupForGroup(null);
+              }}
+              onSave={() => {
+                console.log('Saving MockupGenerator');
+                setShowMockupForGroup(null);
+                showNotification('success', 'Mockup saved successfully!');
+              }}
+            />
+          );
+        }
+        return null;
+      })()}
 
       {/* Line Item Options Modal */}
       {editingGroupIdForOptions && (() => {
