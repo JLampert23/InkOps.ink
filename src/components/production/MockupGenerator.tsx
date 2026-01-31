@@ -102,8 +102,9 @@ export default function MockupGenerator({
     description: string;
     itemNumber: string;
     frontImage: string;
-    backImage: string;
-    sleeveImage: string;
+    rearImage: string;
+    sideImage: string;
+    lifestyleImage: string;
     imagesData: any;
   }>>([]);
   const [activeGarmentIndex, setActiveGarmentIndex] = useState(0);
@@ -152,7 +153,7 @@ export default function MockupGenerator({
       if (quoteId) {
         let query = supabase
           .from('quote_line_items')
-          .select('id, item_number, description, color, garment_front_image_url, garment_back_image_url, garment_sleeve_image_url, garment_images_data')
+          .select('id, item_number, description, color, garment_front_image_url, garment_rear_image_url, garment_side_image_url, garment_lifestyle_image_url, garment_images_data')
           .eq('quote_id', quoteId)
           .not('item_number', 'is', null) // Only load items with item numbers (exclude fees)
           .order('sort_order');
@@ -172,8 +173,9 @@ export default function MockupGenerator({
             description: item.description || '',
             itemNumber: item.item_number || '',
             frontImage: item.garment_front_image_url || '',
-            backImage: item.garment_back_image_url || '',
-            sleeveImage: item.garment_sleeve_image_url || '',
+            rearImage: item.garment_rear_image_url || '',
+            sideImage: item.garment_side_image_url || '',
+            lifestyleImage: item.garment_lifestyle_image_url || '',
             imagesData: item.garment_images_data || null,
           }));
 
@@ -1087,7 +1089,7 @@ export default function MockupGenerator({
                         {isActive && (
                           <div className="px-2 pb-2 border-t border-gray-200 dark:border-slate-600 mt-2 pt-2">
                             <div className="text-[10px] text-gray-500 dark:text-gray-400 mb-1.5 font-medium">Views:</div>
-                            <div className="grid grid-cols-3 gap-1.5">
+                            <div className="grid grid-cols-2 gap-1.5">
                               {garmentStyle.frontImage && (
                                 <button
                                   onClick={() => setGarmentImageUrl(garmentStyle.frontImage)}
@@ -1108,43 +1110,63 @@ export default function MockupGenerator({
                                   </div>
                                 </button>
                               )}
-                              {garmentStyle.backImage && (
+                              {garmentStyle.rearImage && (
                                 <button
-                                  onClick={() => setGarmentImageUrl(garmentStyle.backImage)}
+                                  onClick={() => setGarmentImageUrl(garmentStyle.rearImage)}
                                   className={`relative aspect-square rounded border-2 overflow-hidden transition-all hover:scale-105 ${
-                                    garmentImageUrl === garmentStyle.backImage
+                                    garmentImageUrl === garmentStyle.rearImage
                                       ? 'border-blue-500 ring-1 ring-blue-300'
                                       : 'border-gray-300 dark:border-slate-600'
                                   }`}
-                                  title="Back View"
+                                  title="Rear View"
                                 >
                                   <img
-                                    src={garmentStyle.backImage}
-                                    alt="Back"
+                                    src={garmentStyle.rearImage}
+                                    alt="Rear"
                                     className="w-full h-full object-contain bg-white"
                                   />
                                   <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[9px] text-center py-0.5">
-                                    Back
+                                    Rear
                                   </div>
                                 </button>
                               )}
-                              {garmentStyle.sleeveImage && (
+                              {garmentStyle.sideImage && (
                                 <button
-                                  onClick={() => setGarmentImageUrl(garmentStyle.sleeveImage)}
+                                  onClick={() => setGarmentImageUrl(garmentStyle.sideImage)}
                                   className={`relative aspect-square rounded border-2 overflow-hidden transition-all hover:scale-105 ${
-                                    garmentImageUrl === garmentStyle.sleeveImage
+                                    garmentImageUrl === garmentStyle.sideImage
                                       ? 'border-blue-500 ring-1 ring-blue-300'
                                       : 'border-gray-300 dark:border-slate-600'
                                   }`}
-                                  title="Sleeve View"
+                                  title="Side View"
                                 >
                                   <img
-                                    src={garmentStyle.sleeveImage}
-                                    alt="Sleeve"
+                                    src={garmentStyle.sideImage}
+                                    alt="Side"
                                     className="w-full h-full object-contain bg-white"
                                   />
                                   <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[9px] text-center py-0.5">
-                                    Sleeve
+                                    Side
+                                  </div>
+                                </button>
+                              )}
+                              {garmentStyle.lifestyleImage && (
+                                <button
+                                  onClick={() => setGarmentImageUrl(garmentStyle.lifestyleImage)}
+                                  className={`relative aspect-square rounded border-2 overflow-hidden transition-all hover:scale-105 ${
+                                    garmentImageUrl === garmentStyle.lifestyleImage
+                                      ? 'border-blue-500 ring-1 ring-blue-300'
+                                      : 'border-gray-300 dark:border-slate-600'
+                                  }`}
+                                  title="Lifestyle View"
+                                >
+                                  <img
+                                    src={garmentStyle.lifestyleImage}
+                                    alt="Lifestyle"
+                                    className="w-full h-full object-contain bg-white"
+                                  />
+                                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[9px] text-center py-0.5">
+                                    Lifestyle
                                   </div>
                                 </button>
                               )}
