@@ -1153,70 +1153,6 @@ export default function MockupGenerator({
                 </div>
               )}
 
-              {selectedArtwork.length > 0 && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-900 dark:text-white mb-2">Uploaded Artwork ({selectedArtwork.length})</label>
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                    {selectedArtwork.map((artwork, index) => {
-                      const linkedImprint = artwork.imprint_id ? imprints.find(imp => imp.id === artwork.imprint_id) : null;
-                      const isActive = activeArtworkIndex === index;
-
-                      return (
-                        <div
-                          key={index}
-                          onClick={() => setActiveArtworkIndex(index)}
-                          className={`p-2 rounded border-2 cursor-pointer transition-all ${
-                            isActive
-                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                              : 'border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 hover:border-blue-300'
-                          }`}
-                        >
-                          <div className="flex items-start gap-2">
-                            <div className="w-10 h-10 bg-gray-100 dark:bg-slate-700 rounded border border-gray-200 dark:border-slate-600 flex items-center justify-center overflow-hidden flex-shrink-0">
-                              {artwork.artwork_url ? (
-                                <img src={artwork.artwork_url} alt={artwork.file_name} className="w-full h-full object-contain" />
-                              ) : (
-                                <ImageIcon className="w-4 h-4 text-gray-400" />
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-xs font-medium text-gray-900 dark:text-white truncate">
-                                {artwork.file_name || 'Untitled'}
-                              </div>
-                              <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
-                                {artwork.print_location}
-                              </div>
-                              {linkedImprint && (
-                                <div className="flex items-center gap-1 mt-1">
-                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-700">
-                                    <ImageIcon className="w-2.5 h-2.5 mr-0.5" />
-                                    {linkedImprint.location}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const updated = selectedArtwork.filter((_, i) => i !== index);
-                                setSelectedArtwork(updated);
-                                if (activeArtworkIndex >= updated.length) {
-                                  setActiveArtworkIndex(Math.max(0, updated.length - 1));
-                                }
-                              }}
-                              className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 p-1"
-                              title="Remove artwork"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
               <div>
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Imprints</label>
                 <div className="space-y-1.5">
@@ -1266,19 +1202,37 @@ export default function MockupGenerator({
                                 .map(({ artwork, originalIndex }) => (
                                   <div
                                     key={originalIndex}
-                                    onClick={() => setActiveArtworkIndex(originalIndex)}
-                                    className={`relative w-12 h-12 bg-gray-100 dark:bg-slate-700 rounded border-2 overflow-hidden cursor-pointer transition-all hover:scale-105 ${
-                                      activeArtworkIndex === originalIndex
-                                        ? 'border-blue-500 ring-1 ring-blue-300'
-                                        : 'border-gray-300 dark:border-slate-600'
-                                    }`}
-                                    title={artwork.file_name || 'Artwork'}
+                                    className="relative group"
                                   >
-                                    <img
-                                      src={artwork.artwork_url}
-                                      alt={artwork.file_name}
-                                      className="w-full h-full object-contain"
-                                    />
+                                    <div
+                                      onClick={() => setActiveArtworkIndex(originalIndex)}
+                                      className={`relative w-12 h-12 bg-gray-100 dark:bg-slate-700 rounded border-2 overflow-hidden cursor-pointer transition-all hover:scale-105 ${
+                                        activeArtworkIndex === originalIndex
+                                          ? 'border-blue-500 ring-1 ring-blue-300'
+                                          : 'border-gray-300 dark:border-slate-600'
+                                      }`}
+                                      title={artwork.file_name || 'Artwork'}
+                                    >
+                                      <img
+                                        src={artwork.artwork_url}
+                                        alt={artwork.file_name}
+                                        className="w-full h-full object-contain"
+                                      />
+                                    </div>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const updated = selectedArtwork.filter((_, i) => i !== originalIndex);
+                                        setSelectedArtwork(updated);
+                                        if (activeArtworkIndex >= updated.length) {
+                                          setActiveArtworkIndex(Math.max(0, updated.length - 1));
+                                        }
+                                      }}
+                                      className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                                      title="Remove artwork"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
                                   </div>
                                 ))}
                             </div>
