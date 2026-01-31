@@ -1773,6 +1773,32 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                                             Color: {imprint.thread_ink_color}
                                           </p>
                                         )}
+                                        {/* Display mockup thumbnails */}
+                                        {imprint.mockups && imprint.mockups.length > 0 && (
+                                          <div className="mt-2 pt-2 border-t border-gray-200 dark:border-slate-700">
+                                            <div className="flex flex-wrap gap-1.5">
+                                              {imprint.mockups.map((mockup: any, mockupIdx: number) => {
+                                                const mockupUrl = typeof mockup === 'string' ? mockup : mockup?.url;
+                                                if (!mockupUrl) return null;
+
+                                                return (
+                                                  <div
+                                                    key={mockupIdx}
+                                                    className="relative group"
+                                                  >
+                                                    <img
+                                                      src={mockupUrl}
+                                                      alt={`Mockup ${mockupIdx + 1}`}
+                                                      className="w-16 h-16 object-contain rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 cursor-pointer hover:border-blue-500 transition-all"
+                                                      onClick={() => window.open(mockupUrl, '_blank')}
+                                                      title="Click to view full size"
+                                                    />
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
                                   </div>
@@ -2005,8 +2031,17 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           garmentColor=""
           groupLabel={showMockupForGroup}
           onClose={() => setShowMockupForGroup(null)}
-          onSave={() => {
+          onSave={async () => {
             setShowMockupForGroup(null);
+            // Reload imprints to get updated mockups
+            if (quoteId) {
+              const { data } = await supabase
+                .from('quote_imprints')
+                .select('*')
+                .eq('quote_id', quoteId)
+                .order('sort_order');
+              if (data) setQuoteImprints(data);
+            }
             showNotification('success', 'Mockup saved successfully!');
           }}
         />
