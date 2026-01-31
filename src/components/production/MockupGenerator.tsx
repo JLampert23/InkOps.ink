@@ -1034,41 +1034,38 @@ export default function MockupGenerator({
               {selectedArtwork.length > 0 && (
                 <div>
                   <label className="block text-xs font-medium text-gray-900 dark:text-white mb-2">Transform Controls</label>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-1.5">
-                      <div className="text-xs font-medium text-gray-700 dark:text-gray-300 w-16">Size</div>
-                      <button
-                        onClick={() => updateActiveArtwork({ scale: selectedArtwork[activeArtworkIndex].scale + 0.1 })}
-                        className="w-8 h-8 flex items-center justify-center bg-blue-50 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:border-blue-400 dark:hover:border-blue-600 transition-all"
-                        title="Increase Size"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => updateActiveArtwork({ scale: Math.max(0.1, selectedArtwork[activeArtworkIndex].scale - 0.1) })}
-                        className="w-8 h-8 flex items-center justify-center bg-blue-50 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:border-blue-400 dark:hover:border-blue-600 transition-all"
-                        title="Decrease Size"
-                      >
-                        <Minus className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="text-xs font-medium text-gray-700 dark:text-gray-300 w-16">Rotation</div>
-                      <button
-                        onClick={() => updateActiveArtwork({ rotation: (selectedArtwork[activeArtworkIndex].rotation + 15) % 360 })}
-                        className="w-8 h-8 flex items-center justify-center bg-green-50 dark:bg-green-900/30 border border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 rounded hover:bg-green-100 dark:hover:bg-green-900/50 hover:border-green-400 dark:hover:border-green-600 transition-all"
-                        title="Rotate Clockwise"
-                      >
-                        <RotateCw className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => updateActiveArtwork({ rotation: (selectedArtwork[activeArtworkIndex].rotation - 15 + 360) % 360 })}
-                        className="w-8 h-8 flex items-center justify-center bg-green-50 dark:bg-green-900/30 border border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 rounded hover:bg-green-100 dark:hover:bg-green-900/50 hover:border-green-400 dark:hover:border-green-600 transition-all"
-                        title="Rotate Counter-Clockwise"
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                      </button>
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-xs font-medium text-gray-700 dark:text-gray-300">Size</div>
+                    <button
+                      onClick={() => updateActiveArtwork({ scale: selectedArtwork[activeArtworkIndex].scale + 0.1 })}
+                      className="w-8 h-8 flex items-center justify-center bg-blue-50 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:border-blue-400 dark:hover:border-blue-600 transition-all"
+                      title="Increase Size"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => updateActiveArtwork({ scale: Math.max(0.1, selectedArtwork[activeArtworkIndex].scale - 0.1) })}
+                      className="w-8 h-8 flex items-center justify-center bg-blue-50 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-100 dark:hover:bg-blue-900/50 hover:border-blue-400 dark:hover:border-blue-600 transition-all"
+                      title="Decrease Size"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+
+                    <div className="text-xs font-medium text-gray-700 dark:text-gray-300 ml-2">Rotation</div>
+                    <button
+                      onClick={() => updateActiveArtwork({ rotation: (selectedArtwork[activeArtworkIndex].rotation + 15) % 360 })}
+                      className="w-8 h-8 flex items-center justify-center bg-green-50 dark:bg-green-900/30 border border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 rounded hover:bg-green-100 dark:hover:bg-green-900/50 hover:border-green-400 dark:hover:border-green-600 transition-all"
+                      title="Rotate Clockwise"
+                    >
+                      <RotateCw className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => updateActiveArtwork({ rotation: (selectedArtwork[activeArtworkIndex].rotation - 15 + 360) % 360 })}
+                      className="w-8 h-8 flex items-center justify-center bg-green-50 dark:bg-green-900/30 border border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 rounded hover:bg-green-100 dark:hover:bg-green-900/50 hover:border-green-400 dark:hover:border-green-600 transition-all"
+                      title="Rotate Counter-Clockwise"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               )}
