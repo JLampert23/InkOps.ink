@@ -131,8 +131,16 @@ Deno.serve(async (req: Request) => {
     console.log("=== DIAGNOSTIC: Authorization Header ===");
     console.log("Authorization header present:", !!authHeader);
 
-    // TEMPORARILY SKIP JWT VALIDATION FOR TESTING
-    console.log("⚠️ SKIPPING JWT VALIDATION - USING FIRST COMPANY FOR TESTING");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Missing authorization header" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Check if it's a service role key (internal call) or user JWT
+    const token = authHeader.replace("Bearer ", "");
+    const isServiceRoleKey = token === supabaseServiceRoleKey;
 
     console.log("=== DIAGNOSTIC: Creating Supabase Client ===");
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
@@ -143,25 +151,54 @@ Deno.serve(async (req: Request) => {
     });
     console.log("Supabase client created successfully");
 
-    // Get first company for testing
-    const { data: profiles } = await supabase
-      .from("user_profiles")
-      .select("company_id")
-      .limit(1);
+    let companyId: string;
 
-    const profile = profiles?.[0];
+    if (isServiceRoleKey) {
+      // Internal call from another edge function - get company_id from query params
+      const url = new URL(req.url);
+      const companyIdParam = url.searchParams.get("companyId");
+      if (!companyIdParam) {
+        return new Response(
+          JSON.stringify({ error: "Company ID required for service calls" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      companyId = companyIdParam;
+      console.log("Service role call - using company_id:", companyId);
+    } else {
+      // User JWT - validate and get company_id from profile
+      console.log("User JWT - validating token");
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
-    if (!profile?.company_id) {
-      return new Response(
-        JSON.stringify({ error: "Company not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (authError || !user) {
+        console.error("Auth error:", authError);
+        return new Response(
+          JSON.stringify({ error: "Unauthorized", details: authError?.message }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Get user's company_id
+      const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("company_id")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (!profile?.company_id) {
+        return new Response(
+          JSON.stringify({ error: "Company not found" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      companyId = profile.company_id;
+      console.log("User authenticated - company_id:", companyId);
     }
 
     const { data: settings } = await supabase
       .from("company_settings")
       .select("ssactivewear_enabled, ssactivewear_username, ssactivewear_api_key_encrypted")
-      .eq("id", profile.company_id)
+      .eq("id", companyId)
       .maybeSingle();
 
     if (!settings?.ssactivewear_enabled || !settings?.ssactivewear_api_key_encrypted || !settings?.ssactivewear_username) {

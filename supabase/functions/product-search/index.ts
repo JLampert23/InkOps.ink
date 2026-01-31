@@ -162,7 +162,7 @@ Deno.serve(async (req: Request) => {
     // Search SSActivewear if enabled
     if (settings?.ssactivewear_enabled) {
       try {
-        const ssaUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=product&style=${encodeURIComponent(style)}`;
+        const ssaUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=product&style=${encodeURIComponent(style)}&companyId=${encodeURIComponent(profile.company_id)}`;
         const ssaResponse = await fetch(ssaUrl, {
           headers: {
             "Authorization": `Bearer ${supabaseServiceKey}`,
@@ -178,7 +178,7 @@ Deno.serve(async (req: Request) => {
 
             // Fetch media/images for the product BEFORE returning
             try {
-              const mediaUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=media&productId=${encodeURIComponent(style)}`;
+              const mediaUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=media&productId=${encodeURIComponent(style)}&companyId=${encodeURIComponent(profile.company_id)}`;
               console.log("Fetching media from:", mediaUrl);
               const mediaResponse = await fetch(mediaUrl, {
                 headers: {
