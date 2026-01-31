@@ -60,6 +60,9 @@ interface QuoteItem {
   garment_front_image_url?: string;
   garment_back_image_url?: string;
   garment_sleeve_image_url?: string;
+  garment_rear_image_url?: string;
+  garment_side_image_url?: string;
+  garment_lifestyle_image_url?: string;
   garment_images_data?: any;
   supplier_partid?: string;
 }
@@ -820,6 +823,9 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       garment_front_image_url: undefined as string | undefined,
       garment_back_image_url: undefined as string | undefined,
       garment_sleeve_image_url: undefined as string | undefined,
+      garment_rear_image_url: undefined as string | undefined,
+      garment_side_image_url: undefined as string | undefined,
+      garment_lifestyle_image_url: undefined as string | undefined,
       garment_images_data: undefined as any,
       supplier_partid: color?.code as string | undefined,
     };
@@ -833,13 +839,18 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
 
         if (unifiedData.success && unifiedData.media?.views) {
           garmentImages.garment_front_image_url = unifiedData.media.views.front || undefined;
-          garmentImages.garment_back_image_url = unifiedData.media.views.back || undefined;
-          garmentImages.garment_sleeve_image_url = unifiedData.media.views.left || unifiedData.media.views.right || undefined;
+          garmentImages.garment_rear_image_url = unifiedData.media.views.rear || undefined;
+          garmentImages.garment_side_image_url = unifiedData.media.views.side || undefined;
+          garmentImages.garment_lifestyle_image_url = unifiedData.media.views.lifestyle || undefined;
+          // Backward compatibility: populate old fields if new ones exist
+          garmentImages.garment_back_image_url = unifiedData.media.views.rear || unifiedData.media.views.back || undefined;
+          garmentImages.garment_sleeve_image_url = unifiedData.media.views.side || unifiedData.media.views.left || unifiedData.media.views.right || undefined;
           garmentImages.garment_images_data = unifiedData.media.images || undefined;
           console.log('Garment images extracted:', {
             front: garmentImages.garment_front_image_url,
-            back: garmentImages.garment_back_image_url,
-            sleeve: garmentImages.garment_sleeve_image_url,
+            rear: garmentImages.garment_rear_image_url,
+            side: garmentImages.garment_side_image_url,
+            lifestyle: garmentImages.garment_lifestyle_image_url,
           });
         } else {
           console.warn('No media views in unified data:', unifiedData);
@@ -1070,6 +1081,9 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
             garment_front_image_url: item.garment_front_image_url || null,
             garment_back_image_url: item.garment_back_image_url || null,
             garment_sleeve_image_url: item.garment_sleeve_image_url || null,
+            garment_rear_image_url: item.garment_rear_image_url || null,
+            garment_side_image_url: item.garment_side_image_url || null,
+            garment_lifestyle_image_url: item.garment_lifestyle_image_url || null,
             garment_images_data: item.garment_images_data || null,
             supplier_partid: item.supplier_partid || null,
           }))

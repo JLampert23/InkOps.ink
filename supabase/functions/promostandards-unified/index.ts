@@ -338,24 +338,23 @@ Deno.serve(async (req: Request) => {
         };
       });
 
-      // Organize images by view type
+      // Organize images by view type (using SSActivewear's actual naming: Front, Rear, Side, Lifestyle)
       mediaData.views = {
         front: mediaData.images.find((img: any) =>
           img.description?.toLowerCase().includes('front') ||
           img.classType?.toLowerCase().includes('front')
         )?.url || null,
-        back: mediaData.images.find((img: any) =>
-          img.description?.toLowerCase().includes('back') ||
-          img.classType?.toLowerCase().includes('back')
+        rear: mediaData.images.find((img: any) =>
+          img.description?.toLowerCase().includes('rear') ||
+          img.classType?.toLowerCase().includes('rear')
         )?.url || null,
-        left: mediaData.images.find((img: any) =>
-          img.description?.toLowerCase().includes('left') ||
-          img.classType?.toLowerCase().includes('left') ||
-          img.classType?.toLowerCase().includes('sleeve')
+        side: mediaData.images.find((img: any) =>
+          img.description?.toLowerCase().includes('side') ||
+          img.classType?.toLowerCase().includes('side')
         )?.url || null,
-        right: mediaData.images.find((img: any) =>
-          img.description?.toLowerCase().includes('right') ||
-          img.classType?.toLowerCase().includes('right')
+        lifestyle: mediaData.images.find((img: any) =>
+          img.description?.toLowerCase().includes('lifestyle') ||
+          img.classType?.toLowerCase().includes('lifestyle')
         )?.url || null,
       };
     }
