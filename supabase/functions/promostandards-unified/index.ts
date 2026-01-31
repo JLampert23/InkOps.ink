@@ -77,9 +77,16 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    console.log('Environment check:', {
+      hasUrl: !!supabaseUrl,
+      hasServiceKey: !!supabaseServiceRoleKey
+    });
+
     const authHeader = req.headers.get("Authorization");
 
     if (!authHeader) {
+      console.error('No Authorization header provided');
       return new Response(
         JSON.stringify({ error: "Missing authorization header" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -89,7 +96,7 @@ Deno.serve(async (req: Request) => {
     const token = authHeader.replace("Bearer ", "");
     console.log('Auth header received, token length:', token.length);
 
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false
@@ -97,21 +104,20 @@ Deno.serve(async (req: Request) => {
     });
 
     console.log('Validating JWT token...');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
 
     if (authError) {
       console.error('JWT validation error:', {
         message: authError.message,
         name: authError.name,
         status: authError.status,
-        code: (authError as any).code,
-        tokenPrefix: token.substring(0, 20) + '...'
+        tokenLength: token.length
       });
       return new Response(
         JSON.stringify({
           error: "Invalid JWT",
           details: authError.message,
-          code: (authError as any).code || authError.status
+          status: authError.status
         }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -127,20 +133,23 @@ Deno.serve(async (req: Request) => {
 
     console.log('JWT validated successfully for user:', user.id);
 
-    const { data: profile } = await supabase
+    const { data: profile } = await supabaseAdmin
       .from("user_profiles")
       .select("company_id")
       .eq("id", user.id)
       .maybeSingle();
 
     if (!profile?.company_id) {
+      console.error('No company_id found for user:', user.id);
       return new Response(
         JSON.stringify({ error: "Company not found" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const { data: settings } = await supabase
+    console.log('Found company_id:', profile.company_id);
+
+    const { data: settings } = await supabaseAdmin
       .from("company_settings")
       .select("ssactivewear_enabled, ssactivewear_username, ssactivewear_api_key_encrypted")
       .eq("id", profile.company_id)
