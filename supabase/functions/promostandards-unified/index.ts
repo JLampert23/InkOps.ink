@@ -87,6 +87,8 @@ Deno.serve(async (req: Request) => {
     }
 
     const token = authHeader.replace("Bearer ", "");
+    console.log('Auth header received, token length:', token.length);
+
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
       auth: {
         autoRefreshToken: false,
@@ -98,9 +100,19 @@ Deno.serve(async (req: Request) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
     if (authError) {
-      console.error('JWT validation error:', authError);
+      console.error('JWT validation error:', {
+        message: authError.message,
+        name: authError.name,
+        status: authError.status,
+        code: (authError as any).code,
+        tokenPrefix: token.substring(0, 20) + '...'
+      });
       return new Response(
-        JSON.stringify({ error: "Invalid JWT", details: authError.message }),
+        JSON.stringify({
+          error: "Invalid JWT",
+          details: authError.message,
+          code: (authError as any).code || authError.status
+        }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
