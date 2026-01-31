@@ -838,7 +838,9 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
     // If SSActivewear, fetch unified product data with garment images
     if (product.supplier === 'ssactivewear' && color?.code) {
       try {
+        console.log('Fetching garment images for:', { style: product.style, partId: color.code });
         const unifiedData = await getUnifiedProductData(product.style, color.code);
+        console.log('Unified data response:', unifiedData);
 
         if (unifiedData.success && unifiedData.media?.views) {
           garmentImages.garment_front_image_url = unifiedData.media.views.front || undefined;
@@ -849,8 +851,19 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           garmentImages.garment_back_image_url = unifiedData.media.views.rear || undefined;
           garmentImages.garment_sleeve_image_url = unifiedData.media.views.side || undefined;
           garmentImages.garment_images_data = unifiedData.media.images || undefined;
+
+          console.log('Loaded garment images:', {
+            front: !!garmentImages.garment_front_image_url,
+            rear: !!garmentImages.garment_rear_image_url,
+            side: !!garmentImages.garment_side_image_url,
+            lifestyle: !!garmentImages.garment_lifestyle_image_url,
+          });
+        } else {
+          console.warn('No media data in unified response');
         }
       } catch (error: any) {
+        console.error('Failed to fetch garment images:', error);
+        showNotification('warning', 'Could not load garment images. Product added without images.');
       }
     }
 
