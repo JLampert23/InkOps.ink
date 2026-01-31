@@ -807,7 +807,6 @@ export default function MockupGenerator({
           });
       }
 
-      showNotification('success', 'Proof saved successfully');
       onSave?.();
       onClose();
     } catch (error: any) {
