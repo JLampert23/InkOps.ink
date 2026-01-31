@@ -1233,8 +1233,8 @@ export default function MockupGenerator({
                               <div className="text-xs font-medium text-gray-900 dark:text-white truncate">
                                 {imprint.location || 'No location'}
                               </div>
-                              <div className="text-[10px] text-gray-400 dark:text-gray-500 font-mono flex-shrink-0">
-                                ID: {imprint.id.slice(0, 8)}
+                              <div className="text-[10px] text-gray-700 dark:text-gray-300 font-mono flex-shrink-0 bg-gray-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">
+                                {imprint.id.slice(0, 8)}
                               </div>
                             </div>
                             <div className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
@@ -1252,6 +1252,39 @@ export default function MockupGenerator({
                             )}
                           </div>
                         </div>
+
+                        {/* Show thumbnails of artwork for this imprint */}
+                        {selectedArtwork.filter(a => a.imprint_id === imprint.id).length > 0 && (
+                          <div className="mt-2 pt-2 border-t border-gray-200 dark:border-slate-700">
+                            <div className="text-[10px] text-gray-600 dark:text-gray-400 mb-1.5 font-medium">
+                              Artwork ({selectedArtwork.filter(a => a.imprint_id === imprint.id).length})
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {selectedArtwork
+                                .map((artwork, idx) => ({ artwork, originalIndex: idx }))
+                                .filter(({ artwork }) => artwork.imprint_id === imprint.id)
+                                .map(({ artwork, originalIndex }) => (
+                                  <div
+                                    key={originalIndex}
+                                    onClick={() => setActiveArtworkIndex(originalIndex)}
+                                    className={`relative w-12 h-12 bg-gray-100 dark:bg-slate-700 rounded border-2 overflow-hidden cursor-pointer transition-all hover:scale-105 ${
+                                      activeArtworkIndex === originalIndex
+                                        ? 'border-blue-500 ring-1 ring-blue-300'
+                                        : 'border-gray-300 dark:border-slate-600'
+                                    }`}
+                                    title={artwork.file_name || 'Artwork'}
+                                  >
+                                    <img
+                                      src={artwork.artwork_url}
+                                      alt={artwork.file_name}
+                                      className="w-full h-full object-contain"
+                                    />
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+
                         <button
                           type="button"
                           onClick={() => {
