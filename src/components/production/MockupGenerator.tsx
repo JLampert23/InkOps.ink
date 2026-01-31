@@ -137,15 +137,23 @@ export default function MockupGenerator({
     try {
       setLoading(true);
 
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        console.error('MockupGenerator: Error getting user:', userError);
+        throw new Error('Authentication error: ' + userError.message);
+      }
       if (!user) throw new Error('Not authenticated');
 
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('user_profiles')
         .select('company_id')
         .eq('id', user.id)
         .single();
 
+      if (profileError) {
+        console.error('MockupGenerator: Error getting profile:', profileError);
+        throw new Error('Profile error: ' + profileError.message);
+      }
       if (!profile) throw new Error('Profile not found');
       setCompanyId(profile.company_id);
 
@@ -164,6 +172,10 @@ export default function MockupGenerator({
         }
 
         const { data: lineItems, error: lineItemsError } = await query;
+
+        if (lineItemsError) {
+          console.error('MockupGenerator: Error loading line items:', lineItemsError);
+        }
 
         if (lineItems && lineItems.length > 0) {
           const styles = lineItems.map(item => ({
@@ -192,35 +204,44 @@ export default function MockupGenerator({
       let existingProof = null;
 
       if (imprintId && imprintId.trim()) {
-        const { data } = await supabase
+        const { data, error: proofError } = await supabase
           .from('proofs')
           .select('*')
           .eq('imprint_id', imprintId)
           .maybeSingle();
+        if (proofError) {
+          console.error('MockupGenerator: Error loading proof by imprint_id:', proofError);
+        }
         existingProof = data;
       }
 
       if (!existingProof && lineItemId && lineItemId.trim()) {
-        const { data } = await supabase
+        const { data, error: proofError } = await supabase
           .from('proofs')
           .select('*')
           .eq('line_item_id', lineItemId)
           .maybeSingle();
+        if (proofError) {
+          console.error('MockupGenerator: Error loading proof by line_item_id:', proofError);
+        }
         existingProof = data;
       }
 
       if (!existingProof && quoteId && quoteId.trim() && groupLabel) {
-        const { data } = await supabase
+        const { data, error: proofError } = await supabase
           .from('proofs')
           .select('*')
           .eq('quote_id', quoteId)
           .eq('group_label', groupLabel)
           .maybeSingle();
+        if (proofError) {
+          console.error('MockupGenerator: Error loading proof by quote_id/group_label:', proofError);
+        }
         existingProof = data;
       }
 
       // Load production colors from production_colors table
-      const { data: inkColorsData } = await supabase
+      const { data: inkColorsData, error: inkColorsError } = await supabase
         .from('production_colors')
         .select('id, name, color_code')
         .eq('company_id', profile.company_id)
@@ -228,13 +249,21 @@ export default function MockupGenerator({
         .eq('is_active', true)
         .order('sort_order');
 
-      const { data: threadColorsData } = await supabase
+      if (inkColorsError) {
+        console.error('MockupGenerator: Error loading ink colors:', inkColorsError);
+      }
+
+      const { data: threadColorsData, error: threadColorsError } = await supabase
         .from('production_colors')
         .select('id, name, color_code')
         .eq('company_id', profile.company_id)
         .eq('type_of_work', 'embroidery')
         .eq('is_active', true)
         .order('sort_order');
+
+      if (threadColorsError) {
+        console.error('MockupGenerator: Error loading thread colors:', threadColorsError);
+      }
 
       setInkColors(inkColorsData || []);
       setThreadColors(threadColorsData || []);
@@ -252,11 +281,15 @@ export default function MockupGenerator({
           setSelectedColors(colors);
         }
 
-        const { data: artworkData } = await supabase
+        const { data: artworkData, error: artworkError } = await supabase
           .from('proof_artwork')
           .select('*')
           .eq('proof_id', existingProof.id)
           .order('sort_order');
+
+        if (artworkError) {
+          console.error('MockupGenerator: Error loading proof artwork:', artworkError);
+        }
 
         if (artworkData && artworkData.length > 0) {
           setSelectedArtwork(artworkData.map(a => ({
@@ -328,7 +361,9 @@ export default function MockupGenerator({
         }
       }
     } catch (error) {
-      showNotification('error', 'Failed to load proof data');
+      console.error('MockupGenerator: Failed to load proof data:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      showNotification('error', 'Failed to load proof data: ' + errorMessage);
     } finally {
       setLoading(false);
     }
@@ -1360,10 +1395,15 @@ function CustomerArtworkLibraryModal({
       }
 
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        console.error('CustomerArtworkLibrary: Error loading artwork:', error);
+        throw error;
+      }
       setArtwork(data || []);
     } catch (error) {
-      showNotification('error', 'Failed to load artwork library');
+      console.error('CustomerArtworkLibrary: Failed to load artwork library:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      showNotification('error', 'Failed to load artwork library: ' + errorMessage);
     } finally {
       setLoading(false);
     }
