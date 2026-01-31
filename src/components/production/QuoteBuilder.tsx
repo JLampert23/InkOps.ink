@@ -1732,7 +1732,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                                   Imprint(s)
                                 </button>
                               </div>
-                              <div className="flex flex-col gap-2">
+                              <div className="flex flex-col gap-2 items-end">
                                 <button
                                   onClick={() => {
                                     if (!quoteId) {
@@ -1741,14 +1741,14 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                                     }
                                     setShowMockupForGroup(group.label);
                                   }}
-                                  className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2 shadow-sm"
+                                  className="w-32 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center justify-center gap-2 shadow-sm"
                                 >
                                   <Plus className="w-4 h-4" />
                                   Mockup
                                 </button>
                                 <button
                                   onClick={() => setEditingGroupIdForOptions(group.id)}
-                                  className="px-3 py-2 bg-gray-600 hover:bg-gray-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded text-sm flex items-center gap-2 shadow-sm"
+                                  className="px-3 py-2 bg-gray-600 hover:bg-gray-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded text-sm flex items-center gap-2 shadow-sm whitespace-nowrap"
                                 >
                                   <Settings className="w-4 h-4" />
                                   Line Item Options
