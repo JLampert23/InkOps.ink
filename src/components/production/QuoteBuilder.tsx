@@ -1715,7 +1715,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       <tr key={`actions-${group.id}`}>
                         <td colSpan={getSizeColumns(group).length + 9} className="p-2 border-t-2 border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
                           <div className="space-y-3">
-                            <div className="flex gap-2 justify-between items-center">
+                            <div className="flex gap-2 justify-between items-start">
                               <div className="flex gap-2">
                                 <button
                                   onClick={() => addItem(group.id)}
@@ -1732,26 +1732,28 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                                   Imprint(s)
                                 </button>
                               </div>
-                              <button
-                                onClick={() => setEditingGroupIdForOptions(group.id)}
-                                className="px-3 py-2 bg-gray-600 hover:bg-gray-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded text-sm flex items-center gap-2 shadow-sm"
-                              >
-                                <Settings className="w-4 h-4" />
-                                Line Item Options
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (!quoteId) {
-                                    showNotification('warning', 'Please save the quote first before creating mockups');
-                                    return;
-                                  }
-                                  setShowMockupForGroup(group.label);
-                                }}
-                                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2 shadow-sm"
-                              >
-                                <Plus className="w-4 h-4" />
-                                Mockup
-                              </button>
+                              <div className="flex flex-col gap-2">
+                                <button
+                                  onClick={() => {
+                                    if (!quoteId) {
+                                      showNotification('warning', 'Please save the quote first before creating mockups');
+                                      return;
+                                    }
+                                    setShowMockupForGroup(group.label);
+                                  }}
+                                  className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2 shadow-sm"
+                                >
+                                  <Plus className="w-4 h-4" />
+                                  Mockup
+                                </button>
+                                <button
+                                  onClick={() => setEditingGroupIdForOptions(group.id)}
+                                  className="px-3 py-2 bg-gray-600 hover:bg-gray-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded text-sm flex items-center gap-2 shadow-sm"
+                                >
+                                  <Settings className="w-4 h-4" />
+                                  Line Item Options
+                                </button>
+                              </div>
                             </div>
 
                             {/* Imprint Display Blocks */}
