@@ -129,32 +129,12 @@ export default function MockupGenerator({
   const [initialScale, setInitialScale] = useState(1);
 
   useEffect(() => {
-    console.log('MockupGenerator initialized with props:', {
-      lineItemId,
-      quoteId,
-      customerId,
-      garmentStyle,
-      garmentColor,
-      groupLabel,
-      imprintId,
-      imprintLocation,
-      imprintTypeOfWork
-    });
     loadProofData();
   }, [lineItemId, imprintId, quoteId, groupLabel]);
 
   const loadProofData = async () => {
     try {
       setLoading(true);
-
-      console.log('loadProofData called with:', {
-        lineItemId,
-        garmentStyle,
-        garmentColor,
-        imprintId,
-        quoteId,
-        groupLabel
-      });
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
@@ -170,8 +150,6 @@ export default function MockupGenerator({
 
       // Load all garment styles in this group (or all if no group specified)
       if (quoteId) {
-        console.log('Loading garment styles for quote:', quoteId, 'group:', groupLabel || '(all)');
-
         let query = supabase
           .from('quote_line_items')
           .select('id, item_number, description, color, garment_front_image_url, garment_back_image_url, garment_sleeve_image_url, garment_images_data')
@@ -186,12 +164,6 @@ export default function MockupGenerator({
 
         const { data: lineItems, error: lineItemsError } = await query;
 
-        if (lineItemsError) {
-          console.error('Error loading line items:', lineItemsError);
-        }
-
-        console.log('Found line items:', lineItems);
-
         if (lineItems && lineItems.length > 0) {
           const styles = lineItems.map(item => ({
             lineItemId: item.id,
@@ -205,7 +177,6 @@ export default function MockupGenerator({
             imagesData: item.garment_images_data || null,
           }));
 
-          console.log('Setting garment styles:', styles);
           setGarmentStyles(styles);
 
           // Set the initial garment image from the first item
@@ -213,11 +184,7 @@ export default function MockupGenerator({
             setGarmentImageUrl(lineItems[0].garment_front_image_url);
             setGarmentDescription(lineItems[0].description || '');
           }
-        } else {
-          console.warn('No garment line items found');
         }
-      } else {
-        console.log('Not loading garment styles - missing quoteId');
       }
 
       let existingProof = null;
@@ -271,7 +238,6 @@ export default function MockupGenerator({
       setThreadColors(threadColorsData || []);
 
       if (existingProof) {
-        console.log('Found existing proof:', existingProof);
         setProofId(existingProof.id);
         setGarmentBrand(existingProof.garment_brand || '');
         setGarmentDescription(existingProof.garment_description || '');
@@ -310,10 +276,8 @@ export default function MockupGenerator({
 
         // Check if proof has garment image, if not, fetch it
         if (existingProof.garment_image_url) {
-          console.log('Using garment image from existing proof:', existingProof.garment_image_url);
           setGarmentImageUrl(existingProof.garment_image_url);
         } else {
-          console.log('Existing proof has no garment image, fetching...');
           // Try to get from line item first
           if (lineItemId && lineItemId.trim()) {
             const { data: lineItemData } = await supabase
@@ -322,50 +286,34 @@ export default function MockupGenerator({
               .eq('id', lineItemId)
               .maybeSingle();
 
-            console.log('Line item data for garment image:', lineItemData);
-
             if (lineItemData && lineItemData.garment_front_image_url) {
-              console.log('Using stored garment image from line item:', lineItemData.garment_front_image_url);
               setGarmentImageUrl(lineItemData.garment_front_image_url);
             } else {
-              console.log('No stored garment image, fetching from API...');
               await fetchGarmentImage();
             }
           } else {
-            console.log('No line item ID, fetching garment image from API...');
             await fetchGarmentImage();
           }
         }
       } else {
         // Check if line item has garment images stored
         if (lineItemId && lineItemId.trim()) {
-          console.log('Checking for stored garment images in line item:', lineItemId);
-
           const { data: lineItemData, error: lineItemError } = await supabase
             .from('quote_line_items')
             .select('garment_front_image_url, garment_back_image_url, garment_sleeve_image_url, garment_images_data, item_number, description')
             .eq('id', lineItemId)
             .maybeSingle();
 
-          if (lineItemError) {
-            console.error('Error fetching line item data:', lineItemError);
-          }
-
-          console.log('Line item data:', lineItemData);
-
           if (lineItemData && lineItemData.garment_front_image_url) {
             // Use stored garment images
-            console.log('Using stored garment image:', lineItemData.garment_front_image_url);
             setGarmentImageUrl(lineItemData.garment_front_image_url);
             setGarmentBrand('');
             setGarmentDescription(lineItemData.description || '');
           } else {
             // Fall back to fetching from API
-            console.log('No stored garment image found, fetching from API...');
             await fetchGarmentImage();
           }
         } else {
-          console.log('No line item ID provided, fetching garment image from API...');
           await fetchGarmentImage();
         }
 
@@ -378,7 +326,6 @@ export default function MockupGenerator({
         }
       }
     } catch (error) {
-      console.error('Error loading proof:', error);
       showNotification('error', 'Failed to load proof data');
     } finally {
       setLoading(false);
@@ -387,34 +334,28 @@ export default function MockupGenerator({
 
   const fetchGarmentImage = async () => {
     if (!garmentStyle) {
-      console.log('No garment style provided, skipping image fetch');
       return;
     }
 
     try {
-      console.log('Fetching garment image for:', { garmentStyle, garmentColor });
 
       // Try to refresh session first to ensure we have a valid token
       const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
 
       if (refreshError) {
-        console.error('Error refreshing session:', refreshError);
         showNotification('error', 'Session expired. Please refresh the page and log in again.');
         return;
       }
 
       if (!session?.access_token) {
-        console.error('No access token available after refresh');
         showNotification('error', 'Authentication required. Please refresh the page and log in again.');
         return;
       }
 
       const accessToken = session.access_token;
-      console.log('Using access token (first 20 chars):', accessToken.substring(0, 20) + '...');
 
       const trimmedStyle = garmentStyle.trim();
       const searchUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/product-search?style=${encodeURIComponent(trimmedStyle)}`;
-      console.log('Making product search request to:', searchUrl);
 
       const response = await fetch(searchUrl, {
         method: 'GET',
@@ -424,18 +365,11 @@ export default function MockupGenerator({
         },
       });
 
-      console.log('Product search response status:', response.status);
-      console.log('Product search response headers:', Object.fromEntries(response.headers.entries()));
-
       if (response.ok) {
         const data = await response.json();
-        console.log('Product search results:', data);
-        console.log('Results count:', data.results?.length || 0);
-        console.log('Errors in response:', data.errors);
 
         if (data.results && data.results.length > 0) {
           const product = data.results[0];
-          console.log('First product:', product);
 
           // Find matching color or use first color
           let matchingColor = null;
@@ -453,54 +387,34 @@ export default function MockupGenerator({
             }
           }
 
-          console.log('Matching color:', matchingColor);
-
           if (matchingColor?.image_url) {
-            console.log('Setting garment image from color:', matchingColor.image_url);
             setGarmentImageUrl(matchingColor.image_url);
             setGarmentBrand(product.brand || product.supplier);
             setGarmentDescription(product.description);
 
             // Save the fetched image to the database for future use
             if (lineItemId && lineItemId.trim()) {
-              console.log('Saving garment image to line item:', lineItemId);
-              const { error: updateError } = await supabase
+              await supabase
                 .from('quote_line_items')
                 .update({
                   garment_front_image_url: matchingColor.image_url,
                   brand: product.brand || null,
                 })
                 .eq('id', lineItemId);
-
-              if (updateError) {
-                console.error('Error saving garment image to line item:', updateError);
-              } else {
-                console.log('Successfully saved garment image to line item');
-              }
             }
 
             // Also update the proof if one exists
             if (proofId) {
-              console.log('Saving garment image to proof:', proofId);
-              const { error: proofUpdateError } = await supabase
+              await supabase
                 .from('proofs')
                 .update({
                   garment_image_url: matchingColor.image_url,
                   garment_name: product.description || null,
                 })
                 .eq('id', proofId);
-
-              if (proofUpdateError) {
-                console.error('Error saving garment image to proof:', proofUpdateError);
-              } else {
-                console.log('Successfully saved garment image to proof');
-              }
             }
-          } else {
-            console.warn('No image URL found in product colors');
           }
         } else {
-          console.warn('No product results found - supplier integrations may not be configured');
           showNotification('warning', 'No garment images found. Configure supplier integrations in Account Settings to fetch garment images automatically.');
         }
       } else {
@@ -510,18 +424,9 @@ export default function MockupGenerator({
         } catch (e) {
           errorData = { error: await response.text() };
         }
-        console.error('Product search failed:', response.status, errorData);
-        console.error('Full error details:', {
-          status: response.status,
-          statusText: response.statusText,
-          url: searchUrl,
-          headers: Object.fromEntries(response.headers.entries()),
-          body: errorData
-        });
         showNotification('error', `Failed to fetch garment image: ${errorData.error || errorData.message || 'Unknown error'}`);
       }
     } catch (error) {
-      console.error('Error fetching garment image:', error);
       showNotification('error', 'Error fetching garment image: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   };
@@ -598,7 +503,6 @@ export default function MockupGenerator({
 
       showNotification('success', 'Artwork uploaded successfully');
     } catch (error: any) {
-      console.error('Error uploading artwork:', error);
       showNotification('error', 'Failed to upload artwork', error.message);
     } finally {
       setUploading(false);
@@ -651,9 +555,7 @@ export default function MockupGenerator({
               upsert: false,
             });
 
-          if (uploadError) {
-            console.error('Error uploading composite image:', uploadError);
-          } else {
+          if (!uploadError) {
             const { data: { publicUrl } } = supabase.storage
               .from('imprint-proofs')
               .getPublicUrl(filePath);
@@ -687,7 +589,6 @@ export default function MockupGenerator({
           .single();
 
         if (proofError) {
-          console.error('Error creating proof:', proofError);
           throw proofError;
         }
         currentProofId = newProof.id;
@@ -734,7 +635,6 @@ export default function MockupGenerator({
       onSave?.();
       onClose();
     } catch (error: any) {
-      console.error('Error saving proof:', error);
       showNotification('error', 'Failed to save proof', error.message);
     } finally {
       setSaving(false);
@@ -848,28 +748,23 @@ export default function MockupGenerator({
   const drawCanvas = () => {
     const canvas = canvasRef.current;
     if (!canvas) {
-      console.warn('Canvas ref not available');
       return;
     }
     const ctx = canvas.getContext('2d');
     if (!ctx) {
-      console.warn('Canvas context not available');
       return;
     }
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (garmentImageUrl) {
-      console.log('Drawing garment image to canvas:', garmentImageUrl);
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
-        console.log('Garment image loaded successfully, drawing to canvas');
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         drawArtwork(ctx);
       };
       img.onerror = (error) => {
-        console.error('Failed to load garment image:', error, garmentImageUrl);
         // Draw a placeholder or message
         ctx.fillStyle = '#f3f4f6';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -881,7 +776,6 @@ export default function MockupGenerator({
       };
       img.src = garmentImageUrl;
     } else {
-      console.log('No garment image URL, drawing placeholder');
       // Draw a light gray background when no garment image
       ctx.fillStyle = '#f3f4f6';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1329,9 +1223,7 @@ export default function MockupGenerator({
                 src={garmentImageUrl}
                 alt="Garment"
                 className="w-full rounded mb-3 border border-gray-200 dark:border-slate-700"
-                onLoad={() => console.log('Sidebar garment image loaded successfully')}
                 onError={(e) => {
-                  console.error('Sidebar garment image failed to load:', garmentImageUrl);
                   e.currentTarget.style.display = 'none';
                 }}
               />
@@ -1557,7 +1449,6 @@ function CustomerArtworkLibraryModal({
       if (error) throw error;
       setArtwork(data || []);
     } catch (error) {
-      console.error('Error loading artwork:', error);
       showNotification('error', 'Failed to load artwork library');
     } finally {
       setLoading(false);
