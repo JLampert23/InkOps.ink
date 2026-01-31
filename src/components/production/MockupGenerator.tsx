@@ -1290,6 +1290,21 @@ export default function MockupGenerator({
                 View All Customer Artwork
               </button>
 
+              {selectedArtwork.length > 0 && (
+                <button
+                  onClick={() => {
+                    if (confirm('Clear all artwork from the canvas?')) {
+                      setSelectedArtwork([]);
+                      setActiveArtworkIndex(0);
+                    }
+                  }}
+                  className="w-full flex items-center justify-center px-3 py-1.5 border border-red-300 dark:border-red-700 rounded text-xs hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400"
+                >
+                  <Trash2 className="w-3 h-3 mr-1" />
+                  Clear All Artwork
+                </button>
+              )}
+
               <button
                 onClick={handleSave}
                 disabled={saving || selectedArtwork.length === 0}
