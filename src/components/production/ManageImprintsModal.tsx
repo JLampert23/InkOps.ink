@@ -464,7 +464,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
         .insert({
           quote_id: quoteId,
           company_id: profile.company_id,
-          sort_order: index,
+          sort_order: index + 1,
           location: imprint.location,
           price_matrix_id: imprint.price_matrix_id,
           matrix: imprint.matrix,
@@ -547,7 +547,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
           const imprintData = {
             quote_id: quoteId,
             company_id: profile.company_id,
-            sort_order: idx,
+            sort_order: idx + 1,
             location: imp.location,
             price_matrix_id: imp.price_matrix_id,
             matrix: imp.matrix,
