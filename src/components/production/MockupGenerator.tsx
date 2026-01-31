@@ -1303,26 +1303,6 @@ export default function MockupGenerator({
             )}
 
             <div className="space-y-3 text-xs">
-              {/* Print Location */}
-              {printLocation && (
-                <div className="bg-white dark:bg-slate-800 rounded-lg p-2 border border-gray-200 dark:border-slate-700">
-                  <h4 className="text-xs font-semibold text-gray-900 dark:text-white mb-1.5">Print Location</h4>
-                  <div className="px-2 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs font-medium">
-                    {printLocation}
-                  </div>
-                </div>
-              )}
-
-              {/* Decoration Method */}
-              {typeOfWork && (
-                <div className="bg-white dark:bg-slate-800 rounded-lg p-2 border border-gray-200 dark:border-slate-700">
-                  <h4 className="text-xs font-semibold text-gray-900 dark:text-white mb-1.5">Decoration Method</h4>
-                  <div className="px-2 py-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded text-xs font-medium">
-                    {typeOfWork}
-                  </div>
-                </div>
-              )}
-
               {/* Dimensions */}
               <div className="bg-white dark:bg-slate-800 rounded-lg p-2 border border-gray-200 dark:border-slate-700">
                 <h4 className="text-xs font-semibold text-gray-900 dark:text-white mb-1.5">Print Size (inches)</h4>
