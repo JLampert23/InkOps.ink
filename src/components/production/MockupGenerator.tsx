@@ -807,6 +807,60 @@ export default function MockupGenerator({
           });
       }
 
+      // Update the corresponding quote_imprint with the composite image thumbnail
+      if (compositeImageUrl && imprintId && imprintId.trim()) {
+        const { data: existingImprint } = await supabase
+          .from('quote_imprints')
+          .select('mockups')
+          .eq('id', imprintId)
+          .maybeSingle();
+
+        if (existingImprint) {
+          const existingMockups = existingImprint.mockups || [];
+
+          // Check if this composite image is already in the mockups array
+          const imageExists = existingMockups.some((mockup: any) =>
+            typeof mockup === 'string' ? mockup === compositeImageUrl : mockup?.url === compositeImageUrl
+          );
+
+          if (!imageExists) {
+            // Add the new mockup with metadata
+            const updatedMockups = [
+              ...existingMockups,
+              {
+                url: compositeImageUrl,
+                created_at: new Date().toISOString(),
+                proof_id: currentProofId,
+              }
+            ];
+
+            await supabase
+              .from('quote_imprints')
+              .update({ mockups: updatedMockups })
+              .eq('id', imprintId);
+          } else {
+            // Update the existing mockup entry with the new proof_id
+            const updatedMockups = existingMockups.map((mockup: any) => {
+              const mockupUrl = typeof mockup === 'string' ? mockup : mockup?.url;
+              if (mockupUrl === compositeImageUrl) {
+                return {
+                  url: compositeImageUrl,
+                  created_at: typeof mockup === 'string' ? new Date().toISOString() : mockup.created_at,
+                  proof_id: currentProofId,
+                };
+              }
+              return mockup;
+            });
+
+            await supabase
+              .from('quote_imprints')
+              .update({ mockups: updatedMockups })
+              .eq('id', imprintId);
+          }
+        }
+      }
+
+      showNotification('success', 'Mockup saved successfully');
       onSave?.();
       onClose();
     } catch (error: any) {

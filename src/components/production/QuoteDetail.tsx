@@ -698,7 +698,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                       </div>
                                     )}
 
-                                    {matchingProof && (matchingProof.composite_image_url || matchingProof.garment_image_url) && (
+                                    {(matchingProof && (matchingProof.composite_image_url || matchingProof.garment_image_url)) || (imprint.mockups && imprint.mockups.length > 0) ? (
                                       <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
                                         <div className="flex items-center justify-end mb-2">
                                           <button
@@ -713,18 +713,45 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                             Edit
                                           </button>
                                         </div>
-                                        <img
-                                          src={matchingProof.composite_image_url || matchingProof.garment_image_url!}
-                                          alt={matchingProof.garment_name || 'Proof'}
-                                          className="w-full h-48 object-contain rounded border border-gray-200 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800"
-                                          onClick={() => {
-                                            setSelectedProofImage(matchingProof.composite_image_url || matchingProof.garment_image_url!);
-                                            setShowProofModal(true);
-                                          }}
-                                        />
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{matchingProof.proof_number}</p>
+                                        {/* Display composite image from proof */}
+                                        {matchingProof && (matchingProof.composite_image_url || matchingProof.garment_image_url) && (
+                                          <>
+                                            <img
+                                              src={matchingProof.composite_image_url || matchingProof.garment_image_url!}
+                                              alt={matchingProof.garment_name || 'Proof'}
+                                              className="w-full h-48 object-contain rounded border border-gray-200 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800"
+                                              onClick={() => {
+                                                setSelectedProofImage(matchingProof.composite_image_url || matchingProof.garment_image_url!);
+                                                setShowProofModal(true);
+                                              }}
+                                            />
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{matchingProof.proof_number}</p>
+                                          </>
+                                        )}
+                                        {/* Display mockups from imprint.mockups if no matching proof or as additional thumbnails */}
+                                        {imprint.mockups && imprint.mockups.length > 0 && !matchingProof && (
+                                          <div className="space-y-2">
+                                            {imprint.mockups.map((mockup: any, mockupIdx: number) => {
+                                              const mockupUrl = typeof mockup === 'string' ? mockup : mockup?.url;
+                                              if (!mockupUrl) return null;
+
+                                              return (
+                                                <img
+                                                  key={mockupIdx}
+                                                  src={mockupUrl}
+                                                  alt={`Mockup ${mockupIdx + 1}`}
+                                                  className="w-full h-48 object-contain rounded border border-gray-200 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800"
+                                                  onClick={() => {
+                                                    setSelectedProofImage(mockupUrl);
+                                                    setShowProofModal(true);
+                                                  }}
+                                                />
+                                              );
+                                            })}
+                                          </div>
+                                        )}
                                       </div>
-                                    )}
+                                    ) : null}
                                   </div>
                                 );
                               })}
