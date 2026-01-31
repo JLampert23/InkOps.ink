@@ -753,8 +753,10 @@ export default function MockupGenerator({
       const artworkHeight = baseSize * artwork.scale;
 
       const deleteButtonSize = 24;
-      const deleteButtonX = centerX + artworkWidth / 2 - deleteButtonSize / 2;
-      const deleteButtonY = centerY - artworkHeight / 2 - deleteButtonSize / 2;
+
+      // Calculate delete button position in screen coordinates (top-right of artwork)
+      const deleteButtonX = centerX + artworkWidth / 2;
+      const deleteButtonY = centerY - artworkHeight / 2;
 
       const distance = Math.sqrt(
         Math.pow(x - deleteButtonX, 2) + Math.pow(y - deleteButtonY, 2)
@@ -967,10 +969,14 @@ export default function MockupGenerator({
           });
         }
 
-        // Draw X button to delete artwork (top-right corner)
-        const deleteButtonSize = 24 / artwork.scale;
-        const deleteButtonX = artworkWidth / 2 - deleteButtonSize / 2;
-        const deleteButtonY = -artworkHeight / 2 - deleteButtonSize / 2;
+        ctx.restore();
+
+        // Draw X button to delete artwork in screen coordinates (not transformed)
+        const deleteButtonSize = 24;
+        const scaledWidth = artworkWidth * artwork.scale;
+        const scaledHeight = artworkHeight * artwork.scale;
+        const deleteButtonX = centerX + scaledWidth / 2;
+        const deleteButtonY = centerY - scaledHeight / 2;
 
         // Draw red circle background
         ctx.fillStyle = '#ef4444';
@@ -980,7 +986,7 @@ export default function MockupGenerator({
 
         // Draw white X
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 3 / artwork.scale;
+        ctx.lineWidth = 2;
         ctx.lineCap = 'round';
         const crossSize = deleteButtonSize / 3;
         ctx.beginPath();
@@ -989,8 +995,6 @@ export default function MockupGenerator({
         ctx.moveTo(deleteButtonX + crossSize, deleteButtonY - crossSize);
         ctx.lineTo(deleteButtonX - crossSize, deleteButtonY + crossSize);
         ctx.stroke();
-
-        ctx.restore();
       };
       img.src = artwork.artwork_url;
     });
