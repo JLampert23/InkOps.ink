@@ -142,6 +142,19 @@ export default function MockupGenerator({
   const garmentFileInputRef = useRef<HTMLInputElement>(null);
   const imprintFileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [isDragging, setIsDragging] = useState(false);
+
+  const normalizeTypeOfWork = (typeOfWork: string): string => {
+    const mapping: Record<string, string> = {
+      'Screen Print': 'screen_printing',
+      'Embroidery': 'embroidery',
+      'DTG (Direct to Garment)': 'dtg',
+      'Vinyl': 'vinyl',
+      'Sublimation': 'sublimation',
+      'Heat Transfer': 'heat_transfer',
+      'HeatPress-DTF': 'heatpress_dtf',
+    };
+    return mapping[typeOfWork] || typeOfWork.toLowerCase().replace(/\s+/g, '_');
+  };
   const [isResizing, setIsResizing] = useState(false);
   const [resizeHandle, setResizeHandle] = useState<string | null>(null);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -219,14 +232,15 @@ export default function MockupGenerator({
         return;
       }
 
-      console.log('MockupGenerator: Loading colors for work type:', typeOfWork);
+      const normalizedTypeOfWork = normalizeTypeOfWork(typeOfWork);
+      console.log('MockupGenerator: Loading colors for work type:', typeOfWork, '(normalized:', normalizedTypeOfWork + ')');
 
       try {
         const { data: colorsData, error: colorsError } = await supabase
           .from('production_colors')
           .select('id, name, color_code, type_of_work')
           .eq('company_id', companyId)
-          .eq('type_of_work', typeOfWork)
+          .eq('type_of_work', normalizedTypeOfWork)
           .eq('is_active', true)
           .order('sort_order');
 
@@ -2160,7 +2174,15 @@ export default function MockupGenerator({
                       ? 'No type of work specified for this imprint'
                       : typeOfWorkColorType === 'none'
                         ? 'This work type does not use colors'
-                        : 'No colors available for this work type'}
+                        : (
+                          <>
+                            <div>No colors available for this work type</div>
+                            <div className="mt-1 text-[10px] text-gray-400">
+                              Type: {typeOfWork} → {normalizeTypeOfWork(typeOfWork)}
+                              <br />Color type: {typeOfWorkColorType}
+                            </div>
+                          </>
+                        )}
                   </div>
                 )}
               </div>
