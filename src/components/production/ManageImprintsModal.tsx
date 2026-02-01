@@ -846,6 +846,15 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
           lineItemsCount: lineItems?.length,
         });
 
+        console.log('ManageImprintsModal: Passing to MockupGenerator:', {
+          imprintId: currentImprint.id,
+          imprintLocation: currentImprint.location,
+          imprintTypeOfWork: currentImprint.type_of_work,
+          hasId: !!currentImprint.id,
+          hasLocation: !!currentImprint.location,
+          hasTypeOfWork: !!currentImprint.type_of_work,
+        });
+
         return (
           <MockupGenerator
             lineItemId={firstLineItem.id || ''}

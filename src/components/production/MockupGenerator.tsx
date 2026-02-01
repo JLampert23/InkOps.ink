@@ -343,13 +343,27 @@ export default function MockupGenerator({
           console.log('MockupGenerator: No imprints found for quote:', quoteId, 'groupLabel:', groupLabel);
         }
 
-        // If we have an imprintId, set the type_of_work and location from that specific imprint
+        // Set type_of_work and location from loaded imprints
         console.log('MockupGenerator: Checking for imprintId:', { imprintId, imprintsDataLength: imprintsData?.length });
-        if (imprintId && imprintsData && imprintsData.length > 0) {
-          const selectedImprint = imprintsData.find(imp => imp.id === imprintId);
-          console.log('MockupGenerator: Found selectedImprint:', selectedImprint);
+
+        if (imprintsData && imprintsData.length > 0) {
+          let selectedImprint = null;
+
+          // If imprintId is provided, try to find that specific imprint
+          if (imprintId) {
+            selectedImprint = imprintsData.find(imp => imp.id === imprintId);
+            console.log('MockupGenerator: Found selectedImprint by ID:', selectedImprint);
+          }
+
+          // If no imprintId or not found, use the first imprint
+          if (!selectedImprint) {
+            selectedImprint = imprintsData[0];
+            console.log('MockupGenerator: Using first imprint as default:', selectedImprint);
+          }
+
+          // Set type_of_work and location from the selected imprint
           if (selectedImprint) {
-            console.log('MockupGenerator: Setting type_of_work from selected imprint:', selectedImprint);
+            console.log('MockupGenerator: Setting data from imprint:', selectedImprint);
             if (selectedImprint.type_of_work) {
               loadedTypeOfWork = selectedImprint.type_of_work;
               setTypeOfWork(selectedImprint.type_of_work);
@@ -358,11 +372,13 @@ export default function MockupGenerator({
               loadedPrintLocation = selectedImprint.location;
               setPrintLocation(selectedImprint.location);
             }
-          } else {
-            console.warn('MockupGenerator: imprintId provided but not found in imprints array');
+            // Set the selected imprint ID for future reference
+            if (selectedImprint.id) {
+              setSelectedImprintId(selectedImprint.id);
+            }
           }
-        } else if (imprintId) {
-          console.warn('MockupGenerator: imprintId provided but no imprints data:', { imprintId, hasImprintsData: !!imprintsData });
+        } else {
+          console.warn('MockupGenerator: No imprints data loaded');
         }
       }
 
