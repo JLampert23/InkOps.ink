@@ -1902,60 +1902,75 @@ export default function MockupGenerator({
               </div>
             </div>
 
-            {typeOfWork && (
-              <div className="mt-3 pt-3 border-t dark:border-slate-700">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
-                  {typeOfWork === 'Embroidery' || typeOfWork.toLowerCase().includes('embroid') ? 'Thread Colors' : 'Ink Colors'}
-                </h3>
-                <div className="grid grid-cols-6 gap-1.5">
-                  {(typeOfWork === 'Embroidery' || typeOfWork.toLowerCase().includes('embroid') ? threadColors : inkColors).map((color) => {
-                    const isSelected = selectedColors.some(c => c.name === color.name);
-                    return (
-                      <button
-                        key={color.id}
-                        onClick={() => {
-                          if (isSelected) {
-                            setSelectedColors(selectedColors.filter(c => c.name !== color.name));
-                          } else {
-                            setSelectedColors([...selectedColors, { name: color.name, hex: color.color_code }]);
-                          }
-                        }}
-                        className={`relative h-6 rounded border-2 transition-all ${
-                          isSelected
-                            ? 'border-blue-500 ring-1 ring-blue-300 dark:ring-blue-600'
-                            : 'border-gray-300 dark:border-slate-600 hover:border-gray-400'
-                        }`}
-                        style={{ backgroundColor: color.color_code || '#cccccc' }}
-                        title={color.name}
-                      >
-                        {isSelected && (
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="w-2.5 h-2.5 bg-white rounded-full flex items-center justify-center">
-                              <div className="w-1 h-1 bg-blue-500 rounded-full" />
-                            </div>
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-                {selectedColors.length > 0 && (
-                  <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
-                    <div className="font-medium mb-1">Selected:</div>
-                    <div className="flex flex-wrap gap-1">
-                      {selectedColors.map((color, idx) => (
-                        <span
-                          key={idx}
-                          className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded"
-                        >
-                          {color.name}
-                        </span>
-                      ))}
+            <div className="mt-3 pt-3 border-t dark:border-slate-700">
+              <div className="bg-white dark:bg-slate-800 rounded-lg p-2 border border-gray-200 dark:border-slate-700">
+                <h4 className="text-xs font-semibold text-gray-900 dark:text-white mb-1.5">
+                  {typeOfWork === 'Embroidery' || typeOfWork.toLowerCase().includes('embroid') ? 'Thread Colors' : 'Ink/Thread Colors'}
+                </h4>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  Select colors for this decoration
+                </p>
+                {typeOfWork ? (
+                  <>
+                    <div className="grid grid-cols-6 gap-1.5">
+                      {(typeOfWork === 'Embroidery' || typeOfWork.toLowerCase().includes('embroid') ? threadColors : inkColors).map((color) => {
+                        const isSelected = selectedColors.some(c => c.name === color.name);
+                        return (
+                          <button
+                            key={color.id}
+                            onClick={() => {
+                              if (isSelected) {
+                                setSelectedColors(selectedColors.filter(c => c.name !== color.name));
+                              } else {
+                                setSelectedColors([...selectedColors, { name: color.name, hex: color.color_code }]);
+                              }
+                            }}
+                            className={`relative h-7 rounded border-2 transition-all ${
+                              isSelected
+                                ? 'border-blue-500 ring-1 ring-blue-300 dark:ring-blue-600'
+                                : 'border-gray-300 dark:border-slate-600 hover:border-gray-400'
+                            }`}
+                            style={{ backgroundColor: color.color_code || '#cccccc' }}
+                            title={color.name}
+                          >
+                            {isSelected && (
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="w-3 h-3 bg-white rounded-full flex items-center justify-center shadow-sm">
+                                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                                </div>
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
+                    {selectedColors.length > 0 && (
+                      <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                        <div className="font-medium mb-1">Selected ({selectedColors.length}):</div>
+                        <div className="flex flex-wrap gap-1">
+                          {selectedColors.map((color, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded text-xs"
+                            >
+                              <span
+                                className="w-2 h-2 rounded-full border border-gray-300"
+                                style={{ backgroundColor: color.hex }}
+                              />
+                              {color.name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-xs text-gray-500 dark:text-gray-400 italic py-2">
+                    No type of work specified for this imprint
                   </div>
                 )}
               </div>
-            )}
+            </div>
           </div>
         </div>
       </div>
