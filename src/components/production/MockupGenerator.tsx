@@ -1560,14 +1560,55 @@ export default function MockupGenerator({
                                 return (
                                   <div
                                     key={`mockup-${mockupIndex}`}
-                                    className="relative w-12 h-12 bg-gray-100 dark:bg-slate-700 rounded border-2 border-green-400 dark:border-green-500 overflow-hidden"
-                                    title="Mockup preview"
+                                    className="relative group"
                                   >
-                                    <img
-                                      src={mockupUrl}
-                                      alt={`Mockup ${mockupIndex + 1}`}
-                                      className="w-full h-full object-contain"
-                                    />
+                                    <div
+                                      className="relative w-12 h-12 bg-gray-100 dark:bg-slate-700 rounded border-2 border-green-400 dark:border-green-500 overflow-hidden"
+                                      title="Mockup preview"
+                                    >
+                                      <img
+                                        src={mockupUrl}
+                                        alt={`Mockup ${mockupIndex + 1}`}
+                                        className="w-full h-full object-contain"
+                                      />
+                                    </div>
+                                    <button
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        if (confirm('Delete this mockup?')) {
+                                          try {
+                                            const updatedMockups = imprint.mockups.filter((_: any, idx: number) => idx !== mockupIndex);
+                                            const { error } = await supabase
+                                              .from('quote_imprints')
+                                              .update({ mockups: updatedMockups })
+                                              .eq('id', imprint.id);
+
+                                            if (error) throw error;
+
+                                            setImprints((prev: any[]) =>
+                                              prev.map((imp: any) =>
+                                                imp.id === imprint.id
+                                                  ? { ...imp, mockups: updatedMockups }
+                                                  : imp
+                                              )
+                                            );
+
+                                            showNotification('success', 'Mockup deleted');
+
+                                            if (onSave) {
+                                              onSave();
+                                            }
+                                          } catch (error: any) {
+                                            console.error('Error deleting mockup:', error);
+                                            showNotification('error', `Failed to delete mockup: ${error.message}`);
+                                          }
+                                        }
+                                      }}
+                                      className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                                      title="Delete mockup"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
                                   </div>
                                 );
                               })}

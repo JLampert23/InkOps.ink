@@ -200,7 +200,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const [showImprintsModal, setShowImprintsModal] = useState<string | null>(null);
   const [editingGroupIdForOptions, setEditingGroupIdForOptions] = useState<string | null>(null);
   const [showMockupForGroup, setShowMockupForGroup] = useState<string | null>(null);
-  const [selectedImprintForMockup, setSelectedImprintForMockup] = useState<string | null>(null);
   const [quoteImprints, setQuoteImprints] = useState<any[]>([]);
 
   const [productSearchResults, setProductSearchResults] = useState<ProductSearchResult[]>([]);
@@ -1718,20 +1717,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                                 </button>
                               </div>
                               <div className="flex flex-col gap-2 items-end">
-                                {selectedImprintForMockup && getGroupImprints(group.label).some(imp => imp.id === selectedImprintForMockup) && (
-                                  <div className="text-xs text-blue-600 dark:text-blue-400 font-medium flex items-center gap-1">
-                                    <span>Selected: {getGroupImprints(group.label).find(imp => imp.id === selectedImprintForMockup)?.imprint_number}</span>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedImprintForMockup(null);
-                                      }}
-                                      className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                                    >
-                                      ×
-                                    </button>
-                                  </div>
-                                )}
                                 <button
                                   onClick={() => {
                                     if (!quoteId) {
@@ -1741,7 +1726,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                                     setShowMockupForGroup(group.label);
                                   }}
                                   className="w-32 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center justify-center gap-2 shadow-sm"
-                                  title={selectedImprintForMockup ? "Create mockup for selected imprint" : "Create mockup for all imprints in group"}
                                 >
                                   <Plus className="w-4 h-4" />
                                   Mockup
@@ -1762,12 +1746,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                                 {getGroupImprints(group.label).map((imprint, idx) => (
                                   <div
                                     key={idx}
-                                    onClick={() => setSelectedImprintForMockup(imprint.id)}
-                                    className={`bg-white dark:bg-slate-800/70 rounded-lg p-3 border-2 transition-all cursor-pointer ${
-                                      selectedImprintForMockup === imprint.id
-                                        ? 'border-blue-500 dark:border-blue-400 shadow-lg ring-2 ring-blue-200 dark:ring-blue-900'
-                                        : 'border-gray-200 dark:border-slate-700/50 hover:border-blue-400 dark:hover:border-blue-600'
-                                    }`}
+                                    className="bg-white dark:bg-slate-800/70 rounded-lg p-3 border border-gray-200 dark:border-slate-700/50 hover:border-blue-400 dark:hover:border-blue-600 transition-colors"
                                   >
                                     <div className="flex items-start justify-between gap-2">
                                       <div className="flex-1 min-w-0">
@@ -1799,11 +1778,11 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                                             Color: {imprint.thread_ink_color}
                                           </p>
                                         )}
-                                        {/* Display mockup thumbnails and add mockup button */}
-                                        <div className="mt-2 pt-2 border-t border-gray-200 dark:border-slate-700">
-                                          <div className="flex items-center justify-between gap-2">
-                                            <div className="flex flex-wrap gap-1.5 flex-1">
-                                              {imprint.mockups && imprint.mockups.length > 0 && imprint.mockups.map((mockup: any, mockupIdx: number) => {
+                                        {/* Display mockup thumbnails */}
+                                        {imprint.mockups && imprint.mockups.length > 0 && (
+                                          <div className="mt-2 pt-2 border-t border-gray-200 dark:border-slate-700">
+                                            <div className="flex flex-wrap gap-1.5">
+                                              {imprint.mockups.map((mockup: any, mockupIdx: number) => {
                                                 const mockupUrl = typeof mockup === 'string' ? mockup : mockup?.url;
                                                 if (!mockupUrl) return null;
 
@@ -1816,33 +1795,48 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                                                       src={mockupUrl}
                                                       alt={`Mockup ${mockupIdx + 1}`}
                                                       className="w-16 h-16 object-contain rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 cursor-pointer hover:border-blue-500 transition-all"
-                                                      onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        window.open(mockupUrl, '_blank');
-                                                      }}
+                                                      onClick={() => window.open(mockupUrl, '_blank')}
                                                       title="Click to view full size"
                                                     />
+                                                    <button
+                                                      onClick={async (e) => {
+                                                        e.stopPropagation();
+                                                        if (confirm('Delete this mockup?')) {
+                                                          try {
+                                                            const updatedMockups = imprint.mockups.filter((_: any, idx: number) => idx !== mockupIdx);
+                                                            const { error } = await supabase
+                                                              .from('quote_imprints')
+                                                              .update({ mockups: updatedMockups })
+                                                              .eq('id', imprint.id);
+
+                                                            if (error) throw error;
+
+                                                            setQuoteImprints((prev: any[]) =>
+                                                              prev.map((imp: any) =>
+                                                                imp.id === imprint.id
+                                                                  ? { ...imp, mockups: updatedMockups }
+                                                                  : imp
+                                                              )
+                                                            );
+
+                                                            showNotification('success', 'Mockup deleted');
+                                                          } catch (error: any) {
+                                                            console.error('Error deleting mockup:', error);
+                                                            showNotification('error', `Failed to delete mockup: ${error.message}`);
+                                                          }
+                                                        }
+                                                      }}
+                                                      className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                                                      title="Delete mockup"
+                                                    >
+                                                      <X className="w-3 h-3" />
+                                                    </button>
                                                   </div>
                                                 );
                                               })}
                                             </div>
-                                            <button
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (!quoteId) {
-                                                  showNotification('warning', 'Please save the quote first');
-                                                  return;
-                                                }
-                                                setSelectedImprintForMockup(imprint.id);
-                                                setShowMockupForGroup(group.label);
-                                              }}
-                                              className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded flex items-center gap-1 whitespace-nowrap"
-                                            >
-                                              <Plus className="w-3 h-3" />
-                                              Mockup
-                                            </button>
                                           </div>
-                                        </div>
+                                        )}
                                       </div>
                                     </div>
                                   </div>
@@ -2074,11 +2068,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           garmentStyle=""
           garmentColor=""
           groupLabel={showMockupForGroup}
-          imprintId={selectedImprintForMockup || undefined}
-          onClose={() => {
-            setShowMockupForGroup(null);
-            setSelectedImprintForMockup(null);
-          }}
+          onClose={() => setShowMockupForGroup(null)}
           onSave={async () => {
             // Reload imprints to get updated mockups (but keep modal open)
             if (quoteId) {

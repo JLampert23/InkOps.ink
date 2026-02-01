@@ -14,10 +14,12 @@ import {
   Download,
   Plus,
   Pencil,
+  X,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ManageImprintsModal } from './ManageImprintsModal';
 import { generateQuotePDF, QuotePDFData } from '../../utils/quote-pdf-export';
+import { useNotification } from '../../contexts/NotificationContext';
 
 interface QuoteDetailProps {
   quoteId: string;
@@ -137,6 +139,7 @@ interface Proof {
 }
 
 export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProps) {
+  const { showNotification } = useNotification();
   const [quote, setQuote] = useState<Quote | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [quoteImprints, setQuoteImprints] = useState<QuoteImprint[]>([]);
@@ -736,16 +739,50 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                               if (!mockupUrl) return null;
 
                                               return (
-                                                <img
-                                                  key={mockupIdx}
-                                                  src={mockupUrl}
-                                                  alt={`Mockup ${mockupIdx + 1}`}
-                                                  className="w-full h-48 object-contain rounded border border-gray-200 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800"
-                                                  onClick={() => {
-                                                    setSelectedProofImage(mockupUrl);
-                                                    setShowProofModal(true);
-                                                  }}
-                                                />
+                                                <div key={mockupIdx} className="relative group">
+                                                  <img
+                                                    src={mockupUrl}
+                                                    alt={`Mockup ${mockupIdx + 1}`}
+                                                    className="w-full h-48 object-contain rounded border border-gray-200 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800"
+                                                    onClick={() => {
+                                                      setSelectedProofImage(mockupUrl);
+                                                      setShowProofModal(true);
+                                                    }}
+                                                  />
+                                                  <button
+                                                    onClick={async (e) => {
+                                                      e.stopPropagation();
+                                                      if (confirm('Delete this mockup?')) {
+                                                        try {
+                                                          const updatedMockups = imprint.mockups.filter((_: any, idx: number) => idx !== mockupIdx);
+                                                          const { error } = await supabase
+                                                            .from('quote_imprints')
+                                                            .update({ mockups: updatedMockups })
+                                                            .eq('id', imprint.id);
+
+                                                          if (error) throw error;
+
+                                                          setQuoteImprints((prev: any[]) =>
+                                                            prev.map((imp: any) =>
+                                                              imp.id === imprint.id
+                                                                ? { ...imp, mockups: updatedMockups }
+                                                                : imp
+                                                            )
+                                                          );
+
+                                                          showNotification('success', 'Mockup deleted');
+                                                        } catch (error: any) {
+                                                          console.error('Error deleting mockup:', error);
+                                                          showNotification('error', `Failed to delete mockup: ${error.message}`);
+                                                        }
+                                                      }
+                                                    }}
+                                                    className="absolute top-2 right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                                                    title="Delete mockup"
+                                                  >
+                                                    <X className="w-4 h-4" />
+                                                  </button>
+                                                </div>
                                               );
                                             })}
                                           </div>
