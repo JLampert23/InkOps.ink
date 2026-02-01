@@ -1758,7 +1758,10 @@ export default function MockupGenerator({
                             <div className="grid grid-cols-4 gap-1">
                               {garmentStyle.frontImage && (
                                 <button
-                                  onClick={() => setGarmentImageUrl(garmentStyle.frontImage)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setGarmentImageUrl(garmentStyle.frontImage);
+                                  }}
                                   className={`relative aspect-square rounded border overflow-hidden transition-all hover:scale-105 ${
                                     garmentImageUrl === garmentStyle.frontImage
                                       ? 'border-blue-500 ring-1 ring-blue-300'
@@ -1778,7 +1781,10 @@ export default function MockupGenerator({
                               )}
                               {garmentStyle.rearImage && (
                                 <button
-                                  onClick={() => setGarmentImageUrl(garmentStyle.rearImage)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setGarmentImageUrl(garmentStyle.rearImage);
+                                  }}
                                   className={`relative aspect-square rounded border overflow-hidden transition-all hover:scale-105 ${
                                     garmentImageUrl === garmentStyle.rearImage
                                       ? 'border-blue-500 ring-1 ring-blue-300'
@@ -1798,7 +1804,10 @@ export default function MockupGenerator({
                               )}
                               {garmentStyle.sideImage && (
                                 <button
-                                  onClick={() => setGarmentImageUrl(garmentStyle.sideImage)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setGarmentImageUrl(garmentStyle.sideImage);
+                                  }}
                                   className={`relative aspect-square rounded border overflow-hidden transition-all hover:scale-105 ${
                                     garmentImageUrl === garmentStyle.sideImage
                                       ? 'border-blue-500 ring-1 ring-blue-300'
@@ -1818,7 +1827,10 @@ export default function MockupGenerator({
                               )}
                               {garmentStyle.lifestyleImage && (
                                 <button
-                                  onClick={() => setGarmentImageUrl(garmentStyle.lifestyleImage)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setGarmentImageUrl(garmentStyle.lifestyleImage);
+                                  }}
                                   className={`relative aspect-square rounded border overflow-hidden transition-all hover:scale-105 ${
                                     garmentImageUrl === garmentStyle.lifestyleImage
                                       ? 'border-blue-500 ring-1 ring-blue-300'
