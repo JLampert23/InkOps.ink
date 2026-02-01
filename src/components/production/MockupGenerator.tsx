@@ -174,6 +174,10 @@ export default function MockupGenerator({
       if (!profile) throw new Error('Profile not found');
       setCompanyId(profile.company_id);
 
+      // Track typeOfWork locally during loading since state updates are async
+      let loadedTypeOfWork = '';
+      let loadedPrintLocation = '';
+
       // Load all garment styles in this group (or all if no group specified)
       if (quoteId) {
         let query = supabase
@@ -267,6 +271,22 @@ export default function MockupGenerator({
         } else {
           console.log('MockupGenerator: No imprints found for quote:', quoteId, 'groupLabel:', groupLabel);
         }
+
+        // If we have an imprintId, set the type_of_work and location from that specific imprint
+        if (imprintId && imprintsData && imprintsData.length > 0) {
+          const selectedImprint = imprintsData.find(imp => imp.id === imprintId);
+          if (selectedImprint) {
+            console.log('MockupGenerator: Setting type_of_work from selected imprint:', selectedImprint);
+            if (selectedImprint.type_of_work) {
+              loadedTypeOfWork = selectedImprint.type_of_work;
+              setTypeOfWork(selectedImprint.type_of_work);
+            }
+            if (selectedImprint.location) {
+              loadedPrintLocation = selectedImprint.location;
+              setPrintLocation(selectedImprint.location);
+            }
+          }
+        }
       }
 
       let existingProof = null;
@@ -319,6 +339,8 @@ export default function MockupGenerator({
 
       if (inkColorsError) {
         console.error('MockupGenerator: Error loading ink colors:', inkColorsError);
+      } else {
+        console.log('MockupGenerator: Loaded ink colors:', inkColorsData?.length || 0);
       }
 
       const { data: threadColorsData, error: threadColorsError } = await supabase
@@ -331,6 +353,8 @@ export default function MockupGenerator({
 
       if (threadColorsError) {
         console.error('MockupGenerator: Error loading thread colors:', threadColorsError);
+      } else {
+        console.log('MockupGenerator: Loaded thread colors:', threadColorsData?.length || 0);
       }
 
       setInkColors(inkColorsData || []);
@@ -340,6 +364,9 @@ export default function MockupGenerator({
         setProofId(existingProof.id);
         setGarmentBrand(existingProof.garment_brand || '');
         setGarmentDescription(existingProof.garment_description || '');
+        if (existingProof.type_of_work) {
+          loadedTypeOfWork = existingProof.type_of_work;
+        }
         setTypeOfWork(existingProof.type_of_work || '');
 
         const colors = existingProof.selected_colors || [];
@@ -466,35 +493,40 @@ export default function MockupGenerator({
         } else {
           await fetchGarmentImage();
         }
+      }
 
-        // Auto-populate from imprint data - load from DB if not provided as props
-        if (imprintId) {
-          // Load from database
-          const { data: imprintData, error: imprintError } = await supabase
-            .from('quote_imprints')
-            .select('type_of_work, location')
-            .eq('id', imprintId)
-            .maybeSingle();
-
-          if (imprintData && !imprintError) {
-            // Use prop if provided, otherwise use database value
-            setTypeOfWork(imprintTypeOfWork || imprintData.type_of_work || '');
-            setPrintLocation(imprintLocation || imprintData.location || 'Front');
-          } else {
-            // Fall back to props only if database fetch fails
-            if (imprintTypeOfWork) setTypeOfWork(imprintTypeOfWork);
-            if (imprintLocation) setPrintLocation(imprintLocation);
-          }
-        } else {
-          // No imprintId, just use props if provided
+      // Fallback: if typeOfWork is still not set, try props or load from database
+      // This runs regardless of whether we found an existingProof or not
+      if (!loadedTypeOfWork) {
           if (imprintTypeOfWork) {
+            loadedTypeOfWork = imprintTypeOfWork;
             setTypeOfWork(imprintTypeOfWork);
-          }
-          if (imprintLocation) {
-            setPrintLocation(imprintLocation);
+          } else if (imprintId) {
+            // Last resort: load from database if not already loaded
+            const { data: imprintData, error: imprintError } = await supabase
+              .from('quote_imprints')
+              .select('type_of_work, location')
+              .eq('id', imprintId)
+              .maybeSingle();
+
+            if (imprintData && !imprintError && imprintData.type_of_work) {
+              loadedTypeOfWork = imprintData.type_of_work;
+              setTypeOfWork(imprintData.type_of_work);
+              if (imprintData.location && !loadedPrintLocation && !imprintLocation) {
+                loadedPrintLocation = imprintData.location;
+                setPrintLocation(imprintData.location);
+              }
+            }
           }
         }
+
+      // Set print location from props if provided and not already set
+      if (imprintLocation && !loadedPrintLocation) {
+        loadedPrintLocation = imprintLocation;
+        setPrintLocation(imprintLocation);
       }
+
+      console.log('MockupGenerator: Final loaded type_of_work:', loadedTypeOfWork);
     } catch (error) {
       console.error('MockupGenerator: Failed to load proof data:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
