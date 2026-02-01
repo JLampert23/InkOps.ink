@@ -152,9 +152,24 @@ export default function MockupGenerator({
   }, [lineItemId, imprintId, quoteId, groupLabel]);
 
   useEffect(() => {
-    console.log('MockupGenerator: typeOfWork changed to:', typeOfWork);
-    console.log('MockupGenerator: inkColors.length:', inkColors.length, 'threadColors.length:', threadColors.length);
-  }, [typeOfWork, inkColors, threadColors]);
+    console.log('MockupGenerator: PROPS on mount/update:', {
+      imprintId,
+      imprintLocation,
+      imprintTypeOfWork,
+      quoteId,
+      groupLabel,
+    });
+  }, []);
+
+  useEffect(() => {
+    console.log('MockupGenerator: STATE CHANGE:', {
+      typeOfWork,
+      typeOfWorkColorType,
+      selectedImprintId,
+      inkColorsCount: inkColors.length,
+      threadColorsCount: threadColors.length,
+    });
+  }, [typeOfWork, typeOfWorkColorType, selectedImprintId, inkColors, threadColors]);
 
   useEffect(() => {
     const loadColorType = async () => {
@@ -200,6 +215,15 @@ export default function MockupGenerator({
   const loadProofData = async () => {
     try {
       setLoading(true);
+
+      console.log('MockupGenerator: loadProofData called with props:', {
+        imprintId,
+        imprintLocation,
+        imprintTypeOfWork,
+        quoteId,
+        groupLabel,
+        customerId,
+      });
 
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError) {
@@ -320,8 +344,10 @@ export default function MockupGenerator({
         }
 
         // If we have an imprintId, set the type_of_work and location from that specific imprint
+        console.log('MockupGenerator: Checking for imprintId:', { imprintId, imprintsDataLength: imprintsData?.length });
         if (imprintId && imprintsData && imprintsData.length > 0) {
           const selectedImprint = imprintsData.find(imp => imp.id === imprintId);
+          console.log('MockupGenerator: Found selectedImprint:', selectedImprint);
           if (selectedImprint) {
             console.log('MockupGenerator: Setting type_of_work from selected imprint:', selectedImprint);
             if (selectedImprint.type_of_work) {
@@ -332,7 +358,11 @@ export default function MockupGenerator({
               loadedPrintLocation = selectedImprint.location;
               setPrintLocation(selectedImprint.location);
             }
+          } else {
+            console.warn('MockupGenerator: imprintId provided but not found in imprints array');
           }
+        } else if (imprintId) {
+          console.warn('MockupGenerator: imprintId provided but no imprints data:', { imprintId, hasImprintsData: !!imprintsData });
         }
       }
 
@@ -545,27 +575,42 @@ export default function MockupGenerator({
 
       // Fallback: if typeOfWork is still not set, try props or load from database
       // This runs regardless of whether we found an existingProof or not
+      console.log('MockupGenerator: Checking fallback for type_of_work:', {
+        loadedTypeOfWork,
+        imprintTypeOfWork,
+        imprintId
+      });
+
       if (!loadedTypeOfWork) {
           if (imprintTypeOfWork) {
+            console.log('MockupGenerator: Using imprintTypeOfWork from props:', imprintTypeOfWork);
             loadedTypeOfWork = imprintTypeOfWork;
             setTypeOfWork(imprintTypeOfWork);
           } else if (imprintId) {
             // Last resort: load from database if not already loaded
+            console.log('MockupGenerator: Fetching type_of_work from database for imprint:', imprintId);
             const { data: imprintData, error: imprintError } = await supabase
               .from('quote_imprints')
               .select('type_of_work, location')
               .eq('id', imprintId)
               .maybeSingle();
 
+            console.log('MockupGenerator: Imprint data from DB:', { imprintData, imprintError });
+
             if (imprintData && !imprintError && imprintData.type_of_work) {
               loadedTypeOfWork = imprintData.type_of_work;
               setTypeOfWork(imprintData.type_of_work);
+              console.log('MockupGenerator: Set type_of_work from DB:', imprintData.type_of_work);
               if (imprintData.location && !loadedPrintLocation && !imprintLocation) {
                 loadedPrintLocation = imprintData.location;
                 setPrintLocation(imprintData.location);
               }
             }
+          } else {
+            console.warn('MockupGenerator: No way to determine type_of_work - no props and no imprintId');
           }
+        } else {
+          console.log('MockupGenerator: type_of_work already loaded:', loadedTypeOfWork);
         }
 
       // Set print location from props if provided and not already set
