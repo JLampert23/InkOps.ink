@@ -150,6 +150,11 @@ export default function MockupGenerator({
     loadProofData();
   }, [lineItemId, imprintId, quoteId, groupLabel]);
 
+  useEffect(() => {
+    console.log('MockupGenerator: typeOfWork changed to:', typeOfWork);
+    console.log('MockupGenerator: inkColors.length:', inkColors.length, 'threadColors.length:', threadColors.length);
+  }, [typeOfWork, inkColors, threadColors]);
+
   const loadProofData = async () => {
     try {
       setLoading(true);
@@ -359,6 +364,7 @@ export default function MockupGenerator({
 
       setInkColors(inkColorsData || []);
       setThreadColors(threadColorsData || []);
+      console.log('MockupGenerator: Set ink colors:', inkColorsData?.length || 0, 'thread colors:', threadColorsData?.length || 0);
 
       if (existingProof) {
         setProofId(existingProof.id);
@@ -1957,44 +1963,59 @@ export default function MockupGenerator({
             <div className="mt-3 pt-3 border-t dark:border-slate-700">
               <div className="bg-white dark:bg-slate-800 rounded-lg p-2 border border-gray-200 dark:border-slate-700">
                 <h4 className="text-xs font-semibold text-gray-900 dark:text-white mb-1.5">
-                  {typeOfWork === 'Embroidery' || typeOfWork.toLowerCase().includes('embroid') ? 'Thread Colors' : 'Ink/Thread Colors'}
+                  {typeOfWork && (typeOfWork.toLowerCase().includes('embroid')) ? 'Thread Colors' : 'Ink/Thread Colors'}
                 </h4>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                   Select colors for this decoration
                 </p>
-                {typeOfWork ? (
+                {(typeOfWork || inkColors.length > 0 || threadColors.length > 0) ? (
                   <>
                     <div className="grid grid-cols-6 gap-1.5">
-                      {(typeOfWork === 'Embroidery' || typeOfWork.toLowerCase().includes('embroid') ? threadColors : inkColors).map((color) => {
-                        const isSelected = selectedColors.some(c => c.name === color.name);
-                        return (
-                          <button
-                            key={color.id}
-                            onClick={() => {
-                              if (isSelected) {
-                                setSelectedColors(selectedColors.filter(c => c.name !== color.name));
-                              } else {
-                                setSelectedColors([...selectedColors, { name: color.name, hex: color.color_code }]);
-                              }
-                            }}
-                            className={`relative h-7 rounded border-2 transition-all ${
-                              isSelected
-                                ? 'border-blue-500 ring-1 ring-blue-300 dark:ring-blue-600'
-                                : 'border-gray-300 dark:border-slate-600 hover:border-gray-400'
-                            }`}
-                            style={{ backgroundColor: color.color_code || '#cccccc' }}
-                            title={color.name}
-                          >
-                            {isSelected && (
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                <div className="w-3 h-3 bg-white rounded-full flex items-center justify-center shadow-sm">
-                                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                      {(() => {
+                        // Determine which color set to use
+                        let colorsToShow = inkColors;
+                        if (typeOfWork && typeOfWork.toLowerCase().includes('embroid')) {
+                          colorsToShow = threadColors;
+                        } else if (typeOfWork && (typeOfWork.toLowerCase().includes('screen') || typeOfWork.toLowerCase().includes('print'))) {
+                          colorsToShow = inkColors;
+                        } else if (!typeOfWork) {
+                          // If no type of work specified, show all colors
+                          colorsToShow = [...inkColors, ...threadColors];
+                        }
+
+                        console.log('MockupGenerator: Rendering colors. typeOfWork:', typeOfWork, 'colorsToShow.length:', colorsToShow.length);
+
+                        return colorsToShow.map((color) => {
+                          const isSelected = selectedColors.some(c => c.name === color.name);
+                          return (
+                            <button
+                              key={color.id}
+                              onClick={() => {
+                                if (isSelected) {
+                                  setSelectedColors(selectedColors.filter(c => c.name !== color.name));
+                                } else {
+                                  setSelectedColors([...selectedColors, { name: color.name, hex: color.color_code }]);
+                                }
+                              }}
+                              className={`relative h-7 rounded border-2 transition-all ${
+                                isSelected
+                                  ? 'border-blue-500 ring-1 ring-blue-300 dark:ring-blue-600'
+                                  : 'border-gray-300 dark:border-slate-600 hover:border-gray-400'
+                              }`}
+                              style={{ backgroundColor: color.color_code || '#cccccc' }}
+                              title={color.name}
+                            >
+                              {isSelected && (
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <div className="w-3 h-3 bg-white rounded-full flex items-center justify-center shadow-sm">
+                                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                                  </div>
                                 </div>
-                              </div>
-                            )}
-                          </button>
-                        );
-                      })}
+                              )}
+                            </button>
+                          );
+                        });
+                      })()}
                     </div>
                     {selectedColors.length > 0 && (
                       <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
