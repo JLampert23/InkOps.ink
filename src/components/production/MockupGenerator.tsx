@@ -1382,6 +1382,10 @@ export default function MockupGenerator({
           }
         }
       }
+
+      // Clear editing state after successful save
+      setProofId(null);
+
       onSave?.();
     } catch (error: any) {
       console.error('MockupGenerator: Save error:', error);
