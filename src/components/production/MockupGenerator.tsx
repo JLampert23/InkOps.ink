@@ -1492,14 +1492,15 @@ export default function MockupGenerator({
                           </button>
                         </div>
 
-                        {/* Show thumbnails of uploaded artwork for this imprint */}
-                        {imprintArtwork[imprint.id] && imprintArtwork[imprint.id].length > 0 && (
+                        {/* Show thumbnails of uploaded artwork and mockups for this imprint */}
+                        {((imprintArtwork[imprint.id] && imprintArtwork[imprint.id].length > 0) || (imprint.mockups && imprint.mockups.length > 0)) && (
                           <div className="mt-2 pt-2 border-t border-gray-200 dark:border-slate-700">
                             <div className="text-[10px] text-gray-600 dark:text-gray-400 mb-1.5 font-medium">
-                              Uploaded Artwork ({imprintArtwork[imprint.id].length})
+                              Artwork & Mockups ({(imprintArtwork[imprint.id]?.length || 0) + (imprint.mockups?.length || 0)})
                             </div>
                             <div className="flex flex-wrap gap-1.5">
-                              {imprintArtwork[imprint.id].map((artwork) => (
+                              {/* Uploaded artwork */}
+                              {imprintArtwork[imprint.id] && imprintArtwork[imprint.id].map((artwork) => (
                                 <div
                                   key={artwork.id}
                                   className="relative group"
@@ -1552,23 +1553,14 @@ export default function MockupGenerator({
                                   </button>
                                 </div>
                               ))}
-                            </div>
-                          </div>
-                        )}
 
-                        {/* Show mockup thumbnails for this imprint */}
-                        {imprint.mockups && imprint.mockups.length > 0 && (
-                          <div className="mt-2 pt-2 border-t border-gray-200 dark:border-slate-700">
-                            <div className="text-[10px] text-gray-600 dark:text-gray-400 mb-1.5 font-medium">
-                              Mockups ({imprint.mockups.length})
-                            </div>
-                            <div className="flex flex-wrap gap-1.5">
-                              {imprint.mockups.map((mockup: any, mockupIndex: number) => {
+                              {/* Mockup thumbnails */}
+                              {imprint.mockups && imprint.mockups.map((mockup: any, mockupIndex: number) => {
                                 const mockupUrl = typeof mockup === 'string' ? mockup : mockup?.url;
                                 return (
                                   <div
-                                    key={mockupIndex}
-                                    className="relative w-12 h-12 bg-gray-100 dark:bg-slate-700 rounded border-2 border-green-300 dark:border-green-600 overflow-hidden"
+                                    key={`mockup-${mockupIndex}`}
+                                    className="relative w-12 h-12 bg-gray-100 dark:bg-slate-700 rounded border-2 border-green-400 dark:border-green-500 overflow-hidden"
                                     title="Mockup preview"
                                   >
                                     <img
