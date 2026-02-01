@@ -212,6 +212,44 @@ export default function MockupGenerator({
     loadColorType();
   }, [typeOfWork, companyId]);
 
+  // Load colors dynamically when typeOfWork changes
+  useEffect(() => {
+    const loadColorsForWorkType = async () => {
+      if (!typeOfWork || !companyId) {
+        return;
+      }
+
+      console.log('MockupGenerator: Loading colors for work type:', typeOfWork);
+
+      try {
+        const { data: colorsData, error: colorsError } = await supabase
+          .from('production_colors')
+          .select('id, name, color_code, type_of_work')
+          .eq('company_id', companyId)
+          .eq('type_of_work', typeOfWork)
+          .eq('is_active', true)
+          .order('sort_order');
+
+        if (colorsError) {
+          console.error('MockupGenerator: Error loading colors for work type:', colorsError);
+        } else {
+          console.log('MockupGenerator: Loaded', colorsData?.length || 0, 'colors for work type:', typeOfWork);
+
+          // Update the appropriate color array based on color_type
+          if (typeOfWorkColorType === 'ink') {
+            setInkColors(colorsData || []);
+          } else if (typeOfWorkColorType === 'thread') {
+            setThreadColors(colorsData || []);
+          }
+        }
+      } catch (err) {
+        console.error('MockupGenerator: Error loading colors:', err);
+      }
+    };
+
+    loadColorsForWorkType();
+  }, [typeOfWork, typeOfWorkColorType, companyId]);
+
   const loadProofData = async () => {
     try {
       setLoading(true);
@@ -421,38 +459,8 @@ export default function MockupGenerator({
         existingProof = data;
       }
 
-      // Load production colors from production_colors table
-      const { data: inkColorsData, error: inkColorsError } = await supabase
-        .from('production_colors')
-        .select('id, name, color_code')
-        .eq('company_id', profile.company_id)
-        .eq('type_of_work', 'screen_printing')
-        .eq('is_active', true)
-        .order('sort_order');
-
-      if (inkColorsError) {
-        console.error('MockupGenerator: Error loading ink colors:', inkColorsError);
-      } else {
-        console.log('MockupGenerator: Loaded ink colors:', inkColorsData?.length || 0);
-      }
-
-      const { data: threadColorsData, error: threadColorsError } = await supabase
-        .from('production_colors')
-        .select('id, name, color_code')
-        .eq('company_id', profile.company_id)
-        .eq('type_of_work', 'embroidery')
-        .eq('is_active', true)
-        .order('sort_order');
-
-      if (threadColorsError) {
-        console.error('MockupGenerator: Error loading thread colors:', threadColorsError);
-      } else {
-        console.log('MockupGenerator: Loaded thread colors:', threadColorsData?.length || 0);
-      }
-
-      setInkColors(inkColorsData || []);
-      setThreadColors(threadColorsData || []);
-      console.log('MockupGenerator: Set ink colors:', inkColorsData?.length || 0, 'thread colors:', threadColorsData?.length || 0);
+      // Colors will be loaded dynamically by useEffect based on typeOfWork
+      // No need to load them here anymore
 
       if (existingProof) {
         setProofId(existingProof.id);
