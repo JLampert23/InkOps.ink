@@ -94,7 +94,7 @@ export default function MockupGenerator({
   const [companyId, setCompanyId] = useState<string>('');
 
   const [proofId, setProofId] = useState<string | null>(null);
-  const [imprintNumber, setImprintNumber] = useState<string | null>(null);
+  const [selectedImprintId, setSelectedImprintId] = useState<string | null>(imprintId || null);
   const [garmentImageUrl, setGarmentImageUrl] = useState<string | null>(null);
   const [garmentBrand, setGarmentBrand] = useState<string>('');
   const [garmentDescription, setGarmentDescription] = useState<string>('');
@@ -119,6 +119,7 @@ export default function MockupGenerator({
     type_of_work: string;
     details: string;
     thread_ink_color: string;
+    mockups: any[];
   }>>([]);
 
   const [selectedArtwork, setSelectedArtwork] = useState<MockupArtwork[]>([]);
@@ -219,7 +220,7 @@ export default function MockupGenerator({
         // Load imprints for this group or quote
         let imprintsQuery = supabase
           .from('quote_imprints')
-          .select('id, imprint_number, location, type_of_work, details, thread_ink_color')
+          .select('id, imprint_number, location, type_of_work, details, thread_ink_color, mockups')
           .eq('quote_id', quoteId)
           .order('sort_order');
 
@@ -241,15 +242,8 @@ export default function MockupGenerator({
             type_of_work: imp.type_of_work || '',
             details: imp.details || '',
             thread_ink_color: imp.thread_ink_color || '',
+            mockups: imp.mockups || [],
           })));
-
-          // If imprintId is provided, find and set the imprint number
-          if (imprintId) {
-            const matchingImprint = imprintsData.find(imp => imp.id === imprintId);
-            if (matchingImprint) {
-              setImprintNumber(matchingImprint.imprint_number || null);
-            }
-          }
 
           // Load artwork tagged for each imprint
           if (customerId && imprintsData.length > 0) {
@@ -717,7 +711,7 @@ export default function MockupGenerator({
     console.log('MockupGenerator: Starting save...', {
       quoteId,
       lineItemId,
-      imprintId,
+      selectedImprintId,
       groupLabel,
       customerId,
       companyId,
@@ -778,7 +772,7 @@ export default function MockupGenerator({
           .insert({
             quote_id: quoteId && quoteId.trim() ? quoteId : null,
             line_item_id: lineItemId && lineItemId.trim() ? lineItemId : null,
-            imprint_id: imprintId && imprintId.trim() ? imprintId : null,
+            imprint_id: selectedImprintId && selectedImprintId.trim() ? selectedImprintId : null,
             customer_id: customerId && customerId.trim() ? customerId : null,
             company_id: companyId,
             group_label: groupLabel || '',
@@ -861,18 +855,18 @@ export default function MockupGenerator({
       if (compositeImageUrl) {
         console.log('MockupGenerator: Updating quote_imprints with mockup...', {
           compositeImageUrl,
-          imprintId,
+          selectedImprintId,
           quoteId,
           groupLabel,
         });
 
-        // If we have a specific imprintId, update just that imprint
-        if (imprintId && imprintId.trim()) {
-          console.log('MockupGenerator: Updating specific imprint:', imprintId);
+        // If we have a specific selectedImprintId, update just that imprint
+        if (selectedImprintId && selectedImprintId.trim()) {
+          console.log('MockupGenerator: Updating specific imprint:', selectedImprintId);
           const { data: existingImprint, error: fetchError } = await supabase
             .from('quote_imprints')
             .select('mockups')
-            .eq('id', imprintId)
+            .eq('id', selectedImprintId)
             .maybeSingle();
 
           if (fetchError) {
@@ -903,7 +897,7 @@ export default function MockupGenerator({
               const { error: updateError } = await supabase
                 .from('quote_imprints')
                 .update({ mockups: updatedMockups })
-                .eq('id', imprintId);
+                .eq('id', selectedImprintId);
 
               if (updateError) {
                 console.error('MockupGenerator: Error updating imprint with new mockup:', updateError);
@@ -929,7 +923,7 @@ export default function MockupGenerator({
               const { error: updateError } = await supabase
                 .from('quote_imprints')
                 .update({ mockups: updatedMockups })
-                .eq('id', imprintId);
+                .eq('id', selectedImprintId);
 
               if (updateError) {
                 console.error('MockupGenerator: Error updating existing mockup:', updateError);
@@ -939,7 +933,7 @@ export default function MockupGenerator({
               imprintsUpdated = true;
             }
           } else {
-            console.warn('MockupGenerator: Imprint not found:', imprintId);
+            console.warn('MockupGenerator: Imprint not found:', selectedImprintId);
           }
         }
         // If we have a quoteId but no specific imprintId,
@@ -1033,6 +1027,32 @@ export default function MockupGenerator({
       console.log('MockupGenerator: Save completed successfully');
       if (imprintsUpdated) {
         showNotification('success', 'Mockup saved and linked to imprints');
+
+        // Reload imprints to show updated mockups
+        if (quoteId && quoteId.trim()) {
+          let imprintsQuery = supabase
+            .from('quote_imprints')
+            .select('id, imprint_number, location, type_of_work, details, thread_ink_color, mockups')
+            .eq('quote_id', quoteId)
+            .order('sort_order');
+
+          if (groupLabel && groupLabel.trim() !== '') {
+            imprintsQuery = imprintsQuery.eq('group_label', groupLabel);
+          }
+
+          const { data: updatedImprints } = await imprintsQuery;
+          if (updatedImprints) {
+            setImprints(updatedImprints.map(imp => ({
+              id: imp.id,
+              imprint_number: imp.imprint_number || '',
+              location: imp.location || '',
+              type_of_work: imp.type_of_work || '',
+              details: imp.details || '',
+              thread_ink_color: imp.thread_ink_color || '',
+              mockups: imp.mockups || [],
+            })));
+          }
+        }
       }
       onSave?.();
     } catch (error: any) {
@@ -1327,9 +1347,9 @@ export default function MockupGenerator({
         <div className="flex items-center justify-between px-3 py-2 border-b dark:border-slate-600">
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">Mockup Generator</h2>
-            {imprintNumber && (
+            {selectedImprintId && imprints.find(i => i.id === selectedImprintId) && (
               <span className="text-xs px-2 py-1 bg-blue-600 text-white rounded font-mono">
-                #{imprintNumber}
+                #{imprints.find(i => i.id === selectedImprintId)?.imprint_number}
               </span>
             )}
           </div>
@@ -1407,13 +1427,23 @@ export default function MockupGenerator({
               )}
 
               <div>
-                <label className="block text-base font-bold text-gray-900 dark:text-white mb-2">Imprints</label>
+                <label className="block text-base font-bold text-gray-900 dark:text-white mb-2">
+                  Imprints
+                  <span className="text-xs font-normal text-gray-500 dark:text-gray-400 ml-2">
+                    (Click to link mockup)
+                  </span>
+                </label>
                 <div className="space-y-1.5">
                   {imprints.length > 0 ? (
                     imprints.map((imprint, index) => (
                       <div
                         key={imprint.id}
-                        className="p-3 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded"
+                        onClick={() => setSelectedImprintId(imprint.id)}
+                        className={`p-3 border-2 rounded cursor-pointer transition-all ${
+                          selectedImprintId === imprint.id
+                            ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500 dark:border-blue-400 shadow-md'
+                            : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-600 hover:border-blue-300 dark:hover:border-blue-700'
+                        }`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
@@ -1522,6 +1552,33 @@ export default function MockupGenerator({
                                   </button>
                                 </div>
                               ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Show mockup thumbnails for this imprint */}
+                        {imprint.mockups && imprint.mockups.length > 0 && (
+                          <div className="mt-2 pt-2 border-t border-gray-200 dark:border-slate-700">
+                            <div className="text-[10px] text-gray-600 dark:text-gray-400 mb-1.5 font-medium">
+                              Mockups ({imprint.mockups.length})
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {imprint.mockups.map((mockup: any, mockupIndex: number) => {
+                                const mockupUrl = typeof mockup === 'string' ? mockup : mockup?.url;
+                                return (
+                                  <div
+                                    key={mockupIndex}
+                                    className="relative w-12 h-12 bg-gray-100 dark:bg-slate-700 rounded border-2 border-green-300 dark:border-green-600 overflow-hidden"
+                                    title="Mockup preview"
+                                  >
+                                    <img
+                                      src={mockupUrl}
+                                      alt={`Mockup ${mockupIndex + 1}`}
+                                      className="w-full h-full object-contain"
+                                    />
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         )}
