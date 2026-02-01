@@ -1968,19 +1968,16 @@ export default function MockupGenerator({
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                   Select colors for this decoration
                 </p>
-                {(typeOfWork || inkColors.length > 0 || threadColors.length > 0) ? (
+                {typeOfWork ? (
                   <>
                     <div className="grid grid-cols-6 gap-1.5">
                       {(() => {
-                        // Determine which color set to use
-                        let colorsToShow = inkColors;
-                        if (typeOfWork && typeOfWork.toLowerCase().includes('embroid')) {
+                        // Determine which color set to use based strictly on type of work
+                        let colorsToShow = [];
+                        if (typeOfWork.toLowerCase().includes('embroid')) {
                           colorsToShow = threadColors;
-                        } else if (typeOfWork && (typeOfWork.toLowerCase().includes('screen') || typeOfWork.toLowerCase().includes('print'))) {
+                        } else if (typeOfWork.toLowerCase().includes('screen') || typeOfWork.toLowerCase().includes('print')) {
                           colorsToShow = inkColors;
-                        } else if (!typeOfWork) {
-                          // If no type of work specified, show all colors
-                          colorsToShow = [...inkColors, ...threadColors];
                         }
 
                         console.log('MockupGenerator: Rendering colors. typeOfWork:', typeOfWork, 'colorsToShow.length:', colorsToShow.length);
