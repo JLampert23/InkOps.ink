@@ -286,6 +286,86 @@ export default function MockupGenerator({
     }
   }, [selectedImprintId, imprints]);
 
+  const loadExistingProof = async (proofIdToLoad: string) => {
+    try {
+      setLoading(true);
+      console.log('MockupGenerator: Loading existing proof:', proofIdToLoad);
+
+      // Load proof details
+      const { data: proofData, error: proofError } = await supabase
+        .from('proofs')
+        .select('*')
+        .eq('id', proofIdToLoad)
+        .single();
+
+      if (proofError) {
+        console.error('Error loading proof:', proofError);
+        showNotification('error', 'Failed to load mockup');
+        return;
+      }
+
+      // Load proof artwork
+      const { data: artworkData, error: artworkError } = await supabase
+        .from('proof_artwork')
+        .select('*')
+        .eq('proof_id', proofIdToLoad)
+        .order('sort_order');
+
+      if (artworkError) {
+        console.error('Error loading proof artwork:', artworkError);
+        showNotification('error', 'Failed to load mockup artwork');
+        return;
+      }
+
+      // Set proof state
+      setProofId(proofIdToLoad);
+
+      // Set garment and imprint data from proof
+      if (proofData.garment_image_url) {
+        setGarmentImageUrl(proofData.garment_image_url);
+      }
+      if (proofData.imprint_id) {
+        setSelectedImprintId(proofData.imprint_id);
+      }
+      if (proofData.type_of_work) {
+        setTypeOfWork(proofData.type_of_work);
+      }
+      if (proofData.selected_colors) {
+        setSelectedColors(proofData.selected_colors);
+      }
+
+      // Load artwork onto canvas
+      if (artworkData && artworkData.length > 0) {
+        const loadedArtwork: MockupArtwork[] = artworkData.map(art => ({
+          id: art.id,
+          customer_artwork_id: art.customer_artwork_id,
+          artwork_url: art.artwork_url,
+          print_location: art.print_location,
+          width_inches: art.width_inches,
+          height_inches: art.height_inches,
+          position_x: art.position_x,
+          position_y: art.position_y,
+          scale: art.scale,
+          rotation: art.rotation,
+          file_name: art.artwork_name,
+          imprint_id: art.imprint_id,
+        }));
+
+        setSelectedArtwork(loadedArtwork);
+        setPrintLocation(artworkData[0].print_location || 'Front');
+        setWidthInches(artworkData[0].width_inches || 4);
+        setHeightInches(artworkData[0].height_inches || 4);
+      }
+
+      showNotification('success', 'Mockup loaded for editing');
+    } catch (error) {
+      console.error('Error loading proof:', error);
+      showNotification('error', 'Failed to load mockup');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadProofData = async () => {
     try {
       setLoading(true);
@@ -1552,6 +1632,11 @@ export default function MockupGenerator({
         <div className="flex items-center justify-between px-3 py-2 border-b dark:border-slate-600">
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">Mockup Generator</h2>
+            {proofId && (
+              <span className="text-xs px-2 py-1 bg-amber-500 text-white rounded font-semibold">
+                Editing
+              </span>
+            )}
             {selectedImprintId && imprints.find(i => i.id === selectedImprintId) && (
               <span className="text-xs px-2 py-1 bg-blue-600 text-white rounded font-mono">
                 #{imprints.find(i => i.id === selectedImprintId)?.imprint_number}
@@ -1762,14 +1847,20 @@ export default function MockupGenerator({
                               {/* Mockup thumbnails */}
                               {imprint.mockups && imprint.mockups.map((mockup: any, mockupIndex: number) => {
                                 const mockupUrl = typeof mockup === 'string' ? mockup : mockup?.url;
+                                const mockupProofId = typeof mockup === 'string' ? null : mockup?.proof_id;
                                 return (
                                   <div
                                     key={`mockup-${mockupIndex}`}
                                     className="relative group"
                                   >
                                     <div
-                                      className="relative w-12 h-12 bg-gray-100 dark:bg-slate-700 rounded border-2 border-green-400 dark:border-green-500 overflow-hidden"
-                                      title="Mockup preview"
+                                      onClick={() => {
+                                        if (mockupProofId) {
+                                          loadExistingProof(mockupProofId);
+                                        }
+                                      }}
+                                      className="relative w-12 h-12 bg-gray-100 dark:bg-slate-700 rounded border-2 border-green-400 dark:border-green-500 overflow-hidden cursor-pointer hover:border-green-500 dark:hover:border-green-400 transition-colors"
+                                      title={mockupProofId ? "Click to edit mockup" : "Mockup preview"}
                                     >
                                       <img
                                         src={mockupUrl}
@@ -1879,7 +1970,7 @@ export default function MockupGenerator({
                   ) : (
                     <>
                       <Save className="w-4 h-4 mr-1.5" />
-                      Save Mockup
+                      {proofId ? 'Save Edits' : 'Save Mockup'}
                     </>
                   )}
                 </button>
