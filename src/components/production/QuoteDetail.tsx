@@ -15,9 +15,11 @@ import {
   Plus,
   Pencil,
   X,
+  Tag,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ManageImprintsModal } from './ManageImprintsModal';
+import { LabelPreviewModal } from './LabelPreviewModal';
 import { generateQuotePDF, QuotePDFData } from '../../utils/quote-pdf-export';
 import { useNotification } from '../../contexts/NotificationContext';
 
@@ -152,6 +154,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
   const [selectedGroupLabel, setSelectedGroupLabel] = useState<string>('');
   const [showProofModal, setShowProofModal] = useState(false);
   const [selectedProofImage, setSelectedProofImage] = useState<string>('');
+  const [showLabelModal, setShowLabelModal] = useState(false);
 
   const [expiresInDays, setExpiresInDays] = useState(30);
   const [singleUse, setSingleUse] = useState(true);
@@ -374,6 +377,13 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
               Edit Quote
             </button>
           )}
+          <button
+            onClick={() => setShowLabelModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors shadow-sm"
+          >
+            <Tag className="w-4 h-4" />
+            + Label
+          </button>
           <button
             onClick={handleDownloadQuote}
             className="flex items-center gap-2 px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors shadow-sm"
@@ -1005,6 +1015,14 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
           </div>
         </div>
       )}
+
+      <LabelPreviewModal
+        isOpen={showLabelModal}
+        onClose={() => setShowLabelModal(false)}
+        invoiceNumber={quote?.quote_number || ''}
+        customerName={quote?.customer_name || ''}
+        jobNickname={quote?.nickname || ''}
+      />
     </div>
   );
 }
