@@ -1163,13 +1163,69 @@ export default function MockupGenerator({
             console.log('MockupGenerator: Found existing imprint, current mockups:', existingImprint.mockups);
             const existingMockups = existingImprint.mockups || [];
 
-            // Check if this composite image is already in the mockups array
-            const imageExists = existingMockups.some((mockup: any) =>
-              typeof mockup === 'string' ? mockup === compositeImageUrl : mockup?.url === compositeImageUrl
-            );
+            // If we're editing an existing proof, replace the mockup with this proof_id
+            if (proofId) {
+              console.log('MockupGenerator: Editing existing proof, replacing mockup with proof_id:', proofId);
 
-            if (!imageExists) {
-              // Add the new mockup with metadata
+              // Find and replace the mockup with matching proof_id
+              const mockupIndex = existingMockups.findIndex((mockup: any) =>
+                (typeof mockup === 'object' && mockup?.proof_id === proofId)
+              );
+
+              let updatedMockups;
+              if (mockupIndex !== -1) {
+                // Replace the existing mockup
+                console.log('MockupGenerator: Found existing mockup at index:', mockupIndex);
+                const oldMockup = existingMockups[mockupIndex];
+                const oldUrl = typeof oldMockup === 'string' ? oldMockup : oldMockup?.url;
+
+                // Delete old image from storage if it exists and is different
+                if (oldUrl && oldUrl !== compositeImageUrl && oldUrl.includes('imprint-proofs')) {
+                  try {
+                    const urlParts = oldUrl.split('/imprint-proofs/');
+                    if (urlParts.length > 1) {
+                      const filePath = urlParts[1];
+                      await supabase.storage.from('imprint-proofs').remove([filePath]);
+                      console.log('MockupGenerator: Deleted old mockup image from storage');
+                    }
+                  } catch (error) {
+                    console.warn('MockupGenerator: Failed to delete old mockup image:', error);
+                  }
+                }
+
+                updatedMockups = [...existingMockups];
+                updatedMockups[mockupIndex] = {
+                  url: compositeImageUrl,
+                  created_at: typeof oldMockup === 'object' ? oldMockup.created_at : new Date().toISOString(),
+                  proof_id: currentProofId,
+                };
+              } else {
+                // This shouldn't happen, but add as new if not found
+                console.log('MockupGenerator: Mockup with proof_id not found, adding as new');
+                updatedMockups = [
+                  ...existingMockups,
+                  {
+                    url: compositeImageUrl,
+                    created_at: new Date().toISOString(),
+                    proof_id: currentProofId,
+                  }
+                ];
+              }
+
+              const { error: updateError } = await supabase
+                .from('quote_imprints')
+                .update({ mockups: updatedMockups })
+                .eq('id', selectedImprintId);
+
+              if (updateError) {
+                console.error('MockupGenerator: Error updating imprint mockup:', updateError);
+                throw updateError;
+              }
+              console.log('MockupGenerator: Successfully replaced mockup');
+              imprintsUpdated = true;
+            } else {
+              // Creating a new mockup - add to the array
+              console.log('MockupGenerator: Creating new mockup');
               const updatedMockups = [
                 ...existingMockups,
                 {
@@ -1185,36 +1241,10 @@ export default function MockupGenerator({
                 .eq('id', selectedImprintId);
 
               if (updateError) {
-                console.error('MockupGenerator: Error updating imprint with new mockup:', updateError);
+                console.error('MockupGenerator: Error adding new mockup:', updateError);
                 throw updateError;
               }
-              console.log('MockupGenerator: Successfully added mockup to imprint');
-              imprintsUpdated = true;
-            } else {
-              console.log('MockupGenerator: Mockup already exists, updating proof_id');
-              // Update the existing mockup entry with the new proof_id
-              const updatedMockups = existingMockups.map((mockup: any) => {
-                const mockupUrl = typeof mockup === 'string' ? mockup : mockup?.url;
-                if (mockupUrl === compositeImageUrl) {
-                  return {
-                    url: compositeImageUrl,
-                    created_at: typeof mockup === 'string' ? new Date().toISOString() : mockup.created_at,
-                    proof_id: currentProofId,
-                  };
-                }
-                return mockup;
-              });
-
-              const { error: updateError } = await supabase
-                .from('quote_imprints')
-                .update({ mockups: updatedMockups })
-                .eq('id', selectedImprintId);
-
-              if (updateError) {
-                console.error('MockupGenerator: Error updating existing mockup:', updateError);
-                throw updateError;
-              }
-              console.log('MockupGenerator: Successfully updated existing mockup');
+              console.log('MockupGenerator: Successfully added new mockup');
               imprintsUpdated = true;
             }
           } else {
@@ -1246,14 +1276,51 @@ export default function MockupGenerator({
               console.log('MockupGenerator: Updating imprint:', imprint.id);
               const existingMockups = imprint.mockups || [];
 
-              // Check if this composite image is already in the mockups array
-              const imageExists = existingMockups.some((mockup: any) =>
-                typeof mockup === 'string' ? mockup === compositeImageUrl : mockup?.url === compositeImageUrl
-              );
+              let updatedMockups;
 
-              if (!imageExists) {
-                // Add the new mockup with metadata
-                const updatedMockups = [
+              // If editing an existing proof, replace it; otherwise add new
+              if (proofId) {
+                const mockupIndex = existingMockups.findIndex((mockup: any) =>
+                  (typeof mockup === 'object' && mockup?.proof_id === proofId)
+                );
+
+                if (mockupIndex !== -1) {
+                  // Replace existing
+                  const oldMockup = existingMockups[mockupIndex];
+                  const oldUrl = typeof oldMockup === 'string' ? oldMockup : oldMockup?.url;
+
+                  // Delete old image from storage
+                  if (oldUrl && oldUrl !== compositeImageUrl && oldUrl.includes('imprint-proofs')) {
+                    try {
+                      const urlParts = oldUrl.split('/imprint-proofs/');
+                      if (urlParts.length > 1) {
+                        await supabase.storage.from('imprint-proofs').remove([urlParts[1]]);
+                      }
+                    } catch (error) {
+                      console.warn('Failed to delete old mockup:', error);
+                    }
+                  }
+
+                  updatedMockups = [...existingMockups];
+                  updatedMockups[mockupIndex] = {
+                    url: compositeImageUrl,
+                    created_at: typeof oldMockup === 'object' ? oldMockup.created_at : new Date().toISOString(),
+                    proof_id: currentProofId,
+                  };
+                } else {
+                  // Add as new
+                  updatedMockups = [
+                    ...existingMockups,
+                    {
+                      url: compositeImageUrl,
+                      created_at: new Date().toISOString(),
+                      proof_id: currentProofId,
+                    }
+                  ];
+                }
+              } else {
+                // Add new mockup
+                updatedMockups = [
                   ...existingMockups,
                   {
                     url: compositeImageUrl,
@@ -1261,43 +1328,19 @@ export default function MockupGenerator({
                     proof_id: currentProofId,
                   }
                 ];
-
-                const { error: updateError } = await supabase
-                  .from('quote_imprints')
-                  .update({ mockups: updatedMockups })
-                  .eq('id', imprint.id);
-
-                if (updateError) {
-                  console.error('MockupGenerator: Error adding mockup to imprint:', updateError);
-                  throw updateError;
-                }
-                imprintsUpdated = true;
-              } else {
-                // Update the existing mockup entry with the new proof_id
-                const updatedMockups = existingMockups.map((mockup: any) => {
-                  const mockupUrl = typeof mockup === 'string' ? mockup : mockup?.url;
-                  if (mockupUrl === compositeImageUrl) {
-                    return {
-                      url: compositeImageUrl,
-                      created_at: typeof mockup === 'string' ? new Date().toISOString() : mockup.created_at,
-                      proof_id: currentProofId,
-                    };
-                  }
-                  return mockup;
-                });
-
-                const { error: updateError } = await supabase
-                  .from('quote_imprints')
-                  .update({ mockups: updatedMockups })
-                  .eq('id', imprint.id);
-
-                if (updateError) {
-                  console.error('MockupGenerator: Error updating imprint mockups:', updateError);
-                  throw updateError;
-                }
-                console.log('MockupGenerator: Successfully updated imprint:', imprint.id);
-                imprintsUpdated = true;
               }
+
+              const { error: updateError } = await supabase
+                .from('quote_imprints')
+                .update({ mockups: updatedMockups })
+                .eq('id', imprint.id);
+
+              if (updateError) {
+                console.error('MockupGenerator: Error updating imprint mockups:', updateError);
+                throw updateError;
+              }
+              console.log('MockupGenerator: Successfully updated imprint:', imprint.id);
+              imprintsUpdated = true;
             }
             console.log('MockupGenerator: All group imprints updated successfully');
           } else {
