@@ -158,12 +158,17 @@ export default function MockupGenerator({
 
   useEffect(() => {
     const loadColorType = async () => {
+      console.log('MockupGenerator: loadColorType triggered. typeOfWork:', typeOfWork, 'companyId:', companyId);
+
       if (!typeOfWork || !companyId) {
+        console.log('MockupGenerator: Skipping color type load - missing typeOfWork or companyId');
         setTypeOfWorkColorType('none');
         return;
       }
 
       try {
+        console.log('MockupGenerator: Querying type_of_work_settings for:', { companyId, work_type_name: typeOfWork });
+
         const { data, error } = await supabase
           .from('type_of_work_settings')
           .select('color_type')
@@ -171,13 +176,16 @@ export default function MockupGenerator({
           .eq('work_type_name', typeOfWork)
           .maybeSingle();
 
+        console.log('MockupGenerator: Query result:', { data, error });
+
         if (error) {
           console.error('MockupGenerator: Error loading color_type:', error);
           setTypeOfWorkColorType('none');
         } else if (data?.color_type) {
           setTypeOfWorkColorType(data.color_type as 'ink' | 'thread' | 'none');
-          console.log('MockupGenerator: Loaded color_type:', data.color_type, 'for work type:', typeOfWork);
+          console.log('MockupGenerator: Set color_type to:', data.color_type, 'for work type:', typeOfWork);
         } else {
+          console.log('MockupGenerator: No data returned from query, setting to none');
           setTypeOfWorkColorType('none');
         }
       } catch (err) {
@@ -2002,7 +2010,15 @@ export default function MockupGenerator({
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                   Select colors for this decoration
                 </p>
-                {(inkColors.length > 0 || threadColors.length > 0) && typeOfWorkColorType !== 'none' ? (
+                {(() => {
+                  console.log('MockupGenerator: Color render check:', {
+                    inkColorsLength: inkColors.length,
+                    threadColorsLength: threadColors.length,
+                    typeOfWorkColorType,
+                    shouldShow: (inkColors.length > 0 || threadColors.length > 0) && typeOfWorkColorType !== 'none'
+                  });
+                  return (inkColors.length > 0 || threadColors.length > 0) && typeOfWorkColorType !== 'none';
+                })() ? (
                   <>
                     <div className="grid grid-cols-6 gap-1.5">
                       {(() => {
