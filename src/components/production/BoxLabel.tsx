@@ -4,16 +4,18 @@ interface BoxLabelProps {
   invoiceNumber: string;
   customerName: string;
   jobNickname: string;
+  typeOfWork: string;
 }
 
 export const BoxLabel: React.FC<BoxLabelProps> = ({
   invoiceNumber,
   customerName,
-  jobNickname
+  jobNickname,
+  typeOfWork
 }) => {
   return (
     <div
-      id="box-label"
+      className="box-label"
       style={{
         width: '4in',
         height: '6in',
@@ -34,10 +36,10 @@ export const BoxLabel: React.FC<BoxLabelProps> = ({
         width: '100%',
         display: 'flex',
         flexDirection: 'column',
-        gap: '0.3in'
+        gap: '0.25in'
       }}>
         <div style={{
-          fontSize: '24pt',
+          fontSize: '22pt',
           fontWeight: 'bold',
           letterSpacing: '1px'
         }}>
@@ -45,7 +47,7 @@ export const BoxLabel: React.FC<BoxLabelProps> = ({
         </div>
 
         <div style={{
-          fontSize: '28pt',
+          fontSize: '26pt',
           fontWeight: 'bold',
           wordWrap: 'break-word',
           lineHeight: '1.2'
@@ -54,12 +56,23 @@ export const BoxLabel: React.FC<BoxLabelProps> = ({
         </div>
 
         <div style={{
-          fontSize: '20pt',
+          fontSize: '18pt',
           fontWeight: '600',
           wordWrap: 'break-word',
           lineHeight: '1.2'
         }}>
           {jobNickname}
+        </div>
+
+        <div style={{
+          fontSize: '20pt',
+          fontWeight: 'bold',
+          wordWrap: 'break-word',
+          lineHeight: '1.2',
+          textTransform: 'uppercase',
+          marginTop: '0.1in'
+        }}>
+          {typeOfWork}
         </div>
       </div>
     </div>

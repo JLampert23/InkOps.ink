@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ManageImprintsModal } from './ManageImprintsModal';
-import { LabelPreviewModal } from './LabelPreviewModal';
+import { LabelPreviewModal, LabelData } from './LabelPreviewModal';
 import { generateQuotePDF, QuotePDFData } from '../../utils/quote-pdf-export';
 import { useNotification } from '../../contexts/NotificationContext';
 
@@ -266,6 +266,32 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
     } finally {
       setSending(false);
     }
+  };
+
+  const generateLabels = (): LabelData[] => {
+    if (!quote || quoteImprints.length === 0) {
+      return [];
+    }
+
+    const uniqueTypesOfWork = Array.from(
+      new Set(quoteImprints.map(imprint => imprint.type_of_work).filter(Boolean))
+    );
+
+    if (uniqueTypesOfWork.length === 0) {
+      return [{
+        invoiceNumber: quote.quote_number,
+        customerName: quote.customer_name,
+        jobNickname: quote.nickname || '',
+        typeOfWork: 'General'
+      }];
+    }
+
+    return uniqueTypesOfWork.map(typeOfWork => ({
+      invoiceNumber: quote.quote_number,
+      customerName: quote.customer_name,
+      jobNickname: quote.nickname || '',
+      typeOfWork: typeOfWork
+    }));
   };
 
   const handleDownloadQuote = async () => {
@@ -1019,9 +1045,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
       <LabelPreviewModal
         isOpen={showLabelModal}
         onClose={() => setShowLabelModal(false)}
-        invoiceNumber={quote?.quote_number || ''}
-        customerName={quote?.customer_name || ''}
-        jobNickname={quote?.nickname || ''}
+        labels={generateLabels()}
       />
     </div>
   );

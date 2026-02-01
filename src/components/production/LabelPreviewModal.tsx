@@ -3,37 +3,44 @@ import { X, Printer, Download } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { BoxLabel } from './BoxLabel';
 
-interface LabelPreviewModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+export interface LabelData {
   invoiceNumber: string;
   customerName: string;
   jobNickname: string;
+  typeOfWork: string;
+}
+
+interface LabelPreviewModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  labels: LabelData[];
 }
 
 export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
   isOpen,
   onClose,
-  invoiceNumber,
-  customerName,
-  jobNickname
+  labels
 }) => {
-  const labelRef = useRef<HTMLDivElement>(null);
+  const labelsContainerRef = useRef<HTMLDivElement>(null);
 
-  if (!isOpen) return null;
+  if (!isOpen || labels.length === 0) return null;
 
   const handlePrint = () => {
-    const printContent = labelRef.current;
+    const printContent = labelsContainerRef.current;
     if (!printContent) return;
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
+    const labelsHTML = Array.from(printContent.querySelectorAll('.box-label'))
+      .map(label => label.outerHTML)
+      .join('<div style="page-break-after: always;"></div>');
+
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Box Label - ${invoiceNumber}</title>
+          <title>Box Labels - ${labels[0].invoiceNumber}</title>
           <style>
             @page {
               size: 4in 6in;
@@ -44,15 +51,18 @@ export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
               padding: 0;
             }
             @media print {
-              body {
-                width: 4in;
-                height: 6in;
+              .box-label {
+                page-break-after: always;
+                page-break-inside: avoid;
+              }
+              .box-label:last-child {
+                page-break-after: auto;
               }
             }
           </style>
         </head>
         <body>
-          ${printContent.innerHTML}
+          ${labelsHTML}
         </body>
       </html>
     `);
@@ -64,8 +74,8 @@ export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
   };
 
   const handleDownloadPDF = async () => {
-    const labelElement = labelRef.current;
-    if (!labelElement) return;
+    const labelsContainer = labelsContainerRef.current;
+    if (!labelsContainer) return;
 
     const pdf = new jsPDF({
       orientation: 'portrait',
@@ -75,16 +85,28 @@ export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
 
     try {
       const canvas = await import('html2canvas').then(m => m.default);
-      const canvasElement = await canvas(labelElement, {
-        scale: 2,
-        backgroundColor: '#ffffff',
-        width: 384,
-        height: 576
-      });
+      const labelElements = labelsContainer.querySelectorAll('.box-label');
 
-      const imgData = canvasElement.toDataURL('image/png');
-      pdf.addImage(imgData, 'PNG', 0, 0, 4, 6);
-      pdf.save(`box-label-${invoiceNumber}.pdf`);
+      for (let i = 0; i < labelElements.length; i++) {
+        const labelElement = labelElements[i] as HTMLElement;
+
+        const canvasElement = await canvas(labelElement, {
+          scale: 2,
+          backgroundColor: '#ffffff',
+          width: 384,
+          height: 576
+        });
+
+        const imgData = canvasElement.toDataURL('image/png');
+
+        if (i > 0) {
+          pdf.addPage([4, 6], 'portrait');
+        }
+
+        pdf.addImage(imgData, 'PNG', 0, 0, 4, 6);
+      }
+
+      pdf.save(`box-labels-${labels[0].invoiceNumber}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('Failed to generate PDF. Please try again.');
@@ -93,9 +115,11 @@ export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-slate-700">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Label Preview</h2>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+            Label Preview {labels.length > 1 && `(${labels.length} Labels)`}
+          </h2>
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
@@ -105,14 +129,22 @@ export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
         </div>
 
         <div className="p-6">
-          <div className="flex justify-center mb-6">
-            <div ref={labelRef} className="shadow-lg">
-              <BoxLabel
-                invoiceNumber={invoiceNumber}
-                customerName={customerName}
-                jobNickname={jobNickname}
-              />
-            </div>
+          <div
+            ref={labelsContainerRef}
+            className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6"
+          >
+            {labels.map((label, index) => (
+              <div key={index} className="flex justify-center">
+                <div className="shadow-lg">
+                  <BoxLabel
+                    invoiceNumber={label.invoiceNumber}
+                    customerName={label.customerName}
+                    jobNickname={label.jobNickname}
+                    typeOfWork={label.typeOfWork}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-slate-700">
