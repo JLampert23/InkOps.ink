@@ -1963,24 +1963,29 @@ export default function MockupGenerator({
             <div className="mt-3 pt-3 border-t dark:border-slate-700">
               <div className="bg-white dark:bg-slate-800 rounded-lg p-2 border border-gray-200 dark:border-slate-700">
                 <h4 className="text-xs font-semibold text-gray-900 dark:text-white mb-1.5">
-                  {typeOfWork && (typeOfWork.toLowerCase().includes('embroid')) ? 'Thread Colors' : 'Ink/Thread Colors'}
+                  {typeOfWork && (typeOfWork.toLowerCase().includes('embroid')) ? 'Thread Colors' : 'Ink Colors'}
                 </h4>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                   Select colors for this decoration
                 </p>
-                {typeOfWork ? (
+                {(inkColors.length > 0 || threadColors.length > 0) ? (
                   <>
                     <div className="grid grid-cols-6 gap-1.5">
                       {(() => {
                         // Determine which color set to use based strictly on type of work
                         let colorsToShow = [];
-                        if (typeOfWork.toLowerCase().includes('embroid')) {
+                        const lowerTypeOfWork = typeOfWork?.toLowerCase() || '';
+
+                        if (lowerTypeOfWork.includes('embroid')) {
                           colorsToShow = threadColors;
-                        } else if (typeOfWork.toLowerCase().includes('screen') || typeOfWork.toLowerCase().includes('print')) {
+                        } else if (lowerTypeOfWork.includes('screen') || lowerTypeOfWork.includes('print')) {
+                          colorsToShow = inkColors;
+                        } else if (lowerTypeOfWork && inkColors.length > 0) {
+                          // Default to ink colors for other work types (DTG, Vinyl, etc.)
                           colorsToShow = inkColors;
                         }
 
-                        console.log('MockupGenerator: Rendering colors. typeOfWork:', typeOfWork, 'colorsToShow.length:', colorsToShow.length);
+                        console.log('MockupGenerator: Rendering colors. typeOfWork:', typeOfWork, 'colorsToShow.length:', colorsToShow.length, 'inkColors:', inkColors.length, 'threadColors:', threadColors.length);
 
                         return colorsToShow.map((color) => {
                           const isSelected = selectedColors.some(c => c.name === color.name);
