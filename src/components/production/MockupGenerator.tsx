@@ -467,12 +467,32 @@ export default function MockupGenerator({
           await fetchGarmentImage();
         }
 
-        // Auto-populate from imprint data if provided
-        if (imprintTypeOfWork) {
-          setTypeOfWork(imprintTypeOfWork);
-        }
-        if (imprintLocation) {
-          setPrintLocation(imprintLocation);
+        // Auto-populate from imprint data - load from DB if not provided as props
+        if (imprintId) {
+          // Load from database
+          const { data: imprintData, error: imprintError } = await supabase
+            .from('quote_imprints')
+            .select('type_of_work, location')
+            .eq('id', imprintId)
+            .maybeSingle();
+
+          if (imprintData && !imprintError) {
+            // Use prop if provided, otherwise use database value
+            setTypeOfWork(imprintTypeOfWork || imprintData.type_of_work || '');
+            setPrintLocation(imprintLocation || imprintData.location || 'Front');
+          } else {
+            // Fall back to props only if database fetch fails
+            if (imprintTypeOfWork) setTypeOfWork(imprintTypeOfWork);
+            if (imprintLocation) setPrintLocation(imprintLocation);
+          }
+        } else {
+          // No imprintId, just use props if provided
+          if (imprintTypeOfWork) {
+            setTypeOfWork(imprintTypeOfWork);
+          }
+          if (imprintLocation) {
+            setPrintLocation(imprintLocation);
+          }
         }
       }
     } catch (error) {
