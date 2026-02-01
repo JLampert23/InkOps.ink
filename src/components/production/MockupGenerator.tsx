@@ -264,6 +264,28 @@ export default function MockupGenerator({
     loadColorsForWorkType();
   }, [typeOfWork, typeOfWorkColorType, companyId]);
 
+  // Load imprint details when an imprint is selected
+  useEffect(() => {
+    if (!selectedImprintId || imprints.length === 0) {
+      return;
+    }
+
+    const selectedImprint = imprints.find(imp => imp.id === selectedImprintId);
+    if (selectedImprint) {
+      console.log('MockupGenerator: Loading data from selected imprint:', selectedImprint);
+
+      // Update type of work (which will trigger color loading)
+      if (selectedImprint.type_of_work) {
+        setTypeOfWork(selectedImprint.type_of_work);
+      }
+
+      // Update print location
+      if (selectedImprint.location) {
+        setPrintLocation(selectedImprint.location);
+      }
+    }
+  }, [selectedImprintId, imprints]);
+
   const loadProofData = async () => {
     try {
       setLoading(true);
