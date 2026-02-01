@@ -130,6 +130,7 @@ export default function MockupGenerator({
   const [customLocation, setCustomLocation] = useState('');
 
   const [typeOfWork, setTypeOfWork] = useState<string>('');
+  const [typeOfWorkColorType, setTypeOfWorkColorType] = useState<'ink' | 'thread' | 'none'>('none');
   const [inkColors, setInkColors] = useState<Array<{ id: string; name: string; color_code: string }>>([]);
   const [threadColors, setThreadColors] = useState<Array<{ id: string; name: string; color_code: string }>>([]);
   const [selectedColors, setSelectedColors] = useState<Array<{ name: string; hex: string }>>([]);
@@ -154,6 +155,39 @@ export default function MockupGenerator({
     console.log('MockupGenerator: typeOfWork changed to:', typeOfWork);
     console.log('MockupGenerator: inkColors.length:', inkColors.length, 'threadColors.length:', threadColors.length);
   }, [typeOfWork, inkColors, threadColors]);
+
+  useEffect(() => {
+    const loadColorType = async () => {
+      if (!typeOfWork || !companyId) {
+        setTypeOfWorkColorType('none');
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('type_of_work_settings')
+          .select('color_type')
+          .eq('company_id', companyId)
+          .eq('work_type_name', typeOfWork)
+          .maybeSingle();
+
+        if (error) {
+          console.error('MockupGenerator: Error loading color_type:', error);
+          setTypeOfWorkColorType('none');
+        } else if (data?.color_type) {
+          setTypeOfWorkColorType(data.color_type as 'ink' | 'thread' | 'none');
+          console.log('MockupGenerator: Loaded color_type:', data.color_type, 'for work type:', typeOfWork);
+        } else {
+          setTypeOfWorkColorType('none');
+        }
+      } catch (err) {
+        console.error('MockupGenerator: Error in loadColorType:', err);
+        setTypeOfWorkColorType('none');
+      }
+    };
+
+    loadColorType();
+  }, [typeOfWork, companyId]);
 
   const loadProofData = async () => {
     try {
@@ -1963,29 +1997,25 @@ export default function MockupGenerator({
             <div className="mt-3 pt-3 border-t dark:border-slate-700">
               <div className="bg-white dark:bg-slate-800 rounded-lg p-2 border border-gray-200 dark:border-slate-700">
                 <h4 className="text-xs font-semibold text-gray-900 dark:text-white mb-1.5">
-                  {typeOfWork && (typeOfWork.toLowerCase().includes('embroid')) ? 'Thread Colors' : 'Ink Colors'}
+                  {typeOfWorkColorType === 'thread' ? 'Thread Colors' : typeOfWorkColorType === 'ink' ? 'Ink Colors' : 'Colors'}
                 </h4>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
                   Select colors for this decoration
                 </p>
-                {(inkColors.length > 0 || threadColors.length > 0) ? (
+                {(inkColors.length > 0 || threadColors.length > 0) && typeOfWorkColorType !== 'none' ? (
                   <>
                     <div className="grid grid-cols-6 gap-1.5">
                       {(() => {
-                        // Determine which color set to use based strictly on type of work
+                        // Use the color_type from type_of_work_settings
                         let colorsToShow = [];
-                        const lowerTypeOfWork = typeOfWork?.toLowerCase() || '';
 
-                        if (lowerTypeOfWork.includes('embroid')) {
+                        if (typeOfWorkColorType === 'thread') {
                           colorsToShow = threadColors;
-                        } else if (lowerTypeOfWork.includes('screen') || lowerTypeOfWork.includes('print')) {
-                          colorsToShow = inkColors;
-                        } else if (lowerTypeOfWork && inkColors.length > 0) {
-                          // Default to ink colors for other work types (DTG, Vinyl, etc.)
+                        } else if (typeOfWorkColorType === 'ink') {
                           colorsToShow = inkColors;
                         }
 
-                        console.log('MockupGenerator: Rendering colors. typeOfWork:', typeOfWork, 'colorsToShow.length:', colorsToShow.length, 'inkColors:', inkColors.length, 'threadColors:', threadColors.length);
+                        console.log('MockupGenerator: Rendering colors. typeOfWork:', typeOfWork, 'colorType:', typeOfWorkColorType, 'colorsToShow.length:', colorsToShow.length);
 
                         return colorsToShow.map((color) => {
                           const isSelected = selectedColors.some(c => c.name === color.name);
@@ -2041,7 +2071,11 @@ export default function MockupGenerator({
                   </>
                 ) : (
                   <div className="text-xs text-gray-500 dark:text-gray-400 italic py-2">
-                    No type of work specified for this imprint
+                    {!typeOfWork
+                      ? 'No type of work specified for this imprint'
+                      : typeOfWorkColorType === 'none'
+                        ? 'This work type does not use colors'
+                        : 'No colors available for this work type'}
                   </div>
                 )}
               </div>
