@@ -1738,25 +1738,15 @@ export default function MockupGenerator({
                             }
                           }}
                         >
-                          <div className="flex items-start gap-2">
-                            {garmentStyle.frontImage ? (
-                              <img
-                                src={garmentStyle.frontImage}
-                                alt={garmentStyle.style}
-                                className="w-10 h-10 object-contain rounded border border-gray-200 dark:border-slate-600 bg-white"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 flex items-center justify-center rounded border border-gray-300 dark:border-slate-600 bg-gray-100 dark:bg-slate-700">
-                                <ImageIcon className="w-4 h-4 text-gray-400" />
-                              </div>
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <div className="text-xs font-semibold text-gray-900 dark:text-white truncate">
-                                {garmentStyle.itemNumber}
-                              </div>
-                              <div className="text-xs text-gray-600 dark:text-gray-400">
-                                {garmentStyle.color}
-                              </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-semibold text-gray-900 dark:text-white truncate">
+                              {garmentStyle.itemNumber}
+                            </div>
+                            <div className="text-xs text-gray-600 dark:text-gray-400">
+                              {garmentStyle.color}
+                            </div>
+                            <div className="text-[11px] text-gray-500 dark:text-gray-500 mt-1 leading-tight">
+                              {garmentStyle.description}
                             </div>
                           </div>
                         </div>
@@ -1765,11 +1755,11 @@ export default function MockupGenerator({
                         {isActive && (
                           <div className="px-2 pb-2 border-t border-gray-200 dark:border-slate-600 mt-2 pt-2">
                             <div className="text-[10px] text-gray-500 dark:text-gray-400 mb-1.5 font-medium">Views:</div>
-                            <div className="grid grid-cols-2 gap-1.5">
+                            <div className="grid grid-cols-4 gap-1">
                               {garmentStyle.frontImage && (
                                 <button
                                   onClick={() => setGarmentImageUrl(garmentStyle.frontImage)}
-                                  className={`relative aspect-square rounded border-2 overflow-hidden transition-all hover:scale-105 ${
+                                  className={`relative aspect-square rounded border overflow-hidden transition-all hover:scale-105 ${
                                     garmentImageUrl === garmentStyle.frontImage
                                       ? 'border-blue-500 ring-1 ring-blue-300'
                                       : 'border-gray-300 dark:border-slate-600'
@@ -1781,7 +1771,7 @@ export default function MockupGenerator({
                                     alt="Front"
                                     className="w-full h-full object-contain bg-white"
                                   />
-                                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[9px] text-center py-0.5">
+                                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[8px] text-center py-0.5">
                                     Front
                                   </div>
                                 </button>
@@ -1789,7 +1779,7 @@ export default function MockupGenerator({
                               {garmentStyle.rearImage && (
                                 <button
                                   onClick={() => setGarmentImageUrl(garmentStyle.rearImage)}
-                                  className={`relative aspect-square rounded border-2 overflow-hidden transition-all hover:scale-105 ${
+                                  className={`relative aspect-square rounded border overflow-hidden transition-all hover:scale-105 ${
                                     garmentImageUrl === garmentStyle.rearImage
                                       ? 'border-blue-500 ring-1 ring-blue-300'
                                       : 'border-gray-300 dark:border-slate-600'
@@ -1801,7 +1791,7 @@ export default function MockupGenerator({
                                     alt="Rear"
                                     className="w-full h-full object-contain bg-white"
                                   />
-                                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[9px] text-center py-0.5">
+                                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[8px] text-center py-0.5">
                                     Rear
                                   </div>
                                 </button>
@@ -1809,7 +1799,7 @@ export default function MockupGenerator({
                               {garmentStyle.sideImage && (
                                 <button
                                   onClick={() => setGarmentImageUrl(garmentStyle.sideImage)}
-                                  className={`relative aspect-square rounded border-2 overflow-hidden transition-all hover:scale-105 ${
+                                  className={`relative aspect-square rounded border overflow-hidden transition-all hover:scale-105 ${
                                     garmentImageUrl === garmentStyle.sideImage
                                       ? 'border-blue-500 ring-1 ring-blue-300'
                                       : 'border-gray-300 dark:border-slate-600'
@@ -1821,7 +1811,7 @@ export default function MockupGenerator({
                                     alt="Side"
                                     className="w-full h-full object-contain bg-white"
                                   />
-                                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[9px] text-center py-0.5">
+                                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[8px] text-center py-0.5">
                                     Side
                                   </div>
                                 </button>
@@ -1829,7 +1819,7 @@ export default function MockupGenerator({
                               {garmentStyle.lifestyleImage && (
                                 <button
                                   onClick={() => setGarmentImageUrl(garmentStyle.lifestyleImage)}
-                                  className={`relative aspect-square rounded border-2 overflow-hidden transition-all hover:scale-105 ${
+                                  className={`relative aspect-square rounded border overflow-hidden transition-all hover:scale-105 ${
                                     garmentImageUrl === garmentStyle.lifestyleImage
                                       ? 'border-blue-500 ring-1 ring-blue-300'
                                       : 'border-gray-300 dark:border-slate-600'
@@ -1841,7 +1831,7 @@ export default function MockupGenerator({
                                     alt="Lifestyle"
                                     className="w-full h-full object-contain bg-white"
                                   />
-                                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[9px] text-center py-0.5">
+                                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[8px] text-center py-0.5">
                                     Lifestyle
                                   </div>
                                 </button>
