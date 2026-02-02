@@ -251,20 +251,29 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
     }
   };
 
+  // Load company settings, customers, and fees on mount
   useEffect(() => {
     if (!user) return;
 
     loadCompanySettings();
     loadCustomers();
     loadAvailableFees();
+  }, [user]);
 
-    if (quoteId) {
-      loadQuote();
-    } else {
+  // Handle quote loading or creation
+  useEffect(() => {
+    if (!user) return;
+
+    if (initialQuoteId) {
+      // If we have an initial quote ID, set it and load
+      setQuoteId(initialQuoteId);
+      loadQuote(initialQuoteId);
+    } else if (!draftCreatedRef.current) {
+      // If no quote ID exists and we haven't created a draft yet, create one
       createDraftQuote();
       loadDefaultFees();
     }
-  }, [user]);
+  }, [user, initialQuoteId]);
 
   useEffect(() => {
     if (selectedCustomerId && !quoteId) {
@@ -491,13 +500,14 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
     }
   };
 
-  const loadQuote = async () => {
-    if (!quoteId) return;
+  const loadQuote = async (idToLoad?: string) => {
+    const targetId = idToLoad || quoteId;
+    if (!targetId) return;
     setLoading(true);
     const { data: quote } = await supabase
       .from('quotes')
       .select('*')
-      .eq('id', quoteId)
+      .eq('id', targetId)
       .maybeSingle();
 
     if (quote) {
@@ -538,7 +548,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       const { data: lineItems } = await supabase
         .from('quote_line_items')
         .select('*')
-        .eq('quote_id', quoteId)
+        .eq('quote_id', targetId)
         .or('line_type.is.null,line_type.eq.item')
         .order('sort_order');
 
@@ -579,7 +589,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       const { data: lineItemFees } = await supabase
         .from('quote_line_items')
         .select('*')
-        .eq('quote_id', quoteId)
+        .eq('quote_id', targetId)
         .eq('line_type', 'fee');
 
       if (lineItemFees && lineItemFees.length > 0) {
@@ -597,7 +607,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         const { data: quoteFees } = await supabase
           .from('quote_fees')
           .select('*')
-          .eq('quote_id', quoteId);
+          .eq('quote_id', targetId);
         setFees(quoteFees?.map(fee => ({
           ...fee,
           taxed: fee.taxed || false,
@@ -609,7 +619,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
     const { data: imprints } = await supabase
       .from('quote_imprints')
       .select('*')
-      .eq('quote_id', quoteId)
+      .eq('quote_id', targetId)
       .order('sort_order');
 
     if (imprints) {
