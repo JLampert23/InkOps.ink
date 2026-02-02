@@ -219,6 +219,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [sanmarTestResult, setSanmarTestResult] = useState<any>(null);
   const [testingSSA, setTestingSSA] = useState(false);
   const [ssaTestResult, setSsaTestResult] = useState<any>(null);
+  const [syncingCatalog, setSyncingCatalog] = useState(false);
+  const [catalogSyncResult, setCatalogSyncResult] = useState<any>(null);
 
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -2132,6 +2134,88 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       });
     } finally {
       setTestingSSA(false);
+    }
+  };
+
+  const syncSSACatalog = async () => {
+    try {
+      setSyncingCatalog(true);
+      setCatalogSyncResult(null);
+
+      let session;
+      try {
+        session = await getFreshSession();
+      } catch (err) {
+        setCatalogSyncResult({
+          success: false,
+          error: err instanceof Error ? err.message : 'Authentication error',
+        });
+        return;
+      }
+
+      if (!companySettings?.id) {
+        setCatalogSyncResult({
+          success: false,
+          error: 'Company settings not loaded. Please refresh the page.',
+        });
+        return;
+      }
+
+      const ssaHasCreds = !!(companySettings.ssactivewear_api_key_encrypted);
+
+      if (!ssaHasCreds) {
+        setCatalogSyncResult({
+          success: false,
+          error: 'SSActivewear credentials not saved. Please save your credentials first.',
+        });
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-ss-catalog`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({}),
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const result = data.result || {};
+        setCatalogSyncResult({
+          success: true,
+          message: `Catalog sync completed! Processed ${result.totalStyles || 0} styles (${result.successCount || 0} successful, ${result.failureCount || 0} failed).`,
+          details: result,
+        });
+        showNotification('success', 'Catalog Synced', `Successfully synced ${result.successCount || 0} products from SSActivewear`);
+      } else {
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText || 'Unknown error' };
+        }
+        setCatalogSyncResult({
+          success: false,
+          error: errorData.error || 'Sync failed',
+        });
+        showNotification('error', 'Sync Failed', errorData.error || 'Failed to sync catalog');
+      }
+    } catch (err) {
+      console.error('Catalog sync exception:', err);
+      setCatalogSyncResult({
+        success: false,
+        error: err instanceof Error ? err.message : 'Sync failed',
+      });
+      showNotification('error', 'Sync Failed', err instanceof Error ? err.message : 'Failed to sync catalog');
+    } finally {
+      setSyncingCatalog(false);
     }
   };
 
@@ -5901,23 +5985,43 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                     {ssaHasCredentials && (
                       <>
-                        <button
-                          onClick={testSSAConnection}
-                          disabled={testingSSA}
-                          className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                        >
-                          {testingSSA ? (
-                            <>
-                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              Testing Connection...
-                            </>
-                          ) : (
-                            <>
-                              <Zap className="w-4 h-4" />
-                              Test SSActivewear Connection
-                            </>
-                          )}
-                        </button>
+                        <div className="grid grid-cols-2 gap-3">
+                          <button
+                            onClick={testSSAConnection}
+                            disabled={testingSSA}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                          >
+                            {testingSSA ? (
+                              <>
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                Testing...
+                              </>
+                            ) : (
+                              <>
+                                <Zap className="w-4 h-4" />
+                                Test Connection
+                              </>
+                            )}
+                          </button>
+
+                          <button
+                            onClick={syncSSACatalog}
+                            disabled={syncingCatalog}
+                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                          >
+                            {syncingCatalog ? (
+                              <>
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                Syncing...
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw className="w-4 h-4" />
+                                Sync Catalog
+                              </>
+                            )}
+                          </button>
+                        </div>
 
                         {ssaTestResult && (
                           <div className={`p-4 rounded-lg border ${ssaTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
@@ -5932,6 +6036,35 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                                 <p className={`text-sm mt-1 ${ssaTestResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
                                   {ssaTestResult.message || ssaTestResult.error}
                                 </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {catalogSyncResult && (
+                          <div className={`p-4 rounded-lg border ${catalogSyncResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
+                            <div className="flex items-start gap-3">
+                              <div className={`flex-shrink-0 w-6 h-6 rounded-full ${catalogSyncResult.success ? 'bg-green-500' : 'bg-red-500'} flex items-center justify-center text-white text-sm font-bold`}>
+                                {catalogSyncResult.success ? '✓' : '✕'}
+                              </div>
+                              <div className="flex-1">
+                                <h4 className={`font-medium ${catalogSyncResult.success ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'}`}>
+                                  {catalogSyncResult.success ? 'Catalog Sync Successful!' : 'Catalog Sync Failed'}
+                                </h4>
+                                <p className={`text-sm mt-1 ${catalogSyncResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
+                                  {catalogSyncResult.message || catalogSyncResult.error}
+                                </p>
+                                {catalogSyncResult.success && catalogSyncResult.details && (
+                                  <div className="mt-2 text-xs space-y-1 text-green-700 dark:text-green-300">
+                                    <p>Total Companies: {catalogSyncResult.details.totalCompanies || 0}</p>
+                                    <p>Total Styles: {catalogSyncResult.details.totalStyles || 0}</p>
+                                    {catalogSyncResult.details.errors && catalogSyncResult.details.errors.length > 0 && (
+                                      <p className="text-orange-600 dark:text-orange-400">
+                                        {catalogSyncResult.details.errors.length} error(s) occurred
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
