@@ -81,10 +81,10 @@ Deno.serve(async (req: Request) => {
       // Get unique style numbers from quote line items for this company
       const { data: styleNumbers, error: stylesError } = await supabase
         .from("quote_line_items")
-        .select("supplier_style_number")
+        .select("item_number")
         .eq("company_id", company.id)
-        .not("supplier_style_number", "is", null)
-        .order("supplier_style_number");
+        .not("item_number", "is", null)
+        .order("item_number");
 
       if (stylesError) {
         console.error(`❌ Error fetching styles for company ${company.id}:`, stylesError);
@@ -99,7 +99,7 @@ Deno.serve(async (req: Request) => {
       // Get unique style numbers
       const uniqueStyles = [...new Set(
         styleNumbers
-          .map(item => item.supplier_style_number?.trim())
+          .map(item => item.item_number?.trim())
           .filter(Boolean)
       )];
 
@@ -129,6 +129,14 @@ Deno.serve(async (req: Request) => {
 
           const promoData = await promoResponse.json();
 
+          console.log(`📦 PromoStandards response structure:`, {
+            hasProduct: !!promoData.product,
+            hasInventory: !!promoData.inventory,
+            hasMedia: !!promoData.media,
+            partsCount: promoData.product?.parts?.length || 0,
+            imagesCount: promoData.media?.images?.length || 0
+          });
+
           // Upsert style data
           const { data: styleData, error: styleError } = await supabase
             .from("styles")
@@ -142,22 +150,32 @@ Deno.serve(async (req: Request) => {
               primary_image: promoData.media?.views?.front || null,
               last_synced: new Date().toISOString(),
             }, {
-              onConflict: "company_id,style_number",
-              ignoreDuplicates: false
+              onConflict: "company_id,style_number"
             })
             .select("id")
-            .single();
+            .maybeSingle();
 
           if (styleError) {
+            console.error(`❌ Style upsert error:`, styleError);
             throw new Error(`Failed to upsert style: ${styleError.message}`);
           }
 
+          if (!styleData) {
+            throw new Error(`Failed to retrieve style data after upsert`);
+          }
+
           const styleId = styleData.id;
+          console.log(`✅ Style upserted with id: ${styleId}`);
 
           // Upsert parts data
           if (promoData.product?.parts && Array.isArray(promoData.product.parts)) {
+            console.log(`📦 Processing ${promoData.product.parts.length} parts...`);
+
             for (const part of promoData.product.parts) {
-              if (!part.partId) continue;
+              if (!part.partId) {
+                console.warn(`⚠️ Skipping part with no partId`);
+                continue;
+              }
 
               const { data: partData, error: partError } = await supabase
                 .from("parts")
@@ -170,19 +188,22 @@ Deno.serve(async (req: Request) => {
                   size: part.labelSize || null,
                   weight: null,
                   gtin: null,
-                }, {
-                  onConflict: "company_id,part_id",
-                  ignoreDuplicates: false
                 })
                 .select("id")
-                .single();
+                .maybeSingle();
 
               if (partError) {
                 console.error(`❌ Failed to upsert part ${part.partId}:`, partError);
                 continue;
               }
 
+              if (!partData) {
+                console.error(`❌ No data returned after upserting part ${part.partId}`);
+                continue;
+              }
+
               const partDbId = partData.id;
+              console.log(`✅ Part upserted: ${part.partId} (${part.colorName} - ${part.labelSize})`);
 
               // Upsert inventory data
               if (promoData.inventory?.items && Array.isArray(promoData.inventory.items)) {
@@ -190,8 +211,12 @@ Deno.serve(async (req: Request) => {
                   (inv: any) => inv.partId === part.partId
                 );
 
+                if (inventoryForPart.length > 0) {
+                  console.log(`📊 Upserting ${inventoryForPart.length} inventory records for part ${part.partId}`);
+                }
+
                 for (const inv of inventoryForPart) {
-                  await supabase
+                  const { error: invError } = await supabase
                     .from("inventory")
                     .upsert({
                       company_id: company.id,
@@ -199,10 +224,11 @@ Deno.serve(async (req: Request) => {
                       warehouse: inv.warehouseName || 'Unknown',
                       quantity: inv.quantityAvailable || 0,
                       updated_at: new Date().toISOString(),
-                    }, {
-                      onConflict: "company_id,part_id,warehouse",
-                      ignoreDuplicates: false
                     });
+
+                  if (invError) {
+                    console.error(`❌ Failed to upsert inventory for ${part.partId}:`, invError);
+                  }
                 }
               }
 
@@ -212,10 +238,14 @@ Deno.serve(async (req: Request) => {
                   (img: any) => img.partId === part.partId || !img.partId
                 );
 
+                if (imagesForPart.length > 0) {
+                  console.log(`📸 Upserting ${imagesForPart.length} images for part ${part.partId}`);
+                }
+
                 for (const img of imagesForPart) {
                   if (!img.url) continue;
 
-                  await supabase
+                  const { error: imgError } = await supabase
                     .from("images")
                     .upsert({
                       company_id: company.id,
@@ -225,10 +255,11 @@ Deno.serve(async (req: Request) => {
                       size: null,
                       color: img.color || null,
                       single_part: img.singlePart !== false,
-                    }, {
-                      onConflict: "company_id,part_id,url",
-                      ignoreDuplicates: false
                     });
+
+                  if (imgError) {
+                    console.error(`❌ Failed to upsert image for ${part.partId}:`, imgError);
+                  }
                 }
               }
             }
