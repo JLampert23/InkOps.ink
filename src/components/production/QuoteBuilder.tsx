@@ -227,12 +227,15 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
           },
         }
       );
 
       if (!response.ok) {
-        throw new Error('Failed to create draft quote');
+        const errorText = await response.text();
+        console.error('Draft creation failed:', response.status, errorText);
+        throw new Error(`Failed to create draft quote: ${response.status}`);
       }
 
       const { quote } = await response.json();

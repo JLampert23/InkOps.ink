@@ -56,8 +56,8 @@ Deno.serve(async (req: Request) => {
     const lastPath = pathParts[pathParts.length - 1];
     const quoteId = lastPath && lastPath.match(/^[0-9a-f-]{36}$/i) ? lastPath : null;
 
-    // POST /quotes/draft - Create minimal draft quote
-    if (req.method === "POST" && lastPath === "draft") {
+    // POST /draft - Create minimal draft quote
+    if (req.method === "POST" && (lastPath === "draft" || url.pathname.endsWith("/draft"))) {
       // Generate quote number
       const { data: quoteNumber } = await supabase.rpc("generate_quote_number");
 
