@@ -176,81 +176,61 @@ Deno.serve(async (req: Request) => {
             const ssaProducts = transformSSActivewearData(ssaData.data, style);
             console.log("Transformed products count:", ssaProducts.length);
 
-            // Fetch media/images for the product BEFORE returning
+            // Fetch media/images for EACH color with its specific partId
             try {
-              const mediaUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=media&productId=${encodeURIComponent(style)}&companyId=${encodeURIComponent(profile.company_id)}`;
-              console.log("Fetching media from:", mediaUrl);
-              const mediaResponse = await fetch(mediaUrl, {
-                headers: {
-                  "Authorization": `Bearer ${supabaseServiceKey}`,
-                },
-              });
+              if (ssaProducts.length > 0) {
+                const product = ssaProducts[0];
 
-              if (mediaResponse.ok) {
-                const mediaData = await mediaResponse.json();
-                console.log("Media API response:", {
-                  success: mediaData.success,
-                  mediaContentCount: mediaData.data?.mediaContent?.length || 0
-                });
+                console.log(`Fetching media for ${product.colors.length} colors`);
 
-                if (mediaData.success && mediaData.data && ssaProducts.length > 0) {
-                  // Add media URLs to the product colors
-                  const product = ssaProducts[0];
-                  const mediaContent = mediaData.data.mediaContent || [];
+                // Fetch media for each color with its specific partId
+                for (const color of product.colors) {
+                  if (!color.code) continue;
 
-                  console.log(`Processing ${mediaContent.length} media items for ${product.colors.length} colors`);
+                  const mediaUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=media&productId=${encodeURIComponent(style)}&partId=${encodeURIComponent(color.code)}&companyId=${encodeURIComponent(profile.company_id)}`;
 
-                  // Map media to colors by matching partId (more reliable than color name)
-                  // Priority: Front images > Back images > Side images
-                  for (const color of product.colors) {
-                    // Find all media for this color by matching partId
-                    const colorMedia = mediaContent.filter((media: any) => {
-                      // Match by partId first (most reliable)
-                      if (media.partId && color.partIds && Array.isArray(color.partIds)) {
-                        return color.partIds.includes(media.partId);
-                      }
-
-                      // Fallback: Match by color name (case-insensitive, trim whitespace)
-                      const mediaColorName = (media.colorName || '').trim().toLowerCase();
-                      const productColorName = (color.name || '').trim().toLowerCase();
-                      return mediaColorName === productColorName;
+                  try {
+                    const mediaResponse = await fetch(mediaUrl, {
+                      headers: {
+                        "Authorization": `Bearer ${supabaseServiceKey}`,
+                      },
                     });
 
-                    console.log(`Found ${colorMedia.length} media items for color: ${color.name} (partIds: ${color.partIds?.join(', ')})`);
+                    if (mediaResponse.ok) {
+                      const mediaData = await mediaResponse.json();
+                      const mediaContent = mediaData.data?.mediaContent || [];
 
-                    if (colorMedia.length > 0) {
-                      // Try to find a front image first
-                      let frontImage = colorMedia.find((m: any) =>
-                        (m.classType || '').toLowerCase().includes('front')
-                      );
+                      console.log(`Found ${mediaContent.length} images for ${color.name} (${color.code})`);
 
-                      // If no front image, try back image
-                      if (!frontImage) {
-                        frontImage = colorMedia.find((m: any) =>
-                          (m.classType || '').toLowerCase().includes('back') ||
-                          (m.classType || '').toLowerCase().includes('rear')
+                      if (mediaContent.length > 0) {
+                        // Try to find a front image first
+                        let bestImage = mediaContent.find((m: any) =>
+                          (m.classTypeName || '').toLowerCase().includes('front')
                         );
-                      }
 
-                      // If still no image, use the first available image
-                      if (!frontImage) {
-                        frontImage = colorMedia[0];
-                      }
+                        // If no front image, try back/rear image
+                        if (!bestImage) {
+                          bestImage = mediaContent.find((m: any) => {
+                            const type = (m.classTypeName || '').toLowerCase();
+                            return type.includes('back') || type.includes('rear');
+                          });
+                        }
 
-                      if (frontImage && frontImage.url) {
-                        color.image_url = frontImage.url;
-                        console.log(`Assigned image to ${color.name}: ${frontImage.url.substring(0, 80)}...`);
+                        // If still no image, use the first available image
+                        if (!bestImage) {
+                          bestImage = mediaContent[0];
+                        }
+
+                        if (bestImage && bestImage.url) {
+                          color.image_url = bestImage.url;
+                          console.log(`✓ Assigned image to ${color.name}: ${bestImage.classTypeName}`);
+                        }
                       }
-                    } else {
-                      console.warn(`No media found for color: ${color.name}`);
                     }
+                  } catch (colorMediaError: any) {
+                    console.warn(`Failed to fetch media for color ${color.name}:`, colorMediaError.message);
                   }
-
-                  console.log("Updated product with media:", product);
                 }
-              } else {
-                const errorText = await mediaResponse.text();
-                console.error("Media API error:", errorText);
               }
             } catch (mediaError: any) {
               console.warn("Failed to fetch media for SSActivewear product:", mediaError.message);

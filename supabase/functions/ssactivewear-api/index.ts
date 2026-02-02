@@ -462,43 +462,29 @@ Deno.serve(async (req: Request) => {
         console.log("Media XML Response Preview:", xmlDoc.substring(0, 2000));
 
         const urls = getXmlValues(xmlDoc, "url");
-        const classTypes = getXmlValues(xmlDoc, "classType");
-        const mediaTypes = getXmlValues(xmlDoc, "mediaType");
-
-        // Try different XML tag names for color
-        let colorNames = getXmlValues(xmlDoc, "color");
-        if (colorNames.length === 0) {
-          colorNames = getXmlValues(xmlDoc, "colorName");
-        }
-
+        const classTypeNames = getXmlValues(xmlDoc, "classTypeName");
+        const productIds = getXmlValues(xmlDoc, "productId");
+        const colors = getXmlValues(xmlDoc, "color");
         const partIds = getXmlValues(xmlDoc, "partId");
-        const descriptions = getXmlValues(xmlDoc, "description");
-        const fileTypes = getXmlValues(xmlDoc, "fileType");
+        const singleParts = getXmlValues(xmlDoc, "singlePart");
 
-        console.log(`Parsed media data: ${urls.length} URLs, ${classTypes.length} classTypes, ${colorNames.length} colors`);
+        console.log(`Parsed media data: ${urls.length} URLs, ${classTypeNames.length} classTypeNames, ${colors.length} colors, ${partIds.length} partIds`);
 
         const mediaArray = urls.map((url, i) => {
-          const classType = classTypes[i] || "";
-          const fileType = fileTypes[i] || "";
-          const description = descriptions[i] || "";
+          const classTypeName = classTypeNames[i] || "";
 
           // Check if this is an actual image URL
-          // Must have image extension OR explicit fileType indicating it's an image
-          // Exclude any .aspx, .html, .htm, .php pages
           const hasImageExtension = url.match(/\.(jpg|jpeg|png|gif|webp|bmp|tiff)(\?|$)/i);
-          const hasImageFileType = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff'].includes(fileType.toLowerCase());
           const isWebPage = url.match(/\.(aspx|html|htm|php|jsp|asp)(\?|$)/i);
-
-          const isImageUrl = !isWebPage && (hasImageExtension || hasImageFileType);
+          const isImageUrl = !isWebPage && hasImageExtension;
 
           return {
             url,
-            classType,
-            mediaType: mediaTypes[i] || "",
-            colorName: colorNames[i] || "",
+            productId: productIds[i] || "",
             partId: partIds[i] || "",
-            description,
-            fileType,
+            classTypeName,
+            color: colors[i] || "",
+            singlePart: singleParts[i] === "true",
             isImage: isImageUrl,
           };
         }).filter(item => item.isImage); // Only return actual images
