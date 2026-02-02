@@ -831,24 +831,35 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
     // Fetch garment images based on supplier
     if (product.supplier === 'ssactivewear' && color?.code) {
       try {
-        console.log('Fetching SSActivewear garment images for:', { style: product.style, partId: color.code });
+        console.log('🎨 Fetching SSActivewear garment images for:', { style: product.style, partId: color.code });
         const unifiedData = await getUnifiedProductData(product.style, color.code);
-        console.log('Unified data response:', unifiedData);
+        console.log('📦 Unified data response:', {
+          success: unifiedData.success,
+          hasMedia: !!unifiedData.media,
+          hasViews: !!unifiedData.media?.views,
+          hasImages: !!unifiedData.media?.images,
+          imageCount: unifiedData.media?.images?.length,
+          viewsKeys: unifiedData.media?.views ? Object.keys(unifiedData.media.views) : [],
+        });
 
         if (unifiedData.success && unifiedData.media?.views) {
           if (unifiedData.media.views.front) {
             garmentImages.garment_front_image_url = unifiedData.media.views.front;
             garmentImages.garment_back_image_url = unifiedData.media.views.front;
+            console.log('✅ Set front image:', unifiedData.media.views.front);
           }
           if (unifiedData.media.views.rear) {
             garmentImages.garment_rear_image_url = unifiedData.media.views.rear;
+            console.log('✅ Set rear image:', unifiedData.media.views.rear);
           }
           if (unifiedData.media.views.side) {
             garmentImages.garment_side_image_url = unifiedData.media.views.side;
             garmentImages.garment_sleeve_image_url = unifiedData.media.views.side;
+            console.log('✅ Set side image:', unifiedData.media.views.side);
           }
           if (unifiedData.media.views.lifestyle) {
             garmentImages.garment_lifestyle_image_url = unifiedData.media.views.lifestyle;
+            console.log('✅ Set lifestyle image:', unifiedData.media.views.lifestyle);
           }
 
           const filterValidImages = (images: any[]) => {
@@ -873,23 +884,40 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           };
 
           garmentImages.garment_images_data = {
-            frontImages: filterValidImages(unifiedData.media.views.frontImages),
-            rearImages: filterValidImages(unifiedData.media.views.rearImages),
-            sideImages: filterValidImages(unifiedData.media.views.sideImages),
-            lifestyleImages: filterValidImages(unifiedData.media.views.lifestyleImages),
-            otherImages: filterValidImages(unifiedData.media.views.otherImages),
-            allImages: filterValidImages(unifiedData.media.images),
+            frontImages: filterValidImages(unifiedData.media.views.frontImages || []),
+            rearImages: filterValidImages(unifiedData.media.views.rearImages || []),
+            sideImages: filterValidImages(unifiedData.media.views.sideImages || []),
+            lifestyleImages: filterValidImages(unifiedData.media.views.lifestyleImages || []),
+            otherImages: filterValidImages(unifiedData.media.views.otherImages || []),
+            allImages: filterValidImages(unifiedData.media.images || []),
           };
 
-          console.log('Loaded SSActivewear images:', {
+          console.log('✅ Loaded SSActivewear images:', {
             front: !!garmentImages.garment_front_image_url,
-            totalImages: unifiedData.media.images?.length || 0,
+            rear: !!garmentImages.garment_rear_image_url,
+            side: !!garmentImages.garment_side_image_url,
+            lifestyle: !!garmentImages.garment_lifestyle_image_url,
+            frontImages: garmentImages.garment_images_data.frontImages.length,
+            rearImages: garmentImages.garment_images_data.rearImages.length,
+            sideImages: garmentImages.garment_images_data.sideImages.length,
+            lifestyleImages: garmentImages.garment_images_data.lifestyleImages.length,
+            otherImages: garmentImages.garment_images_data.otherImages.length,
+            allImages: garmentImages.garment_images_data.allImages.length,
           });
         } else {
-          console.warn('No media data in unified response');
+          console.error('❌ No media data in unified response:', {
+            success: unifiedData.success,
+            hasMedia: !!unifiedData.media,
+            media: unifiedData.media,
+          });
         }
       } catch (error: any) {
-        console.warn('Could not fetch SSActivewear garment images - continuing without images:', error.message);
+        console.error('❌ Failed to fetch SSActivewear garment images:', {
+          message: error.message,
+          stack: error.stack,
+          error,
+        });
+        showNotification('error', `Failed to load images: ${error.message}`);
       }
     } else if (product.supplier === 'sanmar' && color) {
       try {
