@@ -2181,15 +2181,15 @@ export default function MockupGenerator({
                                   return (
                                     <div key={label}>
                                       <div className="text-[9px] text-gray-600 dark:text-gray-400 mb-0.5 font-medium">{label}</div>
-                                      <div className="grid grid-cols-4 gap-1">
-                                        {validImages.map((imageUrl, idx) => (
+                                      <div className="flex gap-1 flex-wrap">
+                                        {validImages.slice(0, 4).map((imageUrl, idx) => (
                                           <button
                                             key={idx}
                                             onClick={(e) => {
                                               e.stopPropagation();
                                               setGarmentImageUrl(imageUrl);
                                             }}
-                                            className={`relative aspect-square rounded border overflow-hidden transition-all hover:scale-105 ${
+                                            className={`relative w-14 h-14 rounded border overflow-hidden transition-all hover:scale-105 flex-shrink-0 ${
                                               garmentImageUrl === imageUrl
                                                 ? 'border-blue-500 ring-1 ring-blue-300'
                                                 : 'border-gray-300 dark:border-slate-600'
