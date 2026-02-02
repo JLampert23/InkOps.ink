@@ -77,10 +77,12 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
     console.log('🚀 PromoStandards Unified - Environment check:', {
       hasUrl: !!supabaseUrl,
-      hasServiceKey: !!supabaseServiceRoleKey
+      hasServiceKey: !!supabaseServiceRoleKey,
+      hasAnonKey: !!supabaseAnonKey
     });
 
     const authHeader = req.headers.get("Authorization");
@@ -102,13 +104,6 @@ Deno.serve(async (req: Request) => {
       tokenPrefix: token.substring(0, 20) + '...'
     });
 
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
-
     let companyId: string;
 
     if (isServiceRoleKey) {
@@ -124,9 +119,18 @@ Deno.serve(async (req: Request) => {
       companyId = companyIdParam;
       console.log('🔧 Service role call - using company_id:', companyId);
     } else {
-      // User JWT - validate and get company_id from profile
+      // User JWT - validate using anon key client with user's JWT
       console.log('👤 User JWT - validating token...');
-      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+      const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      });
+
+      const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
 
       if (authError) {
         console.error('❌ JWT validation FAILED:', {
@@ -154,6 +158,14 @@ Deno.serve(async (req: Request) => {
 
       console.log('✅ JWT validated successfully for user:', user.id);
 
+      // Use service role key for database queries
+      const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      });
+
       const { data: profile } = await supabase
         .from("user_profiles")
         .select("company_id")
@@ -171,6 +183,14 @@ Deno.serve(async (req: Request) => {
       companyId = profile.company_id;
       console.log('✅ User authenticated - company_id:', companyId);
     }
+
+    // Use service role key for database queries
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
 
     console.log('📋 Fetching company settings for company_id:', companyId);
     const { data: settings, error: settingsError } = await supabase
