@@ -28,6 +28,8 @@ interface ProductResult {
   description: string;
   category?: string;
   colors: ColorOption[];
+  cached: boolean;
+  last_synced?: string;
   raw_data?: any;
 }
 
@@ -133,7 +135,147 @@ Deno.serve(async (req: Request) => {
     const results: ProductResult[] = [];
     const errors: string[] = [];
 
-    // Search SanMar if enabled
+    // Search local cache for SSActivewear (if enabled)
+    if (settings?.ssactivewear_enabled) {
+      try {
+        console.log(`Searching local cache for style: ${style}`);
+
+        // Query the styles table for matching style_number
+        const { data: styleData, error: styleError } = await supabaseAdmin
+          .from("styles")
+          .select(`
+            id,
+            style_number,
+            brand,
+            name,
+            description,
+            category,
+            primary_image,
+            last_synced
+          `)
+          .eq("company_id", profile.company_id)
+          .ilike("style_number", style)
+          .maybeSingle();
+
+        if (styleError) {
+          console.error("Style lookup error:", styleError);
+          errors.push(`Cache lookup error: ${styleError.message}`);
+        } else if (!styleData) {
+          console.log(`Style ${style} not found in cache`);
+          errors.push(`Style ${style} not found in local cache. Please sync catalog first.`);
+        } else {
+          console.log(`Found style in cache: ${styleData.style_number}`);
+
+          // Get all parts for this style grouped by color
+          const { data: partsData, error: partsError } = await supabaseAdmin
+            .from("parts")
+            .select("id, part_id, color_name, hex, size")
+            .eq("style_id", styleData.id)
+            .order("color_name", { ascending: true })
+            .order("size", { ascending: true });
+
+          if (partsError) {
+            console.error("Parts lookup error:", partsError);
+            errors.push(`Parts lookup error: ${partsError.message}`);
+          } else {
+            console.log(`Found ${partsData?.length || 0} parts for style ${styleData.style_number}`);
+
+            // Group parts by color to create color options
+            const colorMap = new Map<string, ColorOption>();
+
+            for (const part of partsData || []) {
+              const colorName = part.color_name || "Default";
+
+              if (!colorMap.has(colorName)) {
+                colorMap.set(colorName, {
+                  name: colorName,
+                  code: part.hex || "",
+                  partIds: [],
+                  sizes: [],
+                  image_url: "",
+                  pricing: {
+                    wholesale: 0,
+                    retail: 0,
+                  },
+                  stock: {},
+                });
+              }
+
+              const colorOption = colorMap.get(colorName)!;
+              if (part.part_id && !colorOption.partIds?.includes(part.part_id)) {
+                colorOption.partIds?.push(part.part_id);
+              }
+              if (part.size && !colorOption.sizes?.includes(part.size)) {
+                colorOption.sizes?.push(part.size);
+              }
+            }
+
+            const colors = Array.from(colorMap.values());
+
+            // Get primary image for each color (front view preferred)
+            for (const color of colors) {
+              if (!color.partIds || color.partIds.length === 0) continue;
+
+              // Get the first part_id UUID for this color
+              const firstPartId = partsData?.find(p =>
+                p.part_id === color.partIds![0]
+              )?.id;
+
+              if (!firstPartId) continue;
+
+              // Query images for this part
+              const { data: imageData } = await supabaseAdmin
+                .from("images")
+                .select("url, class_type")
+                .eq("part_id", firstPartId)
+                .order("class_type", { ascending: true });
+
+              if (imageData && imageData.length > 0) {
+                // Try to find front image first
+                let bestImage = imageData.find((img) =>
+                  (img.class_type || "").toLowerCase().includes("front")
+                );
+
+                // If no front, try rear/back
+                if (!bestImage) {
+                  bestImage = imageData.find((img) => {
+                    const type = (img.class_type || "").toLowerCase();
+                    return type.includes("rear") || type.includes("back");
+                  });
+                }
+
+                // Otherwise use first available
+                if (!bestImage) {
+                  bestImage = imageData[0];
+                }
+
+                if (bestImage?.url) {
+                  color.image_url = bestImage.url;
+                }
+              }
+            }
+
+            results.push({
+              supplier: "ssactivewear",
+              style: styleData.style_number,
+              brand: styleData.brand || "",
+              description: styleData.name || styleData.description || "",
+              category: styleData.category || "",
+              colors,
+              cached: true,
+              last_synced: styleData.last_synced,
+            });
+
+            console.log(`Successfully loaded ${colors.length} colors from cache`);
+          }
+        }
+      } catch (error: any) {
+        console.error("Cache search error:", error);
+        errors.push(`Cache error: ${error.message}`);
+      }
+    }
+
+    // Search SanMar if enabled (still using live API for now)
     if (settings?.sanmar_enabled) {
       try {
         const sanmarUrl = `${supabaseUrl}/functions/v1/sanmar-api?action=search&style=${encodeURIComponent(style)}&companyId=${encodeURIComponent(profile.company_id)}`;
@@ -146,7 +288,6 @@ Deno.serve(async (req: Request) => {
         if (sanmarResponse.ok) {
           const sanmarData = await sanmarResponse.json();
           if (sanmarData.success && sanmarData.data) {
-            // Transform SanMar data to common format
             const sanmarProducts = transformSanMarData(sanmarData.data, style);
             results.push(...sanmarProducts);
           }
@@ -157,106 +298,6 @@ Deno.serve(async (req: Request) => {
       } catch (error: any) {
         console.error("SanMar search error:", error);
         errors.push(`SanMar: ${error.message}`);
-      }
-    }
-
-    // Search SSActivewear if enabled
-    if (settings?.ssactivewear_enabled) {
-      try {
-        const ssaUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=product&style=${encodeURIComponent(style)}&companyId=${encodeURIComponent(profile.company_id)}`;
-        const ssaResponse = await fetch(ssaUrl, {
-          headers: {
-            "Authorization": `Bearer ${supabaseServiceKey}`,
-          },
-        });
-
-        if (ssaResponse.ok) {
-          const ssaData = await ssaResponse.json();
-          console.log("SSActivewear response data count:", ssaData?.data?.length || 0);
-          if (ssaData.success && ssaData.data) {
-            const ssaProducts = transformSSActivewearData(ssaData.data, style);
-            console.log("Transformed products count:", ssaProducts.length);
-
-            // Fetch all media for the product at once (much faster than per-color)
-            try {
-              if (ssaProducts.length > 0) {
-                const product = ssaProducts[0];
-
-                // Fetch all media for this style (without partId to get all colors)
-                const mediaUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=media&productId=${encodeURIComponent(style)}&companyId=${encodeURIComponent(profile.company_id)}`;
-
-                console.log(`Fetching all media for style ${style}`);
-
-                const mediaResponse = await fetch(mediaUrl, {
-                  headers: {
-                    "Authorization": `Bearer ${supabaseServiceKey}`,
-                  },
-                });
-
-                if (mediaResponse.ok) {
-                  const mediaData = await mediaResponse.json();
-                  const mediaContent = mediaData.data?.mediaContent || [];
-
-                  console.log(`Received ${mediaContent.length} total images for ${product.colors.length} colors`);
-
-                  // Match media to colors by partId
-                  for (const color of product.colors) {
-                    if (!color.partIds || color.partIds.length === 0) continue;
-
-                    // Find all media for this color by matching any of its partIds
-                    const colorMedia = mediaContent.filter((media: any) => {
-                      return color.partIds.some((partId: string) => partId === media.partId);
-                    });
-
-                    console.log(`Found ${colorMedia.length} images for ${color.name} (partIds: ${color.partIds.join(', ')})`);
-
-                    if (colorMedia.length > 0) {
-                      // Try to find a front image first
-                      let bestImage = colorMedia.find((m: any) =>
-                        (m.classTypeName || '').toLowerCase().includes('front')
-                      );
-
-                      // If no front image, try back/rear image
-                      if (!bestImage) {
-                        bestImage = colorMedia.find((m: any) => {
-                          const type = (m.classTypeName || '').toLowerCase();
-                          return type.includes('back') || type.includes('rear');
-                        });
-                      }
-
-                      // If still no image, use the first available image
-                      if (!bestImage) {
-                        bestImage = colorMedia[0];
-                      }
-
-                      if (bestImage && bestImage.url) {
-                        color.image_url = bestImage.url;
-                        console.log(`✓ Assigned ${bestImage.classTypeName} image to ${color.name}`);
-                      }
-                    } else {
-                      console.warn(`No media found for ${color.name} with partIds: ${color.partIds.join(', ')}`);
-                    }
-                  }
-                } else {
-                  const errorText = await mediaResponse.text();
-                  console.error("Media API error:", errorText);
-                }
-              }
-            } catch (mediaError: any) {
-              console.warn("Failed to fetch media for SSActivewear product:", mediaError.message);
-            }
-
-            results.push(...ssaProducts);
-          }
-        } else {
-          const errorText = await ssaResponse.text();
-          console.error("SSActivewear error response status:", ssaResponse.status);
-          console.error("SSActivewear error response:", errorText);
-          errors.push(`SSActivewear error (${ssaResponse.status}): ${errorText}`);
-        }
-      } catch (error: any) {
-        console.error("SSActivewear search error:", error);
-        errors.push(`SSActivewear: ${error.message}`);
       }
     }
 
