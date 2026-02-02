@@ -889,8 +889,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           console.warn('No media data in unified response');
         }
       } catch (error: any) {
-        console.error('Failed to fetch SSActivewear garment images:', error);
-        showNotification('warning', 'Could not load garment images. Product added without images.');
+        console.warn('Could not fetch SSActivewear garment images - continuing without images:', error.message);
       }
     } else if (product.supplier === 'sanmar' && color) {
       try {
