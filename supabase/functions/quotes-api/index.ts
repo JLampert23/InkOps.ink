@@ -17,28 +17,39 @@ Deno.serve(async (req: Request) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       throw new Error("Missing authorization header");
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: {
-        headers: { Authorization: authHeader },
+    const token = authHeader.replace("Bearer ", "");
+
+    // Use service role to validate the token
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
       },
     });
 
-    // Get authenticated user
     const {
       data: { user },
       error: userError,
-    } = await supabase.auth.getUser();
+    } = await supabaseAdmin.auth.getUser(token);
 
     if (userError || !user) {
       throw new Error("Not authenticated");
     }
+
+    // Create client with user's token for RLS
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: { Authorization: authHeader },
+      },
+    });
 
     // Get user profile and company_id
     const { data: profile } = await supabase
