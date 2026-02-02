@@ -163,6 +163,39 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
   useEffect(() => {
     loadQuoteDetails();
+
+    // Subscribe to realtime updates on proofs table
+    const channel = supabase
+      .channel(`quote_${quoteId}_proofs`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'proofs',
+          filter: `quote_id=eq.${quoteId}`,
+        },
+        async (payload) => {
+          console.log('QuoteDetail: Proof changed, reloading proofs...', payload);
+
+          // Reload proofs data
+          const { data: proofsData, error: proofsError } = await supabase
+            .from('proofs')
+            .select('id, proof_number, line_item_id, imprint_id, group_label, garment_image_url, composite_image_url, garment_name, status, created_at, updated_at, selected_colors')
+            .eq('quote_id', quoteId)
+            .order('created_at', { ascending: false });
+
+          if (!proofsError && proofsData) {
+            setProofs(proofsData);
+          }
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on unmount
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [quoteId]);
 
   const loadQuoteDetails = async () => {

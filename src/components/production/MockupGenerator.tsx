@@ -1044,13 +1044,24 @@ export default function MockupGenerator({
       let compositeImageUrl: string | null = null;
       let imprintsUpdated = false;
 
-      // Capture the canvas as a composite image
+      // Capture the canvas as a composite image without selection boxes
       const canvas = canvasRef.current;
       if (canvas) {
         console.log('MockupGenerator: Capturing canvas...');
+
+        // Temporarily deselect artwork to hide bounding boxes
+        const savedActiveIndex = activeArtworkIndex;
+        setActiveArtworkIndex(-1);
+
+        // Wait for canvas to re-render without selection boxes
+        await new Promise(resolve => setTimeout(resolve, 100));
+
         const blob = await new Promise<Blob | null>((resolve) => {
           canvas.toBlob((blob) => resolve(blob), 'image/png', 0.9);
         });
+
+        // Restore selection
+        setActiveArtworkIndex(savedActiveIndex);
 
         if (blob) {
           console.log('MockupGenerator: Canvas captured, uploading to storage...');
