@@ -176,16 +176,40 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
       if (quoteError) throw quoteError;
 
-      // If quote has customer_id, fetch customer zip codes
+      // If quote has customer_id, fetch customer details if billing info is missing
       if (quoteData.customer_id) {
         const { data: customerData } = await supabase
           .from('customers')
-          .select('billing_zip, shipping_zip')
+          .select('*')
           .eq('id', quoteData.customer_id)
           .maybeSingle();
 
         if (customerData) {
-          // Merge customer zip codes into quote if quote doesn't have them
+          // Populate billing info from customer if quote doesn't have it
+          if (!quoteData.bill_company && !quoteData.bill_address_1) {
+            quoteData.bill_company = customerData.company_name;
+            quoteData.bill_name = customerData.contact_name;
+            quoteData.bill_address_1 = customerData.billing_address_line1;
+            quoteData.bill_address_2 = customerData.billing_address_line2;
+            quoteData.bill_city = customerData.billing_city;
+            quoteData.bill_state = customerData.billing_state;
+            quoteData.bill_zip = customerData.billing_zip;
+            quoteData.bill_email = customerData.email;
+            quoteData.bill_phone = customerData.phone;
+          }
+
+          // Populate shipping info from customer if quote doesn't have it
+          if (!quoteData.ship_company && !quoteData.ship_address_1) {
+            quoteData.ship_company = customerData.company_name;
+            quoteData.ship_name = customerData.contact_name;
+            quoteData.ship_address_1 = customerData.shipping_address_line1;
+            quoteData.ship_address_2 = customerData.shipping_address_line2;
+            quoteData.ship_city = customerData.shipping_city;
+            quoteData.ship_state = customerData.shipping_state;
+            quoteData.ship_zip = customerData.shipping_zip;
+          }
+
+          // Merge zip codes if still missing
           if (!quoteData.bill_zip && customerData.billing_zip) {
             quoteData.bill_zip = customerData.billing_zip;
           }

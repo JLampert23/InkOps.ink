@@ -530,6 +530,11 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       setDiscountType(quote.discount_type || '$');
       setSalesTaxRate(quote.sales_tax_rate || 6.25);
 
+      // If quote has a customer but no billing address, load customer details
+      if (quote.customer_id && !quote.bill_company && !quote.bill_address_1) {
+        loadCustomerDetails(quote.customer_id);
+      }
+
       const { data: lineItems } = await supabase
         .from('quote_line_items')
         .select('*')
@@ -1378,7 +1383,13 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                 </div>
                 <select
                   value={selectedCustomerId}
-                  onChange={(e) => setSelectedCustomerId(e.target.value)}
+                  onChange={(e) => {
+                    const newCustomerId = e.target.value;
+                    setSelectedCustomerId(newCustomerId);
+                    if (newCustomerId) {
+                      loadCustomerDetails(newCustomerId);
+                    }
+                  }}
                   className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white"
                 >
                   <option value="">Select a Customer</option>
