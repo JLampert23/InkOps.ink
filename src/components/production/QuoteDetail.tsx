@@ -123,6 +123,11 @@ interface QuoteImprint {
   pricing_matrix_column?: string;
   thread_ink_color?: string;
   mockups?: any[];
+  group_label?: string | null;
+  imprint_number?: string;
+  num_colors?: number;
+  description?: string;
+  artwork_description?: string;
 }
 
 interface Proof {
@@ -269,8 +274,12 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         .eq('quote_id', quoteId)
         .order('sort_order');
 
+      console.log('QuoteDetail: Imprints fetch result:', { imprintsData, imprintsError });
+
       if (!imprintsError) {
         setQuoteImprints(imprintsData || []);
+      } else {
+        console.error('QuoteDetail: Error fetching imprints:', imprintsError);
       }
 
       const { data: proofsData, error: proofsError } = await supabase
@@ -744,6 +753,15 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                 (imp as any).group_label === groupLabel ||
                                 ((imp as any).group_label === null && quoteImprints.filter(i => (i as any).group_label === null).length > 0)
                               );
+
+                          console.log('QuoteDetail: Imprints display check:', {
+                            groupLabel,
+                            itemGroupsLength: itemGroups.length,
+                            allImprints: quoteImprints.length,
+                            groupImprints: groupImprints.length,
+                            groupImprintsData: groupImprints
+                          });
+
                           if (groupImprints.length === 0) return null;
 
                           const garmentItem = groupItems.find(li => li.line_type === 'garment');
