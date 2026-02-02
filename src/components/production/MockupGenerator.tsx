@@ -1440,6 +1440,7 @@ export default function MockupGenerator({
   };
 
   const updateActiveArtwork = (updates: Partial<MockupArtwork>) => {
+    if (activeArtworkIndex < 0 || activeArtworkIndex >= selectedArtwork.length) return;
     const updated = [...selectedArtwork];
     updated[activeArtworkIndex] = { ...updated[activeArtworkIndex], ...updates };
     setSelectedArtwork(updated);
@@ -1478,7 +1479,7 @@ export default function MockupGenerator({
   };
 
   const getHandleAtPosition = (x: number, y: number): string | null => {
-    if (selectedArtwork.length === 0) return null;
+    if (selectedArtwork.length === 0 || activeArtworkIndex < 0) return null;
     const canvas = canvasRef.current;
     if (!canvas) return null;
 
@@ -1540,7 +1541,7 @@ export default function MockupGenerator({
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (selectedArtwork.length === 0) return;
+    if (selectedArtwork.length === 0 || activeArtworkIndex < 0) return;
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
     const x = e.clientX - rect.left;
@@ -1768,7 +1769,7 @@ export default function MockupGenerator({
                 />
               </div>
 
-              {selectedArtwork.length > 0 && (
+              {selectedArtwork.length > 0 && activeArtworkIndex >= 0 && (
                 <div>
                   <label className="block text-xs font-medium text-gray-900 dark:text-white mb-2">Transform Controls</label>
                   <div className="flex items-center gap-2">
@@ -2251,10 +2252,10 @@ export default function MockupGenerator({
                     <input
                       type="number"
                       step="0.1"
-                      value={selectedArtwork.length > 0 ? selectedArtwork[activeArtworkIndex].width_inches : widthInches}
+                      value={selectedArtwork.length > 0 && activeArtworkIndex >= 0 ? selectedArtwork[activeArtworkIndex].width_inches : widthInches}
                       onChange={(e) => {
                         const val = parseFloat(e.target.value);
-                        if (selectedArtwork.length > 0) {
+                        if (selectedArtwork.length > 0 && activeArtworkIndex >= 0) {
                           updateActiveArtwork({ width_inches: val });
                         } else {
                           setWidthInches(val);
@@ -2268,10 +2269,10 @@ export default function MockupGenerator({
                     <input
                       type="number"
                       step="0.1"
-                      value={selectedArtwork.length > 0 ? selectedArtwork[activeArtworkIndex].height_inches : heightInches}
+                      value={selectedArtwork.length > 0 && activeArtworkIndex >= 0 ? selectedArtwork[activeArtworkIndex].height_inches : heightInches}
                       onChange={(e) => {
                         const val = parseFloat(e.target.value);
-                        if (selectedArtwork.length > 0) {
+                        if (selectedArtwork.length > 0 && activeArtworkIndex >= 0) {
                           updateActiveArtwork({ height_inches: val });
                         } else {
                           setHeightInches(val);
