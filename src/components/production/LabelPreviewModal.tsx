@@ -26,12 +26,6 @@ export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
   if (!isOpen || labels.length === 0) return null;
 
   const handlePrint = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      alert('Please allow popups to print labels');
-      return;
-    }
-
     const labelsHTML = labels.map((label, index) => `
       <div class="box-label" style="
         width: 4in;
@@ -95,6 +89,7 @@ export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
     const htmlContent = `<!DOCTYPE html>
 <html>
   <head>
+    <meta charset="UTF-8">
     <title>Box Labels - ${labels[0].invoiceNumber}</title>
     <style>
       @page {
@@ -121,18 +116,26 @@ export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
   <body>
     ${labelsHTML}
     <script>
-      window.onload = function() {
-        setTimeout(function() {
-          window.print();
-        }, 500);
-      };
+      setTimeout(function() {
+        window.print();
+      }, 100);
     </script>
   </body>
 </html>`;
 
-    printWindow.document.open();
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const blobUrl = URL.createObjectURL(blob);
+    const printWindow = window.open(blobUrl, '_blank');
+
+    if (!printWindow) {
+      alert('Please allow popups to print labels');
+      URL.revokeObjectURL(blobUrl);
+      return;
+    }
+
+    setTimeout(() => {
+      URL.revokeObjectURL(blobUrl);
+    }, 1000);
   };
 
   const handleDownloadPDF = async () => {
