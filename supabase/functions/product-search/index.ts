@@ -176,60 +176,69 @@ Deno.serve(async (req: Request) => {
             const ssaProducts = transformSSActivewearData(ssaData.data, style);
             console.log("Transformed products count:", ssaProducts.length);
 
-            // Fetch media/images for EACH color with its specific partId
+            // Fetch all media for the product at once (much faster than per-color)
             try {
               if (ssaProducts.length > 0) {
                 const product = ssaProducts[0];
 
-                console.log(`Fetching media for ${product.colors.length} colors`);
+                // Fetch all media for this style (without partId to get all colors)
+                const mediaUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=media&productId=${encodeURIComponent(style)}&companyId=${encodeURIComponent(profile.company_id)}`;
 
-                // Fetch media for each color with its specific partId
-                for (const color of product.colors) {
-                  if (!color.code) continue;
+                console.log(`Fetching all media for style ${style}`);
 
-                  const mediaUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=media&productId=${encodeURIComponent(style)}&partId=${encodeURIComponent(color.code)}&companyId=${encodeURIComponent(profile.company_id)}`;
+                const mediaResponse = await fetch(mediaUrl, {
+                  headers: {
+                    "Authorization": `Bearer ${supabaseServiceKey}`,
+                  },
+                });
 
-                  try {
-                    const mediaResponse = await fetch(mediaUrl, {
-                      headers: {
-                        "Authorization": `Bearer ${supabaseServiceKey}`,
-                      },
+                if (mediaResponse.ok) {
+                  const mediaData = await mediaResponse.json();
+                  const mediaContent = mediaData.data?.mediaContent || [];
+
+                  console.log(`Received ${mediaContent.length} total images for ${product.colors.length} colors`);
+
+                  // Match media to colors by partId
+                  for (const color of product.colors) {
+                    if (!color.partIds || color.partIds.length === 0) continue;
+
+                    // Find all media for this color by matching any of its partIds
+                    const colorMedia = mediaContent.filter((media: any) => {
+                      return color.partIds.some((partId: string) => partId === media.partId);
                     });
 
-                    if (mediaResponse.ok) {
-                      const mediaData = await mediaResponse.json();
-                      const mediaContent = mediaData.data?.mediaContent || [];
+                    console.log(`Found ${colorMedia.length} images for ${color.name} (partIds: ${color.partIds.join(', ')})`);
 
-                      console.log(`Found ${mediaContent.length} images for ${color.name} (${color.code})`);
+                    if (colorMedia.length > 0) {
+                      // Try to find a front image first
+                      let bestImage = colorMedia.find((m: any) =>
+                        (m.classTypeName || '').toLowerCase().includes('front')
+                      );
 
-                      if (mediaContent.length > 0) {
-                        // Try to find a front image first
-                        let bestImage = mediaContent.find((m: any) =>
-                          (m.classTypeName || '').toLowerCase().includes('front')
-                        );
-
-                        // If no front image, try back/rear image
-                        if (!bestImage) {
-                          bestImage = mediaContent.find((m: any) => {
-                            const type = (m.classTypeName || '').toLowerCase();
-                            return type.includes('back') || type.includes('rear');
-                          });
-                        }
-
-                        // If still no image, use the first available image
-                        if (!bestImage) {
-                          bestImage = mediaContent[0];
-                        }
-
-                        if (bestImage && bestImage.url) {
-                          color.image_url = bestImage.url;
-                          console.log(`✓ Assigned image to ${color.name}: ${bestImage.classTypeName}`);
-                        }
+                      // If no front image, try back/rear image
+                      if (!bestImage) {
+                        bestImage = colorMedia.find((m: any) => {
+                          const type = (m.classTypeName || '').toLowerCase();
+                          return type.includes('back') || type.includes('rear');
+                        });
                       }
+
+                      // If still no image, use the first available image
+                      if (!bestImage) {
+                        bestImage = colorMedia[0];
+                      }
+
+                      if (bestImage && bestImage.url) {
+                        color.image_url = bestImage.url;
+                        console.log(`✓ Assigned ${bestImage.classTypeName} image to ${color.name}`);
+                      }
+                    } else {
+                      console.warn(`No media found for ${color.name} with partIds: ${color.partIds.join(', ')}`);
                     }
-                  } catch (colorMediaError: any) {
-                    console.warn(`Failed to fetch media for color ${color.name}:`, colorMediaError.message);
                   }
+                } else {
+                  const errorText = await mediaResponse.text();
+                  console.error("Media API error:", errorText);
                 }
               }
             } catch (mediaError: any) {
