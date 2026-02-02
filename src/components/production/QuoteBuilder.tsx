@@ -1310,12 +1310,12 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-6 bg-gray-50 dark:bg-slate-950">
-        <div className="max-w-[1800px] mx-auto space-y-6">
+      <div className="flex-1 overflow-auto p-3 bg-gray-50 dark:bg-slate-950">
+        <div className="max-w-[2000px] mx-auto space-y-4">
           {/* Customer and Details Section */}
-          <div className="grid grid-cols-3 gap-6">
+          <div className="grid grid-cols-3 gap-4">
             {/* Left: Customer Information */}
-            <div className="col-span-2 space-y-6 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-200 dark:border-slate-800 p-6">
+            <div className="col-span-2 space-y-6 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-200 dark:border-slate-800 p-4">
               {/* Customer Selector */}
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -1496,7 +1496,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
             </div>
 
             {/* Right: Quote Details */}
-            <div className="space-y-4 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-200 dark:border-slate-800 p-6">
+            <div className="space-y-4 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-200 dark:border-slate-800 p-4">
               <div className="flex items-center justify-end">
                 <span className="px-4 py-2 border-2 border-orange-600 text-orange-600 dark:border-orange-500 dark:text-orange-500 rounded text-sm font-medium">
                   QUOTE
@@ -1592,7 +1592,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           </div>
 
           {/* Line Items Table */}
-          <div className="space-y-2 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-200 dark:border-slate-800 p-6">
+          <div className="space-y-2 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-200 dark:border-slate-800 p-4">
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
                 {/* Only show main thead when there is a single group with no label */}
@@ -1600,8 +1600,8 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                   <thead>
                     <tr className="bg-gray-100 dark:bg-slate-900 text-sm font-semibold text-gray-700 dark:text-gray-300">
                       <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-6"></th>
-                      <th className="p-2 text-left border border-gray-300 dark:border-slate-800 w-20">Item #</th>
-                      <th className="p-2 text-left border border-gray-300 dark:border-slate-800 w-20">Color</th>
+                      <th className="p-2 text-left border border-gray-300 dark:border-slate-800 w-36">Item #</th>
+                      <th className="p-2 text-left border border-gray-300 dark:border-slate-800 w-36">Color</th>
                       <th className="p-2 text-left border border-gray-300 dark:border-slate-800">Description</th>
                       {getSizeColumns(itemGroups[0]).map(size => (
                         <th key={size.key} className="p-2 text-center border border-gray-300 dark:border-slate-800 w-10">{size.label}</th>
@@ -1673,8 +1673,8 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                       {(itemGroups.length > 1 || group.label) && (
                         <tr key={`columns-${group.id}`} className="bg-gray-100 dark:bg-slate-900 text-sm font-semibold text-gray-700 dark:text-gray-300">
                           <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-6"></th>
-                          <th className="p-2 text-left border border-gray-300 dark:border-slate-800 w-40">Item #</th>
-                          <th className="p-2 text-left border border-gray-300 dark:border-slate-800 w-40">Color</th>
+                          <th className="p-2 text-left border border-gray-300 dark:border-slate-800 w-48">Item #</th>
+                          <th className="p-2 text-left border border-gray-300 dark:border-slate-800 w-48">Color</th>
                           <th className="p-2 text-left border border-gray-300 dark:border-slate-800">Description</th>
                           {getSizeColumns(group).map(size => (
                             <th key={size.key} className="p-2 text-center border border-gray-300 dark:border-slate-800 w-10">{size.label}</th>
@@ -2005,7 +2005,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           </div>
 
           {/* Fees Table */}
-          <div className="max-w-4xl ml-auto space-y-2 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-200 dark:border-slate-800 p-6">
+          <div className="max-w-4xl ml-auto space-y-2 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-200 dark:border-slate-800 p-4">
             <table className="w-full border-collapse">
               <thead>
                 <tr className="bg-gray-100 dark:bg-slate-900 text-sm text-gray-700 dark:text-gray-400">
