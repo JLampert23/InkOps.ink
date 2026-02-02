@@ -53,10 +53,50 @@ Deno.serve(async (req: Request) => {
 
     const url = new URL(req.url);
     const pathParts = url.pathname.split("/").filter(Boolean);
-    const quoteId = pathParts[pathParts.length - 1];
+    const lastPath = pathParts[pathParts.length - 1];
+    const quoteId = lastPath && lastPath.match(/^[0-9a-f-]{36}$/i) ? lastPath : null;
+
+    // POST /quotes/draft - Create minimal draft quote
+    if (req.method === "POST" && lastPath === "draft") {
+      // Generate quote number
+      const { data: quoteNumber } = await supabase.rpc("generate_quote_number");
+
+      const quoteData = {
+        quote_number: quoteNumber,
+        company_id: profile.company_id,
+        customer_id: null,
+        customer_name: "Draft Quote",
+        status: "draft",
+        subtotal: 0,
+        tax_rate: 0,
+        tax_amount: 0,
+        total: 0,
+        autosave_enabled: true,
+        created_by: user.id,
+      };
+
+      const { data: quote, error: quoteError } = await supabase
+        .from("quotes")
+        .insert([quoteData])
+        .select()
+        .single();
+
+      if (quoteError) throw quoteError;
+
+      return new Response(
+        JSON.stringify({ quote }),
+        {
+          status: 201,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
 
     // GET /quotes - List quotes with filters
-    if (req.method === "GET" && !quoteId.match(/^[0-9a-f-]{36}$/i)) {
+    if (req.method === "GET" && !quoteId) {
       const status = url.searchParams.get("status");
       const customerId = url.searchParams.get("customer_id");
       const search = url.searchParams.get("search");

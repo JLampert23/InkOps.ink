@@ -94,9 +94,10 @@ interface QuoteBuilderProps {
   onCancel?: () => void;
 }
 
-export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: QuoteBuilderProps) {
+export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSave, onCancel }: QuoteBuilderProps) {
   const { user, session } = useAuth();
   const { showNotification } = useNotification();
+  const [quoteId, setQuoteId] = useState<string | undefined>(initialQuoteId);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -106,6 +107,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(initialCustomerId || '');
   const [availableFees, setAvailableFees] = useState<any[]>([]);
   const [companySettings, setCompanySettings] = useState<any>(null);
+  const draftCreatedRef = useRef(false);
 
   // Helper to get ordered size columns for a specific group based on size mode
   const getSizeColumns = (group: LineItemGroup) => {
@@ -212,18 +214,54 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  const createDraftQuote = async () => {
+    if (!user || !session?.access_token || draftCreatedRef.current) return;
+
+    draftCreatedRef.current = true;
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quotes-api/draft`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to create draft quote');
+      }
+
+      const { quote } = await response.json();
+      setQuoteId(quote.id);
+      setQuoteNumber(quote.quote_number);
+      setCreatedDate(quote.created_date || new Date().toISOString().split('T')[0]);
+
+      return quote.id;
+    } catch (error) {
+      console.error('Error creating draft quote:', error);
+      showNotification('error', 'Failed to create draft quote');
+      draftCreatedRef.current = false;
+    }
+  };
+
   useEffect(() => {
     if (!user) return;
 
     loadCompanySettings();
     loadCustomers();
     loadAvailableFees();
+
     if (quoteId) {
       loadQuote();
     } else {
+      createDraftQuote();
       loadDefaultFees();
     }
-  }, [quoteId, user]);
+  }, [user]);
 
   useEffect(() => {
     if (selectedCustomerId && !quoteId) {
@@ -232,13 +270,13 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   }, [selectedCustomerId, quoteId]);
 
   useEffect(() => {
-    if (!quoteId || !selectedCustomerId) return;
+    if (!quoteId) return;
 
     const interval = setInterval(() => {
       if (hasUnsavedChanges) {
         performSave(true);
       }
-    }, 120000);
+    }, 30000);
 
     autoSaveIntervalRef.current = interval;
 
@@ -247,7 +285,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         clearInterval(autoSaveIntervalRef.current);
       }
     };
-  }, [quoteId, selectedCustomerId, hasUnsavedChanges]);
+  }, [quoteId, hasUnsavedChanges]);
 
   useEffect(() => {
     setHasUnsavedChanges(true);
@@ -1048,18 +1086,23 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
 
   const totals = calculateTotals();
 
-  const performSave = async (isAutoSave = false): Promise<boolean> => {
-    if (!selectedCustomerId) {
-      if (!isAutoSave) {
-        showNotification('error', 'Validation Error', 'Please select a customer');
-      }
-      return false;
-    }
-
+  const performSave = async (isAutoSave = false, statusOverride?: string): Promise<boolean> => {
     if (!user) {
       if (!isAutoSave) {
         showNotification('error', 'Authentication Error', 'You must be logged in to save a quote');
       }
+      return false;
+    }
+
+    if (!quoteId) {
+      if (!isAutoSave) {
+        showNotification('error', 'Error', 'Quote ID is missing');
+      }
+      return false;
+    }
+
+    if (!selectedCustomerId && !isAutoSave) {
+      showNotification('error', 'Validation Error', 'Please select a customer before saving');
       return false;
     }
 
@@ -1078,26 +1121,23 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         return false;
       }
 
-      const { data: customer } = await supabase
-        .from('customers')
-        .select('company_name, email, phone')
-        .eq('id', selectedCustomerId)
-        .maybeSingle();
-
-      let finalQuoteNumber = quoteNumber;
-      if (!finalQuoteNumber && !quoteId) {
-        finalQuoteNumber = await generateNextQuoteNumber(userProfile.company_id);
-        setQuoteNumber(finalQuoteNumber);
+      let customerData: any = null;
+      if (selectedCustomerId) {
+        const { data } = await supabase
+          .from('customers')
+          .select('company_name, email, phone')
+          .eq('id', selectedCustomerId)
+          .maybeSingle();
+        customerData = data;
       }
 
       const quoteData = {
-        quote_number: finalQuoteNumber || `Q${Date.now()}`,
         company_id: userProfile.company_id,
-        customer_id: selectedCustomerId,
-        customer_name: customer?.company_name || 'Unknown Customer',
-        customer_email: customer?.email,
-        customer_phone: customer?.phone,
-        status: 'draft',
+        customer_id: selectedCustomerId || null,
+        customer_name: customerData?.company_name || 'Draft Quote',
+        customer_email: customerData?.email || null,
+        customer_phone: customerData?.phone || null,
+        status: statusOverride || 'draft',
         created_date: createdDate,
         production_due_date: productionDueDate || null,
         customer_due_date: customerDueDate || null,
@@ -1130,33 +1170,18 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         created_by: user.id,
       };
 
-      let savedQuoteId = quoteId;
+      const { error: updateError } = await supabase
+        .from('quotes')
+        .update(quoteData)
+        .eq('id', quoteId);
 
-      if (quoteId) {
-        const { error: updateError } = await supabase
-          .from('quotes')
-          .update(quoteData)
-          .eq('id', quoteId);
+      if (updateError) throw updateError;
 
-        if (updateError) throw updateError;
-      } else {
-        const { data, error: insertError } = await supabase
-          .from('quotes')
-          .insert(quoteData)
-          .select()
-          .single();
+      await supabase.from('quote_line_items').delete().eq('quote_id', quoteId);
 
-        if (insertError) throw insertError;
-        savedQuoteId = data?.id;
-      }
-
-      if (savedQuoteId) {
-        await supabase.from('quote_line_items').delete().eq('quote_id', savedQuoteId);
-        await supabase.from('quote_fees').delete().eq('quote_id', savedQuoteId);
-
-        const allItems = itemGroups.flatMap((group, groupIdx) =>
-          group.items.map((item, itemIdx) => ({
-            quote_id: savedQuoteId,
+      const allItems = itemGroups.flatMap((group, groupIdx) =>
+        group.items.map((item, itemIdx) => ({
+          quote_id: quoteId,
             company_id: userProfile.company_id,
             sort_order: groupIdx * 1000 + itemIdx,
             group_label: group.label || '',
@@ -1201,23 +1226,22 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           if (itemsError) throw itemsError;
         }
 
-        if (fees.length > 0) {
-          const { error: feesError } = await supabase.from('quote_line_items').insert(
-            fees.map((fee, index) => ({
-              quote_id: savedQuoteId,
-              company_id: userProfile.company_id,
-              line_number: 9000 + index,
-              line_type: 'fee',
-              description: fee.fee_name + (fee.description && fee.description !== fee.fee_name ? ` - ${fee.description}` : ''),
-              quantity: fee.quantity,
-              unit_price: fee.unit_amount,
-              total_price: fee.total_amount,
-              notes: fee.description !== fee.fee_name ? fee.description : null,
-            }))
-          );
+      if (fees.length > 0) {
+        const { error: feesError } = await supabase.from('quote_line_items').insert(
+          fees.map((fee, index) => ({
+            quote_id: quoteId,
+            company_id: userProfile.company_id,
+            line_number: 9000 + index,
+            line_type: 'fee',
+            description: fee.fee_name + (fee.description && fee.description !== fee.fee_name ? ` - ${fee.description}` : ''),
+            quantity: fee.quantity,
+            unit_price: fee.unit_amount,
+            total_price: fee.total_amount,
+            notes: fee.description !== fee.fee_name ? fee.description : null,
+          }))
+        );
 
-          if (feesError) throw feesError;
-        }
+        if (feesError) throw feesError;
       }
 
       setHasUnsavedChanges(false);
@@ -1246,6 +1270,19 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const handleSaveAndClose = async () => {
     const success = await performSave(false);
     if (success) {
+      onSave?.();
+    }
+  };
+
+  const handleSendQuote = async () => {
+    if (!selectedCustomerId) {
+      showNotification('error', 'Customer Required', 'Please select a customer before sending the quote');
+      return;
+    }
+
+    const success = await performSave(false, 'sent');
+    if (success) {
+      showNotification('success', 'Quote Sent', 'Quote status updated to "Sent"');
       onSave?.();
     }
   };
@@ -1297,7 +1334,16 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded flex items-center gap-2 shadow-sm disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            Save
+            Save Draft
+          </button>
+          <button
+            onClick={handleSendQuote}
+            disabled={saving || !selectedCustomerId}
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded flex items-center gap-2 shadow-sm disabled:opacity-50"
+            title={!selectedCustomerId ? 'Select a customer to send quote' : 'Send quote to customer'}
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+            Send Quote
           </button>
           <button
             onClick={handleSaveAndClose}
@@ -1859,10 +1905,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                               <div className="flex flex-col gap-2 items-end">
                                 <button
                                   onClick={() => {
-                                    if (!quoteId) {
-                                      showNotification('warning', 'Please save the quote first before creating mockups');
-                                      return;
-                                    }
                                     setShowMockupForGroup(group.label);
                                   }}
                                   className="w-32 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center justify-center gap-2 shadow-sm"
