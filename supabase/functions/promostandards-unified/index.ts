@@ -172,15 +172,32 @@ Deno.serve(async (req: Request) => {
       console.log('✅ User authenticated - company_id:', companyId);
     }
 
-    const { data: settings } = await supabase
+    console.log('📋 Fetching company settings for company_id:', companyId);
+    const { data: settings, error: settingsError } = await supabase
       .from("company_settings")
       .select("ssactivewear_enabled, ssactivewear_username, ssactivewear_api_key_encrypted")
       .eq("id", companyId)
       .maybeSingle();
 
+    console.log('📋 Settings fetch result:', {
+      hasSettings: !!settings,
+      enabled: settings?.ssactivewear_enabled,
+      hasUsername: !!settings?.ssactivewear_username,
+      hasApiKey: !!settings?.ssactivewear_api_key_encrypted,
+      error: settingsError
+    });
+
     if (!settings?.ssactivewear_enabled || !settings?.ssactivewear_api_key_encrypted || !settings?.ssactivewear_username) {
+      console.error('❌ SSActivewear credentials not configured or not enabled');
       return new Response(
-        JSON.stringify({ error: "SSActivewear credentials not configured" }),
+        JSON.stringify({
+          error: "SSActivewear credentials not configured",
+          details: {
+            enabled: settings?.ssactivewear_enabled,
+            hasUsername: !!settings?.ssactivewear_username,
+            hasApiKey: !!settings?.ssactivewear_api_key_encrypted
+          }
+        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -190,6 +207,7 @@ Deno.serve(async (req: Request) => {
       apiKey: settings.ssactivewear_api_key_encrypted
     };
 
+    console.log('🔐 Calling crypto-service to decrypt API key...');
     const decryptResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
       method: "POST",
       headers: {
@@ -202,14 +220,20 @@ Deno.serve(async (req: Request) => {
       }),
     });
 
+    console.log('🔐 Crypto-service response:', decryptResponse.status);
+
     if (!decryptResponse.ok) {
+      const errorText = await decryptResponse.text();
+      console.error('❌ Failed to decrypt credentials:', errorText);
       return new Response(
-        JSON.stringify({ error: "Failed to decrypt credentials" }),
+        JSON.stringify({ error: "Failed to decrypt credentials", details: errorText }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const { result: decryptedApiKey } = await decryptResponse.json();
+    const decryptResult = await decryptResponse.json();
+    console.log('🔐 Decryption successful');
+    const decryptedApiKey = decryptResult.result;
 
     const url = new URL(req.url);
     const styleNumber = url.searchParams.get("styleNumber")?.trim();
