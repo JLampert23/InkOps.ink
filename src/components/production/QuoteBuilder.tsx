@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Save, Plus, Trash2, GripVertical, X, Loader2, DollarSign, Settings, Search, Image as ImageIcon } from 'lucide-react';
+import { Save, Plus, Trash2, GripVertical, X, Loader2, DollarSign, Settings, Search, Image as ImageIcon, Check } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -99,6 +99,9 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
   const { showNotification } = useNotification();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
+  const autoSaveIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [customers, setCustomers] = useState<any[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(initialCustomerId || '');
   const [availableFees, setAvailableFees] = useState<any[]>([]);
@@ -227,6 +230,34 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       loadCustomerDetails(selectedCustomerId);
     }
   }, [selectedCustomerId, quoteId]);
+
+  useEffect(() => {
+    if (!quoteId || !selectedCustomerId) return;
+
+    const interval = setInterval(() => {
+      if (hasUnsavedChanges) {
+        performSave(true);
+      }
+    }, 120000);
+
+    autoSaveIntervalRef.current = interval;
+
+    return () => {
+      if (autoSaveIntervalRef.current) {
+        clearInterval(autoSaveIntervalRef.current);
+      }
+    };
+  }, [quoteId, selectedCustomerId, hasUnsavedChanges]);
+
+  useEffect(() => {
+    setHasUnsavedChanges(true);
+  }, [
+    selectedCustomerId, createdDate, productionDueDate, customerDueDate, terms,
+    poNumber, deliveryMethod, nickname, customerNotes, productionNotes,
+    billCompany, billName, billAddress1, billAddress2, billCity, billState, billZip,
+    shipCompany, shipName, shipAddress1, shipAddress2, shipCity, shipState, shipZip,
+    discount, discountType, salesTaxRate, itemGroups, fees
+  ]);
 
   const loadCompanySettings = async () => {
     if (!user) return;
@@ -1017,20 +1048,23 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
 
   const totals = calculateTotals();
 
-  const handleSave = async () => {
+  const performSave = async (isAutoSave = false): Promise<boolean> => {
     if (!selectedCustomerId) {
-      showNotification('error', 'Validation Error', 'Please select a customer');
-      return;
+      if (!isAutoSave) {
+        showNotification('error', 'Validation Error', 'Please select a customer');
+      }
+      return false;
     }
 
     if (!user) {
-      showNotification('error', 'Authentication Error', 'You must be logged in to save a quote');
-      return;
+      if (!isAutoSave) {
+        showNotification('error', 'Authentication Error', 'You must be logged in to save a quote');
+      }
+      return false;
     }
 
-    setSaving(true);
+    if (!isAutoSave) setSaving(true);
     try {
-      // Get user's company_id
       const { data: userProfile } = await supabase
         .from('user_profiles')
         .select('company_id')
@@ -1038,26 +1072,26 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         .maybeSingle();
 
       if (!userProfile?.company_id) {
-        showNotification('error', 'Configuration Error', 'User company not found');
-        setSaving(false);
-        return;
+        if (!isAutoSave) {
+          showNotification('error', 'Configuration Error', 'User company not found');
+        }
+        return false;
       }
 
-      // Get customer details for customer_name
       const { data: customer } = await supabase
         .from('customers')
         .select('company_name, email, phone')
         .eq('id', selectedCustomerId)
         .maybeSingle();
 
-      // Generate quote number if not provided
       let finalQuoteNumber = quoteNumber;
       if (!finalQuoteNumber && !quoteId) {
         finalQuoteNumber = await generateNextQuoteNumber(userProfile.company_id);
+        setQuoteNumber(finalQuoteNumber);
       }
 
       const quoteData = {
-        quote_number: finalQuoteNumber || `Q${Date.now()}`, // Fallback to timestamp if generation fails
+        quote_number: finalQuoteNumber || `Q${Date.now()}`,
         company_id: userProfile.company_id,
         customer_id: selectedCustomerId,
         customer_name: customer?.company_name || 'Unknown Customer',
@@ -1117,16 +1151,14 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       }
 
       if (savedQuoteId) {
-        // Delete existing line items and fees
         await supabase.from('quote_line_items').delete().eq('quote_id', savedQuoteId);
         await supabase.from('quote_fees').delete().eq('quote_id', savedQuoteId);
 
-        // Insert new line items with group labels
         const allItems = itemGroups.flatMap((group, groupIdx) =>
           group.items.map((item, itemIdx) => ({
             quote_id: savedQuoteId,
             company_id: userProfile.company_id,
-            sort_order: groupIdx * 1000 + itemIdx, // Group items together with spacing
+            sort_order: groupIdx * 1000 + itemIdx,
             group_label: group.label || '',
             size_mode: group.sizeMode || 'regular',
             item_number: item.item_number,
@@ -1169,7 +1201,6 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           if (itemsError) throw itemsError;
         }
 
-        // Insert new fees as line items with line_type='fee'
         if (fees.length > 0) {
           const { error: feesError } = await supabase.from('quote_line_items').insert(
             fees.map((fee, index) => ({
@@ -1189,13 +1220,43 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
         }
       }
 
-      showNotification('success', 'Quote Saved', 'Quote has been saved successfully');
-      onSave?.();
+      setHasUnsavedChanges(false);
+      setLastAutoSave(new Date());
+
+      if (!isAutoSave) {
+        showNotification('success', 'Quote Saved', 'Quote has been saved successfully');
+      }
+
+      return true;
     } catch (error: any) {
       console.error('Error saving quote:', error);
-      showNotification('error', 'Save Failed', error.message || 'Failed to save quote');
+      if (!isAutoSave) {
+        showNotification('error', 'Save Failed', error.message || 'Failed to save quote');
+      }
+      return false;
     } finally {
-      setSaving(false);
+      if (!isAutoSave) setSaving(false);
+    }
+  };
+
+  const handleSave = async () => {
+    await performSave(false);
+  };
+
+  const handleSaveAndClose = async () => {
+    const success = await performSave(false);
+    if (success) {
+      onSave?.();
+    }
+  };
+
+  const handleCancel = () => {
+    if (hasUnsavedChanges) {
+      if (window.confirm('You have unsaved changes. Are you sure you want to cancel?')) {
+        onCancel?.();
+      }
+    } else {
+      onCancel?.();
     }
   };
 
@@ -1208,21 +1269,45 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       {/* Top Bar */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900">
         <div className="flex items-center gap-4">
-          <button onClick={onCancel} className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
-            <X className="w-5 h-5" />
-          </button>
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
             {quoteId ? `Quote ${quoteNumber}` : 'New Quote'}
           </h2>
+          {lastAutoSave && (
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              Last saved: {lastAutoSave.toLocaleTimeString()}
+            </span>
+          )}
+          {hasUnsavedChanges && !lastAutoSave && (
+            <span className="text-xs text-amber-600 dark:text-amber-500">
+              Unsaved changes
+            </span>
+          )}
         </div>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded flex items-center gap-2 shadow-sm"
-        >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          Save Quote
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleCancel}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded flex items-center gap-2 shadow-sm"
+          >
+            <X className="w-4 h-4" />
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded flex items-center gap-2 shadow-sm disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            Save
+          </button>
+          <button
+            onClick={handleSaveAndClose}
+            disabled={saving}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded flex items-center gap-2 shadow-sm disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+            Save & Close
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto p-6 bg-gray-50 dark:bg-slate-950">
