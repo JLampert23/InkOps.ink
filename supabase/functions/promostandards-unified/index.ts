@@ -78,7 +78,7 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    console.log('Environment check:', {
+    console.log('🚀 PromoStandards Unified - Environment check:', {
       hasUrl: !!supabaseUrl,
       hasServiceKey: !!supabaseServiceRoleKey
     });
@@ -86,7 +86,7 @@ Deno.serve(async (req: Request) => {
     const authHeader = req.headers.get("Authorization");
 
     if (!authHeader) {
-      console.error('No Authorization header provided');
+      console.error('❌ No Authorization header provided');
       return new Response(
         JSON.stringify({ error: "Missing authorization header" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -94,65 +94,88 @@ Deno.serve(async (req: Request) => {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    console.log('Auth header received, token length:', token.length);
+    const isServiceRoleKey = token === supabaseServiceRoleKey;
 
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
+    console.log('🔑 Auth token check:', {
+      tokenLength: token.length,
+      isServiceRoleKey,
+      tokenPrefix: token.substring(0, 20) + '...'
+    });
+
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false
       }
     });
 
-    console.log('Validating JWT token...');
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    let companyId: string;
 
-    if (authError) {
-      console.error('JWT validation error:', {
-        message: authError.message,
-        name: authError.name,
-        status: authError.status,
-        tokenLength: token.length
-      });
-      return new Response(
-        JSON.stringify({
-          error: "Invalid JWT",
-          details: authError.message,
-          status: authError.status
-        }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (isServiceRoleKey) {
+      // Internal call from another edge function - get company_id from query params
+      const url = new URL(req.url);
+      const companyIdParam = url.searchParams.get("companyId");
+      if (!companyIdParam) {
+        return new Response(
+          JSON.stringify({ error: "Company ID required for service calls" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      companyId = companyIdParam;
+      console.log('🔧 Service role call - using company_id:', companyId);
+    } else {
+      // User JWT - validate and get company_id from profile
+      console.log('👤 User JWT - validating token...');
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+      if (authError) {
+        console.error('❌ JWT validation FAILED:', {
+          message: authError.message,
+          name: authError.name,
+          status: authError.status,
+          code: authError.code
+        });
+        return new Response(
+          JSON.stringify({
+            error: "Unauthorized",
+            details: authError.message
+          }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (!user) {
+        console.error('❌ No user found in JWT');
+        return new Response(
+          JSON.stringify({ error: "Unauthorized - no user found" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      console.log('✅ JWT validated successfully for user:', user.id);
+
+      const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("company_id")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (!profile?.company_id) {
+        console.error('❌ No company_id found for user:', user.id);
+        return new Response(
+          JSON.stringify({ error: "Company not found" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      companyId = profile.company_id;
+      console.log('✅ User authenticated - company_id:', companyId);
     }
 
-    if (!user) {
-      console.error('No user found in JWT');
-      return new Response(
-        JSON.stringify({ error: "Invalid JWT - no user found" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    console.log('JWT validated successfully for user:', user.id);
-
-    const { data: profile } = await supabaseAdmin
-      .from("user_profiles")
-      .select("company_id")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (!profile?.company_id) {
-      console.error('No company_id found for user:', user.id);
-      return new Response(
-        JSON.stringify({ error: "Company not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    console.log('Found company_id:', profile.company_id);
-
-    const { data: settings } = await supabaseAdmin
+    const { data: settings } = await supabase
       .from("company_settings")
       .select("ssactivewear_enabled, ssactivewear_username, ssactivewear_api_key_encrypted")
-      .eq("id", profile.company_id)
+      .eq("id", companyId)
       .maybeSingle();
 
     if (!settings?.ssactivewear_enabled || !settings?.ssactivewear_api_key_encrypted || !settings?.ssactivewear_username) {
