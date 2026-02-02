@@ -56,25 +56,18 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Create user client with their JWT for authentication
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: { Authorization: authHeader }
-      },
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
+    // Extract the JWT token from the Authorization header
+    const token = authHeader.replace("Bearer ", "");
+    console.log("Token extracted, length:", token.length);
 
-    // Verify the user is authenticated
-    console.log('Validating user session...');
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    // Verify the user is authenticated using service role
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
 
     if (userError || !user) {
       console.error("Authentication error:", userError);
       return new Response(
-        JSON.stringify({ code: 401, message: "Invalid JWT" }),
+        JSON.stringify({ code: 401, message: "Invalid JWT", details: userError?.message }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
