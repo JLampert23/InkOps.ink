@@ -1589,7 +1589,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                             {showProductDropdown && activeSearchItem?.groupId === group.id && activeSearchItem?.itemIdx === itemIdx && productSearchResults.length > 0 && (
                               <div
                                 ref={dropdownRef}
-                                className="absolute z-50 left-0 top-full mt-1 w-80 max-h-96 overflow-auto bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg shadow-xl"
+                                className="absolute z-50 left-0 top-full mt-1 w-[600px] max-h-96 overflow-auto bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg shadow-xl"
                               >
                                 <div className="p-2 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
                                   <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
@@ -1598,43 +1598,21 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
                                 </div>
                                 {productSearchResults.map((product, pIdx) => (
                                   <div key={pIdx} className="border-b border-gray-200 dark:border-slate-700 last:border-0">
-                                    <div className="px-3 py-2 bg-gray-50 dark:bg-slate-900/50">
-                                      <div className="flex items-center justify-between">
-                                        <span className="text-xs font-semibold text-gray-900 dark:text-white">
-                                          {product.brand} {product.style}
-                                        </span>
-                                        <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 uppercase">
-                                          {product.supplier}
-                                        </span>
-                                      </div>
-                                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 line-clamp-1">
-                                        {product.description}
-                                      </p>
-                                    </div>
-                                    <div className="max-h-48 overflow-y-auto">
+                                    <div className="max-h-64 overflow-y-auto">
                                       {product.colors.map((color, cIdx) => (
                                         <button
                                           key={cIdx}
                                           type="button"
                                           onClick={() => selectProductColor(product, cIdx)}
-                                          className="w-full px-3 py-2 text-left hover:bg-blue-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors"
+                                          className="w-full px-3 py-2 text-left hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors border-b border-gray-100 dark:border-slate-700 last:border-0"
                                         >
-                                          {color.image_url && (
-                                            <img
-                                              src={color.image_url}
-                                              alt={color.name}
-                                              className="w-10 h-10 object-cover rounded border border-gray-200 dark:border-slate-600"
-                                            />
-                                          )}
-                                          <div className="flex-1 min-w-0">
-                                            <p className="text-xs font-medium text-gray-900 dark:text-white truncate">
-                                              {color.name}
+                                          <div className="flex items-start justify-between gap-2">
+                                            <p className="text-xs text-gray-900 dark:text-white flex-1">
+                                              {product.brand} - {product.style} - {color.name} - {product.description} - {product.style}
+                                              <span className="ml-2 px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 uppercase text-[10px]">
+                                                {product.supplier}
+                                              </span>
                                             </p>
-                                            {color.pricing?.wholesale && (
-                                              <p className="text-xs text-green-600 dark:text-green-400">
-                                                ${color.pricing.wholesale.toFixed(2)}
-                                              </p>
-                                            )}
                                           </div>
                                         </button>
                                       ))}
