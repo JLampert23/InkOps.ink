@@ -2101,18 +2101,26 @@ export default function MockupGenerator({
                             <div className="space-y-2">
                               {(() => {
                                 const imagesData = garmentStyle.imagesData || {};
-                                const frontImages = imagesData.frontImages || [];
-                                const rearImages = imagesData.rearImages || [];
-                                const sideImages = imagesData.sideImages || [];
-                                const lifestyleImages = imagesData.lifestyleImages || [];
-                                const otherImages = imagesData.otherImages || [];
+                                let frontImages = [...(imagesData.frontImages || [])];
+                                let rearImages = [...(imagesData.rearImages || [])];
+                                let sideImages = [...(imagesData.sideImages || [])];
+                                let lifestyleImages = [...(imagesData.lifestyleImages || [])];
+                                let otherImages = [...(imagesData.otherImages || [])];
 
-                                // Fallback to single URLs if no organized data
+                                // Fallback to single URLs if no organized data - but only push valid URLs
                                 if (frontImages.length === 0 && rearImages.length === 0 && sideImages.length === 0 && lifestyleImages.length === 0) {
-                                  frontImages.push(garmentStyle.frontImage);
-                                  rearImages.push(garmentStyle.rearImage);
-                                  sideImages.push(garmentStyle.sideImage);
-                                  lifestyleImages.push(garmentStyle.lifestyleImage);
+                                  if (garmentStyle.frontImage && garmentStyle.frontImage.trim()) {
+                                    frontImages.push(garmentStyle.frontImage);
+                                  }
+                                  if (garmentStyle.rearImage && garmentStyle.rearImage.trim()) {
+                                    rearImages.push(garmentStyle.rearImage);
+                                  }
+                                  if (garmentStyle.sideImage && garmentStyle.sideImage.trim()) {
+                                    sideImages.push(garmentStyle.sideImage);
+                                  }
+                                  if (garmentStyle.lifestyleImage && garmentStyle.lifestyleImage.trim()) {
+                                    lifestyleImages.push(garmentStyle.lifestyleImage);
+                                  }
                                 }
 
                                 const renderImageRow = (images: string[], label: string) => {
