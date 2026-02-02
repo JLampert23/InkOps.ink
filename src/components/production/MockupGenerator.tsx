@@ -424,6 +424,22 @@ export default function MockupGenerator({
         }
 
         if (lineItems && lineItems.length > 0) {
+          const filterValidImages = (images: any[]) => {
+            return (images || []).filter((img: any) => img && typeof img === 'string' && img.trim() !== '');
+          };
+
+          const cleanImagesData = (data: any) => {
+            if (!data) return null;
+            return {
+              frontImages: filterValidImages(data.frontImages),
+              rearImages: filterValidImages(data.rearImages),
+              sideImages: filterValidImages(data.sideImages),
+              lifestyleImages: filterValidImages(data.lifestyleImages),
+              otherImages: filterValidImages(data.otherImages),
+              allImages: filterValidImages(data.allImages),
+            };
+          };
+
           const styles = lineItems.map(item => ({
             lineItemId: item.id,
             style: item.item_number || '',
@@ -434,7 +450,7 @@ export default function MockupGenerator({
             rearImage: item.garment_rear_image_url || '',
             sideImage: item.garment_side_image_url || '',
             lifestyleImage: item.garment_lifestyle_image_url || '',
-            imagesData: item.garment_images_data || null,
+            imagesData: cleanImagesData(item.garment_images_data),
           }));
 
           setGarmentStyles(styles);

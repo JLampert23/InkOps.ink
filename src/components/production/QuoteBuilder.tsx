@@ -851,13 +851,17 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
             garmentImages.garment_lifestyle_image_url = unifiedData.media.views.lifestyle;
           }
 
+          const filterValidImages = (images: any[]) => {
+            return (images || []).filter((img: any) => img && typeof img === 'string' && img.trim() !== '');
+          };
+
           garmentImages.garment_images_data = {
-            frontImages: unifiedData.media.views.frontImages || [],
-            rearImages: unifiedData.media.views.rearImages || [],
-            sideImages: unifiedData.media.views.sideImages || [],
-            lifestyleImages: unifiedData.media.views.lifestyleImages || [],
-            otherImages: unifiedData.media.views.otherImages || [],
-            allImages: unifiedData.media.images || [],
+            frontImages: filterValidImages(unifiedData.media.views.frontImages),
+            rearImages: filterValidImages(unifiedData.media.views.rearImages),
+            sideImages: filterValidImages(unifiedData.media.views.sideImages),
+            lifestyleImages: filterValidImages(unifiedData.media.views.lifestyleImages),
+            otherImages: filterValidImages(unifiedData.media.views.otherImages),
+            allImages: filterValidImages(unifiedData.media.images),
           };
 
           console.log('Loaded SSActivewear images:', {
