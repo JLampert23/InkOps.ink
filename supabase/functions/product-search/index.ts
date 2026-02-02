@@ -11,6 +11,7 @@ const corsHeaders = {
 interface ColorOption {
   name: string;
   code: string;
+  partIds?: string[];
   image_url?: string;
   pricing?: {
     wholesale?: number;
