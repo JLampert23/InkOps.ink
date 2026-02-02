@@ -299,6 +299,17 @@ Deno.serve(async (req: Request) => {
       ) : Promise.resolve(null),
     ]);
 
+    console.log('📊 PromoStandards API Results:', {
+      product: productResponse.status,
+      inventory: inventoryResponse.status,
+      pricing: pricingResponse.status,
+      media: mediaResponse.status,
+      productError: productResponse.status === 'rejected' ? productResponse.reason : null,
+      inventoryError: inventoryResponse.status === 'rejected' ? inventoryResponse.reason : null,
+      pricingError: pricingResponse.status === 'rejected' ? pricingResponse.reason : null,
+      mediaError: mediaResponse.status === 'rejected' ? mediaResponse.reason : null,
+    });
+
     // Parse Product Data
     const productData: any = {};
     if (productResponse.status === 'fulfilled' && productResponse.value) {
