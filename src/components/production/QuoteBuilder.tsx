@@ -852,7 +852,24 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           }
 
           const filterValidImages = (images: any[]) => {
-            return (images || []).filter((img: any) => img && typeof img === 'string' && img.trim() !== '');
+            return (images || []).filter((img: any) => {
+              if (!img) return false;
+              if (typeof img !== 'string') return false;
+              const trimmed = img.trim();
+              if (trimmed === '' || trimmed === 'null' || trimmed === 'undefined') return false;
+
+              // Check if URL points to an actual image file
+              const lowerUrl = trimmed.toLowerCase();
+              const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
+              const hasImageExtension = imageExtensions.some(ext => lowerUrl.includes(ext));
+
+              // Exclude non-image URLs like PDFs, spec sheets, etc.
+              if (lowerUrl.includes('.pdf') || lowerUrl.includes('itemspecs.aspx') || lowerUrl.includes('itemspecsheet.aspx')) {
+                return false;
+              }
+
+              return hasImageExtension;
+            });
           };
 
           garmentImages.garment_images_data = {
