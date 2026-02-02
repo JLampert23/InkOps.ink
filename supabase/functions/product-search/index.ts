@@ -43,6 +43,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     const authHeader = req.headers.get("Authorization");
@@ -55,38 +56,38 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Extract JWT token from Bearer header
-    const token = authHeader.replace("Bearer ", "");
-
-    // Create admin client for all operations (using service role key)
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+    // Create user client with their JWT for authentication
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: { Authorization: authHeader }
+      },
       auth: {
         autoRefreshToken: false,
         persistSession: false
       }
     });
 
-    // Verify the JWT by passing the token explicitly
-    console.log('Validating JWT token...');
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+    // Verify the user is authenticated
+    console.log('Validating user session...');
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-    if (userError) {
-      console.error("JWT validation error:", userError);
+    if (userError || !user) {
+      console.error("Authentication error:", userError);
       return new Response(
-        JSON.stringify({ code: 401, message: "Invalid JWT", details: userError.message }),
+        JSON.stringify({ code: 401, message: "Invalid JWT" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    if (!user) {
-      console.error("No user found in JWT");
-      return new Response(
-        JSON.stringify({ code: 401, message: "Invalid JWT - no user found" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    console.log("User authenticated:", user.id);
 
-    console.log("JWT validated successfully for user:", user.id);
+    // Create admin client for database operations
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
 
     // Get the user's company from their profile
     const { data: profile, error: profileError } = await supabaseAdmin
