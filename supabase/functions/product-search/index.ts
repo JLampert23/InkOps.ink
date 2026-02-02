@@ -56,13 +56,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Extract the JWT token from the Authorization header
-    const token = authHeader.replace("Bearer ", "");
-    console.log("Token extracted, length:", token.length);
+    // Get user from JWT (Supabase validates the JWT automatically with verify_jwt:true)
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false }
+    });
 
-    // Verify the user is authenticated using service role
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
 
     if (userError || !user) {
       console.error("Authentication error:", userError);
