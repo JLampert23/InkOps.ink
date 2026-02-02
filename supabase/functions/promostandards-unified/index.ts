@@ -285,7 +285,7 @@ Deno.serve(async (req: Request) => {
   <shar:priceType>Customer</shar:priceType>
 </ns2:GetConfigurationAndPricingRequest>`
       ) : Promise.resolve(null),
-      // 4. Media Content - use styleNumber (media is shared across all colors)
+      // 4. Media Content - use styleNumber as productId and partId for color-specific images
       makePromoStandardsRequest(
         PROMOSTANDARDS_ENDPOINTS.media,
         "getMediaContent",
@@ -293,8 +293,9 @@ Deno.serve(async (req: Request) => {
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${credentials.accountNumber}</shar:id>
   <shar:password>${decryptedApiKey}</shar:password>
-  <shar:productId>${styleNumber}</shar:productId>
   <shar:mediaType>Image</shar:mediaType>
+  <shar:productId>${styleNumber}</shar:productId>${partId ? `
+  <shar:partId>${partId}</shar:partId>` : ''}
 </ns2:GetMediaContentRequest>`
       ),
     ]);
@@ -402,18 +403,18 @@ Deno.serve(async (req: Request) => {
     if (mediaResponse.status === 'fulfilled' && mediaResponse.value) {
       const xmlDoc = mediaResponse.value;
       console.log('📸 Media XML Response (first 500 chars):', xmlDoc.substring(0, 500));
-      const mediaPattern = /<Media>([\s\S]*?)<\/Media>/gi;
+      const mediaPattern = /<MediaContent>([\s\S]*?)<\/MediaContent>/gi;
       const mediaMatches = getAllXmlMatches(xmlDoc, mediaPattern);
-      console.log('📸 Media matches found:', mediaMatches.length);
+      console.log('📸 MediaContent matches found:', mediaMatches.length);
 
       mediaData.images = mediaMatches.map(match => {
         const mediaXml = match[1];
         return {
           url: getXmlValue(mediaXml, "url"),
+          productId: getXmlValue(mediaXml, "productId"),
           partId: getXmlValue(mediaXml, "partId"),
-          description: getXmlValue(mediaXml, "description"),
-          fileType: getXmlValue(mediaXml, "fileType"),
-          classType: getXmlValue(mediaXml, "classType"),
+          classTypeName: getXmlValue(mediaXml, "classTypeName"),
+          color: getXmlValue(mediaXml, "color"),
           singlePart: getXmlValue(mediaXml, "singlePart") === "true",
         };
       });
@@ -426,18 +427,17 @@ Deno.serve(async (req: Request) => {
       const otherImages: string[] = [];
 
       mediaData.images.forEach((img: any) => {
-        const desc = (img.description || '').toLowerCase();
-        const classType = (img.classType || '').toLowerCase();
+        const classTypeName = (img.classTypeName || '').toLowerCase();
 
-        if (desc.includes('front') || classType.includes('front')) {
+        if (classTypeName.includes('front')) {
           frontImages.push(img.url);
-        } else if (desc.includes('rear') || classType.includes('rear') || desc.includes('back') || classType.includes('back')) {
+        } else if (classTypeName.includes('rear') || classTypeName.includes('back')) {
           rearImages.push(img.url);
-        } else if (desc.includes('side') || classType.includes('side') || desc.includes('sleeve') || classType.includes('sleeve')) {
+        } else if (classTypeName.includes('side') || classTypeName.includes('sleeve')) {
           sideImages.push(img.url);
-        } else if (desc.includes('lifestyle') || classType.includes('lifestyle') || desc.includes('casual') || classType.includes('casual')) {
+        } else if (classTypeName.includes('lifestyle') || classTypeName.includes('casual')) {
           lifestyleImages.push(img.url);
-        } else if (img.url && !desc.includes('swatch') && !classType.includes('swatch')) {
+        } else if (img.url && !classTypeName.includes('swatch')) {
           // Include other images except swatches (Detail, etc.)
           otherImages.push(img.url);
         }
