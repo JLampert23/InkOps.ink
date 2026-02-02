@@ -2156,71 +2156,67 @@ export default function MockupGenerator({
                                   }
                                 }
 
-                                const renderImageRow = (images: string[], label: string) => {
-                                  const validImages = images.filter(img => {
-                                    if (!img) return false;
-                                    if (typeof img !== 'string') return false;
-                                    const trimmed = img.trim();
-                                    if (trimmed === '' || trimmed === 'null' || trimmed === 'undefined') return false;
+                                // Combine all images into a single array
+                                const allImagesList = [
+                                  ...frontImages,
+                                  ...rearImages,
+                                  ...sideImages,
+                                  ...lifestyleImages,
+                                  ...otherImages
+                                ];
 
-                                    // Check if URL points to an actual image file
-                                    const lowerUrl = trimmed.toLowerCase();
-                                    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
-                                    const hasImageExtension = imageExtensions.some(ext => lowerUrl.includes(ext));
+                                // Filter for valid images only
+                                const validImages = allImagesList.filter(img => {
+                                  if (!img) return false;
+                                  if (typeof img !== 'string') return false;
+                                  const trimmed = img.trim();
+                                  if (trimmed === '' || trimmed === 'null' || trimmed === 'undefined') return false;
 
-                                    // Exclude non-image URLs like PDFs, spec sheets, etc.
-                                    if (lowerUrl.includes('.pdf') || lowerUrl.includes('itemspecs.aspx') || lowerUrl.includes('itemspecsheet.aspx')) {
-                                      return false;
-                                    }
+                                  // Check if URL points to an actual image file
+                                  const lowerUrl = trimmed.toLowerCase();
+                                  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
+                                  const hasImageExtension = imageExtensions.some(ext => lowerUrl.includes(ext));
 
-                                    return hasImageExtension;
-                                  });
+                                  // Exclude non-image URLs like PDFs, spec sheets, etc.
+                                  if (lowerUrl.includes('.pdf') || lowerUrl.includes('itemspecs.aspx') || lowerUrl.includes('itemspecsheet.aspx')) {
+                                    return false;
+                                  }
 
-                                  if (validImages.length === 0) return null;
+                                  return hasImageExtension;
+                                });
 
-                                  return (
-                                    <div key={label}>
-                                      <div className="text-[9px] text-gray-600 dark:text-gray-400 mb-0.5 font-medium">{label}</div>
-                                      <div className="flex gap-1 flex-wrap">
-                                        {validImages.slice(0, 4).map((imageUrl, idx) => (
-                                          <button
-                                            key={idx}
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setGarmentImageUrl(imageUrl);
-                                            }}
-                                            className={`relative w-14 h-14 rounded border overflow-hidden transition-all hover:scale-105 flex-shrink-0 ${
-                                              garmentImageUrl === imageUrl
-                                                ? 'border-blue-500 ring-1 ring-blue-300'
-                                                : 'border-gray-300 dark:border-slate-600'
-                                            }`}
-                                            title={`${label} ${idx + 1}`}
-                                          >
-                                            <img
-                                              src={imageUrl}
-                                              alt={`${label} ${idx + 1}`}
-                                              className="w-full h-full object-contain bg-white"
-                                            />
-                                            {validImages.length > 1 && (
-                                              <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[8px] text-center py-0.5">
-                                                {idx + 1}
-                                              </div>
-                                            )}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  );
-                                };
+                                // Remove duplicates
+                                const uniqueImages = [...new Set(validImages)];
+
+                                if (uniqueImages.length === 0) return null;
 
                                 return (
-                                  <>
-                                    {renderImageRow(frontImages, 'Front')}
-                                    {renderImageRow(rearImages, 'Rear')}
-                                    {renderImageRow(sideImages, 'Side')}
-                                    {renderImageRow(lifestyleImages, 'Lifestyle')}
-                                    {renderImageRow(otherImages, 'Other')}
-                                  </>
+                                  <div className="flex gap-1 overflow-x-auto">
+                                    {uniqueImages.slice(0, 4).map((imageUrl, idx) => (
+                                      <button
+                                        key={idx}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setGarmentImageUrl(imageUrl);
+                                        }}
+                                        className={`relative w-14 h-14 rounded border overflow-hidden transition-all hover:scale-105 flex-shrink-0 ${
+                                          garmentImageUrl === imageUrl
+                                            ? 'border-blue-500 ring-1 ring-blue-300'
+                                            : 'border-gray-300 dark:border-slate-600'
+                                        }`}
+                                        title={`View ${idx + 1}`}
+                                      >
+                                        <img
+                                          src={imageUrl}
+                                          alt={`View ${idx + 1}`}
+                                          className="w-full h-full object-contain bg-white"
+                                        />
+                                        <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[8px] text-center py-0.5">
+                                          {idx + 1}
+                                        </div>
+                                      </button>
+                                    ))}
+                                  </div>
                                 );
                               })()}
                             </div>
