@@ -155,8 +155,233 @@ Deno.serve(async (req: Request) => {
           console.error("Style lookup error:", styleError);
           errors.push(`Cache lookup error: ${styleError.message}`);
         } else if (!styleData) {
-          console.log(`Style ${style} not found in cache`);
-          errors.push(`Style ${style} not found in local cache. Please sync catalog first.`);
+          console.log(`Style ${style} not found in cache - fetching from SSActivewear...`);
+
+          // Fetch from SSActivewear API and cache it
+          try {
+            const ssaUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=product&productId=${encodeURIComponent(style)}&companyId=${encodeURIComponent(profile.company_id)}`;
+            const ssaResponse = await fetch(ssaUrl, {
+              headers: {
+                "Authorization": `Bearer ${supabaseServiceKey}`,
+              },
+            });
+
+            if (!ssaResponse.ok) {
+              const errorText = await ssaResponse.text();
+              console.error("SSActivewear API failed:", errorText);
+              errors.push(`Style ${style} not found in local cache and failed to fetch from SSActivewear.`);
+            } else {
+              const ssaData = await ssaResponse.json();
+              const productData = ssaData.data?.[0];
+
+              if (!productData) {
+                console.log(`Style ${style} not found in SSActivewear API`);
+                errors.push(`Style ${style} not found.`);
+              } else {
+                console.log(`Fetched style ${style} from SSActivewear - caching it...`);
+
+                // Upsert style data into cache
+                const { data: newStyleData, error: upsertError } = await supabaseAdmin
+                  .from("styles")
+                  .upsert({
+                    company_id: profile.company_id,
+                    style_number: style,
+                    brand: productData.productBrand || null,
+                    name: productData.productName || null,
+                    description: productData.description || null,
+                    category: null,
+                    primary_image: null,
+                    last_synced: new Date().toISOString(),
+                  }, {
+                    onConflict: "company_id,style_number"
+                  })
+                  .select("id")
+                  .maybeSingle();
+
+                if (upsertError || !newStyleData) {
+                  console.error("Failed to cache style:", upsertError);
+                  errors.push(`Failed to cache style ${style}`);
+                } else {
+                  const styleId = newStyleData.id;
+                  console.log(`Cached style ${style} with id: ${styleId}`);
+
+                  // Upsert parts data
+                  if (productData.parts && Array.isArray(productData.parts)) {
+                    for (const part of productData.parts) {
+                      if (!part.partId) continue;
+
+                      await supabaseAdmin
+                        .from("parts")
+                        .upsert({
+                          company_id: profile.company_id,
+                          style_id: styleId,
+                          part_id: part.partId,
+                          color_name: part.colorName || null,
+                          hex: null,
+                          size: part.labelSize || null,
+                          weight: null,
+                          gtin: null,
+                        }, {
+                          onConflict: "company_id,part_id"
+                        });
+                    }
+                    console.log(`Cached ${productData.parts.length} parts for style ${style}`);
+                  }
+
+                  // Fetch and cache media/images
+                  const mediaUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=media&productId=${encodeURIComponent(style)}&companyId=${encodeURIComponent(profile.company_id)}`;
+                  const mediaResponse = await fetch(mediaUrl, {
+                    headers: {
+                      "Authorization": `Bearer ${supabaseServiceKey}`,
+                    },
+                  });
+
+                  if (mediaResponse.ok) {
+                    const mediaData = await mediaResponse.json();
+                    const mediaContent = mediaData.data?.mediaContent || [];
+
+                    for (const media of mediaContent) {
+                      if (!media.url) continue;
+
+                      const { data: partForImage } = await supabaseAdmin
+                        .from("parts")
+                        .select("id")
+                        .eq("company_id", profile.company_id)
+                        .eq("style_id", styleId)
+                        .eq("part_id", media.partId || productData.parts?.[0]?.partId)
+                        .maybeSingle();
+
+                      if (partForImage) {
+                        await supabaseAdmin
+                          .from("images")
+                          .upsert({
+                            company_id: profile.company_id,
+                            part_id: partForImage.id,
+                            class_type: media.classTypeName || null,
+                            url: media.url,
+                          }, {
+                            onConflict: "company_id,part_id,class_type"
+                          });
+                      }
+                    }
+                    console.log(`Cached ${mediaContent.length} images for style ${style}`);
+                  }
+
+                  // Now re-query the cached data and return it
+                  const { data: cachedStyle } = await supabaseAdmin
+                    .from("styles")
+                    .select(`
+                      id,
+                      style_number,
+                      brand,
+                      name,
+                      description,
+                      category,
+                      primary_image,
+                      last_synced
+                    `)
+                    .eq("id", styleId)
+                    .maybeSingle();
+
+                  if (cachedStyle) {
+                    // Get all parts for this style grouped by color
+                    const { data: partsData } = await supabaseAdmin
+                      .from("parts")
+                      .select("id, part_id, color_name, hex, size")
+                      .eq("style_id", cachedStyle.id)
+                      .order("color_name", { ascending: true })
+                      .order("size", { ascending: true });
+
+                    // Group parts by color to create color options
+                    const colorMap = new Map<string, ColorOption>();
+
+                    for (const part of partsData || []) {
+                      const colorName = part.color_name || "Default";
+
+                      if (!colorMap.has(colorName)) {
+                        colorMap.set(colorName, {
+                          name: colorName,
+                          code: part.hex || "",
+                          partIds: [],
+                          sizes: [],
+                          image_url: "",
+                          pricing: {
+                            wholesale: 0,
+                            retail: 0,
+                          },
+                          stock: {},
+                        });
+                      }
+
+                      const colorOption = colorMap.get(colorName)!;
+                      if (part.part_id && !colorOption.partIds?.includes(part.part_id)) {
+                        colorOption.partIds?.push(part.part_id);
+                      }
+                      if (part.size && !colorOption.sizes?.includes(part.size)) {
+                        colorOption.sizes?.push(part.size);
+                      }
+                    }
+
+                    const colors = Array.from(colorMap.values());
+
+                    // Get primary image for each color
+                    for (const color of colors) {
+                      if (!color.partIds || color.partIds.length === 0) continue;
+
+                      const firstPartId = partsData?.find(p =>
+                        p.part_id === color.partIds![0]
+                      )?.id;
+
+                      if (!firstPartId) continue;
+
+                      const { data: imageData } = await supabaseAdmin
+                        .from("images")
+                        .select("url, class_type")
+                        .eq("part_id", firstPartId)
+                        .order("class_type", { ascending: true });
+
+                      if (imageData && imageData.length > 0) {
+                        let bestImage = imageData.find((img) =>
+                          (img.class_type || "").toLowerCase().includes("front")
+                        );
+
+                        if (!bestImage) {
+                          bestImage = imageData.find((img) => {
+                            const type = (img.class_type || "").toLowerCase();
+                            return type.includes("rear") || type.includes("back");
+                          });
+                        }
+
+                        if (!bestImage) {
+                          bestImage = imageData[0];
+                        }
+
+                        if (bestImage?.url) {
+                          color.image_url = bestImage.url;
+                        }
+                      }
+                    }
+
+                    results.push({
+                      supplier: "ssactivewear",
+                      style: cachedStyle.style_number,
+                      brand: cachedStyle.brand || "",
+                      description: cachedStyle.name || cachedStyle.description || "",
+                      category: cachedStyle.category || "",
+                      colors,
+                      cached: true,
+                      last_synced: cachedStyle.last_synced,
+                    });
+
+                    console.log(`Successfully loaded ${colors.length} colors from newly cached style`);
+                  }
+                }
+              }
+            }
+          } catch (fetchError: any) {
+            console.error("Error fetching/caching style:", fetchError);
+            errors.push(`Failed to fetch style ${style}: ${fetchError.message}`);
+          }
         } else {
           console.log(`Found style in cache: ${styleData.style_number}`);
 
