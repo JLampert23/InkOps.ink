@@ -837,32 +837,21 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
       supplier_partid: color?.code as string | undefined,
     };
 
-    // If SSActivewear, fetch unified product data with garment images
+    // Fetch garment images based on supplier
     if (product.supplier === 'ssactivewear' && color?.code) {
       try {
-        console.log('Fetching garment images for:', { style: product.style, partId: color.code });
+        console.log('Fetching SSActivewear garment images for:', { style: product.style, partId: color.code });
         const unifiedData = await getUnifiedProductData(product.style, color.code);
         console.log('Unified data response:', unifiedData);
-        console.log('🖼️ Media structure check:', {
-          hasMedia: !!unifiedData.media,
-          hasViews: !!unifiedData.media?.views,
-          mediaKeys: unifiedData.media ? Object.keys(unifiedData.media) : [],
-          viewsKeys: unifiedData.media?.views ? Object.keys(unifiedData.media.views) : [],
-          fullMedia: JSON.stringify(unifiedData.media, null, 2)
-        });
-        console.log('🐛 Media Debug Info:', unifiedData.debug);
-        console.log('📸 FULL MEDIA XML:', unifiedData.debug?.mediaXmlFull);
 
         if (unifiedData.success && unifiedData.media?.views) {
           garmentImages.garment_front_image_url = unifiedData.media.views.front || undefined;
           garmentImages.garment_rear_image_url = unifiedData.media.views.rear || undefined;
           garmentImages.garment_side_image_url = unifiedData.media.views.side || undefined;
           garmentImages.garment_lifestyle_image_url = unifiedData.media.views.lifestyle || undefined;
-          // Backward compatibility: populate old fields with new values
           garmentImages.garment_back_image_url = unifiedData.media.views.rear || undefined;
           garmentImages.garment_sleeve_image_url = unifiedData.media.views.side || undefined;
 
-          // Save complete organized image data including ALL images for each view type
           garmentImages.garment_images_data = {
             frontImages: unifiedData.media.views.frontImages || [],
             rearImages: unifiedData.media.views.rearImages || [],
@@ -872,23 +861,37 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
             allImages: unifiedData.media.images || [],
           };
 
-          console.log('Loaded garment images:', {
+          console.log('Loaded SSActivewear images:', {
             front: !!garmentImages.garment_front_image_url,
-            rear: !!garmentImages.garment_rear_image_url,
-            side: !!garmentImages.garment_side_image_url,
-            lifestyle: !!garmentImages.garment_lifestyle_image_url,
-            frontCount: unifiedData.media.views.frontImages?.length || 0,
-            rearCount: unifiedData.media.views.rearImages?.length || 0,
-            sideCount: unifiedData.media.views.sideImages?.length || 0,
-            lifestyleCount: unifiedData.media.views.lifestyleImages?.length || 0,
             totalImages: unifiedData.media.images?.length || 0,
           });
         } else {
           console.warn('No media data in unified response');
         }
       } catch (error: any) {
-        console.error('Failed to fetch garment images:', error);
+        console.error('Failed to fetch SSActivewear garment images:', error);
         showNotification('warning', 'Could not load garment images. Product added without images.');
+      }
+    } else if (product.supplier === 'sanmar' && color) {
+      try {
+        console.log('Fetching SanMar garment images for:', { style: product.style, color: color.name });
+
+        if (color.image_url) {
+          garmentImages.garment_front_image_url = color.image_url;
+          garmentImages.garment_images_data = {
+            frontImages: [color.image_url],
+            rearImages: [],
+            sideImages: [],
+            lifestyleImages: [],
+            otherImages: [],
+            allImages: [color.image_url],
+          };
+          console.log('Loaded SanMar thumbnail image');
+        } else {
+          console.warn('No image URL available for SanMar product');
+        }
+      } catch (error: any) {
+        console.error('Failed to fetch SanMar garment images:', error);
       }
     }
 
