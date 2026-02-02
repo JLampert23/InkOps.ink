@@ -36,8 +36,8 @@ export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
       <div class="box-label" style="
         width: 4in;
         height: 6in;
-        border: 1px solid black;
-        font-family: system-ui, sans-serif;
+        border: 2px solid black;
+        font-family: Arial, sans-serif;
         display: flex;
         flex-direction: column;
         justify-content: center;
@@ -92,45 +92,47 @@ export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
       </div>
     `).join('');
 
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Box Labels - ${labels[0].invoiceNumber}</title>
-          <style>
-            @page {
-              size: 4in 6in;
-              margin: 0;
-            }
-            * {
-              margin: 0;
-              padding: 0;
-              box-sizing: border-box;
-            }
-            body {
-              margin: 0;
-              padding: 0;
-            }
-            @media print {
-              .box-label {
-                page-break-inside: avoid;
-              }
-            }
-          </style>
-        </head>
-        <body>
-          ${labelsHTML}
-        </body>
-      </html>
-    `);
+    const htmlContent = `<!DOCTYPE html>
+<html>
+  <head>
+    <title>Box Labels - ${labels[0].invoiceNumber}</title>
+    <style>
+      @page {
+        size: 4in 6in;
+        margin: 0;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        background: white;
+      }
+      @media print {
+        .box-label {
+          page-break-inside: avoid;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    ${labelsHTML}
+    <script>
+      window.onload = function() {
+        setTimeout(function() {
+          window.print();
+        }, 500);
+      };
+    </script>
+  </body>
+</html>`;
 
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
     printWindow.document.close();
-    setTimeout(() => {
-      printWindow.print();
-      setTimeout(() => {
-        printWindow.close();
-      }, 100);
-    }, 250);
   };
 
   const handleDownloadPDF = async () => {
