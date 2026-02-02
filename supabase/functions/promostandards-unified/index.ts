@@ -285,18 +285,18 @@ Deno.serve(async (req: Request) => {
   <shar:priceType>Customer</shar:priceType>
 </ns2:GetConfigurationAndPricingRequest>`
       ) : Promise.resolve(null),
-      // 4. Media Content (if partId provided, otherwise skip)
-      partId ? makePromoStandardsRequest(
+      // 4. Media Content - use styleNumber (media is shared across all colors)
+      makePromoStandardsRequest(
         PROMOSTANDARDS_ENDPOINTS.media,
         "getMediaContent",
         `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${credentials.accountNumber}</shar:id>
   <shar:password>${decryptedApiKey}</shar:password>
-  <shar:productId>${partId}</shar:productId>
+  <shar:productId>${styleNumber}</shar:productId>
   <shar:mediaType>Image</shar:mediaType>
 </ns2:GetMediaContentRequest>`
-      ) : Promise.resolve(null),
+      ),
     ]);
 
     console.log('📊 PromoStandards API Results:', {
