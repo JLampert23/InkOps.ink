@@ -401,8 +401,10 @@ Deno.serve(async (req: Request) => {
     const mediaData: any = {};
     if (mediaResponse.status === 'fulfilled' && mediaResponse.value) {
       const xmlDoc = mediaResponse.value;
+      console.log('📸 Media XML Response (first 500 chars):', xmlDoc.substring(0, 500));
       const mediaPattern = /<Media>([\s\S]*?)<\/Media>/gi;
       const mediaMatches = getAllXmlMatches(xmlDoc, mediaPattern);
+      console.log('📸 Media matches found:', mediaMatches.length);
 
       mediaData.images = mediaMatches.map(match => {
         const mediaXml = match[1];
@@ -474,6 +476,13 @@ Deno.serve(async (req: Request) => {
         inventory: inventoryData,
         pricing: pricingData,
         media: mediaData,
+        debug: {
+          mediaResponseStatus: mediaResponse.status,
+          mediaXmlPreview: mediaResponse.status === 'fulfilled' && mediaResponse.value
+            ? mediaResponse.value.substring(0, 500)
+            : null,
+          mediaError: mediaResponse.status === 'rejected' ? mediaResponse.reason?.toString() : null,
+        }
       }),
       {
         status: 200,
