@@ -1680,29 +1680,32 @@ export default function MockupGenerator({
         ctx.restore();
 
         // Draw X button to delete artwork in screen coordinates (not transformed)
-        const deleteButtonSize = 24;
-        const scaledWidth = artworkWidth * artwork.scale;
-        const scaledHeight = artworkHeight * artwork.scale;
-        const deleteButtonX = centerX + scaledWidth / 2;
-        const deleteButtonY = centerY - scaledHeight / 2;
+        // Only show delete button when activeArtworkIndex is valid (not during save)
+        if (activeArtworkIndex >= 0) {
+          const deleteButtonSize = 24;
+          const scaledWidth = artworkWidth * artwork.scale;
+          const scaledHeight = artworkHeight * artwork.scale;
+          const deleteButtonX = centerX + scaledWidth / 2;
+          const deleteButtonY = centerY - scaledHeight / 2;
 
-        // Draw red circle background
-        ctx.fillStyle = '#ef4444';
-        ctx.beginPath();
-        ctx.arc(deleteButtonX, deleteButtonY, deleteButtonSize / 2, 0, 2 * Math.PI);
-        ctx.fill();
+          // Draw red circle background
+          ctx.fillStyle = '#ef4444';
+          ctx.beginPath();
+          ctx.arc(deleteButtonX, deleteButtonY, deleteButtonSize / 2, 0, 2 * Math.PI);
+          ctx.fill();
 
-        // Draw white X
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
-        ctx.lineCap = 'round';
-        const crossSize = deleteButtonSize / 3;
-        ctx.beginPath();
-        ctx.moveTo(deleteButtonX - crossSize, deleteButtonY - crossSize);
-        ctx.lineTo(deleteButtonX + crossSize, deleteButtonY + crossSize);
-        ctx.moveTo(deleteButtonX + crossSize, deleteButtonY - crossSize);
-        ctx.lineTo(deleteButtonX - crossSize, deleteButtonY + crossSize);
-        ctx.stroke();
+          // Draw white X
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2;
+          ctx.lineCap = 'round';
+          const crossSize = deleteButtonSize / 3;
+          ctx.beginPath();
+          ctx.moveTo(deleteButtonX - crossSize, deleteButtonY - crossSize);
+          ctx.lineTo(deleteButtonX + crossSize, deleteButtonY + crossSize);
+          ctx.moveTo(deleteButtonX + crossSize, deleteButtonY - crossSize);
+          ctx.lineTo(deleteButtonX - crossSize, deleteButtonY + crossSize);
+          ctx.stroke();
+        }
       };
       img.src = artwork.artwork_url;
     });
