@@ -111,9 +111,9 @@ Deno.serve(async (req: Request) => {
         try {
           console.log(`🔍 Syncing style: ${styleNumber}`);
 
-          // Call the PromoStandards unified endpoint
-          const promoResponse = await fetch(
-            `${supabaseUrl}/functions/v1/promostandards-unified?styleNumber=${encodeURIComponent(styleNumber!)}&companyId=${company.id}`,
+          // Call the SSActivewear API endpoint
+          const ssaResponse = await fetch(
+            `${supabaseUrl}/functions/v1/ssactivewear-api?action=product&productId=${encodeURIComponent(styleNumber!)}&companyId=${company.id}`,
             {
               method: "GET",
               headers: {
@@ -123,19 +123,29 @@ Deno.serve(async (req: Request) => {
             }
           );
 
-          if (!promoResponse.ok) {
-            throw new Error(`PromoStandards API failed: ${promoResponse.status}`);
+          if (!ssaResponse.ok) {
+            const errorText = await ssaResponse.text();
+            console.error(`❌ SSActivewear API failed:`, {
+              status: ssaResponse.status,
+              statusText: ssaResponse.statusText,
+              body: errorText
+            });
+            throw new Error(`SSActivewear API failed: ${ssaResponse.status} - ${errorText}`);
           }
 
-          const promoData = await promoResponse.json();
+          const ssaData = await ssaResponse.json();
 
-          console.log(`📦 PromoStandards response structure:`, {
-            hasProduct: !!promoData.product,
-            hasInventory: !!promoData.inventory,
-            hasMedia: !!promoData.media,
-            partsCount: promoData.product?.parts?.length || 0,
-            imagesCount: promoData.media?.images?.length || 0
+          console.log(`📦 SSActivewear response structure:`, {
+            success: ssaData.success,
+            hasData: !!ssaData.data,
+            dataLength: Array.isArray(ssaData.data) ? ssaData.data.length : 0,
+            firstProduct: ssaData.data?.[0],
           });
+
+          const productData = ssaData.data?.[0];
+          if (!productData) {
+            throw new Error('No product data returned from SSActivewear API');
+          }
 
           // Upsert style data
           const { data: styleData, error: styleError } = await supabase
@@ -143,11 +153,11 @@ Deno.serve(async (req: Request) => {
             .upsert({
               company_id: company.id,
               style_number: styleNumber,
-              brand: promoData.product?.productBrand || null,
-              name: promoData.product?.productName || null,
-              description: promoData.product?.description || null,
+              brand: productData.productBrand || null,
+              name: productData.productName || null,
+              description: productData.description || null,
               category: null,
-              primary_image: promoData.media?.views?.front || null,
+              primary_image: null,
               last_synced: new Date().toISOString(),
             }, {
               onConflict: "company_id,style_number"
@@ -168,10 +178,10 @@ Deno.serve(async (req: Request) => {
           console.log(`✅ Style upserted with id: ${styleId}`);
 
           // Upsert parts data
-          if (promoData.product?.parts && Array.isArray(promoData.product.parts)) {
-            console.log(`📦 Processing ${promoData.product.parts.length} parts...`);
+          if (productData.parts && Array.isArray(productData.parts)) {
+            console.log(`📦 Processing ${productData.parts.length} parts...`);
 
-            for (const part of promoData.product.parts) {
+            for (const part of productData.parts) {
               if (!part.partId) {
                 console.warn(`⚠️ Skipping part with no partId`);
                 continue;
@@ -184,10 +194,12 @@ Deno.serve(async (req: Request) => {
                   style_id: styleId,
                   part_id: part.partId,
                   color_name: part.colorName || null,
-                  hex: part.hex || null,
+                  hex: null,
                   size: part.labelSize || null,
                   weight: null,
                   gtin: null,
+                }, {
+                  onConflict: "company_id,part_id"
                 })
                 .select("id")
                 .maybeSingle();
@@ -204,65 +216,64 @@ Deno.serve(async (req: Request) => {
 
               const partDbId = partData.id;
               console.log(`✅ Part upserted: ${part.partId} (${part.colorName} - ${part.labelSize})`);
+            }
+          }
 
-              // Upsert inventory data
-              if (promoData.inventory?.items && Array.isArray(promoData.inventory.items)) {
-                const inventoryForPart = promoData.inventory.items.filter(
-                  (inv: any) => inv.partId === part.partId
-                );
-
-                if (inventoryForPart.length > 0) {
-                  console.log(`📊 Upserting ${inventoryForPart.length} inventory records for part ${part.partId}`);
-                }
-
-                for (const inv of inventoryForPart) {
-                  const { error: invError } = await supabase
-                    .from("inventory")
-                    .upsert({
-                      company_id: company.id,
-                      part_id: partDbId,
-                      warehouse: inv.warehouseName || 'Unknown',
-                      quantity: inv.quantityAvailable || 0,
-                      updated_at: new Date().toISOString(),
-                    });
-
-                  if (invError) {
-                    console.error(`❌ Failed to upsert inventory for ${part.partId}:`, invError);
-                  }
-                }
+          // Fetch and sync media/images
+          console.log(`📸 Fetching media for style: ${styleNumber}`);
+          const mediaResponse = await fetch(
+            `${supabaseUrl}/functions/v1/ssactivewear-api?action=media&productId=${encodeURIComponent(styleNumber!)}&companyId=${company.id}`,
+            {
+              method: "GET",
+              headers: {
+                "Authorization": `Bearer ${supabaseServiceRoleKey}`,
+                "Content-Type": "application/json"
               }
+            }
+          );
 
-              // Upsert images data
-              if (promoData.media?.images && Array.isArray(promoData.media.images)) {
-                const imagesForPart = promoData.media.images.filter(
-                  (img: any) => img.partId === part.partId || !img.partId
-                );
+          if (mediaResponse.ok) {
+            const mediaData = await mediaResponse.json();
+            const mediaContent = mediaData.data?.mediaContent || [];
 
-                if (imagesForPart.length > 0) {
-                  console.log(`📸 Upserting ${imagesForPart.length} images for part ${part.partId}`);
-                }
+            console.log(`📸 Found ${mediaContent.length} images`);
 
-                for (const img of imagesForPart) {
-                  if (!img.url) continue;
+            for (const media of mediaContent) {
+              if (!media.url) continue;
 
-                  const { error: imgError } = await supabase
-                    .from("images")
-                    .upsert({
-                      company_id: company.id,
-                      part_id: partDbId,
-                      class_type: img.classTypeName || null,
-                      url: img.url,
-                      size: null,
-                      color: img.color || null,
-                      single_part: img.singlePart !== false,
-                    });
+              // Find the part for this image
+              const { data: partForImage } = await supabase
+                .from("parts")
+                .select("id")
+                .eq("company_id", company.id)
+                .eq("style_id", styleId)
+                .eq("part_id", media.partId || productData.parts?.[0]?.partId)
+                .maybeSingle();
 
-                  if (imgError) {
-                    console.error(`❌ Failed to upsert image for ${part.partId}:`, imgError);
-                  }
+              if (partForImage) {
+                const { error: imgError } = await supabase
+                  .from("images")
+                  .upsert({
+                    company_id: company.id,
+                    part_id: partForImage.id,
+                    class_type: media.classTypeName || null,
+                    url: media.url,
+                    size: null,
+                    color: media.color || null,
+                    single_part: media.singlePart !== false,
+                  }, {
+                    onConflict: "company_id,part_id,url"
+                  });
+
+                if (imgError) {
+                  console.error(`❌ Failed to upsert image:`, imgError);
                 }
               }
             }
+
+            console.log(`✅ Images synced for style: ${styleNumber}`);
+          } else {
+            console.warn(`⚠️ Failed to fetch media: ${mediaResponse.status}`);
           }
 
           result.successCount++;
