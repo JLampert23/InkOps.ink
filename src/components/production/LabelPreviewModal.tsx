@@ -26,15 +26,71 @@ export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
   if (!isOpen || labels.length === 0) return null;
 
   const handlePrint = () => {
-    const printContent = labelsContainerRef.current;
-    if (!printContent) return;
-
     const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
+    if (!printWindow) {
+      alert('Please allow popups to print labels');
+      return;
+    }
 
-    const labelsHTML = Array.from(printContent.querySelectorAll('.box-label'))
-      .map(label => label.outerHTML)
-      .join('<div style="page-break-after: always;"></div>');
+    const labelsHTML = labels.map((label, index) => `
+      <div class="box-label" style="
+        width: 4in;
+        height: 6in;
+        border: 1px solid black;
+        font-family: system-ui, sans-serif;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        padding: 0.5in;
+        background-color: white;
+        color: black;
+        box-sizing: border-box;
+        ${index < labels.length - 1 ? 'page-break-after: always;' : ''}
+      ">
+        <div style="
+          text-align: center;
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          gap: 0.25in;
+        ">
+          <div style="
+            font-size: 22pt;
+            font-weight: bold;
+            letter-spacing: 1px;
+          ">
+            INVOICE #${label.invoiceNumber}
+          </div>
+          <div style="
+            font-size: 26pt;
+            font-weight: bold;
+            word-wrap: break-word;
+            line-height: 1.2;
+          ">
+            ${label.customerName}
+          </div>
+          <div style="
+            font-size: 18pt;
+            font-weight: 600;
+            word-wrap: break-word;
+            line-height: 1.2;
+          ">
+            ${label.jobNickname}
+          </div>
+          <div style="
+            font-size: 20pt;
+            font-weight: bold;
+            word-wrap: break-word;
+            line-height: 1.2;
+            text-transform: uppercase;
+            margin-top: 0.1in;
+          ">
+            ${label.typeOfWork}
+          </div>
+        </div>
+      </div>
+    `).join('');
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -46,17 +102,18 @@ export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
               size: 4in 6in;
               margin: 0;
             }
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
             body {
               margin: 0;
               padding: 0;
             }
             @media print {
               .box-label {
-                page-break-after: always;
                 page-break-inside: avoid;
-              }
-              .box-label:last-child {
-                page-break-after: auto;
               }
             }
           </style>
@@ -70,6 +127,9 @@ export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
     printWindow.document.close();
     setTimeout(() => {
       printWindow.print();
+      setTimeout(() => {
+        printWindow.close();
+      }, 100);
     }, 250);
   };
 
