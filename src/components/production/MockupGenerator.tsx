@@ -2098,99 +2098,72 @@ export default function MockupGenerator({
                         {isActive && (
                           <div className="px-2 pb-2 border-t border-gray-200 dark:border-slate-600 mt-2 pt-2">
                             <div className="text-[10px] text-gray-500 dark:text-gray-400 mb-1.5 font-medium">Views:</div>
-                            <div className="grid grid-cols-4 gap-1">
-                              {garmentStyle.frontImage && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setGarmentImageUrl(garmentStyle.frontImage);
-                                  }}
-                                  className={`relative aspect-square rounded border overflow-hidden transition-all hover:scale-105 ${
-                                    garmentImageUrl === garmentStyle.frontImage
-                                      ? 'border-blue-500 ring-1 ring-blue-300'
-                                      : 'border-gray-300 dark:border-slate-600'
-                                  }`}
-                                  title="Front View"
-                                >
-                                  <img
-                                    src={garmentStyle.frontImage}
-                                    alt="Front"
-                                    className="w-full h-full object-contain bg-white"
-                                  />
-                                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[8px] text-center py-0.5">
-                                    Front
-                                  </div>
-                                </button>
-                              )}
-                              {garmentStyle.rearImage && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setGarmentImageUrl(garmentStyle.rearImage);
-                                  }}
-                                  className={`relative aspect-square rounded border overflow-hidden transition-all hover:scale-105 ${
-                                    garmentImageUrl === garmentStyle.rearImage
-                                      ? 'border-blue-500 ring-1 ring-blue-300'
-                                      : 'border-gray-300 dark:border-slate-600'
-                                  }`}
-                                  title="Rear View"
-                                >
-                                  <img
-                                    src={garmentStyle.rearImage}
-                                    alt="Rear"
-                                    className="w-full h-full object-contain bg-white"
-                                  />
-                                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[8px] text-center py-0.5">
-                                    Rear
-                                  </div>
-                                </button>
-                              )}
-                              {garmentStyle.sideImage && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setGarmentImageUrl(garmentStyle.sideImage);
-                                  }}
-                                  className={`relative aspect-square rounded border overflow-hidden transition-all hover:scale-105 ${
-                                    garmentImageUrl === garmentStyle.sideImage
-                                      ? 'border-blue-500 ring-1 ring-blue-300'
-                                      : 'border-gray-300 dark:border-slate-600'
-                                  }`}
-                                  title="Side View"
-                                >
-                                  <img
-                                    src={garmentStyle.sideImage}
-                                    alt="Side"
-                                    className="w-full h-full object-contain bg-white"
-                                  />
-                                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[8px] text-center py-0.5">
-                                    Side
-                                  </div>
-                                </button>
-                              )}
-                              {garmentStyle.lifestyleImage && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setGarmentImageUrl(garmentStyle.lifestyleImage);
-                                  }}
-                                  className={`relative aspect-square rounded border overflow-hidden transition-all hover:scale-105 ${
-                                    garmentImageUrl === garmentStyle.lifestyleImage
-                                      ? 'border-blue-500 ring-1 ring-blue-300'
-                                      : 'border-gray-300 dark:border-slate-600'
-                                  }`}
-                                  title="Lifestyle View"
-                                >
-                                  <img
-                                    src={garmentStyle.lifestyleImage}
-                                    alt="Lifestyle"
-                                    className="w-full h-full object-contain bg-white"
-                                  />
-                                  <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[8px] text-center py-0.5">
-                                    Lifestyle
-                                  </div>
-                                </button>
-                              )}
+                            <div className="space-y-2">
+                              {(() => {
+                                const imagesData = garmentStyle.imagesData || {};
+                                const frontImages = imagesData.frontImages || [];
+                                const rearImages = imagesData.rearImages || [];
+                                const sideImages = imagesData.sideImages || [];
+                                const lifestyleImages = imagesData.lifestyleImages || [];
+                                const otherImages = imagesData.otherImages || [];
+
+                                // Fallback to single URLs if no organized data
+                                if (frontImages.length === 0 && rearImages.length === 0 && sideImages.length === 0 && lifestyleImages.length === 0) {
+                                  frontImages.push(garmentStyle.frontImage);
+                                  rearImages.push(garmentStyle.rearImage);
+                                  sideImages.push(garmentStyle.sideImage);
+                                  lifestyleImages.push(garmentStyle.lifestyleImage);
+                                }
+
+                                const renderImageRow = (images: string[], label: string) => {
+                                  const validImages = images.filter(img => img && img.trim());
+                                  if (validImages.length === 0) return null;
+
+                                  return (
+                                    <div key={label}>
+                                      <div className="text-[9px] text-gray-600 dark:text-gray-400 mb-0.5 font-medium">{label}</div>
+                                      <div className="grid grid-cols-4 gap-1">
+                                        {validImages.map((imageUrl, idx) => (
+                                          <button
+                                            key={idx}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setGarmentImageUrl(imageUrl);
+                                            }}
+                                            className={`relative aspect-square rounded border overflow-hidden transition-all hover:scale-105 ${
+                                              garmentImageUrl === imageUrl
+                                                ? 'border-blue-500 ring-1 ring-blue-300'
+                                                : 'border-gray-300 dark:border-slate-600'
+                                            }`}
+                                            title={`${label} ${idx + 1}`}
+                                          >
+                                            <img
+                                              src={imageUrl}
+                                              alt={`${label} ${idx + 1}`}
+                                              className="w-full h-full object-contain bg-white"
+                                            />
+                                            {validImages.length > 1 && (
+                                              <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[8px] text-center py-0.5">
+                                                {idx + 1}
+                                              </div>
+                                            )}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  );
+                                };
+
+                                return (
+                                  <>
+                                    {renderImageRow(frontImages, 'Front')}
+                                    {renderImageRow(rearImages, 'Rear')}
+                                    {renderImageRow(sideImages, 'Side')}
+                                    {renderImageRow(lifestyleImages, 'Lifestyle')}
+                                    {renderImageRow(otherImages, 'Other')}
+                                  </>
+                                );
+                              })()}
                             </div>
                           </div>
                         )}

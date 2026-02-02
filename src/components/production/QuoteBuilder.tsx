@@ -852,13 +852,27 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           // Backward compatibility: populate old fields with new values
           garmentImages.garment_back_image_url = unifiedData.media.views.rear || undefined;
           garmentImages.garment_sleeve_image_url = unifiedData.media.views.side || undefined;
-          garmentImages.garment_images_data = unifiedData.media.images || undefined;
+
+          // Save complete organized image data including ALL images for each view type
+          garmentImages.garment_images_data = {
+            frontImages: unifiedData.media.views.frontImages || [],
+            rearImages: unifiedData.media.views.rearImages || [],
+            sideImages: unifiedData.media.views.sideImages || [],
+            lifestyleImages: unifiedData.media.views.lifestyleImages || [],
+            otherImages: unifiedData.media.views.otherImages || [],
+            allImages: unifiedData.media.images || [],
+          };
 
           console.log('Loaded garment images:', {
             front: !!garmentImages.garment_front_image_url,
             rear: !!garmentImages.garment_rear_image_url,
             side: !!garmentImages.garment_side_image_url,
             lifestyle: !!garmentImages.garment_lifestyle_image_url,
+            frontCount: unifiedData.media.views.frontImages?.length || 0,
+            rearCount: unifiedData.media.views.rearImages?.length || 0,
+            sideCount: unifiedData.media.views.sideImages?.length || 0,
+            lifestyleCount: unifiedData.media.views.lifestyleImages?.length || 0,
+            totalImages: unifiedData.media.images?.length || 0,
           });
         } else {
           console.warn('No media data in unified response');

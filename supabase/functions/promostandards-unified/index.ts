@@ -189,8 +189,8 @@ Deno.serve(async (req: Request) => {
     const { result: decryptedApiKey } = await decryptResponse.json();
 
     const url = new URL(req.url);
-    const styleNumber = url.searchParams.get("styleNumber");
-    const partId = url.searchParams.get("partId");
+    const styleNumber = url.searchParams.get("styleNumber")?.trim();
+    const partId = url.searchParams.get("partId")?.trim();
 
     if (!styleNumber) {
       return new Response(
@@ -358,25 +358,52 @@ Deno.serve(async (req: Request) => {
         };
       });
 
-      // Organize images by view type (using SSActivewear's actual naming: Front, Rear, Side, Lifestyle)
+      // Organize ALL images by view type (return arrays instead of single URLs)
+      const frontImages: string[] = [];
+      const rearImages: string[] = [];
+      const sideImages: string[] = [];
+      const lifestyleImages: string[] = [];
+      const otherImages: string[] = [];
+
+      mediaData.images.forEach((img: any) => {
+        const desc = (img.description || '').toLowerCase();
+        const classType = (img.classType || '').toLowerCase();
+
+        if (desc.includes('front') || classType.includes('front')) {
+          frontImages.push(img.url);
+        } else if (desc.includes('rear') || classType.includes('rear') || desc.includes('back') || classType.includes('back')) {
+          rearImages.push(img.url);
+        } else if (desc.includes('side') || classType.includes('side') || desc.includes('sleeve') || classType.includes('sleeve')) {
+          sideImages.push(img.url);
+        } else if (desc.includes('lifestyle') || classType.includes('lifestyle') || desc.includes('casual') || classType.includes('casual')) {
+          lifestyleImages.push(img.url);
+        } else if (img.url && !desc.includes('swatch') && !classType.includes('swatch')) {
+          // Include other images except swatches (Detail, etc.)
+          otherImages.push(img.url);
+        }
+      });
+
+      // Return both the full images array AND organized views with ALL matching URLs
       mediaData.views = {
-        front: mediaData.images.find((img: any) =>
-          img.description?.toLowerCase().includes('front') ||
-          img.classType?.toLowerCase().includes('front')
-        )?.url || null,
-        rear: mediaData.images.find((img: any) =>
-          img.description?.toLowerCase().includes('rear') ||
-          img.classType?.toLowerCase().includes('rear')
-        )?.url || null,
-        side: mediaData.images.find((img: any) =>
-          img.description?.toLowerCase().includes('side') ||
-          img.classType?.toLowerCase().includes('side')
-        )?.url || null,
-        lifestyle: mediaData.images.find((img: any) =>
-          img.description?.toLowerCase().includes('lifestyle') ||
-          img.classType?.toLowerCase().includes('lifestyle')
-        )?.url || null,
+        front: frontImages.length > 0 ? frontImages[0] : null, // Keep first for backward compatibility
+        rear: rearImages.length > 0 ? rearImages[0] : null,
+        side: sideImages.length > 0 ? sideImages[0] : null,
+        lifestyle: lifestyleImages.length > 0 ? lifestyleImages[0] : null,
+        frontImages,
+        rearImages,
+        sideImages,
+        lifestyleImages,
+        otherImages,
       };
+
+      console.log('Media Content organized:', {
+        totalImages: mediaData.images.length,
+        frontCount: frontImages.length,
+        rearCount: rearImages.length,
+        sideCount: sideImages.length,
+        lifestyleCount: lifestyleImages.length,
+        otherCount: otherImages.length,
+      });
     }
 
     // Return unified response
