@@ -478,8 +478,8 @@ Deno.serve(async (req: Request) => {
         media: mediaData,
         debug: {
           mediaResponseStatus: mediaResponse.status,
-          mediaXmlPreview: mediaResponse.status === 'fulfilled' && mediaResponse.value
-            ? mediaResponse.value.substring(0, 500)
+          mediaXmlFull: mediaResponse.status === 'fulfilled' && mediaResponse.value
+            ? mediaResponse.value
             : null,
           mediaError: mediaResponse.status === 'rejected' ? mediaResponse.reason?.toString() : null,
         }

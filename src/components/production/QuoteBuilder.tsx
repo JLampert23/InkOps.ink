@@ -851,6 +851,7 @@ export function QuoteBuilder({ quoteId, initialCustomerId, onSave, onCancel }: Q
           fullMedia: JSON.stringify(unifiedData.media, null, 2)
         });
         console.log('🐛 Media Debug Info:', unifiedData.debug);
+        console.log('📸 FULL MEDIA XML:', unifiedData.debug?.mediaXmlFull);
 
         if (unifiedData.success && unifiedData.media?.views) {
           garmentImages.garment_front_image_url = unifiedData.media.views.front || undefined;
