@@ -301,7 +301,6 @@ export default function MockupGenerator({
 
   const loadExistingProof = async (proofIdToLoad: string) => {
     try {
-      setLoading(true);
       console.log('MockupGenerator: Loading existing proof:', proofIdToLoad);
 
       // Load proof details
@@ -370,8 +369,6 @@ export default function MockupGenerator({
 
     } catch (error) {
       console.error('Error loading proof:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
