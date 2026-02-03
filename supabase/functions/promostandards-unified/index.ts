@@ -66,6 +66,15 @@ function getAllXmlMatches(xmlText: string, pattern: RegExp): RegExpMatchArray[] 
   return matches;
 }
 
+function escapeXml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 Deno.serve(async (req: Request) => {
   console.log('🟢 Function invoked - verifyJWT is FALSE');
 
@@ -270,21 +279,27 @@ Deno.serve(async (req: Request) => {
 
     console.log('Unified PromoStandards Request:', { styleNumber, partId });
 
+    // XML-escape credentials to prevent authentication issues
+    const escapedAccountNumber = escapeXml(credentials.accountNumber);
+    const escapedApiKey = escapeXml(decryptedApiKey);
+    const escapedStyleNumber = escapeXml(styleNumber);
+    const escapedPartId = partId ? escapeXml(partId) : '';
+
     // Store SOAP bodies for debugging
     const productSoap = `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
   <shar:wsVersion>2.0.0</shar:wsVersion>
-  <shar:id>${credentials.accountNumber}</shar:id>
-  <shar:password>${decryptedApiKey}</shar:password>
-  <shar:productId>${styleNumber}</shar:productId>
+  <shar:id>${escapedAccountNumber}</shar:id>
+  <shar:password>${escapedApiKey}</shar:password>
+  <shar:productId>${escapedStyleNumber}</shar:productId>
 </ns2:GetProductRequest>`;
 
     const mediaSoap = `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
-  <shar:id>${credentials.accountNumber}</shar:id>
-  <shar:password>${decryptedApiKey}</shar:password>
+  <shar:id>${escapedAccountNumber}</shar:id>
+  <shar:password>${escapedApiKey}</shar:password>
   <shar:mediaType>Image</shar:mediaType>
-  <shar:productId>${styleNumber}</shar:productId>${partId ? `
-  <shar:partId>${partId}</shar:partId>` : ''}
+  <shar:productId>${escapedStyleNumber}</shar:productId>${partId ? `
+  <shar:partId>${escapedPartId}</shar:partId>` : ''}
 </ns2:GetMediaContentRequest>`;
 
     // Make all 4 requests in parallel
@@ -301,9 +316,9 @@ Deno.serve(async (req: Request) => {
         "getInventoryLevels",
         `<ns2:GetInventoryLevelsRequest xmlns:ns2="http://www.promostandards.org/WSDL/InventoryService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/Inventory/2.0.0/SharedObjects/">
   <shar:wsVersion>2.0.0</shar:wsVersion>
-  <shar:id>${credentials.accountNumber}</shar:id>
-  <shar:password>${decryptedApiKey}</shar:password>
-  <shar:productId>${partId}</shar:productId>
+  <shar:id>${escapedAccountNumber}</shar:id>
+  <shar:password>${escapedApiKey}</shar:password>
+  <shar:productId>${escapedPartId}</shar:productId>
 </ns2:GetInventoryLevelsRequest>`
       ) : Promise.resolve(null),
       // 3. Pricing - ALWAYS call with styleNumber (S&S expects style, not partId)
@@ -312,9 +327,9 @@ Deno.serve(async (req: Request) => {
         "getConfigurationAndPricing",
         `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
-  <shar:id>${credentials.accountNumber}</shar:id>
-  <shar:password>${decryptedApiKey}</shar:password>
-  <shar:productId>${styleNumber}</shar:productId>
+  <shar:id>${escapedAccountNumber}</shar:id>
+  <shar:password>${escapedApiKey}</shar:password>
+  <shar:productId>${escapedStyleNumber}</shar:productId>
   <shar:currency>USD</shar:currency>
   <shar:priceType>Customer</shar:priceType>
   <shar:localizationCountry>US</shar:localizationCountry>
@@ -480,10 +495,10 @@ Deno.serve(async (req: Request) => {
             "getMediaContent",
             `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
-  <shar:id>${credentials.accountNumber}</shar:id>
-  <shar:password>${decryptedApiKey}</shar:password>
+  <shar:id>${escapedAccountNumber}</shar:id>
+  <shar:password>${escapedApiKey}</shar:password>
   <shar:mediaType>Image</shar:mediaType>
-  <shar:productId>${styleNumber}</shar:productId>
+  <shar:productId>${escapedStyleNumber}</shar:productId>
 </ns2:GetMediaContentRequest>`
           );
           console.log('📸 Fallback media request succeeded');
