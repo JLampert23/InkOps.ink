@@ -270,18 +270,30 @@ Deno.serve(async (req: Request) => {
 
     console.log('Unified PromoStandards Request:', { styleNumber, partId });
 
+    // Store SOAP bodies for debugging
+    const productSoap = `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
+  <shar:wsVersion>2.0.0</shar:wsVersion>
+  <shar:id>${credentials.accountNumber}</shar:id>
+  <shar:password>${decryptedApiKey}</shar:password>
+  <shar:productId>${styleNumber}</shar:productId>
+</ns2:GetProductRequest>`;
+
+    const mediaSoap = `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
+  <shar:wsVersion>1.0.0</shar:wsVersion>
+  <shar:id>${credentials.accountNumber}</shar:id>
+  <shar:password>${decryptedApiKey}</shar:password>
+  <shar:mediaType>Image</shar:mediaType>
+  <shar:productId>${styleNumber}</shar:productId>${partId ? `
+  <shar:partId>${partId}</shar:partId>` : ''}
+</ns2:GetMediaContentRequest>`;
+
     // Make all 4 requests in parallel
     const [productResponse, inventoryResponse, pricingResponse, mediaResponse] = await Promise.allSettled([
       // 1. Product Data
       makePromoStandardsRequest(
         PROMOSTANDARDS_ENDPOINTS.productData,
         "getProduct",
-        `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
-  <shar:wsVersion>2.0.0</shar:wsVersion>
-  <shar:id>${credentials.accountNumber}</shar:id>
-  <shar:password>${decryptedApiKey}</shar:password>
-  <shar:productId>${styleNumber}</shar:productId>
-</ns2:GetProductRequest>`
+        productSoap
       ),
       // 2. Inventory (if partId provided, otherwise skip)
       partId ? makePromoStandardsRequest(
@@ -314,14 +326,7 @@ Deno.serve(async (req: Request) => {
       makePromoStandardsRequest(
         PROMOSTANDARDS_ENDPOINTS.media,
         "getMediaContent",
-        `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
-  <shar:wsVersion>1.0.0</shar:wsVersion>
-  <shar:id>${credentials.accountNumber}</shar:id>
-  <shar:password>${decryptedApiKey}</shar:password>
-  <shar:mediaType>Image</shar:mediaType>
-  <shar:productId>${styleNumber}</shar:productId>${partId ? `
-  <shar:partId>${partId}</shar:partId>` : ''}
-</ns2:GetMediaContentRequest>`
+        mediaSoap
       ),
     ]);
 
@@ -589,6 +594,14 @@ Deno.serve(async (req: Request) => {
             : null,
           mediaError: mediaResponse.status === 'rejected' ? mediaResponse.reason?.toString() : null,
           mediaAuthError,
+          soapRequests: {
+            productDataRequest: productSoap,
+            mediaRequest: mediaSoap,
+          },
+          credentials: {
+            accountNumber: credentials.accountNumber,
+            apiKeyLength: decryptedApiKey?.length,
+          }
         }
       }),
       {
