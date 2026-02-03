@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Save, X, Grid3x3 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, Trash2, Edit2, Save, X, Grid3x3, Upload } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -23,6 +23,7 @@ export function PriceMatricesManager() {
   const [loading, setLoading] = useState(true);
   const [editingMatrix, setEditingMatrix] = useState<PriceMatrix | null>(null);
   const [showEditor, setShowEditor] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadMatrices();
@@ -87,6 +88,100 @@ export function PriceMatricesManager() {
     setEditingMatrix(null);
   };
 
+  const parseCSV = (csvText: string): { headers: string[], rows: any[][] } => {
+    const lines = csvText.trim().split('\n');
+    const headers = lines[0].split(',').map(h => h.trim());
+    const rows = lines.slice(1).map(line => {
+      return line.split(',').map(cell => cell.trim());
+    });
+    return { headers, rows };
+  };
+
+  const handleCSVUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const { headers, rows } = parseCSV(text);
+
+      const quantityIndex = headers.findIndex(h => h.toLowerCase() === 'quantity');
+      if (quantityIndex === -1) {
+        showNotification('error', 'Invalid CSV', 'CSV must have a "Quantity" column');
+        return;
+      }
+
+      const columnHeaders: string[] = [];
+      const columnIndices: number[] = [];
+      let markupIndex = -1;
+
+      headers.forEach((header, idx) => {
+        if (idx === quantityIndex) return;
+        if (header.toLowerCase().includes('markup')) {
+          markupIndex = idx;
+        } else if (header.toLowerCase().startsWith('column')) {
+          columnHeaders.push(header);
+          columnIndices.push(idx);
+        }
+      });
+
+      if (columnHeaders.length === 0) {
+        showNotification('error', 'Invalid CSV', 'CSV must have column headers (e.g., "Column 1", "Column 2")');
+        return;
+      }
+
+      const rowLabels: string[] = [];
+      const cells: Record<string, number> = {};
+      const markupPercentages: Record<string, number> = {};
+
+      rows.forEach((row, rowIdx) => {
+        const quantity = row[quantityIndex];
+        if (!quantity) return;
+
+        rowLabels.push(quantity);
+
+        columnIndices.forEach((colIdx, colPosition) => {
+          const value = parseFloat(row[colIdx]);
+          if (!isNaN(value)) {
+            cells[`${rowIdx}-${colPosition}`] = value;
+          }
+        });
+
+        if (markupIndex >= 0) {
+          const markup = parseFloat(row[markupIndex]);
+          if (!isNaN(markup)) {
+            markupPercentages[quantity] = markup;
+          }
+        }
+      });
+
+      const matrixName = file.name.replace('.csv', '');
+
+      setEditingMatrix({
+        id: '',
+        name: matrixName,
+        description: `Imported from ${file.name}${markupIndex >= 0 ? ' (includes markup percentages)' : ''}`,
+        matrix_type: 'general',
+        setup_fee: 0,
+        columns: columnHeaders,
+        rows: rowLabels,
+        cells: cells,
+        is_active: true,
+      });
+      setShowEditor(true);
+
+      showNotification('success', 'CSV Imported', `Successfully imported ${rowLabels.length} rows and ${columnHeaders.length} columns`);
+
+    } catch (error) {
+      console.error('Error parsing CSV:', error);
+      showNotification('error', 'Import Failed', 'Failed to parse CSV file');
+    }
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
@@ -95,13 +190,29 @@ export function PriceMatricesManager() {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Price Matrices</h2>
             <p className="text-sm text-gray-600 dark:text-gray-400">Create and manage pricing tables with custom columns and rows</p>
           </div>
-          <button
-            onClick={createNewMatrix}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            New Matrix
-          </button>
+          <div className="flex items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv"
+              onChange={handleCSVUpload}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Upload className="w-4 h-4" />
+              Import CSV
+            </button>
+            <button
+              onClick={createNewMatrix}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              New Matrix
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -112,13 +223,22 @@ export function PriceMatricesManager() {
           <div className="text-center py-12 bg-gray-50 dark:bg-slate-700/50 rounded-lg">
             <Grid3x3 className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-3" />
             <p className="text-gray-600 dark:text-gray-400 mb-4">No price matrices created yet</p>
-            <button
-              onClick={createNewMatrix}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Create Your First Matrix
-            </button>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Upload className="w-4 h-4" />
+                Import from CSV
+              </button>
+              <button
+                onClick={createNewMatrix}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Create Your First Matrix
+              </button>
+            </div>
           </div>
         ) : (
           <div className="grid gap-4">
