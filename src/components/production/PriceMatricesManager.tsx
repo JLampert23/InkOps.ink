@@ -53,7 +53,7 @@ export function PriceMatricesManager() {
       id: '',
       name: '',
       description: '',
-      matrix_type: 'general',
+      matrix_type: '',
       setup_fee: 0,
       product_markup_percentage: 0,
       columns: ['Column 1', 'Column 2', 'Column 3'],
@@ -169,7 +169,7 @@ export function PriceMatricesManager() {
         id: '',
         name: matrixName,
         description: `Imported from ${file.name}${markupIndex >= 0 ? ` (avg markup: ${averageMarkup.toFixed(0)}%)` : ''}`,
-        matrix_type: 'general',
+        matrix_type: '',
         setup_fee: 0,
         product_markup_percentage: averageMarkup,
         columns: columnHeaders,
@@ -260,9 +260,11 @@ export function PriceMatricesManager() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="text-md font-semibold text-gray-900 dark:text-white">{matrix.name}</h3>
-                      <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs rounded">
-                        {matrix.matrix_type.replace('_', ' ')}
-                      </span>
+                      {matrix.matrix_type && (
+                        <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs rounded">
+                          {matrix.matrix_type}
+                        </span>
+                      )}
                       {matrix.is_active && (
                         <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded">
                           Active
@@ -341,14 +343,15 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
     const loadTypesOfWork = async () => {
       try {
         const { data, error } = await supabase
-          .from('production_colors')
-          .select('type_of_work')
-          .eq('is_active', true);
+          .from('type_of_work_settings')
+          .select('work_type_name')
+          .eq('is_active', true)
+          .order('sort_order');
 
         if (error) throw error;
 
-        const uniqueTypes = Array.from(new Set(data?.map(item => item.type_of_work) || []));
-        setTypesOfWork(uniqueTypes);
+        const typeNames = data?.map(item => item.work_type_name) || [];
+        setTypesOfWork(typeNames);
       } catch (err) {
         console.error('Error loading types of work:', err);
       }
@@ -543,7 +546,7 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
                 <option value="">Select type of work</option>
                 {typesOfWork.map((type) => (
                   <option key={type} value={type}>
-                    {type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                    {type}
                   </option>
                 ))}
               </select>
