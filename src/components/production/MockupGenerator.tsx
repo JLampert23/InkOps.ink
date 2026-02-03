@@ -1475,7 +1475,7 @@ export default function MockupGenerator({
       const artworkWidth = baseSize * artwork.scale;
       const artworkHeight = baseSize * artwork.scale;
 
-      const deleteButtonSize = 24;
+      const deleteButtonSize = 36;
 
       // Calculate delete button position in screen coordinates (top-right of artwork)
       const deleteButtonX = centerX + artworkWidth / 2;
@@ -1508,7 +1508,7 @@ export default function MockupGenerator({
     const artworkWidth = baseSize * artwork.scale;
     const artworkHeight = baseSize * artwork.scale;
 
-    const handleSize = 20; // Increased from 10 to 20 for better responsiveness
+    const handleSize = 30;
     const handles = [
       { name: 'nw', x: centerX - artworkWidth / 2, y: centerY - artworkHeight / 2 },
       { name: 'ne', x: centerX + artworkWidth / 2, y: centerY - artworkHeight / 2 },
@@ -1523,6 +1523,26 @@ export default function MockupGenerator({
     }
 
     return null;
+  };
+
+  const isClickInsideArtwork = (x: number, y: number, index: number): boolean => {
+    const canvas = canvasRef.current;
+    if (!canvas) return false;
+
+    const artwork = selectedArtwork[index];
+    const centerX = artwork.position_x + canvas.width / 2;
+    const centerY = artwork.position_y + canvas.height / 2;
+
+    const baseSize = 120;
+    const artworkWidth = baseSize * artwork.scale;
+    const artworkHeight = baseSize * artwork.scale;
+
+    const left = centerX - artworkWidth / 2;
+    const right = centerX + artworkWidth / 2;
+    const top = centerY - artworkHeight / 2;
+    const bottom = centerY + artworkHeight / 2;
+
+    return x >= left && x <= right && y >= top && y <= bottom;
   };
 
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -1549,9 +1569,26 @@ export default function MockupGenerator({
       setResizeHandle(handle);
       setInitialScale(selectedArtwork[activeArtworkIndex].scale);
       setDragStart({ x, y });
-    } else {
+      return;
+    }
+
+    // Check if clicking inside any artwork
+    let clickedArtworkIndex = -1;
+    for (let i = 0; i < selectedArtwork.length; i++) {
+      if (isClickInsideArtwork(x, y, i)) {
+        clickedArtworkIndex = i;
+        break;
+      }
+    }
+
+    if (clickedArtworkIndex >= 0) {
+      // Clicked inside artwork - start dragging
+      setActiveArtworkIndex(clickedArtworkIndex);
       setIsDragging(true);
       setDragStart({ x, y });
+    } else {
+      // Clicked outside all artwork - deselect
+      setActiveArtworkIndex(-1);
     }
   };
 
@@ -1743,7 +1780,7 @@ export default function MockupGenerator({
         ctx.lineWidth = 3;
         ctx.strokeRect(-artworkWidth / 2, -artworkHeight / 2, artworkWidth, artworkHeight);
 
-        const handleSize = 16 / currentArtwork.scale;
+        const handleSize = 24 / currentArtwork.scale;
         const handles = [
           { x: -artworkWidth / 2, y: -artworkHeight / 2 },
           { x: artworkWidth / 2, y: -artworkHeight / 2 },
@@ -1765,8 +1802,8 @@ export default function MockupGenerator({
 
       ctx.restore();
 
-      if (activeArtworkIndex >= 0) {
-        const deleteButtonSize = 24;
+      if (index === activeArtworkIndex) {
+        const deleteButtonSize = 36;
         const scaledWidth = artworkWidth * currentArtwork.scale;
         const scaledHeight = artworkHeight * currentArtwork.scale;
         const deleteButtonX = centerX + scaledWidth / 2;
