@@ -67,6 +67,8 @@ function getAllXmlMatches(xmlText: string, pattern: RegExp): RegExpMatchArray[] 
 }
 
 Deno.serve(async (req: Request) => {
+  console.log('🟢 Function invoked - verifyJWT is FALSE');
+
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 200,

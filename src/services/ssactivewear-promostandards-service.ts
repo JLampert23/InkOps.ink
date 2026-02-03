@@ -28,6 +28,21 @@ async function getAuthToken(): Promise<string> {
     throw new Error('Not authenticated - no access token in session');
   }
 
+  // Check if token is expired or about to expire (within 5 minutes)
+  const expiresAt = session.expires_at || 0;
+  const now = Math.floor(Date.now() / 1000);
+  const isExpiringSoon = expiresAt - now < 300; // 5 minutes
+
+  if (isExpiringSoon) {
+    console.log('Token expiring soon, refreshing session...');
+    const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
+    if (refreshError || !newSession) {
+      console.error('Failed to refresh session:', refreshError);
+      throw new Error('Session expired, please log in again');
+    }
+    return newSession.access_token;
+  }
+
   // Check if token is expired
   if (session.expires_at && new Date(session.expires_at * 1000) < new Date()) {
     console.warn('Access token has expired, attempting to refresh...');
@@ -307,7 +322,6 @@ export async function getUnifiedProductData(
     const response = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${token}`,
-        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         'Content-Type': 'application/json',
       },
     });
