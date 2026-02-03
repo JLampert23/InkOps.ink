@@ -601,15 +601,11 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
   };
 
   const getGroupImprints = (groupLabel: string) => {
-    // If there's only one group, show all imprints
-    if (itemGroups.length === 1) {
-      return quoteImprints;
-    }
-
-    // Otherwise, treat empty string, null, and undefined as equivalent
-    const normalizedGroupLabel = groupLabel || null;
+    // Always filter by group_label to ensure imprints stay with their assigned groups
+    // Normalize empty string, null, and undefined as empty string
+    const normalizedGroupLabel = groupLabel || '';
     return quoteImprints.filter(imp => {
-      const normalizedImprintLabel = imp.group_label || null;
+      const normalizedImprintLabel = imp.group_label || '';
       return normalizedImprintLabel === normalizedGroupLabel;
     });
   };

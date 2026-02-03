@@ -229,7 +229,8 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
       .select('*')
       .eq('quote_id', quoteId);
 
-    if (initialGroupLabel) {
+    // Always filter by group_label when provided (including empty strings)
+    if (initialGroupLabel !== undefined && initialGroupLabel !== null) {
       query = query.eq('group_label', initialGroupLabel);
     }
 
