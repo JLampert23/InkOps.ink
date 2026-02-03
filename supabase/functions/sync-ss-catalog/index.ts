@@ -276,6 +276,68 @@ Deno.serve(async (req: Request) => {
             console.warn(`⚠️ Failed to fetch media: ${mediaResponse.status}`);
           }
 
+          // Fetch and sync pricing for all parts
+          console.log(`💰 Fetching pricing for style: ${styleNumber}`);
+          const pricingResponse = await fetch(
+            `${supabaseUrl}/functions/v1/promostandards-unified?styleNumber=${encodeURIComponent(styleNumber!)}`,
+            {
+              method: "GET",
+              headers: {
+                "Authorization": `Bearer ${supabaseServiceRoleKey}`,
+                "Content-Type": "application/json"
+              }
+            }
+          );
+
+          if (pricingResponse.ok) {
+            const pricingData = await pricingResponse.json();
+            const pricingParts = pricingData.pricing?.parts || [];
+
+            console.log(`💰 Found pricing for ${pricingParts.length} parts`);
+
+            for (const pricingPart of pricingParts) {
+              if (!pricingPart.partId || !pricingPart.prices || pricingPart.prices.length === 0) {
+                continue;
+              }
+
+              // Find the part in database
+              const { data: partForPricing } = await supabase
+                .from("parts")
+                .select("id")
+                .eq("company_id", company.id)
+                .eq("style_id", styleId)
+                .eq("part_id", pricingPart.partId)
+                .maybeSingle();
+
+              if (partForPricing) {
+                // Insert all price tiers
+                for (const priceEntry of pricingPart.prices) {
+                  const { error: priceError } = await supabase
+                    .from("pricing")
+                    .upsert({
+                      company_id: company.id,
+                      part_id: partForPricing.id,
+                      min_quantity: priceEntry.minQuantity || 1,
+                      price: priceEntry.price,
+                      price_type: "Customer",
+                      currency: "USD",
+                      discount_code: priceEntry.discountCode || null,
+                    }, {
+                      onConflict: "company_id,part_id,min_quantity"
+                    });
+
+                  if (priceError) {
+                    console.error(`❌ Failed to upsert pricing for ${pricingPart.partId}:`, priceError);
+                  }
+                }
+              }
+            }
+
+            console.log(`✅ Pricing synced for style: ${styleNumber}`);
+          } else {
+            console.warn(`⚠️ Failed to fetch pricing: ${pricingResponse.status}`);
+          }
+
           result.successCount++;
           console.log(`✅ Successfully synced style: ${styleNumber}`);
 

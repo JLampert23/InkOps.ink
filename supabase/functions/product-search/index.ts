@@ -297,9 +297,9 @@ Deno.serve(async (req: Request) => {
                     console.log(`Cached ${mediaContent.length} images for style ${style}`);
                   }
 
-                  // Fetch live pricing
+                  // Fetch live pricing from unified endpoint
                   console.log(`🔍 Fetching live pricing for style: ${style}`);
-                  const pricingUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=pricing&productId=${encodeURIComponent(style)}&companyId=${encodeURIComponent(profile.company_id)}`;
+                  const pricingUrl = `${supabaseUrl}/functions/v1/promostandards-unified?styleNumber=${encodeURIComponent(style)}`;
                   const pricingResponse = await fetch(pricingUrl, {
                     headers: {
                       "Authorization": `Bearer ${supabaseServiceKey}`,
@@ -310,23 +310,22 @@ Deno.serve(async (req: Request) => {
                   console.log(`💰 Pricing API response status: ${pricingResponse.status}`);
 
                   if (pricingResponse.ok) {
-                    const pricingData = await pricingResponse.json();
-                    console.log(`💰 Pricing data received:`, JSON.stringify(pricingData, null, 2));
+                    const unifiedData = await pricingResponse.json();
+                    console.log(`💰 Unified data success:`, unifiedData.success);
 
-                    // pricingData.data is an array of { partId, prices: [{quantity, price}] }
-                    if (pricingData.data && Array.isArray(pricingData.data)) {
-                      for (const partPricing of pricingData.data) {
-                        if (partPricing.prices && partPricing.prices.length > 0) {
-                          // Use the first price (lowest quantity) as the base price
-                          const price = partPricing.prices[0].price;
-                          pricingMap.set(partPricing.partId, price);
-                          console.log(`💰 Part ${partPricing.partId}: $${price}`);
-                        }
+                    // Extract pricing from unified response
+                    const pricingParts = unifiedData.pricing?.parts || [];
+                    console.log(`💰 Found ${pricingParts.length} parts with pricing`);
+
+                    for (const partPricing of pricingParts) {
+                      if (partPricing.prices && partPricing.prices.length > 0) {
+                        // Use the first price (lowest quantity) as the base price
+                        const price = partPricing.prices[0].price;
+                        pricingMap.set(partPricing.partId, price);
+                        console.log(`💰 Part ${partPricing.partId}: $${price}`);
                       }
-                      console.log(`✅ Fetched pricing for ${pricingMap.size} parts`);
-                    } else {
-                      console.log(`⚠️ No pricing data array found`);
                     }
+                    console.log(`✅ Fetched pricing for ${pricingMap.size} parts`);
                   } else {
                     const errorText = await pricingResponse.text();
                     console.error(`❌ Pricing API failed: ${pricingResponse.status} - ${errorText}`);
@@ -455,9 +454,9 @@ Deno.serve(async (req: Request) => {
         } else {
           console.log(`Found style in cache: ${styleData.style_number}`);
 
-          // Fetch live pricing for cached style
+          // Fetch live pricing for cached style from unified endpoint
           console.log(`🔍 Fetching live pricing for cached style: ${style}`);
-          const pricingUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=pricing&productId=${encodeURIComponent(style)}&companyId=${encodeURIComponent(profile.company_id)}`;
+          const pricingUrl = `${supabaseUrl}/functions/v1/promostandards-unified?styleNumber=${encodeURIComponent(style)}`;
           const pricingResponse = await fetch(pricingUrl, {
             headers: {
               "Authorization": `Bearer ${supabaseServiceKey}`,
@@ -468,21 +467,21 @@ Deno.serve(async (req: Request) => {
           console.log(`💰 Pricing API response status: ${pricingResponse.status}`);
 
           if (pricingResponse.ok) {
-            const pricingData = await pricingResponse.json();
-            console.log(`💰 Pricing data received:`, JSON.stringify(pricingData, null, 2));
+            const unifiedData = await pricingResponse.json();
+            console.log(`💰 Unified data success:`, unifiedData.success);
 
-            if (pricingData.data && Array.isArray(pricingData.data)) {
-              for (const partPricing of pricingData.data) {
-                if (partPricing.prices && partPricing.prices.length > 0) {
-                  const price = partPricing.prices[0].price;
-                  pricingMap.set(partPricing.partId, price);
-                  console.log(`💰 Part ${partPricing.partId}: $${price}`);
-                }
+            // Extract pricing from unified response
+            const pricingParts = unifiedData.pricing?.parts || [];
+            console.log(`💰 Found ${pricingParts.length} parts with pricing`);
+
+            for (const partPricing of pricingParts) {
+              if (partPricing.prices && partPricing.prices.length > 0) {
+                const price = partPricing.prices[0].price;
+                pricingMap.set(partPricing.partId, price);
+                console.log(`💰 Part ${partPricing.partId}: $${price}`);
               }
-              console.log(`✅ Fetched live pricing for ${pricingMap.size} parts`);
-            } else {
-              console.log(`⚠️ No pricing data array found`);
             }
+            console.log(`✅ Fetched live pricing for ${pricingMap.size} parts`);
           } else {
             const errorText = await pricingResponse.text();
             console.error(`❌ Pricing API failed: ${pricingResponse.status} - ${errorText}`);

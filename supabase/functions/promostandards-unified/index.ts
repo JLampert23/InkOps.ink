@@ -401,50 +401,111 @@ Deno.serve(async (req: Request) => {
     const pricingData: any = {};
     if (pricingResponse.status === 'fulfilled' && pricingResponse.value) {
       const xmlDoc = pricingResponse.value;
+      console.log('💰 Pricing XML Response (first 2000 chars):', xmlDoc.substring(0, 2000));
+
       const partPattern = /<Part>([\s\S]*?)<\/Part>/gi;
       const partMatches = getAllXmlMatches(xmlDoc, partPattern);
+      console.log('💰 Found', partMatches.length, 'parts in pricing response');
 
       pricingData.parts = partMatches.map(match => {
         const partXml = match[1];
-        const pricePattern = /<Price>([\s\S]*?)<\/Price>/gi;
+        // S&S uses PartPrice tags, not Price tags
+        const pricePattern = /<PartPrice>([\s\S]*?)<\/PartPrice>/gi;
         const priceMatches = getAllXmlMatches(partXml, pricePattern);
 
+        const partId = getXmlValue(partXml, "partId");
+        const prices = priceMatches.map(priceMatch => {
+          const priceXml = priceMatch[1];
+          return {
+            minQuantity: parseInt(getXmlValue(priceXml, "minQuantity") || "0"),
+            price: parseFloat(getXmlValue(priceXml, "price") || "0"),
+            discountCode: getXmlValue(priceXml, "discountCode"),
+            priceUom: getXmlValue(priceXml, "priceUom"),
+          };
+        });
+
+        console.log(`💰 Part ${partId}:`, prices.length, 'prices', prices[0]);
+
         return {
-          partId: getXmlValue(partXml, "partId"),
-          prices: priceMatches.map(priceMatch => {
-            const priceXml = priceMatch[1];
-            return {
-              minQuantity: parseInt(getXmlValue(priceXml, "minQuantity") || "0"),
-              price: parseFloat(getXmlValue(priceXml, "price") || "0"),
-              discountCode: getXmlValue(priceXml, "discountCode"),
-            };
-          })
+          partId,
+          prices
         };
       });
+
+      console.log('💰 Total pricing data:', pricingData.parts?.length, 'parts');
+
+      // Create a pricing map for easy lookup by partId
+      pricingData.pricesByPartId = {};
+      if (pricingData.parts) {
+        pricingData.parts.forEach((part: any) => {
+          if (part.partId && part.prices && part.prices.length > 0) {
+            // Store the first price tier (usually min quantity 1)
+            pricingData.pricesByPartId[part.partId] = part.prices[0].price;
+          }
+        });
+      }
+      console.log('💰 Price map created with', Object.keys(pricingData.pricesByPartId || {}).length, 'entries');
+    } else if (pricingResponse.status === 'rejected') {
+      console.error('💰 Pricing API Error:', pricingResponse.reason);
     }
 
-    // Parse Media Content
+    // Parse Media Content with fallback for error 105
     const mediaData: any = {};
     console.log('📸 Media Response Status:', mediaResponse.status);
-    if (mediaResponse.status === 'rejected') {
-      console.error('📸 Media Request Failed:', mediaResponse.reason);
-    }
 
     let mediaAuthError: { code: string; description: string } | null = null;
+    let finalMediaResponse = mediaResponse;
 
+    // Check if media request failed or returned error 105
     if (mediaResponse.status === 'fulfilled' && mediaResponse.value) {
-      const xmlDoc = mediaResponse.value;
-      console.log('📸 Media XML Response (first 1000 chars):', xmlDoc.substring(0, 1000));
+      const errorCodeMatch = mediaResponse.value.match(/<code>(\d+)<\/code>/);
+      const errorDescMatch = mediaResponse.value.match(/<description>(.*?)<\/description>/);
 
-      // Check for error message first
-      const errorCodeMatch = xmlDoc.match(/<code>(\d+)<\/code>/);
-      const errorDescMatch = xmlDoc.match(/<description>(.*?)<\/description>/);
-
-      if (errorCodeMatch && errorDescMatch) {
+      if (errorCodeMatch && errorDescMatch && errorCodeMatch[1] === '105') {
         mediaAuthError = {
           code: errorCodeMatch[1],
           description: errorDescMatch[1]
         };
+        console.warn('📸 Media API error 105 (auth failed), retrying without partId as fallback...');
+
+        // Retry without partId to get style-level images
+        try {
+          const fallbackMediaXml = await makePromoStandardsRequest(
+            PROMOSTANDARDS_ENDPOINTS.media,
+            "getMediaContent",
+            `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
+  <shar:wsVersion>1.0.0</shar:wsVersion>
+  <shar:id>${credentials.accountNumber}</shar:id>
+  <shar:password>${decryptedApiKey}</shar:password>
+  <shar:mediaType>Image</shar:mediaType>
+  <shar:productId>${styleNumber}</shar:productId>
+</ns2:GetMediaContentRequest>`
+          );
+          console.log('📸 Fallback media request succeeded');
+          finalMediaResponse = { status: 'fulfilled' as const, value: fallbackMediaXml };
+        } catch (fallbackError) {
+          console.error('📸 Fallback media request also failed:', fallbackError);
+        }
+      }
+    } else if (mediaResponse.status === 'rejected') {
+      console.error('📸 Media Request Failed:', mediaResponse.reason);
+    }
+
+    if (finalMediaResponse.status === 'fulfilled' && finalMediaResponse.value) {
+      const xmlDoc = finalMediaResponse.value;
+      console.log('📸 Media XML Response (first 1000 chars):', xmlDoc.substring(0, 1000));
+
+      // Check for error message
+      const errorCodeMatch = xmlDoc.match(/<code>(\d+)<\/code>/);
+      const errorDescMatch = xmlDoc.match(/<description>(.*?)<\/description>/);
+
+      if (errorCodeMatch && errorDescMatch) {
+        if (!mediaAuthError) {
+          mediaAuthError = {
+            code: errorCodeMatch[1],
+            description: errorDescMatch[1]
+          };
+        }
         console.error('📸 Media API returned error:', mediaAuthError);
       } else {
         const mediaPattern = /<MediaContent>([\s\S]*?)<\/MediaContent>/gi;
