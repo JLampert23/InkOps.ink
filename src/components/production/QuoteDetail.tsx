@@ -782,7 +782,8 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                           return (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                               {groupImprints.map((imprint, idx) => {
-                                const matchingProof = proofs.find(proof => {
+                                // Find ALL matching proofs for this imprint (not just one)
+                                const matchingProofs = proofs.filter(proof => {
                                   if (proof.imprint_id && proof.imprint_id === imprint.id) {
                                     return true;
                                   }
@@ -794,6 +795,9 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                   }
                                   return false;
                                 });
+
+                                const hasProofs = matchingProofs.length > 0 && matchingProofs.some(p => p.composite_image_url || p.garment_image_url);
+                                const hasMockups = imprint.mockups && imprint.mockups.length > 0;
 
                                 return (
                                   <div
@@ -817,32 +821,37 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                       </div>
                                     )}
 
-                                    {(matchingProof && (matchingProof.composite_image_url || matchingProof.garment_image_url)) || (imprint.mockups && imprint.mockups.length > 0) ? (
-                                      <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
-                                        {/* Display composite image from proof */}
-                                        {matchingProof && (matchingProof.composite_image_url || matchingProof.garment_image_url) && (
+                                    {(hasProofs || hasMockups) && (
+                                      <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600 space-y-2">
+                                        {/* Display ALL matching proofs */}
+                                        {matchingProofs.map((matchingProof, proofIdx) => {
+                                          const imageUrl = matchingProof.composite_image_url || matchingProof.garment_image_url;
+                                          if (!imageUrl) return null;
+
+                                          return (
+                                            <div key={`proof-${proofIdx}`}>
+                                              <img
+                                                src={imageUrl}
+                                                alt={matchingProof.garment_name || 'Proof'}
+                                                className="w-full h-48 object-contain rounded border border-gray-200 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800"
+                                                onClick={() => {
+                                                  setSelectedProofImage(imageUrl);
+                                                  setShowProofModal(true);
+                                                }}
+                                              />
+                                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{matchingProof.proof_number}</p>
+                                            </div>
+                                          );
+                                        })}
+                                        {/* Display mockups from imprint.mockups if no matching proofs */}
+                                        {!hasProofs && hasMockups && (
                                           <>
-                                            <img
-                                              src={matchingProof.composite_image_url || matchingProof.garment_image_url!}
-                                              alt={matchingProof.garment_name || 'Proof'}
-                                              className="w-full h-48 object-contain rounded border border-gray-200 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800"
-                                              onClick={() => {
-                                                setSelectedProofImage(matchingProof.composite_image_url || matchingProof.garment_image_url!);
-                                                setShowProofModal(true);
-                                              }}
-                                            />
-                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{matchingProof.proof_number}</p>
-                                          </>
-                                        )}
-                                        {/* Display mockups from imprint.mockups if no matching proof or as additional thumbnails */}
-                                        {imprint.mockups && imprint.mockups.length > 0 && !matchingProof && (
-                                          <div className="space-y-2">
                                             {imprint.mockups.map((mockup: any, mockupIdx: number) => {
                                               const mockupUrl = typeof mockup === 'string' ? mockup : mockup?.url;
                                               if (!mockupUrl) return null;
 
                                               return (
-                                                <div key={mockupIdx}>
+                                                <div key={`mockup-${mockupIdx}`}>
                                                   <img
                                                     src={mockupUrl}
                                                     alt={`Mockup ${mockupIdx + 1}`}
@@ -855,10 +864,10 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                                 </div>
                                               );
                                             })}
-                                          </div>
+                                          </>
                                         )}
                                       </div>
-                                    ) : null}
+                                    )}
                                   </div>
                                 );
                               })}
@@ -873,6 +882,70 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             </tbody>
           </table>
         </div>
+
+        {/* Unmatched Proofs Section - Show proofs that don't match any imprint */}
+        {(() => {
+          const normalizeLabel = (label: string | null | undefined) => label || '';
+
+          // Find all imprint IDs and group labels that are displayed
+          const displayedImprintIds = new Set(quoteImprints.map(imp => imp.id));
+          const displayedGroupLabels = new Set(quoteImprints.map(imp => normalizeLabel((imp as any).group_label)));
+
+          // Find proofs that don't match any displayed imprint
+          const unmatchedProofs = proofs.filter(proof => {
+            // If proof has an imprint_id, check if it matches any displayed imprint
+            if (proof.imprint_id) {
+              return !displayedImprintIds.has(proof.imprint_id);
+            }
+            // Otherwise check by group_label
+            const proofLabel = normalizeLabel(proof.group_label);
+            return !displayedGroupLabels.has(proofLabel);
+          });
+
+          if (unmatchedProofs.length === 0) return null;
+
+          return (
+            <div className="px-8 py-6 border-t border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-800/50">
+              <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Additional Proofs</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {unmatchedProofs.map((proof, idx) => {
+                  const imageUrl = proof.composite_image_url || proof.garment_image_url;
+                  if (!imageUrl) return null;
+
+                  return (
+                    <div
+                      key={`unmatched-proof-${idx}`}
+                      className="bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-4"
+                    >
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <span className="text-sm font-bold text-gray-900 dark:text-white">
+                          {proof.proof_number}
+                        </span>
+                        {proof.group_label && (
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            ({proof.group_label})
+                          </span>
+                        )}
+                      </div>
+                      <img
+                        src={imageUrl}
+                        alt={proof.garment_name || 'Proof'}
+                        className="w-full h-48 object-contain rounded border border-gray-200 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800"
+                        onClick={() => {
+                          setSelectedProofImage(imageUrl);
+                          setShowProofModal(true);
+                        }}
+                      />
+                      {proof.garment_name && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{proof.garment_name}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Fees Section */}
         {fees.length > 0 && (
