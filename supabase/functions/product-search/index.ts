@@ -301,7 +301,7 @@ Deno.serve(async (req: Request) => {
                       if (!colorMap.has(colorName)) {
                         colorMap.set(colorName, {
                           name: colorName,
-                          code: part.hex || "",
+                          code: part.part_id || "",
                           partIds: [],
                           sizes: [],
                           image_url: "",
@@ -408,7 +408,7 @@ Deno.serve(async (req: Request) => {
               if (!colorMap.has(colorName)) {
                 colorMap.set(colorName, {
                   name: colorName,
-                  code: part.hex || "",
+                  code: part.part_id || "",
                   partIds: [],
                   sizes: [],
                   image_url: "",
