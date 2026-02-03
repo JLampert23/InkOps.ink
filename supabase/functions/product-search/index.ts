@@ -267,6 +267,29 @@ Deno.serve(async (req: Request) => {
                     console.log(`Cached ${mediaContent.length} images for style ${style}`);
                   }
 
+                  // Fetch live pricing
+                  const pricingUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=pricing&productId=${encodeURIComponent(style)}&companyId=${encodeURIComponent(profile.company_id)}`;
+                  const pricingResponse = await fetch(pricingUrl, {
+                    headers: {
+                      "Authorization": `Bearer ${supabaseServiceKey}`,
+                    },
+                  });
+
+                  let pricingMap = new Map<string, number>();
+                  if (pricingResponse.ok) {
+                    const pricingData = await pricingResponse.json();
+                    // pricingData.data is an array of { partId, prices: [{quantity, price}] }
+                    if (pricingData.data && Array.isArray(pricingData.data)) {
+                      for (const partPricing of pricingData.data) {
+                        if (partPricing.prices && partPricing.prices.length > 0) {
+                          // Use the first price (lowest quantity) as the base price
+                          pricingMap.set(partPricing.partId, partPricing.prices[0].price);
+                        }
+                      }
+                      console.log(`Fetched pricing for ${pricingMap.size} parts`);
+                    }
+                  }
+
                   // Now re-query the cached data and return it
                   const { data: cachedStyle } = await supabaseAdmin
                     .from("styles")
@@ -297,6 +320,7 @@ Deno.serve(async (req: Request) => {
 
                     for (const part of partsData || []) {
                       const colorName = part.color_name || "Default";
+                      const partPrice = pricingMap.get(part.part_id || "") || 0;
 
                       if (!colorMap.has(colorName)) {
                         colorMap.set(colorName, {
@@ -306,7 +330,7 @@ Deno.serve(async (req: Request) => {
                           sizes: [],
                           image_url: "",
                           pricing: {
-                            wholesale: 0,
+                            wholesale: partPrice,
                             retail: 0,
                           },
                           stock: {},
@@ -319,6 +343,10 @@ Deno.serve(async (req: Request) => {
                       }
                       if (part.size && !colorOption.sizes?.includes(part.size)) {
                         colorOption.sizes?.push(part.size);
+                      }
+                      // Update pricing if we found a price for this part
+                      if (partPrice > 0 && colorOption.pricing) {
+                        colorOption.pricing.wholesale = Math.max(colorOption.pricing.wholesale || 0, partPrice);
                       }
                     }
 
@@ -385,6 +413,27 @@ Deno.serve(async (req: Request) => {
         } else {
           console.log(`Found style in cache: ${styleData.style_number}`);
 
+          // Fetch live pricing for cached style
+          const pricingUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=pricing&productId=${encodeURIComponent(style)}&companyId=${encodeURIComponent(profile.company_id)}`;
+          const pricingResponse = await fetch(pricingUrl, {
+            headers: {
+              "Authorization": `Bearer ${supabaseServiceKey}`,
+            },
+          });
+
+          let pricingMap = new Map<string, number>();
+          if (pricingResponse.ok) {
+            const pricingData = await pricingResponse.json();
+            if (pricingData.data && Array.isArray(pricingData.data)) {
+              for (const partPricing of pricingData.data) {
+                if (partPricing.prices && partPricing.prices.length > 0) {
+                  pricingMap.set(partPricing.partId, partPricing.prices[0].price);
+                }
+              }
+              console.log(`Fetched live pricing for ${pricingMap.size} parts`);
+            }
+          }
+
           // Get all parts for this style grouped by color
           const { data: partsData, error: partsError } = await supabaseAdmin
             .from("parts")
@@ -404,6 +453,7 @@ Deno.serve(async (req: Request) => {
 
             for (const part of partsData || []) {
               const colorName = part.color_name || "Default";
+              const partPrice = pricingMap.get(part.part_id || "") || 0;
 
               if (!colorMap.has(colorName)) {
                 colorMap.set(colorName, {
@@ -413,7 +463,7 @@ Deno.serve(async (req: Request) => {
                   sizes: [],
                   image_url: "",
                   pricing: {
-                    wholesale: 0,
+                    wholesale: partPrice,
                     retail: 0,
                   },
                   stock: {},
@@ -426,6 +476,10 @@ Deno.serve(async (req: Request) => {
               }
               if (part.size && !colorOption.sizes?.includes(part.size)) {
                 colorOption.sizes?.push(part.size);
+              }
+              // Update pricing if we found a price for this part
+              if (partPrice > 0 && colorOption.pricing) {
+                colorOption.pricing.wholesale = Math.max(colorOption.pricing.wholesale || 0, partPrice);
               }
             }
 
