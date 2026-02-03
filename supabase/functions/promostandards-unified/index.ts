@@ -294,19 +294,22 @@ Deno.serve(async (req: Request) => {
   <shar:productId>${partId}</shar:productId>
 </ns2:GetInventoryLevelsRequest>`
       ) : Promise.resolve(null),
-      // 3. Pricing (if partId provided, otherwise skip)
-      partId ? makePromoStandardsRequest(
+      // 3. Pricing - ALWAYS call with styleNumber (S&S expects style, not partId)
+      makePromoStandardsRequest(
         PROMOSTANDARDS_ENDPOINTS.pricing,
         "getConfigurationAndPricing",
         `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${credentials.accountNumber}</shar:id>
   <shar:password>${decryptedApiKey}</shar:password>
-  <shar:productId>${partId}</shar:productId>
+  <shar:productId>${styleNumber}</shar:productId>
   <shar:currency>USD</shar:currency>
   <shar:priceType>Customer</shar:priceType>
+  <shar:localizationCountry>US</shar:localizationCountry>
+  <shar:localizationLanguage>en</shar:localizationLanguage>
+  <shar:configurationType>Blank</shar:configurationType>
 </ns2:GetConfigurationAndPricingRequest>`
-      ) : Promise.resolve(null),
+      ),
       // 4. Media Content - use styleNumber as productId and partId for color-specific images
       makePromoStandardsRequest(
         PROMOSTANDARDS_ENDPOINTS.media,
