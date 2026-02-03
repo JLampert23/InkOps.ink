@@ -420,9 +420,13 @@ Deno.serve(async (req: Request) => {
 
     // Parse Media Content
     const mediaData: any = {};
+    console.log('📸 Media Response Status:', mediaResponse.status);
+    if (mediaResponse.status === 'rejected') {
+      console.error('📸 Media Request Failed:', mediaResponse.reason);
+    }
     if (mediaResponse.status === 'fulfilled' && mediaResponse.value) {
       const xmlDoc = mediaResponse.value;
-      console.log('📸 Media XML Response (first 500 chars):', xmlDoc.substring(0, 500));
+      console.log('📸 Media XML Response (first 1000 chars):', xmlDoc.substring(0, 1000));
       const mediaPattern = /<MediaContent>([\s\S]*?)<\/MediaContent>/gi;
       const mediaMatches = getAllXmlMatches(xmlDoc, mediaPattern);
       console.log('📸 MediaContent matches found:', mediaMatches.length);
