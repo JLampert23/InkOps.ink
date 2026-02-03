@@ -771,25 +771,27 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                     )}
 
                                     {hasMockups && (
-                                      <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600 space-y-2">
-                                        {imprint.mockups.map((mockup: any, mockupIdx: number) => {
-                                          const mockupUrl = typeof mockup === 'string' ? mockup : mockup?.url;
-                                          if (!mockupUrl) return null;
+                                      <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                                          {imprint.mockups.map((mockup: any, mockupIdx: number) => {
+                                            const mockupUrl = typeof mockup === 'string' ? mockup : mockup?.url;
+                                            if (!mockupUrl) return null;
 
-                                          return (
-                                            <div key={`mockup-${mockupIdx}`}>
-                                              <img
-                                                src={mockupUrl}
-                                                alt={`Mockup ${mockupIdx + 1}`}
-                                                className="w-full h-48 object-contain rounded border border-gray-200 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800"
-                                                onClick={() => {
-                                                  setSelectedProofImage(mockupUrl);
-                                                  setShowProofModal(true);
-                                                }}
-                                              />
-                                            </div>
-                                          );
-                                        })}
+                                            return (
+                                              <div key={`mockup-${mockupIdx}`} className="aspect-square">
+                                                <img
+                                                  src={mockupUrl}
+                                                  alt={`Mockup ${mockupIdx + 1}`}
+                                                  className="w-full h-full object-contain rounded border border-gray-200 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800"
+                                                  onClick={() => {
+                                                    setSelectedProofImage(mockupUrl);
+                                                    setShowProofModal(true);
+                                                  }}
+                                                />
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
                                       </div>
                                     )}
                                   </div>
