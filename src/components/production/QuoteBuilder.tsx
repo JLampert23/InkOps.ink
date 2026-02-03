@@ -932,10 +932,12 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
 
     const garmentImages: Record<string, any> = {};
 
-    // Fetch garment images based on supplier
+    // Fetch garment images AND pricing based on supplier
+    let freshPrice: number | null = null;
+
     if (product.supplier === 'ssactivewear' && color?.code) {
       try {
-        console.log('🎨 Fetching SSActivewear garment images for:', { style: product.style, partId: color.code });
+        console.log('🎨 Fetching SSActivewear garment images & pricing for:', { style: product.style, partId: color.code });
         const unifiedData = await getUnifiedProductData(product.style, color.code);
         console.log('📦 Unified data response:', {
           success: unifiedData.success,
@@ -944,7 +946,23 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           hasImages: !!unifiedData.media?.images,
           imageCount: unifiedData.media?.images?.length,
           viewsKeys: unifiedData.media?.views ? Object.keys(unifiedData.media.views) : [],
+          hasPricing: !!unifiedData.pricing,
+          pricingPartsCount: unifiedData.pricing?.parts?.length || 0,
+          hasPriceMap: !!unifiedData.pricing?.pricesByPartId,
         });
+
+        // Extract fresh pricing for this specific partId
+        if (unifiedData.pricing?.pricesByPartId && color.code) {
+          const priceForPart = unifiedData.pricing.pricesByPartId[color.code];
+          if (priceForPart) {
+            freshPrice = priceForPart;
+            console.log('💰 Fresh pricing found for part:', { partId: color.code, price: freshPrice });
+          } else {
+            console.warn('⚠️ No price found for part:', color.code, 'Available parts:', Object.keys(unifiedData.pricing.pricesByPartId));
+          }
+        } else {
+          console.warn('⚠️ No pricing data in unified response');
+        }
 
         console.log('🐛 Debug info from API:', unifiedData.debug);
 
@@ -1082,9 +1100,15 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           item_number: product.style.trim(),
           color: color?.name?.trim() || '',
           description: `${product.brand} ${product.description}`.trim(),
-          unit_price: color?.pricing?.wholesale || 0,
+          unit_price: freshPrice !== null ? freshPrice : (color?.pricing?.wholesale || 0),
           ...garmentImages,
         };
+
+        console.log('💰 Final unit_price set:', {
+          freshPrice,
+          cachedPrice: color?.pricing?.wholesale,
+          finalPrice: freshPrice !== null ? freshPrice : (color?.pricing?.wholesale || 0),
+        });
         console.log('📝 Updated item:', newItems[itemIdx]);
         return { ...group, items: newItems };
       }
