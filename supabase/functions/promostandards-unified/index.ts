@@ -503,7 +503,7 @@ Deno.serve(async (req: Request) => {
         lifestyleCount: lifestyleImages.length,
         otherCount: otherImages.length,
       });
-      }
+    }
     }
 
     // Return unified response
