@@ -1004,6 +1004,15 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       garmentImages.supplier_partid = color.code;
     }
 
+    console.log('🎨 Updating item with garment images:', {
+      groupId,
+      itemIdx,
+      garmentImages,
+      hasFrontImage: !!garmentImages.garment_front_image_url,
+      hasRearImage: !!garmentImages.garment_rear_image_url,
+      hasImagesData: !!garmentImages.garment_images_data,
+    });
+
     const newGroups = itemGroups.map(group => {
       if (group.id === groupId) {
         const newItems = [...group.items];
@@ -1015,6 +1024,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           unit_price: color?.pricing?.wholesale || 0,
           ...garmentImages,
         };
+        console.log('📝 Updated item:', newItems[itemIdx]);
         return { ...group, items: newItems };
       }
       return group;
@@ -1169,7 +1179,16 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       await supabase.from('quote_line_items').delete().eq('quote_id', quoteId);
 
       const allItems = itemGroups.flatMap((group, groupIdx) =>
-        group.items.map((item, itemIdx) => ({
+        group.items.map((item, itemIdx) => {
+          console.log('💾 Saving item with images:', {
+            item_number: item.item_number,
+            color: item.color,
+            has_front_image: !!item.garment_front_image_url,
+            has_rear_image: !!item.garment_rear_image_url,
+            has_images_data: !!item.garment_images_data,
+            front_image_url: item.garment_front_image_url,
+          });
+          return {
           quote_id: quoteId,
             company_id: userProfile.company_id,
             line_type: 'item',
@@ -1192,6 +1211,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
             qty_2xl: item.qty_2xl || 0,
             qty_3xl: item.qty_3xl || 0,
             qty_4xl: item.qty_4xl || 0,
+            qty_5xl: item.qty_5xl || 0,
             qty_sm: item.qty_sm || 0,
             qty_lxl: item.qty_lxl || 0,
             qty_ysym: item.qty_ysym || 0,
@@ -1208,7 +1228,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
             garment_lifestyle_image_url: item.garment_lifestyle_image_url || null,
             garment_images_data: item.garment_images_data || null,
             supplier_partid: item.supplier_partid || null,
-          }))
+          };
+        })
         );
 
         if (allItems.length > 0) {
