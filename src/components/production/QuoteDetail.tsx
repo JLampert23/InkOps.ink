@@ -512,12 +512,16 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                   {quote.bill_city}, {quote.bill_state} {quote.bill_zip}
                 </p>
               )}
-              {quote.bill_email && (
+              {(quote.bill_email || quote.customer_email) && (
                 <p className="text-blue-600 dark:text-blue-400 mt-1">
-                  <a href={`mailto:${quote.bill_email}`} className="hover:underline">{quote.bill_email}</a>
+                  <a href={`mailto:${quote.bill_email || quote.customer_email}`} className="hover:underline">
+                    {quote.bill_email || quote.customer_email}
+                  </a>
                 </p>
               )}
-              {quote.bill_phone && <p className="text-gray-700 dark:text-gray-300">{quote.bill_phone}</p>}
+              {(quote.bill_phone || quote.customer_phone) && (
+                <p className="text-gray-700 dark:text-gray-300">{quote.bill_phone || quote.customer_phone}</p>
+              )}
               {!quote.bill_company && !quote.bill_name && !quote.bill_address_1 && (
                 <p className="text-gray-500 dark:text-gray-400 italic">No billing address provided</p>
               )}
