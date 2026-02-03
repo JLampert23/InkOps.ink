@@ -134,7 +134,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
 
     switch (sizeMode) {
       case 'regular':
-        visibleSizeLabels = ['YS', 'YM', 'YL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
+        visibleSizeLabels = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
         break;
       case 'double':
         visibleSizeLabels = ['S/M', 'L/XL', 'YS/YM', 'YL/YXL'];
@@ -146,7 +146,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         visibleSizeLabels = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
         break;
       default:
-        visibleSizeLabels = ['YS', 'YM', 'YL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
+        visibleSizeLabels = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
     }
 
     // Include custom sizes if selected for this group (only for regular mode)
@@ -2292,7 +2292,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                   </select>
                   <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded">
                     <p className="text-xs text-blue-800 dark:text-blue-200">
-                      {editingGroup.sizeMode === 'regular' && 'Displays: YS, YM, YL, XS, S, M, L, XL, 2XL, 3XL, 4XL'}
+                      {editingGroup.sizeMode === 'regular' && 'Displays: YXS, YS, YM, YL, YXL, XS, S, M, L, XL, 2XL, 3XL, 4XL'}
                       {editingGroup.sizeMode === 'double' && 'Displays: S/M, L/XL, YS/YM, YL/YXL'}
                       {editingGroup.sizeMode === 'youth' && 'Displays: YXS, YS, YM, YL, YXL'}
                       {editingGroup.sizeMode === 'adult' && 'Displays: XS, S, M, L, XL, 2XL, 3XL, 4XL'}
