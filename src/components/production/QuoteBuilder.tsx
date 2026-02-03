@@ -601,7 +601,13 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
   };
 
   const getGroupImprints = (groupLabel: string) => {
-    // Always filter by group_label to ensure imprints stay with their assigned groups
+    // If there's only one group with an empty label, show all imprints
+    // This handles legacy quotes where imprints weren't assigned to groups
+    if (itemGroups.length === 1 && !groupLabel) {
+      return quoteImprints;
+    }
+
+    // Otherwise, filter by exact group_label match
     // Normalize empty string, null, and undefined as empty string
     const normalizedGroupLabel = groupLabel || '';
     return quoteImprints.filter(imp => {
@@ -689,9 +695,13 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
   };
 
   const addItemGroup = () => {
+    // Generate a unique label for the new group
+    const nextGroupNumber = itemGroups.length + 1;
+    const defaultLabel = `Group ${nextGroupNumber}`;
+
     setItemGroups([...itemGroups, {
       id: crypto.randomUUID(),
-      label: '',
+      label: defaultLabel,
       items: [],
       taxed: false,
       customSizeOptions: [],

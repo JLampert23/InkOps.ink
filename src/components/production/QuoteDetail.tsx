@@ -750,15 +750,21 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                       <div className="space-y-3">
                         {/* List imprints for this group */}
                         {(() => {
-                          // Filter imprints to only show those matching this group's label
-                          // Normalize empty strings and null to be equivalent
+                          // Filter imprints to match this group's label
                           const normalizeLabel = (label: string | null | undefined) => label || '';
                           const normalizedGroupLabel = normalizeLabel(groupLabel);
 
-                          const groupImprints = quoteImprints.filter(imp => {
-                            const imprintLabel = normalizeLabel((imp as any).group_label);
-                            return imprintLabel === normalizedGroupLabel;
-                          });
+                          let groupImprints;
+                          // If there's only one group with an empty label, show all imprints
+                          if (itemGroups.length === 1 && !groupLabel) {
+                            groupImprints = quoteImprints;
+                          } else {
+                            // Otherwise, filter by exact group_label match
+                            groupImprints = quoteImprints.filter(imp => {
+                              const imprintLabel = normalizeLabel((imp as any).group_label);
+                              return imprintLabel === normalizedGroupLabel;
+                            });
+                          }
 
                           console.log('QuoteDetail: Imprints display check:', {
                             groupLabel,
