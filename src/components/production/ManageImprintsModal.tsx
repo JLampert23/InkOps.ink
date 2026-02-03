@@ -641,7 +641,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
       <div className="bg-slate-900 rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700/70">
           <h2 className="text-lg font-semibold text-white">
-            Imprints and Proofs{initialGroupLabel ? ` - ${initialGroupLabel}` : ''}
+            Imprints{initialGroupLabel ? ` - ${initialGroupLabel}` : ''}
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
             <X className="w-5 h-5" />
