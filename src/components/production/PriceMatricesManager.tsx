@@ -335,6 +335,26 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
   const [cells, setCells] = useState<Record<string, number>>(matrix.cells);
   const [isActive, setIsActive] = useState(matrix.is_active);
   const [saving, setSaving] = useState(false);
+  const [typesOfWork, setTypesOfWork] = useState<string[]>([]);
+
+  useEffect(() => {
+    const loadTypesOfWork = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('production_colors')
+          .select('type_of_work')
+          .eq('is_active', true);
+
+        if (error) throw error;
+
+        const uniqueTypes = Array.from(new Set(data?.map(item => item.type_of_work) || []));
+        setTypesOfWork(uniqueTypes);
+      } catch (err) {
+        console.error('Error loading types of work:', err);
+      }
+    };
+    loadTypesOfWork();
+  }, []);
 
   const addColumn = () => {
     setColumns([...columns, `Column ${columns.length + 1}`]);
@@ -520,13 +540,12 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
                 onChange={(e) => setMatrixType(e.target.value)}
                 className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded focus:ring-2 focus:ring-blue-500"
               >
-                <option value="general">General</option>
-                <option value="screen_print">Screen Print</option>
-                <option value="embroidery">Embroidery</option>
-                <option value="dtg">DTG (Direct to Garment)</option>
-                <option value="vinyl">Vinyl</option>
-                <option value="sublimation">Sublimation</option>
-                <option value="heat_transfer">Heat Transfer</option>
+                <option value="">Select type of work</option>
+                {typesOfWork.map((type) => (
+                  <option key={type} value={type}>
+                    {type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
