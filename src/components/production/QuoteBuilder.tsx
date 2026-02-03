@@ -105,6 +105,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
   const autoSaveIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const hasUnsavedChangesRef = useRef(false);
   const lastUserInteractionRef = useRef<number>(Date.now());
+  const performSaveRef = useRef<((isAutoSave?: boolean, statusOverride?: string) => Promise<boolean>) | null>(null);
   const [customers, setCustomers] = useState<any[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(initialCustomerId || '');
   const [availableFees, setAvailableFees] = useState<any[]>([]);
@@ -294,8 +295,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       const timeSinceLastInteraction = Date.now() - lastUserInteractionRef.current;
       const isIdle = timeSinceLastInteraction > 3000;
 
-      if (hasUnsavedChangesRef.current && isIdle) {
-        performSave(true);
+      if (hasUnsavedChangesRef.current && isIdle && performSaveRef.current) {
+        performSaveRef.current(true);
       }
     }, 30000);
 
@@ -1293,6 +1294,9 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       if (!isAutoSave) setSaving(false);
     }
   };
+
+  // Store the latest version of performSave in the ref for the autosave interval
+  performSaveRef.current = performSave;
 
   const handleSave = async () => {
     await performSave(false);
