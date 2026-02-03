@@ -52,27 +52,6 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
     loadQuotes();
   }, [statusFilter]);
 
-  useEffect(() => {
-    const channel = supabase
-      .channel('quotes-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'quotes',
-        },
-        () => {
-          loadQuotes();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
   const loadQuotes = async () => {
     setLoading(true);
     try {

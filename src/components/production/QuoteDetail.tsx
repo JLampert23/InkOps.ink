@@ -152,29 +152,6 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
   useEffect(() => {
     loadQuoteDetails();
-
-    // Subscribe to realtime updates on quote_imprints table
-    const channel = supabase
-      .channel(`quote_${quoteId}_imprints`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'quote_imprints',
-          filter: `quote_id=eq.${quoteId}`,
-        },
-        async (payload) => {
-          console.log('QuoteDetail: Imprints changed, reloading...', payload);
-          loadQuoteDetails();
-        }
-      )
-      .subscribe();
-
-    // Cleanup subscription on unmount
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, [quoteId]);
 
   const loadQuoteDetails = async () => {
