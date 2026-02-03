@@ -750,13 +750,15 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                       <div className="space-y-3">
                         {/* List imprints for this group */}
                         {(() => {
-                          // If there's only one group, show all imprints
-                          const groupImprints = itemGroups.length === 1
-                            ? quoteImprints
-                            : quoteImprints.filter(imp =>
-                                (imp as any).group_label === groupLabel ||
-                                ((imp as any).group_label === null && quoteImprints.filter(i => (i as any).group_label === null).length > 0)
-                              );
+                          // Filter imprints to only show those matching this group's label
+                          // Normalize empty strings and null to be equivalent
+                          const normalizeLabel = (label: string | null | undefined) => label || '';
+                          const normalizedGroupLabel = normalizeLabel(groupLabel);
+
+                          const groupImprints = quoteImprints.filter(imp => {
+                            const imprintLabel = normalizeLabel((imp as any).group_label);
+                            return imprintLabel === normalizedGroupLabel;
+                          });
 
                           console.log('QuoteDetail: Imprints display check:', {
                             groupLabel,
@@ -778,10 +780,11 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                   if (proof.imprint_id && proof.imprint_id === imprint.id) {
                                     return true;
                                   }
-                                  if (proof.group_label && imprint.group_label &&
-                                      proof.group_label === imprint.group_label &&
-                                      !proof.imprint_id) {
-                                    return true;
+                                  // Also match by normalized group_label if no imprint_id
+                                  if (!proof.imprint_id) {
+                                    const proofLabel = normalizeLabel(proof.group_label);
+                                    const imprintLabel = normalizeLabel((imprint as any).group_label);
+                                    return proofLabel === imprintLabel;
                                   }
                                   return false;
                                 });
