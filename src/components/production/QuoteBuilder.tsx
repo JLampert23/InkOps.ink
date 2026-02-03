@@ -771,21 +771,27 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
   };
 
   const searchProductByStyle = useCallback(async (styleNumber: string) => {
+    console.log('🔍 searchProductByStyle called with:', styleNumber);
+
     if (!styleNumber || styleNumber.length < 2) {
+      console.log('⚠️ Style number too short, skipping search');
       setProductSearchResults([]);
       setShowProductDropdown(false);
       return;
     }
 
+    console.log('✅ Style number valid, getting session...');
+
     // Get fresh session
     const { data: { session: freshSession }, error: sessionError } = await supabase.auth.getSession();
 
     if (sessionError || !freshSession) {
+      console.error('❌ Auth error:', sessionError);
       showNotification('error', 'Auth Error', 'You must be logged in');
       return;
     }
 
-    console.log('Session check:', {
+    console.log('✅ Session check:', {
       hasSession: !!freshSession,
       hasAccessToken: !!freshSession.access_token,
       tokenLength: freshSession.access_token?.length,
@@ -793,21 +799,28 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       now: Math.floor(Date.now() / 1000)
     });
 
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/product-search?style=${encodeURIComponent(styleNumber)}`;
+    console.log('📡 Calling API:', apiUrl);
+
     setProductSearchLoading(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/product-search?style=${encodeURIComponent(styleNumber)}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${freshSession.access_token}`,
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      console.log('⏳ Fetching...');
+      const response = await fetch(apiUrl, {
+        headers: {
+          'Authorization': `Bearer ${freshSession.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('📥 Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
 
       const data = await response.json();
-      console.log('Product search response:', data);
+      console.log('📦 Product search response:', data);
 
       // Log errors if present
       if (data.errors && data.errors.length > 0) {
@@ -859,17 +872,28 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         setShowProductDropdown(false);
       }
     } catch (err) {
-      console.error('Product search error:', err);
+      console.error('❌❌❌ Product search error:', err);
+      console.error('Error details:', {
+        message: err instanceof Error ? err.message : 'Unknown error',
+        stack: err instanceof Error ? err.stack : undefined,
+        type: typeof err,
+        err
+      });
+      showNotification('error', 'Search Error', `Failed to search: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
+      console.log('🏁 Search complete, setting loading to false');
       setProductSearchLoading(false);
     }
   }, [showNotification]);
 
   const handleStyleNumberChange = (groupId: string, itemIdx: number, value: string) => {
+    console.log('⌨️ handleStyleNumberChange called:', { groupId, itemIdx, value });
+
     // Store the original value but trim for searching
     updateItem(groupId, itemIdx, 'item_number', value);
 
     if (searchTimeoutRef.current) {
+      console.log('⏱️ Clearing previous timeout');
       clearTimeout(searchTimeoutRef.current);
     }
 
@@ -877,10 +901,16 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
 
     // Trim whitespace before searching
     const trimmedValue = value.trim();
+    console.log('🔤 Trimmed value:', trimmedValue, 'Length:', trimmedValue.length);
+
     if (trimmedValue) {
+      console.log('⏱️ Setting timeout to search in 500ms');
       searchTimeoutRef.current = setTimeout(() => {
+        console.log('⏰ Timeout fired! Calling searchProductByStyle');
         searchProductByStyle(trimmedValue);
       }, 500);
+    } else {
+      console.log('⚠️ Trimmed value is empty, not searching');
     }
   };
 
