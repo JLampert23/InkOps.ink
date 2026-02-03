@@ -103,6 +103,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
   const autoSaveIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const hasUnsavedChangesRef = useRef(false);
+  const lastUserInteractionRef = useRef<number>(Date.now());
   const [customers, setCustomers] = useState<any[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(initialCustomerId || '');
   const [availableFees, setAvailableFees] = useState<any[]>([]);
@@ -285,7 +287,14 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
     if (!quoteId) return;
 
     const interval = setInterval(() => {
-      if (hasUnsavedChanges) {
+      // Check hasUnsavedChanges at runtime, not in dependencies
+      // This prevents recreating the interval on every change
+
+      // Only autosave if user has been idle for at least 3 seconds
+      const timeSinceLastInteraction = Date.now() - lastUserInteractionRef.current;
+      const isIdle = timeSinceLastInteraction > 3000;
+
+      if (hasUnsavedChangesRef.current && isIdle) {
         performSave(true);
       }
     }, 30000);
@@ -297,10 +306,12 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         clearInterval(autoSaveIntervalRef.current);
       }
     };
-  }, [quoteId, hasUnsavedChanges]);
+  }, [quoteId]);
 
   useEffect(() => {
     setHasUnsavedChanges(true);
+    hasUnsavedChangesRef.current = true;
+    lastUserInteractionRef.current = Date.now();
   }, [
     selectedCustomerId, createdDate, productionDueDate, customerDueDate, terms,
     poNumber, deliveryMethod, nickname, customerNotes, productionNotes,
@@ -1264,6 +1275,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       }
 
       setHasUnsavedChanges(false);
+      hasUnsavedChangesRef.current = false;
       setLastAutoSave(new Date());
 
       if (!isAutoSave) {
