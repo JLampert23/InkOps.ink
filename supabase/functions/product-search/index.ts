@@ -56,23 +56,24 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Since verifyJWT is enabled, the JWT is already validated by Supabase
-    // We can decode it to get the user ID
-    const token = authHeader.replace("Bearer ", "");
-    let userId: string;
+    // Create a client with the user's auth token to verify authentication
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false }
+    });
 
-    try {
-      // Decode the JWT to get the user ID (no validation needed since verifyJWT already did it)
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      userId = payload.sub;
-      console.log("User authenticated:", userId);
-    } catch (e) {
-      console.error("Failed to decode JWT:", e);
+    // Get the authenticated user
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+
+    if (userError || !user) {
+      console.error("Authentication error:", userError);
       return new Response(
-        JSON.stringify({ code: 401, message: "Invalid JWT format" }),
+        JSON.stringify({ code: 401, message: "Authentication failed", details: userError?.message }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    console.log("User authenticated:", user.id);
 
     // Create admin client for database operations
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
@@ -86,7 +87,7 @@ Deno.serve(async (req: Request) => {
     const { data: profile, error: profileError } = await supabaseAdmin
       .from("user_profiles")
       .select("company_id")
-      .eq("id", userId)
+      .eq("id", user.id)
       .maybeSingle();
 
     if (profileError || !profile || !profile.company_id) {
