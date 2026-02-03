@@ -169,8 +169,24 @@ Deno.serve(async (req: Request) => {
 
             if (!ssaResponse.ok) {
               const errorText = await ssaResponse.text();
-              console.error("SSActivewear API failed:", errorText);
-              errors.push(`Style ${style} not found in local cache and failed to fetch from SSActivewear.`);
+              console.error("SSActivewear API failed:", {
+                status: ssaResponse.status,
+                statusText: ssaResponse.statusText,
+                errorBody: errorText
+              });
+              let errorDetail = `SSActivewear API returned ${ssaResponse.status}`;
+              try {
+                const errorJson = JSON.parse(errorText);
+                if (errorJson.error) {
+                  errorDetail += `: ${errorJson.error}`;
+                }
+              } catch {
+                // Not JSON, use text if short enough
+                if (errorText.length < 100) {
+                  errorDetail += `: ${errorText}`;
+                }
+              }
+              errors.push(`Style ${style} not found in local cache. ${errorDetail}`);
             } else {
               const ssaData = await ssaResponse.json();
               const productData = ssaData.data?.[0];
