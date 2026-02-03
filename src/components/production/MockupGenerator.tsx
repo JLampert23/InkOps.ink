@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase-client';
-import { useNotification } from '../../contexts/NotificationContext';
 import {
   X,
   Upload,
@@ -87,7 +86,6 @@ export default function MockupGenerator({
   onClose,
   onSave,
 }: MockupGeneratorProps) {
-  const { showNotification } = useNotification();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingGarment, setUploadingGarment] = useState(false);
@@ -315,7 +313,6 @@ export default function MockupGenerator({
 
       if (proofError) {
         console.error('Error loading proof:', proofError);
-        showNotification('error', 'Failed to load mockup');
         return;
       }
 
@@ -328,7 +325,6 @@ export default function MockupGenerator({
 
       if (artworkError) {
         console.error('Error loading proof artwork:', artworkError);
-        showNotification('error', 'Failed to load mockup artwork');
         return;
       }
 
@@ -372,10 +368,8 @@ export default function MockupGenerator({
         setHeightInches(artworkData[0].height_inches || 4);
       }
 
-      showNotification('success', 'Mockup loaded for editing');
     } catch (error) {
       console.error('Error loading proof:', error);
-      showNotification('error', 'Failed to load mockup');
     } finally {
       setLoading(false);
     }
@@ -810,8 +804,6 @@ export default function MockupGenerator({
       console.log('MockupGenerator: Final loaded type_of_work:', loadedTypeOfWork);
     } catch (error) {
       console.error('MockupGenerator: Failed to load proof data:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      showNotification('error', 'Failed to load proof data: ' + errorMessage);
     } finally {
       setLoading(false);
     }
@@ -828,12 +820,10 @@ export default function MockupGenerator({
       const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
 
       if (refreshError) {
-        showNotification('error', 'Session expired. Please refresh the page and log in again.');
         return;
       }
 
       if (!session?.access_token) {
-        showNotification('error', 'Authentication required. Please refresh the page and log in again.');
         return;
       }
 
@@ -899,8 +889,6 @@ export default function MockupGenerator({
                 .eq('id', proofId);
             }
           }
-        } else {
-          showNotification('warning', 'No garment images found. Configure supplier integrations in Account Settings to fetch garment images automatically.');
         }
       } else {
         let errorData;
@@ -909,10 +897,9 @@ export default function MockupGenerator({
         } catch (e) {
           errorData = { error: await response.text() };
         }
-        showNotification('error', `Failed to fetch garment image: ${errorData.error || errorData.message || 'Unknown error'}`);
       }
     } catch (error) {
-      showNotification('error', 'Error fetching garment image: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      console.error('Error fetching garment image:', error);
     }
   };
 
@@ -921,7 +908,6 @@ export default function MockupGenerator({
     if (!files || files.length === 0) return;
 
     if (!companyId || companyId.trim() === '') {
-      showNotification('error', 'Company ID not loaded. Please refresh the page and try again.');
       return;
     }
 
@@ -982,9 +968,8 @@ export default function MockupGenerator({
         [imprintId]: [...(prev[imprintId] || []), ...uploadedArtwork],
       }));
 
-      showNotification('success', `Artwork uploaded for ${imprintLocation}. Click to add to canvas.`);
     } catch (error: any) {
-      showNotification('error', 'Failed to upload artwork', error.message);
+      console.error('Failed to upload artwork:', error);
     } finally {
       setUploadingImprintId(null);
       event.target.value = '';
@@ -1012,9 +997,8 @@ export default function MockupGenerator({
         .getPublicUrl(filePath);
 
       setGarmentImageUrl(publicUrl);
-      showNotification('success', 'Garment image uploaded successfully');
     } catch (error: any) {
-      showNotification('error', 'Failed to upload garment image', error.message);
+      console.error('Failed to upload garment image:', error);
     } finally {
       setUploadingGarment(false);
       event.target.value = '';
@@ -1037,7 +1021,6 @@ export default function MockupGenerator({
 
   const handleSave = async () => {
     if (selectedArtwork.length === 0) {
-      showNotification('error', 'Please add artwork before saving');
       return;
     }
 
@@ -1404,7 +1387,6 @@ export default function MockupGenerator({
             console.log('MockupGenerator: All group imprints updated successfully');
           } else {
             console.warn('MockupGenerator: No imprints found to update for group');
-            showNotification('warning', 'Mockup saved but not linked to any imprints', 'Create imprints first using the "+ Imprint(s)" button, then create mockups.');
           }
         } else {
           console.warn('MockupGenerator: Missing quoteId - cannot link mockup to imprints');
@@ -1413,8 +1395,6 @@ export default function MockupGenerator({
 
       console.log('MockupGenerator: Save completed successfully');
       if (imprintsUpdated) {
-        showNotification('success', 'Mockup saved and linked to imprints');
-
         // Reload imprints to show updated mockups
         if (quoteId && quoteId.trim()) {
           let imprintsQuery = supabase
@@ -1448,7 +1428,6 @@ export default function MockupGenerator({
       onSave?.();
     } catch (error: any) {
       console.error('MockupGenerator: Save error:', error);
-      showNotification('error', 'Failed to save mockup: ' + (error.message || 'Unknown error'));
     } finally {
       setSaving(false);
     }
@@ -2027,7 +2006,6 @@ export default function MockupGenerator({
                                       setSelectedArtwork([...selectedArtwork, newArtwork]);
                                       setActiveArtworkIndex(selectedArtwork.length);
                                       setPrintLocation(imprint.location || 'Front');
-                                      showNotification('success', 'Artwork added to canvas');
                                     }}
                                     className="relative w-12 h-12 bg-gray-100 dark:bg-slate-700 rounded border-2 overflow-hidden cursor-pointer transition-all hover:scale-105 border-gray-300 dark:border-slate-600 hover:border-blue-500"
                                     title={`Click to add ${artwork.file_name} to canvas`}
@@ -2101,14 +2079,11 @@ export default function MockupGenerator({
                                               )
                                             );
 
-                                            showNotification('success', 'Mockup deleted');
-
                                             if (onSave) {
                                               onSave();
                                             }
                                           } catch (error: any) {
                                             console.error('Error deleting mockup:', error);
-                                            showNotification('error', `Failed to delete mockup: ${error.message}`);
                                           }
                                         }
                                       }}
@@ -2549,7 +2524,6 @@ function CustomerArtworkLibraryModal({
   onClose: () => void;
   onSelectArtwork: (artwork: CustomerArtwork) => void;
 }) {
-  const { showNotification } = useNotification();
   const [artwork, setArtwork] = useState<CustomerArtwork[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -2577,8 +2551,6 @@ function CustomerArtworkLibraryModal({
       setArtwork(data || []);
     } catch (error) {
       console.error('CustomerArtworkLibrary: Failed to load artwork library:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      showNotification('error', 'Failed to load artwork library: ' + errorMessage);
     } finally {
       setLoading(false);
     }
