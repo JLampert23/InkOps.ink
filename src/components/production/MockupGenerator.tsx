@@ -143,6 +143,11 @@ export default function MockupGenerator({
   const imprintFileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [isDragging, setIsDragging] = useState(false);
 
+  const garmentImageCache = useRef<HTMLImageElement | null>(null);
+  const artworkImageCache = useRef<Map<string, HTMLImageElement>>(new Map());
+  const rafRef = useRef<number | null>(null);
+  const tempArtworkPosition = useRef<{ position_x: number; position_y: number; scale: number } | null>(null);
+
   const normalizeTypeOfWork = (typeOfWork: string): string => {
     const mapping: Record<string, string> = {
       'Screen Print': 'screen_printing',
@@ -163,6 +168,16 @@ export default function MockupGenerator({
   useEffect(() => {
     loadProofData();
   }, [lineItemId, imprintId, quoteId, groupLabel]);
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+      }
+      garmentImageCache.current = null;
+      artworkImageCache.current.clear();
+    };
+  }, []);
 
   useEffect(() => {
     console.log('MockupGenerator: PROPS on mount/update:', {
@@ -1540,6 +1555,16 @@ export default function MockupGenerator({
     }
   };
 
+  const scheduleCanvasRedraw = () => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+    }
+    rafRef.current = requestAnimationFrame(() => {
+      drawCanvas();
+      rafRef.current = null;
+    });
+  };
+
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (selectedArtwork.length === 0 || activeArtworkIndex < 0) return;
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -1555,17 +1580,24 @@ export default function MockupGenerator({
       const scaleFactor = 1 + (direction * distance / 100);
       const newScale = Math.max(0.1, initialScale * scaleFactor);
 
-      updateActiveArtwork({ scale: newScale });
+      tempArtworkPosition.current = {
+        position_x: selectedArtwork[activeArtworkIndex].position_x,
+        position_y: selectedArtwork[activeArtworkIndex].position_y,
+        scale: newScale,
+      };
+      scheduleCanvasRedraw();
     } else if (isDragging) {
       const dx = x - dragStart.x;
       const dy = y - dragStart.y;
-      updateActiveArtwork({
+
+      tempArtworkPosition.current = {
         position_x: selectedArtwork[activeArtworkIndex].position_x + dx,
         position_y: selectedArtwork[activeArtworkIndex].position_y + dy,
-      });
+        scale: selectedArtwork[activeArtworkIndex].scale,
+      };
+      scheduleCanvasRedraw();
       setDragStart({ x, y });
     } else {
-      // Update cursor based on hover
       const handle = getHandleAtPosition(x, y);
       if (handle && canvasRef.current) {
         canvasRef.current.style.cursor = handle.includes('n') && handle.includes('w') || handle.includes('s') && handle.includes('e') ? 'nwse-resize' :
@@ -1577,14 +1609,76 @@ export default function MockupGenerator({
   };
 
   const handleCanvasMouseUp = () => {
+    if (tempArtworkPosition.current && activeArtworkIndex >= 0) {
+      updateActiveArtwork(tempArtworkPosition.current);
+      tempArtworkPosition.current = null;
+    }
+
     setIsDragging(false);
     setIsResizing(false);
     setResizeHandle(null);
   };
 
   useEffect(() => {
+    preloadGarmentImage();
+  }, [garmentImageUrl]);
+
+  useEffect(() => {
+    preloadArtworkImages();
+  }, [selectedArtwork]);
+
+  useEffect(() => {
     drawCanvas();
   }, [garmentImageUrl, selectedArtwork, activeArtworkIndex]);
+
+  const preloadGarmentImage = () => {
+    if (!garmentImageUrl) {
+      garmentImageCache.current = null;
+      drawCanvas();
+      return;
+    }
+
+    if (garmentImageCache.current && garmentImageCache.current.src === garmentImageUrl) {
+      return;
+    }
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      garmentImageCache.current = img;
+      drawCanvas();
+    };
+    img.onerror = () => {
+      garmentImageCache.current = null;
+      drawCanvas();
+    };
+    img.src = garmentImageUrl;
+  };
+
+  const preloadArtworkImages = () => {
+    selectedArtwork.forEach((artwork) => {
+      const url = artwork.artwork_url;
+      if (!artworkImageCache.current.has(url)) {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          artworkImageCache.current.set(url, img);
+          drawCanvas();
+        };
+        img.onerror = () => {
+          console.error('Failed to load artwork:', url);
+        };
+        img.src = url;
+      }
+    });
+
+    const currentUrls = new Set(selectedArtwork.map(a => a.artwork_url));
+    artworkImageCache.current.forEach((_, url) => {
+      if (!currentUrls.has(url)) {
+        artworkImageCache.current.delete(url);
+      }
+    });
+  };
 
   const drawCanvas = () => {
     const canvas = canvasRef.current;
@@ -1598,121 +1692,103 @@ export default function MockupGenerator({
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    if (garmentImageUrl) {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        drawArtwork(ctx);
-      };
-      img.onerror = (error) => {
-        // Draw a placeholder or message
-        ctx.fillStyle = '#f3f4f6';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#6b7280';
-        ctx.textAlign = 'center';
-        ctx.font = '14px sans-serif';
-        ctx.fillText('Garment image failed to load', canvas.width / 2, canvas.height / 2);
-        drawArtwork(ctx);
-      };
-      const cacheBust = `?cb=${Date.now()}`;
-      img.src = garmentImageUrl.includes('?') ? `${garmentImageUrl}&cb=${Date.now()}` : `${garmentImageUrl}${cacheBust}`;
+    if (garmentImageCache.current && garmentImageCache.current.complete) {
+      ctx.drawImage(garmentImageCache.current, 0, 0, canvas.width, canvas.height);
+    } else if (garmentImageUrl) {
+      ctx.fillStyle = '#f3f4f6';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#6b7280';
+      ctx.textAlign = 'center';
+      ctx.font = '14px sans-serif';
+      ctx.fillText('Loading garment...', canvas.width / 2, canvas.height / 2);
     } else {
-      // Draw a light gray background when no garment image
       ctx.fillStyle = '#f3f4f6';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = '#9ca3af';
       ctx.textAlign = 'center';
       ctx.font = '14px sans-serif';
       ctx.fillText('No garment image', canvas.width / 2, canvas.height / 2);
-      drawArtwork(ctx);
     }
+
+    drawArtwork(ctx);
   };
 
   const drawArtwork = (ctx: CanvasRenderingContext2D) => {
+    if (!canvasRef.current) return;
+
     selectedArtwork.forEach((artwork, index) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      const cacheBust = Date.now();
-      const artworkUrl = artwork.artwork_url.includes('?')
-        ? `${artwork.artwork_url}&cb=${cacheBust}`
-        : `${artwork.artwork_url}?cb=${cacheBust}`;
-      img.onload = () => {
-        ctx.save();
-        const centerX = artwork.position_x + (canvasRef.current!.width / 2);
-        const centerY = artwork.position_y + (canvasRef.current!.height / 2);
+      const img = artworkImageCache.current.get(artwork.artwork_url);
+      if (!img || !img.complete) return;
 
-        ctx.translate(centerX, centerY);
-        ctx.rotate((artwork.rotation * Math.PI) / 180);
-        ctx.scale(artwork.scale, artwork.scale);
+      const currentArtwork = (tempArtworkPosition.current && index === activeArtworkIndex)
+        ? { ...artwork, ...tempArtworkPosition.current }
+        : artwork;
 
-        // Use fixed base size for visual representation (not affected by dimension inputs)
-        const baseSize = 120; // Base size in pixels for visual display
-        const aspectRatio = img.width / img.height;
-        const artworkWidth = aspectRatio >= 1 ? baseSize : baseSize * aspectRatio;
-        const artworkHeight = aspectRatio >= 1 ? baseSize / aspectRatio : baseSize;
+      ctx.save();
+      const centerX = currentArtwork.position_x + (canvasRef.current!.width / 2);
+      const centerY = currentArtwork.position_y + (canvasRef.current!.height / 2);
 
-        ctx.drawImage(img, -artworkWidth / 2, -artworkHeight / 2, artworkWidth, artworkHeight);
+      ctx.translate(centerX, centerY);
+      ctx.rotate((currentArtwork.rotation * Math.PI) / 180);
+      ctx.scale(currentArtwork.scale, currentArtwork.scale);
 
-        if (index === activeArtworkIndex) {
-          // Draw selection box
-          ctx.strokeStyle = '#3b82f6';
-          ctx.lineWidth = 3;
-          ctx.strokeRect(-artworkWidth / 2, -artworkHeight / 2, artworkWidth, artworkHeight);
+      const baseSize = 120;
+      const aspectRatio = img.width / img.height;
+      const artworkWidth = aspectRatio >= 1 ? baseSize : baseSize * aspectRatio;
+      const artworkHeight = aspectRatio >= 1 ? baseSize / aspectRatio : baseSize;
 
-          // Draw resize handles - larger and more visible
-          const handleSize = 16 / artwork.scale; // Increased from 10 to 16
-          const handles = [
-            { x: -artworkWidth / 2, y: -artworkHeight / 2 }, // nw
-            { x: artworkWidth / 2, y: -artworkHeight / 2 },  // ne
-            { x: -artworkWidth / 2, y: artworkHeight / 2 },  // sw
-            { x: artworkWidth / 2, y: artworkHeight / 2 },   // se
-          ];
+      ctx.drawImage(img, -artworkWidth / 2, -artworkHeight / 2, artworkWidth, artworkHeight);
 
-          ctx.fillStyle = '#3b82f6';
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 3 / artwork.scale;
+      if (index === activeArtworkIndex) {
+        ctx.strokeStyle = '#3b82f6';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(-artworkWidth / 2, -artworkHeight / 2, artworkWidth, artworkHeight);
 
-          handles.forEach(handle => {
-            // Draw circle handles instead of squares for better visibility
-            ctx.beginPath();
-            ctx.arc(handle.x, handle.y, handleSize / 2, 0, 2 * Math.PI);
-            ctx.fill();
-            ctx.stroke();
-          });
-        }
+        const handleSize = 16 / currentArtwork.scale;
+        const handles = [
+          { x: -artworkWidth / 2, y: -artworkHeight / 2 },
+          { x: artworkWidth / 2, y: -artworkHeight / 2 },
+          { x: -artworkWidth / 2, y: artworkHeight / 2 },
+          { x: artworkWidth / 2, y: artworkHeight / 2 },
+        ];
 
-        ctx.restore();
+        ctx.fillStyle = '#3b82f6';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 3 / currentArtwork.scale;
 
-        // Draw X button to delete artwork in screen coordinates (not transformed)
-        // Only show delete button when activeArtworkIndex is valid (not during save)
-        if (activeArtworkIndex >= 0) {
-          const deleteButtonSize = 24;
-          const scaledWidth = artworkWidth * artwork.scale;
-          const scaledHeight = artworkHeight * artwork.scale;
-          const deleteButtonX = centerX + scaledWidth / 2;
-          const deleteButtonY = centerY - scaledHeight / 2;
-
-          // Draw red circle background
-          ctx.fillStyle = '#ef4444';
+        handles.forEach(handle => {
           ctx.beginPath();
-          ctx.arc(deleteButtonX, deleteButtonY, deleteButtonSize / 2, 0, 2 * Math.PI);
+          ctx.arc(handle.x, handle.y, handleSize / 2, 0, 2 * Math.PI);
           ctx.fill();
-
-          // Draw white X
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 2;
-          ctx.lineCap = 'round';
-          const crossSize = deleteButtonSize / 3;
-          ctx.beginPath();
-          ctx.moveTo(deleteButtonX - crossSize, deleteButtonY - crossSize);
-          ctx.lineTo(deleteButtonX + crossSize, deleteButtonY + crossSize);
-          ctx.moveTo(deleteButtonX + crossSize, deleteButtonY - crossSize);
-          ctx.lineTo(deleteButtonX - crossSize, deleteButtonY + crossSize);
           ctx.stroke();
-        }
-      };
-      img.src = artworkUrl;
+        });
+      }
+
+      ctx.restore();
+
+      if (activeArtworkIndex >= 0) {
+        const deleteButtonSize = 24;
+        const scaledWidth = artworkWidth * currentArtwork.scale;
+        const scaledHeight = artworkHeight * currentArtwork.scale;
+        const deleteButtonX = centerX + scaledWidth / 2;
+        const deleteButtonY = centerY - scaledHeight / 2;
+
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(deleteButtonX, deleteButtonY, deleteButtonSize / 2, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        const crossSize = deleteButtonSize / 3;
+        ctx.beginPath();
+        ctx.moveTo(deleteButtonX - crossSize, deleteButtonY - crossSize);
+        ctx.lineTo(deleteButtonX + crossSize, deleteButtonY + crossSize);
+        ctx.moveTo(deleteButtonX + crossSize, deleteButtonY - crossSize);
+        ctx.lineTo(deleteButtonX - crossSize, deleteButtonY + crossSize);
+        ctx.stroke();
+      }
     });
   };
 
