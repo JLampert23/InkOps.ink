@@ -165,6 +165,57 @@ export default function MockupGenerator({
   }, [lineItemId, imprintId, quoteId, groupLabel]);
 
   useEffect(() => {
+    if (!quoteId) return;
+
+    const channel = supabase
+      .channel(`quote_line_items_changes_${quoteId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'quote_line_items',
+          filter: `quote_id=eq.${quoteId}`
+        },
+        (payload) => {
+          console.log('MockupGenerator: Line item updated, refreshing garment images', payload);
+          const updatedItem = payload.new as any;
+
+          if (updatedItem.garment_front_image_url || updatedItem.garment_rear_image_url) {
+            setGarmentStyles(prevStyles => {
+              const newStyles = prevStyles.map(style => {
+                if (style.lineItemId === updatedItem.id) {
+                  return {
+                    ...style,
+                    frontImage: updatedItem.garment_front_image_url || style.frontImage,
+                    rearImage: updatedItem.garment_rear_image_url || style.rearImage,
+                    sideImage: updatedItem.garment_side_image_url || style.sideImage,
+                    lifestyleImage: updatedItem.garment_lifestyle_image_url || style.lifestyleImage,
+                    imagesData: updatedItem.garment_images_data || style.imagesData,
+                  };
+                }
+                return style;
+              });
+
+              const firstUpdatedStyle = newStyles.find(s => s.lineItemId === updatedItem.id);
+              if (firstUpdatedStyle && firstUpdatedStyle.frontImage) {
+                setGarmentImageUrl(firstUpdatedStyle.frontImage);
+                setGarmentDescription(firstUpdatedStyle.description);
+              }
+
+              return newStyles;
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [quoteId]);
+
+  useEffect(() => {
     console.log('MockupGenerator: PROPS on mount/update:', {
       imprintId,
       imprintLocation,
@@ -1615,7 +1666,8 @@ export default function MockupGenerator({
         ctx.fillText('Garment image failed to load', canvas.width / 2, canvas.height / 2);
         drawArtwork(ctx);
       };
-      img.src = garmentImageUrl;
+      const cacheBust = `?cb=${Date.now()}`;
+      img.src = garmentImageUrl.includes('?') ? `${garmentImageUrl}&cb=${Date.now()}` : `${garmentImageUrl}${cacheBust}`;
     } else {
       // Draw a light gray background when no garment image
       ctx.fillStyle = '#f3f4f6';
@@ -1632,6 +1684,10 @@ export default function MockupGenerator({
     selectedArtwork.forEach((artwork, index) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
+      const cacheBust = Date.now();
+      const artworkUrl = artwork.artwork_url.includes('?')
+        ? `${artwork.artwork_url}&cb=${cacheBust}`
+        : `${artwork.artwork_url}?cb=${cacheBust}`;
       img.onload = () => {
         ctx.save();
         const centerX = artwork.position_x + (canvasRef.current!.width / 2);
@@ -1707,7 +1763,7 @@ export default function MockupGenerator({
           ctx.stroke();
         }
       };
-      img.src = artwork.artwork_url;
+      img.src = artworkUrl;
     });
   };
 
