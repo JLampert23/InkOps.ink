@@ -879,10 +879,20 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
   };
 
   const selectProductColor = async (product: ProductSearchResult, colorIdx: number) => {
+    console.log('🔵 START selectProductColor:', { product, colorIdx });
     if (!activeSearchItem) return;
 
     const { groupId, itemIdx } = activeSearchItem;
     const color = colorIdx >= 0 ? product.colors[colorIdx] : null;
+
+    console.log('🔵 Product and color details:', {
+      supplier: product.supplier,
+      style: product.style,
+      hasColor: !!color,
+      colorName: color?.name,
+      colorCode: color?.code,
+      willFetchImages: product.supplier === 'ssactivewear' && !!color?.code,
+    });
 
     const garmentImages: Record<string, any> = {};
 
