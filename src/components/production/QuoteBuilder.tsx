@@ -946,6 +946,16 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           viewsKeys: unifiedData.media?.views ? Object.keys(unifiedData.media.views) : [],
         });
 
+        console.log('🐛 Debug info from API:', unifiedData.debug);
+
+        if (unifiedData.debug?.mediaError) {
+          console.error('❌ Media API Error:', unifiedData.debug.mediaError);
+        }
+
+        if (unifiedData.debug?.mediaXmlFull) {
+          console.log('📄 Media XML (first 2000 chars):', unifiedData.debug.mediaXmlFull.substring(0, 2000));
+        }
+
         if (unifiedData.success && unifiedData.media?.views) {
           if (unifiedData.media.views.front) {
             garmentImages.garment_front_image_url = unifiedData.media.views.front;
