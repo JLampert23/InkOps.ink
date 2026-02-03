@@ -424,12 +424,27 @@ Deno.serve(async (req: Request) => {
     if (mediaResponse.status === 'rejected') {
       console.error('📸 Media Request Failed:', mediaResponse.reason);
     }
+
+    let mediaAuthError: { code: string; description: string } | null = null;
+
     if (mediaResponse.status === 'fulfilled' && mediaResponse.value) {
       const xmlDoc = mediaResponse.value;
       console.log('📸 Media XML Response (first 1000 chars):', xmlDoc.substring(0, 1000));
-      const mediaPattern = /<MediaContent>([\s\S]*?)<\/MediaContent>/gi;
-      const mediaMatches = getAllXmlMatches(xmlDoc, mediaPattern);
-      console.log('📸 MediaContent matches found:', mediaMatches.length);
+
+      // Check for error message first
+      const errorCodeMatch = xmlDoc.match(/<code>(\d+)<\/code>/);
+      const errorDescMatch = xmlDoc.match(/<description>(.*?)<\/description>/);
+
+      if (errorCodeMatch && errorDescMatch) {
+        mediaAuthError = {
+          code: errorCodeMatch[1],
+          description: errorDescMatch[1]
+        };
+        console.error('📸 Media API returned error:', mediaAuthError);
+      } else {
+        const mediaPattern = /<MediaContent>([\s\S]*?)<\/MediaContent>/gi;
+        const mediaMatches = getAllXmlMatches(xmlDoc, mediaPattern);
+        console.log('📸 MediaContent matches found:', mediaMatches.length);
 
       mediaData.images = mediaMatches.map(match => {
         const mediaXml = match[1];
@@ -488,6 +503,7 @@ Deno.serve(async (req: Request) => {
         lifestyleCount: lifestyleImages.length,
         otherCount: otherImages.length,
       });
+      }
     }
 
     // Return unified response
@@ -506,6 +522,7 @@ Deno.serve(async (req: Request) => {
             ? mediaResponse.value
             : null,
           mediaError: mediaResponse.status === 'rejected' ? mediaResponse.reason?.toString() : null,
+          mediaAuthError,
         }
       }),
       {

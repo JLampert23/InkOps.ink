@@ -948,6 +948,11 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
 
         console.log('🐛 Debug info from API:', unifiedData.debug);
 
+        if (unifiedData.debug?.mediaAuthError) {
+          console.warn('⚠️ SSActivewear Media API Authentication Error:', unifiedData.debug.mediaAuthError);
+          console.warn('Your SSActivewear account may not have Media API access enabled. Contact SSActivewear support to enable it.');
+        }
+
         if (unifiedData.debug?.mediaError) {
           console.error('❌ Media API Error:', unifiedData.debug.mediaError);
         }
