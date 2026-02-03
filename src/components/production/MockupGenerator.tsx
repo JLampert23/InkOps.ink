@@ -1596,7 +1596,6 @@ export default function MockupGenerator({
         scale: selectedArtwork[activeArtworkIndex].scale,
       };
       scheduleCanvasRedraw();
-      setDragStart({ x, y });
     } else {
       const handle = getHandleAtPosition(x, y);
       if (handle && canvasRef.current) {
