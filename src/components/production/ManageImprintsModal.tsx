@@ -229,9 +229,23 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
       .select('*')
       .eq('quote_id', quoteId);
 
-    // Always filter by group_label when provided (including empty strings)
-    if (initialGroupLabel !== undefined && initialGroupLabel !== null) {
-      query = query.eq('group_label', initialGroupLabel);
+    // Get unique group labels from line items to determine if we have multiple groups
+    const uniqueGroupLabels = lineItems
+      ? [...new Set(lineItems.map(item => item.group_label || ''))]
+      : [];
+
+    // If there's only one group with an empty label, show all imprints
+    // This handles legacy quotes where imprints weren't assigned to groups
+    const shouldShowAllImprints = uniqueGroupLabels.length === 1 && !initialGroupLabel;
+
+    // Only filter by group_label if we have multiple groups
+    if (!shouldShowAllImprints && initialGroupLabel !== undefined && initialGroupLabel !== null) {
+      // Handle empty string: match both empty string AND NULL values
+      if (initialGroupLabel === '') {
+        query = query.or('group_label.is.null,group_label.eq.');
+      } else {
+        query = query.eq('group_label', initialGroupLabel);
+      }
     }
 
     const { data, error } = await query.order('sort_order');
@@ -513,8 +527,22 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
 
         const existingImprintIds = imprints.filter(imp => imp.id).map(imp => imp.id);
 
+        // Get unique group labels to determine if we're in single-group mode
+        const uniqueGroupLabels = lineItems
+          ? [...new Set(lineItems.map(item => item.group_label || ''))]
+          : [];
+        const shouldManageAllImprints = uniqueGroupLabels.length === 1 && !initialGroupLabel;
+
         if (existingImprintIds.length > 0) {
-          if (initialGroupLabel) {
+          if (shouldManageAllImprints) {
+            // Single group mode: delete all imprints not in the current list
+            await supabase
+              .from('quote_imprints')
+              .delete()
+              .eq('quote_id', quoteId)
+              .not('id', 'in', `(${existingImprintIds.join(',')})`);
+          } else if (initialGroupLabel) {
+            // Multi-group mode with non-empty label
             await supabase
               .from('quote_imprints')
               .delete()
@@ -522,24 +550,35 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
               .eq('group_label', initialGroupLabel)
               .not('id', 'in', `(${existingImprintIds.join(',')})`);
           } else {
+            // Multi-group mode with empty label: match NULL or empty string
             await supabase
               .from('quote_imprints')
               .delete()
               .eq('quote_id', quoteId)
+              .or('group_label.is.null,group_label.eq.')
               .not('id', 'in', `(${existingImprintIds.join(',')})`);
           }
         } else {
-          if (initialGroupLabel) {
+          if (shouldManageAllImprints) {
+            // Single group mode: delete all imprints
+            await supabase
+              .from('quote_imprints')
+              .delete()
+              .eq('quote_id', quoteId);
+          } else if (initialGroupLabel) {
+            // Multi-group mode with non-empty label
             await supabase
               .from('quote_imprints')
               .delete()
               .eq('quote_id', quoteId)
               .eq('group_label', initialGroupLabel);
           } else {
+            // Multi-group mode with empty label: match NULL or empty string
             await supabase
               .from('quote_imprints')
               .delete()
-              .eq('quote_id', quoteId);
+              .eq('quote_id', quoteId)
+              .or('group_label.is.null,group_label.eq.');
           }
         }
 
