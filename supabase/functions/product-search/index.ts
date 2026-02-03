@@ -268,6 +268,7 @@ Deno.serve(async (req: Request) => {
                   }
 
                   // Fetch live pricing
+                  console.log(`🔍 Fetching live pricing for style: ${style}`);
                   const pricingUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=pricing&productId=${encodeURIComponent(style)}&companyId=${encodeURIComponent(profile.company_id)}`;
                   const pricingResponse = await fetch(pricingUrl, {
                     headers: {
@@ -276,18 +277,29 @@ Deno.serve(async (req: Request) => {
                   });
 
                   let pricingMap = new Map<string, number>();
+                  console.log(`💰 Pricing API response status: ${pricingResponse.status}`);
+
                   if (pricingResponse.ok) {
                     const pricingData = await pricingResponse.json();
+                    console.log(`💰 Pricing data received:`, JSON.stringify(pricingData, null, 2));
+
                     // pricingData.data is an array of { partId, prices: [{quantity, price}] }
                     if (pricingData.data && Array.isArray(pricingData.data)) {
                       for (const partPricing of pricingData.data) {
                         if (partPricing.prices && partPricing.prices.length > 0) {
                           // Use the first price (lowest quantity) as the base price
-                          pricingMap.set(partPricing.partId, partPricing.prices[0].price);
+                          const price = partPricing.prices[0].price;
+                          pricingMap.set(partPricing.partId, price);
+                          console.log(`💰 Part ${partPricing.partId}: $${price}`);
                         }
                       }
-                      console.log(`Fetched pricing for ${pricingMap.size} parts`);
+                      console.log(`✅ Fetched pricing for ${pricingMap.size} parts`);
+                    } else {
+                      console.log(`⚠️ No pricing data array found`);
                     }
+                  } else {
+                    const errorText = await pricingResponse.text();
+                    console.error(`❌ Pricing API failed: ${pricingResponse.status} - ${errorText}`);
                   }
 
                   // Now re-query the cached data and return it
@@ -414,6 +426,7 @@ Deno.serve(async (req: Request) => {
           console.log(`Found style in cache: ${styleData.style_number}`);
 
           // Fetch live pricing for cached style
+          console.log(`🔍 Fetching live pricing for cached style: ${style}`);
           const pricingUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=pricing&productId=${encodeURIComponent(style)}&companyId=${encodeURIComponent(profile.company_id)}`;
           const pricingResponse = await fetch(pricingUrl, {
             headers: {
@@ -422,16 +435,27 @@ Deno.serve(async (req: Request) => {
           });
 
           let pricingMap = new Map<string, number>();
+          console.log(`💰 Pricing API response status: ${pricingResponse.status}`);
+
           if (pricingResponse.ok) {
             const pricingData = await pricingResponse.json();
+            console.log(`💰 Pricing data received:`, JSON.stringify(pricingData, null, 2));
+
             if (pricingData.data && Array.isArray(pricingData.data)) {
               for (const partPricing of pricingData.data) {
                 if (partPricing.prices && partPricing.prices.length > 0) {
-                  pricingMap.set(partPricing.partId, partPricing.prices[0].price);
+                  const price = partPricing.prices[0].price;
+                  pricingMap.set(partPricing.partId, price);
+                  console.log(`💰 Part ${partPricing.partId}: $${price}`);
                 }
               }
-              console.log(`Fetched live pricing for ${pricingMap.size} parts`);
+              console.log(`✅ Fetched live pricing for ${pricingMap.size} parts`);
+            } else {
+              console.log(`⚠️ No pricing data array found`);
             }
+          } else {
+            const errorText = await pricingResponse.text();
+            console.error(`❌ Pricing API failed: ${pricingResponse.status} - ${errorText}`);
           }
 
           // Get all parts for this style grouped by color
