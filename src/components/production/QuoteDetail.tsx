@@ -130,27 +130,11 @@ interface QuoteImprint {
   artwork_description?: string;
 }
 
-interface Proof {
-  id: string;
-  proof_number: string;
-  line_item_id: string;
-  imprint_id: string | null;
-  group_label: string | null;
-  garment_image_url: string | null;
-  composite_image_url: string | null;
-  garment_name: string | null;
-  status: string;
-  created_at: string;
-  updated_at: string;
-  selected_colors?: Array<{ name: string; hex: string }>;
-}
-
 export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProps) {
   const { showNotification } = useNotification();
   const [quote, setQuote] = useState<Quote | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [quoteImprints, setQuoteImprints] = useState<QuoteImprint[]>([]);
-  const [proofs, setProofs] = useState<Proof[]>([]);
   const [loading, setLoading] = useState(true);
   const [showSendModal, setShowSendModal] = useState(false);
   const [sending, setSending] = useState(false);
@@ -169,30 +153,20 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
   useEffect(() => {
     loadQuoteDetails();
 
-    // Subscribe to realtime updates on proofs table
+    // Subscribe to realtime updates on quote_imprints table
     const channel = supabase
-      .channel(`quote_${quoteId}_proofs`)
+      .channel(`quote_${quoteId}_imprints`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'proofs',
+          table: 'quote_imprints',
           filter: `quote_id=eq.${quoteId}`,
         },
         async (payload) => {
-          console.log('QuoteDetail: Proof changed, reloading proofs...', payload);
-
-          // Reload proofs data
-          const { data: proofsData, error: proofsError } = await supabase
-            .from('proofs')
-            .select('id, proof_number, line_item_id, imprint_id, group_label, garment_image_url, composite_image_url, garment_name, status, created_at, updated_at, selected_colors')
-            .eq('quote_id', quoteId)
-            .order('created_at', { ascending: false });
-
-          if (!proofsError && proofsData) {
-            setProofs(proofsData);
-          }
+          console.log('QuoteDetail: Imprints changed, reloading...', payload);
+          loadQuoteDetails();
         }
       )
       .subscribe();
@@ -280,16 +254,6 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         setQuoteImprints(imprintsData || []);
       } else {
         console.error('QuoteDetail: Error fetching imprints:', imprintsError);
-      }
-
-      const { data: proofsData, error: proofsError } = await supabase
-        .from('proofs')
-        .select('id, proof_number, line_item_id, imprint_id, group_label, garment_image_url, composite_image_url, garment_name, status, created_at, updated_at, selected_colors')
-        .eq('quote_id', quoteId)
-        .order('created_at', { ascending: false });
-
-      if (!proofsError) {
-        setProofs(proofsData || []);
       }
     } catch (error) {
       console.error('Error loading quote:', error);
@@ -782,21 +746,6 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                           return (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                               {groupImprints.map((imprint, idx) => {
-                                // Find ALL matching proofs for this imprint (not just one)
-                                const matchingProofs = proofs.filter(proof => {
-                                  if (proof.imprint_id && proof.imprint_id === imprint.id) {
-                                    return true;
-                                  }
-                                  // Also match by normalized group_label if no imprint_id
-                                  if (!proof.imprint_id) {
-                                    const proofLabel = normalizeLabel(proof.group_label);
-                                    const imprintLabel = normalizeLabel((imprint as any).group_label);
-                                    return proofLabel === imprintLabel;
-                                  }
-                                  return false;
-                                });
-
-                                const hasProofs = matchingProofs.length > 0 && matchingProofs.some(p => p.composite_image_url || p.garment_image_url);
                                 const hasMockups = imprint.mockups && imprint.mockups.length > 0;
 
                                 return (
@@ -821,51 +770,26 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                       </div>
                                     )}
 
-                                    {(hasProofs || hasMockups) && (
+                                    {hasMockups && (
                                       <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600 space-y-2">
-                                        {/* Display ALL matching proofs */}
-                                        {matchingProofs.map((matchingProof, proofIdx) => {
-                                          const imageUrl = matchingProof.composite_image_url || matchingProof.garment_image_url;
-                                          if (!imageUrl) return null;
+                                        {imprint.mockups.map((mockup: any, mockupIdx: number) => {
+                                          const mockupUrl = typeof mockup === 'string' ? mockup : mockup?.url;
+                                          if (!mockupUrl) return null;
 
                                           return (
-                                            <div key={`proof-${proofIdx}`}>
+                                            <div key={`mockup-${mockupIdx}`}>
                                               <img
-                                                src={imageUrl}
-                                                alt={matchingProof.garment_name || 'Proof'}
+                                                src={mockupUrl}
+                                                alt={`Mockup ${mockupIdx + 1}`}
                                                 className="w-full h-48 object-contain rounded border border-gray-200 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800"
                                                 onClick={() => {
-                                                  setSelectedProofImage(imageUrl);
+                                                  setSelectedProofImage(mockupUrl);
                                                   setShowProofModal(true);
                                                 }}
                                               />
-                                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{matchingProof.proof_number}</p>
                                             </div>
                                           );
                                         })}
-                                        {/* Display mockups from imprint.mockups if no matching proofs */}
-                                        {!hasProofs && hasMockups && (
-                                          <>
-                                            {imprint.mockups.map((mockup: any, mockupIdx: number) => {
-                                              const mockupUrl = typeof mockup === 'string' ? mockup : mockup?.url;
-                                              if (!mockupUrl) return null;
-
-                                              return (
-                                                <div key={`mockup-${mockupIdx}`}>
-                                                  <img
-                                                    src={mockupUrl}
-                                                    alt={`Mockup ${mockupIdx + 1}`}
-                                                    className="w-full h-48 object-contain rounded border border-gray-200 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800"
-                                                    onClick={() => {
-                                                      setSelectedProofImage(mockupUrl);
-                                                      setShowProofModal(true);
-                                                    }}
-                                                  />
-                                                </div>
-                                              );
-                                            })}
-                                          </>
-                                        )}
                                       </div>
                                     )}
                                   </div>
@@ -882,70 +806,6 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             </tbody>
           </table>
         </div>
-
-        {/* Unmatched Proofs Section - Show proofs that don't match any imprint */}
-        {(() => {
-          const normalizeLabel = (label: string | null | undefined) => label || '';
-
-          // Find all imprint IDs and group labels that are displayed
-          const displayedImprintIds = new Set(quoteImprints.map(imp => imp.id));
-          const displayedGroupLabels = new Set(quoteImprints.map(imp => normalizeLabel((imp as any).group_label)));
-
-          // Find proofs that don't match any displayed imprint
-          const unmatchedProofs = proofs.filter(proof => {
-            // If proof has an imprint_id, check if it matches any displayed imprint
-            if (proof.imprint_id) {
-              return !displayedImprintIds.has(proof.imprint_id);
-            }
-            // Otherwise check by group_label
-            const proofLabel = normalizeLabel(proof.group_label);
-            return !displayedGroupLabels.has(proofLabel);
-          });
-
-          if (unmatchedProofs.length === 0) return null;
-
-          return (
-            <div className="px-8 py-6 border-t border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-800/50">
-              <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Additional Proofs</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {unmatchedProofs.map((proof, idx) => {
-                  const imageUrl = proof.composite_image_url || proof.garment_image_url;
-                  if (!imageUrl) return null;
-
-                  return (
-                    <div
-                      key={`unmatched-proof-${idx}`}
-                      className="bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-4"
-                    >
-                      <div className="flex items-center gap-2 mb-2 flex-wrap">
-                        <span className="text-sm font-bold text-gray-900 dark:text-white">
-                          {proof.proof_number}
-                        </span>
-                        {proof.group_label && (
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                            ({proof.group_label})
-                          </span>
-                        )}
-                      </div>
-                      <img
-                        src={imageUrl}
-                        alt={proof.garment_name || 'Proof'}
-                        className="w-full h-48 object-contain rounded border border-gray-200 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800"
-                        onClick={() => {
-                          setSelectedProofImage(imageUrl);
-                          setShowProofModal(true);
-                        }}
-                      />
-                      {proof.garment_name && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{proof.garment_name}</p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
 
         {/* Fees Section */}
         {fees.length > 0 && (
