@@ -1667,8 +1667,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                         <th key={size.key} className="p-2 text-center border border-gray-300 dark:border-slate-800 w-10">{size.label}</th>
                       ))}
                       <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-14">Qty</th>
-                      <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-16">Price</th>
-                      <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-20">Total</th>
+                      <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-24">Unit Price</th>
+                      <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-24">Total</th>
                       <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-20">Actions</th>
                     </tr>
                   </thead>
@@ -1740,8 +1740,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                             <th key={size.key} className="p-2 text-center border border-gray-300 dark:border-slate-800 w-10">{size.label}</th>
                           ))}
                           <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-14">Qty</th>
-                          <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-16">Price</th>
-                          <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-20">Total</th>
+                          <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-24">Unit Price</th>
+                          <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-24">Total</th>
                           <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-20">Actions</th>
                         </tr>
                       )}

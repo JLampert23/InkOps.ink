@@ -562,8 +562,8 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                   <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">3XL</th>
                   <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">4XL</th>
                   <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Qty</th>
-                  <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">Price</th>
-                  <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">Total</th>
+                  <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[100px]">Unit Price</th>
+                  <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[100px]">Total</th>
                 </tr>
               </thead>
             )}
@@ -606,8 +606,8 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                       <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">3XL</th>
                       <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">4XL</th>
                       <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Qty</th>
-                      <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">Price</th>
-                      <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">Total</th>
+                      <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[100px]">Unit Price</th>
+                      <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[100px]">Total</th>
                     </tr>
                   )}
                   {/* Group items */}

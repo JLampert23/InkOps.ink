@@ -505,7 +505,7 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
                       <th className="border border-gray-400 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>3XL</th>
                       <th className="border border-gray-400 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>4XL</th>
                       <th className="border border-gray-400 px-1 py-0.5 text-center font-semibold">Qty</th>
-                      <th className="border border-gray-400 px-1 py-0.5 text-right font-semibold">Items Price</th>
+                      <th className="border border-gray-400 px-1 py-0.5 text-right font-semibold">Unit Price</th>
                       <th className="border border-gray-400 px-1 py-0.5 text-right font-semibold">Total</th>
                     </tr>
                   </thead>
