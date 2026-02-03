@@ -100,12 +100,6 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
   const [quoteId, setQuoteId] = useState<string | undefined>(initialQuoteId);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [lastAutoSave, setLastAutoSave] = useState<Date | null>(null);
-  const autoSaveIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const hasUnsavedChangesRef = useRef(false);
-  const lastUserInteractionRef = useRef<number>(Date.now());
-  const performSaveRef = useRef<((isAutoSave?: boolean, statusOverride?: string) => Promise<boolean>) | null>(null);
   const [customers, setCustomers] = useState<any[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(initialCustomerId || '');
   const [availableFees, setAvailableFees] = useState<any[]>([]);
@@ -284,42 +278,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
     }
   }, [selectedCustomerId, quoteId]);
 
-  useEffect(() => {
-    if (!quoteId) return;
 
-    const interval = setInterval(() => {
-      // Check hasUnsavedChanges at runtime, not in dependencies
-      // This prevents recreating the interval on every change
-
-      // Only autosave if user has been idle for at least 3 seconds
-      const timeSinceLastInteraction = Date.now() - lastUserInteractionRef.current;
-      const isIdle = timeSinceLastInteraction > 3000;
-
-      if (hasUnsavedChangesRef.current && isIdle && performSaveRef.current) {
-        performSaveRef.current(true);
-      }
-    }, 30000);
-
-    autoSaveIntervalRef.current = interval;
-
-    return () => {
-      if (autoSaveIntervalRef.current) {
-        clearInterval(autoSaveIntervalRef.current);
-      }
-    };
-  }, [quoteId]);
-
-  useEffect(() => {
-    setHasUnsavedChanges(true);
-    hasUnsavedChangesRef.current = true;
-    lastUserInteractionRef.current = Date.now();
-  }, [
-    selectedCustomerId, createdDate, productionDueDate, customerDueDate, terms,
-    poNumber, deliveryMethod, nickname, customerNotes, productionNotes,
-    billCompany, billName, billAddress1, billAddress2, billCity, billState, billZip,
-    shipCompany, shipName, shipAddress1, shipAddress2, shipCity, shipState, shipZip,
-    discount, discountType, salesTaxRate, itemGroups, fees
-  ]);
 
   const loadCompanySettings = async () => {
     if (!user) return;
@@ -1275,10 +1234,6 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         if (feesError) throw feesError;
       }
 
-      setHasUnsavedChanges(false);
-      hasUnsavedChangesRef.current = false;
-      setLastAutoSave(new Date());
-
       if (!isAutoSave) {
         showNotification('success', 'Quote Saved', 'Quote has been saved successfully');
       }
@@ -1294,9 +1249,6 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       if (!isAutoSave) setSaving(false);
     }
   };
-
-  // Store the latest version of performSave in the ref for the autosave interval
-  performSaveRef.current = performSave;
 
   const handleSave = async () => {
     await performSave(false);
@@ -1323,13 +1275,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
   };
 
   const handleCancel = () => {
-    if (hasUnsavedChanges) {
-      if (window.confirm('You have unsaved changes. Are you sure you want to cancel?')) {
-        onCancel?.();
-      }
-    } else {
-      onCancel?.();
-    }
+    onCancel?.();
   };
 
   if (loading) {
@@ -1344,16 +1290,6 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
             {quoteId ? `Quote ${quoteNumber}` : 'New Quote'}
           </h2>
-          {lastAutoSave && (
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              Last saved: {lastAutoSave.toLocaleTimeString()}
-            </span>
-          )}
-          {hasUnsavedChanges && !lastAutoSave && (
-            <span className="text-xs text-amber-600 dark:text-amber-500">
-              Unsaved changes
-            </span>
-          )}
         </div>
         <div className="flex items-center gap-2">
           <button
