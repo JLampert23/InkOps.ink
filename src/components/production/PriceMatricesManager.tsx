@@ -10,6 +10,7 @@ interface PriceMatrix {
   description: string;
   matrix_type: string;
   setup_fee: number;
+  product_markup_percentage: number;
   columns: string[];
   rows: string[];
   cells: Record<string, number>;
@@ -54,6 +55,7 @@ export function PriceMatricesManager() {
       description: '',
       matrix_type: 'general',
       setup_fee: 0,
+      product_markup_percentage: 0,
       columns: ['Column 1', 'Column 2', 'Column 3'],
       rows: ['Row 1', 'Row 2', 'Row 3'],
       cells: {},
@@ -157,12 +159,19 @@ export function PriceMatricesManager() {
 
       const matrixName = file.name.replace('.csv', '');
 
+      let averageMarkup = 0;
+      if (markupIndex >= 0 && Object.keys(markupPercentages).length > 0) {
+        const markupValues = Object.values(markupPercentages);
+        averageMarkup = markupValues.reduce((sum, val) => sum + val, 0) / markupValues.length;
+      }
+
       setEditingMatrix({
         id: '',
         name: matrixName,
-        description: `Imported from ${file.name}${markupIndex >= 0 ? ' (includes markup percentages)' : ''}`,
+        description: `Imported from ${file.name}${markupIndex >= 0 ? ` (avg markup: ${averageMarkup.toFixed(0)}%)` : ''}`,
         matrix_type: 'general',
         setup_fee: 0,
+        product_markup_percentage: averageMarkup,
         columns: columnHeaders,
         rows: rowLabels,
         cells: cells,
@@ -170,7 +179,7 @@ export function PriceMatricesManager() {
       });
       setShowEditor(true);
 
-      showNotification('success', 'CSV Imported', `Successfully imported ${rowLabels.length} rows and ${columnHeaders.length} columns`);
+      showNotification('success', 'CSV Imported', `Successfully imported ${rowLabels.length} rows and ${columnHeaders.length} columns${markupIndex >= 0 ? ` with ${averageMarkup.toFixed(0)}% avg markup` : ''}`);
 
     } catch (error) {
       console.error('Error parsing CSV:', error);
@@ -320,6 +329,7 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
   const [description, setDescription] = useState(matrix.description);
   const [matrixType, setMatrixType] = useState(matrix.matrix_type);
   const [setupFee, setSetupFee] = useState(matrix.setup_fee.toString());
+  const [productMarkup, setProductMarkup] = useState(matrix.product_markup_percentage.toString());
   const [columns, setColumns] = useState<string[]>(matrix.columns);
   const [rows, setRows] = useState<string[]>(matrix.rows);
   const [cells, setCells] = useState<Record<string, number>>(matrix.cells);
@@ -404,6 +414,7 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
         description,
         matrix_type: matrixType,
         setup_fee: parseFloat(setupFee) || 0,
+        product_markup_percentage: parseFloat(productMarkup) || 0,
         columns,
         rows,
         cells,
@@ -499,7 +510,7 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Matrix Type
@@ -530,6 +541,20 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
                 onChange={(e) => setSetupFee(e.target.value)}
                 className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded focus:ring-2 focus:ring-blue-500"
                 placeholder="0.00"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Product Markup % <span className="text-gray-500">(100% = 2x)</span>
+              </label>
+              <input
+                type="number"
+                step="1"
+                min="0"
+                value={productMarkup}
+                onChange={(e) => setProductMarkup(e.target.value)}
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded focus:ring-2 focus:ring-blue-500"
+                placeholder="0"
               />
             </div>
           </div>
