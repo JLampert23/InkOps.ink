@@ -93,6 +93,10 @@ export interface TemplateTypeInfo {
     mockups: boolean;
     terms: boolean;
   };
+  requiredShortCodes: {
+    code: string;
+    reason: string;
+  }[];
 }
 
 /**
@@ -126,6 +130,11 @@ export interface TemplateValidation {
   warnings: string[];
   usedShortCodes: string[];
   missingShortCodes: string[];
+  missingRequiredCodes: {
+    code: string;
+    reason: string;
+  }[];
+  hasRequiredCodeViolations: boolean;
 }
 
 /**
@@ -144,6 +153,11 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
       mockups: true,
       terms: true,
     },
+    requiredShortCodes: [
+      { code: 'quote_link', reason: 'Required for customers to access and approve their quote' },
+      { code: 'quote_number', reason: 'Required for quote identification and tracking' },
+      { code: 'customer_first_name', reason: 'Required for personalized communication' },
+    ],
   },
   invoice_email_default: {
     type: 'invoice_email_default',
@@ -157,6 +171,10 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
       mockups: false,
       terms: true,
     },
+    requiredShortCodes: [
+      { code: 'invoice_link', reason: 'Required for customers to view and pay their invoice online' },
+      { code: 'invoice_number', reason: 'Required for invoice identification and payment reference' },
+    ],
   },
   invoice_reminder: {
     type: 'invoice_reminder',
@@ -170,6 +188,11 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
       mockups: false,
       terms: true,
     },
+    requiredShortCodes: [
+      { code: 'invoice_link', reason: 'Required for customers to view and pay their invoice' },
+      { code: 'invoice_number', reason: 'Required for invoice identification' },
+      { code: 'invoice_balance', reason: 'Required to show the amount due' },
+    ],
   },
   payment_confirmation: {
     type: 'payment_confirmation',
@@ -183,6 +206,10 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
       mockups: false,
       terms: false,
     },
+    requiredShortCodes: [
+      { code: 'payment_amount', reason: 'Required to show the amount paid' },
+      { code: 'invoice_number', reason: 'Required for payment reference' },
+    ],
   },
   approval_email: {
     type: 'approval_email',
@@ -196,6 +223,10 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
       mockups: true,
       terms: false,
     },
+    requiredShortCodes: [
+      { code: 'quote_link', reason: 'Required for customers to review and approve' },
+      { code: 'quote_number', reason: 'Required for quote identification' },
+    ],
   },
   internal_notification: {
     type: 'internal_notification',
@@ -209,6 +240,7 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
       mockups: false,
       terms: false,
     },
+    requiredShortCodes: [],
   },
   ar_report: {
     type: 'ar_report',
@@ -222,6 +254,9 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
       mockups: false,
       terms: false,
     },
+    requiredShortCodes: [
+      { code: 'current_date', reason: 'Required for report identification' },
+    ],
   },
   custom: {
     type: 'custom',
@@ -235,6 +270,7 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
       mockups: false,
       terms: false,
     },
+    requiredShortCodes: [],
   },
 };
 
@@ -257,4 +293,11 @@ export function getAllTemplateTypes(): TemplateType[] {
  */
 export function isValidTemplateType(type: string): type is TemplateType {
   return type in TEMPLATE_TYPE_METADATA;
+}
+
+/**
+ * Helper function to get required short codes for a template type
+ */
+export function getRequiredShortCodes(type: TemplateType): { code: string; reason: string }[] {
+  return TEMPLATE_TYPE_METADATA[type].requiredShortCodes;
 }

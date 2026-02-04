@@ -7,11 +7,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-interface TemplateType {
-  type: 'quote_email_default' | 'invoice_email_default' | 'invoice_reminder' |
-        'payment_confirmation' | 'approval_email' | 'internal_notification' |
-        'ar_report' | 'custom';
-}
+type TemplateTypeValue = 'quote_email_default' | 'invoice_email_default' | 'invoice_reminder' |
+  'payment_confirmation' | 'approval_email' | 'internal_notification' |
+  'ar_report' | 'custom';
 
 interface CommunicationTemplate {
   id?: string;
@@ -25,6 +23,103 @@ interface CommunicationTemplate {
   auto_attach_mockups?: boolean;
   auto_attach_terms?: boolean;
   is_active?: boolean;
+  override_required_validation?: boolean;
+}
+
+interface ValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+  missingRequiredCodes: { code: string; reason: string }[];
+  hasRequiredCodeViolations: boolean;
+}
+
+const REQUIRED_SHORT_CODES: Record<TemplateTypeValue, { code: string; reason: string }[]> = {
+  quote_email_default: [
+    { code: 'quote_link', reason: 'Required for customers to access and approve their quote' },
+    { code: 'quote_number', reason: 'Required for quote identification and tracking' },
+    { code: 'customer_first_name', reason: 'Required for personalized communication' },
+  ],
+  invoice_email_default: [
+    { code: 'invoice_link', reason: 'Required for customers to view and pay their invoice online' },
+    { code: 'invoice_number', reason: 'Required for invoice identification and payment reference' },
+  ],
+  invoice_reminder: [
+    { code: 'invoice_link', reason: 'Required for customers to view and pay their invoice' },
+    { code: 'invoice_number', reason: 'Required for invoice identification' },
+    { code: 'invoice_balance', reason: 'Required to show the amount due' },
+  ],
+  payment_confirmation: [
+    { code: 'payment_amount', reason: 'Required to show the amount paid' },
+    { code: 'invoice_number', reason: 'Required for payment reference' },
+  ],
+  approval_email: [
+    { code: 'quote_link', reason: 'Required for customers to review and approve' },
+    { code: 'quote_number', reason: 'Required for quote identification' },
+  ],
+  internal_notification: [],
+  ar_report: [
+    { code: 'current_date', reason: 'Required for report identification' },
+  ],
+  custom: [],
+};
+
+function extractShortCodes(template: string): string[] {
+  const regex = /\{\{([^}]+)\}\}/g;
+  const matches = [];
+  let match;
+  while ((match = regex.exec(template)) !== null) {
+    matches.push(match[1].trim());
+  }
+  return [...new Set(matches)];
+}
+
+function validateTemplate(
+  subjectTemplate: string,
+  bodyTemplate: string,
+  templateType: TemplateTypeValue
+): ValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const missingRequiredCodes: { code: string; reason: string }[] = [];
+
+  if (!subjectTemplate.trim()) {
+    errors.push('Subject template cannot be empty');
+  }
+
+  if (!bodyTemplate.trim()) {
+    errors.push('Body template cannot be empty');
+  }
+
+  const subjectCodes = extractShortCodes(subjectTemplate);
+  const bodyCodes = extractShortCodes(bodyTemplate);
+  const allCodes = [...new Set([...subjectCodes, ...bodyCodes])];
+
+  const malformedPattern = /\{\{[^}]*$/g;
+  if (malformedPattern.test(subjectTemplate) || malformedPattern.test(bodyTemplate)) {
+    errors.push('Template contains malformed short codes (unclosed brackets)');
+  }
+
+  const nestedPattern = /\{\{[^}]*\{\{/g;
+  if (nestedPattern.test(subjectTemplate) || nestedPattern.test(bodyTemplate)) {
+    errors.push('Template contains nested short codes (not supported)');
+  }
+
+  const requiredCodes = REQUIRED_SHORT_CODES[templateType] || [];
+  for (const required of requiredCodes) {
+    if (!allCodes.includes(required.code)) {
+      missingRequiredCodes.push(required);
+      warnings.push(`Missing required short code: {{${required.code}}} - ${required.reason}`);
+    }
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    warnings,
+    missingRequiredCodes,
+    hasRequiredCodeViolations: missingRequiredCodes.length > 0,
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -183,6 +278,85 @@ Deno.serve(async (req: Request) => {
           );
         }
 
+        // Validate template content
+        const validation = validateTemplate(
+          body.subject_template,
+          body.body_template,
+          body.template_type as TemplateTypeValue
+        );
+
+        // If template has validation errors, reject
+        if (!validation.isValid) {
+          return new Response(
+            JSON.stringify({
+              error: "Template validation failed",
+              validation,
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        // If template has missing required codes and is being set as active without override
+        if (validation.hasRequiredCodeViolations && body.is_active !== false && !body.override_required_validation) {
+          return new Response(
+            JSON.stringify({
+              error: "Template is missing required short codes and cannot be activated",
+              validation,
+              message: "Add the required short codes or save as inactive template",
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        // Log validation event
+        const validationStatus = validation.hasRequiredCodeViolations && body.override_required_validation
+          ? 'override'
+          : validation.hasRequiredCodeViolations
+          ? 'warning'
+          : !validation.isValid
+          ? 'failed'
+          : 'passed';
+
+        // Log to console for immediate visibility
+        if (validation.hasRequiredCodeViolations && body.override_required_validation && isAdmin) {
+          console.warn(`[TEMPLATE_VALIDATION] Admin override: User ${user.id} created template with missing required codes`, {
+            template_type: body.template_type,
+            template_name: body.template_name,
+            missing_codes: validation.missingRequiredCodes.map(c => c.code),
+            user_id: user.id,
+            company_id,
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        // Log to database for audit trail (fire and forget)
+        supabase.rpc('log_template_validation', {
+          p_company_id: company_id,
+          p_template_id: null,
+          p_template_type: body.template_type,
+          p_template_name: body.template_name,
+          p_action: 'created',
+          p_validation_status: validationStatus,
+          p_has_errors: !validation.isValid,
+          p_has_missing_required_codes: validation.hasRequiredCodeViolations,
+          p_missing_codes: JSON.stringify(validation.missingRequiredCodes),
+          p_errors: JSON.stringify(validation.errors),
+          p_warnings: JSON.stringify(validation.warnings),
+          p_override_used: body.override_required_validation || false,
+          p_user_id: user.id,
+          p_user_role: role,
+        }).then(({ error: logError }) => {
+          if (logError) {
+            console.error('[TEMPLATE_VALIDATION] Failed to log validation event:', logError);
+          }
+        });
+
         // Check if active template of this type already exists
         const { data: existing } = await supabase
           .from("communication_templates")
@@ -264,34 +438,132 @@ Deno.serve(async (req: Request) => {
 
         const body: Partial<CommunicationTemplate> = await req.json();
 
+        // Get current template for validation
+        const { data: currentTemplate } = await supabase
+          .from("communication_templates")
+          .select("*")
+          .eq("id", templateId)
+          .eq("company_id", company_id)
+          .single();
+
+        if (!currentTemplate) {
+          return new Response(
+            JSON.stringify({ error: "Template not found" }),
+            {
+              status: 404,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        // If updating subject or body, validate the new content
+        if (body.subject_template || body.body_template) {
+          const subjectToValidate = body.subject_template ?? currentTemplate.subject_template;
+          const bodyToValidate = body.body_template ?? currentTemplate.body_template;
+          const typeToValidate = body.template_type ?? currentTemplate.template_type;
+
+          const validation = validateTemplate(
+            subjectToValidate,
+            bodyToValidate,
+            typeToValidate as TemplateTypeValue
+          );
+
+          // If template has validation errors, reject
+          if (!validation.isValid) {
+            return new Response(
+              JSON.stringify({
+                error: "Template validation failed",
+                validation,
+              }),
+              {
+                status: 400,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              }
+            );
+          }
+
+          // Check if activating with missing required codes
+          const isActivating = body.is_active === true || (body.is_active !== false && currentTemplate.is_active);
+          if (validation.hasRequiredCodeViolations && isActivating && !body.override_required_validation) {
+            return new Response(
+              JSON.stringify({
+                error: "Template is missing required short codes and cannot be activated",
+                validation,
+                message: "Add the required short codes or save as inactive template",
+              }),
+              {
+                status: 400,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              }
+            );
+          }
+
+          // Log validation event
+          const validationStatus = validation.hasRequiredCodeViolations && body.override_required_validation
+            ? 'override'
+            : validation.hasRequiredCodeViolations
+            ? 'warning'
+            : !validation.isValid
+            ? 'failed'
+            : 'passed';
+
+          const actionType = body.is_active === true && !currentTemplate.is_active ? 'activated' : 'updated';
+
+          // Log to console for immediate visibility
+          if (validation.hasRequiredCodeViolations && body.override_required_validation && isAdmin) {
+            console.warn(`[TEMPLATE_VALIDATION] Admin override: User ${user.id} updated template with missing required codes`, {
+              template_id: templateId,
+              template_type: typeToValidate,
+              template_name: body.template_name ?? currentTemplate.template_name,
+              missing_codes: validation.missingRequiredCodes.map(c => c.code),
+              user_id: user.id,
+              company_id,
+              timestamp: new Date().toISOString(),
+            });
+          }
+
+          // Log to database for audit trail (fire and forget)
+          supabase.rpc('log_template_validation', {
+            p_company_id: company_id,
+            p_template_id: templateId,
+            p_template_type: typeToValidate,
+            p_template_name: body.template_name ?? currentTemplate.template_name,
+            p_action: actionType,
+            p_validation_status: validationStatus,
+            p_has_errors: !validation.isValid,
+            p_has_missing_required_codes: validation.hasRequiredCodeViolations,
+            p_missing_codes: JSON.stringify(validation.missingRequiredCodes),
+            p_errors: JSON.stringify(validation.errors),
+            p_warnings: JSON.stringify(validation.warnings),
+            p_override_used: body.override_required_validation || false,
+            p_user_id: user.id,
+            p_user_role: role,
+          }).then(({ error: logError }) => {
+            if (logError) {
+              console.error('[TEMPLATE_VALIDATION] Failed to log validation event:', logError);
+            }
+          });
+        }
+
         // If activating this template, check for conflicts
         if (body.is_active === true) {
-          const { data: currentTemplate } = await supabase
+          const { data: existing } = await supabase
             .from("communication_templates")
-            .select("template_type")
-            .eq("id", templateId)
+            .select("id")
             .eq("company_id", company_id)
-            .single();
+            .eq("template_type", currentTemplate.template_type)
+            .eq("is_active", true)
+            .neq("id", templateId)
+            .maybeSingle();
 
-          if (currentTemplate) {
-            const { data: existing } = await supabase
-              .from("communication_templates")
-              .select("id")
-              .eq("company_id", company_id)
-              .eq("template_type", currentTemplate.template_type)
-              .eq("is_active", true)
-              .neq("id", templateId)
-              .maybeSingle();
-
-            if (existing) {
-              return new Response(
-                JSON.stringify({ error: `Another active template of type '${currentTemplate.template_type}' already exists.` }),
-                {
-                  status: 409,
-                  headers: { ...corsHeaders, "Content-Type": "application/json" },
-                }
-              );
-            }
+          if (existing) {
+            return new Response(
+              JSON.stringify({ error: `Another active template of type '${currentTemplate.template_type}' already exists.` }),
+              {
+                status: 409,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              }
+            );
           }
         }
 

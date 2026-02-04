@@ -11,7 +11,9 @@ import type {
   UpdateTemplateRequest,
   TemplateType,
   RenderedTemplate,
+  TemplateValidation,
 } from '../types/communication-template';
+import { getRequiredShortCodes } from '../types/communication-template';
 import { ShortCodeEngine, type ShortCodeData } from './shortcode-service';
 
 const EDGE_FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/communication-templates`;
@@ -209,14 +211,16 @@ export function renderTemplate(
 }
 
 /**
- * Validate template content
+ * Validate template content with required short code checking
  */
 export function validateTemplate(
   subjectTemplate: string,
-  bodyTemplate: string
-): { isValid: boolean; errors: string[]; warnings: string[] } {
+  bodyTemplate: string,
+  templateType?: TemplateType
+): TemplateValidation {
   const errors: string[] = [];
   const warnings: string[] = [];
+  const missingRequiredCodes: { code: string; reason: string }[] = [];
 
   // Check for empty templates
   if (!subjectTemplate.trim()) {
@@ -254,10 +258,57 @@ export function validateTemplate(
     warnings.push('No short codes detected. Consider using dynamic data placeholders.');
   }
 
+  // Check for required short codes if template type is provided
+  if (templateType) {
+    const requiredCodes = getRequiredShortCodes(templateType);
+
+    for (const required of requiredCodes) {
+      if (!allCodes.includes(required.code)) {
+        missingRequiredCodes.push(required);
+        warnings.push(`Missing required short code: {{${required.code}}} - ${required.reason}`);
+      }
+    }
+  }
+
   return {
     isValid: errors.length === 0,
     errors,
     warnings,
+    usedShortCodes: allCodes,
+    missingShortCodes: [],
+    missingRequiredCodes,
+    hasRequiredCodeViolations: missingRequiredCodes.length > 0,
+  };
+}
+
+/**
+ * Validate template before sending (strict validation)
+ * Returns true if template can be sent, false if required codes are missing
+ */
+export function validateTemplateForSending(
+  template: CommunicationTemplate,
+  allowOverride: boolean = false
+): { canSend: boolean; validation: TemplateValidation } {
+  const validation = validateTemplate(
+    template.subject_template,
+    template.body_template,
+    template.template_type
+  );
+
+  // If override is allowed and user is admin, they can send anyway
+  if (allowOverride) {
+    return {
+      canSend: true,
+      validation,
+    };
+  }
+
+  // Strict validation: cannot send if required codes are missing
+  const canSend = !validation.hasRequiredCodeViolations && validation.isValid;
+
+  return {
+    canSend,
+    validation,
   };
 }
 
@@ -373,6 +424,7 @@ export const CommunicationTemplateService = {
   deactivateTemplate,
   renderTemplate,
   validateTemplate,
+  validateTemplateForSending,
   previewTemplate,
   cloneTemplate,
   exportTemplate,
