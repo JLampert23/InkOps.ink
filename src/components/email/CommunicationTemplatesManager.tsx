@@ -611,6 +611,7 @@ export default function CommunicationTemplatesManager() {
               setBodyTemplate(body);
             }}
             showShortCodes={true}
+            showSmartBlocks={true}
             autoSaveDelay={2000}
           />
 

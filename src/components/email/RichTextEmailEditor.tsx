@@ -2,10 +2,12 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import ReactQuill, { Quill } from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import DOMPurify from 'dompurify';
-import { Save, Eye, Code, ChevronDown, Check, Loader2 } from 'lucide-react';
+import { Save, Eye, Code, ChevronDown, Check, Loader2, Blocks } from 'lucide-react';
 import { AVAILABLE_SHORT_CODES, type ShortCodeKey } from '../../types/shortcode';
 import { ShortCodeEngine } from '../../services/shortcode-service';
 import { useNotification } from '../../contexts/NotificationContext';
+import SmartBlocksSidebar from './SmartBlocksSidebar';
+import { type SmartBlock } from '../../types/smart-blocks';
 
 interface RichTextEmailEditorProps {
   initialSubject?: string;
@@ -13,6 +15,7 @@ interface RichTextEmailEditorProps {
   onSave?: (subject: string, body: string) => void;
   onAutoSave?: (subject: string, body: string) => void;
   showShortCodes?: boolean;
+  showSmartBlocks?: boolean;
   autoSaveDelay?: number;
 }
 
@@ -24,6 +27,7 @@ export default function RichTextEmailEditor({
   onSave,
   onAutoSave,
   showShortCodes = true,
+  showSmartBlocks = true,
   autoSaveDelay = 2000,
 }: RichTextEmailEditorProps) {
   const { showNotification } = useNotification();
@@ -33,11 +37,14 @@ export default function RichTextEmailEditor({
   const [showVariableDropdown, setShowVariableDropdown] = useState(false);
   const [variableSearch, setVariableSearch] = useState('');
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [showBlocksSidebar, setShowBlocksSidebar] = useState(showSmartBlocks);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   const quillRef = useRef<ReactQuill>(null);
   const subjectRef = useRef<HTMLInputElement>(null);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const editorContainerRef = useRef<HTMLDivElement>(null);
 
   // Sanitize HTML to prevent XSS
   const sanitizeHTML = (html: string): string => {
@@ -188,6 +195,58 @@ export default function RichTextEmailEditor({
     showNotification('success', 'Variable Inserted', `${shortCode} added to subject`);
   };
 
+  // Insert smart block into editor
+  const insertBlock = (block: SmartBlock) => {
+    const quill = quillRef.current?.getEditor();
+
+    if (quill) {
+      const range = quill.getSelection();
+      const position = range ? range.index : quill.getLength();
+
+      // Insert the HTML content
+      const delta = quill.clipboard.convert(block.htmlTemplate);
+      quill.updateContents(delta, 'user');
+
+      // Move cursor to end of inserted content
+      quill.setSelection(position + delta.length(), 0);
+      quill.focus();
+
+      showNotification('success', 'Block Inserted', `${block.name} added to template`);
+    }
+  };
+
+  // Handle drag over editor
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+    setIsDragOver(true);
+  };
+
+  // Handle drag leave editor
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  // Handle drop into editor
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    try {
+      const blockData = e.dataTransfer.getData('application/json');
+      if (blockData) {
+        const block: SmartBlock = JSON.parse(blockData);
+        insertBlock(block);
+      }
+    } catch (error) {
+      console.error('Failed to parse dropped block:', error);
+    }
+  };
+
   // Manual save
   const handleSave = () => {
     if (!subject.trim()) {
@@ -231,15 +290,26 @@ export default function RichTextEmailEditor({
   const preview = viewMode === 'preview' ? generatePreview() : null;
 
   return (
-    <div className="space-y-4">
-      {/* Header with Controls */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Email Template
-          </h3>
+    <div className="flex gap-4">
+      {/* Smart Blocks Sidebar */}
+      {showSmartBlocks && showBlocksSidebar && viewMode === 'editor' && (
+        <div className="w-80 flex-shrink-0">
+          <div className="sticky top-4 h-[calc(100vh-8rem)] overflow-hidden rounded-lg border border-gray-200 dark:border-slate-700">
+            <SmartBlocksSidebar onBlockSelect={insertBlock} />
+          </div>
+        </div>
+      )}
 
-          <div className="flex items-center gap-3">
+      {/* Main Editor Content */}
+      <div className="flex-1 space-y-4">
+        {/* Header with Controls */}
+        <div className="bg-white dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Email Template
+            </h3>
+
+            <div className="flex items-center gap-3">
             {/* Save Status Indicator */}
             {onAutoSave && (
               <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
@@ -259,6 +329,21 @@ export default function RichTextEmailEditor({
                   <span className="text-red-600 dark:text-red-400">Save failed</span>
                 )}
               </div>
+            )}
+
+            {/* Smart Blocks Toggle */}
+            {showSmartBlocks && viewMode === 'editor' && (
+              <button
+                onClick={() => setShowBlocksSidebar(!showBlocksSidebar)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors ${
+                  showBlocksSidebar
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-slate-600'
+                }`}
+              >
+                <Blocks className="w-4 h-4" />
+                Blocks
+              </button>
             )}
 
             {/* View Toggle */}
@@ -383,7 +468,28 @@ export default function RichTextEmailEditor({
           </label>
 
           {viewMode === 'editor' ? (
-            <div className="border border-gray-300 dark:border-slate-600 rounded-lg overflow-hidden">
+            <div
+              ref={editorContainerRef}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`relative border rounded-lg overflow-hidden transition-all ${
+                isDragOver
+                  ? 'border-blue-500 dark:border-blue-400 border-2 bg-blue-50 dark:bg-blue-900/10'
+                  : 'border-gray-300 dark:border-slate-600'
+              }`}
+            >
+              {/* Drag Overlay */}
+              {isDragOver && (
+                <div className="absolute inset-0 bg-blue-500/10 dark:bg-blue-400/10 flex items-center justify-center pointer-events-none z-10">
+                  <div className="bg-white dark:bg-slate-800 px-6 py-4 rounded-lg shadow-lg border-2 border-blue-500 dark:border-blue-400">
+                    <p className="text-blue-600 dark:text-blue-400 font-semibold">
+                      Drop block here to insert
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Custom Toolbar */}
               {showShortCodes && (
                 <div id="toolbar" className="bg-gray-50 dark:bg-slate-800 border-b border-gray-300 dark:border-slate-600 p-2 flex items-center gap-2 flex-wrap">
@@ -505,18 +611,20 @@ export default function RichTextEmailEditor({
         </div>
       </div>
 
-      {/* Help Text */}
-      {showShortCodes && viewMode === 'editor' && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-          <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
-            Using Variables
-          </h4>
-          <p className="text-sm text-blue-800 dark:text-blue-200">
-            Click "Insert Variable" to add dynamic content like customer names, invoice numbers, and payment links.
-            These will be replaced with actual data when the email is sent.
-          </p>
-        </div>
-      )}
+        {/* Help Text */}
+        {showShortCodes && viewMode === 'editor' && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
+              Using Variables{showSmartBlocks && ' & Smart Blocks'}
+            </h4>
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              Click "Insert Variable" to add dynamic content like customer names, invoice numbers, and payment links.
+              {showSmartBlocks && ' Drag Smart Blocks from the sidebar or click to insert prebuilt content sections.'}
+              {' '}Variables will be replaced with actual data when the email is sent.
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
