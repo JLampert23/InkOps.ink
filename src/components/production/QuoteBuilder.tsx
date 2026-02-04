@@ -808,12 +808,58 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         }
       }
 
-      // Get the price from the first column (column 0) for the selected row
-      const cellKey = `${selectedRowIndex}-0`;
+      // Count the number of colors in the imprints for this group
+      // Each imprint can have multiple colors selected
+      let totalColors = 0;
+      for (const imp of groupImprints) {
+        if (imp.thread_or_ink_color && Array.isArray(imp.thread_or_ink_color)) {
+          totalColors += imp.thread_or_ink_color.length;
+        } else if (imp.thread_or_ink_color) {
+          totalColors += 1;
+        }
+      }
+
+      // Find the appropriate column based on number of colors
+      // Columns are typically labeled like "1 Color", "2 Colors", "3 Colors", etc.
+      let selectedColumnIndex = 0;
+
+      if (totalColors > 0 && columns.length > 0) {
+        // Try to find exact match first
+        for (let i = 0; i < columns.length; i++) {
+          const colLabel = columns[i].toLowerCase();
+          if (colLabel.includes(`${totalColors} color`)) {
+            selectedColumnIndex = i;
+            break;
+          }
+        }
+
+        // If no exact match, use the last column if colors exceed available columns
+        if (selectedColumnIndex === 0 && totalColors > columns.length) {
+          selectedColumnIndex = columns.length - 1;
+        } else if (selectedColumnIndex === 0 && totalColors > 0 && totalColors <= columns.length) {
+          // Use color count directly as index (accounting for 0-based indexing)
+          selectedColumnIndex = Math.min(totalColors - 1, columns.length - 1);
+        }
+      }
+
+      // Get the price from the selected row and column
+      const cellKey = `${selectedRowIndex}-${selectedColumnIndex}`;
       const price = cells[cellKey];
 
+      console.log('Price matrix lookup:', {
+        totalQty,
+        totalColors,
+        selectedRowIndex,
+        selectedColumnIndex,
+        cellKey,
+        price,
+        rows: rows[selectedRowIndex],
+        columns: columns[selectedColumnIndex],
+        availableColumns: columns
+      });
+
       if (price === undefined || price === null) {
-        if (!silent) showNotification('warning', 'No price found', 'No price found in the matrix for this quantity');
+        if (!silent) showNotification('warning', 'No price found', `No price found in the matrix for ${totalQty} units with ${totalColors} color(s)`);
         return;
       }
 
@@ -833,7 +879,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
 
       setItemGroups(newGroups);
       if (!silent) {
-        showNotification('success', 'Price updated', `Unit price set to $${parseFloat(price).toFixed(2)} based on ${typeOfWork} pricing matrix`);
+        showNotification('success', 'Price updated', `Unit price set to $${parseFloat(price).toFixed(2)} for ${totalQty} units with ${totalColors} color(s)`);
       }
 
     } catch (error) {
