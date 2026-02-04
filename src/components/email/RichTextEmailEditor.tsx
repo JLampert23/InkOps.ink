@@ -7,7 +7,6 @@ import { AVAILABLE_SHORT_CODES, type ShortCodeKey } from '../../types/shortcode'
 import { ShortCodeEngine } from '../../services/shortcode-service';
 import { useNotification } from '../../contexts/NotificationContext';
 import SmartBlocksSidebar from './SmartBlocksSidebar';
-import ShortCodeSidebar from './ShortCodeSidebar';
 import { type SmartBlock } from '../../types/smart-blocks';
 
 interface RichTextEmailEditorProps {
@@ -15,7 +14,6 @@ interface RichTextEmailEditorProps {
   initialBody?: string;
   onSave?: (subject: string, body: string) => void;
   onAutoSave?: (subject: string, body: string) => void;
-  showShortCodes?: boolean;
   showSmartBlocks?: boolean;
   autoSaveDelay?: number;
 }
@@ -27,7 +25,6 @@ export default function RichTextEmailEditor({
   initialBody = '',
   onSave,
   onAutoSave,
-  showShortCodes = true,
   showSmartBlocks = true,
   autoSaveDelay = 2000,
 }: RichTextEmailEditorProps) {
@@ -305,15 +302,6 @@ export default function RichTextEmailEditor({
 
   return (
     <div className="flex gap-4">
-      {/* Shortcode Sidebar - Always visible on the left */}
-      {showShortCodes && viewMode === 'editor' && (
-        <div className="w-72 flex-shrink-0">
-          <div className="sticky top-4 h-[calc(100vh-8rem)] overflow-hidden rounded-lg border border-gray-200 dark:border-slate-700">
-            <ShortCodeSidebar onShortCodeClick={insertVariable} />
-          </div>
-        </div>
-      )}
-
       {/* Main Editor Content */}
       <div className="flex-1 space-y-4 min-w-0">
         {/* Header with Controls */}
@@ -403,7 +391,7 @@ export default function RichTextEmailEditor({
         {/* Subject Field */}
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Subject {showShortCodes && viewMode === 'editor' && <span className="text-xs text-gray-500 dark:text-gray-400">(Click shortcodes in the sidebar to insert)</span>}
+            Subject
           </label>
           <input
             ref={subjectRef}
@@ -525,21 +513,19 @@ export default function RichTextEmailEditor({
 
           <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
             {viewMode === 'editor'
-              ? 'Use the toolbar to format your email. Insert variables for dynamic content.'
+              ? 'Use the toolbar to format your email. Drag and drop Smart Blocks for prebuilt content sections.'
               : 'Preview shows how your email will look with sample data.'}
           </div>
         </div>
 
         {/* Help Text */}
-        {showShortCodes && viewMode === 'editor' && (
+        {showSmartBlocks && viewMode === 'editor' && (
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
-              Using Shortcodes{showSmartBlocks && ' & Smart Blocks'}
+              Using Smart Blocks
             </h4>
             <p className="text-sm text-blue-800 dark:text-blue-200">
-              Click any shortcode in the left sidebar to insert it at your cursor position.
-              {showSmartBlocks && ' Toggle Smart Blocks to access prebuilt content sections.'}
-              {' '}Shortcodes will be replaced with actual data when the email is sent.
+              Toggle Smart Blocks to access prebuilt content sections. Drag and drop blocks into your email template to quickly build professional emails.
             </p>
           </div>
         )}
