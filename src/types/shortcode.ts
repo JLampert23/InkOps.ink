@@ -21,6 +21,7 @@ export interface ShortCodeData {
   quote_expiry_date?: string;
   quote_link?: string;
   quote_status?: string;
+  art_approval_link?: string;
 
   // Invoice data
   invoice_number?: string;
@@ -86,6 +87,7 @@ export const AVAILABLE_SHORT_CODES: Record<ShortCodeKey, string> = {
   quote_expiry_date: 'Quote Expiry Date',
   quote_link: 'Quote Approval Link',
   quote_status: 'Quote Status',
+  art_approval_link: 'Art Approval Link',
 
   // Invoice
   invoice_number: 'Invoice Number',

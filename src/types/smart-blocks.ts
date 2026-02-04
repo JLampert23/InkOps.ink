@@ -60,8 +60,8 @@ export const SMART_BLOCKS: SmartBlock[] = [
     requiredShortCodes: ['invoice_link'],
   },
   {
-    id: 'approval_button',
-    name: 'Approval Button',
+    id: 'quote_approval_button',
+    name: 'Quote Approval Button',
     description: 'Call-to-action button for quote approval',
     category: 'action',
     icon: 'check-circle',
@@ -71,6 +71,19 @@ export const SMART_BLOCKS: SmartBlock[] = [
   </a>
 </div>`,
     requiredShortCodes: ['quote_link'],
+  },
+  {
+    id: 'art_approval_button',
+    name: 'Art Approval Button',
+    description: 'Call-to-action button for artwork approval',
+    category: 'action',
+    icon: 'check-circle',
+    htmlTemplate: `<div style="text-align: center; margin: 24px 0;">
+  <a href="{{art_approval_link}}" style="display: inline-block; background-color: #8b5cf6; color: white; padding: 12px 32px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
+    Review & Approve Artwork
+  </a>
+</div>`,
+    requiredShortCodes: ['art_approval_link'],
   },
   {
     id: 'company_signature',

@@ -295,7 +295,7 @@ export default function RichTextEmailEditor({
       {showSmartBlocks && showBlocksSidebar && viewMode === 'editor' && (
         <div className="w-80 flex-shrink-0">
           <div className="sticky top-4 h-[calc(100vh-8rem)] overflow-hidden rounded-lg border border-gray-200 dark:border-slate-700">
-            <SmartBlocksSidebar onBlockSelect={insertBlock} />
+            <SmartBlocksSidebar onBlockSelect={insertBlock} onShortCodeClick={insertVariable} />
           </div>
         </div>
       )}
