@@ -146,7 +146,7 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
     label: 'Default Quote Email',
     description: 'Default template for sending quote approval emails to customers',
     defaultSubject: 'Quote {{quote_number}} for {{customer_company}}',
-    defaultBody: '<p>Hi {{customer_first_name}},</p><p>Your quote {{quote_number}} is ready for review.</p>',
+    defaultBody: '<p>Hi {{customer_first_name}},</p><p>Your quote {{quote_number}} is ready for review.</p><br><hr><p><strong>{{company_name}}</strong><br>{{company_address}}<br>Phone: {{company_phone}}<br>Email: {{company_email}}<br>{{company_website}}</p>',
     supportedAttachments: {
       quoteLink: true,
       pdf: true,
@@ -164,7 +164,7 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
     label: 'Default Invoice Email',
     description: 'Default template for sending invoices to customers',
     defaultSubject: 'Invoice {{invoice_number}} from {{company_name}}',
-    defaultBody: '<p>Hi {{customer_first_name}},</p><p>Your invoice {{invoice_number}} is now available.</p>',
+    defaultBody: '<p>Hi {{customer_first_name}},</p><p>Your invoice {{invoice_number}} is now available.</p><br><hr><p><strong>{{company_name}}</strong><br>{{company_address}}<br>Phone: {{company_phone}}<br>Email: {{company_email}}<br>{{company_website}}</p>',
     supportedAttachments: {
       quoteLink: false,
       pdf: true,
@@ -181,7 +181,7 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
     label: 'Invoice Reminder',
     description: 'Template for sending payment reminder emails for overdue invoices',
     defaultSubject: 'Payment Reminder: Invoice {{invoice_number}}',
-    defaultBody: '<p>Hi {{customer_first_name}},</p><p>This is a friendly reminder that invoice {{invoice_number}} for {{invoice_balance}} is due.</p>',
+    defaultBody: '<p>Hi {{customer_first_name}},</p><p>This is a friendly reminder that invoice {{invoice_number}} for {{invoice_balance}} is due.</p><br><hr><p><strong>{{company_name}}</strong><br>{{company_address}}<br>Phone: {{company_phone}}<br>Email: {{company_email}}<br>{{company_website}}</p>',
     supportedAttachments: {
       quoteLink: false,
       pdf: true,
@@ -199,7 +199,7 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
     label: 'Payment Confirmation',
     description: 'Template for confirming payment receipt',
     defaultSubject: 'Payment Received: {{payment_amount}}',
-    defaultBody: '<p>Hi {{customer_first_name}},</p><p>We have received your payment of {{payment_amount}} for invoice {{invoice_number}}.</p>',
+    defaultBody: '<p>Hi {{customer_first_name}},</p><p>We have received your payment of {{payment_amount}} for invoice {{invoice_number}}.</p><br><hr><p><strong>{{company_name}}</strong><br>{{company_address}}<br>Phone: {{company_phone}}<br>Email: {{company_email}}<br>{{company_website}}</p>',
     supportedAttachments: {
       quoteLink: false,
       pdf: true,
@@ -216,7 +216,7 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
     label: 'Approval Email',
     description: 'Template for requesting approval on quotes or designs',
     defaultSubject: 'Approval Required: {{quote_number}}',
-    defaultBody: '<p>Hi {{customer_first_name}},</p><p>Please review and approve {{quote_number}}.</p>',
+    defaultBody: '<p>Hi {{customer_first_name}},</p><p>Please review and approve {{quote_number}}.</p><br><hr><p><strong>{{company_name}}</strong><br>{{company_address}}<br>Phone: {{company_phone}}<br>Email: {{company_email}}<br>{{company_website}}</p>',
     supportedAttachments: {
       quoteLink: true,
       pdf: true,
@@ -263,7 +263,7 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
     label: 'Custom Template',
     description: 'Custom template for specialized communication needs',
     defaultSubject: 'Message from {{company_name}}',
-    defaultBody: '<p>Hi {{customer_first_name}},</p>',
+    defaultBody: '<p>Hi {{customer_first_name}},</p><p>Your custom message here.</p><br><hr><p><strong>{{company_name}}</strong><br>{{company_address}}<br>Phone: {{company_phone}}<br>Email: {{company_email}}<br>{{company_website}}</p>',
     supportedAttachments: {
       quoteLink: false,
       pdf: false,
