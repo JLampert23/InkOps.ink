@@ -75,6 +75,7 @@ export interface SendEmailRequest {
   data?: EmailTemplateData;
   html?: string;
   attachments?: EmailAttachment[];
+  shortCodeData?: Record<string, any>;
 }
 
 export interface SendEmailResponse {

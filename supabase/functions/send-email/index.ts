@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { renderTemplate, formatCurrency, formatDate, type ShortCodeData } from '../_shared/shortcode-engine.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -20,6 +21,7 @@ interface EmailRequest {
   data?: Record<string, any>;
   html?: string;
   attachments?: EmailAttachment[];
+  shortCodeData?: ShortCodeData;
 }
 
 interface ResendResponse {
@@ -114,7 +116,7 @@ Deno.serve(async (req: Request) => {
     const fromName = config.from_name || '';
 
     const emailRequest: EmailRequest = await req.json();
-    const { to, subject, template, data, html: customHtml, attachments } = emailRequest;
+    const { to, subject, template, data, html: customHtml, attachments, shortCodeData } = emailRequest;
 
     if (!to || !subject) {
       return new Response(
@@ -132,6 +134,17 @@ Deno.serve(async (req: Request) => {
       html = generateEmailTemplate(template, data || {});
     }
 
+    // Apply short code replacement if shortCodeData is provided
+    if (html && shortCodeData) {
+      html = renderTemplate(html, shortCodeData);
+    }
+
+    // Also apply short codes to subject line
+    let finalSubject = subject;
+    if (shortCodeData) {
+      finalSubject = renderTemplate(subject, shortCodeData);
+    }
+
     const toArray = Array.isArray(to) ? to : [to];
 
     const fromAddress = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
@@ -139,7 +152,7 @@ Deno.serve(async (req: Request) => {
     const emailPayload: any = {
       from: data?.from || fromAddress,
       to: toArray,
-      subject: subject,
+      subject: finalSubject,
       html: html,
     };
 
