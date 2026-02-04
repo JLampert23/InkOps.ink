@@ -33,7 +33,7 @@ interface CompanySettings {
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState<Tab>('production');
-  const [accountingExpanded, setAccountingExpanded] = useState(true);
+  const [accountingExpanded, setAccountingExpanded] = useState(false);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [settingsInitialTab, setSettingsInitialTab] = useState<string | undefined>(undefined);
   const [syncing, setSyncing] = useState(false);
