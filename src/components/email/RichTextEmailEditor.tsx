@@ -279,7 +279,7 @@ export default function RichTextEmailEditor({
   // Generate preview with sample data
   const generatePreview = () => {
     const previewSubject = ShortCodeEngine.generatePreview(subject);
-    const previewBody = ShortCodeEngine.generatePreview(body);
+    const previewBody = sanitizeHTML(ShortCodeEngine.generatePreview(body));
 
     return { subject: previewSubject, body: previewBody };
   };
@@ -398,6 +398,7 @@ export default function RichTextEmailEditor({
             )}
           </div>
         </div>
+        </div>
 
         {/* Subject Field */}
         <div className="mb-4">
@@ -413,12 +414,24 @@ export default function RichTextEmailEditor({
             className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
             disabled={viewMode === 'preview'}
           />
-          {viewMode === 'preview' && preview && (
-            <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-sm text-gray-700 dark:text-gray-300">
-              <strong>Preview:</strong> {preview.subject}
+          {viewMode === 'preview' && (
+            <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm text-gray-700 dark:text-gray-300">
+              <strong className="text-blue-900 dark:text-blue-100">Preview:</strong>{' '}
+              {preview?.subject || <span className="italic text-gray-500 dark:text-gray-400">No subject entered</span>}
             </div>
           )}
         </div>
+
+        {/* Preview Banner */}
+        {viewMode === 'preview' && (
+          <div className="bg-blue-600 text-white px-4 py-3 rounded-lg flex items-center gap-3">
+            <Eye className="w-5 h-5" />
+            <div>
+              <div className="font-semibold">Preview Mode</div>
+              <div className="text-xs text-blue-100">Showing how your email will look with sample data</div>
+            </div>
+          </div>
+        )}
 
         {/* Body Editor / Preview */}
         <div>
@@ -497,10 +510,16 @@ export default function RichTextEmailEditor({
             </div>
           ) : (
             <div className="border border-gray-300 dark:border-slate-600 rounded-lg p-6 bg-white dark:bg-slate-800 min-h-[400px]">
-              <div
-                className="prose dark:prose-invert max-w-none"
-                dangerouslySetInnerHTML={{ __html: preview?.body || '' }}
-              />
+              {preview?.body ? (
+                <div
+                  className="prose dark:prose-invert max-w-none"
+                  dangerouslySetInnerHTML={{ __html: preview.body }}
+                />
+              ) : (
+                <div className="text-gray-500 dark:text-gray-400 italic">
+                  No content to preview. Add some text to the email body to see a preview.
+                </div>
+              )}
             </div>
           )}
 
@@ -510,7 +529,6 @@ export default function RichTextEmailEditor({
               : 'Preview shows how your email will look with sample data.'}
           </div>
         </div>
-      </div>
 
         {/* Help Text */}
         {showShortCodes && viewMode === 'editor' && (
