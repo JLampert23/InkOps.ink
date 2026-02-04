@@ -726,152 +726,63 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         return;
       }
 
-      // Find the specific imprint for this line item using imprint_number
-      let matchingImprint = null;
+      // If quote is saved in database, use the database function to recalculate pricing
+      if (quoteId && !quoteId.startsWith('temp-')) {
+        console.log('Recalculating pricing using database function for quote:', quoteId);
 
-      if (item.imprint_number) {
-        matchingImprint = groupImprints.find((imp: any) => imp.imprint_number === item.imprint_number);
+        // Call the database function to recalculate all pricing
+        const { error: calcError } = await supabase.rpc('recalculate_quote_pricing', {
+          p_quote_id: quoteId
+        });
 
-        if (!matchingImprint) {
-          if (!silent) showNotification('warning', 'Imprint not found', `No imprint found with number ${item.imprint_number} in this group`);
+        if (calcError) {
+          console.error('Error recalculating pricing:', calcError);
+          if (!silent) showNotification('error', 'Failed to recalculate pricing', calcError.message);
           return;
         }
-      } else {
-        // If no imprint_number is set on the line item, use the first imprint in the group
-        matchingImprint = groupImprints[0];
-      }
 
-      const typeOfWork = matchingImprint.type_of_work;
+        // Reload the quote data to get updated prices
+        await loadQuote(quoteId);
 
-      if (!typeOfWork) {
-        if (!silent) showNotification('warning', 'No type of work specified', 'Please set a type of work for the imprint');
+        if (!silent) {
+          showNotification('success', 'Pricing Updated', 'Prices have been recalculated based on all imprints in the group');
+        }
         return;
       }
 
-      // Fetch price matrices for this company and type
-      const { data: matrices, error } = await supabase
-        .from('price_matrices')
-        .select('*')
-        .eq('matrix_type', typeOfWork)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(1);
+      // For unsaved quotes (draft mode), calculate pricing locally
+      // Sum all imprint prices for this group
+      let totalImprintPrice = 0;
 
-      if (error) {
-        console.error('Error fetching price matrices:', error);
-        if (!silent) showNotification('error', 'Failed to fetch price matrix');
+      for (const imprint of groupImprints) {
+        // Use the price if it's already calculated
+        if (imprint.price && imprint.price > 0) {
+          totalImprintPrice += parseFloat(imprint.price);
+        }
+      }
+
+      if (totalImprintPrice === 0) {
+        if (!silent) {
+          showNotification('warning', 'No pricing available', 'Please save the quote first to calculate pricing from imprints');
+        }
         return;
       }
 
-      if (!matrices || matrices.length === 0) {
-        if (!silent) showNotification('warning', 'No price matrix found', `No active price matrix found for ${typeOfWork}`);
-        return;
-      }
-
-      const matrix = matrices[0];
-
-      // Parse the matrix structure
-      const rows = matrix.rows || [];
-      const columns = matrix.columns || [];
-      const cells = matrix.cells || {};
-
-      if (rows.length === 0 || Object.keys(cells).length === 0) {
-        if (!silent) showNotification('warning', 'Empty price matrix', 'The price matrix has no pricing data');
-        return;
-      }
-
-      // Find the appropriate row based on total quantity
-      let selectedRowIndex = 0;
-      const totalQty = item.total_quantity;
-
-      for (let i = 0; i < rows.length; i++) {
-        const rowLabel = rows[i];
-        // Parse quantity ranges like "1-24", "25-49", "50-99", "100+"
-        const match = rowLabel.match(/(\d+)\s*-\s*(\d+)|(\d+)\+/);
-
-        if (match) {
-          if (match[3]) {
-            // Format like "100+"
-            const minQty = parseInt(match[3]);
-            if (totalQty >= minQty) {
-              selectedRowIndex = i;
-            }
-          } else if (match[1] && match[2]) {
-            // Format like "1-24"
-            const minQty = parseInt(match[1]);
-            const maxQty = parseInt(match[2]);
-            if (totalQty >= minQty && totalQty <= maxQty) {
-              selectedRowIndex = i;
-              break;
-            }
-          }
-        }
-      }
-
-      // Count the number of colors in the imprints for this group
-      // Each imprint can have multiple colors selected
-      let totalColors = 0;
-      for (const imp of groupImprints) {
-        if (imp.thread_or_ink_color && Array.isArray(imp.thread_or_ink_color)) {
-          totalColors += imp.thread_or_ink_color.length;
-        } else if (imp.thread_or_ink_color) {
-          totalColors += 1;
-        }
-      }
-
-      // Find the appropriate column based on number of colors
-      // Columns are typically labeled like "1 Color", "2 Colors", "3 Colors", etc.
-      let selectedColumnIndex = 0;
-
-      if (totalColors > 0 && columns.length > 0) {
-        // Try to find exact match first
-        for (let i = 0; i < columns.length; i++) {
-          const colLabel = columns[i].toLowerCase();
-          if (colLabel.includes(`${totalColors} color`)) {
-            selectedColumnIndex = i;
-            break;
-          }
-        }
-
-        // If no exact match, use the last column if colors exceed available columns
-        if (selectedColumnIndex === 0 && totalColors > columns.length) {
-          selectedColumnIndex = columns.length - 1;
-        } else if (selectedColumnIndex === 0 && totalColors > 0 && totalColors <= columns.length) {
-          // Use color count directly as index (accounting for 0-based indexing)
-          selectedColumnIndex = Math.min(totalColors - 1, columns.length - 1);
-        }
-      }
-
-      // Get the price from the selected row and column
-      const cellKey = `${selectedRowIndex}-${selectedColumnIndex}`;
-      const price = cells[cellKey];
-
-      console.log('Price matrix lookup:', {
-        totalQty,
-        totalColors,
-        selectedRowIndex,
-        selectedColumnIndex,
-        cellKey,
-        price,
-        rows: rows[selectedRowIndex],
-        columns: columns[selectedColumnIndex],
-        availableColumns: columns
+      console.log('Draft mode pricing:', {
+        groupLabel: group.label,
+        imprintCount: groupImprints.length,
+        totalImprintPrice,
+        itemCount: group.items.length
       });
 
-      if (price === undefined || price === null) {
-        if (!silent) showNotification('warning', 'No price found', `No price found in the matrix for ${totalQty} units with ${totalColors} color(s)`);
-        return;
-      }
-
-      // Update the item's unit price
+      // Apply the calculated unit price to ALL items in the group
       const newGroups = groups.map(g => {
         if (g.id === groupId) {
-          const newItems = [...g.items];
-          newItems[itemIndex] = {
-            ...newItems[itemIndex],
-            unit_price: parseFloat(price),
-            total_price: item.total_quantity * parseFloat(price)
-          };
+          const newItems = g.items.map((itm: any) => ({
+            ...itm,
+            unit_price: totalImprintPrice,
+            total_price: itm.total_quantity * totalImprintPrice
+          }));
           return { ...g, items: newItems };
         }
         return g;
@@ -879,7 +790,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
 
       setItemGroups(newGroups);
       if (!silent) {
-        showNotification('success', 'Price updated', `Unit price set to $${parseFloat(price).toFixed(2)} for ${totalQty} units with ${totalColors} color(s)`);
+        showNotification('success', 'Price updated', `Unit price set to $${totalImprintPrice.toFixed(2)} (sum of ${groupImprints.length} imprint${groupImprints.length > 1 ? 's' : ''})`);
       }
 
     } catch (error) {
