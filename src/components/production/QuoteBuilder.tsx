@@ -717,8 +717,22 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         return;
       }
 
-      // Use the first imprint's type_of_work to find the matching price matrix
-      const typeOfWork = groupImprints[0].type_of_work;
+      // Find the specific imprint for this line item using imprint_number
+      let matchingImprint = null;
+
+      if (item.imprint_number) {
+        matchingImprint = groupImprints.find((imp: any) => imp.imprint_number === item.imprint_number);
+
+        if (!matchingImprint) {
+          showNotification('warning', 'Imprint not found', `No imprint found with number ${item.imprint_number} in this group`);
+          return;
+        }
+      } else {
+        // If no imprint_number is set on the line item, use the first imprint in the group
+        matchingImprint = groupImprints[0];
+      }
+
+      const typeOfWork = matchingImprint.type_of_work;
 
       if (!typeOfWork) {
         showNotification('warning', 'No type of work specified', 'Please set a type of work for the imprint');
