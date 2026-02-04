@@ -108,10 +108,9 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
                 type="text"
                 value={formData.subject}
                 onChange={(e) => updateFormData('subject', e.target.value)}
-                placeholder={isInvoiceTemplate ? 'Invoice Reminder - {{invoice_number}}' : 'Quote Ready - {{quote_number}}'}
+                placeholder={isInvoiceTemplate ? 'Invoice Reminder' : 'Quote Ready for Review'}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">You can use shortcodes like {'{{invoice_number}}'} or {'{{customer_company}}'}</p>
             </div>
 
             <div>
@@ -122,10 +121,9 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
                 type="text"
                 value={formData.greeting}
                 onChange={(e) => updateFormData('greeting', e.target.value)}
-                placeholder="Hi {{customer_first_name}},"
+                placeholder="Hi there,"
                 className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Use {'{{customer_first_name}}'} for personalization</p>
             </div>
           </div>
         );
@@ -146,9 +144,6 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
               rows={6}
               className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Available shortcodes: {'{{customer_company}}'}, {'{{invoice_number}}'}, {'{{invoice_total}}'}, etc.
-            </p>
           </div>
         );
 
@@ -172,7 +167,7 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
                   />
                   <div>
                     <div className="font-medium text-gray-900 dark:text-white">Include Payment Button</div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">Add a prominent "Pay Now" button linked to {'{{invoice_link}}'}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Add a prominent "Pay Now" button for invoice payment</div>
                   </div>
                 </label>
               )}
@@ -189,7 +184,7 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
                   />
                   <div>
                     <div className="font-medium text-gray-900 dark:text-white">Include Quote Approval Button</div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">Add an "Approve Quote" button linked to {'{{quote_link}}'}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Add an "Approve Quote" button for quote approval</div>
                   </div>
                 </label>
               )}
@@ -291,10 +286,10 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
             <div className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg p-6">
               <h3 className="font-medium text-gray-900 dark:text-white mb-4">Auto-Generated Signature</h3>
               <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-                <p className="font-medium">{'{{user_name}}'}</p>
-                <p>{'{{company_name}}'}</p>
-                <p>{'{{company_phone}}'}</p>
-                <p>{'{{company_email}}'}</p>
+                <p className="font-medium">Your Name</p>
+                <p>Your Company Name</p>
+                <p>Your Company Phone</p>
+                <p>Your Company Email</p>
               </div>
             </div>
 
