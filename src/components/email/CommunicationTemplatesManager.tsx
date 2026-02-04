@@ -11,13 +11,11 @@ import {
   AlertTriangle,
   CheckCircle2,
   Copy,
-  Eye,
 } from 'lucide-react';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase-client';
 import ShortCodePicker from './ShortCodePicker';
-import ShortCodeReference from './ShortCodeReference';
 import RichTextEmailEditor from './RichTextEmailEditor';
 import { MissingShortCodesWarningModal } from './MissingShortCodesWarningModal';
 import { TemplateValidationFeedback } from './TemplateValidationFeedback';
@@ -43,7 +41,6 @@ export default function CommunicationTemplatesManager() {
   const [showEditor, setShowEditor] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<CommunicationTemplate | null>(null);
   const [showShortCodes, setShowShortCodes] = useState(false);
-  const [showReference, setShowReference] = useState(false);
 
   // Form state
   const [templateType, setTemplateType] = useState<TemplateType>('quote_email_default');
@@ -320,32 +317,16 @@ export default function CommunicationTemplatesManager() {
             Manage customizable email templates with short codes
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        {isAdmin && (
           <button
-            onClick={() => setShowReference(!showReference)}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors"
+            onClick={() => openEditor()}
+            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-base shadow-lg"
           >
-            <Eye className="w-4 h-4" />
-            Short Code Reference
+            <Plus className="w-5 h-5" />
+            Create New Template
           </button>
-          {isAdmin && (
-            <button
-              onClick={() => openEditor()}
-              className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-base shadow-lg"
-            >
-              <Plus className="w-5 h-5" />
-              Create New Template
-            </button>
-          )}
-        </div>
+        )}
       </div>
-
-      {/* Short Code Reference */}
-      {showReference && (
-        <div className="bg-white dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-700 p-6">
-          <ShortCodeReference />
-        </div>
-      )}
 
       {/* Template List */}
       {!showEditor && (
