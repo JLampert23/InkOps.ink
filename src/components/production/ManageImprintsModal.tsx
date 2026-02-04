@@ -26,6 +26,8 @@ interface Imprint {
   thread_ink_color?: string;
   pricing_matrix_column?: string;
   group_label?: string;
+  num_colors?: number;
+  price?: number;
 }
 
 interface PriceMatrix {
@@ -68,6 +70,13 @@ interface ManageImprintsModalProps {
   lineItems?: any[];
 }
 
+// Helper function to extract number of colors from pricing_matrix_column
+const extractNumColors = (columnName: string): number => {
+  if (!columnName) return 1;
+  const match = columnName.match(/(\d+)\s*color/i);
+  return match ? parseInt(match[1]) : 1;
+};
+
 export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabel, quote, lineItems }: ManageImprintsModalProps) {
   const { user } = useAuth();
   const { showNotification } = useNotification();
@@ -90,6 +99,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
     thread_ink_color: '',
     pricing_matrix_column: '',
     group_label: '',
+    num_colors: 1,
   });
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -125,6 +135,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
         thread_ink_color: '',
         pricing_matrix_column: '',
         group_label: '',
+        num_colors: 1,
       });
       setEditingIndex(null);
     }
@@ -287,6 +298,8 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
             thread_ink_color: imp.thread_ink_color || '',
             pricing_matrix_column: imp.pricing_matrix_column || '',
             group_label: imp.group_label || '',
+            num_colors: imp.num_colors || extractNumColors(imp.pricing_matrix_column),
+            price: imp.price || 0,
           };
         })
       );
@@ -413,6 +426,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
       thread_ink_color: '',
       pricing_matrix_column: '',
       group_label: initialGroupLabel || '',
+      num_colors: 1,
     });
     setSelectedMatrixColumns([]);
     setSelectedProofForNote(null);
@@ -490,6 +504,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
           thread_ink_color: imprint.thread_ink_color,
           pricing_matrix_column: imprint.pricing_matrix_column,
           group_label: imprint.group_label || null,
+          num_colors: extractNumColors(imprint.pricing_matrix_column),
         })
         .select()
         .single();
@@ -598,6 +613,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
             thread_ink_color: imp.thread_ink_color,
             pricing_matrix_column: imp.pricing_matrix_column,
             group_label: imp.group_label || null,
+            num_colors: extractNumColors(imp.pricing_matrix_column),
           };
 
           if (imp.id) {
@@ -705,7 +721,8 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
                         ...currentImprint,
                         price_matrix_id: e.target.value,
                         matrix: matrix?.name || '',
-                        pricing_matrix_column: ''
+                        pricing_matrix_column: '',
+                        num_colors: 1
                       });
                       setSelectedMatrixColumns(columns);
                     }}
@@ -724,7 +741,11 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
                   <label className="block text-xs font-medium text-gray-400 mb-1.5">Column</label>
                   <select
                     value={currentImprint.pricing_matrix_column}
-                    onChange={(e) => setCurrentImprint({ ...currentImprint, pricing_matrix_column: e.target.value })}
+                    onChange={(e) => setCurrentImprint({
+                      ...currentImprint,
+                      pricing_matrix_column: e.target.value,
+                      num_colors: extractNumColors(e.target.value)
+                    })}
                     disabled={!currentImprint.price_matrix_id || selectedMatrixColumns.length === 0}
                     className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-600 rounded text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -795,7 +816,12 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
                           </span>
                           {imprint.pricing_matrix_column && (
                             <span className="text-xs text-gray-400">
-                              Col: {imprint.pricing_matrix_column}
+                              {imprint.pricing_matrix_column}
+                            </span>
+                          )}
+                          {imprint.price !== undefined && imprint.price > 0 && (
+                            <span className="text-xs px-1.5 py-0.5 bg-green-500/20 text-green-300 rounded font-medium">
+                              ${imprint.price.toFixed(2)}
                             </span>
                           )}
                         </div>
