@@ -692,20 +692,27 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       return group;
     });
     setItemGroups(newGroups);
+
+    // Auto-update price from matrix when quantity changes
+    if (field.startsWith('qty_')) {
+      setTimeout(() => {
+        updatePriceFromMatrix(groupId, itemIndex, true); // silent mode
+      }, 0);
+    }
   };
 
-  const updatePriceFromMatrix = async (groupId: string, itemIndex: number) => {
+  const updatePriceFromMatrix = async (groupId: string, itemIndex: number, silent = false) => {
     try {
       // Find the group
       const group = itemGroups.find(g => g.id === groupId);
       if (!group) {
-        showNotification('error', 'Group not found');
+        if (!silent) showNotification('error', 'Group not found');
         return;
       }
 
       const item = group.items[itemIndex];
       if (!item) {
-        showNotification('error', 'Item not found');
+        if (!silent) showNotification('error', 'Item not found');
         return;
       }
 
@@ -713,7 +720,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       const groupImprints = getGroupImprints(group.label);
 
       if (groupImprints.length === 0) {
-        showNotification('warning', 'No imprints found', 'Please add an imprint to this group first');
+        if (!silent) showNotification('warning', 'No imprints found', 'Please add an imprint to this group first');
         return;
       }
 
@@ -724,7 +731,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         matchingImprint = groupImprints.find((imp: any) => imp.imprint_number === item.imprint_number);
 
         if (!matchingImprint) {
-          showNotification('warning', 'Imprint not found', `No imprint found with number ${item.imprint_number} in this group`);
+          if (!silent) showNotification('warning', 'Imprint not found', `No imprint found with number ${item.imprint_number} in this group`);
           return;
         }
       } else {
@@ -735,7 +742,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       const typeOfWork = matchingImprint.type_of_work;
 
       if (!typeOfWork) {
-        showNotification('warning', 'No type of work specified', 'Please set a type of work for the imprint');
+        if (!silent) showNotification('warning', 'No type of work specified', 'Please set a type of work for the imprint');
         return;
       }
 
@@ -750,12 +757,12 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
 
       if (error) {
         console.error('Error fetching price matrices:', error);
-        showNotification('error', 'Failed to fetch price matrix');
+        if (!silent) showNotification('error', 'Failed to fetch price matrix');
         return;
       }
 
       if (!matrices || matrices.length === 0) {
-        showNotification('warning', 'No price matrix found', `No active price matrix found for ${typeOfWork}`);
+        if (!silent) showNotification('warning', 'No price matrix found', `No active price matrix found for ${typeOfWork}`);
         return;
       }
 
@@ -767,7 +774,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       const cells = matrix.cells || {};
 
       if (rows.length === 0 || Object.keys(cells).length === 0) {
-        showNotification('warning', 'Empty price matrix', 'The price matrix has no pricing data');
+        if (!silent) showNotification('warning', 'Empty price matrix', 'The price matrix has no pricing data');
         return;
       }
 
@@ -804,7 +811,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       const price = cells[cellKey];
 
       if (price === undefined || price === null) {
-        showNotification('warning', 'No price found', 'No price found in the matrix for this quantity');
+        if (!silent) showNotification('warning', 'No price found', 'No price found in the matrix for this quantity');
         return;
       }
 
@@ -823,11 +830,13 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       });
 
       setItemGroups(newGroups);
-      showNotification('success', 'Price updated', `Unit price set to $${parseFloat(price).toFixed(2)} based on ${typeOfWork} pricing matrix`);
+      if (!silent) {
+        showNotification('success', 'Price updated', `Unit price set to $${parseFloat(price).toFixed(2)} based on ${typeOfWork} pricing matrix`);
+      }
 
     } catch (error) {
       console.error('Error updating price from matrix:', error);
-      showNotification('error', 'Failed to update price');
+      if (!silent) showNotification('error', 'Failed to update price');
     }
   };
 
