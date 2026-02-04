@@ -3,9 +3,17 @@ import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase-client';
 import { signUpCompany, CompanySignupData, getCompanySettings, CompanySettings } from '../services/auth-service';
 
+interface UserProfile {
+  id: string;
+  email: string;
+  role: string;
+  company_id: string;
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
+  userProfile: UserProfile | null;
   loading: boolean;
   companySettings: CompanySettings | null;
   refreshCompanySettings: () => Promise<void>;
@@ -21,8 +29,29 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
+
+  const refreshUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('id, email, role, company_id')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching user profile:', error);
+        setUserProfile(null);
+      } else {
+        setUserProfile(data);
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+      setUserProfile(null);
+    }
+  };
 
   const refreshCompanySettings = async () => {
     const settings = await getCompanySettings();
@@ -35,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
 
       if (session?.user) {
+        await refreshUserProfile(session.user.id);
         await refreshCompanySettings();
       }
 
@@ -47,8 +77,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
 
         if (session?.user) {
+          await refreshUserProfile(session.user.id);
           await refreshCompanySettings();
         } else {
+          setUserProfile(null);
           setCompanySettings(null);
         }
 
@@ -92,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setSession(null);
     setUser(null);
+    setUserProfile(null);
     setCompanySettings(null);
 
     return { error: null };
@@ -107,6 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = {
     user,
     session,
+    userProfile,
     loading,
     companySettings,
     refreshCompanySettings,
