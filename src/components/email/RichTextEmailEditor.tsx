@@ -7,6 +7,7 @@ import { AVAILABLE_SHORT_CODES, type ShortCodeKey } from '../../types/shortcode'
 import { ShortCodeEngine } from '../../services/shortcode-service';
 import { useNotification } from '../../contexts/NotificationContext';
 import SmartBlocksSidebar from './SmartBlocksSidebar';
+import ShortCodeSidebar from './ShortCodeSidebar';
 import { type SmartBlock } from '../../types/smart-blocks';
 
 interface RichTextEmailEditorProps {
@@ -166,6 +167,19 @@ export default function RichTextEmailEditor({
       quill.insertText(position, shortCode);
       quill.setSelection(position + shortCode.length, 0);
       quill.focus();
+    } else {
+      // If quill is not available, try inserting into subject
+      const input = subjectRef.current;
+      if (input && document.activeElement === input) {
+        const start = input.selectionStart || 0;
+        const end = input.selectionEnd || 0;
+        const newSubject = subject.substring(0, start) + shortCode + subject.substring(end);
+        setSubject(newSubject);
+        setTimeout(() => {
+          input.focus();
+          input.setSelectionRange(start + shortCode.length, start + shortCode.length);
+        }, 0);
+      }
     }
 
     setShowVariableDropdown(false);
@@ -291,17 +305,17 @@ export default function RichTextEmailEditor({
 
   return (
     <div className="flex gap-4">
-      {/* Smart Blocks Sidebar */}
-      {showSmartBlocks && showBlocksSidebar && viewMode === 'editor' && (
-        <div className="w-80 flex-shrink-0">
+      {/* Shortcode Sidebar - Always visible on the left */}
+      {showShortCodes && viewMode === 'editor' && (
+        <div className="w-72 flex-shrink-0">
           <div className="sticky top-4 h-[calc(100vh-8rem)] overflow-hidden rounded-lg border border-gray-200 dark:border-slate-700">
-            <SmartBlocksSidebar onBlockSelect={insertBlock} onShortCodeClick={insertVariable} />
+            <ShortCodeSidebar onShortCodeClick={insertVariable} />
           </div>
         </div>
       )}
 
       {/* Main Editor Content */}
-      <div className="flex-1 space-y-4">
+      <div className="flex-1 space-y-4 min-w-0">
         {/* Header with Controls */}
         <div className="bg-white dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
           <div className="flex items-center justify-between mb-4">
@@ -331,7 +345,7 @@ export default function RichTextEmailEditor({
               </div>
             )}
 
-            {/* Smart Blocks Toggle */}
+            {/* Smart Blocks Toggle - Show on Right */}
             {showSmartBlocks && viewMode === 'editor' && (
               <button
                 onClick={() => setShowBlocksSidebar(!showBlocksSidebar)}
@@ -342,7 +356,7 @@ export default function RichTextEmailEditor({
                 }`}
               >
                 <Blocks className="w-4 h-4" />
-                Blocks
+                Smart Blocks
               </button>
             )}
 
@@ -388,72 +402,17 @@ export default function RichTextEmailEditor({
         {/* Subject Field */}
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Subject
+            Subject {showShortCodes && viewMode === 'editor' && <span className="text-xs text-gray-500 dark:text-gray-400">(Click shortcodes in the sidebar to insert)</span>}
           </label>
-          <div className="flex gap-2">
-            <input
-              ref={subjectRef}
-              type="text"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="Enter email subject..."
-              className="flex-1 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
-              disabled={viewMode === 'preview'}
-            />
-            {showShortCodes && viewMode === 'editor' && (
-              <div className="relative" ref={dropdownRef}>
-                <button
-                  onClick={() => setShowVariableDropdown(!showVariableDropdown)}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-lg transition-colors whitespace-nowrap"
-                >
-                  Insert Variable
-                  <ChevronDown className="w-4 h-4" />
-                </button>
-
-                {/* Variable Dropdown for Subject */}
-                {showVariableDropdown && (
-                  <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-xl z-50 max-h-96 overflow-hidden flex flex-col">
-                    <div className="p-3 border-b border-gray-200 dark:border-slate-700">
-                      <input
-                        type="text"
-                        placeholder="Search variables..."
-                        value={variableSearch}
-                        onChange={(e) => setVariableSearch(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-gray-900 dark:text-white text-sm"
-                        autoFocus
-                      />
-                    </div>
-                    <div className="overflow-y-auto flex-1">
-                      {Object.entries(groupedVariables).map(([category, items]) => {
-                        if (items.length === 0) return null;
-                        return (
-                          <div key={category} className="p-2">
-                            <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide px-2 py-1">
-                              {category}
-                            </div>
-                            {items.map(([key, label]) => (
-                              <button
-                                key={key}
-                                onClick={() => insertVariableIntoSubject(key)}
-                                className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded transition-colors"
-                              >
-                                <div className="text-sm font-mono text-blue-600 dark:text-blue-400">
-                                  {`{{${key}}}`}
-                                </div>
-                                <div className="text-xs text-gray-600 dark:text-gray-400">
-                                  {label}
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          <input
+            ref={subjectRef}
+            type="text"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            placeholder="Enter email subject..."
+            className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+            disabled={viewMode === 'preview'}
+          />
           {viewMode === 'preview' && preview && (
             <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-sm text-gray-700 dark:text-gray-300">
               <strong>Preview:</strong> {preview.subject}
@@ -491,96 +450,38 @@ export default function RichTextEmailEditor({
               )}
 
               {/* Custom Toolbar */}
-              {showShortCodes && (
-                <div id="toolbar" className="bg-gray-50 dark:bg-slate-800 border-b border-gray-300 dark:border-slate-600 p-2 flex items-center gap-2 flex-wrap">
-                  <select className="ql-header" defaultValue="">
-                    <option value="1">Heading 1</option>
-                    <option value="2">Heading 2</option>
-                    <option value="3">Heading 3</option>
-                    <option value="4">Heading 4</option>
-                    <option value="">Normal</option>
-                  </select>
+              <div id="toolbar" className="bg-gray-50 dark:bg-slate-800 border-b border-gray-300 dark:border-slate-600 p-2 flex items-center gap-2 flex-wrap">
+                <select className="ql-header" defaultValue="">
+                  <option value="1">Heading 1</option>
+                  <option value="2">Heading 2</option>
+                  <option value="3">Heading 3</option>
+                  <option value="4">Heading 4</option>
+                  <option value="">Normal</option>
+                </select>
 
-                  <button className="ql-bold" />
-                  <button className="ql-italic" />
-                  <button className="ql-underline" />
-                  <button className="ql-strike" />
+                <button className="ql-bold" />
+                <button className="ql-italic" />
+                <button className="ql-underline" />
+                <button className="ql-strike" />
 
-                  <span className="w-px h-6 bg-gray-300 dark:bg-slate-600" />
+                <span className="w-px h-6 bg-gray-300 dark:bg-slate-600" />
 
-                  <select className="ql-color" />
-                  <select className="ql-background" />
+                <select className="ql-color" />
+                <select className="ql-background" />
 
-                  <span className="w-px h-6 bg-gray-300 dark:bg-slate-600" />
+                <span className="w-px h-6 bg-gray-300 dark:bg-slate-600" />
 
-                  <button className="ql-list" value="ordered" />
-                  <button className="ql-list" value="bullet" />
+                <button className="ql-list" value="ordered" />
+                <button className="ql-list" value="bullet" />
 
-                  <span className="w-px h-6 bg-gray-300 dark:bg-slate-600" />
+                <span className="w-px h-6 bg-gray-300 dark:bg-slate-600" />
 
-                  <button className="ql-link" />
+                <button className="ql-link" />
 
-                  <span className="w-px h-6 bg-gray-300 dark:bg-slate-600" />
+                <span className="w-px h-6 bg-gray-300 dark:bg-slate-600" />
 
-                  <button className="ql-clean" />
-
-                  <span className="flex-1" />
-
-                  {/* Insert Variable Button in Toolbar */}
-                  <div className="relative" ref={dropdownRef}>
-                    <button
-                      type="button"
-                      onClick={() => setShowVariableDropdown(!showVariableDropdown)}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors"
-                    >
-                      Insert Variable
-                      <ChevronDown className="w-4 h-4" />
-                    </button>
-
-                    {/* Variable Dropdown */}
-                    {showVariableDropdown && (
-                      <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-xl z-50 max-h-96 overflow-hidden flex flex-col">
-                        <div className="p-3 border-b border-gray-200 dark:border-slate-700">
-                          <input
-                            type="text"
-                            placeholder="Search variables..."
-                            value={variableSearch}
-                            onChange={(e) => setVariableSearch(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-gray-900 dark:text-white text-sm"
-                            autoFocus
-                          />
-                        </div>
-                        <div className="overflow-y-auto flex-1">
-                          {Object.entries(groupedVariables).map(([category, items]) => {
-                            if (items.length === 0) return null;
-                            return (
-                              <div key={category} className="p-2">
-                                <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide px-2 py-1">
-                                  {category}
-                                </div>
-                                {items.map(([key, label]) => (
-                                  <button
-                                    key={key}
-                                    onClick={() => insertVariable(key)}
-                                    className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded transition-colors"
-                                  >
-                                    <div className="text-sm font-mono text-blue-600 dark:text-blue-400">
-                                      {`{{${key}}}`}
-                                    </div>
-                                    <div className="text-xs text-gray-600 dark:text-gray-400">
-                                      {label}
-                                    </div>
-                                  </button>
-                                ))}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+                <button className="ql-clean" />
+              </div>
 
               {/* Quill Editor */}
               <ReactQuill
@@ -615,16 +516,25 @@ export default function RichTextEmailEditor({
         {showShortCodes && viewMode === 'editor' && (
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
-              Using Variables{showSmartBlocks && ' & Smart Blocks'}
+              Using Shortcodes{showSmartBlocks && ' & Smart Blocks'}
             </h4>
             <p className="text-sm text-blue-800 dark:text-blue-200">
-              Click "Insert Variable" to add dynamic content like customer names, invoice numbers, and payment links.
-              {showSmartBlocks && ' Drag Smart Blocks from the sidebar or click to insert prebuilt content sections.'}
-              {' '}Variables will be replaced with actual data when the email is sent.
+              Click any shortcode in the left sidebar to insert it at your cursor position.
+              {showSmartBlocks && ' Toggle Smart Blocks to access prebuilt content sections.'}
+              {' '}Shortcodes will be replaced with actual data when the email is sent.
             </p>
           </div>
         )}
       </div>
+
+      {/* Smart Blocks Sidebar - Show on Right when toggled */}
+      {showSmartBlocks && showBlocksSidebar && viewMode === 'editor' && (
+        <div className="w-80 flex-shrink-0">
+          <div className="sticky top-4 h-[calc(100vh-8rem)] overflow-hidden rounded-lg border border-gray-200 dark:border-slate-700">
+            <SmartBlocksSidebar onBlockSelect={insertBlock} onShortCodeClick={insertVariable} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { Save, Send, Eye, Code } from 'lucide-react';
-import ShortCodePicker from './ShortCodePicker';
+import { Save, Send, Eye } from 'lucide-react';
+import ShortCodeSidebar from './ShortCodeSidebar';
 import { ShortCodeEngine } from '../../services/shortcode-service';
 import { useNotification } from '../../contexts/NotificationContext';
 
@@ -22,13 +22,14 @@ export default function EmailTemplateEditor({
   const { showNotification } = useNotification();
   const [subject, setSubject] = useState(initialSubject);
   const [body, setBody] = useState(initialBody);
-  const [showPicker, setShowPicker] = useState(false);
-  const [activeField, setActiveField] = useState<'subject' | 'body'>('body');
   const subjectRef = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleInsertShortCode = (shortCode: string) => {
-    if (activeField === 'subject') {
+  const handleInsertShortCode = (key: string) => {
+    const shortCode = `{{${key}}}`;
+
+    // Check which field is focused
+    if (document.activeElement === subjectRef.current) {
       const input = subjectRef.current;
       if (input) {
         const start = input.selectionStart || 0;
@@ -53,6 +54,8 @@ export default function EmailTemplateEditor({
         }, 0);
       }
     }
+
+    showNotification('success', 'Shortcode Inserted', `${shortCode} added to template`);
   };
 
   const handleSave = () => {
@@ -80,28 +83,24 @@ export default function EmailTemplateEditor({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      {/* Editor */}
-      <div className={showShortCodes ? 'lg:col-span-2' : 'lg:col-span-3'}>
+    <div className="flex gap-4">
+      {/* Shortcode Sidebar - Always visible on the left */}
+      {showShortCodes && (
+        <div className="w-72 flex-shrink-0">
+          <div className="sticky top-4 h-[calc(100vh-8rem)] overflow-hidden rounded-lg border border-gray-200 dark:border-slate-700">
+            <ShortCodeSidebar onShortCodeClick={handleInsertShortCode} />
+          </div>
+        </div>
+      )}
+
+      {/* Main Editor Content */}
+      <div className="flex-1 min-w-0">
         <div className="bg-white dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-700 p-4 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               Email Template
             </h3>
             <div className="flex items-center gap-2">
-              {showShortCodes && (
-                <button
-                  onClick={() => setShowPicker(!showPicker)}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors ${
-                    showPicker
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-gray-300'
-                  }`}
-                >
-                  <Code className="w-4 h-4" />
-                  Short Codes
-                </button>
-              )}
               {onSave && (
                 <button
                   onClick={handleSave}
@@ -125,20 +124,16 @@ export default function EmailTemplateEditor({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Subject
+              Subject {showShortCodes && <span className="text-xs text-gray-500 dark:text-gray-400">(Click shortcodes in the sidebar to insert)</span>}
             </label>
             <input
               ref={subjectRef}
               type="text"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              onFocus={() => setActiveField('subject')}
               placeholder="Enter email subject..."
               className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
             />
-            <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              You can use short codes like {'{{'} {'{customer_first_name}'} {'}}'}
-            </div>
           </div>
 
           <div>
@@ -149,13 +144,12 @@ export default function EmailTemplateEditor({
               ref={bodyRef}
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              onFocus={() => setActiveField('body')}
               placeholder="Enter email body... HTML tags are supported."
               rows={15}
               className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white font-mono text-sm focus:ring-2 focus:ring-blue-500"
             />
             <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              HTML formatting is supported. Use short codes for dynamic content.
+              HTML formatting is supported. Click shortcodes in the sidebar to add dynamic content.
             </div>
           </div>
 
@@ -216,18 +210,6 @@ export default function EmailTemplateEditor({
           </div>
         </div>
       </div>
-
-      {/* Short Code Picker */}
-      {showShortCodes && showPicker && (
-        <div className="lg:col-span-1">
-          <div className="bg-white dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-700 p-4 sticky top-4">
-            <ShortCodePicker
-              onInsert={handleInsertShortCode}
-              currentTemplate={activeField === 'subject' ? subject : body}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
