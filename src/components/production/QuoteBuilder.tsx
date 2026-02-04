@@ -671,7 +671,9 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
     setItemGroups(newGroups);
   };
 
-  const updateItem = (groupId: string, itemIndex: number, field: keyof QuoteItem, value: any) => {
+  const updateItem = async (groupId: string, itemIndex: number, field: keyof QuoteItem, value: any) => {
+    let updatedGroups: any[] = [];
+
     const newGroups = itemGroups.map(group => {
       if (group.id === groupId) {
         const newItems = [...group.items];
@@ -691,20 +693,20 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       }
       return group;
     });
+
+    updatedGroups = newGroups;
     setItemGroups(newGroups);
 
     // Auto-update price from matrix when quantity changes
     if (field.startsWith('qty_')) {
-      setTimeout(() => {
-        updatePriceFromMatrix(groupId, itemIndex, true); // silent mode
-      }, 0);
+      await updatePriceFromMatrixWithGroups(updatedGroups, groupId, itemIndex, true);
     }
   };
 
-  const updatePriceFromMatrix = async (groupId: string, itemIndex: number, silent = false) => {
+  const updatePriceFromMatrixWithGroups = async (groups: any[], groupId: string, itemIndex: number, silent = false) => {
     try {
       // Find the group
-      const group = itemGroups.find(g => g.id === groupId);
+      const group = groups.find(g => g.id === groupId);
       if (!group) {
         if (!silent) showNotification('error', 'Group not found');
         return;
@@ -816,7 +818,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       }
 
       // Update the item's unit price
-      const newGroups = itemGroups.map(g => {
+      const newGroups = groups.map(g => {
         if (g.id === groupId) {
           const newItems = [...g.items];
           newItems[itemIndex] = {
@@ -838,6 +840,10 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       console.error('Error updating price from matrix:', error);
       if (!silent) showNotification('error', 'Failed to update price');
     }
+  };
+
+  const updatePriceFromMatrix = async (groupId: string, itemIndex: number, silent = false) => {
+    await updatePriceFromMatrixWithGroups(itemGroups, groupId, itemIndex, silent);
   };
 
   const addItemGroup = () => {
