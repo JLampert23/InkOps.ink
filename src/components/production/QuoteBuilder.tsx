@@ -694,6 +694,129 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
     setItemGroups(newGroups);
   };
 
+  const updatePriceFromMatrix = async (groupId: string, itemIndex: number) => {
+    try {
+      // Find the group
+      const group = itemGroups.find(g => g.id === groupId);
+      if (!group) {
+        showNotification('error', 'Group not found');
+        return;
+      }
+
+      const item = group.items[itemIndex];
+      if (!item) {
+        showNotification('error', 'Item not found');
+        return;
+      }
+
+      // Get imprints for this group
+      const groupImprints = getGroupImprints(group.label);
+
+      if (groupImprints.length === 0) {
+        showNotification('warning', 'No imprints found', 'Please add an imprint to this group first');
+        return;
+      }
+
+      // Use the first imprint's type_of_work to find the matching price matrix
+      const typeOfWork = groupImprints[0].type_of_work;
+
+      if (!typeOfWork) {
+        showNotification('warning', 'No type of work specified', 'Please set a type of work for the imprint');
+        return;
+      }
+
+      // Fetch price matrices for this company and type
+      const { data: matrices, error } = await supabase
+        .from('price_matrices')
+        .select('*')
+        .eq('matrix_type', typeOfWork.toLowerCase().replace(/\s+/g, '_'))
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error('Error fetching price matrices:', error);
+        showNotification('error', 'Failed to fetch price matrix');
+        return;
+      }
+
+      if (!matrices || matrices.length === 0) {
+        showNotification('warning', 'No price matrix found', `No active price matrix found for ${typeOfWork}`);
+        return;
+      }
+
+      const matrix = matrices[0];
+
+      // Parse the matrix structure
+      const rows = matrix.rows || [];
+      const columns = matrix.columns || [];
+      const cells = matrix.cells || {};
+
+      if (rows.length === 0 || Object.keys(cells).length === 0) {
+        showNotification('warning', 'Empty price matrix', 'The price matrix has no pricing data');
+        return;
+      }
+
+      // Find the appropriate row based on total quantity
+      let selectedRowIndex = 0;
+      const totalQty = item.total_quantity;
+
+      for (let i = 0; i < rows.length; i++) {
+        const rowLabel = rows[i];
+        // Parse quantity ranges like "1-24", "25-49", "50-99", "100+"
+        const match = rowLabel.match(/(\d+)\s*-\s*(\d+)|(\d+)\+/);
+
+        if (match) {
+          if (match[3]) {
+            // Format like "100+"
+            const minQty = parseInt(match[3]);
+            if (totalQty >= minQty) {
+              selectedRowIndex = i;
+            }
+          } else if (match[1] && match[2]) {
+            // Format like "1-24"
+            const minQty = parseInt(match[1]);
+            const maxQty = parseInt(match[2]);
+            if (totalQty >= minQty && totalQty <= maxQty) {
+              selectedRowIndex = i;
+              break;
+            }
+          }
+        }
+      }
+
+      // Get the price from the first column (column 0) for the selected row
+      const cellKey = `${selectedRowIndex}-0`;
+      const price = cells[cellKey];
+
+      if (price === undefined || price === null) {
+        showNotification('warning', 'No price found', 'No price found in the matrix for this quantity');
+        return;
+      }
+
+      // Update the item's unit price
+      const newGroups = itemGroups.map(g => {
+        if (g.id === groupId) {
+          const newItems = [...g.items];
+          newItems[itemIndex] = {
+            ...newItems[itemIndex],
+            unit_price: parseFloat(price),
+            total_price: item.total_quantity * parseFloat(price)
+          };
+          return { ...g, items: newItems };
+        }
+        return g;
+      });
+
+      setItemGroups(newGroups);
+      showNotification('success', 'Price updated', `Unit price set to $${parseFloat(price).toFixed(2)} based on ${typeOfWork} pricing matrix`);
+
+    } catch (error) {
+      console.error('Error updating price from matrix:', error);
+      showNotification('error', 'Failed to update price');
+    }
+  };
+
   const addItemGroup = () => {
     // Generate a unique label for the new group
     const nextGroupNumber = itemGroups.length + 1;
@@ -1945,9 +2068,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                       <td className="p-0.5 border border-gray-300 dark:border-slate-800">
                         <div className="flex items-center justify-center gap-0.5">
                           <button
-                            onClick={() => {
-                              showNotification('info', 'Coming Soon', 'Refresh pricing from matrix will be available soon');
-                            }}
+                            onClick={() => updatePriceFromMatrix(group.id, itemIdx)}
                             className="p-0.5 text-green-600 dark:text-green-500 hover:text-green-700 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-slate-800 rounded"
                             title="Refresh Pricing from Matrix"
                           >
