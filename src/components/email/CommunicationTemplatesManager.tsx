@@ -8,7 +8,6 @@ import {
   Power,
   PowerOff,
   Code,
-  AlertTriangle,
   CheckCircle2,
   Copy,
 } from 'lucide-react';
@@ -17,8 +16,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase-client';
 import ShortCodePicker from './ShortCodePicker';
 import RichTextEmailEditor from './RichTextEmailEditor';
-import { MissingShortCodesWarningModal } from './MissingShortCodesWarningModal';
-import { TemplateValidationFeedback } from './TemplateValidationFeedback';
 import {
   CommunicationTemplateService,
   validateTemplate,
@@ -55,9 +52,6 @@ export default function CommunicationTemplatesManager() {
 
   // Validation state
   const [validation, setValidation] = useState<TemplateValidation | null>(null);
-  const [showValidation, setShowValidation] = useState(false);
-  const [showWarningModal, setShowWarningModal] = useState(false);
-  const [pendingSave, setPendingSave] = useState<'save' | 'send' | null>(null);
 
   const subjectRef = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
@@ -80,7 +74,6 @@ export default function CommunicationTemplatesManager() {
     if (showEditor && (subjectTemplate || bodyTemplate)) {
       const result = validateTemplate(subjectTemplate, bodyTemplate, templateType);
       setValidation(result);
-      setShowValidation(true);
     }
   }, [subjectTemplate, bodyTemplate, templateType, showEditor]);
 
@@ -122,16 +115,13 @@ export default function CommunicationTemplatesManager() {
       setAutoAttachTerms(metadata.supportedAttachments.terms);
     }
     setShowEditor(true);
-    setShowValidation(false);
     setValidation(null);
   }
 
   function closeEditor() {
     setShowEditor(false);
     setEditingTemplate(null);
-    setShowValidation(false);
     setValidation(null);
-    setPendingSave(null);
   }
 
   function handleTemplateTypeChange(newType: TemplateType) {
@@ -187,7 +177,6 @@ export default function CommunicationTemplatesManager() {
     // Validate before saving
     const result = validateTemplate(subjectTemplate, bodyTemplate, templateType);
     setValidation(result);
-    setShowValidation(true);
 
     // Check for syntax errors
     if (!result.isValid) {
@@ -196,13 +185,6 @@ export default function CommunicationTemplatesManager() {
         'Validation Failed',
         'Please fix template errors before saving'
       );
-      return;
-    }
-
-    // Check for missing required codes
-    if (result.hasRequiredCodeViolations && isActive && !overrideValidation) {
-      setPendingSave('save');
-      setShowWarningModal(true);
       return;
     }
 
@@ -308,19 +290,19 @@ export default function CommunicationTemplatesManager() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between px-6 py-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm rounded-xl shadow-lg border border-slate-200 dark:border-slate-800">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400 bg-clip-text text-transparent">
             Email Templates
           </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+          <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
             Manage customizable email templates with short codes
           </p>
         </div>
         {isAdmin && (
           <button
             onClick={() => openEditor()}
-            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold text-base shadow-lg"
+            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-lg transition-all font-semibold text-base shadow-md hover:shadow-lg"
           >
             <Plus className="w-5 h-5" />
             Create New Template
@@ -332,8 +314,8 @@ export default function CommunicationTemplatesManager() {
       {!showEditor && (
         <div className="grid grid-cols-1 gap-4">
           {templates.length === 0 ? (
-            <div className="bg-white dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-700 p-8 text-center">
-              <p className="text-gray-600 dark:text-gray-400">
+            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-slate-800 p-8 text-center shadow-lg">
+              <p className="text-slate-600 dark:text-slate-400">
                 No email templates yet. Create your first template to get started.
               </p>
             </div>
@@ -346,7 +328,7 @@ export default function CommunicationTemplatesManager() {
               return (
                 <div
                   key={template.id}
-                  className="bg-white dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-700 p-4"
+                  className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-lg hover:shadow-xl transition-all"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -434,14 +416,14 @@ export default function CommunicationTemplatesManager() {
       {showEditor && (
         <div className="space-y-6">
           {/* Template Configuration */}
-          <div className="bg-white dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-700 p-6">
+          <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-lg">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  <h3 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400 bg-clip-text text-transparent">
                     {editingTemplate ? 'Edit Template' : 'New Template'}
                   </h3>
                   <button
                     onClick={closeEditor}
-                    className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                    className="p-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -450,14 +432,14 @@ export default function CommunicationTemplatesManager() {
             <div className="space-y-4">
               {/* Template Type */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
                   Template Type
                 </label>
                 <select
                   value={templateType}
                   onChange={(e) => handleTemplateTypeChange(e.target.value as TemplateType)}
                   disabled={!!editingTemplate}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-2.5 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {Object.values(TEMPLATE_TYPE_METADATA).map((meta) => (
                     <option key={meta.type} value={meta.type}>
@@ -465,36 +447,14 @@ export default function CommunicationTemplatesManager() {
                     </option>
                   ))}
                 </select>
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   {TEMPLATE_TYPE_METADATA[templateType].description}
                 </p>
-                {getRequiredShortCodes(templateType).length > 0 && (
-                  <div className="mt-2 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle className="w-4 h-4 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-sm font-medium text-orange-800 dark:text-orange-300">
-                          Required Short Codes
-                        </p>
-                        <div className="mt-1 space-y-1">
-                          {getRequiredShortCodes(templateType).map((req) => (
-                            <div key={req.code} className="text-xs text-orange-700 dark:text-orange-400">
-                              <code className="bg-orange-100 dark:bg-orange-900/40 px-1 py-0.5 rounded">
-                                {`{{${req.code}}}`}
-                              </code>{' '}
-                              - {req.reason}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* Template Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
                   Template Name
                 </label>
                 <input
@@ -502,13 +462,13 @@ export default function CommunicationTemplatesManager() {
                   value={templateName}
                   onChange={(e) => setTemplateName(e.target.value)}
                   placeholder="e.g., Professional Quote Email"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                  className="w-full px-4 py-2.5 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
               </div>
 
               {/* Attachments */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
                   Auto-Attach
                 </label>
                 <div className="space-y-2">
@@ -596,22 +556,17 @@ export default function CommunicationTemplatesManager() {
             autoSaveDelay={2000}
           />
 
-          {/* Validation Feedback */}
-          {validation && (
-            <TemplateValidationFeedback validation={validation} show={showValidation} />
-          )}
-
           {/* Action Buttons */}
           <div className="flex items-center justify-end gap-3">
             <button
               onClick={closeEditor}
-              className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-slate-700 rounded-lg hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors"
+              className="px-5 py-2.5 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-sm hover:shadow-md"
             >
               Cancel
             </button>
             <button
               onClick={() => handleSave(false)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-lg transition-all shadow-md hover:shadow-lg"
             >
               <Save className="w-4 h-4" />
               {editingTemplate ? 'Update Template' : 'Create Template'}
@@ -620,28 +575,6 @@ export default function CommunicationTemplatesManager() {
         </div>
       )}
 
-      {/* Missing Short Codes Warning Modal */}
-      {validation && (
-        <MissingShortCodesWarningModal
-          isOpen={showWarningModal}
-          onClose={() => {
-            setShowWarningModal(false);
-            setPendingSave(null);
-          }}
-          validation={validation}
-          onFixTemplate={() => {
-            setShowWarningModal(false);
-            setPendingSave(null);
-          }}
-          onSaveAnyway={() => {
-            setShowWarningModal(false);
-            handleSave(true);
-            setPendingSave(null);
-          }}
-          canOverride={isAdmin}
-          actionType={pendingSave || 'save'}
-        />
-      )}
     </div>
   );
 }
