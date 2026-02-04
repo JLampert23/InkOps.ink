@@ -18,6 +18,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase-client';
 import ShortCodePicker from './ShortCodePicker';
 import ShortCodeReference from './ShortCodeReference';
+import RichTextEmailEditor from './RichTextEmailEditor';
 import { MissingShortCodesWarningModal } from './MissingShortCodesWarningModal';
 import { TemplateValidationFeedback } from './TemplateValidationFeedback';
 import {
@@ -450,236 +451,190 @@ export default function CommunicationTemplatesManager() {
 
       {/* Template Editor */}
       {showEditor && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-4">
-            <div className="bg-white dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-700 p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {editingTemplate ? 'Edit Template' : 'New Template'}
-                </h3>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setShowShortCodes(!showShortCodes)}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors ${
-                      showShortCodes
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-gray-300'
-                    }`}
-                  >
-                    <Code className="w-4 h-4" />
-                    Short Codes
-                  </button>
-                  <button
-                    onClick={closeEditor}
-                    className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
+        <div className="space-y-6">
+          {/* Template Configuration */}
+          <div className="bg-white dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-700 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {editingTemplate ? 'Edit Template' : 'New Template'}
+              </h3>
+              <button
+                onClick={closeEditor}
+                className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-              <div className="space-y-4">
-                {/* Template Type */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Template Type
-                  </label>
-                  <select
-                    value={templateType}
-                    onChange={(e) => handleTemplateTypeChange(e.target.value as TemplateType)}
-                    disabled={!!editingTemplate}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {Object.values(TEMPLATE_TYPE_METADATA).map((meta) => (
-                      <option key={meta.type} value={meta.type}>
-                        {meta.label}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    {TEMPLATE_TYPE_METADATA[templateType].description}
-                  </p>
-                  {getRequiredShortCodes(templateType).length > 0 && (
-                    <div className="mt-2 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
-                      <div className="flex items-start gap-2">
-                        <AlertTriangle className="w-4 h-4 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-medium text-orange-800 dark:text-orange-300">
-                            Required Short Codes
-                          </p>
-                          <div className="mt-1 space-y-1">
-                            {getRequiredShortCodes(templateType).map((req) => (
-                              <div key={req.code} className="text-xs text-orange-700 dark:text-orange-400">
-                                <code className="bg-orange-100 dark:bg-orange-900/40 px-1 py-0.5 rounded">
-                                  {`{{${req.code}}}`}
-                                </code>{' '}
-                                - {req.reason}
-                              </div>
-                            ))}
-                          </div>
+            <div className="space-y-4">
+              {/* Template Type */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Template Type
+                </label>
+                <select
+                  value={templateType}
+                  onChange={(e) => handleTemplateTypeChange(e.target.value as TemplateType)}
+                  disabled={!!editingTemplate}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {Object.values(TEMPLATE_TYPE_METADATA).map((meta) => (
+                    <option key={meta.type} value={meta.type}>
+                      {meta.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {TEMPLATE_TYPE_METADATA[templateType].description}
+                </p>
+                {getRequiredShortCodes(templateType).length > 0 && (
+                  <div className="mt-2 p-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-orange-800 dark:text-orange-300">
+                          Required Short Codes
+                        </p>
+                        <div className="mt-1 space-y-1">
+                          {getRequiredShortCodes(templateType).map((req) => (
+                            <div key={req.code} className="text-xs text-orange-700 dark:text-orange-400">
+                              <code className="bg-orange-100 dark:bg-orange-900/40 px-1 py-0.5 rounded">
+                                {`{{${req.code}}}`}
+                              </code>{' '}
+                              - {req.reason}
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Template Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Template Name
+                </label>
+                <input
+                  type="text"
+                  value={templateName}
+                  onChange={(e) => setTemplateName(e.target.value)}
+                  placeholder="e.g., Professional Quote Email"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                />
+              </div>
+
+              {/* Attachments */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Auto-Attach
+                </label>
+                <div className="space-y-2">
+                  {TEMPLATE_TYPE_METADATA[templateType].supportedAttachments.quoteLink && (
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={autoAttachQuoteLink}
+                        onChange={(e) => setAutoAttachQuoteLink(e.target.checked)}
+                        className="rounded"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                        Quote/Invoice Link
+                      </span>
+                    </label>
+                  )}
+                  {TEMPLATE_TYPE_METADATA[templateType].supportedAttachments.pdf && (
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={autoAttachPdf}
+                        onChange={(e) => setAutoAttachPdf(e.target.checked)}
+                        className="rounded"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">PDF</span>
+                    </label>
+                  )}
+                  {TEMPLATE_TYPE_METADATA[templateType].supportedAttachments.mockups && (
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={autoAttachMockups}
+                        onChange={(e) => setAutoAttachMockups(e.target.checked)}
+                        className="rounded"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Mockups</span>
+                    </label>
+                  )}
+                  {TEMPLATE_TYPE_METADATA[templateType].supportedAttachments.terms && (
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={autoAttachTerms}
+                        onChange={(e) => setAutoAttachTerms(e.target.checked)}
+                        className="rounded"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-300">
+                        Terms & Conditions
+                      </span>
+                    </label>
                   )}
                 </div>
+              </div>
 
-                {/* Template Name */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Template Name
-                  </label>
+              {/* Active Toggle */}
+              <div>
+                <label className="flex items-center gap-2">
                   <input
-                    type="text"
-                    value={templateName}
-                    onChange={(e) => setTemplateName(e.target.value)}
-                    placeholder="e.g., Professional Quote Email"
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
+                    type="checkbox"
+                    checked={isActive}
+                    onChange={(e) => setIsActive(e.target.checked)}
+                    className="rounded"
                   />
-                </div>
-
-                {/* Subject Template */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Subject Template
-                  </label>
-                  <input
-                    ref={subjectRef}
-                    type="text"
-                    value={subjectTemplate}
-                    onChange={(e) => setSubjectTemplate(e.target.value)}
-                    onFocus={() => setActiveField('subject')}
-                    placeholder="Enter email subject..."
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white font-mono text-sm"
-                  />
-                </div>
-
-                {/* Body Template */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Body Template (HTML)
-                  </label>
-                  <textarea
-                    ref={bodyRef}
-                    value={bodyTemplate}
-                    onChange={(e) => setBodyTemplate(e.target.value)}
-                    onFocus={() => setActiveField('body')}
-                    placeholder="Enter email body... HTML tags are supported."
-                    rows={15}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white font-mono text-sm"
-                  />
-                </div>
-
-                {/* Validation Feedback */}
-                {validation && (
-                  <TemplateValidationFeedback validation={validation} show={showValidation} />
-                )}
-
-                {/* Attachments */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Auto-Attach
-                  </label>
-                  <div className="space-y-2">
-                    {TEMPLATE_TYPE_METADATA[templateType].supportedAttachments.quoteLink && (
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={autoAttachQuoteLink}
-                          onChange={(e) => setAutoAttachQuoteLink(e.target.checked)}
-                          className="rounded"
-                        />
-                        <span className="text-sm text-gray-700 dark:text-gray-300">
-                          Quote/Invoice Link
-                        </span>
-                      </label>
-                    )}
-                    {TEMPLATE_TYPE_METADATA[templateType].supportedAttachments.pdf && (
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={autoAttachPdf}
-                          onChange={(e) => setAutoAttachPdf(e.target.checked)}
-                          className="rounded"
-                        />
-                        <span className="text-sm text-gray-700 dark:text-gray-300">PDF</span>
-                      </label>
-                    )}
-                    {TEMPLATE_TYPE_METADATA[templateType].supportedAttachments.mockups && (
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={autoAttachMockups}
-                          onChange={(e) => setAutoAttachMockups(e.target.checked)}
-                          className="rounded"
-                        />
-                        <span className="text-sm text-gray-700 dark:text-gray-300">Mockups</span>
-                      </label>
-                    )}
-                    {TEMPLATE_TYPE_METADATA[templateType].supportedAttachments.terms && (
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={autoAttachTerms}
-                          onChange={(e) => setAutoAttachTerms(e.target.checked)}
-                          className="rounded"
-                        />
-                        <span className="text-sm text-gray-700 dark:text-gray-300">
-                          Terms & Conditions
-                        </span>
-                      </label>
-                    )}
-                  </div>
-                </div>
-
-                {/* Active Toggle */}
-                <div>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={isActive}
-                      onChange={(e) => setIsActive(e.target.checked)}
-                      className="rounded"
-                    />
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Set as active template
-                    </span>
-                  </label>
-                  <p className="mt-1 ml-6 text-xs text-gray-500 dark:text-gray-400">
-                    Only one template of each type can be active at a time
-                  </p>
-                </div>
-
-                {/* Save Button */}
-                <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-slate-700">
-                  <button
-                    onClick={closeEditor}
-                    className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-slate-700 rounded-lg hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => handleSave(false)}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    <Save className="w-4 h-4" />
-                    {editingTemplate ? 'Update Template' : 'Create Template'}
-                  </button>
-                </div>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Set as active template
+                  </span>
+                </label>
+                <p className="mt-1 ml-6 text-xs text-gray-500 dark:text-gray-400">
+                  Only one template of each type can be active at a time
+                </p>
               </div>
             </div>
           </div>
 
-          {/* Short Code Picker */}
-          {showShortCodes && (
-            <div className="lg:col-span-1">
-              <div className="bg-white dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-700 p-4 sticky top-4">
-                <ShortCodePicker
-                  onInsert={handleInsertShortCode}
-                  currentTemplate={activeField === 'subject' ? subjectTemplate : bodyTemplate}
-                />
-              </div>
-            </div>
+          {/* Rich Text Email Editor */}
+          <RichTextEmailEditor
+            initialSubject={subjectTemplate}
+            initialBody={bodyTemplate}
+            onAutoSave={(subject, body) => {
+              setSubjectTemplate(subject);
+              setBodyTemplate(body);
+            }}
+            showShortCodes={true}
+            autoSaveDelay={2000}
+          />
+
+          {/* Validation Feedback */}
+          {validation && (
+            <TemplateValidationFeedback validation={validation} show={showValidation} />
           )}
+
+          {/* Action Buttons */}
+          <div className="flex items-center justify-end gap-3">
+            <button
+              onClick={closeEditor}
+              className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-slate-700 rounded-lg hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => handleSave(false)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Save className="w-4 h-4" />
+              {editingTemplate ? 'Update Template' : 'Create Template'}
+            </button>
+          </div>
         </div>
       )}
 
