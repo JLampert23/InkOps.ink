@@ -12,8 +12,6 @@ import {
   CheckCircle2,
   Copy,
   Eye,
-  Wand2,
-  FileEdit,
 } from 'lucide-react';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -23,7 +21,6 @@ import ShortCodeReference from './ShortCodeReference';
 import RichTextEmailEditor from './RichTextEmailEditor';
 import { MissingShortCodesWarningModal } from './MissingShortCodesWarningModal';
 import { TemplateValidationFeedback } from './TemplateValidationFeedback';
-import { GuidedTemplateBuilder } from './GuidedTemplateBuilder';
 import {
   CommunicationTemplateService,
   validateTemplate,
@@ -47,8 +44,6 @@ export default function CommunicationTemplatesManager() {
   const [editingTemplate, setEditingTemplate] = useState<CommunicationTemplate | null>(null);
   const [showShortCodes, setShowShortCodes] = useState(false);
   const [showReference, setShowReference] = useState(false);
-  const [editorMode, setEditorMode] = useState<'guided' | 'advanced'>('guided');
-  const [showModeSwitch, setShowModeSwitch] = useState(false);
 
   // Form state
   const [templateType, setTemplateType] = useState<TemplateType>('quote_email_default');
@@ -140,35 +135,6 @@ export default function CommunicationTemplatesManager() {
     setShowValidation(false);
     setValidation(null);
     setPendingSave(null);
-    setEditorMode('guided');
-  }
-
-  function handleSwitchToAdvanced() {
-    if (subjectTemplate || bodyTemplate) {
-      setEditorMode('advanced');
-    } else {
-      setEditorMode('advanced');
-    }
-  }
-
-  function handleSwitchToGuided() {
-    if (bodyTemplate && bodyTemplate.length > 0) {
-      const confirmSwitch = confirm(
-        'Switching to Guided Builder will overwrite your current template. Are you sure you want to continue?'
-      );
-      if (confirmSwitch) {
-        setEditorMode('guided');
-      }
-    } else {
-      setEditorMode('guided');
-    }
-  }
-
-  function handleGuidedComplete(html: string, subject: string) {
-    setBodyTemplate(html);
-    setSubjectTemplate(subject);
-    setEditorMode('advanced');
-    showNotification('success', 'Template Generated', 'Your template has been created! You can now customize it further.');
   }
 
   function handleTemplateTypeChange(newType: TemplateType) {
@@ -486,107 +452,12 @@ export default function CommunicationTemplatesManager() {
       {/* Template Editor */}
       {showEditor && (
         <div className="space-y-6">
-          {/* Mode Selector */}
-          {!editingTemplate && (
-            <div className="bg-white dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-700 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Choose Editor Mode
-                </h3>
-                <button
-                  onClick={closeEditor}
-                  className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  onClick={() => setEditorMode('guided')}
-                  className={`p-6 border-2 rounded-lg transition-all ${
-                    editorMode === 'guided'
-                      ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20'
-                      : 'border-gray-200 dark:border-slate-700 hover:border-blue-400'
-                  }`}
-                >
-                  <div className="flex flex-col items-center text-center">
-                    <Wand2 className={`w-8 h-8 mb-3 ${
-                      editorMode === 'guided' ? 'text-blue-600' : 'text-gray-500'
-                    }`} />
-                    <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
-                      Guided Builder
-                    </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Step-by-step wizard to create professional templates without coding
-                    </p>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => setEditorMode('advanced')}
-                  className={`p-6 border-2 rounded-lg transition-all ${
-                    editorMode === 'advanced'
-                      ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20'
-                      : 'border-gray-200 dark:border-slate-700 hover:border-blue-400'
-                  }`}
-                >
-                  <div className="flex flex-col items-center text-center">
-                    <FileEdit className={`w-8 h-8 mb-3 ${
-                      editorMode === 'advanced' ? 'text-blue-600' : 'text-gray-500'
-                    }`} />
-                    <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
-                      Advanced Editor
-                    </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Full control with rich text editor and HTML customization
-                    </p>
-                  </div>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Guided Builder Mode */}
-          {editorMode === 'guided' && !editingTemplate && (
-            <div className="bg-white dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
-              <GuidedTemplateBuilder
-                onComplete={handleGuidedComplete}
-                onCancel={closeEditor}
-                templateType={templateType}
-                initialData={{
-                  subject: subjectTemplate,
-                  greeting: '',
-                  intro: '',
-                  actionType: templateType.includes('invoice') ? 'payment' : templateType.includes('quote') ? 'quote' : 'link',
-                  includeInvoiceSummary: templateType.includes('invoice'),
-                  includeQuoteSummary: templateType.includes('quote'),
-                  closing: '',
-                }}
-              />
-            </div>
-          )}
-
-          {/* Advanced Editor Mode */}
-          {(editorMode === 'advanced' || editingTemplate) && (
-            <>
-              {/* Template Configuration */}
-              <div className="bg-white dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-700 p-6">
+          {/* Template Configuration */}
+          <div className="bg-white dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-700 p-6">
                 <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-4">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {editingTemplate ? 'Edit Template' : 'New Template'}
-                    </h3>
-                    {!editingTemplate && (
-                      <button
-                        onClick={handleSwitchToGuided}
-                        className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
-                      >
-                        <Wand2 className="w-4 h-4" />
-                        Switch to Guided Builder
-                      </button>
-                    )}
-                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {editingTemplate ? 'Edit Template' : 'New Template'}
+                  </h3>
                   <button
                     onClick={closeEditor}
                     className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
@@ -749,24 +620,22 @@ export default function CommunicationTemplatesManager() {
             <TemplateValidationFeedback validation={validation} show={showValidation} />
           )}
 
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-3">
-                <button
-                  onClick={closeEditor}
-                  className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-slate-700 rounded-lg hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleSave(false)}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <Save className="w-4 h-4" />
-                  {editingTemplate ? 'Update Template' : 'Create Template'}
-                </button>
-              </div>
-            </>
-          )}
+          {/* Action Buttons */}
+          <div className="flex items-center justify-end gap-3">
+            <button
+              onClick={closeEditor}
+              className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-slate-700 rounded-lg hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => handleSave(false)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Save className="w-4 h-4" />
+              {editingTemplate ? 'Update Template' : 'Create Template'}
+            </button>
+          </div>
         </div>
       )}
 
