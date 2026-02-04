@@ -743,7 +743,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       const { data: matrices, error } = await supabase
         .from('price_matrices')
         .select('*')
-        .eq('matrix_type', typeOfWork.toLowerCase().replace(/\s+/g, '_'))
+        .eq('matrix_type', typeOfWork)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
         .limit(1);
