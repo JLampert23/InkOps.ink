@@ -62,17 +62,19 @@ export async function listTemplates(
       ? `${EDGE_FUNCTION_URL}?${params.toString()}`
       : EDGE_FUNCTION_URL;
 
+    console.log('Fetching templates with headers:', { url, hasAuth: !!headers.Authorization });
     const response = await fetch(url, { headers });
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error('Response error:', response.status, errorText);
       let errorData;
       try {
         errorData = JSON.parse(errorText);
       } catch {
         errorData = { error: errorText };
       }
-      throw new Error(errorData.error || `Failed to fetch templates (${response.status})`);
+      throw new Error(errorData.error || errorData.details || `Failed to fetch templates (${response.status})`);
     }
 
     return await response.json();

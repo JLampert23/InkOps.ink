@@ -132,12 +132,16 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    console.log('Communication templates endpoint called');
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const authHeader = req.headers.get("Authorization");
 
+    console.log('Auth header present:', !!authHeader);
+
     if (!authHeader) {
+      console.error('No authorization header provided');
       return new Response(
         JSON.stringify({ error: "Missing Authorization header" }),
         {
@@ -152,16 +156,20 @@ Deno.serve(async (req: Request) => {
 
     // Extract JWT token from Authorization header
     const token = authHeader.replace('Bearer ', '');
+    console.log('Token extracted, length:', token.length);
 
     // Verify the JWT and get the user
     const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    console.log('User verification result:', { userId: user?.id, hasError: !!authError });
 
     if (authError || !user) {
       console.error('Auth error:', authError);
       return new Response(
         JSON.stringify({
           error: "Unauthorized - Invalid or expired token",
-          details: authError?.message
+          details: authError?.message,
+          debugInfo: 'Token verification failed'
         }),
         {
           status: 401,
@@ -169,6 +177,8 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
+
+    console.log('User authenticated successfully:', user.id);
 
     // Use the admin client for all database operations (bypasses RLS)
     const supabase = supabaseAdmin;
