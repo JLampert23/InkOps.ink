@@ -697,6 +697,23 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
     updatedGroups = newGroups;
     setItemGroups(newGroups);
 
+    // If the quote is saved, persist the change to the database immediately
+    const group = updatedGroups.find(g => g.id === groupId);
+    if (group && quoteId && !quoteId.startsWith('temp-')) {
+      const item = group.items[itemIndex];
+      if (item.id) {
+        // Update the line item in the database
+        const { error } = await supabase
+          .from('quote_line_items')
+          .update({ [field]: value })
+          .eq('id', item.id);
+
+        if (error) {
+          console.error('Error updating line item:', error);
+        }
+      }
+    }
+
     // Auto-update price from matrix when quantity changes
     if (field.startsWith('qty_')) {
       await updatePriceFromMatrixWithGroups(updatedGroups, groupId, itemIndex, true);
@@ -741,8 +758,40 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           return;
         }
 
-        // Reload the quote data to get updated prices
-        await loadQuote(quoteId);
+        // Instead of reloading the entire quote, just fetch updated prices for this group
+        const { data: updatedLineItems, error: lineItemError } = await supabase
+          .from('quote_line_items')
+          .select('id, unit_price, total_price')
+          .eq('quote_id', quoteId)
+          .eq('group_label', group.label);
+
+        if (lineItemError) {
+          console.error('Error fetching updated prices:', lineItemError);
+          if (!silent) showNotification('error', 'Failed to fetch updated prices', lineItemError.message);
+          return;
+        }
+
+        // Update only the prices in the local state
+        if (updatedLineItems) {
+          const newGroups = groups.map(g => {
+            if (g.id === groupId) {
+              const newItems = g.items.map((itm: any) => {
+                const updated = updatedLineItems.find(li => li.id === itm.id);
+                if (updated) {
+                  return {
+                    ...itm,
+                    unit_price: parseFloat(updated.unit_price) || 0,
+                    total_price: parseFloat(updated.total_price) || 0
+                  };
+                }
+                return itm;
+              });
+              return { ...g, items: newItems };
+            }
+            return g;
+          });
+          setItemGroups(newGroups);
+        }
 
         if (!silent) {
           showNotification('success', 'Pricing Updated', 'Prices have been recalculated based on all imprints in the group');
