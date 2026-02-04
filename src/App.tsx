@@ -16,6 +16,7 @@ const PaidInvoicesPage = lazy(() => import('./components/billing/PaidInvoicesPag
 const AccountsReceivableReport = lazy(() => import('./components/accounting/AccountsReceivableReport'));
 const CustomersReport = lazy(() => import('./components/accounting/CustomersReport'));
 const PaymentsReport = lazy(() => import('./components/accounting/UnifiedPaymentsReport'));
+const CommunicationTemplatesManager = lazy(() => import('./components/email/CommunicationTemplatesManager').then(m => ({ default: m.default })));
 import CreateCustomerModal from './components/accounting/CreateCustomerModal';
 
 type Tab =
@@ -24,7 +25,8 @@ type Tab =
   | 'accounts-receivable'
   | 'paid-invoices'
   | 'customers'
-  | 'payments';
+  | 'payments'
+  | 'email-templates';
 
 interface CompanySettings {
   company_name: string;
@@ -147,6 +149,15 @@ function AppContent() {
       name: 'Production Management',
       icon: Package,
       description: 'Workflow & production tracking'
+    },
+  ];
+
+  const emailNavItems = [
+    {
+      id: 'email-templates' as Tab,
+      name: 'Email Templates',
+      icon: Mail,
+      description: 'Manage email templates'
     },
   ];
 
@@ -325,6 +336,37 @@ function AppContent() {
               );
             })}
           </div>
+
+          {/* Separator */}
+          <div className="border-t border-gray-200 dark:border-slate-700 my-3" />
+
+          {/* 4. EMAIL TEMPLATES - Top-level link */}
+          <div className="space-y-1">
+            {emailNavItems.map(item => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
+                    isActive
+                      ? 'bg-purple-50 dark:bg-purple-600/20 text-purple-700 dark:text-purple-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                  aria-label="Email Templates"
+                >
+                  <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-purple-600 dark:text-purple-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-bold text-xs uppercase tracking-wide leading-tight ${isActive ? 'text-purple-700 dark:text-purple-400' : 'text-gray-900 dark:text-gray-100'}`}>
+                      Email<br />Templates
+                    </div>
+                  </div>
+                  {isActive && <div className="w-1 h-8 bg-purple-600 dark:bg-purple-500 rounded-full absolute right-0" />}
+                </button>
+              );
+            })}
+          </div>
         </nav>
 
         {/* User & Controls */}
@@ -372,7 +414,8 @@ function AppContent() {
                  activeTab === 'customers' ? 'Customers' :
                  activeTab === 'payments' ? 'Payments' :
                  activeTab === 'production' ? 'Production Dashboard' :
-                 [...accountingNavItems, ...squareNavItems, ...productionNavItems].find(item => item.id === activeTab)?.name ||
+                 activeTab === 'email-templates' ? 'Email Templates' :
+                 [...accountingNavItems, ...squareNavItems, ...productionNavItems, ...emailNavItems].find(item => item.id === activeTab)?.name ||
                  (activeTab === 'settings' ? 'Account Settings' : 'Dashboard')}
               </h2>
               {activeTab !== 'production' && (
@@ -389,6 +432,8 @@ function AppContent() {
                     'Payment history and Stripe transaction records'
                   ) : activeTab === 'square' ? (
                     'Square payment data and reports'
+                  ) : activeTab === 'email-templates' ? (
+                    'Manage customizable email templates with short codes'
                   ) : activeTab === 'settings' ? (
                     'Configure your integrations and preferences'
                   ) : (
@@ -542,6 +587,20 @@ function AppContent() {
                 initialCustomerId={quoteCustomerId}
                 onCustomerIdConsumed={() => setQuoteCustomerId(undefined)}
               />
+            </Suspense>
+          )}
+
+          {activeTab === 'email-templates' && (
+            <Suspense fallback={
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-8">
+                <div className="text-center">
+                  <Loader2 className="w-12 h-12 text-purple-600 dark:text-purple-500 animate-spin mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Loading Email Templates</h3>
+                  <p className="text-gray-600 dark:text-gray-400">Initializing template manager...</p>
+                </div>
+              </div>
+            }>
+              <CommunicationTemplatesManager />
             </Suspense>
           )}
 
