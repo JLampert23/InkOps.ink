@@ -1547,18 +1547,18 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-white">
+    <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 text-gray-900 dark:text-white">
       {/* Top Bar */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm shadow-sm">
         <div className="flex items-center gap-4">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400 bg-clip-text text-transparent">
             {quoteId ? `Quote ${quoteNumber}` : 'New Quote'}
           </h2>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <button
             onClick={handleCancel}
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded flex items-center gap-2 shadow-sm"
+            className="px-5 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg flex items-center gap-2 shadow-sm transition-all hover:shadow-md"
           >
             <X className="w-4 h-4" />
             Cancel
@@ -1566,7 +1566,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded flex items-center gap-2 shadow-sm disabled:opacity-50"
+            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2 shadow-md disabled:opacity-50 transition-all hover:shadow-lg"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             Save Draft
@@ -1574,7 +1574,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           <button
             onClick={handleSendQuote}
             disabled={saving || !selectedCustomerId}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded flex items-center gap-2 shadow-sm disabled:opacity-50"
+            className="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg flex items-center gap-2 shadow-md disabled:opacity-50 transition-all hover:shadow-lg"
             title={!selectedCustomerId ? 'Select a customer to send quote' : 'Send quote to customer'}
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
@@ -1583,7 +1583,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           <button
             onClick={handleSaveAndClose}
             disabled={saving}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded flex items-center gap-2 shadow-sm disabled:opacity-50"
+            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-2 shadow-md disabled:opacity-50 transition-all hover:shadow-lg"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
             Save & Close
@@ -1591,21 +1591,21 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-3 bg-gray-50 dark:bg-slate-950">
-        <div className="max-w-[2000px] mx-auto space-y-4">
+      <div className="flex-1 overflow-auto p-6">
+        <div className="max-w-[2000px] mx-auto space-y-6">
           {/* Customer and Details Section */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-6">
             {/* Left: Customer Information */}
-            <div className="col-span-2 space-y-6 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-200 dark:border-slate-800 p-4">
+            <div className="col-span-2 space-y-6 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 p-6">
               {/* Customer Selector */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm text-gray-700 dark:text-gray-300 font-medium">Customer</label>
+                <div className="flex items-center justify-between mb-3">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Customer</label>
                   <button
                     onClick={() => setShowNewCustomerModal(true)}
-                    className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
                   >
-                    New Customer
+                    + New Customer
                   </button>
                 </div>
                 <select
@@ -1617,7 +1617,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                       loadCustomerDetails(newCustomerId);
                     }
                   }}
-                  className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white"
+                  className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 >
                   <option value="">Select a Customer</option>
                   {customers.map(customer => (
@@ -1627,37 +1627,40 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
               </div>
 
               {/* Billing and Shipping */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <h3 className="text-sm text-gray-700 dark:text-gray-300 mb-3 font-semibold">Customer Billing</h3>
-                  <div className="space-y-2">
+                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+                    <DollarSign className="w-4 h-4" />
+                    Customer Billing
+                  </h3>
+                  <div className="space-y-3">
                     <input
                       type="text"
                       value={billCompany}
                       onChange={(e) => setBillCompany(e.target.value)}
                       placeholder="Company"
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     />
                     <input
                       type="text"
                       value={billName}
                       onChange={(e) => setBillName(e.target.value)}
                       placeholder="Name"
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     />
                     <input
                       type="text"
                       value={billAddress1}
                       onChange={(e) => setBillAddress1(e.target.value)}
                       placeholder="Address 1"
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     />
                     <input
                       type="text"
                       value={billAddress2}
                       onChange={(e) => setBillAddress2(e.target.value)}
                       placeholder="Address 2"
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     />
                     <div className="grid grid-cols-2 gap-2">
                       <input
@@ -1665,12 +1668,12 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                         value={billCity}
                         onChange={(e) => setBillCity(e.target.value)}
                         placeholder="City"
-                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                        className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                       />
                       <select
                         value={billState}
                         onChange={(e) => setBillState(e.target.value)}
-                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                        className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                       >
                         <option value="">State</option>
                         <option value="AL">AL</option>
@@ -1683,7 +1686,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                       value={billZip}
                       onChange={(e) => setBillZip(e.target.value)}
                       placeholder="Zip"
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     />
                   </div>
                 </div>
@@ -1696,28 +1699,28 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                       value={shipCompany}
                       onChange={(e) => setShipCompany(e.target.value)}
                       placeholder="Company"
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     />
                     <input
                       type="text"
                       value={shipName}
                       onChange={(e) => setShipName(e.target.value)}
                       placeholder="Name"
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     />
                     <input
                       type="text"
                       value={shipAddress1}
                       onChange={(e) => setShipAddress1(e.target.value)}
                       placeholder="Address 1"
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     />
                     <input
                       type="text"
                       value={shipAddress2}
                       onChange={(e) => setShipAddress2(e.target.value)}
                       placeholder="Address 2"
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     />
                     <div className="grid grid-cols-2 gap-2">
                       <input
@@ -1725,12 +1728,12 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                         value={shipCity}
                         onChange={(e) => setShipCity(e.target.value)}
                         placeholder="City"
-                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                        className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                       />
                       <select
                         value={shipState}
                         onChange={(e) => setShipState(e.target.value)}
-                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                        className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                       >
                         <option value="">State</option>
                         <option value="AL">AL</option>
@@ -1743,7 +1746,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                       value={shipZip}
                       onChange={(e) => setShipZip(e.target.value)}
                       placeholder="Zip"
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                      className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     />
                   </div>
                 </div>
@@ -1752,68 +1755,68 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
               {/* Nickname and Notes */}
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm text-gray-700 dark:text-gray-300 mb-2 block font-medium">Nickname</label>
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 block">Nickname</label>
                   <input
                     type="text"
                     value={nickname}
                     onChange={(e) => setNickname(e.target.value)}
                     placeholder="Invoice nickname"
-                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-gray-700 dark:text-gray-300 mb-2 block font-medium">Customer Notes ?</label>
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 block">Customer Notes ?</label>
                   <textarea
                     value={customerNotes}
                     onChange={(e) => setCustomerNotes(e.target.value)}
                     rows={3}
-                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-gray-700 dark:text-gray-300 mb-2 block font-medium">Production Notes ?</label>
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 block">Production Notes ?</label>
                   <textarea
                     value={productionNotes}
                     onChange={(e) => setProductionNotes(e.target.value)}
                     rows={3}
-                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   />
                 </div>
               </div>
             </div>
 
             {/* Right: Quote Details */}
-            <div className="space-y-4 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-200 dark:border-slate-800 p-4">
+            <div className="space-y-5 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 p-6">
               <div className="flex items-center justify-end">
-                <span className="px-4 py-2 border-2 border-orange-600 text-orange-600 dark:border-orange-500 dark:text-orange-500 rounded text-sm font-medium">
+                <span className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg text-sm font-bold shadow-md">
                   QUOTE
                 </span>
               </div>
 
               <div>
-                <label className="text-sm text-gray-700 dark:text-gray-300 mb-2 block font-medium">Quote Number</label>
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 block">Quote Number</label>
                 <input
                   type="text"
                   value={quoteNumber}
                   onChange={(e) => setQuoteNumber(e.target.value)}
                   placeholder="Auto-generated if left empty"
-                  className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                  className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
               </div>
 
               <div>
-                <label className="text-sm text-gray-700 dark:text-gray-300 mb-2 block font-medium">Owner</label>
-                <select className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm">
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 block">Owner</label>
+                <select className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
                   <option>Jamie</option>
                 </select>
               </div>
 
               <div>
-                <label className="text-sm text-gray-700 dark:text-gray-300 mb-2 block font-medium">Delivery Method</label>
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 block">Delivery Method</label>
                 <select
                   value={deliveryMethod}
                   onChange={(e) => setDeliveryMethod(e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                  className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 >
                   <option value="">Select a Delivery Method</option>
                   <option value="PICK-UP">PICK-UP</option>
@@ -1823,51 +1826,51 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
               </div>
 
               <div>
-                <label className="text-sm text-gray-700 dark:text-gray-300 mb-2 block font-medium">PO Number</label>
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 block">PO Number</label>
                 <input
                   type="text"
                   value={poNumber}
                   onChange={(e) => setPoNumber(e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                  className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
               </div>
 
               <div>
-                <label className="text-sm text-gray-700 dark:text-gray-300 mb-2 block font-medium">Created</label>
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 block">Created</label>
                 <input
                   type="date"
                   value={createdDate}
                   onChange={(e) => setCreatedDate(e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                  className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
               </div>
 
               <div>
-                <label className="text-sm text-gray-700 dark:text-gray-300 mb-2 block font-medium">Production Due Date ?</label>
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 block">Production Due Date ?</label>
                 <input
                   type="date"
                   value={productionDueDate}
                   onChange={(e) => setProductionDueDate(e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                  className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
               </div>
 
               <div>
-                <label className="text-sm text-gray-700 dark:text-gray-300 mb-2 block font-medium">Customer Due Date ?</label>
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 block">Customer Due Date ?</label>
                 <input
                   type="date"
                   value={customerDueDate}
                   onChange={(e) => setCustomerDueDate(e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                  className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
               </div>
 
               <div>
-                <label className="text-sm text-gray-700 dark:text-gray-300 mb-2 block font-medium">Terms</label>
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 block">Terms</label>
                 <select
                   value={terms}
                   onChange={(e) => setTerms(e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                  className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 >
                   <option value="Net 15">Net 15</option>
                   <option value="Net 30">Net 30</option>
@@ -1879,13 +1882,13 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           </div>
 
           {/* Line Items Table */}
-          <div className="space-y-2 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-200 dark:border-slate-800 p-4">
+          <div className="space-y-3 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 p-6">
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
                 {/* Only show main thead when there is a single group with no label */}
                 {itemGroups.length === 1 && !itemGroups[0].label && (
                   <thead>
-                    <tr className="bg-gray-100 dark:bg-slate-900 text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    <tr className="bg-gradient-to-r from-slate-100 to-slate-200 dark:from-slate-900 dark:to-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-300">
                       <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-6"></th>
                       <th className="p-2 text-left border border-gray-300 dark:border-slate-800 w-36">Item #</th>
                       <th className="p-2 text-left border border-gray-300 dark:border-slate-800 w-36">Color</th>
@@ -1911,7 +1914,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                       )}
                       {/* Group Header Row with Label - All Groups */}
                       {(itemGroups.length > 1 || group.label) && (
-                        <tr key={`header-${group.id}`} className="bg-gray-200 dark:bg-slate-800">
+                        <tr key={`header-${group.id}`} className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-slate-800 dark:to-slate-700">
                           <td colSpan={getSizeColumns(group).length + 8} className="p-2 border border-gray-300 dark:border-slate-800">
                             <div className="flex items-center justify-between gap-4">
                               <div className="flex items-center gap-4 flex-1">
@@ -1958,7 +1961,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                       )}
                       {/* Group Column Headers - All Groups with Labels */}
                       {(itemGroups.length > 1 || group.label) && (
-                        <tr key={`columns-${group.id}`} className="bg-gray-100 dark:bg-slate-900 text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        <tr key={`columns-${group.id}`} className="bg-gradient-to-r from-slate-100 to-slate-200 dark:from-slate-900 dark:to-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-300">
                           <th className="p-1 text-left border border-gray-300 dark:border-slate-800 w-6"></th>
                           <th className="p-2 text-left border border-gray-300 dark:border-slate-800 w-48">Item #</th>
                           <th className="p-2 text-left border border-gray-300 dark:border-slate-800 w-48">Color</th>
@@ -1974,7 +1977,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                       )}
                       {/* Group Items */}
                       {group.items.map((item, itemIdx) => (
-                        <tr key={`${group.id}-${itemIdx}`} className="bg-white dark:bg-slate-900/50 hover:bg-gray-50 dark:hover:bg-slate-900">
+                        <tr key={`${group.id}-${itemIdx}`} className="bg-white/80 dark:bg-slate-900/50 hover:bg-blue-50/50 dark:hover:bg-slate-800/50 transition-colors">
                           <td className="p-0.5 border border-gray-300 dark:border-slate-800 text-center">
                             <GripVertical className="w-3 h-3 text-gray-600 mx-auto" />
                           </td>
@@ -2278,18 +2281,18 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           <div className="mb-6">
             <button
               onClick={addItemGroup}
-              className="px-4 py-2 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-900 dark:text-white rounded text-sm flex items-center gap-2 shadow-sm"
+              className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-lg text-sm flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
             >
               <Plus className="w-4 h-4" />
-              Line Item Group
+              Add Line Item Group
             </button>
           </div>
 
           {/* Fees Table */}
-          <div className="max-w-4xl ml-auto space-y-2 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-gray-200 dark:border-slate-800 p-4">
+          <div className="max-w-4xl ml-auto space-y-3 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 p-6">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="bg-gray-100 dark:bg-slate-900 text-sm text-gray-700 dark:text-gray-400">
+                <tr className="bg-gradient-to-r from-slate-100 to-slate-200 dark:from-slate-900 dark:to-slate-800 text-sm font-semibold text-slate-700 dark:text-slate-300">
                   <th className="p-2 text-left border border-gray-300 dark:border-slate-800">Fee</th>
                   <th className="p-2 text-left border border-gray-300 dark:border-slate-800">Description</th>
                   <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-20">Qty</th>
@@ -2300,7 +2303,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
               </thead>
               <tbody>
                 {fees.map((fee, idx) => (
-                  <tr key={idx} className="bg-white dark:bg-slate-900/50 hover:bg-gray-50 dark:hover:bg-slate-900">
+                  <tr key={idx} className="bg-white/80 dark:bg-slate-900/50 hover:bg-blue-50/50 dark:hover:bg-slate-800/50 transition-colors">
                     <td className="p-1 border border-gray-300 dark:border-slate-800">
                       <input
                         type="text"
@@ -2342,17 +2345,6 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
               </tbody>
             </table>
 
-            {/* Debug Info - Shows number of fees loaded */}
-            {availableFees.length > 0 && (
-              <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                {availableFees.length} fee template(s) available
-              </div>
-            )}
-            {availableFees.length === 0 && (
-              <div className="text-xs text-amber-600 dark:text-amber-400 mb-2 p-2 bg-amber-50 dark:bg-amber-900/20 rounded">
-                No fee templates found. Add fees in Account Settings → Production → General Settings.
-              </div>
-            )}
 
             <div className="flex gap-2">
               <select
@@ -2365,7 +2357,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                     }
                   }
                 }}
-                className="px-3 py-2 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-900 dark:text-white rounded text-sm"
+                className="px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-900 dark:text-white rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all flex-1"
               >
                 <option value="">Select a fee to add...</option>
                 {availableFees.map(fee => (
@@ -2376,7 +2368,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
               </select>
               <button
                 onClick={addFee}
-                className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2 shadow-sm"
+                className="px-4 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-lg text-sm flex items-center gap-2 shadow-md hover:shadow-lg transition-all"
               >
                 <Plus className="w-4 h-4" />
                 Custom Fee
@@ -2386,7 +2378,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
 
           {/* Totals Summary */}
           <div className="flex justify-end">
-            <div className="w-96 space-y-2 bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-slate-800">
+            <div className="w-96 space-y-3 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-950 p-6 rounded-xl shadow-lg border border-slate-200 dark:border-slate-800">
               <div className="flex justify-between items-center text-sm">
                 <span className="text-gray-600 dark:text-gray-400">Total Quantity</span>
                 <span className="text-gray-900 dark:text-white">{totals.totalQuantity}</span>
@@ -2438,9 +2430,9 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                   <span className="text-gray-600 dark:text-gray-400">%</span>
                 </div>
               </div>
-              <div className="flex justify-between items-center text-base font-semibold border-t border-gray-300 dark:border-slate-700 pt-2">
-                <span className="text-gray-900 dark:text-white">Total Due</span>
-                <span className="text-gray-900 dark:text-white">{totals.totalDue.toFixed(2)}</span>
+              <div className="flex justify-between items-center text-lg font-bold border-t-2 border-slate-300 dark:border-slate-700 pt-3 mt-2">
+                <span className="bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400 bg-clip-text text-transparent">Total Due</span>
+                <span className="bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-400 dark:to-cyan-400 bg-clip-text text-transparent">${totals.totalDue.toFixed(2)}</span>
               </div>
             </div>
           </div>
@@ -2545,7 +2537,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                       });
                       setItemGroups(updatedGroups);
                     }}
-                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded text-gray-900 dark:text-white text-sm"
+                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   >
                     <option value="regular">Regular Sizes (Youth + Adult)</option>
                     <option value="double">Double Sizes (S/M, L/XL, YS/YM, YL/YXL)</option>
