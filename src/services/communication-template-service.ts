@@ -24,7 +24,12 @@ const EDGE_FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/com
 async function getHeaders(): Promise<HeadersInit> {
   const { data: { session }, error } = await supabase.auth.getSession();
 
-  if (error || !session?.access_token) {
+  if (error) {
+    console.error('Session error:', error);
+    throw new Error(`Authentication error: ${error.message}`);
+  }
+
+  if (!session?.access_token) {
     throw new Error('Not authenticated. Please sign in again.');
   }
 
@@ -60,8 +65,14 @@ export async function listTemplates(
     const response = await fetch(url, { headers });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to fetch templates');
+      const errorText = await response.text();
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: errorText };
+      }
+      throw new Error(errorData.error || `Failed to fetch templates (${response.status})`);
     }
 
     return await response.json();

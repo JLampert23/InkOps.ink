@@ -134,7 +134,7 @@ Deno.serve(async (req: Request) => {
   try {
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const authHeader = req.headers.get("Authorization");
 
     if (!authHeader) {
@@ -147,23 +147,31 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: {
-        headers: { Authorization: authHeader },
-      },
-    });
+    // Create client with service role key for admin operations
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Extract JWT token from Authorization header
+    const token = authHeader.replace('Bearer ', '');
+
+    // Verify the JWT and get the user
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
     if (authError || !user) {
+      console.error('Auth error:', authError);
       return new Response(
-        JSON.stringify({ error: "Unauthorized - Invalid or expired token" }),
+        JSON.stringify({
+          error: "Unauthorized - Invalid or expired token",
+          details: authError?.message
+        }),
         {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
     }
+
+    // Use the admin client for all database operations (bypasses RLS)
+    const supabase = supabaseAdmin;
 
     // Get user's company_id and role
     const { data: userProfile, error: profileError } = await supabase
