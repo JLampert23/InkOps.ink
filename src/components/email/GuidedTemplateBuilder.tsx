@@ -101,7 +101,7 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
         return (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Email Subject Line
               </label>
               <input
@@ -109,13 +109,13 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
                 value={formData.subject}
                 onChange={(e) => updateFormData('subject', e.target.value)}
                 placeholder={isInvoiceTemplate ? 'Invoice Reminder - {{invoice_number}}' : 'Quote Ready - {{quote_number}}'}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
-              <p className="mt-1 text-sm text-gray-500">You can use shortcodes like {'{{invoice_number}}'} or {'{{customer_company}}'}</p>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">You can use shortcodes like {'{{invoice_number}}'} or {'{{customer_company}}'}</p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Greeting Message
               </label>
               <input
@@ -123,9 +123,9 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
                 value={formData.greeting}
                 onChange={(e) => updateFormData('greeting', e.target.value)}
                 placeholder="Hi {{customer_first_name}},"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
-              <p className="mt-1 text-sm text-gray-500">Use {'{{customer_first_name}}'} for personalization</p>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Use {'{{customer_first_name}}'} for personalization</p>
             </div>
           </div>
         );
@@ -133,7 +133,7 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
       case 'intro':
         return (
           <div className="space-y-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Opening Message
             </label>
             <textarea
@@ -144,9 +144,9 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
                 : "Thank you for requesting a quote. We've prepared the following details for your review."
               }
               rows={6}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               Available shortcodes: {'{{customer_company}}'}, {'{{invoice_number}}'}, {'{{invoice_total}}'}, etc.
             </p>
           </div>
@@ -155,13 +155,13 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
       case 'action':
         return (
           <div className="space-y-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               What action should the customer take?
             </label>
 
             <div className="space-y-3">
               {isInvoiceTemplate && (
-                <label className="flex items-start p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-blue-500 transition-colors">
+                <label className="flex items-start p-4 border-2 border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 transition-colors">
                   <input
                     type="radio"
                     name="actionType"
@@ -171,14 +171,14 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
                     className="mt-1 mr-3"
                   />
                   <div>
-                    <div className="font-medium text-gray-900">Include Payment Button</div>
-                    <div className="text-sm text-gray-500">Add a prominent "Pay Now" button linked to {'{{invoice_link}}'}</div>
+                    <div className="font-medium text-gray-900 dark:text-white">Include Payment Button</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Add a prominent "Pay Now" button linked to {'{{invoice_link}}'}</div>
                   </div>
                 </label>
               )}
 
               {isQuoteTemplate && (
-                <label className="flex items-start p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-blue-500 transition-colors">
+                <label className="flex items-start p-4 border-2 border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 transition-colors">
                   <input
                     type="radio"
                     name="actionType"
@@ -188,13 +188,13 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
                     className="mt-1 mr-3"
                   />
                   <div>
-                    <div className="font-medium text-gray-900">Include Quote Approval Button</div>
-                    <div className="text-sm text-gray-500">Add an "Approve Quote" button linked to {'{{quote_link}}'}</div>
+                    <div className="font-medium text-gray-900 dark:text-white">Include Quote Approval Button</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Add an "Approve Quote" button linked to {'{{quote_link}}'}</div>
                   </div>
                 </label>
               )}
 
-              <label className="flex items-start p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-blue-500 transition-colors">
+              <label className="flex items-start p-4 border-2 border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 transition-colors">
                 <input
                   type="radio"
                   name="actionType"
@@ -204,8 +204,8 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
                   className="mt-1 mr-3"
                 />
                 <div>
-                  <div className="font-medium text-gray-900">Include Text Link Only</div>
-                  <div className="text-sm text-gray-500">Add a simple text link instead of a button</div>
+                  <div className="font-medium text-gray-900 dark:text-white">Include Text Link Only</div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">Add a simple text link instead of a button</div>
                 </div>
               </label>
             </div>
@@ -215,13 +215,13 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
       case 'summary':
         return (
           <div className="space-y-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Include Details Section
             </label>
 
             <div className="space-y-3">
               {isInvoiceTemplate && (
-                <label className="flex items-start p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-blue-500 transition-colors">
+                <label className="flex items-start p-4 border-2 border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 transition-colors">
                   <input
                     type="checkbox"
                     checked={formData.includeInvoiceSummary}
@@ -229,8 +229,8 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
                     className="mt-1 mr-3"
                   />
                   <div>
-                    <div className="font-medium text-gray-900">Include Invoice Summary</div>
-                    <div className="text-sm text-gray-500">
+                    <div className="font-medium text-gray-900 dark:text-white">Include Invoice Summary</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
                       Shows invoice number, total, balance, and due date in a formatted box
                     </div>
                   </div>
@@ -238,7 +238,7 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
               )}
 
               {isQuoteTemplate && (
-                <label className="flex items-start p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-blue-500 transition-colors">
+                <label className="flex items-start p-4 border-2 border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 transition-colors">
                   <input
                     type="checkbox"
                     checked={formData.includeQuoteSummary}
@@ -246,8 +246,8 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
                     className="mt-1 mr-3"
                   />
                   <div>
-                    <div className="font-medium text-gray-900">Include Quote Summary</div>
-                    <div className="text-sm text-gray-500">
+                    <div className="font-medium text-gray-900 dark:text-white">Include Quote Summary</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
                       Shows quote number, total, and expiry date in a formatted box
                     </div>
                   </div>
@@ -255,10 +255,10 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
               )}
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mt-4">
               <div className="flex">
-                <AlertTriangle className="h-5 w-5 text-blue-600 mr-2 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-blue-800">
+                <AlertTriangle className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-2 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-blue-800 dark:text-blue-300">
                   These summary boxes use Smart Blocks that automatically pull data like totals, dates, and balances.
                 </div>
               </div>
@@ -269,7 +269,7 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
       case 'closing':
         return (
           <div className="space-y-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Closing Message
             </label>
             <textarea
@@ -277,9 +277,9 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
               onChange={(e) => updateFormData('closing', e.target.value)}
               placeholder="We appreciate your business and look forward to serving you."
               rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               Add a friendly closing statement or call-to-action
             </p>
           </div>
@@ -288,9 +288,9 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
       case 'signature':
         return (
           <div className="space-y-4">
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-              <h3 className="font-medium text-gray-900 mb-4">Auto-Generated Signature</h3>
-              <div className="space-y-2 text-sm text-gray-700">
+            <div className="bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg p-6">
+              <h3 className="font-medium text-gray-900 dark:text-white mb-4">Auto-Generated Signature</h3>
+              <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
                 <p className="font-medium">{'{{user_name}}'}</p>
                 <p>{'{{company_name}}'}</p>
                 <p>{'{{company_phone}}'}</p>
@@ -298,10 +298,10 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
               </div>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
               <div className="flex">
-                <AlertTriangle className="h-5 w-5 text-blue-600 mr-2 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-blue-800">
+                <AlertTriangle className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-2 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-blue-800 dark:text-blue-300">
                   Your signature will be automatically personalized with your name and company information when emails are sent.
                 </div>
               </div>
@@ -319,21 +319,21 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
 
   return (
     <div className="h-full flex flex-col">
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
+      <div className="bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-700 px-6 py-4">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Guided Template Builder</h2>
-            <p className="text-sm text-gray-600">Step {currentStep + 1} of {WIZARD_STEPS.length}</p>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Guided Template Builder</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Step {currentStep + 1} of {WIZARD_STEPS.length}</p>
           </div>
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-gray-600 hover:text-gray-800"
+            className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
           >
             Cancel
           </button>
         </div>
 
-        <div className="w-full bg-gray-200 rounded-full h-2">
+        <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
           <div
             className="bg-blue-600 h-2 rounded-full transition-all duration-300"
             style={{ width: `${progress}%` }}
@@ -351,8 +351,8 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
                   index < currentStep
                     ? 'bg-blue-600 border-blue-600 text-white'
                     : index === currentStep
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-gray-300 text-gray-400'
+                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                    : 'border-gray-300 dark:border-slate-600 text-gray-400 dark:text-gray-500'
                 }`}
               >
                 {index < currentStep ? (
@@ -364,7 +364,7 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
               {index < WIZARD_STEPS.length - 1 && (
                 <div
                   className={`flex-1 h-0.5 mx-2 ${
-                    index < currentStep ? 'bg-blue-600' : 'bg-gray-300'
+                    index < currentStep ? 'bg-blue-600' : 'bg-gray-300 dark:bg-slate-600'
                   }`}
                 />
               )}
@@ -373,25 +373,25 @@ export function GuidedTemplateBuilder({ onComplete, onCancel, templateType, init
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-slate-800">
         <div className="max-w-2xl mx-auto">
           <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
               {currentStepData.title}
             </h3>
-            <p className="text-gray-600">{currentStepData.description}</p>
+            <p className="text-gray-600 dark:text-gray-400">{currentStepData.description}</p>
           </div>
 
           {renderStep()}
         </div>
       </div>
 
-      <div className="bg-white border-t border-gray-200 px-6 py-4">
+      <div className="bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-700 px-6 py-4">
         <div className="flex justify-between">
           <button
             onClick={handleBack}
             disabled={currentStep === 0}
-            className="flex items-center px-4 py-2 text-gray-600 hover:text-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ChevronLeft className="h-4 w-4 mr-1" />
             Back
