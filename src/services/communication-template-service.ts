@@ -22,10 +22,14 @@ const EDGE_FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/com
  * Get headers for API requests
  */
 async function getHeaders(): Promise<HeadersInit> {
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session }, error } = await supabase.auth.getSession();
+
+  if (error || !session?.access_token) {
+    throw new Error('Not authenticated. Please sign in again.');
+  }
 
   return {
-    'Authorization': `Bearer ${session?.access_token}`,
+    'Authorization': `Bearer ${session.access_token}`,
     'Content-Type': 'application/json',
     'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
   };

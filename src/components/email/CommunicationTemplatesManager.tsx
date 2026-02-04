@@ -68,8 +68,10 @@ export default function CommunicationTemplatesManager() {
   const isAdmin = userProfile?.role === 'super_admin' || userProfile?.role === 'admin';
 
   useEffect(() => {
-    loadTemplates();
-  }, []);
+    if (user) {
+      loadTemplates();
+    }
+  }, [user]);
 
   useEffect(() => {
     // Auto-validate as user types
@@ -283,6 +285,14 @@ export default function CommunicationTemplatesManager() {
     } catch (error: any) {
       showNotification('error', 'Clone Failed', error.message);
     }
+  }
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-600 dark:text-gray-400">Please sign in to access email templates.</div>
+      </div>
+    );
   }
 
   if (loading) {
