@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import AutomatedReports from './automation/AutomatedReports';
 import WorkflowBuilder from './production/WorkflowBuilder';
+import ShortCodeReference from './email/ShortCodeReference';
 
 const AutomationsDashboard = lazy(() => import('./automations/AutomationsDashboard').then(m => ({ default: m.AutomationsDashboard })));
 const StripePayments = lazy(() => import('./production/StripePayments').then(m => ({ default: m.StripePayments })));
@@ -7593,6 +7594,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 </div>
               </div>
             </div>
+
+              {/* Email Short Codes Reference */}
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
+                <ShortCodeReference showPreview={true} />
+              </div>
             </div>
           )}
 
