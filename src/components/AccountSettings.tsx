@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, CreditCard as Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, RefreshCw, Bug, MessageSquare, Eye, EyeOff, Grid3x3, FileText, CheckCircle, GripVertical, Workflow } from 'lucide-react';
+import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, CreditCard as Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, RefreshCw, Bug, MessageSquare, Eye, EyeOff, Grid3x3, FileText, CheckCircle, GripVertical, Workflow, Mail } from 'lucide-react';
 import { supabase } from '../lib/supabase-client';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
@@ -11,6 +11,7 @@ const AutomationsDashboard = lazy(() => import('./automations/AutomationsDashboa
 const StripePayments = lazy(() => import('./production/StripePayments').then(m => ({ default: m.StripePayments })));
 const PriceMatricesManager = lazy(() => import('./production/PriceMatricesManager').then(m => ({ default: m.PriceMatricesManager })));
 const InkThreadColorsManager = lazy(() => import('./production/InkThreadColorsManager').then(m => ({ default: m.InkThreadColorsManager })));
+const CommunicationTemplatesManager = lazy(() => import('./email/CommunicationTemplatesManager').then(m => ({ default: m.default })));
 
 interface CompanySettings {
   id: string;
@@ -120,7 +121,8 @@ type SettingsTab =
   | 'user-management' | 'user-security'
   | 'billing-status-filters'
   | 'automated-reports' | 'automations'
-  | 'production-general' | 'scheduler-settings' | 'invoice-fees' | 'price-matrices';
+  | 'production-general' | 'scheduler-settings' | 'invoice-fees' | 'price-matrices'
+  | 'email-templates';
 
 interface AccountSettingsProps {
   initialTab?: SettingsTab;
@@ -140,6 +142,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [productionExpanded, setProductionExpanded] = useState(false);
   const [accountingExpanded, setAccountingExpanded] = useState(false);
   const [companySettingsExpanded, setCompanySettingsExpanded] = useState(false);
+  const [communicationsExpanded, setCommunicationsExpanded] = useState(false);
 
   const [companyName, setCompanyName] = useState('');
   const [companyAddress, setCompanyAddress] = useState('');
@@ -3945,6 +3948,47 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               </div>
             )}
           </div>
+
+          {/* Communications Section - Collapsible */}
+          <div className="mb-2">
+            <button
+              onClick={() => setCommunicationsExpanded(!communicationsExpanded)}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-slate-700/50"
+            >
+              <Mail className="w-4 h-4 flex-shrink-0 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
+              <div className="flex-1 text-left">
+                <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                  Communications
+                </div>
+              </div>
+              {communicationsExpanded ? (
+                <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200" />
+              ) : (
+                <ChevronUp className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200 rotate-180" />
+              )}
+            </button>
+
+            {communicationsExpanded && (
+              <div className="mt-1 ml-2 space-y-1 collapsible-section collapsible-section-enter">
+                <button
+                  onClick={() => setActiveTab('email-templates')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'email-templates'
+                      ? 'bg-purple-50 dark:bg-purple-600/20 text-purple-700 dark:text-purple-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Mail className={`w-4 h-4 flex-shrink-0 ${activeTab === 'email-templates' ? 'text-purple-600 dark:text-purple-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'email-templates' ? 'text-purple-700 dark:text-purple-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      Email Templates
+                    </div>
+                  </div>
+                  {activeTab === 'email-templates' && <div className="w-1 h-6 bg-purple-600 dark:bg-purple-500 rounded-full absolute right-0" />}
+                </button>
+              </div>
+            )}
+          </div>
         </nav>
       </div>
 
@@ -5570,6 +5614,16 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               </div>
             }>
               <PriceMatricesManager />
+            </Suspense>
+          )}
+
+          {activeTab === 'email-templates' && (
+            <Suspense fallback={
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 text-purple-600 dark:text-purple-400 animate-spin" />
+              </div>
+            }>
+              <CommunicationTemplatesManager />
             </Suspense>
           )}
 
