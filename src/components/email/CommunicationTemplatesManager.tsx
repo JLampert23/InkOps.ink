@@ -27,7 +27,6 @@ import type {
 } from '../../types/communication-template';
 import {
   TEMPLATE_TYPE_METADATA,
-  getRequiredShortCodes,
 } from '../../types/communication-template';
 
 export default function CommunicationTemplatesManager() {
@@ -274,7 +273,7 @@ export default function CommunicationTemplatesManager() {
   if (!user) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-600 dark:text-gray-400">Please sign in to access email templates.</div>
+        <div className="text-slate-600 dark:text-slate-400">Please sign in to access email templates.</div>
       </div>
     );
   }
@@ -282,7 +281,7 @@ export default function CommunicationTemplatesManager() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-600 dark:text-gray-400">Loading templates...</div>
+        <div className="text-slate-600 dark:text-slate-400">Loading templates...</div>
       </div>
     );
   }
@@ -322,8 +321,6 @@ export default function CommunicationTemplatesManager() {
           ) : (
             templates.map((template) => {
               const metadata = TEMPLATE_TYPE_METADATA[template.template_type as TemplateType];
-              const requiredCodes = getRequiredShortCodes(template.template_type as TemplateType);
-              const hasRequiredCodes = requiredCodes.length > 0;
 
               return (
                 <div
@@ -333,7 +330,7 @@ export default function CommunicationTemplatesManager() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
                           {template.template_name}
                         </h3>
                         <span
@@ -346,22 +343,16 @@ export default function CommunicationTemplatesManager() {
                           {template.is_active ? 'Active' : 'Inactive'}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
                         {metadata?.label || template.template_type}
                       </p>
                       <div className="mt-3 space-y-1">
                         <div className="text-sm">
-                          <span className="text-gray-600 dark:text-gray-400">Subject: </span>
-                          <span className="text-gray-900 dark:text-white font-mono text-xs">
+                          <span className="text-slate-600 dark:text-slate-400">Subject: </span>
+                          <span className="text-slate-900 dark:text-white font-mono text-xs">
                             {template.subject_template}
                           </span>
                         </div>
-                        {hasRequiredCodes && (
-                          <div className="text-xs text-orange-600 dark:text-orange-400 flex items-center gap-1">
-                            <AlertTriangle className="w-3 h-3" />
-                            Requires: {requiredCodes.map((c) => `{{${c.code}}}`).join(', ')}
-                          </div>
-                        )}
                       </div>
                     </div>
                     {isAdmin && (
