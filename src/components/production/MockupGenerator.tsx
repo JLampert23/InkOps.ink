@@ -162,6 +162,7 @@ export default function MockupGenerator({
   const [resizeHandle, setResizeHandle] = useState<string | null>(null);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [initialScale, setInitialScale] = useState(1);
+  const [initialPosition, setInitialPosition] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     loadProofData();
@@ -1484,7 +1485,7 @@ export default function MockupGenerator({
     const artworkWidth = baseSize * artwork.scale;
     const artworkHeight = baseSize * artwork.scale;
 
-    const handleSize = 30;
+    const handleSize = 40;
     const handles = [
       { name: 'nw', x: centerX - artworkWidth / 2, y: centerY - artworkHeight / 2 },
       { name: 'ne', x: centerX + artworkWidth / 2, y: centerY - artworkHeight / 2 },
@@ -1522,6 +1523,7 @@ export default function MockupGenerator({
   };
 
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
     if (selectedArtwork.length === 0) return;
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -1544,6 +1546,10 @@ export default function MockupGenerator({
       setIsResizing(true);
       setResizeHandle(handle);
       setInitialScale(selectedArtwork[activeArtworkIndex].scale);
+      setInitialPosition({
+        x: selectedArtwork[activeArtworkIndex].position_x,
+        y: selectedArtwork[activeArtworkIndex].position_y
+      });
       setDragStart({ x, y });
       return;
     }
@@ -1562,6 +1568,10 @@ export default function MockupGenerator({
       setActiveArtworkIndex(clickedArtworkIndex);
       setIsDragging(true);
       setDragStart({ x, y });
+      setInitialPosition({
+        x: selectedArtwork[clickedArtworkIndex].position_x,
+        y: selectedArtwork[clickedArtworkIndex].position_y
+      });
     } else {
       // Clicked outside all artwork - deselect
       setActiveArtworkIndex(-1);
@@ -1579,11 +1589,18 @@ export default function MockupGenerator({
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (selectedArtwork.length === 0 || activeArtworkIndex < 0) return;
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+
+    // Update cursor even when no artwork is selected
+    if (selectedArtwork.length === 0 || activeArtworkIndex < 0) {
+      if (canvasRef.current) {
+        canvasRef.current.style.cursor = 'default';
+      }
+      return;
+    }
 
     if (isResizing && resizeHandle) {
       const dx = x - dragStart.x;
@@ -1594,8 +1611,8 @@ export default function MockupGenerator({
       const newScale = Math.max(0.1, initialScale * scaleFactor);
 
       tempArtworkPosition.current = {
-        position_x: selectedArtwork[activeArtworkIndex].position_x,
-        position_y: selectedArtwork[activeArtworkIndex].position_y,
+        position_x: initialPosition.x,
+        position_y: initialPosition.y,
         scale: newScale,
       };
       scheduleCanvasRedraw();
@@ -1604,18 +1621,27 @@ export default function MockupGenerator({
       const dy = y - dragStart.y;
 
       tempArtworkPosition.current = {
-        position_x: selectedArtwork[activeArtworkIndex].position_x + dx,
-        position_y: selectedArtwork[activeArtworkIndex].position_y + dy,
+        position_x: initialPosition.x + dx,
+        position_y: initialPosition.y + dy,
         scale: selectedArtwork[activeArtworkIndex].scale,
       };
       scheduleCanvasRedraw();
     } else {
+      // Update cursor based on what's under the mouse
       const handle = getHandleAtPosition(x, y);
-      if (handle && canvasRef.current) {
-        canvasRef.current.style.cursor = handle.includes('n') && handle.includes('w') || handle.includes('s') && handle.includes('e') ? 'nwse-resize' :
-          'nesw-resize';
-      } else if (canvasRef.current) {
-        canvasRef.current.style.cursor = 'move';
+      const deleteButton = getDeleteButtonAtPosition(x, y);
+
+      if (canvasRef.current) {
+        if (deleteButton !== null) {
+          canvasRef.current.style.cursor = 'pointer';
+        } else if (handle) {
+          canvasRef.current.style.cursor = handle.includes('n') && handle.includes('w') || handle.includes('s') && handle.includes('e') ? 'nwse-resize' :
+            'nesw-resize';
+        } else if (isClickInsideArtwork(x, y, activeArtworkIndex)) {
+          canvasRef.current.style.cursor = 'move';
+        } else {
+          canvasRef.current.style.cursor = 'default';
+        }
       }
     }
   };
@@ -1752,11 +1778,18 @@ export default function MockupGenerator({
       ctx.drawImage(img, -artworkWidth / 2, -artworkHeight / 2, artworkWidth, artworkHeight);
 
       if (index === activeArtworkIndex) {
+        // Draw shadow for bounding box
+        ctx.shadowColor = 'rgba(59, 130, 246, 0.3)';
+        ctx.shadowBlur = 8 / currentArtwork.scale;
         ctx.strokeStyle = '#3b82f6';
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 4;
         ctx.strokeRect(-artworkWidth / 2, -artworkHeight / 2, artworkWidth, artworkHeight);
 
-        const handleSize = 24 / currentArtwork.scale;
+        // Reset shadow for handles
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+
+        const handleSize = 32 / currentArtwork.scale;
         const handles = [
           { x: -artworkWidth / 2, y: -artworkHeight / 2 },
           { x: artworkWidth / 2, y: -artworkHeight / 2 },
@@ -1764,9 +1797,12 @@ export default function MockupGenerator({
           { x: artworkWidth / 2, y: artworkHeight / 2 },
         ];
 
+        // Draw handle shadows
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
+        ctx.shadowBlur = 4 / currentArtwork.scale;
         ctx.fillStyle = '#3b82f6';
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 3 / currentArtwork.scale;
+        ctx.lineWidth = 4 / currentArtwork.scale;
 
         handles.forEach(handle => {
           ctx.beginPath();
@@ -1774,6 +1810,10 @@ export default function MockupGenerator({
           ctx.fill();
           ctx.stroke();
         });
+
+        // Reset shadow
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
       }
 
       ctx.restore();
