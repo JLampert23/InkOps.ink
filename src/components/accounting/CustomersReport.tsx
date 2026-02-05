@@ -77,6 +77,8 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
   const [savingCredit, setSavingCredit] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showArtworkLibrary, setShowArtworkLibrary] = useState(false);
+  const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
+  const [artworkCustomerId, setArtworkCustomerId] = useState<string | null>(null);
 
   useEffect(() => {
     loadCustomers();
@@ -516,7 +518,7 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
                   </div>
                 </button>
                 {onCreateQuote && (
-                  <div className="mt-2 pl-2">
+                  <div className="mt-2 pl-2 flex flex-wrap gap-2">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -526,6 +528,29 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
                     >
                       <FileText className="w-4 h-4" />
                       Create Quote
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setArtworkCustomerId(customer.id);
+                        setShowArtworkLibrary(true);
+                      }}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition-colors border border-green-200 dark:border-green-800"
+                      title="View customer artwork library"
+                    >
+                      <Image className="w-4 h-4" />
+                      Artwork Library
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingCustomerId(customer.id);
+                        setShowEditModal(true);
+                      }}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors border border-blue-200 dark:border-blue-800"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      Edit Customer
                     </button>
                   </div>
                 )}
@@ -547,30 +572,11 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
           {selectedCustomer ? (
             <>
               <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{selectedCustomer.company_name}</h3>
-                    {selectedCustomer.contact_name && (
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{selectedCustomer.contact_name}</p>
-                    )}
-                  </div>
-                  <div className="flex gap-3 shrink-0 ml-4">
-                    <button
-                      onClick={() => setShowArtworkLibrary(true)}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold shadow-lg"
-                      title="View customer artwork library"
-                    >
-                      <Image className="w-5 h-5" />
-                      Artwork Library
-                    </button>
-                    <button
-                      onClick={() => setShowEditModal(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                      Edit Customer
-                    </button>
-                  </div>
+                <div className="mb-2">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{selectedCustomer.company_name}</h3>
+                  {selectedCustomer.contact_name && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{selectedCustomer.contact_name}</p>
+                  )}
                 </div>
 
                 <div className="mt-2 grid grid-cols-2 gap-4 text-sm">
@@ -799,20 +805,29 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
       </div>
 
       {/* Edit Customer Modal */}
-      {selectedCustomer && (
+      {editingCustomerId && (
         <EditCustomerModal
           isOpen={showEditModal}
-          onClose={() => setShowEditModal(false)}
-          onSuccess={handleEditSuccess}
-          customerId={selectedCustomer.id}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditingCustomerId(null);
+          }}
+          onSuccess={() => {
+            handleEditSuccess();
+            setEditingCustomerId(null);
+          }}
+          customerId={editingCustomerId}
         />
       )}
 
       {/* Artwork Library Modal */}
-      {selectedCustomer && showArtworkLibrary && (
+      {artworkCustomerId && showArtworkLibrary && (
         <CustomerArtworkLibrary
-          customerId={selectedCustomer.id}
-          onClose={() => setShowArtworkLibrary(false)}
+          customerId={artworkCustomerId}
+          onClose={() => {
+            setShowArtworkLibrary(false);
+            setArtworkCustomerId(null);
+          }}
         />
       )}
     </div>
