@@ -481,47 +481,17 @@ Deno.serve(async (req: Request) => {
 
         const xmlDoc = parseResult.xmlText!;
 
-        // Parse Part elements
-        const partPattern = /<Part>([\s\S]*?)<\/Part>/gi;
-        const getAllXmlMatches = (xml: string, pattern: RegExp) => {
-          const matches = [];
-          let match;
-          while ((match = pattern.exec(xml)) !== null) {
-            matches.push(match);
-          }
-          return matches;
-        };
+        const partIds = getXmlValues(xmlDoc, "partId");
+        const quantities = getXmlValues(xmlDoc, "quantity");
+        const prices = getXmlValues(xmlDoc, "price");
 
-        const partMatches = getAllXmlMatches(xmlDoc, partPattern);
-        console.log('Found', partMatches.length, 'parts in pricing response');
-
-        const partArray = partMatches.map(match => {
-          const partXml = match[1];
-
-          // Extract partId
-          const partIdMatch = partXml.match(/<partId>([^<]*)<\/partId>/i);
-          const partId = partIdMatch ? partIdMatch[1] : '';
-
-          // S&S uses PartPrice tags
-          const pricePattern = /<PartPrice>([\s\S]*?)<\/PartPrice>/gi;
-          const priceMatches = getAllXmlMatches(partXml, pricePattern);
-
-          const prices = priceMatches.map(priceMatch => {
-            const priceXml = priceMatch[1];
-            const quantityMatch = priceXml.match(/<minQuantity>([^<]*)<\/minQuantity>/i);
-            const priceValueMatch = priceXml.match(/<price>([^<]*)<\/price>/i);
-
-            return {
-              quantity: parseInt(quantityMatch?.[1] || "1"),
-              price: parseFloat(priceValueMatch?.[1] || "0"),
-            };
-          });
-
-          return {
-            partId,
-            prices
-          };
-        });
+        const partArray = partIds.map((id) => ({
+          partId: id,
+          prices: prices.map((price, i) => ({
+            quantity: parseInt(quantities[i] || "0"),
+            price: parseFloat(price),
+          })),
+        }));
 
         return new Response(
           JSON.stringify({
