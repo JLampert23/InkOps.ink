@@ -183,24 +183,15 @@ Deno.serve(async (req: Request) => {
 
             if (!ssaResponse.ok) {
               const errorText = await ssaResponse.text();
-              console.error("SSActivewear API failed:", {
+              console.log("SSActivewear API response (not found):", {
                 status: ssaResponse.status,
                 statusText: ssaResponse.statusText,
-                errorBody: errorText
+                errorBody: errorText.substring(0, 200)
               });
-              let errorDetail = `SSActivewear API returned ${ssaResponse.status}`;
-              try {
-                const errorJson = JSON.parse(errorText);
-                if (errorJson.error) {
-                  errorDetail += `: ${errorJson.error}`;
-                }
-              } catch {
-                // Not JSON, use text if short enough
-                if (errorText.length < 100) {
-                  errorDetail += `: ${errorText}`;
-                }
-              }
-              errors.push(`Style ${style} not found in local cache. ${errorDetail}`);
+
+              // Don't add error for product not found - this is expected when searching across multiple suppliers
+              // Only log it for debugging
+              console.log(`SSActivewear: Style ${style} not found in catalog`);
             } else {
               const ssaData = await ssaResponse.json();
               const productData = ssaData.data?.[0];

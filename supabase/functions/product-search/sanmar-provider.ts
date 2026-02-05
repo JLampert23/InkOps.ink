@@ -91,9 +91,18 @@ export async function searchSanMarCatalog(
       );
 
       if (liveResult.success && liveResult.data) {
-        results.push(...transformSanMarLiveData(liveResult.data, style));
+        const transformedProducts = transformSanMarLiveData(liveResult.data, style);
+        if (transformedProducts.length > 0) {
+          results.push(...transformedProducts);
+        } else {
+          // Data was returned but couldn't be transformed (invalid structure)
+          errors.push(`SanMar: Style ${style} not found or invalid data returned`);
+        }
       } else if (liveResult.error) {
-        errors.push(`SanMar API: ${liveResult.error}`);
+        errors.push(`SanMar: ${liveResult.error}`);
+      } else {
+        // No success, no error, no data - unexpected state
+        errors.push(`SanMar: Style ${style} not found`);
       }
 
       return { results, errors };
