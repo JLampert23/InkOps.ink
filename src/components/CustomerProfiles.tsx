@@ -623,14 +623,24 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
       {/* Customer Info Header */}
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow border border-gray-200 dark:border-slate-700 p-6">
         {!databaseCustomer ? (
-          <div className="text-center py-8">
-            <div className="mb-4">
+          <div className="py-8">
+            <div className="text-center mb-4">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{customer.name}</h2>
               {customer.email && (
                 <p className="text-gray-600 dark:text-gray-400">{customer.email}</p>
               )}
             </div>
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <button
+                onClick={() => setShowArtworkLibrary(true)}
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                title="View customer artwork library"
+              >
+                <Image className="w-4 h-4" />
+                Artwork Library
+              </button>
+            </div>
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 max-w-2xl mx-auto">
               <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-3">
                 This customer exists in your invoices but doesn't have an editable profile yet. Create one to add contacts, addresses, and more details.
               </p>
