@@ -57,7 +57,7 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
   const [selectedGarment, setSelectedGarment] = useState<GarmentNeed | null>(null);
   const [showDrillDown, setShowDrillDown] = useState(false);
   const [vendors, setVendors] = useState<Array<{ id: string; vendor_name: string }>>([]);
-  const [customers, setCustomers] = useState<Array<{ id: string; customer_name: string }>>([]);
+  const [customers, setCustomers] = useState<Array<{ id: string; company_name: string }>>([]);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -100,26 +100,24 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
     const { data: quoteLineItems, error: quoteError } = await supabase
       .from('quote_line_items')
       .select(`
-        style_number,
-        product_name,
+        item_number,
+        description,
         color,
-        size,
         supplier_name,
         quote_id,
-        xs_quantity,
-        s_quantity,
-        m_quantity,
-        l_quantity,
-        xl_quantity,
-        xxl_quantity,
-        xxxl_quantity,
-        xxxxl_quantity,
-        youth_s_quantity,
-        youth_m_quantity,
-        youth_l_quantity,
-        youth_xl_quantity,
-        other_size_quantity,
-        custom_size_quantity,
+        qty_xs,
+        qty_s,
+        qty_m,
+        qty_l,
+        qty_xl,
+        qty_2xl,
+        qty_3xl,
+        qty_4xl,
+        qty_yxs,
+        qty_ys,
+        qty_ym,
+        qty_yl,
+        qty_yxl,
         quotes!inner (
           id,
           quote_number,
@@ -136,7 +134,7 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
     const { data: poLineItems, error: poError } = await supabase
       .from('purchase_order_line_items')
       .select(`
-        style_number,
+        item_number:style_number,
         product_name,
         color,
         size,
@@ -160,30 +158,29 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
 
     quoteLineItems?.forEach((item: any) => {
       const sizeQuantities = {
-        'XS': item.xs_quantity || 0,
-        'S': item.s_quantity || 0,
-        'M': item.m_quantity || 0,
-        'L': item.l_quantity || 0,
-        'XL': item.xl_quantity || 0,
-        '2XL': item.xxl_quantity || 0,
-        '3XL': item.xxxl_quantity || 0,
-        '4XL': item.xxxxl_quantity || 0,
-        'Youth S': item.youth_s_quantity || 0,
-        'Youth M': item.youth_m_quantity || 0,
-        'Youth L': item.youth_l_quantity || 0,
-        'Youth XL': item.youth_xl_quantity || 0,
-        'Other': item.other_size_quantity || 0,
-        'Custom': item.custom_size_quantity || 0,
+        'XS': item.qty_xs || 0,
+        'S': item.qty_s || 0,
+        'M': item.qty_m || 0,
+        'L': item.qty_l || 0,
+        'XL': item.qty_xl || 0,
+        '2XL': item.qty_2xl || 0,
+        '3XL': item.qty_3xl || 0,
+        '4XL': item.qty_4xl || 0,
+        'Youth XS': item.qty_yxs || 0,
+        'Youth S': item.qty_ys || 0,
+        'Youth M': item.qty_ym || 0,
+        'Youth L': item.qty_yl || 0,
+        'Youth XL': item.qty_yxl || 0,
       };
 
       Object.entries(sizeQuantities).forEach(([size, quantity]) => {
         if (quantity > 0) {
-          const key = `${item.style_number || 'N/A'}-${item.color || 'N/A'}-${size}`;
+          const key = `${item.item_number || 'N/A'}-${item.color || 'N/A'}-${size}`;
 
           if (!garmentMap.has(key)) {
             garmentMap.set(key, {
-              style_number: item.style_number || 'N/A',
-              product_name: item.product_name,
+              style_number: item.item_number || 'N/A',
+              product_name: item.description || 'Unknown Product',
               color: item.color || 'N/A',
               size: size,
               supplier: item.supplier_name || 'Unknown',
@@ -209,7 +206,7 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
     });
 
     poLineItems?.forEach((item: any) => {
-      const key = `${item.style_number || 'N/A'}-${item.color || 'N/A'}-${item.size || 'N/A'}`;
+      const key = `${item.item_number || 'N/A'}-${item.color || 'N/A'}-${item.size || 'N/A'}`;
 
       if (garmentMap.has(key)) {
         const garment = garmentMap.get(key)!;
@@ -248,9 +245,9 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
   const loadCustomers = async (companyId: string) => {
     const { data, error } = await supabase
       .from('customers')
-      .select('id, customer_name')
+      .select('id, company_name')
       .eq('company_id', companyId)
-      .order('customer_name');
+      .order('company_name');
 
     if (error) throw error;
     setCustomers(data || []);
@@ -517,8 +514,8 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
               >
                 <option value="all">All Customers</option>
                 {customers.map((customer) => (
-                  <option key={customer.id} value={customer.customer_name}>
-                    {customer.customer_name}
+                  <option key={customer.id} value={customer.company_name}>
+                    {customer.company_name}
                   </option>
                 ))}
               </select>
