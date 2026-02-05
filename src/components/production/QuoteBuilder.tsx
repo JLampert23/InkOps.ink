@@ -743,7 +743,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         return;
       }
 
-      // If quote is saved in database, use the database function to recalculate pricing
+      // If quote is saved in database, call database function to ensure DB is in sync
       if (quoteId && !quoteId.startsWith('temp-')) {
         console.log('Recalculating pricing using database function for quote:', quoteId);
 
@@ -758,7 +758,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           return;
         }
 
-        // Instead of reloading the entire quote, just fetch updated prices for this group
+        // Fetch updated prices from database for saved items
         const { data: updatedLineItems, error: lineItemError } = await supabase
           .from('quote_line_items')
           .select('id, unit_price, total_price')
@@ -767,34 +767,35 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
 
         if (lineItemError) {
           console.error('Error fetching updated prices:', lineItemError);
-          if (!silent) showNotification('error', 'Failed to fetch updated prices', lineItemError.message);
-          return;
         }
 
-        // Update only the prices in the local state
-        if (updatedLineItems) {
-          const newGroups = groups.map(g => {
-            if (g.id === groupId) {
-              const newItems = g.items.map((itm: any) => {
-                const updated = updatedLineItems.find(li => li.id === itm.id);
-                if (updated) {
-                  return {
-                    ...itm,
-                    unit_price: parseFloat(updated.unit_price) || 0,
-                    total_price: parseFloat(updated.total_price) || 0
-                  };
-                }
-                return itm;
-              });
-              return { ...g, items: newItems };
-            }
-            return g;
-          });
-          setItemGroups(newGroups);
-        }
+        // Calculate the unit price from imprints
+        const totalImprintPrice = groupImprints.reduce((sum, imp) => {
+          return sum + (parseFloat(imp.price) || 0);
+        }, 0);
 
+        // Apply pricing to ALL items in the group (both saved and unsaved)
+        const newGroups = groups.map(g => {
+          if (g.id === groupId) {
+            const newItems = g.items.map((itm: any) => {
+              // Try to get the price from the database first (for saved items)
+              const updated = updatedLineItems?.find(li => li.id === itm.id);
+              const unitPrice = updated ? parseFloat(updated.unit_price) : totalImprintPrice;
+
+              return {
+                ...itm,
+                unit_price: unitPrice,
+                total_price: itm.total_quantity * unitPrice
+              };
+            });
+            return { ...g, items: newItems };
+          }
+          return g;
+        });
+
+        setItemGroups(newGroups);
         if (!silent) {
-          showNotification('success', 'Pricing Updated', 'Prices have been recalculated based on all imprints in the group');
+          showNotification('success', 'Pricing Updated', 'Prices have been recalculated for all items in the group');
         }
         return;
       }
@@ -839,7 +840,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
 
       setItemGroups(newGroups);
       if (!silent) {
-        showNotification('success', 'Price updated', `Unit price set to $${totalImprintPrice.toFixed(2)} (sum of ${groupImprints.length} imprint${groupImprints.length > 1 ? 's' : ''})`);
+        showNotification('success', 'Price updated', `Unit price set to $${totalImprintPrice.toFixed(2)} for all items in group`);
       }
 
     } catch (error) {
