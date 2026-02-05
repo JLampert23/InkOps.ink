@@ -8,46 +8,95 @@ const corsHeaders = {
   "Access-Control-Max-Age": "86400",
 };
 
-const SSA_REST_API_BASE = "https://api.ssactivewear.com/v2";
+const PROMOSTANDARDS_ENDPOINTS = {
+  productData: "https://promostandards.ssactivewear.com/productdata/v2/productdataservicev2.svc",
+  inventory: "https://promostandards.ssactivewear.com/inventory/v2/inventoryservice.svc",
+  pricing: "https://promostandards.ssactivewear.com/pricingandconfiguration/v1/pricingandconfigurationservice.svc",
+  media: "https://promostandards.ssactivewear.com/mediacontent/v1/mediacontentservice.svc",
+};
 
 interface SSActivewearCredentials {
   accountNumber: string;
   apiKey: string;
 }
 
-async function makeSSARestRequest(
+async function makePromoStandardsRequest(
   endpoint: string,
+  soapAction: string,
+  soapBody: string,
   accountNumber: string,
   apiKey: string
 ) {
-  const basicAuth = btoa(`${accountNumber}:${apiKey}`);
+  const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Header/>
+  <soap:Body>
+    ${soapBody}
+  </soap:Body>
+</soap:Envelope>`;
 
-  console.log('Making SSActivewear REST API request:', {
+  console.log('Making PromoStandards SOAP request:', {
     endpoint,
+    soapAction,
     accountNumber: accountNumber.substring(0, 4) + '***',
+    soapBodyPreview: soapBody.substring(0, 300)
   });
 
   const response = await fetch(endpoint, {
-    method: "GET",
+    method: "POST",
     headers: {
-      "Authorization": `Basic ${basicAuth}`,
-      "Content-Type": "application/json",
+      "Content-Type": "text/xml; charset=utf-8",
+      "SOAPAction": `"${soapAction}"`,
     },
+    body: soapEnvelope,
   });
 
   const responseText = await response.text();
 
-  console.log('SSActivewear REST API Response:', {
+  console.log('PromoStandards Response:', {
     status: response.status,
     statusText: response.statusText,
     bodyLength: responseText.length,
+    bodyPreview: responseText.substring(0, 500)
   });
 
   if (!response.ok) {
-    throw new Error(`SSActivewear REST API request failed: ${response.status} ${response.statusText}`);
+    throw new Error(`PromoStandards request failed: ${response.status} ${response.statusText}\nResponse: ${responseText.substring(0, 500)}`);
   }
 
-  return JSON.parse(responseText);
+  return responseText;
+}
+
+function getXmlValue(xmlText: string, tagName: string): string | null {
+  const regex = new RegExp(`<${tagName}[^>]*>([^<]*)</${tagName}>`, 'i');
+  const match = xmlText.match(regex);
+  return match ? match[1] : null;
+}
+
+function getXmlValues(xmlText: string, tagName: string): string[] {
+  const regex = new RegExp(`<${tagName}[^>]*>([^<]*)</${tagName}>`, 'gi');
+  const matches = xmlText.matchAll(regex);
+  return Array.from(matches, m => m[1]);
+}
+
+function parseXmlResponse(xmlText: string): { success: boolean; xmlText?: string; error?: { code: string; description: string } } {
+  const errorCode = getXmlValue(xmlText, 'code');
+  const errorDesc = getXmlValue(xmlText, 'description');
+
+  if (errorCode && errorDesc) {
+    return {
+      success: false,
+      error: {
+        code: errorCode,
+        description: errorDesc
+      }
+    };
+  }
+
+  return {
+    success: true,
+    xmlText
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -62,7 +111,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    console.log("=== SSActivewear REST API Request Started ===");
+    console.log("=== SSActivewear PromoStandards API Request Started ===");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -184,7 +233,7 @@ Deno.serve(async (req: Request) => {
     const action = url.searchParams.get("action");
     const productId = url.searchParams.get("productId") || url.searchParams.get("style");
 
-    console.log('SSActivewear REST API Request:', { action, productId });
+    console.log('SSActivewear PromoStandards Request:', { action, productId });
 
     switch (action) {
       case "brands": {
@@ -212,68 +261,32 @@ Deno.serve(async (req: Request) => {
           );
         }
 
-        try {
-          const productData = await makeSSARestRequest(
-            `${SSA_REST_API_BASE}/products/?style=${encodeURIComponent(productId)}`,
-            credentials.accountNumber,
-            decryptedApiKey
-          );
+        const soapBody = `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
+  <shar:wsVersion>2.0.0</shar:wsVersion>
+  <shar:id>${credentials.accountNumber}</shar:id>
+  <shar:password>${decryptedApiKey}</shar:password>
+  <shar:productId>${productId}</shar:productId>
+</ns2:GetProductRequest>`;
 
-          if (!productData || productData.length === 0) {
-            return new Response(
-              JSON.stringify({
-                success: false,
-                supplier: "ssactivewear",
-                action,
-                error: `Product not found`,
-                data: []
-              }),
-              {
-                status: 200,
-                headers: { ...corsHeaders, "Content-Type": "application/json" }
-              }
-            );
-          }
+        const xmlResponse = await makePromoStandardsRequest(
+          PROMOSTANDARDS_ENDPOINTS.productData,
+          "getProduct",
+          soapBody,
+          credentials.accountNumber,
+          decryptedApiKey
+        );
 
-          // Transform REST API response to match expected format
-          const product = productData[0];
-          const transformedData = [{
-            productId: product.styleID || productId,
-            productName: product.styleName || "",
-            description: product.description || "",
-            productBrand: product.brandName || "",
-            colors: (product.colorArray || []).map((c: any) => ({
-              colorName: c.colorName || "",
-            })),
-            parts: (product.colorArray || []).flatMap((color: any) =>
-              (color.sizeArray || []).map((size: any) => ({
-                partId: size.sku || "",
-                colorName: color.colorName || "",
-                labelSize: size.size || "",
-              }))
-            ),
-          }];
+        const parseResult = parseXmlResponse(xmlResponse);
 
-          return new Response(
-            JSON.stringify({
-              success: true,
-              supplier: "ssactivewear",
-              action,
-              data: transformedData,
-            }),
-            {
-              status: 200,
-              headers: { ...corsHeaders, "Content-Type": "application/json" }
-            }
-          );
-        } catch (error: any) {
-          console.error("Product search error:", error);
+        if (!parseResult.success) {
+          console.error("PromoStandards error:", parseResult.error);
           return new Response(
             JSON.stringify({
               success: false,
               supplier: "ssactivewear",
               action,
-              error: error.message,
+              error: `Product not found or API error: ${parseResult.error?.description}`,
+              errorCode: parseResult.error?.code,
               data: []
             }),
             {
@@ -282,6 +295,52 @@ Deno.serve(async (req: Request) => {
             }
           );
         }
+
+        const xmlDoc = parseResult.xmlText!;
+
+        const productName = getXmlValue(xmlDoc, "productName") || "";
+        const description = getXmlValue(xmlDoc, "description") || "";
+        const productBrand = getXmlValue(xmlDoc, "productBrand") || "";
+
+        const colorNames = getXmlValues(xmlDoc, "colorName");
+        const partIds = getXmlValues(xmlDoc, "partId");
+        const labelSizes = getXmlValues(xmlDoc, "labelSize");
+
+        console.log("Product data parsed:", {
+          productName,
+          productBrand,
+          colorCount: colorNames.length,
+          partCount: partIds.length
+        });
+
+        const colorArray = colorNames.map(name => ({ colorName: name }));
+        const partsArray = partIds.map((id, i) => ({
+          partId: id,
+          colorName: colorNames[i] || "",
+          labelSize: labelSizes[i] || "",
+        }));
+
+        const transformedData = [{
+          productId,
+          productName,
+          description,
+          productBrand,
+          colors: colorArray,
+          parts: partsArray,
+        }];
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            supplier: "ssactivewear",
+            action,
+            data: transformedData,
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          }
+        );
       }
 
       case "inventory": {
@@ -292,38 +351,32 @@ Deno.serve(async (req: Request) => {
           );
         }
 
-        try {
-          const inventoryData = await makeSSARestRequest(
-            `${SSA_REST_API_BASE}/inventory/?style=${encodeURIComponent(productId)}`,
-            credentials.accountNumber,
-            decryptedApiKey
-          );
+        const soapBody = `<ns2:GetInventoryLevelsRequest xmlns:ns2="http://www.promostandards.org/WSDL/InventoryService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/Inventory/2.0.0/SharedObjects/">
+  <shar:wsVersion>2.0.0</shar:wsVersion>
+  <shar:id>${credentials.accountNumber}</shar:id>
+  <shar:password>${decryptedApiKey}</shar:password>
+  <shar:productId>${productId}</shar:productId>
+</ns2:GetInventoryLevelsRequest>`;
 
-          const inventoryArray = (inventoryData || []).map((item: any) => ({
-            partId: item.sku || "",
-            quantityAvailable: item.qty || 0,
-          }));
+        const xmlResponse = await makePromoStandardsRequest(
+          PROMOSTANDARDS_ENDPOINTS.inventory,
+          "getInventoryLevels",
+          soapBody,
+          credentials.accountNumber,
+          decryptedApiKey
+        );
 
-          return new Response(
-            JSON.stringify({
-              success: true,
-              supplier: "ssactivewear",
-              action,
-              data: inventoryArray,
-            }),
-            {
-              status: 200,
-              headers: { ...corsHeaders, "Content-Type": "application/json" }
-            }
-          );
-        } catch (error: any) {
-          console.error("Inventory error:", error);
+        const parseResult = parseXmlResponse(xmlResponse);
+
+        if (!parseResult.success) {
+          console.error("PromoStandards error:", parseResult.error);
           return new Response(
             JSON.stringify({
               success: false,
               supplier: "ssactivewear",
               action,
-              error: error.message,
+              error: `Inventory not found or API error: ${parseResult.error?.description}`,
+              errorCode: parseResult.error?.code,
               data: []
             }),
             {
@@ -332,6 +385,29 @@ Deno.serve(async (req: Request) => {
             }
           );
         }
+
+        const xmlDoc = parseResult.xmlText!;
+
+        const partIds = getXmlValues(xmlDoc, "partId");
+        const quantities = getXmlValues(xmlDoc, "quantityAvailable");
+
+        const inventoryArray = partIds.map((id, i) => ({
+          partId: id,
+          quantityAvailable: parseInt(quantities[i] || "0"),
+        }));
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            supplier: "ssactivewear",
+            action,
+            data: inventoryArray,
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          }
+        );
       }
 
       case "pricing": {
@@ -342,60 +418,32 @@ Deno.serve(async (req: Request) => {
           );
         }
 
-        try {
-          const productData = await makeSSARestRequest(
-            `${SSA_REST_API_BASE}/products/?style=${encodeURIComponent(productId)}`,
-            credentials.accountNumber,
-            decryptedApiKey
-          );
+        const soapBody = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
+  <shar:wsVersion>1.0.0</shar:wsVersion>
+  <shar:id>${credentials.accountNumber}</shar:id>
+  <shar:password>${decryptedApiKey}</shar:password>
+  <shar:productId>${productId}</shar:productId>
+</ns2:GetConfigurationAndPricingRequest>`;
 
-          if (!productData || productData.length === 0) {
-            return new Response(
-              JSON.stringify({
-                success: false,
-                supplier: "ssactivewear",
-                action,
-                error: "Product not found",
-                data: []
-              }),
-              {
-                status: 200,
-                headers: { ...corsHeaders, "Content-Type": "application/json" }
-              }
-            );
-          }
+        const xmlResponse = await makePromoStandardsRequest(
+          PROMOSTANDARDS_ENDPOINTS.pricing,
+          "getConfigurationAndPricing",
+          soapBody,
+          credentials.accountNumber,
+          decryptedApiKey
+        );
 
-          const product = productData[0];
-          const partArray = (product.colorArray || []).flatMap((color: any) =>
-            (color.sizeArray || []).map((size: any) => ({
-              partId: size.sku || "",
-              prices: [{
-                quantity: 1,
-                price: parseFloat(size.customerPrice || size.casePrice || "0"),
-              }],
-            }))
-          );
+        const parseResult = parseXmlResponse(xmlResponse);
 
-          return new Response(
-            JSON.stringify({
-              success: true,
-              supplier: "ssactivewear",
-              action,
-              data: partArray,
-            }),
-            {
-              status: 200,
-              headers: { ...corsHeaders, "Content-Type": "application/json" }
-            }
-          );
-        } catch (error: any) {
-          console.error("Pricing error:", error);
+        if (!parseResult.success) {
+          console.error("PromoStandards error:", parseResult.error);
           return new Response(
             JSON.stringify({
               success: false,
               supplier: "ssactivewear",
               action,
-              error: error.message,
+              error: `Pricing not found or API error: ${parseResult.error?.description}`,
+              errorCode: parseResult.error?.code,
               data: []
             }),
             {
@@ -404,6 +452,51 @@ Deno.serve(async (req: Request) => {
             }
           );
         }
+
+        const xmlDoc = parseResult.xmlText!;
+
+        // SSActivewear returns pricing in nested Part/PartPrice structure
+        const partPattern = /<Part>([\s\S]*?)<\/Part>/gi;
+        const parts: any[] = [];
+        let partMatch;
+
+        while ((partMatch = partPattern.exec(xmlDoc)) !== null) {
+          const partXml = partMatch[1];
+          const partId = getXmlValue(partXml, "partId");
+
+          // Extract PartPrice elements within this Part
+          const pricePattern = /<PartPrice>([\s\S]*?)<\/PartPrice>/gi;
+          const prices: any[] = [];
+          let priceMatch;
+
+          while ((priceMatch = pricePattern.exec(partXml)) !== null) {
+            const priceXml = priceMatch[1];
+            prices.push({
+              quantity: parseInt(getXmlValue(priceXml, "minQuantity") || "1"),
+              price: parseFloat(getXmlValue(priceXml, "price") || "0"),
+            });
+          }
+
+          parts.push({
+            partId,
+            prices
+          });
+        }
+
+        const partArray = parts;
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            supplier: "ssactivewear",
+            action,
+            data: partArray,
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          }
+        );
       }
 
       case "media": {
@@ -414,115 +507,41 @@ Deno.serve(async (req: Request) => {
           );
         }
 
-        try {
-          const productData = await makeSSARestRequest(
-            `${SSA_REST_API_BASE}/products/?style=${encodeURIComponent(productId)}`,
-            credentials.accountNumber,
-            decryptedApiKey
-          );
+        const partId = url.searchParams.get("partId");
 
-          if (!productData || productData.length === 0) {
-            return new Response(
-              JSON.stringify({
-                success: false,
-                supplier: "ssactivewear",
-                action,
-                error: "Product not found",
-                data: {
-                  productId,
-                  partId: null,
-                  mediaContent: []
-                }
-              }),
-              {
-                status: 200,
-                headers: { ...corsHeaders, "Content-Type": "application/json" }
-              }
-            );
-          }
+        const partIdTag = partId ? `<shar:partId>${partId}</shar:partId>` : '';
 
-          const product = productData[0];
-          const mediaArray: any[] = [];
+        const soapBody = `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
+  <shar:wsVersion>1.0.0</shar:wsVersion>
+  <shar:id>${credentials.accountNumber}</shar:id>
+  <shar:password>${decryptedApiKey}</shar:password>
+  <shar:mediaType>Image</shar:mediaType>
+  <shar:productId>${productId}</shar:productId>
+  ${partIdTag}
+</ns2:GetMediaContentRequest>`;
 
-          // Add product-level images
-          if (product.imageArray) {
-            for (const img of product.imageArray) {
-              mediaArray.push({
-                url: img.image || "",
-                productId: product.styleID || productId,
-                partId: "",
-                classTypeName: img.imageType || "Front",
-                color: "",
-                singlePart: false,
-                isImage: true,
-              });
-            }
-          }
+        const xmlResponse = await makePromoStandardsRequest(
+          PROMOSTANDARDS_ENDPOINTS.media,
+          "getMediaContent",
+          soapBody,
+          credentials.accountNumber,
+          decryptedApiKey
+        );
 
-          // Add color-specific images
-          for (const color of product.colorArray || []) {
-            if (color.colorFrontImage) {
-              mediaArray.push({
-                url: color.colorFrontImage,
-                productId: product.styleID || productId,
-                partId: "",
-                classTypeName: "Front",
-                color: color.colorName || "",
-                singlePart: false,
-                isImage: true,
-              });
-            }
-            if (color.colorBackImage) {
-              mediaArray.push({
-                url: color.colorBackImage,
-                productId: product.styleID || productId,
-                partId: "",
-                classTypeName: "Back",
-                color: color.colorName || "",
-                singlePart: false,
-                isImage: true,
-              });
-            }
-            if (color.colorSideImage) {
-              mediaArray.push({
-                url: color.colorSideImage,
-                productId: product.styleID || productId,
-                partId: "",
-                classTypeName: "Side",
-                color: color.colorName || "",
-                singlePart: false,
-                isImage: true,
-              });
-            }
-          }
+        const parseResult = parseXmlResponse(xmlResponse);
 
-          return new Response(
-            JSON.stringify({
-              success: true,
-              supplier: "ssactivewear",
-              action,
-              data: {
-                productId,
-                partId: null,
-                mediaContent: mediaArray,
-              },
-            }),
-            {
-              status: 200,
-              headers: { ...corsHeaders, "Content-Type": "application/json" }
-            }
-          );
-        } catch (error: any) {
-          console.error("Media error:", error);
+        if (!parseResult.success) {
+          console.error("PromoStandards error:", parseResult.error);
           return new Response(
             JSON.stringify({
               success: false,
               supplier: "ssactivewear",
               action,
-              error: error.message,
+              error: `Media not found or API error: ${parseResult.error?.description}`,
+              errorCode: parseResult.error?.code,
               data: {
                 productId,
-                partId: null,
+                partId: partId || null,
                 mediaContent: []
               }
             }),
@@ -532,6 +551,60 @@ Deno.serve(async (req: Request) => {
             }
           );
         }
+
+        const xmlDoc = parseResult.xmlText!;
+
+        console.log("Media XML Response Preview:", xmlDoc.substring(0, 2000));
+
+        const urls = getXmlValues(xmlDoc, "url");
+        const classTypeNames = getXmlValues(xmlDoc, "classTypeName");
+        const productIds = getXmlValues(xmlDoc, "productId");
+        const colors = getXmlValues(xmlDoc, "color");
+        const partIds = getXmlValues(xmlDoc, "partId");
+        const singleParts = getXmlValues(xmlDoc, "singlePart");
+
+        console.log(`Parsed media data: ${urls.length} URLs, ${classTypeNames.length} classTypeNames, ${colors.length} colors, ${partIds.length} partIds`);
+
+        const mediaArray = urls.map((url, i) => {
+          const classTypeName = classTypeNames[i] || "";
+
+          // Check if this is an actual image URL
+          const hasImageExtension = url.match(/\.(jpg|jpeg|png|gif|webp|bmp|tiff)(\?|$)/i);
+          const isWebPage = url.match(/\.(aspx|html|htm|php|jsp|asp)(\?|$)/i);
+          const isImageUrl = !isWebPage && hasImageExtension;
+
+          return {
+            url,
+            productId: productIds[i] || "",
+            partId: partIds[i] || "",
+            classTypeName,
+            color: colors[i] || "",
+            singlePart: singleParts[i] === "true",
+            isImage: isImageUrl,
+          };
+        }).filter(item => item.isImage);
+
+        console.log(`Filtered to ${mediaArray.length} actual images`);
+        if (mediaArray.length > 0) {
+          console.log("First image:", mediaArray[0]);
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            supplier: "ssactivewear",
+            action,
+            data: {
+              productId,
+              partId: partId || null,
+              mediaContent: mediaArray,
+            },
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          }
+        );
       }
 
       default:
@@ -542,7 +615,7 @@ Deno.serve(async (req: Request) => {
     }
 
   } catch (error: any) {
-    console.error("SSActivewear REST API error:", error);
+    console.error("SSActivewear PromoStandards API error:", error);
     console.error("Error stack:", error.stack);
     return new Response(
       JSON.stringify({
