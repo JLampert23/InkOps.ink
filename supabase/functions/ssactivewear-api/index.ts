@@ -79,15 +79,24 @@ function getXmlValues(xmlText: string, tagName: string): string[] {
   return Array.from(matches, m => m[1]);
 }
 
-function parseXmlResponse(xmlText: string): string {
+function parseXmlResponse(xmlText: string): { success: boolean; xmlText?: string; error?: { code: string; description: string } } {
   const errorCode = getXmlValue(xmlText, 'code');
   const errorDesc = getXmlValue(xmlText, 'description');
 
   if (errorCode && errorDesc) {
-    throw new Error(`PromoStandards Error ${errorCode}: ${errorDesc}`);
+    return {
+      success: false,
+      error: {
+        code: errorCode,
+        description: errorDesc
+      }
+    };
   }
 
-  return xmlText;
+  return {
+    success: true,
+    xmlText
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -166,9 +175,19 @@ Deno.serve(async (req: Request) => {
       companyId = companyIdParam;
       console.log("Service role call - using company_id:", companyId);
     } else {
-      // User JWT - validate and get company_id from profile
+      // User JWT - validate using anon key client with user's JWT
       console.log("User JWT - validating token");
-      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+      const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+      const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      });
+
+      const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
 
       if (authError || !user) {
         console.error("Auth error:", authError);
@@ -178,7 +197,7 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      // Get user's company_id
+      // Get user's company_id using service role client
       const { data: profile } = await supabase
         .from("user_profiles")
         .select("company_id")
@@ -281,7 +300,27 @@ Deno.serve(async (req: Request) => {
           decryptedApiKey
         );
 
-        const xmlDoc = parseXmlResponse(xmlResponse);
+        const parseResult = parseXmlResponse(xmlResponse);
+
+        if (!parseResult.success) {
+          console.error("PromoStandards error:", parseResult.error);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              supplier: "ssactivewear",
+              action,
+              error: `Product not found or API error: ${parseResult.error?.description}`,
+              errorCode: parseResult.error?.code,
+              data: []
+            }),
+            {
+              status: 200,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            }
+          );
+        }
+
+        const xmlDoc = parseResult.xmlText!;
 
         const productName = getXmlValue(xmlDoc, "productName") || "";
         const description = getXmlValue(xmlDoc, "description") || "";
@@ -353,7 +392,27 @@ Deno.serve(async (req: Request) => {
           decryptedApiKey
         );
 
-        const xmlDoc = parseXmlResponse(xmlResponse);
+        const parseResult = parseXmlResponse(xmlResponse);
+
+        if (!parseResult.success) {
+          console.error("PromoStandards error:", parseResult.error);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              supplier: "ssactivewear",
+              action,
+              error: `Inventory not found or API error: ${parseResult.error?.description}`,
+              errorCode: parseResult.error?.code,
+              data: []
+            }),
+            {
+              status: 200,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            }
+          );
+        }
+
+        const xmlDoc = parseResult.xmlText!;
 
         const partIds = getXmlValues(xmlDoc, "partId");
         const quantities = getXmlValues(xmlDoc, "quantityAvailable");
@@ -400,7 +459,27 @@ Deno.serve(async (req: Request) => {
           decryptedApiKey
         );
 
-        const xmlDoc = parseXmlResponse(xmlResponse);
+        const parseResult = parseXmlResponse(xmlResponse);
+
+        if (!parseResult.success) {
+          console.error("PromoStandards error:", parseResult.error);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              supplier: "ssactivewear",
+              action,
+              error: `Pricing not found or API error: ${parseResult.error?.description}`,
+              errorCode: parseResult.error?.code,
+              data: []
+            }),
+            {
+              status: 200,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            }
+          );
+        }
+
+        const xmlDoc = parseResult.xmlText!;
 
         const partIds = getXmlValues(xmlDoc, "partId");
         const quantities = getXmlValues(xmlDoc, "quantity");
@@ -457,7 +536,31 @@ Deno.serve(async (req: Request) => {
           decryptedApiKey
         );
 
-        const xmlDoc = parseXmlResponse(xmlResponse);
+        const parseResult = parseXmlResponse(xmlResponse);
+
+        if (!parseResult.success) {
+          console.error("PromoStandards error:", parseResult.error);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              supplier: "ssactivewear",
+              action,
+              error: `Media not found or API error: ${parseResult.error?.description}`,
+              errorCode: parseResult.error?.code,
+              data: {
+                productId,
+                partId: partId || null,
+                mediaContent: []
+              }
+            }),
+            {
+              status: 200,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            }
+          );
+        }
+
+        const xmlDoc = parseResult.xmlText!;
 
         console.log("Media XML Response Preview:", xmlDoc.substring(0, 2000));
 
