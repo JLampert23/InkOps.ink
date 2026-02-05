@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { X, File, Trash2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, File, Trash2, Upload, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 
 interface CustomerArtworkLibraryProps {
@@ -23,6 +23,8 @@ export function CustomerArtworkLibrary({ customerId, onClose }: CustomerArtworkL
   const [artwork, setArtwork] = useState<CustomerArtwork[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadArtwork();
@@ -87,18 +89,130 @@ export function CustomerArtworkLibrary({ customerId, onClose }: CustomerArtworkL
     }
   };
 
+  const handleFileSelect = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert('You must be logged in to upload artwork');
+        return;
+      }
+
+      const { data: userProfile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!userProfile?.company_id) {
+        alert('Company ID not found');
+        return;
+      }
+
+      const uploadPromises = Array.from(files).map(async (file) => {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `${userProfile.company_id}/${customerId}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('customer-artwork')
+          .upload(filePath, file);
+
+        if (uploadError) {
+          console.error('Error uploading file:', uploadError);
+          throw uploadError;
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('customer-artwork')
+          .getPublicUrl(filePath);
+
+        const { data: artworkRecord, error: dbError } = await supabase
+          .from('customer_artwork')
+          .insert({
+            customer_id: customerId,
+            company_id: userProfile.company_id,
+            file_name: file.name,
+            file_url: urlData.publicUrl,
+            file_type: file.type,
+            file_size: file.size,
+            tags: []
+          })
+          .select()
+          .single();
+
+        if (dbError) {
+          console.error('Error creating artwork record:', dbError);
+          throw dbError;
+        }
+
+        return artworkRecord;
+      });
+
+      const uploadedArtwork = await Promise.all(uploadPromises);
+      setArtwork([...uploadedArtwork, ...artwork]);
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+
+      alert(`Successfully uploaded ${uploadedArtwork.length} file(s)`);
+    } catch (error) {
+      console.error('Error uploading artwork:', error);
+      alert('Failed to upload artwork. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-5xl max-h-[85vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b dark:border-slate-600">
           <h3 className="text-xl font-bold text-gray-900 dark:text-white">Customer Artwork Library</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:text-gray-300 dark:hover:text-white transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleFileSelect}
+              disabled={uploading}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-lg"
+            >
+              {uploading ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-5 h-5" />
+                  Upload Artwork
+                </>
+              )}
+            </button>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 dark:text-gray-300 dark:hover:text-white transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
         </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,.pdf,.ai,.eps,.svg"
+          multiple
+          onChange={handleFileUpload}
+          className="hidden"
+        />
 
         <div className="flex-1 overflow-y-auto p-6">
           {loading ? (
