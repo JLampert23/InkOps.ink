@@ -623,6 +623,7 @@ Deno.serve(async (req: Request) => {
             : null,
           mediaError: mediaResponse.status === 'rejected' ? mediaResponse.reason?.toString() : null,
           mediaAuthError,
+          pricingAuthError,
           soapRequests: {
             productDataRequest: productSoap,
             mediaRequest: mediaSoap,

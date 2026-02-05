@@ -1120,6 +1120,13 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           }
         } else {
           console.warn('⚠️ No pricing data in unified response');
+
+          // Fall back to cached pricing if available
+          if (color.pricing?.wholesale) {
+            freshPrice = color.pricing.wholesale;
+            console.log('💰 Using cached pricing from search results:', freshPrice);
+            showNotification('info', 'Using cached pricing (Pricing API unavailable)');
+          }
         }
 
         console.log('🐛 Debug info from API:', unifiedData.debug);
@@ -1137,7 +1144,85 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           console.log('📄 Media XML (first 2000 chars):', unifiedData.debug.mediaXmlFull.substring(0, 2000));
         }
 
-        if (unifiedData.success && unifiedData.media?.views) {
+        // If Media API failed (error 105), try to use cached images from database
+        const hasLiveMediaData = unifiedData.success && unifiedData.media?.views;
+
+        if (!hasLiveMediaData && unifiedData.debug?.mediaAuthError) {
+          console.log('⚠️ Media API unavailable, attempting to load cached images from database...');
+
+          // Try to get cached images for this partId
+          try {
+            const { data: cachedPart } = await supabase
+              .from('parts')
+              .select(`
+                id,
+                images (
+                  url,
+                  class_type
+                )
+              `)
+              .eq('part_id', color.code)
+              .maybeSingle();
+
+            if (cachedPart?.images && cachedPart.images.length > 0) {
+              console.log(`✅ Found ${cachedPart.images.length} cached images for ${color.code}`);
+
+              // Organize cached images by type
+              const frontImg = cachedPart.images.find((img: any) =>
+                (img.class_type || '').toLowerCase().includes('front')
+              );
+              const rearImg = cachedPart.images.find((img: any) =>
+                (img.class_type || '').toLowerCase().includes('rear') ||
+                (img.class_type || '').toLowerCase().includes('back')
+              );
+              const sideImg = cachedPart.images.find((img: any) =>
+                (img.class_type || '').toLowerCase().includes('side') ||
+                (img.class_type || '').toLowerCase().includes('sleeve')
+              );
+              const lifestyleImg = cachedPart.images.find((img: any) =>
+                (img.class_type || '').toLowerCase().includes('lifestyle')
+              );
+
+              if (frontImg) {
+                garmentImages.garment_front_image_url = frontImg.url;
+                garmentImages.garment_back_image_url = frontImg.url;
+                console.log('✅ Loaded cached front image');
+              }
+              if (rearImg) {
+                garmentImages.garment_rear_image_url = rearImg.url;
+                console.log('✅ Loaded cached rear image');
+              }
+              if (sideImg) {
+                garmentImages.garment_side_image_url = sideImg.url;
+                garmentImages.garment_sleeve_image_url = sideImg.url;
+                console.log('✅ Loaded cached side image');
+              }
+              if (lifestyleImg) {
+                garmentImages.garment_lifestyle_image_url = lifestyleImg.url;
+                console.log('✅ Loaded cached lifestyle image');
+              }
+
+              garmentImages.garment_images_data = {
+                frontImages: frontImg ? [frontImg.url] : [],
+                rearImages: rearImg ? [rearImg.url] : [],
+                sideImages: sideImg ? [sideImg.url] : [],
+                lifestyleImages: lifestyleImg ? [lifestyleImg.url] : [],
+                otherImages: [],
+                allImages: cachedPart.images.map((img: any) => img.url),
+              };
+
+              showNotification('warning', 'Using cached images (Media API unavailable)');
+            } else {
+              console.warn('⚠️ No cached images found for this color');
+              showNotification('warning', 'No product images available (Media API access required)');
+            }
+          } catch (cacheError) {
+            console.error('Failed to load cached images:', cacheError);
+            showNotification('warning', 'No product images available');
+          }
+        }
+
+        if (hasLiveMediaData) {
           if (unifiedData.media.views.front) {
             garmentImages.garment_front_image_url = unifiedData.media.views.front;
             garmentImages.garment_back_image_url = unifiedData.media.views.front;
