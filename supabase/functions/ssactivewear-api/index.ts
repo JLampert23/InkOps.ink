@@ -481,47 +481,35 @@ Deno.serve(async (req: Request) => {
 
         const xmlDoc = parseResult.xmlText!;
 
-        // Parse Part elements
+        // SSActivewear returns pricing in nested Part/PartPrice structure
         const partPattern = /<Part>([\s\S]*?)<\/Part>/gi;
-        const getAllXmlMatches = (xml: string, pattern: RegExp) => {
-          const matches = [];
-          let match;
-          while ((match = pattern.exec(xml)) !== null) {
-            matches.push(match);
-          }
-          return matches;
-        };
+        const parts: any[] = [];
+        let partMatch;
 
-        const partMatches = getAllXmlMatches(xmlDoc, partPattern);
-        console.log('Found', partMatches.length, 'parts in pricing response');
+        while ((partMatch = partPattern.exec(xmlDoc)) !== null) {
+          const partXml = partMatch[1];
+          const partId = getXmlValue(partXml, "partId");
 
-        const partArray = partMatches.map(match => {
-          const partXml = match[1];
-
-          // Extract partId
-          const partIdMatch = partXml.match(/<partId>([^<]*)<\/partId>/i);
-          const partId = partIdMatch ? partIdMatch[1] : '';
-
-          // S&S uses PartPrice tags
+          // Extract PartPrice elements within this Part
           const pricePattern = /<PartPrice>([\s\S]*?)<\/PartPrice>/gi;
-          const priceMatches = getAllXmlMatches(partXml, pricePattern);
+          const prices: any[] = [];
+          let priceMatch;
 
-          const prices = priceMatches.map(priceMatch => {
+          while ((priceMatch = pricePattern.exec(partXml)) !== null) {
             const priceXml = priceMatch[1];
-            const quantityMatch = priceXml.match(/<minQuantity>([^<]*)<\/minQuantity>/i);
-            const priceValueMatch = priceXml.match(/<price>([^<]*)<\/price>/i);
+            prices.push({
+              quantity: parseInt(getXmlValue(priceXml, "minQuantity") || "1"),
+              price: parseFloat(getXmlValue(priceXml, "price") || "0"),
+            });
+          }
 
-            return {
-              quantity: parseInt(quantityMatch?.[1] || "1"),
-              price: parseFloat(priceValueMatch?.[1] || "0"),
-            };
-          });
-
-          return {
+          parts.push({
             partId,
             prices
-          };
-        });
+          });
+        }
+
+        const partArray = parts;
 
         return new Response(
           JSON.stringify({
