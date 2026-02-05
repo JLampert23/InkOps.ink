@@ -503,7 +503,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
           mockups: imprint.proofs,
           thread_ink_color: imprint.thread_ink_color,
           pricing_matrix_column: imprint.pricing_matrix_column,
-          group_label: imprint.group_label || null,
+          group_label: imprint.group_label ?? '',
           num_colors: extractNumColors(imprint.pricing_matrix_column),
         })
         .select()
@@ -612,7 +612,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
             mockups: imp.proofs,
             thread_ink_color: imp.thread_ink_color,
             pricing_matrix_column: imp.pricing_matrix_column,
-            group_label: imp.group_label || null,
+            group_label: imp.group_label ?? '',
             num_colors: extractNumColors(imp.pricing_matrix_column),
           };
 
