@@ -198,13 +198,13 @@ Deno.serve(async (req: Request) => {
               // Check if API returned an error (success: false)
               if (ssaData.success === false) {
                 console.log(`SSActivewear API error:`, ssaData.error);
-                errors.push(`Style ${style} not found.`);
+                // Don't add to errors - this is expected when product doesn't exist in this supplier
               } else {
                 const productData = ssaData.data?.[0];
 
                 if (!productData) {
                   console.log(`Style ${style} not found in SSActivewear API`);
-                  errors.push(`Style ${style} not found.`);
+                  // Don't add to errors - this is expected when product doesn't exist in this supplier
                 } else {
                 console.log(`Fetched style ${style} from SSActivewear - caching it...`);
 
