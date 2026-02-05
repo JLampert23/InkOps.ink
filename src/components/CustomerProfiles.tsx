@@ -620,6 +620,23 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
 
   return (
     <div className="space-y-6">
+      {/* Quick Action Bar */}
+      <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg shadow-lg p-4">
+        <div className="flex items-center justify-between">
+          <div className="text-white">
+            <h3 className="text-lg font-bold">Customer Artwork</h3>
+            <p className="text-sm text-green-100">View and manage {customer.name}'s artwork files</p>
+          </div>
+          <button
+            onClick={() => setShowArtworkLibrary(true)}
+            className="flex items-center gap-2 px-6 py-3 bg-white text-green-600 rounded-lg hover:bg-green-50 transition-colors shadow-lg font-bold text-lg"
+          >
+            <Image className="w-6 h-6" />
+            Open Artwork Library
+          </button>
+        </div>
+      </div>
+
       {/* Customer Info Header */}
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow border border-gray-200 dark:border-slate-700 p-6">
         {!databaseCustomer ? (
@@ -729,8 +746,8 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
                 </div>
               ) : (
                 <div>
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
+                  <div className="flex flex-col lg:flex-row items-start lg:justify-between gap-4 mb-4">
+                    <div className="flex-1 min-w-0">
                       <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{customer.name}</h2>
                       <div className="mt-2 space-y-1">
                         {databaseCustomer.contact_name && (
@@ -761,20 +778,20 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
                         )}
                       </div>
                     </div>
-                    <div className="flex gap-2 shrink-0 ml-4">
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
                       <button
                         onClick={() => setShowArtworkLibrary(true)}
-                        className="flex items-center gap-2 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        className="flex items-center justify-center gap-2 px-6 py-3 text-base font-semibold bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-lg"
                         title="View customer artwork library"
                       >
-                        <Image className="w-4 h-4" />
+                        <Image className="w-5 h-5" />
                         Artwork Library
                       </button>
                       <button
                         onClick={() => setIsEditingInfo(true)}
-                        className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        className="flex items-center justify-center gap-2 px-6 py-3 text-base font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-lg"
                       >
-                        <Edit2 className="w-4 h-4" />
+                        <Edit2 className="w-5 h-5" />
                         Edit Info
                       </button>
                     </div>
