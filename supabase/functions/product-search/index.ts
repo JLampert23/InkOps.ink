@@ -663,56 +663,78 @@ Deno.serve(async (req: Request) => {
 });
 
 function transformSanMarData(data: any, style: string): ProductResult[] {
-  // Transform SanMar API response to common format
-  // This is a placeholder - adjust based on actual SanMar API response structure
   const products: ProductResult[] = [];
 
-  if (Array.isArray(data)) {
-    for (const item of data) {
-      products.push({
-        supplier: "sanmar",
-        style: item.styleNumber || style,
-        brand: item.brandName || item.brand || "",
-        description: item.productName || item.description || "",
-        category: item.category || item.productCategory,
-        colors: (item.colors || []).map((color: any) => ({
-          name: color.colorName || color.name,
-          code: color.colorCode || color.code,
-          image_url: color.imageUrl || color.image,
-          pricing: {
-            wholesale: color.wholesalePrice || color.price,
-            retail: color.retailPrice || color.msrp,
-          },
-          stock: color.inventory || {},
-          sizes: color.sizes || color.availableSizes || [],
-        })),
-        raw_data: item,
-      });
-    }
-  } else if (data.product || data.products) {
-    const product = data.product || data.products[0];
-    if (product) {
-      products.push({
-        supplier: "sanmar",
-        style: product.styleNumber || style,
-        brand: product.brandName || product.brand || "",
-        description: product.productName || product.description || "",
-        category: product.category || product.productCategory,
-        colors: (product.colors || []).map((color: any) => ({
-          name: color.colorName || color.name,
-          code: color.colorCode || color.code,
-          image_url: color.imageUrl || color.image,
-          pricing: {
-            wholesale: color.wholesalePrice || color.price,
-            retail: color.retailPrice || color.msrp,
-          },
-          stock: color.inventory || {},
-          sizes: color.sizes || color.availableSizes || [],
-        })),
-        raw_data: product,
+  if (!data || !data.style) {
+    console.error("Invalid SanMar data structure:", data);
+    return products;
+  }
+
+  const styleData = data.style;
+  const mediaData = data.media;
+  const pricingData = data.pricing;
+  const inventoryData = data.inventory;
+
+  const colors: ColorOption[] = [];
+
+  if (styleData.colors && Array.isArray(styleData.colors)) {
+    for (const color of styleData.colors) {
+      const partIds = color.partIds || [];
+      const sizes = partIds.map((p: any) => p.size).filter(Boolean);
+
+      const firstPartId = partIds.length > 0 ? partIds[0].partId : "";
+
+      let pricingInfo = { wholesale: 0, retail: 0 };
+      if (pricingData?.parts && Array.isArray(pricingData.parts)) {
+        const partPricing = pricingData.parts.find((p: any) => p.partId === firstPartId);
+        if (partPricing?.prices && partPricing.prices.length > 0) {
+          pricingInfo.wholesale = partPricing.prices[0].price || 0;
+          pricingInfo.retail = partPricing.prices[0].price || 0;
+        }
+      }
+
+      let inventoryInfo = {};
+      if (inventoryData?.items && Array.isArray(inventoryData.items)) {
+        const partInventory = inventoryData.items.filter((inv: any) =>
+          partIds.some((p: any) => p.partId === inv.partId)
+        );
+        if (partInventory.length > 0) {
+          inventoryInfo = partInventory.reduce((acc: any, inv: any) => {
+            acc[inv.partId] = inv.quantityAvailable;
+            return acc;
+          }, {});
+        }
+      }
+
+      let imageUrl = "";
+      if (mediaData?.views) {
+        imageUrl = mediaData.views.front ||
+                   mediaData.views.lifestyle ||
+                   (mediaData.views.frontImages?.[0]) ||
+                   "";
+      }
+
+      colors.push({
+        name: color.colorName,
+        code: color.hex || "",
+        partIds: partIds.map((p: any) => p.partId),
+        image_url: imageUrl,
+        pricing: pricingInfo,
+        sizes: sizes,
+        stock: inventoryInfo,
       });
     }
   }
+
+  products.push({
+    supplier: "sanmar",
+    style: styleData.styleNumber || style,
+    brand: styleData.productBrand || "",
+    description: styleData.productName || styleData.description || "",
+    category: styleData.productCategory || "",
+    colors: colors,
+    raw_data: data,
+  });
 
   return products;
 }
