@@ -1,17 +1,21 @@
 import React, { useState } from 'react';
-import { Package, FileText } from 'lucide-react';
+import { Package, FileText, Truck } from 'lucide-react';
 import { PurchaseOrdersList } from './PurchaseOrdersList';
 import { CreatePurchaseOrder } from './CreatePurchaseOrder';
 import { PurchaseOrderDetail } from './PurchaseOrderDetail';
 import { GarmentOrderReport } from './GarmentOrderReport';
+import { ReceivingDashboard } from './ReceivingDashboard';
+import { ReceiveGoods } from './ReceiveGoods';
 
 type View = 'list' | 'create' | 'detail';
-type Tab = 'purchase-orders' | 'garment-report';
+type Tab = 'purchase-orders' | 'garment-report' | 'receiving';
 
 export function PurchaseOrdersManager() {
   const [activeTab, setActiveTab] = useState<Tab>('purchase-orders');
   const [currentView, setCurrentView] = useState<View>('list');
   const [selectedPoId, setSelectedPoId] = useState<string | null>(null);
+  const [showReceiveModal, setShowReceiveModal] = useState(false);
+  const [receivingPoId, setReceivingPoId] = useState<string | null>(null);
 
   const handleCreateNew = () => {
     setCurrentView('create');
@@ -36,13 +40,25 @@ export function PurchaseOrdersManager() {
     setActiveTab(tab);
     setCurrentView('list');
     setSelectedPoId(null);
+    setShowReceiveModal(false);
+    setReceivingPoId(null);
+  };
+
+  const handleReceivePO = (poId: string) => {
+    setReceivingPoId(poId);
+    setShowReceiveModal(true);
+  };
+
+  const handleReceiveSuccess = () => {
+    setShowReceiveModal(false);
+    setReceivingPoId(null);
   };
 
   return (
     <div className="space-y-6">
       {/* Tab Navigation */}
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
-        <div className="grid grid-cols-2 divide-x divide-gray-200 dark:divide-slate-700">
+        <div className="grid grid-cols-3 divide-x divide-gray-200 dark:divide-slate-700">
           <button
             onClick={() => handleTabChange('purchase-orders')}
             className={`p-4 text-center transition-colors hover:bg-gray-50 dark:hover:bg-slate-700 ${
@@ -76,6 +92,25 @@ export function PurchaseOrdersManager() {
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                   Track garment needs
+                </div>
+              </div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => handleTabChange('receiving')}
+            className={`p-4 text-center transition-colors hover:bg-gray-50 dark:hover:bg-slate-700 ${
+              activeTab === 'receiving' ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+            }`}
+          >
+            <div className="flex flex-col items-center gap-2">
+              <Truck className={`w-6 h-6 ${activeTab === 'receiving' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`} />
+              <div>
+                <div className={`text-sm font-semibold ${activeTab === 'receiving' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
+                  Receiving
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Receive goods
                 </div>
               </div>
             </div>
@@ -117,7 +152,23 @@ export function PurchaseOrdersManager() {
             }}
           />
         )}
+
+        {activeTab === 'receiving' && (
+          <ReceivingDashboard
+            onReceivePO={handleReceivePO}
+            onViewPO={handleViewDetail}
+          />
+        )}
       </div>
+
+      {/* Receive Goods Modal */}
+      {showReceiveModal && receivingPoId && (
+        <ReceiveGoods
+          poId={receivingPoId}
+          onClose={() => setShowReceiveModal(false)}
+          onSuccess={handleReceiveSuccess}
+        />
+      )}
     </div>
   );
 }
