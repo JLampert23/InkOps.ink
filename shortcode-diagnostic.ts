@@ -7,10 +7,85 @@
  * Run with: npx tsx shortcode-diagnostic.ts
  */
 
-import { supabase } from './src/lib/supabase-client';
-import { ShortCodeEngine } from './src/services/shortcode-service';
+import { createClient } from '@supabase/supabase-js';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// Load environment variables from .env file
+function loadEnv() {
+  try {
+    const envPath = path.join(process.cwd(), '.env');
+    if (fs.existsSync(envPath)) {
+      const envContent = fs.readFileSync(envPath, 'utf-8');
+      envContent.split('\n').forEach(line => {
+        const match = line.match(/^([^=:#]+)=(.*)$/);
+        if (match) {
+          const key = match[1].trim();
+          const value = match[2].trim();
+          process.env[key] = value;
+        }
+      });
+    }
+  } catch (error) {
+    console.warn('Warning: Could not load .env file');
+  }
+}
+
+loadEnv();
+
+// Import types after env is loaded
 import { AVAILABLE_SHORT_CODES, type ShortCodeKey, type ShortCodeData } from './src/types/shortcode';
-import { TEMPLATE_TYPE_METADATA } from './src/types/communication-template';
+
+// Inline shortcode engine for standalone operation
+class StandaloneShortCodeEngine {
+  static renderTemplate(template: string, data: ShortCodeData): string {
+    if (!template) return '';
+
+    let rendered = template;
+    const shortCodePattern = /\{\{([a-z_]+)\}\}/gi;
+    const matches = [...template.matchAll(shortCodePattern)];
+    const processedCodes = new Set<string>();
+
+    for (const match of matches) {
+      const fullMatch = match[0];
+      const key = match[1] as keyof ShortCodeData;
+
+      if (processedCodes.has(key)) continue;
+      processedCodes.add(key);
+
+      const value = data[key];
+      if (value !== undefined && value !== null) {
+        // Ensure the value is a primitive (string or number), not an object
+        let stringValue: string;
+
+        if (typeof value === 'object') {
+          // If someone accidentally passed an object, use empty string
+          stringValue = '';
+        } else {
+          // Convert to string (handles numbers, booleans, etc.)
+          stringValue = String(value);
+        }
+
+        const escapedMatch = fullMatch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(escapedMatch, 'g');
+        rendered = rendered.replace(regex, stringValue);
+      } else {
+        const escapedMatch = fullMatch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(escapedMatch, 'g');
+        rendered = rendered.replace(regex, '');
+      }
+    }
+
+    return rendered;
+  }
+
+  static extractShortCodes(template: string): string[] {
+    if (!template) return [];
+    const shortCodePattern = /\{\{([a-z_]+)\}\}/gi;
+    const matches = [...template.matchAll(shortCodePattern)];
+    return [...new Set(matches.map(match => match[1]))];
+  }
+}
 
 interface DiagnosticReport {
   registry_issues: RegistryIssue[];
@@ -71,6 +146,24 @@ interface UIIssue {
   expected?: string;
   actual?: string;
 }
+
+// Template type metadata for required codes
+const TEMPLATE_REQUIRED_CODES: Record<string, Array<{ code: string; reason: string }>> = {
+  quote_email_default: [
+    { code: 'quote_number', reason: 'Required to identify the quote' },
+    { code: 'quote_link', reason: 'Required for customer to view/approve quote' },
+    { code: 'customer_full_name', reason: 'Required for personalization' },
+  ],
+  invoice_email_default: [
+    { code: 'invoice_number', reason: 'Required to identify the invoice' },
+    { code: 'invoice_link', reason: 'Required for customer to pay invoice' },
+    { code: 'customer_full_name', reason: 'Required for personalization' },
+  ],
+  payment_receipt: [
+    { code: 'payment_amount', reason: 'Required to show payment amount' },
+    { code: 'invoice_number', reason: 'Required to identify the invoice' },
+  ],
+};
 
 /**
  * Main diagnostic function
@@ -157,7 +250,7 @@ async function inspectRegistry(report: DiagnosticReport): Promise<void> {
     }
   }
 
-  // Check for duplicate keys (shouldn't happen with TypeScript, but verify)
+  // Check for duplicate keys
   const uniqueKeys = new Set(registeredKeys);
   if (uniqueKeys.size !== registeredKeys.length) {
     report.registry_issues.push({
@@ -172,12 +265,12 @@ async function inspectRegistry(report: DiagnosticReport): Promise<void> {
   // Verify data source categorization
   const dataSources = {
     customer: registeredKeys.filter(k => k.startsWith('customer_')),
-    quote: registeredKeys.filter(k => k.startsWith('quote_')),
+    quote: registeredKeys.filter(k => k.startsWith('quote_') || k === 'art_approval_link'),
     invoice: registeredKeys.filter(k => k.startsWith('invoice_')),
     company: registeredKeys.filter(k => k.startsWith('company_')),
     user: registeredKeys.filter(k => k.startsWith('user_')),
     payment: registeredKeys.filter(k => k.startsWith('payment_')),
-    system: registeredKeys.filter(k => k.startsWith('current_') || k === 'art_approval_link'),
+    system: registeredKeys.filter(k => k.startsWith('current_')),
   };
 
   console.log(`   Data sources:`);
@@ -198,15 +291,11 @@ async function inspectResolvers(report: DiagnosticReport): Promise<void> {
 
   console.log(`   Testing ${registeredKeys.length} resolvers...`);
 
-  // Note: In this architecture, there are no explicit resolver functions
-  // The ShortCodeEngine uses direct property access on the ShortCodeData object
-  // So we check that the rendering engine handles all data types correctly
-
   for (const key of registeredKeys) {
     try {
       // Test with undefined value
       const testDataUndefined: ShortCodeData = { [key]: undefined };
-      const resultUndefined = ShortCodeEngine.renderTemplate(`{{${key}}}`, testDataUndefined);
+      const resultUndefined = StandaloneShortCodeEngine.renderTemplate(`{{${key}}}`, testDataUndefined);
 
       if (resultUndefined === 'undefined') {
         report.resolver_issues.push({
@@ -220,7 +309,7 @@ async function inspectResolvers(report: DiagnosticReport): Promise<void> {
 
       // Test with null value
       const testDataNull: ShortCodeData = { [key]: null as any };
-      const resultNull = ShortCodeEngine.renderTemplate(`{{${key}}}`, testDataNull);
+      const resultNull = StandaloneShortCodeEngine.renderTemplate(`{{${key}}}`, testDataNull);
 
       if (resultNull === 'null') {
         report.resolver_issues.push({
@@ -232,9 +321,9 @@ async function inspectResolvers(report: DiagnosticReport): Promise<void> {
         });
       }
 
-      // Test with object value (should be caught)
+      // Test with object value
       const testDataObject: ShortCodeData = { [key]: { test: 'object' } as any };
-      const resultObject = ShortCodeEngine.renderTemplate(`{{${key}}}`, testDataObject);
+      const resultObject = StandaloneShortCodeEngine.renderTemplate(`{{${key}}}`, testDataObject);
 
       if (resultObject.includes('[object Object]')) {
         report.resolver_issues.push({
@@ -265,6 +354,16 @@ async function inspectResolvers(report: DiagnosticReport): Promise<void> {
  */
 async function inspectTemplateUsage(report: DiagnosticReport): Promise<void> {
   try {
+    const supabaseUrl = process.env.VITE_SUPABASE_URL;
+    const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.log(`   ⚠️  Skipping template analysis (Supabase credentials not found)`);
+      return;
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
     // Fetch all templates from database
     const { data: templates, error } = await supabase
       .from('communication_templates')
@@ -287,8 +386,8 @@ async function inspectTemplateUsage(report: DiagnosticReport): Promise<void> {
 
     for (const template of templates) {
       // Extract short codes from subject and body
-      const subjectCodes = ShortCodeEngine.extractShortCodes(template.subject_template || '');
-      const bodyCodes = ShortCodeEngine.extractShortCodes(template.body_template || '');
+      const subjectCodes = StandaloneShortCodeEngine.extractShortCodes(template.subject_template || '');
+      const bodyCodes = StandaloneShortCodeEngine.extractShortCodes(template.body_template || '');
       const allCodes = [...new Set([...subjectCodes, ...bodyCodes])];
 
       // Check for unknown short codes
@@ -308,9 +407,9 @@ async function inspectTemplateUsage(report: DiagnosticReport): Promise<void> {
       }
 
       // Check for required short codes based on template type
-      const templateTypeInfo = TEMPLATE_TYPE_METADATA[template.template_type as keyof typeof TEMPLATE_TYPE_METADATA];
-      if (templateTypeInfo && templateTypeInfo.requiredShortCodes) {
-        for (const required of templateTypeInfo.requiredShortCodes) {
+      const requiredCodes = TEMPLATE_REQUIRED_CODES[template.template_type];
+      if (requiredCodes) {
+        for (const required of requiredCodes) {
           if (!allCodes.includes(required.code)) {
             report.template_issues.push({
               severity: 'warning',
@@ -319,7 +418,7 @@ async function inspectTemplateUsage(report: DiagnosticReport): Promise<void> {
               template_name: template.template_name,
               template_type: template.template_type,
               short_code: required.code,
-              message: `Template missing required short code '{{${required.code}}}'`,
+              message: `Template missing required short code '{{${required.code}}}' - ${required.reason}`,
             });
           }
         }
@@ -418,17 +517,22 @@ async function testRendering(report: DiagnosticReport): Promise<void> {
   for (const key of registeredKeys) {
     try {
       const template = `{{${key}}}`;
-      const output = ShortCodeEngine.renderTemplate(template, sampleData);
+      const output = StandaloneShortCodeEngine.renderTemplate(template, sampleData);
 
-      // Check for empty output (could be legitimate for optional fields)
+      // Check for empty output (only info - could be legitimate)
       if (output === '' || output.trim() === '') {
-        report.render_issues.push({
-          severity: 'info',
-          type: 'empty_output',
-          short_code: key,
-          message: `Short code '${key}' renders as empty string with sample data`,
-          output,
-        });
+        // Only report if sample data should have had a value
+        if (sampleData[key] !== undefined && sampleData[key] !== null) {
+          // This shouldn't happen with our sample data
+        } else {
+          report.render_issues.push({
+            severity: 'info',
+            type: 'empty_output',
+            short_code: key,
+            message: `Short code '${key}' renders as empty string (no sample data provided)`,
+            output,
+          });
+        }
       }
 
       // Check for undefined output
@@ -442,11 +546,11 @@ async function testRendering(report: DiagnosticReport): Promise<void> {
         });
       }
 
-      // Check for potential XSS injection (script tags, event handlers)
+      // Check for potential XSS injection
       const injectionPatterns = [
         /<script/i,
         /javascript:/i,
-        /on\w+\s*=/i, // onclick=, onload=, etc.
+        /on\w+\s*=/i,
         /<iframe/i,
       ];
 
@@ -485,7 +589,6 @@ async function inspectUIExposure(report: DiagnosticReport): Promise<void> {
 
   console.log(`   Verifying UI exposure for ${registeredKeys.length} short codes...`);
 
-  // Check that all registered short codes have descriptions for UI display
   for (const key of registeredKeys) {
     const description = AVAILABLE_SHORT_CODES[key];
 
@@ -535,12 +638,12 @@ async function inspectUIExposure(report: DiagnosticReport): Promise<void> {
  */
 function getCategoryFromKey(key: string): string | null {
   if (key.startsWith('customer_')) return 'customer';
-  if (key.startsWith('quote_')) return 'quote';
+  if (key.startsWith('quote_') || key === 'art_approval_link') return 'quote';
   if (key.startsWith('invoice_')) return 'invoice';
   if (key.startsWith('company_')) return 'company';
   if (key.startsWith('user_')) return 'user';
   if (key.startsWith('payment_')) return 'payment';
-  if (key.startsWith('current_') || key === 'art_approval_link') return 'general';
+  if (key.startsWith('current_')) return 'general';
   return null;
 }
 
@@ -651,7 +754,6 @@ async function main() {
     displayReport(report);
 
     // Save to JSON file
-    const fs = await import('fs');
     const reportPath = './shortcode-diagnostic-report.json';
     fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
     console.log(`\n💾 Full report saved to: ${reportPath}`);

@@ -47,10 +47,22 @@ export class ShortCodeEngine {
 
       // Replace all occurrences of this short code
       if (value !== undefined && value !== null) {
+        // Ensure the value is a primitive (string or number), not an object
+        let stringValue: string;
+
+        if (typeof value === 'object') {
+          // If someone accidentally passed an object, log a warning and use empty string
+          console.warn(`Short code '${key}' received an object value instead of a string. Using empty string.`);
+          stringValue = '';
+        } else {
+          // Convert to string (handles numbers, booleans, etc.)
+          stringValue = String(value);
+        }
+
         // Escape special regex characters in the short code
         const escapedMatch = fullMatch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const regex = new RegExp(escapedMatch, 'g');
-        rendered = rendered.replace(regex, String(value));
+        rendered = rendered.replace(regex, stringValue);
       } else {
         // Replace with empty string if value is missing
         const escapedMatch = fullMatch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
