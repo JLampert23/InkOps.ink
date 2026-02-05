@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
-import { Package, FileText, Truck } from 'lucide-react';
+import { Package, FileText, Truck, LayoutDashboard } from 'lucide-react';
 import { PurchaseOrdersList } from './PurchaseOrdersList';
 import { CreatePurchaseOrder } from './CreatePurchaseOrder';
 import { PurchaseOrderDetail } from './PurchaseOrderDetail';
 import { GarmentOrderReport } from './GarmentOrderReport';
 import { ReceivingDashboard } from './ReceivingDashboard';
 import { ReceiveGoods } from './ReceiveGoods';
+import { ManageGoodsDashboard } from './ManageGoodsDashboard';
 
 type View = 'list' | 'create' | 'detail';
-type Tab = 'purchase-orders' | 'garment-report' | 'receiving';
+type Tab = 'dashboard' | 'purchase-orders' | 'garment-report' | 'receiving';
 
 export function PurchaseOrdersManager() {
-  const [activeTab, setActiveTab] = useState<Tab>('purchase-orders');
+  const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [currentView, setCurrentView] = useState<View>('list');
   const [selectedPoId, setSelectedPoId] = useState<string | null>(null);
   const [showReceiveModal, setShowReceiveModal] = useState(false);
@@ -54,11 +55,39 @@ export function PurchaseOrdersManager() {
     setReceivingPoId(null);
   };
 
+  const handleDashboardNavigate = (tab: string, view?: string, id?: string) => {
+    setActiveTab(tab as Tab);
+    if (view) setCurrentView(view as View);
+    if (id) {
+      setSelectedPoId(id);
+      setCurrentView('detail');
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Tab Navigation */}
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
-        <div className="grid grid-cols-3 divide-x divide-gray-200 dark:divide-slate-700">
+        <div className="grid grid-cols-4 divide-x divide-gray-200 dark:divide-slate-700">
+          <button
+            onClick={() => handleTabChange('dashboard')}
+            className={`p-4 text-center transition-colors hover:bg-gray-50 dark:hover:bg-slate-700 ${
+              activeTab === 'dashboard' ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+            }`}
+          >
+            <div className="flex flex-col items-center gap-2">
+              <LayoutDashboard className={`w-6 h-6 ${activeTab === 'dashboard' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`} />
+              <div>
+                <div className={`text-sm font-semibold ${activeTab === 'dashboard' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
+                  Dashboard
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  Overview & KPIs
+                </div>
+              </div>
+            </div>
+          </button>
+
           <button
             onClick={() => handleTabChange('purchase-orders')}
             className={`p-4 text-center transition-colors hover:bg-gray-50 dark:hover:bg-slate-700 ${
@@ -120,6 +149,10 @@ export function PurchaseOrdersManager() {
 
       {/* Content */}
       <div>
+        {activeTab === 'dashboard' && (
+          <ManageGoodsDashboard onNavigate={handleDashboardNavigate} />
+        )}
+
         {activeTab === 'purchase-orders' && (
           <>
             {currentView === 'list' && (
