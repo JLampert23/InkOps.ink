@@ -194,12 +194,18 @@ Deno.serve(async (req: Request) => {
               console.log(`SSActivewear: Style ${style} not found in catalog`);
             } else {
               const ssaData = await ssaResponse.json();
-              const productData = ssaData.data?.[0];
 
-              if (!productData) {
-                console.log(`Style ${style} not found in SSActivewear API`);
+              // Check if API returned an error (success: false)
+              if (ssaData.success === false) {
+                console.log(`SSActivewear API error:`, ssaData.error);
                 errors.push(`Style ${style} not found.`);
               } else {
+                const productData = ssaData.data?.[0];
+
+                if (!productData) {
+                  console.log(`Style ${style} not found in SSActivewear API`);
+                  errors.push(`Style ${style} not found.`);
+                } else {
                 console.log(`Fetched style ${style} from SSActivewear - caching it...`);
 
                 // Upsert style data into cache
@@ -437,6 +443,7 @@ Deno.serve(async (req: Request) => {
                     console.log(`Successfully loaded ${colors.length} colors from newly cached style`);
                   }
                 }
+              }
               }
             }
           } catch (fetchError: any) {
