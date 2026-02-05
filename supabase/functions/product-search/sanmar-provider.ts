@@ -292,9 +292,24 @@ async function fetchSanMarLiveData(
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`SanMar API failed: ${response.status} - ${errorText}`);
+
+      // Try to parse error message from JSON response
+      let errorMessage = `API returned ${response.status}`;
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch {
+        // If not JSON, use raw text if it's short enough
+        if (errorText && errorText.length < 100) {
+          errorMessage = errorText;
+        }
+      }
+
       return {
         success: false,
-        error: `API returned ${response.status}`,
+        error: errorMessage,
       };
     }
 
