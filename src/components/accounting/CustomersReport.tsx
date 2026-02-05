@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Users, Search, ChevronRight, Mail, Phone, DollarSign, Loader2, FileText, CreditCard, FileSpreadsheet, Gift, Plus, Save, X, Edit2, Trash2, Upload } from 'lucide-react';
+import { Users, Search, ChevronRight, Mail, Phone, DollarSign, Loader2, FileText, CreditCard, FileSpreadsheet, Gift, Plus, Save, X, Edit2, Trash2, Upload, Image } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format } from 'date-fns';
 import { InvoiceDetail } from '../billing/InvoiceDetail';
 import { useNotification } from '../../contexts/NotificationContext';
 import EditCustomerModal from './EditCustomerModal';
+import { CustomerArtworkLibrary } from './CustomerArtworkLibrary';
 import {
   exportCustomerListToPDF,
   exportCustomerListToCSV,
@@ -75,6 +76,7 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [savingCredit, setSavingCredit] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showArtworkLibrary, setShowArtworkLibrary] = useState(false);
 
   useEffect(() => {
     loadCustomers();
@@ -552,13 +554,23 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
                       <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{selectedCustomer.contact_name}</p>
                     )}
                   </div>
-                  <button
-                    onClick={() => setShowEditModal(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shrink-0 ml-4"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                    Edit Customer
-                  </button>
+                  <div className="flex gap-3 shrink-0 ml-4">
+                    <button
+                      onClick={() => setShowArtworkLibrary(true)}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold shadow-lg"
+                      title="View customer artwork library"
+                    >
+                      <Image className="w-5 h-5" />
+                      Artwork Library
+                    </button>
+                    <button
+                      onClick={() => setShowEditModal(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      Edit Customer
+                    </button>
+                  </div>
                 </div>
 
                 <div className="mt-2 grid grid-cols-2 gap-4 text-sm">
@@ -793,6 +805,14 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
           onClose={() => setShowEditModal(false)}
           onSuccess={handleEditSuccess}
           customerId={selectedCustomer.id}
+        />
+      )}
+
+      {/* Artwork Library Modal */}
+      {selectedCustomer && showArtworkLibrary && (
+        <CustomerArtworkLibrary
+          customerId={selectedCustomer.id}
+          onClose={() => setShowArtworkLibrary(false)}
         />
       )}
     </div>
