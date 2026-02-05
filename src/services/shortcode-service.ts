@@ -169,12 +169,11 @@ export class ShortCodeEngine {
   }
 
   /**
-   * Generates a preview of a template with sample data
-   * @param template - The template string
-   * @returns Rendered template with sample data
+   * Generates sample data for testing and previews
+   * @returns Sample ShortCodeData object with realistic test values
    */
-  static generatePreview(template: string): string {
-    const sampleData: ShortCodeData = {
+  static generateSampleData(): ShortCodeData {
+    return {
       customer_first_name: 'John',
       customer_last_name: 'Doe',
       customer_full_name: 'John Doe',
@@ -195,6 +194,7 @@ export class ShortCodeEngine {
       quote_expiry_date: 'January 30, 2024',
       quote_link: 'https://example.com/quotes/approve/abc123',
       quote_status: 'Sent',
+      art_approval_link: 'https://example.com/art/approve/xyz789',
 
       invoice_number: 'INV-2024-001',
       invoice_total: '$1,250.00',
@@ -233,8 +233,15 @@ export class ShortCodeEngine {
       }),
       current_year: new Date().getFullYear().toString(),
     };
+  }
 
-    return this.renderTemplate(template, sampleData);
+  /**
+   * Generates a preview of a template with sample data
+   * @param template - The template string
+   * @returns Rendered template with sample data
+   */
+  static generatePreview(template: string): string {
+    return this.renderTemplate(template, this.generateSampleData());
   }
 }
 

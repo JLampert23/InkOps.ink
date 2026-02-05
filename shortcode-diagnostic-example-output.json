@@ -1,0 +1,32 @@
+{
+  "registry_issues": [],
+  "resolver_issues": [],
+  "template_issues": [
+    {
+      "severity": "warning",
+      "type": "missing_required_code",
+      "template_id": "abc123-def456",
+      "template_name": "Custom Quote Email",
+      "template_type": "quote_email_default",
+      "short_code": "quote_link",
+      "message": "Template missing required short code '{{quote_link}}'"
+    }
+  ],
+  "render_issues": [
+    {
+      "severity": "info",
+      "type": "empty_output",
+      "short_code": "art_approval_link",
+      "message": "Short code 'art_approval_link' renders as empty string with sample data",
+      "output": ""
+    }
+  ],
+  "ui_issues": [],
+  "summary": {
+    "total_short_codes": 52,
+    "total_templates": 8,
+    "issues_found": 2,
+    "critical_issues": 0,
+    "warnings": 1
+  }
+}
