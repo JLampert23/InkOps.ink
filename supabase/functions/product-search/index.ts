@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { searchSanMarCatalog } from "./sanmar-provider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -601,25 +602,25 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Search SanMar if enabled (still using live API for now)
+    // Search SanMar catalog cache if enabled
     if (settings?.sanmar_enabled) {
       try {
-        const sanmarUrl = `${supabaseUrl}/functions/v1/sanmar-api?action=search&style=${encodeURIComponent(style)}&companyId=${encodeURIComponent(profile.company_id)}`;
-        const sanmarResponse = await fetch(sanmarUrl, {
-          headers: {
-            "Authorization": `Bearer ${supabaseServiceKey}`,
-          },
-        });
+        console.log(`🔍 Searching SanMar catalog (cache + live enrichment)...`);
+        const sanmarResult = await searchSanMarCatalog(
+          supabaseAdmin,
+          supabaseUrl,
+          supabaseServiceKey,
+          profile.company_id,
+          style
+        );
 
-        if (sanmarResponse.ok) {
-          const sanmarData = await sanmarResponse.json();
-          if (sanmarData.success && sanmarData.data) {
-            const sanmarProducts = transformSanMarData(sanmarData.data, style);
-            results.push(...sanmarProducts);
-          }
-        } else {
-          const errorText = await sanmarResponse.text();
-          errors.push(`SanMar: ${errorText}`);
+        if (sanmarResult.results.length > 0) {
+          results.push(...sanmarResult.results);
+          console.log(`✅ Found ${sanmarResult.results.length} SanMar result(s)`);
+        }
+
+        if (sanmarResult.errors.length > 0) {
+          errors.push(...sanmarResult.errors);
         }
       } catch (error: any) {
         console.error("SanMar search error:", error);
@@ -662,82 +663,6 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-function transformSanMarData(data: any, style: string): ProductResult[] {
-  const products: ProductResult[] = [];
-
-  if (!data || !data.style) {
-    console.error("Invalid SanMar data structure:", data);
-    return products;
-  }
-
-  const styleData = data.style;
-  const mediaData = data.media;
-  const pricingData = data.pricing;
-  const inventoryData = data.inventory;
-
-  const colors: ColorOption[] = [];
-
-  if (styleData.colors && Array.isArray(styleData.colors)) {
-    for (const color of styleData.colors) {
-      const partIds = color.partIds || [];
-      const sizes = partIds.map((p: any) => p.size).filter(Boolean);
-
-      const firstPartId = partIds.length > 0 ? partIds[0].partId : "";
-
-      let pricingInfo = { wholesale: 0, retail: 0 };
-      if (pricingData?.parts && Array.isArray(pricingData.parts)) {
-        const partPricing = pricingData.parts.find((p: any) => p.partId === firstPartId);
-        if (partPricing?.prices && partPricing.prices.length > 0) {
-          pricingInfo.wholesale = partPricing.prices[0].price || 0;
-          pricingInfo.retail = partPricing.prices[0].price || 0;
-        }
-      }
-
-      let inventoryInfo = {};
-      if (inventoryData?.items && Array.isArray(inventoryData.items)) {
-        const partInventory = inventoryData.items.filter((inv: any) =>
-          partIds.some((p: any) => p.partId === inv.partId)
-        );
-        if (partInventory.length > 0) {
-          inventoryInfo = partInventory.reduce((acc: any, inv: any) => {
-            acc[inv.partId] = inv.quantityAvailable;
-            return acc;
-          }, {});
-        }
-      }
-
-      let imageUrl = "";
-      if (mediaData?.views) {
-        imageUrl = mediaData.views.front ||
-                   mediaData.views.lifestyle ||
-                   (mediaData.views.frontImages?.[0]) ||
-                   "";
-      }
-
-      colors.push({
-        name: color.colorName,
-        code: color.hex || "",
-        partIds: partIds.map((p: any) => p.partId),
-        image_url: imageUrl,
-        pricing: pricingInfo,
-        sizes: sizes,
-        stock: inventoryInfo,
-      });
-    }
-  }
-
-  products.push({
-    supplier: "sanmar",
-    style: styleData.styleNumber || style,
-    brand: styleData.productBrand || "",
-    description: styleData.productName || styleData.description || "",
-    category: styleData.productCategory || "",
-    colors: colors,
-    raw_data: data,
-  });
-
-  return products;
-}
 
 function transformSSActivewearData(data: any, style: string): ProductResult[] {
   const products: ProductResult[] = [];
