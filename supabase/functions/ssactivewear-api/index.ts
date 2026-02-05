@@ -46,7 +46,7 @@ async function makePromoStandardsRequest(
     method: "POST",
     headers: {
       "Content-Type": "text/xml; charset=utf-8",
-      "SOAPAction": soapAction,
+      "SOAPAction": `"${soapAction}"`,
     },
     body: soapEnvelope,
   });
