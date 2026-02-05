@@ -55,7 +55,7 @@ Deno.serve(async (req: Request) => {
 
     const { action, email, full_name, role, userId, password } = await req.json();
 
-    const isAdmin = profile?.role === "admin";
+    const isAdmin = profile?.role === "admin" || profile?.role === "super_admin";
     const isUpdatingSelf = action === "update" && userId === user.id;
 
     if (!isAdmin && !isUpdatingSelf) {
