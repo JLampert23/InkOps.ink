@@ -6,6 +6,7 @@
  */
 
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { resolveSanMarImages } from "../_shared/sanmar-image-resolver.ts";
 
 export interface ColorOption {
   name: string;
@@ -186,13 +187,27 @@ export async function searchSanMarCatalog(
           pricingInfo.retail = livePricing.price || 0;
         }
 
-        // Build image URL from EPDD filename
-        const imageUrl = buildImageUrl(
-          product.image_front,
-          product.image_back,
-          product.image_side,
-          product.image_lifestyle
-        );
+        // Resolve image URL from sanmar_image_map (CDN)
+        let imageUrl = "";
+        try {
+          const imageUrls = await resolveSanMarImages(
+            supabaseAdmin,
+            companyId,
+            styleData.style_number,
+            product.color_code
+          );
+          // Use front model, then front flat, then thumbnail as fallback
+          imageUrl = imageUrls.frontModel || imageUrls.frontFlat || imageUrls.thumbnail || "";
+        } catch (err) {
+          console.error(`Failed to resolve images for ${styleData.style_number}:`, err);
+          // Fallback to building URL from filename if image resolver fails
+          imageUrl = buildImageUrl(
+            product.image_front,
+            product.image_back,
+            product.image_side,
+            product.image_lifestyle
+          );
+        }
 
         colorMap.set(colorName, {
           name: colorName,
