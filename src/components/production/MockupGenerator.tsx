@@ -2563,6 +2563,7 @@ function CustomerArtworkLibraryModal({
 }) {
   const [artwork, setArtwork] = useState<CustomerArtwork[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
     loadArtwork();
@@ -2593,6 +2594,48 @@ function CustomerArtworkLibraryModal({
     }
   };
 
+  const handleDeleteArtwork = async (artworkId: string, fileUrl: string) => {
+    if (!confirm('Are you sure you want to delete this artwork? This action cannot be undone.')) {
+      return;
+    }
+
+    setDeleting(artworkId);
+    try {
+      // Extract the file path from the URL
+      const urlParts = fileUrl.split('/customer-artwork/');
+      if (urlParts.length > 1) {
+        const filePath = urlParts[1].split('?')[0];
+
+        // Delete from storage
+        const { error: storageError } = await supabase.storage
+          .from('customer-artwork')
+          .remove([filePath]);
+
+        if (storageError) {
+          console.error('Error deleting file from storage:', storageError);
+        }
+      }
+
+      // Delete from database
+      const { error: dbError } = await supabase
+        .from('customer_artwork')
+        .delete()
+        .eq('id', artworkId);
+
+      if (dbError) {
+        throw dbError;
+      }
+
+      // Remove from local state
+      setArtwork(artwork.filter(a => a.id !== artworkId));
+    } catch (error) {
+      console.error('Error deleting artwork:', error);
+      alert('Failed to delete artwork');
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-2">
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[85vh] flex flex-col">
@@ -2618,31 +2661,50 @@ function CustomerArtworkLibraryModal({
               {artwork.map((item) => (
                 <div
                   key={item.id}
-                  onClick={() => onSelectArtwork(item)}
-                  className="bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded p-2 cursor-pointer hover:border-blue-500 hover:shadow-md transition-all"
+                  className="bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded p-2 hover:border-blue-500 hover:shadow-md transition-all relative group"
                 >
-                  <div className="aspect-square bg-gray-100 dark:bg-slate-800 rounded mb-2 flex items-center justify-center overflow-hidden">
-                    {item.file_type.startsWith('image/') ? (
-                      <img src={item.file_url} alt={item.file_name} className="w-full h-full object-contain" />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteArtwork(item.id, item.file_url);
+                    }}
+                    disabled={deleting === item.id}
+                    className="absolute top-1 right-1 p-1.5 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 hover:bg-red-700 transition-all shadow-lg disabled:opacity-50 z-10"
+                    title="Delete artwork"
+                  >
+                    {deleting === item.id ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
                     ) : (
-                      <ImageIcon className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+                      <Trash2 className="w-3 h-3" />
+                    )}
+                  </button>
+                  <div
+                    onClick={() => onSelectArtwork(item)}
+                    className="cursor-pointer"
+                  >
+                    <div className="aspect-square bg-gray-100 dark:bg-slate-800 rounded mb-2 flex items-center justify-center overflow-hidden">
+                      {item.file_type.startsWith('image/') ? (
+                        <img src={item.file_url} alt={item.file_name} className="w-full h-full object-contain" />
+                      ) : (
+                        <ImageIcon className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+                      )}
+                    </div>
+                    <p className="text-xs font-medium text-gray-900 dark:text-white truncate">{item.file_name}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      {item.width_inches && item.height_inches
+                        ? `${item.width_inches}" × ${item.height_inches}"`
+                        : 'No dimensions'}
+                    </p>
+                    {item.tags && item.tags.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-0.5">
+                        {item.tags.slice(0, 2).map((tag, i) => (
+                          <span key={i} className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
                     )}
                   </div>
-                  <p className="text-xs font-medium text-gray-900 dark:text-white truncate">{item.file_name}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                    {item.width_inches && item.height_inches
-                      ? `${item.width_inches}" × ${item.height_inches}"`
-                      : 'No dimensions'}
-                  </p>
-                  {item.tags && item.tags.length > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-0.5">
-                      {item.tags.slice(0, 2).map((tag, i) => (
-                        <span key={i} className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
