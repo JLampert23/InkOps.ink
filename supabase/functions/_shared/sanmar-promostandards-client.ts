@@ -122,23 +122,29 @@ async function makeSanMarSOAPRequest(
   </soap:Body>
 </soap:Envelope>`;
 
-  // Basic Auth: username:password
-  const basicAuth = btoa(`${credentials.username}:${credentials.password}`);
+  console.log(`🔐 Making SOAP request to: ${endpoint}`);
+  console.log(`🔐 SOAPAction: ${soapAction}`);
+  console.log(`🔐 Username: ${credentials.username}`);
+  console.log(`🔐 Password length: ${credentials.password?.length || 0}`);
 
+  // SanMar PromoStandards uses credentials in SOAP body only (not Basic Auth header)
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "text/xml; charset=utf-8",
       "SOAPAction": soapAction,
-      "Authorization": `Basic ${basicAuth}`,
     },
     body: soapEnvelope,
   });
 
   const responseText = await response.text();
 
+  console.log(`📥 SOAP response status: ${response.status}`);
   if (!response.ok) {
-    console.error("SanMar SOAP Error Response:", responseText);
+    console.error("SanMar SOAP Error Response:", responseText.slice(0, 500));
+  }
+
+  if (!response.ok) {
     throw new Error(`SanMar PromoStandards request failed: ${response.status} ${response.statusText}`);
   }
 
