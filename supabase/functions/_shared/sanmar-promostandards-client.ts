@@ -473,18 +473,19 @@ export async function fetchUnifiedSanMarData(
     media: mediaResult.status,
   });
 
-  // Extract results or use defaults
-  const style = productResult.status === 'fulfilled'
-    ? productResult.value
-    : {
-        styleNumber,
-        productName: "",
-        description: "",
-        productBrand: "",
-        productCategory: "",
-        parts: [],
-        colors: []
-      };
+  // Check if product data fetch failed (this is critical - can't proceed without it)
+  if (productResult.status === 'rejected') {
+    console.error('❌ SanMar Product fetch failed:', productResult.reason);
+    throw new Error(`SanMar: ${productResult.reason?.message || 'Product not found'}`);
+  }
+
+  const style = productResult.value;
+
+  // Check if product has no parts/colors (means product doesn't exist)
+  if (!style.parts || style.parts.length === 0) {
+    console.warn(`⚠️ SanMar: Style ${styleNumber} returned no parts/colors`);
+    throw new Error(`SanMar: Style ${styleNumber} not found or has no variants`);
+  }
 
   const inventory = inventoryResult.status === 'fulfilled'
     ? inventoryResult.value
@@ -510,6 +511,8 @@ export async function fetchUnifiedSanMarData(
           otherImages: [],
         }
       };
+
+  console.log(`✅ SanMar: Successfully fetched ${style.parts.length} parts for ${styleNumber}`);
 
   return {
     success: true,
