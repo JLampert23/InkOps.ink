@@ -41,10 +41,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const authHeader = req.headers.get('Authorization');
-    console.log('[send-email] Auth header present:', !!authHeader);
-
     if (!authHeader) {
-      console.error('[send-email] No Authorization header provided');
       throw new Error('Missing authorization header');
     }
 
@@ -52,72 +49,59 @@ Deno.serve(async (req: Request) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    console.log('[send-email] Environment check:', {
-      hasUrl: !!supabaseUrl,
-      hasAnonKey: !!supabaseAnonKey,
-      hasServiceKey: !!supabaseServiceKey
-    });
-
     if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
       throw new Error('Supabase configuration missing');
     }
 
     const token = authHeader.replace('Bearer ', '');
-    console.log('[send-email] Token length:', token.length);
-    console.log('[send-email] Token preview:', token.substring(0, 20) + '...');
-
-    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
-
-    console.log('[send-email] Attempting to validate user with token...');
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
-
-    console.log('[send-email] User validation result:', {
-      userId: user?.id,
-      userEmail: user?.email,
-      error: userError?.message,
-      errorName: userError?.name,
-      errorStatus: userError?.status
-    });
-
-    if (userError || !user) {
-      const errorMsg = userError?.message || 'No user found';
-      console.error('[send-email] Authentication failed:', errorMsg, 'Full error:', userError);
-      return new Response(
-        JSON.stringify({
-          code: 401,
-          message: `Invalid JWT: ${errorMsg}`,
-          details: userError
-        }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
-    console.log('[send-email] User authenticated successfully:', user.email);
+    const isServiceCall = token === supabaseServiceKey;
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { data: userProfile } = await supabase
-      .from('user_profiles')
-      .select('company_id')
-      .eq('id', user.id)
-      .maybeSingle();
+    let companyId: string;
 
-    if (!userProfile?.company_id) {
-      throw new Error('User company not found');
+    if (isServiceCall) {
+      const body = await req.clone().json();
+      if (!body.company_id) {
+        throw new Error('company_id is required for service-to-service calls');
+      }
+      companyId = body.company_id;
+    } else {
+      const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
+        auth: { autoRefreshToken: false, persistSession: false }
+      });
+
+      const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
+
+      if (userError || !user) {
+        return new Response(
+          JSON.stringify({
+            code: 401,
+            message: `Invalid JWT: ${userError?.message || 'No user found'}`,
+          }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      const { data: userProfile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!userProfile?.company_id) {
+        throw new Error('User company not found');
+      }
+      companyId = userProfile.company_id;
     }
 
     const { data: companySettings, error: settingsError } = await supabase
       .from('company_settings')
       .select('resend_api_key, email_from_address, company_name')
-      .eq('id', userProfile.company_id)
+      .eq('id', companyId)
       .maybeSingle();
 
     if (settingsError) {

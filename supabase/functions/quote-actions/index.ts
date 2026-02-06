@@ -264,6 +264,7 @@ Deno.serve(async (req: Request) => {
             to: quote.customer_email,
             subject,
             html,
+            company_id: profile.company_id,
           }),
         });
 
