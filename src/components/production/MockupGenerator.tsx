@@ -1438,33 +1438,39 @@ export default function MockupGenerator({
     setSelectedArtwork(updated);
   };
 
+  const getArtworkScreenDimensions = (artwork: MockupArtwork) => {
+    const img = artworkImageCache.current.get(artwork.artwork_url);
+    const baseSize = 120;
+    let w = baseSize;
+    let h = baseSize;
+    if (img && img.complete) {
+      const ar = img.width / img.height;
+      w = ar >= 1 ? baseSize : baseSize * ar;
+      h = ar >= 1 ? baseSize / ar : baseSize;
+    }
+    return { width: w * artwork.scale, height: h * artwork.scale };
+  };
+
   const getDeleteButtonAtPosition = (x: number, y: number): number | null => {
-    if (selectedArtwork.length === 0) return null;
+    if (selectedArtwork.length === 0 || activeArtworkIndex < 0) return null;
     const canvas = canvasRef.current;
     if (!canvas) return null;
 
-    for (let index = 0; index < selectedArtwork.length; index++) {
-      const artwork = selectedArtwork[index];
-      const centerX = artwork.position_x + canvas.width / 2;
-      const centerY = artwork.position_y + canvas.height / 2;
+    const artwork = selectedArtwork[activeArtworkIndex];
+    const { width, height } = getArtworkScreenDimensions(artwork);
+    const centerX = artwork.position_x + canvas.width / 2;
+    const centerY = artwork.position_y + canvas.height / 2;
 
-      const baseSize = 120;
-      const artworkWidth = baseSize * artwork.scale;
-      const artworkHeight = baseSize * artwork.scale;
+    const deleteButtonSize = 36;
+    const deleteButtonX = centerX + width / 2;
+    const deleteButtonY = centerY - height / 2;
 
-      const deleteButtonSize = 36;
+    const distance = Math.sqrt(
+      Math.pow(x - deleteButtonX, 2) + Math.pow(y - deleteButtonY, 2)
+    );
 
-      // Calculate delete button position in screen coordinates (top-right of artwork)
-      const deleteButtonX = centerX + artworkWidth / 2;
-      const deleteButtonY = centerY - artworkHeight / 2;
-
-      const distance = Math.sqrt(
-        Math.pow(x - deleteButtonX, 2) + Math.pow(y - deleteButtonY, 2)
-      );
-
-      if (distance <= deleteButtonSize / 2) {
-        return index;
-      }
+    if (distance <= deleteButtonSize / 2) {
+      return activeArtworkIndex;
     }
 
     return null;
@@ -1476,21 +1482,16 @@ export default function MockupGenerator({
     if (!canvas) return null;
 
     const artwork = selectedArtwork[activeArtworkIndex];
+    const { width, height } = getArtworkScreenDimensions(artwork);
     const centerX = artwork.position_x + canvas.width / 2;
     const centerY = artwork.position_y + canvas.height / 2;
 
-    // Use fixed base size matching the drawing logic
-    const baseSize = 120;
-    // We need to load the image to get aspect ratio - use a reasonable default for now
-    const artworkWidth = baseSize * artwork.scale;
-    const artworkHeight = baseSize * artwork.scale;
-
     const handleSize = 40;
     const handles = [
-      { name: 'nw', x: centerX - artworkWidth / 2, y: centerY - artworkHeight / 2 },
-      { name: 'ne', x: centerX + artworkWidth / 2, y: centerY - artworkHeight / 2 },
-      { name: 'sw', x: centerX - artworkWidth / 2, y: centerY + artworkHeight / 2 },
-      { name: 'se', x: centerX + artworkWidth / 2, y: centerY + artworkHeight / 2 },
+      { name: 'nw', x: centerX - width / 2, y: centerY - height / 2 },
+      { name: 'ne', x: centerX + width / 2, y: centerY - height / 2 },
+      { name: 'sw', x: centerX - width / 2, y: centerY + height / 2 },
+      { name: 'se', x: centerX + width / 2, y: centerY + height / 2 },
     ];
 
     for (const handle of handles) {
@@ -1504,32 +1505,26 @@ export default function MockupGenerator({
 
   const isClickInsideArtwork = (x: number, y: number, index: number): boolean => {
     const canvas = canvasRef.current;
-    if (!canvas) return false;
+    if (!canvas || index < 0 || index >= selectedArtwork.length) return false;
 
     const artwork = selectedArtwork[index];
+    const { width, height } = getArtworkScreenDimensions(artwork);
     const centerX = artwork.position_x + canvas.width / 2;
     const centerY = artwork.position_y + canvas.height / 2;
 
-    const baseSize = 120;
-    const artworkWidth = baseSize * artwork.scale;
-    const artworkHeight = baseSize * artwork.scale;
-
-    const left = centerX - artworkWidth / 2;
-    const right = centerX + artworkWidth / 2;
-    const top = centerY - artworkHeight / 2;
-    const bottom = centerY + artworkHeight / 2;
-
-    return x >= left && x <= right && y >= top && y <= bottom;
+    return x >= centerX - width / 2 && x <= centerX + width / 2 &&
+           y >= centerY - height / 2 && y <= centerY + height / 2;
   };
 
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     if (selectedArtwork.length === 0) return;
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    const canvas = canvasRef.current;
+    const rect = canvas?.getBoundingClientRect();
+    if (!rect || !canvas) return;
 
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
 
     const deleteIndex = getDeleteButtonAtPosition(x, y);
     if (deleteIndex !== null) {
@@ -1589,10 +1584,11 @@ export default function MockupGenerator({
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const canvas = canvasRef.current;
+    const rect = canvas?.getBoundingClientRect();
+    if (!rect || !canvas) return;
+    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
 
     // Update cursor even when no artwork is selected
     if (selectedArtwork.length === 0 || activeArtworkIndex < 0) {
