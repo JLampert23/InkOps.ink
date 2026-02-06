@@ -418,16 +418,20 @@ Deno.serve(async (req: Request) => {
         .eq("id", approval.company_id)
         .maybeSingle();
 
-      const html = renderQuotePage(
-        approval.quote,
-        lineItems || [],
-        companySettings || {},
-        approval,
-        token,
-        supabaseUrl,
-      );
+      // TEST: Return simple HTML first
+      const testHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Test</title>
+</head>
+<body>
+  <h1>TEST HTML RENDERING</h1>
+  <p>If you can see this as a styled page, HTML rendering works!</p>
+</body>
+</html>`;
 
-      return new Response(html, {
+      return new Response(testHtml, {
         headers: { "Content-Type": "text/html; charset=utf-8" },
       });
     }
