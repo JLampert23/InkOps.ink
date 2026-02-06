@@ -1617,10 +1617,50 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       return;
     }
 
-    const success = await performSave(false, 'sent');
-    if (success) {
-      showNotification('success', 'Quote Sent', 'Quote status updated to "Sent"');
+    setSaving(true);
+    try {
+      const success = await performSave(false);
+      if (!success) {
+        return;
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        showNotification('error', 'Authentication Error', 'You must be logged in to send a quote');
+        return;
+      }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const apiUrl = `${supabaseUrl}/functions/v1/quote-actions/${quoteId}/send`;
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          expires_in_days: 30,
+          single_use: false,
+          auto_approve_after_days: null,
+          auto_convert_on_approval: false,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to send quote');
+      }
+
+      const result = await response.json();
+      showNotification('success', 'Quote Sent', `Quote has been sent to ${result.approval?.quote_id ? 'customer' : 'customer'} with approval link`);
       onSave?.();
+    } catch (error) {
+      console.error('Error sending quote:', error);
+      showNotification('error', 'Send Failed', error instanceof Error ? error.message : 'Failed to send quote');
+    } finally {
+      setSaving(false);
     }
   };
 
