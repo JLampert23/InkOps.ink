@@ -72,9 +72,10 @@ Account Settings → Production Settings → Receiving Settings
 - **Dropdown selectors** for scan mode
 - **Number input** for variance threshold
 - **Real-time save** with success/error notifications
-- **Responsive design** with dark mode support
+- **Responsive design** with comprehensive dark mode support
 - **Auto-loading** of existing settings
 - **Validation** before save
+- **Dark mode styling** throughout all components, inputs, and sections
 
 ### UI Sections
 1. **Receiving Behavior** (Package icon, blue)

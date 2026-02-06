@@ -155,7 +155,7 @@ export default function ReceivingSettings() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-gray-500">Loading settings...</div>
+        <div className="text-gray-500 dark:text-gray-400">Loading settings...</div>
       </div>
     );
   }
@@ -166,8 +166,8 @@ export default function ReceivingSettings() {
         <div
           className={`p-4 rounded-lg flex items-start gap-3 ${
             message.type === 'success'
-              ? 'bg-green-50 text-green-800 border border-green-200'
-              : 'bg-red-50 text-red-800 border border-red-200'
+              ? 'bg-green-50 text-green-800 border border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800'
+              : 'bg-red-50 text-red-800 border border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800'
           }`}
         >
           {message.type === 'success' ? (
@@ -180,11 +180,11 @@ export default function ReceivingSettings() {
       )}
 
       {/* Section 1: Receiving Behavior */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="bg-gray-50 dark:bg-gray-700/50 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3">
-            <Package className="w-5 h-5 text-blue-600" />
-            <h3 className="text-lg font-semibold text-gray-900">Receiving Behavior</h3>
+            <Package className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Receiving Behavior</h3>
           </div>
         </div>
         <div className="p-6 space-y-4">
@@ -216,11 +216,11 @@ export default function ReceivingSettings() {
       </div>
 
       {/* Section 2: Job Readiness Rules */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="bg-gray-50 dark:bg-gray-700/50 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3">
-            <Clipboard className="w-5 h-5 text-green-600" />
-            <h3 className="text-lg font-semibold text-gray-900">Job Readiness Rules</h3>
+            <Clipboard className="w-5 h-5 text-green-600 dark:text-green-400" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Job Readiness Rules</h3>
           </div>
         </div>
         <div className="p-6 space-y-4">
@@ -246,11 +246,11 @@ export default function ReceivingSettings() {
       </div>
 
       {/* Section 3: Variance Handling */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="bg-gray-50 dark:bg-gray-700/50 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-amber-600" />
-            <h3 className="text-lg font-semibold text-gray-900">Variance Handling</h3>
+            <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Variance Handling</h3>
           </div>
         </div>
         <div className="p-6 space-y-4">
@@ -267,7 +267,7 @@ export default function ReceivingSettings() {
             onChange={(checked) => updateSetting('require_damage_reason', checked)}
           />
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
               Variance Threshold Percentage
             </label>
             <div className="flex items-center gap-2">
@@ -278,11 +278,11 @@ export default function ReceivingSettings() {
                 step="0.01"
                 value={settings.variance_flag_threshold}
                 onChange={(e) => updateSetting('variance_flag_threshold', parseFloat(e.target.value) || 0)}
-                className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-32 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
-              <span className="text-sm text-gray-500">%</span>
+              <span className="text-sm text-gray-500 dark:text-gray-400">%</span>
             </div>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               Vendor is flagged for review when variances exceed this percentage
             </p>
           </div>
@@ -296,11 +296,11 @@ export default function ReceivingSettings() {
       </div>
 
       {/* Section 4: Barcode/Scanning Settings */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="bg-gray-50 dark:bg-gray-700/50 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3">
-            <ScanBarcode className="w-5 h-5 text-purple-600" />
-            <h3 className="text-lg font-semibold text-gray-900">Barcode / Scanning Settings</h3>
+            <ScanBarcode className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Barcode / Scanning Settings</h3>
           </div>
         </div>
         <div className="p-6 space-y-4">
@@ -311,17 +311,17 @@ export default function ReceivingSettings() {
             onChange={(checked) => updateSetting('enable_barcode_scanning', checked)}
           />
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">Scan Mode</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Scan Mode</label>
             <select
               value={settings.scan_mode}
               onChange={(e) => updateSetting('scan_mode', e.target.value as any)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="increment">Increment Quantity</option>
               <option value="replace">Replace Quantity</option>
               <option value="prompt">Prompt for Quantity</option>
             </select>
-            <p className="text-sm text-gray-500">How scanning affects received quantities</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">How scanning affects received quantities</p>
           </div>
           <ToggleSetting
             label="Allow Scanning of Non-PO Items"
@@ -333,11 +333,11 @@ export default function ReceivingSettings() {
       </div>
 
       {/* Section 5: Receiving Log Settings */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="bg-gray-50 dark:bg-gray-700/50 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3">
-            <FileText className="w-5 h-5 text-teal-600" />
-            <h3 className="text-lg font-semibold text-gray-900">Receiving Log Settings</h3>
+            <FileText className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Receiving Log Settings</h3>
           </div>
         </div>
         <div className="p-6 space-y-4">
@@ -369,19 +369,19 @@ export default function ReceivingSettings() {
       </div>
 
       {/* Section 6: Vendor Settings */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="bg-gray-50 dark:bg-gray-700/50 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3">
-            <Truck className="w-5 h-5 text-orange-600" />
-            <h3 className="text-lg font-semibold text-gray-900">Vendor Settings (Receiving-Specific)</h3>
+            <Truck className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Vendor Settings (Receiving-Specific)</h3>
           </div>
         </div>
         <div className="p-6 space-y-4">
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">Default Vendor Lead Times</label>
-            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-              <p className="text-xs text-gray-500 mb-2">Configure lead times per vendor (in days)</p>
-              <div className="space-y-1 text-sm text-gray-600">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Default Vendor Lead Times</label>
+            <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg border border-gray-200 dark:border-gray-600">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Configure lead times per vendor (in days)</p>
+              <div className="space-y-1 text-sm text-gray-600 dark:text-gray-300">
                 {Object.keys(settings.default_vendor_lead_times).length === 0 ? (
                   <p className="text-xs italic">No vendor lead times configured</p>
                 ) : (
@@ -396,10 +396,10 @@ export default function ReceivingSettings() {
             </div>
           </div>
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">Default Vendor Backorder Rules</label>
-            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-              <p className="text-xs text-gray-500 mb-2">Configure backorder handling per vendor</p>
-              <div className="space-y-1 text-sm text-gray-600">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Default Vendor Backorder Rules</label>
+            <div className="bg-gray-50 dark:bg-gray-700/50 p-3 rounded-lg border border-gray-200 dark:border-gray-600">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Configure backorder handling per vendor</p>
+              <div className="space-y-1 text-sm text-gray-600 dark:text-gray-300">
                 {Object.keys(settings.default_vendor_backorder_rules).length === 0 ? (
                   <p className="text-xs italic">No vendor backorder rules configured</p>
                 ) : (
@@ -423,11 +423,11 @@ export default function ReceivingSettings() {
       </div>
 
       {/* Section 7: Notifications */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="bg-gray-50 dark:bg-gray-700/50 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3">
-            <Bell className="w-5 h-5 text-red-600" />
-            <h3 className="text-lg font-semibold text-gray-900">Notifications</h3>
+            <Bell className="w-5 h-5 text-red-600 dark:text-red-400" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Notifications</h3>
           </div>
         </div>
         <div className="p-6 space-y-4">
@@ -463,7 +463,7 @@ export default function ReceivingSettings() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+          className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
         >
           <Save className="w-4 h-4" />
           {saving ? 'Saving...' : 'Save Settings'}
@@ -484,16 +484,16 @@ function ToggleSetting({ label, description, checked, onChange }: ToggleSettingP
   return (
     <div className="flex items-start justify-between gap-4 py-2">
       <div className="flex-1">
-        <label className="block text-sm font-medium text-gray-900">{label}</label>
-        <p className="text-sm text-gray-500 mt-0.5">{description}</p>
+        <label className="block text-sm font-medium text-gray-900 dark:text-gray-100">{label}</label>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{description}</p>
       </div>
       <button
         type="button"
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-          checked ? 'bg-blue-600' : 'bg-gray-200'
+        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+          checked ? 'bg-blue-600 dark:bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'
         }`}
       >
         <span
