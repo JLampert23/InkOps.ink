@@ -1624,7 +1624,37 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
     }
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
+    // Check if quote has any meaningful data
+    const hasLineItems = itemGroups.some(group => group.items.length > 0);
+    const hasFees = fees.length > 0;
+    const hasCustomer = !!selectedCustomerId;
+    const hasNotes = !!customerNotes.trim() || !!productionNotes.trim();
+    const hasImprints = quoteImprints.length > 0;
+
+    const isEmpty = !hasLineItems && !hasFees && !hasCustomer && !hasNotes && !hasImprints;
+
+    // If we created a draft quote and it's still empty, delete it
+    if (quoteId && isEmpty && draftCreatedRef.current) {
+      try {
+        // Delete the empty draft quote and related records
+        await supabase.from('quote_line_items').delete().eq('quote_id', quoteId);
+        await supabase.from('quote_fees').delete().eq('quote_id', quoteId);
+        await supabase.from('quote_imprints').delete().eq('quote_id', quoteId);
+
+        const { error } = await supabase
+          .from('quotes')
+          .delete()
+          .eq('id', quoteId);
+
+        if (error) {
+          console.error('Error deleting empty draft quote:', error);
+        }
+      } catch (error) {
+        console.error('Error deleting empty draft quote:', error);
+      }
+    }
+
     onCancel?.();
   };
 
