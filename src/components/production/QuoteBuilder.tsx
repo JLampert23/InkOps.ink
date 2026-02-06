@@ -1999,8 +1999,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           </div>
 
           {/* Line Items Table */}
-          <div className="space-y-3 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 p-6">
-            <div className="overflow-x-auto">
+          <div className="space-y-3 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl shadow-lg border border-slate-200 dark:border-slate-800 p-6 pb-52">
+            <div className="overflow-visible">
               <table className="w-full border-collapse">
                 {/* Only show main thead when there is a single group with no label */}
                 {itemGroups.length === 1 && !itemGroups[0].label && (
