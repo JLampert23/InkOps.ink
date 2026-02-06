@@ -171,7 +171,7 @@ Deno.serve(async (req: Request) => {
     const fromAddress = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
 
     const emailPayload: any = {
-      from: data?.from || fromAddress,
+      from: fromAddress,
       to: toArray,
       subject: finalSubject,
       html: html,
@@ -183,6 +183,15 @@ Deno.serve(async (req: Request) => {
         content: att.content,
       }));
     }
+
+    console.log('Sending email with payload:', {
+      from: emailPayload.from,
+      to: emailPayload.to,
+      subject: emailPayload.subject,
+      hasHtml: !!emailPayload.html,
+      htmlLength: emailPayload.html?.length,
+      attachmentCount: emailPayload.attachments?.length || 0,
+    });
 
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
