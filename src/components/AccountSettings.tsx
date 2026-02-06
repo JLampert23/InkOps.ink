@@ -13,6 +13,7 @@ const PriceMatricesManager = lazy(() => import('./production/PriceMatricesManage
 const InkThreadColorsManager = lazy(() => import('./production/InkThreadColorsManager').then(m => ({ default: m.InkThreadColorsManager })));
 const CommunicationTemplatesManager = lazy(() => import('./email/CommunicationTemplatesManager').then(m => ({ default: m.default })));
 const ReceivingSettings = lazy(() => import('./settings/ReceivingSettings').then(m => ({ default: m.default })));
+const POSettings = lazy(() => import('./settings/POSettings').then(m => ({ default: m.default })));
 
 interface CompanySettings {
   id: string;
@@ -122,7 +123,7 @@ type SettingsTab =
   | 'user-management' | 'user-security'
   | 'billing-status-filters'
   | 'automated-reports' | 'automations'
-  | 'manage-goods' | 'receiving-settings'
+  | 'manage-goods' | 'receiving-settings' | 'po-settings'
   | 'production-general' | 'scheduler-settings' | 'invoice-fees' | 'price-matrices'
   | 'email-templates';
 
@@ -3894,6 +3895,22 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   </div>
                   {activeTab === 'receiving-settings' && <div className="w-1 h-6 bg-purple-600 dark:bg-purple-500 rounded-full absolute right-0" />}
                 </button>
+                <button
+                  onClick={() => setActiveTab('po-settings')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'po-settings'
+                      ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  <SettingsIcon className={`w-4 h-4 flex-shrink-0 ${activeTab === 'po-settings' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'po-settings' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      PO Settings
+                    </div>
+                  </div>
+                  {activeTab === 'po-settings' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                </button>
               </div>
             )}
           </div>
@@ -6666,6 +6683,16 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               </div>
             }>
               <ReceivingSettings />
+            </Suspense>
+          )}
+
+          {activeTab === 'po-settings' && (
+            <Suspense fallback={
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
+              </div>
+            }>
+              <POSettings />
             </Suspense>
           )}
 
