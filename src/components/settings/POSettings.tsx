@@ -281,15 +281,27 @@ export default function POSettings() {
       }
 
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        showNotification('error', 'Not authenticated');
+        return;
+      }
 
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('user_profiles')
         .select('company_id')
         .eq('id', user.id)
         .single();
 
-      if (!profile?.company_id) return;
+      if (profileError) {
+        console.error('Profile error:', profileError);
+        showNotification('error', `Profile error: ${profileError.message}`);
+        return;
+      }
+
+      if (!profile?.company_id) {
+        showNotification('error', 'No company assigned to your account');
+        return;
+      }
 
       if (editingVendor) {
         const { error } = await supabase
@@ -311,9 +323,17 @@ export default function POSettings() {
 
       setShowVendorModal(false);
       loadVendors();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving vendor:', error);
-      showNotification('error', 'Failed to save vendor');
+      const errorMessage = error?.message || 'Unknown error';
+      const errorDetails = error?.details || '';
+      const errorHint = error?.hint || '';
+
+      let fullMessage = `Failed to save vendor: ${errorMessage}`;
+      if (errorDetails) fullMessage += ` - ${errorDetails}`;
+      if (errorHint) fullMessage += ` (${errorHint})`;
+
+      showNotification('error', fullMessage);
     }
   };
 
