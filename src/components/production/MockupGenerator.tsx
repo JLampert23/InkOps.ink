@@ -1599,11 +1599,18 @@ export default function MockupGenerator({
     }
 
     if (isResizing && resizeHandle) {
-      const dx = x - dragStart.x;
-      const dy = y - dragStart.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      const direction = resizeHandle.includes('e') ? 1 : -1;
-      const scaleFactor = 1 + (direction * distance / 100);
+      const canvasEl = canvasRef.current;
+      if (!canvasEl) return;
+      const artwork = selectedArtwork[activeArtworkIndex];
+      const centerX = artwork.position_x + canvasEl.width / 2;
+      const centerY = artwork.position_y + canvasEl.height / 2;
+      const initialDist = Math.sqrt(
+        Math.pow(dragStart.x - centerX, 2) + Math.pow(dragStart.y - centerY, 2)
+      );
+      const currentDist = Math.sqrt(
+        Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2)
+      );
+      const scaleFactor = currentDist / Math.max(initialDist, 1);
       const newScale = Math.max(0.1, initialScale * scaleFactor);
 
       tempArtworkPosition.current = {
@@ -1778,7 +1785,7 @@ export default function MockupGenerator({
         ctx.shadowColor = 'rgba(59, 130, 246, 0.3)';
         ctx.shadowBlur = 8 / currentArtwork.scale;
         ctx.strokeStyle = '#3b82f6';
-        ctx.lineWidth = 4;
+        ctx.lineWidth = 1.5 / currentArtwork.scale;
         ctx.strokeRect(-artworkWidth / 2, -artworkHeight / 2, artworkWidth, artworkHeight);
 
         // Reset shadow for handles
@@ -1798,7 +1805,7 @@ export default function MockupGenerator({
         ctx.shadowBlur = 4 / currentArtwork.scale;
         ctx.fillStyle = '#3b82f6';
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 4 / currentArtwork.scale;
+        ctx.lineWidth = 1.5 / currentArtwork.scale;
 
         handles.forEach(handle => {
           ctx.beginPath();
