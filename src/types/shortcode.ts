@@ -60,6 +60,7 @@ export interface ShortCodeData {
   // General
   current_date?: string;
   current_year?: string;
+  custom_message?: string;
 }
 
 export type ShortCodeKey = keyof ShortCodeData;
@@ -126,4 +127,5 @@ export const AVAILABLE_SHORT_CODES: Record<ShortCodeKey, string> = {
   // General
   current_date: 'Current Date',
   current_year: 'Current Year',
+  custom_message: 'Custom Message',
 };

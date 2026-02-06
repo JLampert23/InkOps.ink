@@ -194,8 +194,66 @@ Deno.serve(async (req: Request) => {
       // Generate public approval URL
       const approvalUrl = `${supabaseUrl}/functions/v1/quote-approval/${approvalToken}`;
 
-      // Send email with approval link
+      // Send email with template or default
       try {
+        let subject = `Quote ${quote.quote_number} - Review and Approve`;
+        let html = `
+          <p>Hello ${quote.customer_name || 'valued customer'},</p>
+          <p>Your quote ${quote.quote_number} is ready for review.</p>
+          <p><strong>Total: $${(quote.total || 0).toFixed(2)}</strong></p>
+          <p>
+            <a href="${approvalUrl}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+              View and Approve Quote
+            </a>
+          </p>
+          ${expiresAt ? `<p><small>This link expires on ${new Date(expiresAt).toLocaleDateString()}</small></p>` : ''}
+          <p>Thank you for your business!</p>
+        `;
+
+        // If template_id is provided, use the communication template
+        if (body.template_id) {
+          const { data: template } = await supabase
+            .from("communication_templates")
+            .select("*")
+            .eq("id", body.template_id)
+            .eq("company_id", profile.company_id)
+            .maybeSingle();
+
+          if (template) {
+            // Build context for shortcode processing
+            const context = {
+              quote: {
+                ...quote,
+                approval_url: approvalUrl,
+                expires_at: expiresAt,
+              },
+              custom_message: body.custom_message || '',
+            };
+
+            // Process shortcodes via communication-templates edge function
+            const shortcodeResponse = await fetch(
+              `${supabaseUrl}/functions/v1/communication-templates/process`,
+              {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${supabaseServiceKey}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  template_id: template.id,
+                  context,
+                }),
+              }
+            );
+
+            if (shortcodeResponse.ok) {
+              const processed = await shortcodeResponse.json();
+              subject = processed.subject || subject;
+              html = processed.body_html || html;
+            }
+          }
+        }
+
         const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
           method: 'POST',
           headers: {
@@ -204,19 +262,8 @@ Deno.serve(async (req: Request) => {
           },
           body: JSON.stringify({
             to: quote.customer_email,
-            subject: `Quote ${quote.quote_number} - Review and Approve`,
-            html: `
-              <p>Hello ${quote.customer_name || 'valued customer'},</p>
-              <p>Your quote ${quote.quote_number} is ready for review.</p>
-              <p><strong>Total: $${(quote.total || 0).toFixed(2)}</strong></p>
-              <p>
-                <a href="${approvalUrl}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                  View and Approve Quote
-                </a>
-              </p>
-              ${expiresAt ? `<p><small>This link expires on ${new Date(expiresAt).toLocaleDateString()}</small></p>` : ''}
-              <p>Thank you for your business!</p>
-            `,
+            subject,
+            html,
           }),
         });
 

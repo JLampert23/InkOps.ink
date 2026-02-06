@@ -6,6 +6,7 @@ import { useNotification } from '../../contexts/NotificationContext';
 import CreateCustomerModal from '../accounting/CreateCustomerModal';
 import { ManageImprintsModal } from './ManageImprintsModal';
 import MockupGenerator from './MockupGenerator';
+import { SendQuoteModal } from './SendQuoteModal';
 import { getUnifiedProductData } from '../../services/ssactivewear-promostandards-service';
 
 type SizeMode = 'regular' | 'double' | 'youth' | 'adult';
@@ -202,6 +203,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
   const [showImprintsModal, setShowImprintsModal] = useState<string | null>(null);
   const [editingGroupIdForOptions, setEditingGroupIdForOptions] = useState<string | null>(null);
   const [showMockupForGroup, setShowMockupForGroup] = useState<string | null>(null);
+  const [showSendQuoteModal, setShowSendQuoteModal] = useState(false);
   const [quoteImprints, setQuoteImprints] = useState<any[]>([]);
 
   const [productSearchResults, setProductSearchResults] = useState<ProductSearchResult[]>([]);
@@ -1617,50 +1619,9 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       return;
     }
 
-    setSaving(true);
-    try {
-      const success = await performSave(false);
-      if (!success) {
-        return;
-      }
-
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        showNotification('error', 'Authentication Error', 'You must be logged in to send a quote');
-        return;
-      }
-
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const apiUrl = `${supabaseUrl}/functions/v1/quote-actions/${quoteId}/send`;
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          expires_in_days: 30,
-          single_use: false,
-          auto_approve_after_days: null,
-          auto_convert_on_approval: false,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Failed to send quote');
-      }
-
-      const result = await response.json();
-      showNotification('success', 'Quote Sent', `Quote has been sent to ${result.approval?.quote_id ? 'customer' : 'customer'} with approval link`);
-      onSave?.();
-    } catch (error) {
-      console.error('Error sending quote:', error);
-      showNotification('error', 'Send Failed', error instanceof Error ? error.message : 'Failed to send quote');
-    } finally {
-      setSaving(false);
+    const success = await performSave(false);
+    if (success) {
+      setShowSendQuoteModal(true);
     }
   };
 
@@ -2601,6 +2562,22 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         onClose={() => setShowNewCustomerModal(false)}
         onSuccess={handleCustomerCreated}
       />
+
+      {/* Send Quote Modal */}
+      {showSendQuoteModal && selectedCustomerId && (
+        <SendQuoteModal
+          quoteId={quoteId!}
+          quoteNumber={quoteNumber}
+          customerName={customers.find(c => c.id === selectedCustomerId)?.company_name || ''}
+          customerEmail={customers.find(c => c.id === selectedCustomerId)?.email || ''}
+          totalAmount={totals.totalDue}
+          onClose={() => setShowSendQuoteModal(false)}
+          onSuccess={() => {
+            setShowSendQuoteModal(false);
+            onSave?.();
+          }}
+        />
+      )}
 
       {/* Manage Imprints Modal */}
       <ManageImprintsModal
