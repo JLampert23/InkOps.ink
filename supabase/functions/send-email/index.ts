@@ -108,7 +108,31 @@ Deno.serve(async (req: Request) => {
       throw new Error('From email address not configured. Please add it in Account Settings.');
     }
 
-    const RESEND_API_KEY = companySettings.resend_api_key;
+    const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
+    if (!encryptionKey) {
+      throw new Error('ENCRYPTION_KEY environment variable not set');
+    }
+
+    const decryptResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({
+        action: 'decrypt',
+        token: companySettings.resend_api_key,
+      }),
+    });
+
+    if (!decryptResponse.ok) {
+      const errorData = await decryptResponse.json();
+      throw new Error(`Failed to decrypt Resend API key: ${errorData.error || 'Unknown error'}`);
+    }
+
+    const { result: decryptedApiKey } = await decryptResponse.json();
+
+    const RESEND_API_KEY = decryptedApiKey;
     const fromEmail = companySettings.email_from_address;
     const fromName = companySettings.company_name || '';
 
