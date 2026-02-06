@@ -8,6 +8,7 @@ import { EnhancedAuthScreen } from './components/EnhancedAuthScreen';
 import { supabase } from './lib/supabase-client';
 import { billingService } from './services/billing-service';
 import { useRBAC } from './hooks/useRBAC';
+import PublicQuoteApproval from './components/production/PublicQuoteApproval';
 
 const SquareData = lazy(() => import('./components/SquareData'));
 const ProductionManagement = lazy(() => import('./components/ProductionManagement').then(m => ({ default: m.ProductionManagement })));
@@ -567,7 +568,26 @@ function AppContent() {
   );
 }
 
+function useHashRoute() {
+  const [hash, setHash] = useState(window.location.hash);
+
+  useEffect(() => {
+    const onHashChange = () => setHash(window.location.hash);
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  return hash;
+}
+
 function App() {
+  const hash = useHashRoute();
+  const approveMatch = hash.match(/^#\/approve\/(.+)$/);
+
+  if (approveMatch) {
+    return <PublicQuoteApproval token={approveMatch[1]} />;
+  }
+
   return (
     <AuthProvider>
       <ThemeProvider>

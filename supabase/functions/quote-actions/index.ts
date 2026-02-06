@@ -191,8 +191,9 @@ Deno.serve(async (req: Request) => {
         })
         .eq("id", quoteId);
 
-      // Generate public approval URL
-      const approvalUrl = `${supabaseUrl}/functions/v1/quote-approval/${approvalToken}`;
+      // Generate public approval URL pointing to the frontend app
+      const appUrl = body.app_url || supabaseUrl;
+      const approvalUrl = `${appUrl}/#/approve/${approvalToken}`;
 
       // Send email with template or default
       try {
