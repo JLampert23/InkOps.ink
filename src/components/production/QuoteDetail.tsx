@@ -242,10 +242,24 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
   const handleSendApproval = async () => {
     try {
       setSending(true);
+
+      // Validate required fields
+      if (!quote?.customer_email && !quote?.bill_email) {
+        showNotification('Customer email is required to send quote', 'error');
+        setSending(false);
+        return;
+      }
+
+      if (!lineItems || lineItems.length === 0) {
+        showNotification('Cannot send empty quote. Please add line items first.', 'error');
+        setSending(false);
+        return;
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quote-actions`;
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quote-actions/${quoteId}/send`;
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -253,8 +267,6 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          action: 'send_approval',
-          quote_id: quoteId,
           expires_in_days: expiresInDays,
           single_use: singleUse,
           auto_approve_after_days: autoApproveAfterDays,
@@ -262,14 +274,18 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         }),
       });
 
-      if (!response.ok) throw new Error('Failed to send approval');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || errorData.message || 'Failed to send approval';
+        throw new Error(errorMessage);
+      }
 
-      alert('Quote sent for approval!');
+      showNotification('Quote sent for approval successfully!', 'success');
       setShowSendModal(false);
       loadQuoteDetails();
     } catch (error) {
       console.error('Error sending approval:', error);
-      alert('Failed to send approval');
+      showNotification(error instanceof Error ? error.message : 'Failed to send approval', 'error');
     } finally {
       setSending(false);
     }

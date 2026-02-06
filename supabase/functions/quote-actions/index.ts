@@ -194,8 +194,39 @@ Deno.serve(async (req: Request) => {
       // Generate public approval URL
       const approvalUrl = `${supabaseUrl}/functions/v1/quote-approval/${approvalToken}`;
 
-      // TODO: Send email with approval link
-      // This would integrate with the send-email function
+      // Send email with approval link
+      try {
+        const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            to: quote.customer_email,
+            subject: `Quote ${quote.quote_number} - Review and Approve`,
+            html: `
+              <p>Hello ${quote.customer_name || 'valued customer'},</p>
+              <p>Your quote ${quote.quote_number} is ready for review.</p>
+              <p><strong>Total: $${(quote.total || 0).toFixed(2)}</strong></p>
+              <p>
+                <a href="${approvalUrl}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                  View and Approve Quote
+                </a>
+              </p>
+              ${expiresAt ? `<p><small>This link expires on ${new Date(expiresAt).toLocaleDateString()}</small></p>` : ''}
+              <p>Thank you for your business!</p>
+            `,
+          }),
+        });
+
+        if (!emailResponse.ok) {
+          console.error('Failed to send email:', await emailResponse.text());
+        }
+      } catch (emailError) {
+        console.error('Error sending email:', emailError);
+        // Don't fail the whole request if email fails
+      }
 
       return new Response(
         JSON.stringify({
