@@ -1691,7 +1691,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
 <button
             onClick={handleSaveAndClose}
             disabled={saving}
-            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-2 shadow-md disabled:opacity-50 transition-all hover:shadow-lg"
+            className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center gap-2 shadow-md disabled:opacity-50 transition-all hover:shadow-lg"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
             Save & Close
