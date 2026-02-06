@@ -8,12 +8,15 @@ import {
   Send,
   Package,
   Eye,
+  Edit,
   Loader2,
   Calendar,
   DollarSign,
   Building2,
   ChevronDown,
   X,
+  Archive,
+  FileText,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -136,13 +139,13 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
 
   const getStatusBadge = (status: string) => {
     const styles = {
-      draft: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
-      sent: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-      confirmed: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-      in_transit: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-      partially_received: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
-      fully_received: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-      closed: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
+      draft: 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-[#2A2A2A] dark:text-gray-300 dark:border-[#3A3A3A]',
+      sent: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20',
+      confirmed: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-500/10 dark:text-purple-400 dark:border-purple-500/20',
+      in_transit: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20',
+      partially_received: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20',
+      fully_received: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20',
+      closed: 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-[#2A2A2A] dark:text-gray-500 dark:border-[#3A3A3A]',
     };
 
     const labels = {
@@ -156,7 +159,7 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
     };
 
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status as keyof typeof styles] || styles.draft}`}>
+      <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border ${styles[status as keyof typeof styles] || styles.draft}`}>
         {labels[status as keyof typeof labels] || status}
       </span>
     );
@@ -186,6 +189,30 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
     } catch (error) {
       console.error('Error updating purchase orders:', error);
       alert('Failed to update purchase orders');
+    }
+  };
+
+  const handleBulkArchive = async () => {
+    if (selectedPos.size === 0) {
+      alert('Please select purchase orders to archive');
+      return;
+    }
+
+    if (!confirm(`Archive ${selectedPos.size} purchase order(s)?`)) return;
+
+    try {
+      const { error } = await supabase
+        .from('purchase_orders')
+        .update({ status: 'closed' })
+        .in('id', Array.from(selectedPos));
+
+      if (error) throw error;
+      alert('Purchase orders archived');
+      setSelectedPos(new Set());
+      loadPurchaseOrders();
+    } catch (error) {
+      console.error('Error archiving purchase orders:', error);
+      alert('Failed to archive purchase orders');
     }
   };
 
@@ -244,47 +271,54 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      <div className="flex items-center justify-center h-96 bg-white dark:bg-[#121212] rounded-lg border border-gray-200 dark:border-[#2A2A2A]">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600 dark:text-blue-400" />
+          <p className="text-sm text-gray-600 dark:text-[#A0A0A0]">Loading purchase orders...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Purchase Orders</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-[#EDEDED]">Purchase Orders</h2>
+          <p className="text-sm text-gray-600 dark:text-[#A0A0A0] mt-1">
             Manage vendor purchase orders and track deliveries
           </p>
         </div>
         <button
           onClick={onCreateNew}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-all duration-200 shadow-sm hover:shadow-md font-medium"
         >
           <Plus className="w-4 h-4" />
-          Create PO
+          Create Purchase Order
         </button>
       </div>
 
       {/* Search and Filters */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
-        <div className="flex flex-col sm:flex-row gap-4">
+      <div className="bg-white dark:bg-[#1A1A1A] rounded-lg border border-gray-200 dark:border-[#2A2A2A] p-5 shadow-sm">
+        <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
             <input
               type="text"
               placeholder="Search by PO number or vendor..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 dark:border-[#2A2A2A] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent bg-white dark:bg-[#121212] text-gray-900 dark:text-[#EDEDED] placeholder-gray-400 dark:placeholder-gray-600 transition-all"
             />
           </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 dark:text-white"
+            className={`flex items-center gap-2 px-4 py-2.5 border rounded-lg font-medium transition-all ${
+              showFilters
+                ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400'
+                : 'border-gray-300 dark:border-[#2A2A2A] bg-white dark:bg-[#121212] text-gray-700 dark:text-[#EDEDED] hover:bg-gray-50 dark:hover:bg-[#2A2A2A]'
+            }`}
           >
             <Filter className="w-4 h-4" />
             Filters
@@ -292,7 +326,7 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
           </button>
           <button
             onClick={handleBulkExport}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 dark:text-white"
+            className="flex items-center gap-2 px-4 py-2.5 border border-gray-300 dark:border-[#2A2A2A] rounded-lg bg-white dark:bg-[#121212] text-gray-700 dark:text-[#EDEDED] hover:bg-gray-50 dark:hover:bg-[#2A2A2A] transition-all font-medium"
           >
             <Download className="w-4 h-4" />
             Export
@@ -300,7 +334,7 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
         </div>
 
         {showFilters && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5 pt-5 border-t border-gray-200 dark:border-[#2A2A2A]">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Status
@@ -308,7 +342,7 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
               <select
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-[#2A2A2A] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-[#121212] text-gray-900 dark:text-[#EDEDED]"
               >
                 <option value="all">All Statuses</option>
                 <option value="draft">Draft</option>
@@ -328,7 +362,7 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
               <select
                 value={selectedVendor}
                 onChange={(e) => setSelectedVendor(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-[#2A2A2A] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-[#121212] text-gray-900 dark:text-[#EDEDED]"
               >
                 <option value="all">All Vendors</option>
                 {vendors.map((vendor) => (
@@ -348,13 +382,13 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
                   type="date"
                   value={dateRange.start}
                   onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-[#2A2A2A] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-[#121212] text-gray-900 dark:text-[#EDEDED]"
                 />
                 <input
                   type="date"
                   value={dateRange.end}
                   onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-[#2A2A2A] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-[#121212] text-gray-900 dark:text-[#EDEDED]"
                 />
               </div>
             </div>
@@ -363,7 +397,7 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
               <div className="col-span-full">
                 <button
                   onClick={clearFilters}
-                  className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                  className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors"
                 >
                   <X className="w-4 h-4" />
                   Clear all filters
@@ -376,22 +410,29 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
 
       {/* Bulk Actions */}
       {selectedPos.size > 0 && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+        <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-lg p-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-blue-900 dark:text-blue-300">
-              {selectedPos.size} purchase order(s) selected
+            <span className="text-sm font-semibold text-blue-900 dark:text-blue-300">
+              {selectedPos.size} purchase order{selectedPos.size !== 1 ? 's' : ''} selected
             </span>
             <div className="flex gap-2">
               <button
                 onClick={handleBulkMarkAsSent}
-                className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 text-sm font-medium transition-all"
               >
                 <Send className="w-4 h-4" />
                 Mark as Sent
               </button>
               <button
+                onClick={handleBulkArchive}
+                className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#1A1A1A] border border-gray-300 dark:border-[#2A2A2A] text-gray-700 dark:text-[#EDEDED] rounded-lg hover:bg-gray-50 dark:hover:bg-[#2A2A2A] text-sm font-medium transition-all"
+              >
+                <Archive className="w-4 h-4" />
+                Archive
+              </button>
+              <button
                 onClick={() => setSelectedPos(new Set())}
-                className="px-3 py-1.5 border border-blue-300 dark:border-blue-700 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-900 dark:text-blue-300 text-sm"
+                className="px-4 py-2 border border-blue-300 dark:border-blue-500/30 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-500/20 text-blue-900 dark:text-blue-300 text-sm font-medium transition-all"
               >
                 Clear Selection
               </button>
@@ -401,133 +442,157 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
       )}
 
       {/* Table */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-slate-900">
-              <tr>
-                <th className="px-4 py-3 text-left">
-                  <input
-                    type="checkbox"
-                    checked={selectedPos.size === filteredPos.length && filteredPos.length > 0}
-                    onChange={handleSelectAll}
-                    className="rounded border-gray-300 dark:border-slate-600"
-                  />
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                  PO Number
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                  Vendor
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                  Total Cost
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                  Expected Delivery
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                  Created
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
-              {filteredPos.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-                    {pos.length === 0 ? (
-                      <div>
-                        <Package className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                        <p>No purchase orders yet. Create your first PO to get started.</p>
-                      </div>
-                    ) : (
-                      <p>No purchase orders match your filters.</p>
-                    )}
-                  </td>
+      <div className="bg-white dark:bg-[#1A1A1A] rounded-lg border border-gray-200 dark:border-[#2A2A2A] overflow-hidden shadow-sm">
+        {filteredPos.length === 0 && pos.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 px-4">
+            <div className="w-20 h-20 bg-blue-50 dark:bg-blue-500/10 rounded-full flex items-center justify-center mb-5">
+              <Package className="w-10 h-10 text-blue-600 dark:text-blue-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-[#EDEDED] mb-2">
+              No purchase orders yet
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-[#A0A0A0] text-center mb-6 max-w-md">
+              Create your first purchase order to start ordering garments and supplies from your vendors.
+            </p>
+            <button
+              onClick={onCreateNew}
+              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-all duration-200 font-medium"
+            >
+              <Plus className="w-4 h-4" />
+              Create Purchase Order
+            </button>
+          </div>
+        ) : filteredPos.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 px-4">
+            <FileText className="w-12 h-12 text-gray-400 dark:text-gray-600 mb-4" />
+            <p className="text-gray-600 dark:text-[#A0A0A0]">No purchase orders match your filters.</p>
+            <button
+              onClick={clearFilters}
+              className="mt-4 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
+            >
+              Clear filters
+            </button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 dark:bg-[#121212] border-b border-gray-200 dark:border-[#2A2A2A]">
+                  <th className="px-5 py-3.5 text-left">
+                    <input
+                      type="checkbox"
+                      checked={selectedPos.size === filteredPos.length && filteredPos.length > 0}
+                      onChange={handleSelectAll}
+                      className="rounded border-gray-300 dark:border-[#2A2A2A] text-blue-600 focus:ring-blue-500 dark:bg-[#121212]"
+                    />
+                  </th>
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-600 dark:text-[#A0A0A0] uppercase tracking-wider">
+                    PO Number
+                  </th>
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-600 dark:text-[#A0A0A0] uppercase tracking-wider">
+                    Vendor
+                  </th>
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-600 dark:text-[#A0A0A0] uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-600 dark:text-[#A0A0A0] uppercase tracking-wider">
+                    Total Cost
+                  </th>
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-600 dark:text-[#A0A0A0] uppercase tracking-wider">
+                    Expected Delivery
+                  </th>
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-600 dark:text-[#A0A0A0] uppercase tracking-wider">
+                    Created
+                  </th>
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-600 dark:text-[#A0A0A0] uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
-              ) : (
-                filteredPos.map((po) => (
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-[#2A2A2A]">
+                {filteredPos.map((po) => (
                   <tr
                     key={po.id}
-                    className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
+                    className="hover:bg-gray-50 dark:hover:bg-[#121212] transition-colors"
                   >
-                    <td className="px-4 py-3">
+                    <td className="px-5 py-4">
                       <input
                         type="checkbox"
                         checked={selectedPos.has(po.id)}
                         onChange={() => toggleSelection(po.id)}
-                        className="rounded border-gray-300 dark:border-slate-600"
+                        className="rounded border-gray-300 dark:border-[#2A2A2A] text-blue-600 focus:ring-blue-500 dark:bg-[#121212]"
                       />
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-5 py-4">
                       <button
                         onClick={() => onViewDetail(po.id)}
-                        className="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                        className="font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
                       >
                         {po.po_number}
                       </button>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-5 py-4">
                       <div className="flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm text-gray-900 dark:text-white">
+                        <div className="w-8 h-8 bg-gray-100 dark:bg-[#2A2A2A] rounded-lg flex items-center justify-center">
+                          <Building2 className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                        </div>
+                        <span className="text-sm font-medium text-gray-900 dark:text-[#EDEDED]">
                           {po.vendor.vendor_name}
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3">{getStatusBadge(po.status)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">
-                          ${po.total_cost.toFixed(2)}
+                    <td className="px-5 py-4">{getStatusBadge(po.status)}</td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-1.5">
+                        <DollarSign className="w-4 h-4 text-gray-400 dark:text-gray-600" />
+                        <span className="text-sm font-semibold text-gray-900 dark:text-[#EDEDED]">
+                          {po.total_cost.toFixed(2)}
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-5 py-4">
                       {po.expected_delivery_date ? (
                         <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-600 dark:text-gray-400">
+                          <Calendar className="w-4 h-4 text-gray-400 dark:text-gray-600" />
+                          <span className="text-sm text-gray-600 dark:text-[#A0A0A0]">
                             {format(new Date(po.expected_delivery_date), 'MMM dd, yyyy')}
                           </span>
                         </div>
                       ) : (
-                        <span className="text-sm text-gray-400 dark:text-gray-500">—</span>
+                        <span className="text-sm text-gray-400 dark:text-gray-600">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                    <td className="px-5 py-4">
+                      <span className="text-sm text-gray-600 dark:text-[#A0A0A0]">
                         {format(new Date(po.created_at), 'MMM dd, yyyy')}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => onViewDetail(po.id)}
-                        className="flex items-center gap-1 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-600 rounded transition-colors"
-                      >
-                        <Eye className="w-4 h-4" />
-                        View
-                      </button>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => onViewDetail(po.id)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-700 dark:text-[#EDEDED] hover:bg-gray-100 dark:hover:bg-[#2A2A2A] rounded-lg transition-all font-medium"
+                        >
+                          <Eye className="w-4 h-4" />
+                          View
+                        </button>
+                      </div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Summary */}
       {filteredPos.length > 0 && (
-        <div className="text-sm text-gray-600 dark:text-gray-400">
-          Showing {filteredPos.length} of {pos.length} purchase orders
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-gray-600 dark:text-[#A0A0A0]">
+            Showing <span className="font-semibold text-gray-900 dark:text-[#EDEDED]">{filteredPos.length}</span> of{' '}
+            <span className="font-semibold text-gray-900 dark:text-[#EDEDED]">{pos.length}</span> purchase orders
+          </span>
         </div>
       )}
     </div>
