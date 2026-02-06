@@ -13,6 +13,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { POSettingsService } from '../../services/po-settings-service';
 
 interface LineItem {
   id: string;
@@ -37,6 +38,8 @@ interface PurchaseOrder {
   vendor_name: string;
   expected_delivery_date: string | null;
   receiving_status: string;
+  status: string;
+  confirmed_at: string | null;
   vendor?: {
     vendor_name: string;
   };
@@ -57,6 +60,7 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
   const [scanInput, setScanInput] = useState('');
   const [notes, setNotes] = useState('');
   const [markAsComplete, setMarkAsComplete] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -78,6 +82,8 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
         .select(`
           id,
           po_number,
+          status,
+          confirmed_at,
           expected_delivery_date,
           receiving_status,
           vendors!vendor_id (
@@ -88,6 +94,15 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
         .single();
 
       if (poError) throw poError;
+
+      const validation = await POSettingsService.canReceiveGoods({
+        status: poData.status,
+        confirmed_at: poData.confirmed_at,
+      });
+
+      if (!validation.allowed) {
+        setValidationError(validation.reason || 'Cannot receive goods for this PO.');
+      }
 
       const { data: items, error: itemsError } = await supabase
         .from('purchase_order_line_items')
@@ -171,6 +186,11 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
   };
 
   const handleSave = async () => {
+    if (validationError) {
+      alert(validationError);
+      return;
+    }
+
     try {
       setSaving(true);
 
@@ -307,6 +327,19 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
             </button>
           </div>
         </div>
+
+        {/* Validation Error */}
+        {validationError && (
+          <div className="p-6 border-b border-gray-200 dark:border-slate-700 bg-red-50 dark:bg-red-900/20">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-red-900 dark:text-red-200">Cannot Receive Goods</p>
+                <p className="text-sm text-red-700 dark:text-red-300 mt-1">{validationError}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Stats */}
         <div className="p-6 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">

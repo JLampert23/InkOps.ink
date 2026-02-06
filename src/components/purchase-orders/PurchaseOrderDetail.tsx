@@ -19,8 +19,11 @@ import {
   File,
   X,
   Printer,
+  Edit,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { POSettingsService } from '../../services/po-settings-service';
+import { POValidationModal } from './POValidationModal';
 
 interface PurchaseOrder {
   id: string;
@@ -102,6 +105,14 @@ export function PurchaseOrderDetail({ poId, onBack }: PurchaseOrderDetailProps) 
   const [uploading, setUploading] = useState(false);
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [receivingQuantities, setReceivingQuantities] = useState<{ [key: string]: number }>({});
+  const [validationModal, setValidationModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    requiresJustification?: boolean;
+    onConfirm?: (justification?: string) => void;
+  }>({ isOpen: false, title: '', message: '' });
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     loadPurchaseOrder();
@@ -181,6 +192,24 @@ export function PurchaseOrderDetail({ poId, onBack }: PurchaseOrderDetailProps) 
   const updateStatus = async (newStatus: string) => {
     if (!po) return;
 
+    if (newStatus === 'sent') {
+      const hasPdf = attachments.some((a) => a.file_type === 'application/pdf');
+      const validation = await POSettingsService.canSendPO({
+        status: po.status,
+        approved_by: null,
+        has_pdf: hasPdf,
+      });
+
+      if (!validation.allowed) {
+        setValidationModal({
+          isOpen: true,
+          title: 'Cannot Send PO',
+          message: validation.reason || 'This PO cannot be sent at this time.',
+        });
+        return;
+      }
+    }
+
     try {
       setUpdating(true);
 
@@ -240,8 +269,65 @@ export function PurchaseOrderDetail({ poId, onBack }: PurchaseOrderDetailProps) 
     return profile?.company_id || null;
   };
 
+  const handleEditClick = async () => {
+    if (!po) return;
+
+    const validation = await POSettingsService.canEditPO({
+      status: po.status,
+      sent_at: po.sent_at,
+    });
+
+    if (!validation.allowed) {
+      setValidationModal({
+        isOpen: true,
+        title: 'Cannot Edit PO',
+        message: validation.reason || 'This PO cannot be edited.',
+      });
+      return;
+    }
+
+    if (validation.requiresJustification) {
+      setValidationModal({
+        isOpen: true,
+        title: 'Edit Justification Required',
+        message: 'This PO has already been sent. Please provide a justification for editing it.',
+        requiresJustification: true,
+        onConfirm: async (justification) => {
+          const { data: { user } } = await supabase.auth.getUser();
+          await supabase.from('purchase_order_activity_log').insert([
+            {
+              company_id: await getUserCompanyId(),
+              po_id: poId,
+              action: 'po_edited_after_sending',
+              performed_by: user?.id,
+              performed_by_name: user?.email || 'Unknown',
+              notes: justification || 'No justification provided',
+            },
+          ]);
+          setIsEditing(true);
+        },
+      });
+    } else {
+      setIsEditing(true);
+    }
+  };
+
   const handleReceiveGoods = async () => {
     if (!po) return;
+
+    const validation = await POSettingsService.canReceiveGoods({
+      status: po.status,
+      confirmed_at: po.confirmed_at,
+    });
+
+    if (!validation.allowed) {
+      setValidationModal({
+        isOpen: true,
+        title: 'Cannot Receive Goods',
+        message: validation.reason || 'Goods cannot be received at this time.',
+      });
+      return;
+    }
 
     const itemsToUpdate = Object.entries(receivingQuantities)
       .filter(([_, qty]) => qty > 0)
@@ -1003,6 +1089,16 @@ export function PurchaseOrderDetail({ poId, onBack }: PurchaseOrderDetailProps) 
           </div>
         </div>
       )}
+
+      {/* Validation Modal */}
+      <POValidationModal
+        isOpen={validationModal.isOpen}
+        onClose={() => setValidationModal({ ...validationModal, isOpen: false })}
+        title={validationModal.title}
+        message={validationModal.message}
+        requiresJustification={validationModal.requiresJustification}
+        onConfirm={validationModal.onConfirm}
+      />
     </div>
   );
 }

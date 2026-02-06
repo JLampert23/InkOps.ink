@@ -18,6 +18,8 @@ import {
   X,
 } from 'lucide-react';
 import { ProductSearchModal } from './ProductSearchModal';
+import { POSettingsService } from '../../services/po-settings-service';
+import { POValidationModal } from './POValidationModal';
 
 interface Vendor {
   id: string;
@@ -65,11 +67,33 @@ export function CreatePurchaseOrder({ onBack, onSave }: CreatePurchaseOrderProps
   const [saving, setSaving] = useState(false);
   const [showProductSearch, setShowProductSearch] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [validationModal, setValidationModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+  }>({ isOpen: false, title: '', message: '' });
 
   useEffect(() => {
     loadVendors();
     generatePONumber();
+    loadPODefaults();
   }, []);
+
+  const loadPODefaults = async () => {
+    try {
+      const defaultVendorId = await POSettingsService.getDefaultVendorId();
+      const defaultNotes = await POSettingsService.getDefaultNotes();
+
+      if (defaultVendorId) {
+        setSelectedVendor(defaultVendorId);
+      }
+      if (defaultNotes) {
+        setNotesToVendor(defaultNotes);
+      }
+    } catch (error) {
+      console.error('Error loading PO defaults:', error);
+    }
+  };
 
   const loadVendors = async () => {
     try {
@@ -91,9 +115,8 @@ export function CreatePurchaseOrder({ onBack, onSave }: CreatePurchaseOrderProps
 
   const generatePONumber = async () => {
     try {
-      const { data, error } = await supabase.rpc('generate_po_number');
-      if (error) throw error;
-      setPoNumber(data);
+      const number = await POSettingsService.generatePONumber();
+      setPoNumber(number);
     } catch (error) {
       console.error('Error generating PO number:', error);
       setPoNumber('PO-00001');
@@ -214,6 +237,23 @@ export function CreatePurchaseOrder({ onBack, onSave }: CreatePurchaseOrderProps
     if (!selectedVendor || lineItems.length === 0) {
       alert('Please complete all required fields');
       return;
+    }
+
+    if (status === 'sent') {
+      const validation = await POSettingsService.canSendPO({
+        status: 'draft',
+        approved_by: null,
+        has_pdf: attachments.some((f) => f.type === 'application/pdf'),
+      });
+
+      if (!validation.allowed) {
+        setValidationModal({
+          isOpen: true,
+          title: 'Cannot Send PO',
+          message: validation.reason || 'This PO cannot be sent at this time.',
+        });
+        return;
+      }
     }
 
     try {
@@ -1006,6 +1046,14 @@ export function CreatePurchaseOrder({ onBack, onSave }: CreatePurchaseOrderProps
           onClose={() => setShowProductSearch(false)}
         />
       )}
+
+      {/* Validation Modal */}
+      <POValidationModal
+        isOpen={validationModal.isOpen}
+        onClose={() => setValidationModal({ ...validationModal, isOpen: false })}
+        title={validationModal.title}
+        message={validationModal.message}
+      />
     </div>
   );
 }
