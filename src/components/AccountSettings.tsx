@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, CreditCard as Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, RefreshCw, Bug, MessageSquare, Eye, EyeOff, Grid3x3, FileText, CheckCircle, GripVertical, Workflow, Mail } from 'lucide-react';
+import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, CreditCard as Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, RefreshCw, Bug, MessageSquare, Eye, EyeOff, Grid3x3, FileText, CheckCircle, GripVertical, Workflow, Mail, Package } from 'lucide-react';
 import { supabase } from '../lib/supabase-client';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
@@ -12,6 +12,7 @@ const StripePayments = lazy(() => import('./production/StripePayments').then(m =
 const PriceMatricesManager = lazy(() => import('./production/PriceMatricesManager').then(m => ({ default: m.PriceMatricesManager })));
 const InkThreadColorsManager = lazy(() => import('./production/InkThreadColorsManager').then(m => ({ default: m.InkThreadColorsManager })));
 const CommunicationTemplatesManager = lazy(() => import('./email/CommunicationTemplatesManager').then(m => ({ default: m.default })));
+const ReceivingSettings = lazy(() => import('./settings/ReceivingSettings').then(m => ({ default: m.default })));
 
 interface CompanySettings {
   id: string;
@@ -121,7 +122,7 @@ type SettingsTab =
   | 'user-management' | 'user-security'
   | 'billing-status-filters'
   | 'automated-reports' | 'automations'
-  | 'production-general' | 'scheduler-settings' | 'invoice-fees' | 'price-matrices'
+  | 'production-general' | 'scheduler-settings' | 'invoice-fees' | 'price-matrices' | 'receiving-settings'
   | 'email-templates';
 
 interface AccountSettingsProps {
@@ -3945,6 +3946,24 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   </div>
                   {activeTab === 'price-matrices' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
                 </button>
+
+                <button
+                  onClick={() => setActiveTab('receiving-settings')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'receiving-settings'
+                      ? 'bg-green-50 dark:bg-green-600/20 text-green-700 dark:text-green-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                  style={{ animationDelay: '120ms' }}
+                >
+                  <Package className={`w-4 h-4 flex-shrink-0 ${activeTab === 'receiving-settings' ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'receiving-settings' ? 'text-green-700 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      Receiving Settings
+                    </div>
+                  </div>
+                  {activeTab === 'receiving-settings' && <div className="w-1 h-6 bg-green-600 dark:bg-green-500 rounded-full absolute right-0" />}
+                </button>
               </div>
             )}
           </div>
@@ -6612,6 +6631,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 )}
               </div>
             </div>
+          )}
+
+          {/* Receiving Settings Section */}
+          {activeTab === 'receiving-settings' && (
+            <Suspense fallback={
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 text-green-600 dark:text-green-400 animate-spin" />
+              </div>
+            }>
+              <ReceivingSettings />
+            </Suspense>
           )}
 
           {/* Invoice Fees Section */}
