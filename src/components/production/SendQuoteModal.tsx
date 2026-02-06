@@ -17,11 +17,11 @@ interface SendQuoteModalProps {
 
 interface EmailTemplate {
   id: string;
-  name: string;
-  subject: string;
-  body_html: string;
+  template_name: string;
+  subject_template: string;
+  body_template: string;
   template_type: string;
-  is_default: boolean;
+  auto_attach_quote_link: boolean;
 }
 
 export function SendQuoteModal({
@@ -70,19 +70,15 @@ export function SendQuoteModal({
         .from('communication_templates')
         .select('*')
         .eq('company_id', profile.company_id)
-        .eq('template_type', 'quote_send')
+        .eq('template_type', 'quote_email_default')
         .eq('is_active', true)
-        .order('is_default', { ascending: false })
-        .order('name');
+        .order('template_name');
 
       if (error) throw error;
 
       setTemplates(data || []);
 
-      const defaultTemplate = data?.find(t => t.is_default);
-      if (defaultTemplate) {
-        setSelectedTemplateId(defaultTemplate.id);
-      } else if (data && data.length > 0) {
+      if (data && data.length > 0) {
         setSelectedTemplateId(data[0].id);
       }
     } catch (error) {
@@ -123,8 +119,8 @@ export function SendQuoteModal({
         custom_message: customMessage,
       };
 
-      const processedSubject = ShortCodeEngine.renderTemplate(template.subject, shortcodeData);
-      const processedBody = ShortCodeEngine.renderTemplate(template.body_html, shortcodeData);
+      const processedSubject = ShortCodeEngine.renderTemplate(template.subject_template, shortcodeData);
+      const processedBody = ShortCodeEngine.renderTemplate(template.body_template, shortcodeData);
 
       setPreviewSubject(processedSubject);
       setPreviewHtml(processedBody);
@@ -211,7 +207,7 @@ export function SendQuoteModal({
             <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-sm text-amber-900 dark:text-amber-200">
-                No email templates found for sending quotes. Please create a template in Settings with type "Quote Send" first.
+                No email templates found for sending quotes. Please create a template in Settings with type "Quote Email Default" first.
               </p>
             </div>
           </div>
@@ -274,7 +270,7 @@ export function SendQuoteModal({
             >
               {templates.map(template => (
                 <option key={template.id} value={template.id}>
-                  {template.name} {template.is_default ? '(Default)' : ''}
+                  {template.template_name}
                 </option>
               ))}
             </select>
