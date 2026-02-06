@@ -101,7 +101,7 @@ export function SendQuoteModal({
 
       if (!quote) return;
 
-      const approvalUrl = `${window.location.origin}/#/approve/PREVIEW_TOKEN`;
+      const approvalUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quote-approval/PREVIEW_TOKEN`;
       const expiryDate = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
 
       const shortcodeData = {
@@ -159,7 +159,6 @@ export function SendQuoteModal({
           single_use: false,
           auto_approve_after_days: null,
           auto_convert_on_approval: false,
-          app_url: window.location.origin,
         }),
       });
 
