@@ -1688,16 +1688,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             Save Draft
           </button>
-          <button
-            onClick={handleSendQuote}
-            disabled={saving || !selectedCustomerId}
-            className="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg flex items-center gap-2 shadow-md disabled:opacity-50 transition-all hover:shadow-lg"
-            title={!selectedCustomerId ? 'Select a customer to send quote' : 'Send quote to customer'}
-          >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-            Send Quote
-          </button>
-          <button
+<button
             onClick={handleSaveAndClose}
             disabled={saving}
             className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-2 shadow-md disabled:opacity-50 transition-all hover:shadow-lg"
