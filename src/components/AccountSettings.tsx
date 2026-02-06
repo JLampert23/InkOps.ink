@@ -122,7 +122,8 @@ type SettingsTab =
   | 'user-management' | 'user-security'
   | 'billing-status-filters'
   | 'automated-reports' | 'automations'
-  | 'production-general' | 'scheduler-settings' | 'invoice-fees' | 'price-matrices' | 'receiving-settings'
+  | 'manage-goods' | 'receiving-settings'
+  | 'production-general' | 'scheduler-settings' | 'invoice-fees' | 'price-matrices'
   | 'email-templates';
 
 interface AccountSettingsProps {
@@ -144,6 +145,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [accountingExpanded, setAccountingExpanded] = useState(false);
   const [companySettingsExpanded, setCompanySettingsExpanded] = useState(false);
   const [communicationsExpanded, setCommunicationsExpanded] = useState(false);
+  const [manageGoodsExpanded, setManageGoodsExpanded] = useState(false);
 
   const [companyName, setCompanyName] = useState('');
   const [companyAddress, setCompanyAddress] = useState('');
@@ -3855,6 +3857,47 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             )}
           </div>
 
+          {/* Manage Goods Section - Collapsible */}
+          <div className="mb-2">
+            <button
+              onClick={() => setManageGoodsExpanded(!manageGoodsExpanded)}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-slate-700/50"
+            >
+              <Package className="w-4 h-4 flex-shrink-0 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
+              <div className="flex-1 text-left">
+                <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                  Manage Goods
+                </div>
+              </div>
+              {manageGoodsExpanded ? (
+                <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200" />
+              ) : (
+                <ChevronUp className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200 rotate-180" />
+              )}
+            </button>
+
+            {manageGoodsExpanded && (
+              <div className="mt-1 ml-2 space-y-1 collapsible-section collapsible-section-enter">
+                <button
+                  onClick={() => setActiveTab('receiving-settings')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'receiving-settings'
+                      ? 'bg-purple-50 dark:bg-purple-600/20 text-purple-700 dark:text-purple-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Package className={`w-4 h-4 flex-shrink-0 ${activeTab === 'receiving-settings' ? 'text-purple-600 dark:text-purple-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'receiving-settings' ? 'text-purple-700 dark:text-purple-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      Receiving Settings
+                    </div>
+                  </div>
+                  {activeTab === 'receiving-settings' && <div className="w-1 h-6 bg-purple-600 dark:bg-purple-500 rounded-full absolute right-0" />}
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Production Settings Section - Collapsible */}
           <div className="mb-2">
             <button
@@ -3945,24 +3988,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     </div>
                   </div>
                   {activeTab === 'price-matrices' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('receiving-settings')}
-                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
-                    activeTab === 'receiving-settings'
-                      ? 'bg-green-50 dark:bg-green-600/20 text-green-700 dark:text-green-400 shadow-sm'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                  style={{ animationDelay: '120ms' }}
-                >
-                  <Package className={`w-4 h-4 flex-shrink-0 ${activeTab === 'receiving-settings' ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
-                  <div className="flex-1 text-left">
-                    <div className={`font-medium text-sm ${activeTab === 'receiving-settings' ? 'text-green-700 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                      Receiving Settings
-                    </div>
-                  </div>
-                  {activeTab === 'receiving-settings' && <div className="w-1 h-6 bg-green-600 dark:bg-green-500 rounded-full absolute right-0" />}
                 </button>
               </div>
             )}
