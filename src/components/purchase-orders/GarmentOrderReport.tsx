@@ -12,8 +12,14 @@ import {
   FileText,
   Search,
   AlertCircle,
+  ShoppingCart,
+  Users,
+  Layers,
+  FileDown,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 interface GarmentNeed {
   style_number: string;
@@ -58,7 +64,6 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
   const [showDrillDown, setShowDrillDown] = useState(false);
   const [vendors, setVendors] = useState<Array<{ id: string; vendor_name: string }>>([]);
   const [customers, setCustomers] = useState<Array<{ id: string; company_name: string }>>([]);
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadData();
@@ -312,6 +317,38 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
     a.href = url;
     a.download = `garment-report-${format(new Date(), 'yyyy-MM-dd')}.csv`;
     a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+
+    doc.setFontSize(18);
+    doc.text('Garment Order Report', 14, 22);
+    doc.setFontSize(10);
+    doc.text(`Generated: ${format(new Date(), 'MMM dd, yyyy')}`, 14, 30);
+
+    const tableData = filteredGarments.map((g) => [
+      g.style_number,
+      g.product_name,
+      g.color,
+      g.size,
+      g.supplier,
+      g.total_needed.toString(),
+      g.on_po.toString(),
+      g.received.toString(),
+      g.remaining.toString(),
+    ]);
+
+    (doc as any).autoTable({
+      head: [['Style', 'Description', 'Color', 'Size', 'Supplier', 'Needed', 'On PO', 'Received', 'Remaining']],
+      body: tableData,
+      startY: 35,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [66, 139, 202] },
+    });
+
+    doc.save(`garment-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
   };
 
   const getTotalStats = () => {
@@ -324,17 +361,6 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
       }),
       { totalNeeded: 0, onPO: 0, received: 0, remaining: 0 }
     );
-  };
-
-  const toggleSelection = (garment: GarmentNeed) => {
-    const key = `${garment.style_number}-${garment.color}-${garment.size}`;
-    const newSelected = new Set(selectedItems);
-    if (newSelected.has(key)) {
-      newSelected.delete(key);
-    } else {
-      newSelected.add(key);
-    }
-    setSelectedItems(newSelected);
   };
 
   const handleCreatePOForRemaining = () => {
@@ -355,12 +381,42 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
     setShowMissingOnly(false);
   };
 
+  const groupGarments = () => {
+    const grouped = new Map<string, GarmentNeed[]>();
+
+    filteredGarments.forEach((garment) => {
+      let key = '';
+      switch (groupBy) {
+        case 'style':
+          key = garment.style_number;
+          break;
+        case 'vendor':
+          key = garment.supplier;
+          break;
+        case 'customer':
+          key = garment.jobs[0]?.customer_name || 'Unknown';
+          break;
+        case 'job':
+          key = garment.jobs[0]?.quote_number || 'Unknown';
+          break;
+      }
+
+      if (!grouped.has(key)) {
+        grouped.set(key, []);
+      }
+      grouped.get(key)!.push(garment);
+    });
+
+    return Array.from(grouped.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  };
+
   const stats = getTotalStats();
+  const groupedData = groupGarments();
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600 dark:text-blue-400" />
       </div>
     );
   }
@@ -378,14 +434,21 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
         <div className="flex gap-2">
           <button
             onClick={exportToCSV}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300"
+            className="flex items-center gap-2 px-4 py-2 bg-slate-700 dark:bg-slate-600 text-white rounded-lg hover:bg-slate-800 dark:hover:bg-slate-700 transition-colors"
           >
             <Download className="w-4 h-4" />
-            Export CSV
+            CSV
+          </button>
+          <button
+            onClick={exportToPDF}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-700 dark:bg-slate-600 text-white rounded-lg hover:bg-slate-800 dark:hover:bg-slate-700 transition-colors"
+          >
+            <FileDown className="w-4 h-4" />
+            PDF
           </button>
           <button
             onClick={handleCreatePOForRemaining}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             <Plus className="w-4 h-4" />
             Create PO for Remaining
@@ -395,57 +458,57 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
+        <div className="bg-slate-900 dark:bg-slate-900 rounded-lg border border-slate-700 dark:border-slate-700 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Total Needed</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+              <p className="text-sm text-gray-400 dark:text-gray-400">Total Needed</p>
+              <p className="text-2xl font-bold text-white dark:text-white mt-1">
                 {stats.totalNeeded.toLocaleString()}
               </p>
             </div>
-            <Package className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+            <Package className="w-8 h-8 text-blue-400 dark:text-blue-400" />
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
+        <div className="bg-slate-900 dark:bg-slate-900 rounded-lg border border-slate-700 dark:border-slate-700 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">On PO</p>
-              <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-1">
+              <p className="text-sm text-gray-400 dark:text-gray-400">On PO</p>
+              <p className="text-2xl font-bold text-purple-400 dark:text-purple-400 mt-1">
                 {stats.onPO.toLocaleString()}
               </p>
             </div>
-            <FileText className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+            <FileText className="w-8 h-8 text-purple-400 dark:text-purple-400" />
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
+        <div className="bg-slate-900 dark:bg-slate-900 rounded-lg border border-slate-700 dark:border-slate-700 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Received</p>
-              <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
+              <p className="text-sm text-gray-400 dark:text-gray-400">Received</p>
+              <p className="text-2xl font-bold text-green-400 dark:text-green-400 mt-1">
                 {stats.received.toLocaleString()}
               </p>
             </div>
-            <Package className="w-8 h-8 text-green-600 dark:text-green-400" />
+            <Package className="w-8 h-8 text-green-400 dark:text-green-400" />
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
+        <div className="bg-slate-900 dark:bg-slate-900 rounded-lg border border-slate-700 dark:border-slate-700 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Remaining to Order</p>
-              <p className="text-2xl font-bold text-orange-600 dark:text-orange-400 mt-1">
+              <p className="text-sm text-gray-400 dark:text-gray-400">Remaining to Order</p>
+              <p className="text-2xl font-bold text-orange-400 dark:text-orange-400 mt-1">
                 {stats.remaining.toLocaleString()}
               </p>
             </div>
-            <AlertCircle className="w-8 h-8 text-orange-600 dark:text-orange-400" />
+            <AlertCircle className="w-8 h-8 text-orange-400 dark:text-orange-400" />
           </div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
+      <div className="bg-slate-900 dark:bg-slate-800 rounded-lg border border-slate-700 dark:border-slate-700 p-4">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -454,12 +517,12 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
               placeholder="Search by style, product, or color..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+              className="w-full pl-10 pr-4 py-2 bg-slate-800 dark:bg-slate-700 border border-slate-600 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-white placeholder-gray-400"
             />
           </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 dark:text-white"
+            className="flex items-center gap-2 px-4 py-2 bg-slate-800 dark:bg-slate-700 border border-slate-600 dark:border-slate-600 rounded-lg hover:bg-slate-700 dark:hover:bg-slate-600 text-white transition-colors"
           >
             <Filter className="w-4 h-4" />
             Filters
@@ -468,15 +531,15 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
         </div>
 
         {showFilters && (
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-4 pt-4 border-t border-slate-700 dark:border-slate-700">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-gray-300 dark:text-gray-300 mb-2">
                 Group By
               </label>
               <select
                 value={groupBy}
                 onChange={(e) => setGroupBy(e.target.value as any)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+                className="w-full px-3 py-2 bg-slate-800 dark:bg-slate-700 border border-slate-600 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-white"
               >
                 <option value="style">Style</option>
                 <option value="vendor">Vendor</option>
@@ -486,13 +549,13 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-gray-300 dark:text-gray-300 mb-2">
                 Vendor
               </label>
               <select
                 value={selectedVendor}
                 onChange={(e) => setSelectedVendor(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+                className="w-full px-3 py-2 bg-slate-800 dark:bg-slate-700 border border-slate-600 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-white"
               >
                 <option value="all">All Vendors</option>
                 {vendors.map((vendor) => (
@@ -504,13 +567,13 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-gray-300 dark:text-gray-300 mb-2">
                 Customer
               </label>
               <select
                 value={selectedCustomer}
                 onChange={(e) => setSelectedCustomer(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+                className="w-full px-3 py-2 bg-slate-800 dark:bg-slate-700 border border-slate-600 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-white"
               >
                 <option value="all">All Customers</option>
                 {customers.map((customer) => (
@@ -522,7 +585,7 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-gray-300 dark:text-gray-300 mb-2">
                 Options
               </label>
               <label className="flex items-center gap-2">
@@ -530,9 +593,9 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
                   type="checkbox"
                   checked={showMissingOnly}
                   onChange={(e) => setShowMissingOnly(e.target.checked)}
-                  className="rounded border-gray-300 dark:border-slate-600"
+                  className="rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-blue-500"
                 />
-                <span className="text-sm text-gray-700 dark:text-gray-300">
+                <span className="text-sm text-gray-300 dark:text-gray-300">
                   Show missing items only
                 </span>
               </label>
@@ -542,7 +605,7 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
               <div className="col-span-full">
                 <button
                   onClick={clearFilters}
-                  className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                  className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300"
                 >
                   <X className="w-4 h-4" />
                   Clear all filters
@@ -554,115 +617,143 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
       </div>
 
       {/* Table */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
+      <div className="bg-slate-900 dark:bg-slate-800 rounded-lg border border-slate-700 dark:border-slate-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-slate-900">
+            <thead className="bg-slate-950 dark:bg-slate-900 sticky top-0 z-10">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 dark:text-gray-400 uppercase tracking-wider">
                   Style Number
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 dark:text-gray-400 uppercase tracking-wider">
                   Description
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 dark:text-gray-400 uppercase tracking-wider">
                   Color
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 dark:text-gray-400 uppercase tracking-wider">
                   Size
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 dark:text-gray-400 uppercase tracking-wider">
                   Supplier
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 dark:text-gray-400 uppercase tracking-wider">
                   Total Needed
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 dark:text-gray-400 uppercase tracking-wider">
                   On PO
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 dark:text-gray-400 uppercase tracking-wider">
                   Received
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 dark:text-gray-400 uppercase tracking-wider">
                   Remaining
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 dark:text-gray-400 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
+            <tbody className="divide-y divide-slate-700 dark:divide-slate-700">
               {filteredGarments.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-                    {garments.length === 0 ? (
-                      <div>
-                        <Package className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                        <p>No garment data available. Create quotes with garments to see the report.</p>
-                      </div>
-                    ) : (
-                      <p>No garments match your filters.</p>
-                    )}
+                  <td colSpan={10} className="px-4 py-12 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <Package className="w-16 h-16 text-gray-600 dark:text-gray-600 mb-4" />
+                      <p className="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">
+                        No garments match your filters
+                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-500 mb-4">
+                        {garments.length === 0
+                          ? 'Create quotes with garments to see the report.'
+                          : 'Try adjusting your search criteria or filters.'}
+                      </p>
+                      {(searchTerm || selectedVendor !== 'all' || selectedCustomer !== 'all' || showMissingOnly) && (
+                        <button
+                          onClick={clearFilters}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          Reset Filters
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ) : (
-                filteredGarments.map((garment, index) => {
-                  const key = `${garment.style_number}-${garment.color}-${garment.size}`;
-                  const isLow = garment.remaining > garment.total_needed * 0.5;
-                  return (
-                    <tr
-                      key={index}
-                      className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
-                    >
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
-                        {garment.style_number}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                        {garment.product_name}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                        {garment.color}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                        {garment.size}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                        {garment.supplier}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right font-medium text-gray-900 dark:text-white">
-                        {garment.total_needed}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-purple-600 dark:text-purple-400">
-                        {garment.on_po}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-green-600 dark:text-green-400">
-                        {garment.received}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right">
-                        <span
-                          className={`font-medium ${
-                            garment.remaining === 0
-                              ? 'text-gray-400'
-                              : isLow
-                              ? 'text-orange-600 dark:text-orange-400'
-                              : 'text-red-600 dark:text-red-400'
-                          }`}
-                        >
-                          {garment.remaining}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => handleDrillDown(garment)}
-                          className="flex items-center gap-1 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors dark:text-blue-400"
-                        >
-                          <Eye className="w-4 h-4" />
-                          Details
-                        </button>
+                groupedData.map(([groupKey, items]) => (
+                  <React.Fragment key={groupKey}>
+                    {/* Group Header */}
+                    <tr className="bg-slate-800 dark:bg-slate-900">
+                      <td colSpan={10} className="px-4 py-2">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                          {groupBy === 'style' && <Layers className="w-4 h-4" />}
+                          {groupBy === 'vendor' && <ShoppingCart className="w-4 h-4" />}
+                          {groupBy === 'customer' && <Users className="w-4 h-4" />}
+                          {groupBy === 'job' && <FileText className="w-4 h-4" />}
+                          <span>{groupKey}</span>
+                          <span className="text-xs text-gray-400">({items.length} items)</span>
+                        </div>
                       </td>
                     </tr>
-                  );
-                })
+                    {/* Group Items */}
+                    {items.map((garment, index) => {
+                      const hasRemaining = garment.remaining > 0;
+                      return (
+                        <tr
+                          key={`${groupKey}-${index}`}
+                          className={`hover:bg-slate-800 dark:hover:bg-slate-700 transition-colors ${
+                            hasRemaining ? 'bg-yellow-900/10' : ''
+                          }`}
+                        >
+                          <td className="px-4 py-3 text-sm font-medium text-white">
+                            {garment.style_number}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-300">
+                            {garment.product_name}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-300">
+                            {garment.color}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-300">
+                            {garment.size}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-300">
+                            {garment.supplier}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right font-medium text-white">
+                            {garment.total_needed}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right text-purple-400">
+                            {garment.on_po}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right text-green-400">
+                            {garment.received}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right">
+                            <span
+                              className={`font-semibold ${
+                                garment.remaining === 0
+                                  ? 'text-gray-500'
+                                  : 'text-orange-400'
+                              }`}
+                            >
+                              {garment.remaining}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => handleDrillDown(garment)}
+                              className="flex items-center gap-1 px-3 py-1.5 text-sm text-blue-400 hover:bg-blue-900/30 rounded transition-colors"
+                            >
+                              <Eye className="w-4 h-4" />
+                              Details
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </React.Fragment>
+                ))
               )}
             </tbody>
           </table>
@@ -671,30 +762,30 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
 
       {/* Summary */}
       {filteredGarments.length > 0 && (
-        <div className="text-sm text-gray-600 dark:text-gray-400">
+        <div className="text-sm text-gray-400 dark:text-gray-400">
           Showing {filteredGarments.length} garment variants
         </div>
       )}
 
       {/* Drill-Down Modal */}
       {showDrillDown && selectedGarment && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-lg max-w-4xl w-full max-h-[80vh] overflow-hidden">
-            <div className="p-6 border-b border-gray-200 dark:border-slate-700">
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 dark:bg-slate-800 rounded-lg max-w-4xl w-full max-h-[80vh] overflow-hidden border border-slate-700">
+            <div className="p-6 border-b border-slate-700 dark:border-slate-700">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  <h3 className="text-xl font-semibold text-white dark:text-white">
                     Garment Details
                   </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  <p className="text-sm text-gray-400 dark:text-gray-400 mt-1">
                     {selectedGarment.style_number} - {selectedGarment.color} - {selectedGarment.size}
                   </p>
                 </div>
                 <button
                   onClick={() => setShowDrillDown(false)}
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                  className="p-2 hover:bg-slate-800 dark:hover:bg-slate-700 rounded-lg transition-colors"
                 >
-                  <X className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                  <X className="w-5 h-5 text-gray-400 dark:text-gray-400" />
                 </button>
               </div>
             </div>
@@ -703,25 +794,25 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
               <div className="grid grid-cols-2 gap-6">
                 {/* Jobs Requiring This Garment */}
                 <div>
-                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                  <h4 className="text-lg font-semibold text-white dark:text-white mb-4">
                     Jobs Requiring This Garment
                   </h4>
                   <div className="space-y-3">
                     {selectedGarment.jobs.map((job, idx) => (
                       <div
                         key={idx}
-                        className="border border-gray-200 dark:border-slate-700 rounded-lg p-3"
+                        className="border border-slate-700 dark:border-slate-700 rounded-lg p-3 bg-slate-800"
                       >
                         <div className="flex justify-between items-start mb-2">
                           <div>
-                            <p className="font-medium text-gray-900 dark:text-white">
+                            <p className="font-medium text-white dark:text-white">
                               {job.quote_number}
                             </p>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                            <p className="text-sm text-gray-400 dark:text-gray-400">
                               {job.customer_name}
                             </p>
                           </div>
-                          <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400 text-xs font-medium rounded">
+                          <span className="px-2 py-1 bg-blue-900/40 text-blue-400 text-xs font-medium rounded">
                             {job.quantity} units
                           </span>
                         </div>
@@ -732,13 +823,13 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
 
                 {/* Purchase Orders */}
                 <div>
-                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                  <h4 className="text-lg font-semibold text-white dark:text-white mb-4">
                     Purchase Orders
                   </h4>
                   {selectedGarment.pos.length === 0 ? (
-                    <div className="border border-gray-200 dark:border-slate-700 rounded-lg p-6 text-center">
-                      <Package className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                    <div className="border border-slate-700 dark:border-slate-700 rounded-lg p-6 text-center bg-slate-800">
+                      <Package className="w-8 h-8 mx-auto mb-2 text-gray-500" />
+                      <p className="text-sm text-gray-400 dark:text-gray-400">
                         No purchase orders yet
                       </p>
                     </div>
@@ -747,28 +838,28 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
                       {selectedGarment.pos.map((po, idx) => (
                         <div
                           key={idx}
-                          className="border border-gray-200 dark:border-slate-700 rounded-lg p-3"
+                          className="border border-slate-700 dark:border-slate-700 rounded-lg p-3 bg-slate-800"
                         >
                           <div className="flex justify-between items-start mb-2">
                             <div>
-                              <p className="font-medium text-gray-900 dark:text-white">
+                              <p className="font-medium text-white dark:text-white">
                                 {po.po_number}
                               </p>
-                              <p className="text-sm text-gray-600 dark:text-gray-400">
+                              <p className="text-sm text-gray-400 dark:text-gray-400">
                                 {po.vendor_name}
                               </p>
                             </div>
                           </div>
                           <div className="grid grid-cols-2 gap-2 text-xs">
                             <div>
-                              <span className="text-gray-600 dark:text-gray-400">Ordered:</span>
-                              <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                              <span className="text-gray-400 dark:text-gray-400">Ordered:</span>
+                              <span className="ml-2 font-medium text-white dark:text-white">
                                 {po.quantity_ordered}
                               </span>
                             </div>
                             <div>
-                              <span className="text-gray-600 dark:text-gray-400">Received:</span>
-                              <span className="ml-2 font-medium text-green-600 dark:text-green-400">
+                              <span className="text-gray-400 dark:text-gray-400">Received:</span>
+                              <span className="ml-2 font-medium text-green-400 dark:text-green-400">
                                 {po.quantity_received}
                               </span>
                             </div>
@@ -781,29 +872,29 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
               </div>
 
               {/* Summary */}
-              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-slate-700">
+              <div className="mt-6 pt-6 border-t border-slate-700 dark:border-slate-700">
                 <div className="grid grid-cols-4 gap-4 text-center">
                   <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Total Needed</p>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+                    <p className="text-sm text-gray-400 dark:text-gray-400">Total Needed</p>
+                    <p className="text-2xl font-bold text-white dark:text-white mt-1">
                       {selectedGarment.total_needed}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">On PO</p>
-                    <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-1">
+                    <p className="text-sm text-gray-400 dark:text-gray-400">On PO</p>
+                    <p className="text-2xl font-bold text-purple-400 dark:text-purple-400 mt-1">
                       {selectedGarment.on_po}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Received</p>
-                    <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
+                    <p className="text-sm text-gray-400 dark:text-gray-400">Received</p>
+                    <p className="text-2xl font-bold text-green-400 dark:text-green-400 mt-1">
                       {selectedGarment.received}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Remaining</p>
-                    <p className="text-2xl font-bold text-orange-600 dark:text-orange-400 mt-1">
+                    <p className="text-sm text-gray-400 dark:text-gray-400">Remaining</p>
+                    <p className="text-2xl font-bold text-orange-400 dark:text-orange-400 mt-1">
                       {selectedGarment.remaining}
                     </p>
                   </div>
@@ -811,10 +902,10 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-200 dark:border-slate-700">
+            <div className="p-6 border-t border-slate-700 dark:border-slate-700">
               <button
                 onClick={() => setShowDrillDown(false)}
-                className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                className="w-full px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors"
               >
                 Close
               </button>
