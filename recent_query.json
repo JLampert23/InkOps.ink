@@ -1,3 +1,0 @@
-{
-  "query": "query { invoices(first: 25, orderBy: { field: VISUAL_ID, direction: DESC }) { edges { node { id visualId total amountPaid amountOutstanding paidInFull status { name } createdAt } } } }"
-}
