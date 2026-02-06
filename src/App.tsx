@@ -8,6 +8,7 @@ import { EnhancedAuthScreen } from './components/EnhancedAuthScreen';
 import { supabase } from './lib/supabase-client';
 import { billingService } from './services/billing-service';
 import { useRBAC } from './hooks/useRBAC';
+import PublicQuoteApprovalPage from './components/production/PublicQuoteApprovalPage';
 
 const SquareData = lazy(() => import('./components/SquareData'));
 const ProductionManagement = lazy(() => import('./components/ProductionManagement').then(m => ({ default: m.ProductionManagement })));
@@ -568,6 +569,12 @@ function AppContent() {
 }
 
 function App() {
+  const isQuoteApprovalPage = window.location.pathname.startsWith('/quote-approval/');
+
+  if (isQuoteApprovalPage) {
+    return <PublicQuoteApprovalPage />;
+  }
+
   return (
     <AuthProvider>
       <ThemeProvider>

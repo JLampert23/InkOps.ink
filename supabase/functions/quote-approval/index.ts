@@ -418,22 +418,19 @@ Deno.serve(async (req: Request) => {
         .eq("id", approval.company_id)
         .maybeSingle();
 
-      // TEST: Return simple HTML first
-      const testHtml = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>Test</title>
-</head>
-<body>
-  <h1>TEST HTML RENDERING</h1>
-  <p>If you can see this as a styled page, HTML rendering works!</p>
-</body>
-</html>`;
-
-      return new Response(testHtml, {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      });
+      return new Response(
+        JSON.stringify({
+          quote: approval.quote,
+          line_items: lineItems || [],
+          company_settings: companySettings || {},
+          approval_status: approval.status,
+          expires_at: approval.expires_at,
+          is_expired: approval.expires_at && new Date(approval.expires_at) < new Date(),
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     if (req.method === "POST") {
