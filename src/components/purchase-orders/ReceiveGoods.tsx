@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { POSettingsService } from '../../services/po-settings-service';
+import { ReceivingService } from '../../services/receiving-service';
 
 interface LineItem {
   id: string;
@@ -197,14 +198,6 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .single();
-
-      if (!profile) throw new Error('User profile not found');
-
       const totalReceiving = lineItems.reduce(
         (sum, item) => sum + item.receiving.quantity_received,
         0
@@ -215,60 +208,44 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
         return;
       }
 
-      const allFullyReceived = lineItems.every(
-        (item) =>
-          item.quantity_received + item.receiving.quantity_received >= item.quantity_ordered
+      // Prepare line items for receiving
+      const receivingLineItems = lineItems
+        .filter(
+          (item) =>
+            item.receiving.quantity_received > 0 ||
+            item.receiving.quantity_damaged > 0 ||
+            item.receiving.quantity_short > 0
+        )
+        .map((item) => ({
+          po_line_item_id: item.id,
+          quantity_received: item.receiving.quantity_received,
+          quantity_damaged: item.receiving.quantity_damaged,
+          quantity_short: item.receiving.quantity_short,
+          variance_notes: item.receiving.variance_notes || '',
+        }));
+
+      // Use receiving service to process with vendor confirmation enforcement
+      const { data: result, error } = await ReceivingService.processReceiving(
+        poId,
+        user.id,
+        receivingLineItems,
+        notes
       );
 
-      const status = markAsComplete || allFullyReceived ? 'complete' : 'partial';
+      if (error) throw error;
 
-      const { data: receivingLog, error: logError } = await supabase
-        .from('receiving_logs')
-        .insert({
-          company_id: profile.company_id,
-          po_id: poId,
-          received_by: user.id,
-          status: status,
-          notes: notes,
-        })
-        .select()
-        .single();
-
-      if (logError) throw logError;
-
-      for (const item of lineItems) {
-        if (item.receiving.quantity_received > 0 ||
-            item.receiving.quantity_damaged > 0 ||
-            item.receiving.quantity_short > 0) {
-
-          const { error: lineItemError } = await supabase
-            .from('receiving_line_items')
-            .insert({
-              receiving_log_id: receivingLog.id,
-              po_line_item_id: item.id,
-              quantity_received: item.receiving.quantity_received,
-              quantity_damaged: item.receiving.quantity_damaged,
-              quantity_short: item.receiving.quantity_short,
-              variance_notes: item.receiving.variance_notes,
-            });
-
-          if (lineItemError) throw lineItemError;
-
-          const newTotal = item.quantity_received + item.receiving.quantity_received;
-          const { error: updateError } = await supabase
-            .from('purchase_order_line_items')
-            .update({
-              quantity_received: newTotal,
-              quantity_damaged: (item.quantity_damaged || 0) + item.receiving.quantity_damaged,
-              quantity_short: (item.quantity_short || 0) + item.receiving.quantity_short,
-            })
-            .eq('id', item.id);
-
-          if (updateError) throw updateError;
+      if (!result?.success) {
+        if (result?.error === 'vendor_confirmation_required') {
+          alert(
+            'This PO requires vendor confirmation before receiving. Please confirm the PO first.'
+          );
+        } else {
+          alert(result?.message || 'Failed to process receiving');
         }
+        return;
       }
 
-      alert('Goods received successfully');
+      alert(result.message || 'Goods received successfully');
       onSuccess();
     } catch (error) {
       console.error('Error saving receiving:', error);
