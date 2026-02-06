@@ -8,7 +8,6 @@ import {
   Package,
   XCircle,
   Download,
-  Edit,
   Loader2,
   Building2,
   Calendar,
@@ -16,6 +15,10 @@ import {
   FileText,
   Clock,
   User,
+  Upload,
+  File,
+  X,
+  Printer,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -63,6 +66,18 @@ interface LineItem {
   notes: string | null;
 }
 
+interface Attachment {
+  id: string;
+  file_name: string;
+  file_url: string;
+  file_type: string;
+  file_size: number;
+  created_at: string;
+  uploaded_by_user?: {
+    email: string;
+  };
+}
+
 interface ActivityLog {
   id: string;
   action: string;
@@ -77,12 +92,14 @@ interface PurchaseOrderDetailProps {
   onEdit?: () => void;
 }
 
-export function PurchaseOrderDetail({ poId, onBack, onEdit }: PurchaseOrderDetailProps) {
+export function PurchaseOrderDetail({ poId, onBack }: PurchaseOrderDetailProps) {
   const [po, setPo] = useState<PurchaseOrder | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [activityLog, setActivityLog] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [receivingQuantities, setReceivingQuantities] = useState<{ [key: string]: number }>({});
 
@@ -131,6 +148,20 @@ export function PurchaseOrderDetail({ poId, onBack, onEdit }: PurchaseOrderDetai
       });
       setReceivingQuantities(initialQuantities);
 
+      const { data: attachmentData, error: attachmentError } = await supabase
+        .from('purchase_order_attachments')
+        .select(`
+          *,
+          uploaded_by_user:user_profiles!uploaded_by (
+            email
+          )
+        `)
+        .eq('po_id', poId)
+        .order('created_at', { ascending: false });
+
+      if (attachmentError) throw attachmentError;
+      setAttachments(attachmentData || []);
+
       const { data: logs, error: logsError } = await supabase
         .from('purchase_order_activity_log')
         .select('*')
@@ -177,7 +208,7 @@ export function PurchaseOrderDetail({ poId, onBack, onEdit }: PurchaseOrderDetai
       const { data: { user } } = await supabase.auth.getUser();
       await supabase.from('purchase_order_activity_log').insert([
         {
-          company_id: po.vendor ? await getUserCompanyId() : null,
+          company_id: await getUserCompanyId(),
           po_id: poId,
           action: `status_changed_to_${newStatus}`,
           performed_by: user?.id,
@@ -260,6 +291,94 @@ export function PurchaseOrderDetail({ poId, onBack, onEdit }: PurchaseOrderDetai
     }
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !po) return;
+
+    try {
+      setUploading(true);
+      const file = e.target.files[0];
+      const companyId = await getUserCompanyId();
+
+      const fileName = `${companyId}/${po.id}/${Date.now()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('po-attachments')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('po-attachments')
+        .getPublicUrl(fileName);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error: dbError } = await supabase
+        .from('purchase_order_attachments')
+        .insert([
+          {
+            company_id: companyId,
+            po_id: po.id,
+            file_name: file.name,
+            file_url: publicUrl,
+            file_type: file.type,
+            file_size: file.size,
+            uploaded_by: user?.id,
+          },
+        ]);
+
+      if (dbError) throw dbError;
+
+      await supabase.from('purchase_order_activity_log').insert([
+        {
+          company_id: companyId,
+          po_id: po.id,
+          action: 'attachment_uploaded',
+          performed_by: user?.id,
+          performed_by_name: user?.email || 'Unknown',
+          notes: `Uploaded file: ${file.name}`,
+        },
+      ]);
+
+      alert('File uploaded successfully');
+      loadPurchaseOrder();
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      alert('Failed to upload file');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDeleteAttachment = async (attachment: Attachment) => {
+    if (!confirm('Are you sure you want to delete this attachment?')) return;
+
+    try {
+      const { error: dbError } = await supabase
+        .from('purchase_order_attachments')
+        .delete()
+        .eq('id', attachment.id);
+
+      if (dbError) throw dbError;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from('purchase_order_activity_log').insert([
+        {
+          company_id: await getUserCompanyId(),
+          po_id: po?.id,
+          action: 'attachment_deleted',
+          performed_by: user?.id,
+          performed_by_name: user?.email || 'Unknown',
+          notes: `Deleted file: ${attachment.file_name}`,
+        },
+      ]);
+
+      alert('Attachment deleted successfully');
+      loadPurchaseOrder();
+    } catch (error) {
+      console.error('Error deleting attachment:', error);
+      alert('Failed to delete attachment');
+    }
+  };
+
   const exportPDF = () => {
     alert('PDF export will be implemented');
   };
@@ -267,11 +386,11 @@ export function PurchaseOrderDetail({ poId, onBack, onEdit }: PurchaseOrderDetai
   const getStatusBadge = (status: string) => {
     const styles = {
       draft: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
-      sent: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-      confirmed: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-      in_transit: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-      partially_received: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
-      fully_received: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+      sent: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-2 border-blue-600 dark:border-blue-400',
+      confirmed: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 border-2 border-purple-600 dark:border-purple-400',
+      in_transit: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 border-2 border-yellow-600 dark:border-yellow-400',
+      partially_received: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 border-2 border-orange-600 dark:border-orange-400',
+      fully_received: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-2 border-green-600 dark:border-green-400',
       closed: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
     };
 
@@ -286,57 +405,129 @@ export function PurchaseOrderDetail({ poId, onBack, onEdit }: PurchaseOrderDetai
     };
 
     return (
-      <span className={`px-3 py-1 rounded-full text-sm font-medium ${styles[status as keyof typeof styles] || styles.draft}`}>
+      <span className={`px-4 py-2 rounded-lg text-sm font-bold ${styles[status as keyof typeof styles] || styles.draft}`}>
         {labels[status as keyof typeof labels] || status}
       </span>
     );
   };
 
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
   if (loading || !po) {
     return (
       <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600 dark:text-blue-400" />
       </div>
     );
   }
 
+  const statusTimeline = [
+    { key: 'draft', label: 'Draft', date: po.created_at, active: true },
+    { key: 'sent', label: 'Sent', date: po.sent_at, active: !!po.sent_at },
+    { key: 'confirmed', label: 'Confirmed', date: po.confirmed_at, active: !!po.confirmed_at },
+    { key: 'in_transit', label: 'In Transit', date: null, active: po.status === 'in_transit' },
+    { key: 'partially_received', label: 'Receiving', date: po.received_at, active: ['partially_received', 'fully_received'].includes(po.status) },
+    { key: 'fully_received', label: 'Received', date: po.received_at, active: po.status === 'fully_received' },
+    { key: 'closed', label: 'Closed', date: po.closed_at, active: !!po.closed_at },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onBack}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-          </button>
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{po.po_number}</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              {po.vendor.vendor_name}
-            </p>
+      <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-6">
+        <div className="flex items-start justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={onBack}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+            </button>
+            <div>
+              <h2 className="text-3xl font-bold text-gray-900 dark:text-white">{po.po_number}</h2>
+              <div className="flex items-center gap-4 mt-2">
+                <p className="text-gray-600 dark:text-gray-400 flex items-center gap-2">
+                  <Building2 className="w-4 h-4" />
+                  {po.vendor.vendor_name}
+                </p>
+                <p className="text-gray-600 dark:text-gray-400 flex items-center gap-2">
+                  <Calendar className="w-4 h-4" />
+                  {format(new Date(po.created_at), 'MMM dd, yyyy')}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {getStatusBadge(po.status)}
+            <div className="text-right">
+              <p className="text-sm text-gray-600 dark:text-gray-400">Total Cost</p>
+              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                ${po.total_cost.toFixed(2)}
+              </p>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {getStatusBadge(po.status)}
-          <button
-            onClick={exportPDF}
-            className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300"
-          >
-            <Download className="w-4 h-4" />
-            Print PO
-          </button>
+
+        {/* Status Timeline - Horizontal */}
+        <div className="relative">
+          <div className="flex items-center justify-between">
+            {statusTimeline.map((step, index) => (
+              <React.Fragment key={step.key}>
+                <div className="flex flex-col items-center flex-1 relative z-10">
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 transition-all ${
+                      step.active
+                        ? 'bg-green-500 text-white shadow-lg ring-4 ring-green-500/20'
+                        : 'bg-gray-200 dark:bg-slate-700 text-gray-400 dark:text-gray-500'
+                    }`}
+                  >
+                    {step.active ? (
+                      <CheckCircle className="w-5 h-5" />
+                    ) : (
+                      <div className="w-3 h-3 rounded-full bg-current" />
+                    )}
+                  </div>
+                  <span
+                    className={`text-xs font-medium text-center ${
+                      step.active
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-gray-500 dark:text-gray-400'
+                    }`}
+                  >
+                    {step.label}
+                  </span>
+                  {step.date && (
+                    <span className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                      {format(new Date(step.date), 'MMM dd')}
+                    </span>
+                  )}
+                </div>
+                {index < statusTimeline.length - 1 && (
+                  <div
+                    className={`h-1 flex-1 -mx-2 mb-8 transition-all ${
+                      statusTimeline[index + 1].active
+                        ? 'bg-green-500'
+                        : 'bg-gray-200 dark:bg-slate-700'
+                    }`}
+                  />
+                )}
+              </React.Fragment>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Action Buttons */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {po.status === 'draft' && (
           <button
             onClick={() => updateStatus('sent')}
             disabled={updating}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-all"
           >
             {updating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             Send PO
@@ -346,7 +537,7 @@ export function PurchaseOrderDetail({ poId, onBack, onEdit }: PurchaseOrderDetai
           <button
             onClick={() => updateStatus('confirmed')}
             disabled={updating}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-all"
           >
             {updating ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
             Mark as Confirmed
@@ -356,7 +547,7 @@ export function PurchaseOrderDetail({ poId, onBack, onEdit }: PurchaseOrderDetai
           <button
             onClick={() => updateStatus('in_transit')}
             disabled={updating}
-            className="flex items-center gap-2 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 disabled:opacity-50 transition-all"
           >
             {updating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Truck className="w-4 h-4" />}
             Mark as In Transit
@@ -365,7 +556,7 @@ export function PurchaseOrderDetail({ poId, onBack, onEdit }: PurchaseOrderDetai
         {['sent', 'confirmed', 'in_transit', 'partially_received'].includes(po.status) && (
           <button
             onClick={() => setShowReceiveModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all"
           >
             <Package className="w-4 h-4" />
             Receive Goods
@@ -375,156 +566,195 @@ export function PurchaseOrderDetail({ poId, onBack, onEdit }: PurchaseOrderDetai
           <button
             onClick={() => updateStatus('closed')}
             disabled={updating}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 transition-all"
           >
             {updating ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
             Close PO
           </button>
         )}
+        <button
+          onClick={exportPDF}
+          className="flex items-center gap-2 px-4 py-2 border-2 border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300 transition-all ml-auto"
+        >
+          <Printer className="w-4 h-4" />
+          Print PO PDF
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Vendor Info */}
-          <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-              <Building2 className="w-5 h-5" />
-              Vendor Information
-            </h3>
-            <div className="space-y-2 text-sm">
-              <p className="text-gray-700 dark:text-gray-300">
-                <span className="font-medium">Name:</span> {po.vendor.vendor_name}
-              </p>
-              <p className="text-gray-700 dark:text-gray-300">
-                <span className="font-medium">Type:</span> {po.vendor.vendor_type}
-              </p>
-              {po.vendor.contact_name && (
-                <p className="text-gray-700 dark:text-gray-300">
-                  <span className="font-medium">Contact:</span> {po.vendor.contact_name}
-                </p>
-              )}
-              {po.vendor.contact_email && (
-                <p className="text-gray-700 dark:text-gray-300">
-                  <span className="font-medium">Email:</span> {po.vendor.contact_email}
-                </p>
-              )}
-              {po.vendor.contact_phone && (
-                <p className="text-gray-700 dark:text-gray-300">
-                  <span className="font-medium">Phone:</span> {po.vendor.contact_phone}
-                </p>
-              )}
-            </div>
-          </div>
-
           {/* Line Items */}
           <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
             <div className="p-6 border-b border-gray-200 dark:border-slate-700">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                 <FileText className="w-5 h-5" />
-                Line Items
+                Line Items ({lineItems.length})
               </h3>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-slate-900">
+                <thead className="bg-[#1A1A1A] dark:bg-[#0A0A0A]">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">
-                      #
+                    <th className="px-4 py-3 text-left text-xs font-bold text-[#EDEDED] uppercase tracking-wider">
+                      Style
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">
-                      Product
+                    <th className="px-4 py-3 text-left text-xs font-bold text-[#EDEDED] uppercase tracking-wider">
+                      Color
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">
-                      Color / Size
+                    <th className="px-4 py-3 text-left text-xs font-bold text-[#EDEDED] uppercase tracking-wider">
+                      Size
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">
+                    <th className="px-4 py-3 text-right text-xs font-bold text-[#EDEDED] uppercase tracking-wider">
                       Ordered
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">
+                    <th className="px-4 py-3 text-right text-xs font-bold text-[#EDEDED] uppercase tracking-wider">
                       Received
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">
+                    <th className="px-4 py-3 text-right text-xs font-bold text-[#EDEDED] uppercase tracking-wider">
+                      Remaining
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-bold text-[#EDEDED] uppercase tracking-wider">
                       Unit Cost
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-400 uppercase">
+                    <th className="px-4 py-3 text-right text-xs font-bold text-[#EDEDED] uppercase tracking-wider">
                       Total
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
-                  {lineItems.map((item) => (
-                    <tr key={item.id}>
-                      <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
-                        {item.line_number}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">
-                            {item.product_name}
-                          </p>
-                          {item.style_number && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                              Style: {item.style_number}
+                <tbody className="bg-white dark:bg-[#1A1A1A] divide-y divide-[#2A2A2A]">
+                  {lineItems.map((item) => {
+                    const remaining = item.quantity_ordered - item.quantity_received;
+                    return (
+                      <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-slate-900/50 transition-colors">
+                        <td className="px-4 py-4">
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900 dark:text-[#EDEDED]">
+                              {item.style_number || '—'}
                             </p>
-                          )}
-                          {item.sku && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                              SKU: {item.sku}
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                              {item.product_name}
                             </p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                        {item.color && item.size ? `${item.color} / ${item.size}` : item.color || item.size || '—'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
-                        {item.quantity_ordered}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right">
-                        <span className={item.quantity_received >= item.quantity_ordered ? 'text-green-600 dark:text-green-400 font-medium' : 'text-gray-900 dark:text-white'}>
-                          {item.quantity_received}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
-                        ${item.unit_cost.toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right font-medium text-gray-900 dark:text-white">
-                        ${item.extended_cost.toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 text-sm text-gray-700 dark:text-[#EDEDED]">
+                          {item.color || '—'}
+                        </td>
+                        <td className="px-4 py-4 text-sm text-gray-700 dark:text-[#EDEDED]">
+                          {item.size || '—'}
+                        </td>
+                        <td className="px-4 py-4 text-sm text-right font-medium text-gray-900 dark:text-[#EDEDED]">
+                          {item.quantity_ordered}
+                        </td>
+                        <td className="px-4 py-4 text-sm text-right">
+                          <span
+                            className={
+                              item.quantity_received >= item.quantity_ordered
+                                ? 'text-green-600 dark:text-green-400 font-bold'
+                                : 'text-gray-900 dark:text-[#EDEDED] font-medium'
+                            }
+                          >
+                            {item.quantity_received}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-sm text-right">
+                          <span
+                            className={
+                              remaining === 0
+                                ? 'text-green-600 dark:text-green-400 font-bold'
+                                : remaining < item.quantity_ordered * 0.5
+                                ? 'text-yellow-600 dark:text-yellow-400 font-medium'
+                                : 'text-gray-900 dark:text-[#EDEDED] font-medium'
+                            }
+                          >
+                            {remaining}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-sm text-right text-gray-900 dark:text-[#EDEDED]">
+                          ${item.unit_cost.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-4 text-sm text-right font-bold text-gray-900 dark:text-[#EDEDED]">
+                          ${item.extended_cost.toFixed(2)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           </div>
 
-          {/* Notes */}
-          {(po.notes_to_vendor || po.internal_notes) && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Notes</h3>
-              {po.notes_to_vendor && (
-                <div className="mb-4">
-                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Notes to Vendor:
-                  </h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
-                    {po.notes_to_vendor}
-                  </p>
-                </div>
-              )}
-              {po.internal_notes && (
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Internal Notes:
-                  </h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
-                    {po.internal_notes}
-                  </p>
-                </div>
-              )}
+          {/* Attachments */}
+          <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <Upload className="w-5 h-5" />
+                Attachments ({attachments.length})
+              </h3>
+              <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer transition-all">
+                {uploading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Upload className="w-4 h-4" />
+                )}
+                Upload File
+                <input
+                  type="file"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  disabled={uploading}
+                />
+              </label>
             </div>
-          )}
+
+            {attachments.length === 0 ? (
+              <div className="text-center py-8 border-2 border-dashed border-gray-300 dark:border-slate-600 rounded-lg">
+                <File className="w-12 h-12 text-gray-400 dark:text-gray-600 mx-auto mb-2" />
+                <p className="text-sm text-gray-600 dark:text-gray-400">No attachments uploaded</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3">
+                {attachments.map((attachment) => (
+                  <div
+                    key={attachment.id}
+                    className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-500 transition-all"
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <File className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                          {attachment.file_name}
+                        </p>
+                        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          <span>{formatFileSize(attachment.file_size)}</span>
+                          <span>·</span>
+                          <span>{format(new Date(attachment.created_at), 'MMM dd, yyyy')}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={attachment.file_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 hover:bg-gray-200 dark:hover:bg-slate-700 rounded transition-colors"
+                      >
+                        <Download className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                      </a>
+                      <button
+                        onClick={() => handleDeleteAttachment(attachment)}
+                        className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                      >
+                        <X className="w-4 h-4 text-red-600 dark:text-red-400" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Activity Log */}
           <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-6">
@@ -534,26 +764,29 @@ export function PurchaseOrderDetail({ poId, onBack, onEdit }: PurchaseOrderDetai
             </h3>
             <div className="space-y-4">
               {activityLog.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                <p className="text-sm text-gray-500 dark:text-gray-400 italic text-center py-8">
                   No activity recorded yet
                 </p>
               ) : (
                 activityLog.map((log) => (
-                  <div key={log.id} className="flex gap-3">
+                  <div key={log.id} className="flex gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors">
                     <div className="flex-shrink-0">
-                      <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                        <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                        <User className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                       </div>
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <p className="text-sm text-gray-900 dark:text-white">
-                        <span className="font-medium">{log.performed_by_name}</span>{' '}
-                        {log.action.replace(/_/g, ' ')}
+                        <span className="font-semibold">{log.performed_by_name}</span>{' '}
+                        <span className="text-gray-600 dark:text-gray-400">
+                          {log.action.replace(/_/g, ' ')}
+                        </span>
                       </p>
                       {log.notes && (
                         <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{log.notes}</p>
                       )}
-                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
                         {format(new Date(log.created_at), 'MMM dd, yyyy h:mm a')}
                       </p>
                     </div>
@@ -562,56 +795,68 @@ export function PurchaseOrderDetail({ poId, onBack, onEdit }: PurchaseOrderDetai
               )}
             </div>
           </div>
+
+          {/* Notes */}
+          {(po.notes_to_vendor || po.internal_notes) && (
+            <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Notes</h3>
+              {po.notes_to_vendor && (
+                <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-300 mb-2">
+                    Notes to Vendor:
+                  </h4>
+                  <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                    {po.notes_to_vendor}
+                  </p>
+                </div>
+              )}
+              {po.internal_notes && (
+                <div className="p-4 bg-gray-50 dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-700">
+                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    Internal Notes:
+                  </h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
+                    {po.internal_notes}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Status Timeline */}
+          {/* Vendor Info */}
           <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Status Timeline
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+              <Building2 className="w-5 h-5" />
+              Vendor
             </h3>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <CheckCircle className="w-5 h-5 text-green-600" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">Created</p>
-                  <p className="text-xs text-gray-500">
-                    {format(new Date(po.created_at), 'MMM dd, yyyy')}
-                  </p>
-                </div>
+            <div className="space-y-3 text-sm">
+              <div>
+                <p className="text-gray-500 dark:text-gray-400 text-xs mb-1">Name</p>
+                <p className="font-semibold text-gray-900 dark:text-white">{po.vendor.vendor_name}</p>
               </div>
-              {po.sent_at && (
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">Sent</p>
-                    <p className="text-xs text-gray-500">
-                      {format(new Date(po.sent_at), 'MMM dd, yyyy')}
-                    </p>
-                  </div>
+              <div>
+                <p className="text-gray-500 dark:text-gray-400 text-xs mb-1">Type</p>
+                <p className="text-gray-700 dark:text-gray-300 capitalize">{po.vendor.vendor_type}</p>
+              </div>
+              {po.vendor.contact_name && (
+                <div>
+                  <p className="text-gray-500 dark:text-gray-400 text-xs mb-1">Contact</p>
+                  <p className="text-gray-700 dark:text-gray-300">{po.vendor.contact_name}</p>
                 </div>
               )}
-              {po.confirmed_at && (
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">Confirmed</p>
-                    <p className="text-xs text-gray-500">
-                      {format(new Date(po.confirmed_at), 'MMM dd, yyyy')}
-                    </p>
-                  </div>
+              {po.vendor.contact_email && (
+                <div>
+                  <p className="text-gray-500 dark:text-gray-400 text-xs mb-1">Email</p>
+                  <p className="text-gray-700 dark:text-gray-300">{po.vendor.contact_email}</p>
                 </div>
               )}
-              {po.received_at && (
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">Received</p>
-                    <p className="text-xs text-gray-500">
-                      {format(new Date(po.received_at), 'MMM dd, yyyy')}
-                    </p>
-                  </div>
+              {po.vendor.contact_phone && (
+                <div>
+                  <p className="text-gray-500 dark:text-gray-400 text-xs mb-1">Phone</p>
+                  <p className="text-gray-700 dark:text-gray-300">{po.vendor.contact_phone}</p>
                 </div>
               )}
             </div>
@@ -619,13 +864,16 @@ export function PurchaseOrderDetail({ poId, onBack, onEdit }: PurchaseOrderDetai
 
           {/* Delivery Date */}
           {po.expected_delivery_date && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
-                <Calendar className="w-5 h-5" />
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 rounded-lg border-2 border-blue-200 dark:border-blue-800 p-6">
+              <h3 className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-2 flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
                 Expected Delivery
               </h3>
-              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                {format(new Date(po.expected_delivery_date), 'MMM dd, yyyy')}
+              <p className="text-3xl font-bold text-blue-900 dark:text-blue-200">
+                {format(new Date(po.expected_delivery_date), 'MMM dd')}
+              </p>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                {format(new Date(po.expected_delivery_date), 'yyyy')}
               </p>
             </div>
           )}
@@ -636,29 +884,33 @@ export function PurchaseOrderDetail({ poId, onBack, onEdit }: PurchaseOrderDetai
               <DollarSign className="w-5 h-5" />
               Cost Summary
             </h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm">
                 <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
-                <span className="font-medium text-gray-900 dark:text-white">
+                <span className="font-semibold text-gray-900 dark:text-white">
                   ${po.subtotal.toFixed(2)}
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Tax</span>
-                <span className="font-medium text-gray-900 dark:text-white">
-                  ${po.tax_amount.toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Shipping</span>
-                <span className="font-medium text-gray-900 dark:text-white">
-                  ${po.shipping_cost.toFixed(2)}
-                </span>
-              </div>
-              <div className="pt-2 border-t border-gray-200 dark:border-slate-700">
+              {po.tax_amount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">Tax</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">
+                    ${po.tax_amount.toFixed(2)}
+                  </span>
+                </div>
+              )}
+              {po.shipping_cost > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">Shipping</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">
+                    ${po.shipping_cost.toFixed(2)}
+                  </span>
+                </div>
+              )}
+              <div className="pt-3 border-t-2 border-gray-200 dark:border-slate-700">
                 <div className="flex justify-between">
-                  <span className="font-semibold text-gray-900 dark:text-white">Total</span>
-                  <span className="text-xl font-bold text-blue-600 dark:text-blue-400">
+                  <span className="font-bold text-gray-900 dark:text-white">Total</span>
+                  <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                     ${po.total_cost.toFixed(2)}
                   </span>
                 </div>
@@ -670,10 +922,10 @@ export function PurchaseOrderDetail({ poId, onBack, onEdit }: PurchaseOrderDetai
 
       {/* Receive Goods Modal */}
       {showReceiveModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden">
-            <div className="p-6 border-b border-gray-200 dark:border-slate-700">
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden border border-gray-200 dark:border-slate-700">
+            <div className="p-6 border-b border-gray-200 dark:border-slate-700 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">
                 Receive Goods
               </h3>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
@@ -689,20 +941,23 @@ export function PurchaseOrderDetail({ poId, onBack, onEdit }: PurchaseOrderDetai
                   return (
                     <div
                       key={item.id}
-                      className="border border-gray-200 dark:border-slate-700 rounded-lg p-4"
+                      className="border-2 border-gray-200 dark:border-slate-700 rounded-lg p-4 hover:border-blue-500 dark:hover:border-blue-500 transition-all"
                     >
-                      <div className="flex justify-between mb-2">
-                        <div>
-                          <p className="font-medium text-gray-900 dark:text-white">
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex-1">
+                          <p className="font-semibold text-gray-900 dark:text-white">
                             {item.product_name}
                           </p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            {item.color && item.size ? `${item.color} / ${item.size}` : item.color || item.size || ''}
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                            {item.color && item.size
+                              ? `${item.color} / ${item.size}`
+                              : item.color || item.size || ''}
                           </p>
                         </div>
-                        <div className="text-right">
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Remaining: <span className="font-medium">{remaining}</span>
+                        <div className="text-right ml-4">
+                          <p className="text-xs text-gray-500 dark:text-gray-400">Remaining</p>
+                          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                            {remaining}
                           </p>
                         </div>
                       </div>
@@ -717,7 +972,7 @@ export function PurchaseOrderDetail({ poId, onBack, onEdit }: PurchaseOrderDetai
                             [item.id]: Math.min(parseInt(e.target.value) || 0, remaining),
                           })
                         }
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+                        className="w-full px-4 py-3 border-2 border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-700 dark:text-white text-lg font-semibold"
                         placeholder="Quantity received"
                       />
                     </div>
@@ -725,19 +980,23 @@ export function PurchaseOrderDetail({ poId, onBack, onEdit }: PurchaseOrderDetai
                 })}
               </div>
             </div>
-            <div className="p-6 border-t border-gray-200 dark:border-slate-700 flex gap-2">
+            <div className="p-6 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 flex gap-3">
               <button
                 onClick={() => setShowReceiveModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300"
+                className="flex-1 px-6 py-3 border-2 border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300 font-semibold transition-all"
               >
                 Cancel
               </button>
               <button
                 onClick={handleReceiveGoods}
                 disabled={updating}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2 font-semibold shadow-lg hover:shadow-xl transition-all"
               >
-                {updating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Package className="w-4 h-4" />}
+                {updating ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Package className="w-5 h-5" />
+                )}
                 Confirm Receipt
               </button>
             </div>
