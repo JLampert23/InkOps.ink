@@ -9,58 +9,56 @@ interface ReceivingSettings {
   allow_partial_receiving: boolean;
   allow_over_receiving: boolean;
   require_vendor_confirmation: boolean;
-  auto_close_po_when_fully_received: boolean;
-  auto_mark_jobs_ready: boolean;
-  require_manual_review_for_job_ready: boolean;
-  notify_production_when_job_ready: boolean;
-  require_reason_for_shortages: boolean;
-  require_reason_for_damaged_items: boolean;
-  variance_threshold_percentage: number;
-  auto_flag_vendor_on_variance: boolean;
+  auto_close_po: boolean;
+  auto_mark_job_ready: boolean;
+  require_manual_job_ready_review: boolean;
+  notify_production_when_ready: boolean;
+  require_shortage_reason: boolean;
+  require_damage_reason: boolean;
+  variance_flag_threshold: number;
   variance_approval_required: boolean;
   enable_barcode_scanning: boolean;
   scan_mode: 'increment' | 'replace' | 'prompt';
-  allow_scanning_non_po_items: boolean;
+  allow_non_po_scanning: boolean;
   track_receiving_user: boolean;
   track_receiving_timestamp: boolean;
-  require_notes_on_receiving: boolean;
-  auto_generate_receiving_report_pdf: boolean;
+  require_receiving_notes: boolean;
+  auto_generate_receiving_pdf: boolean;
   default_vendor_lead_times: Record<string, number>;
-  default_backorder_rule: 'auto_split' | 'hold' | 'auto_cancel';
-  enable_vendor_delay_alerts: boolean;
-  notify_accounting_on_receive: boolean;
-  notify_production_on_receive: boolean;
-  notify_sales_on_job_ready: boolean;
-  daily_receiving_summary_email: boolean;
+  default_vendor_backorder_rules: Record<string, string>;
+  vendor_delay_alerts: boolean;
+  notify_accounting: boolean;
+  notify_production_on_arrival: boolean;
+  notify_sales_rep_job_ready: boolean;
+  daily_receiving_summary: boolean;
 }
 
 const defaultSettings: Omit<ReceivingSettings, 'id' | 'company_id'> = {
   allow_partial_receiving: true,
   allow_over_receiving: false,
   require_vendor_confirmation: false,
-  auto_close_po_when_fully_received: true,
-  auto_mark_jobs_ready: true,
-  require_manual_review_for_job_ready: false,
-  notify_production_when_job_ready: true,
-  require_reason_for_shortages: true,
-  require_reason_for_damaged_items: true,
-  variance_threshold_percentage: 5.00,
-  auto_flag_vendor_on_variance: true,
+  auto_close_po: true,
+  auto_mark_job_ready: true,
+  require_manual_job_ready_review: false,
+  notify_production_when_ready: true,
+  require_shortage_reason: true,
+  require_damage_reason: true,
+  variance_flag_threshold: 5.00,
   variance_approval_required: false,
   enable_barcode_scanning: false,
   scan_mode: 'increment',
-  allow_scanning_non_po_items: false,
+  allow_non_po_scanning: false,
   track_receiving_user: true,
   track_receiving_timestamp: true,
-  require_notes_on_receiving: false,
-  auto_generate_receiving_report_pdf: false,
+  require_receiving_notes: false,
+  auto_generate_receiving_pdf: false,
   default_vendor_lead_times: {},
-  default_backorder_rule: 'hold',
-  enable_vendor_delay_alerts: true,
-  notify_accounting_on_receive: true,
-  notify_production_on_receive: true,
-  notify_sales_on_job_ready: false,
-  daily_receiving_summary_email: false,
+  default_vendor_backorder_rules: {},
+  vendor_delay_alerts: true,
+  notify_accounting: false,
+  notify_production_on_arrival: true,
+  notify_sales_rep_job_ready: false,
+  daily_receiving_summary: false,
 };
 
 export default function ReceivingSettings() {
@@ -211,8 +209,8 @@ export default function ReceivingSettings() {
           <ToggleSetting
             label="Auto-Close PO When Fully Received"
             description="PO automatically moves to 'Closed' when all items are received"
-            checked={settings.auto_close_po_when_fully_received}
-            onChange={(checked) => updateSetting('auto_close_po_when_fully_received', checked)}
+            checked={settings.auto_close_po}
+            onChange={(checked) => updateSetting('auto_close_po', checked)}
           />
         </div>
       </div>
@@ -229,20 +227,20 @@ export default function ReceivingSettings() {
           <ToggleSetting
             label="Auto-Mark Jobs as Ready for Production"
             description="When all garments for a job are received, job status updates automatically"
-            checked={settings.auto_mark_jobs_ready}
-            onChange={(checked) => updateSetting('auto_mark_jobs_ready', checked)}
+            checked={settings.auto_mark_job_ready}
+            onChange={(checked) => updateSetting('auto_mark_job_ready', checked)}
           />
           <ToggleSetting
             label="Require Manual Review Before Job Becomes Ready"
             description="Job readiness requires human approval"
-            checked={settings.require_manual_review_for_job_ready}
-            onChange={(checked) => updateSetting('require_manual_review_for_job_ready', checked)}
+            checked={settings.require_manual_job_ready_review}
+            onChange={(checked) => updateSetting('require_manual_job_ready_review', checked)}
           />
           <ToggleSetting
             label="Notify Production Team When Job Becomes Ready"
             description="Sends internal notification to production team"
-            checked={settings.notify_production_when_job_ready}
-            onChange={(checked) => updateSetting('notify_production_when_job_ready', checked)}
+            checked={settings.notify_production_when_ready}
+            onChange={(checked) => updateSetting('notify_production_when_ready', checked)}
           />
         </div>
       </div>
@@ -259,14 +257,14 @@ export default function ReceivingSettings() {
           <ToggleSetting
             label="Require Reason for Shortages"
             description="Users must provide a reason when receiving less than ordered"
-            checked={settings.require_reason_for_shortages}
-            onChange={(checked) => updateSetting('require_reason_for_shortages', checked)}
+            checked={settings.require_shortage_reason}
+            onChange={(checked) => updateSetting('require_shortage_reason', checked)}
           />
           <ToggleSetting
             label="Require Reason for Damaged Items"
             description="Users must provide a reason when marking items as damaged"
-            checked={settings.require_reason_for_damaged_items}
-            onChange={(checked) => updateSetting('require_reason_for_damaged_items', checked)}
+            checked={settings.require_damage_reason}
+            onChange={(checked) => updateSetting('require_damage_reason', checked)}
           />
           <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-700">
@@ -278,8 +276,8 @@ export default function ReceivingSettings() {
                 min="0"
                 max="100"
                 step="0.01"
-                value={settings.variance_threshold_percentage}
-                onChange={(e) => updateSetting('variance_threshold_percentage', parseFloat(e.target.value) || 0)}
+                value={settings.variance_flag_threshold}
+                onChange={(e) => updateSetting('variance_flag_threshold', parseFloat(e.target.value) || 0)}
                 className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               <span className="text-sm text-gray-500">%</span>
@@ -288,12 +286,6 @@ export default function ReceivingSettings() {
               Vendor is flagged for review when variances exceed this percentage
             </p>
           </div>
-          <ToggleSetting
-            label="Auto-Flag Vendor When Variances Exceed Threshold"
-            description="Vendor is automatically flagged for review"
-            checked={settings.auto_flag_vendor_on_variance}
-            onChange={(checked) => updateSetting('auto_flag_vendor_on_variance', checked)}
-          />
           <ToggleSetting
             label="Variance Approval Required"
             description="Requires manager approval for discrepancies"
@@ -334,8 +326,8 @@ export default function ReceivingSettings() {
           <ToggleSetting
             label="Allow Scanning of Non-PO Items"
             description="Users can scan items not on the current PO"
-            checked={settings.allow_scanning_non_po_items}
-            onChange={(checked) => updateSetting('allow_scanning_non_po_items', checked)}
+            checked={settings.allow_non_po_scanning}
+            onChange={(checked) => updateSetting('allow_non_po_scanning', checked)}
           />
         </div>
       </div>
@@ -364,14 +356,14 @@ export default function ReceivingSettings() {
           <ToggleSetting
             label="Require Notes on Every Receiving Session"
             description="Users must add notes before completing receiving"
-            checked={settings.require_notes_on_receiving}
-            onChange={(checked) => updateSetting('require_notes_on_receiving', checked)}
+            checked={settings.require_receiving_notes}
+            onChange={(checked) => updateSetting('require_receiving_notes', checked)}
           />
           <ToggleSetting
             label="Auto-Generate Receiving Report PDF"
             description="Automatically create PDF report after each receiving session"
-            checked={settings.auto_generate_receiving_report_pdf}
-            onChange={(checked) => updateSetting('auto_generate_receiving_report_pdf', checked)}
+            checked={settings.auto_generate_receiving_pdf}
+            onChange={(checked) => updateSetting('auto_generate_receiving_pdf', checked)}
           />
         </div>
       </div>
@@ -386,23 +378,46 @@ export default function ReceivingSettings() {
         </div>
         <div className="p-6 space-y-4">
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">Default Backorder Rules</label>
-            <select
-              value={settings.default_backorder_rule}
-              onChange={(e) => updateSetting('default_backorder_rule', e.target.value as any)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="auto_split">Auto-split PO</option>
-              <option value="hold">Hold PO until complete</option>
-              <option value="auto_cancel">Auto-cancel backordered items</option>
-            </select>
-            <p className="text-sm text-gray-500">How to handle backordered items</p>
+            <label className="block text-sm font-medium text-gray-700">Default Vendor Lead Times</label>
+            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+              <p className="text-xs text-gray-500 mb-2">Configure lead times per vendor (in days)</p>
+              <div className="space-y-1 text-sm text-gray-600">
+                {Object.keys(settings.default_vendor_lead_times).length === 0 ? (
+                  <p className="text-xs italic">No vendor lead times configured</p>
+                ) : (
+                  Object.entries(settings.default_vendor_lead_times).map(([vendor, days]) => (
+                    <div key={vendor} className="flex justify-between">
+                      <span>{vendor}:</span>
+                      <span className="font-medium">{days} days</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">Default Vendor Backorder Rules</label>
+            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+              <p className="text-xs text-gray-500 mb-2">Configure backorder handling per vendor</p>
+              <div className="space-y-1 text-sm text-gray-600">
+                {Object.keys(settings.default_vendor_backorder_rules).length === 0 ? (
+                  <p className="text-xs italic">No vendor backorder rules configured</p>
+                ) : (
+                  Object.entries(settings.default_vendor_backorder_rules).map(([vendor, rule]) => (
+                    <div key={vendor} className="flex justify-between">
+                      <span>{vendor}:</span>
+                      <span className="font-medium">{rule}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
           <ToggleSetting
             label="Vendor Delay Alerts"
             description="Notify when vendor delivery is delayed beyond expected date"
-            checked={settings.enable_vendor_delay_alerts}
-            onChange={(checked) => updateSetting('enable_vendor_delay_alerts', checked)}
+            checked={settings.vendor_delay_alerts}
+            onChange={(checked) => updateSetting('vendor_delay_alerts', checked)}
           />
         </div>
       </div>
@@ -419,26 +434,26 @@ export default function ReceivingSettings() {
           <ToggleSetting
             label="Notify Accounting When Goods Are Received"
             description="Send notification to accounting team after receiving"
-            checked={settings.notify_accounting_on_receive}
-            onChange={(checked) => updateSetting('notify_accounting_on_receive', checked)}
+            checked={settings.notify_accounting}
+            onChange={(checked) => updateSetting('notify_accounting', checked)}
           />
           <ToggleSetting
             label="Notify Production When Items Arrive"
             description="Send notification to production team after receiving"
-            checked={settings.notify_production_on_receive}
-            onChange={(checked) => updateSetting('notify_production_on_receive', checked)}
+            checked={settings.notify_production_on_arrival}
+            onChange={(checked) => updateSetting('notify_production_on_arrival', checked)}
           />
           <ToggleSetting
             label="Notify Sales Rep When Job Becomes Ready"
             description="Send notification to sales rep when job is ready for production"
-            checked={settings.notify_sales_on_job_ready}
-            onChange={(checked) => updateSetting('notify_sales_on_job_ready', checked)}
+            checked={settings.notify_sales_rep_job_ready}
+            onChange={(checked) => updateSetting('notify_sales_rep_job_ready', checked)}
           />
           <ToggleSetting
             label="Daily Receiving Summary Email"
             description="Send daily summary of all receiving activity"
-            checked={settings.daily_receiving_summary_email}
-            onChange={(checked) => updateSetting('daily_receiving_summary_email', checked)}
+            checked={settings.daily_receiving_summary}
+            onChange={(checked) => updateSetting('daily_receiving_summary', checked)}
           />
         </div>
       </div>
