@@ -20,6 +20,7 @@ import {
 import { format } from 'date-fns';
 import { ManageImprintsModal } from './ManageImprintsModal';
 import { LabelPreviewModal, LabelData } from './LabelPreviewModal';
+import { SendQuoteModal } from './SendQuoteModal';
 import { generateQuotePDF, QuotePDFData } from '../../utils/quote-pdf-export';
 import { useNotification } from '../../contexts/NotificationContext';
 
@@ -137,18 +138,12 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
   const [quoteImprints, setQuoteImprints] = useState<QuoteImprint[]>([]);
   const [loading, setLoading] = useState(true);
   const [showSendModal, setShowSendModal] = useState(false);
-  const [sending, setSending] = useState(false);
   const [converting, setConverting] = useState(false);
   const [showManageImprints, setShowManageImprints] = useState(false);
   const [selectedGroupLabel, setSelectedGroupLabel] = useState<string>('');
   const [showProofModal, setShowProofModal] = useState(false);
   const [selectedProofImage, setSelectedProofImage] = useState<string>('');
   const [showLabelModal, setShowLabelModal] = useState(false);
-
-  const [expiresInDays, setExpiresInDays] = useState(30);
-  const [singleUse, setSingleUse] = useState(true);
-  const [autoApproveAfterDays, setAutoApproveAfterDays] = useState<number | null>(null);
-  const [autoConvertOnApproval, setAutoConvertOnApproval] = useState(false);
 
   useEffect(() => {
     loadQuoteDetails();
@@ -239,58 +234,6 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
     }
   };
 
-  const handleSendApproval = async () => {
-    try {
-      setSending(true);
-
-      // Validate required fields
-      if (!quote?.customer_email && !quote?.bill_email) {
-        showNotification('Customer email is required to send quote', 'error');
-        setSending(false);
-        return;
-      }
-
-      if (!lineItems || lineItems.length === 0) {
-        showNotification('Cannot send empty quote. Please add line items first.', 'error');
-        setSending(false);
-        return;
-      }
-
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
-
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quote-actions/${quoteId}/send`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
-          expires_in_days: expiresInDays,
-          single_use: singleUse,
-          auto_approve_after_days: autoApproveAfterDays,
-          auto_convert_on_approval: autoConvertOnApproval,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || errorData.message || 'Failed to send approval';
-        throw new Error(errorMessage);
-      }
-
-      showNotification('Quote sent for approval successfully!', 'success');
-      setShowSendModal(false);
-      loadQuoteDetails();
-    } catch (error) {
-      console.error('Error sending approval:', error);
-      showNotification(error instanceof Error ? error.message : 'Failed to send approval', 'error');
-    } finally {
-      setSending(false);
-    }
-  };
 
   const generateLabels = (): LabelData[] => {
     if (!quote || quoteImprints.length === 0) {
@@ -441,15 +384,13 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             <Download className="w-4 h-4" />
             Download PDF
           </button>
-          {quote.status === 'draft' && (
-            <button
-              onClick={() => setShowSendModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm"
-            >
-              <Send className="w-4 h-4" />
-              Send to Customer
-            </button>
-          )}
+          <button
+            onClick={() => setShowSendModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm"
+          >
+            <Send className="w-4 h-4" />
+            {quote.status === 'draft' ? 'Send to Customer' : 'Resend to Customer'}
+          </button>
         </div>
       </div>
 
@@ -933,82 +874,20 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         </div>
       </div>
 
-      {/* Send Modal */}
-      {showSendModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-lg max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Send Quote for Approval
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Expires in (Days)
-                </label>
-                <input
-                  type="number"
-                  value={expiresInDays}
-                  onChange={(e) => setExpiresInDays(parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
-                  min="1"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="singleUse"
-                  checked={singleUse}
-                  onChange={(e) => setSingleUse(e.target.checked)}
-                  className="rounded"
-                />
-                <label htmlFor="singleUse" className="text-sm text-gray-700 dark:text-gray-300">
-                  Single-use link
-                </label>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Auto-Approve After (Days)
-                </label>
-                <input
-                  type="number"
-                  value={autoApproveAfterDays || ''}
-                  onChange={(e) => setAutoApproveAfterDays(e.target.value ? parseInt(e.target.value) : null)}
-                  placeholder="Leave empty to disable"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
-                  min="1"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="autoConvert"
-                  checked={autoConvertOnApproval}
-                  onChange={(e) => setAutoConvertOnApproval(e.target.checked)}
-                  className="rounded"
-                />
-                <label htmlFor="autoConvert" className="text-sm text-gray-700 dark:text-gray-300">
-                  Auto-convert when approved
-                </label>
-              </div>
-              <div className="flex gap-2 pt-4">
-                <button
-                  onClick={() => setShowSendModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSendApproval}
-                  disabled={sending}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  Send
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Send Quote Modal */}
+      {showSendModal && quote && (
+        <SendQuoteModal
+          quoteId={quoteId}
+          quoteNumber={quote.quote_number}
+          customerName={quote.customer_name}
+          customerEmail={quote.customer_email || quote.bill_email || ''}
+          totalAmount={quote.total || 0}
+          onClose={() => setShowSendModal(false)}
+          onSuccess={() => {
+            setShowSendModal(false);
+            loadQuoteDetails();
+          }}
+        />
       )}
 
       <ManageImprintsModal
