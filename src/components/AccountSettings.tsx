@@ -2281,20 +2281,24 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setTestingResend(true);
       setResendTestResult(null);
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('You must be logged in to test the connection');
+      const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError || !session?.access_token) {
+        console.error('Session refresh failed:', refreshError);
+        throw new Error('Your session has expired. Please refresh the page and try again.');
       }
 
       if (!user?.email) {
         throw new Error('User email not found');
       }
 
+      console.log('Testing Resend with refreshed token...');
+
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({
           to: user.email,
