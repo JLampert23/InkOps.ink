@@ -86,34 +86,31 @@ Deno.serve(async (req: Request) => {
       throw new Error('User company not found');
     }
 
-    const { data: integrationSettings, error: settingsError } = await supabase
-      .from('integration_settings')
-      .select('config, is_enabled')
-      .eq('company_id', userProfile.company_id)
-      .eq('provider_name', 'resend')
+    const { data: companySettings, error: settingsError } = await supabase
+      .from('company_settings')
+      .select('resend_api_key, email_from_address, company_name')
+      .eq('id', userProfile.company_id)
       .maybeSingle();
 
     if (settingsError) {
-      throw new Error(`Failed to load Resend settings: ${settingsError.message}`);
+      throw new Error(`Failed to load company settings: ${settingsError.message}`);
     }
 
-    if (!integrationSettings?.is_enabled) {
-      throw new Error('Resend integration is not enabled. Please enable it in Settings → Integrations.');
+    if (!companySettings) {
+      throw new Error('Company settings not found.');
     }
 
-    const config = integrationSettings.config as any;
-
-    if (!config?.api_key) {
-      throw new Error('Resend API key not configured. Please add it in Settings → Integrations.');
+    if (!companySettings.resend_api_key) {
+      throw new Error('Resend API key not configured. Please add it in Account Settings.');
     }
 
-    if (!config?.from_email) {
-      throw new Error('From email address not configured. Please add it in Settings → Integrations.');
+    if (!companySettings.email_from_address) {
+      throw new Error('From email address not configured. Please add it in Account Settings.');
     }
 
-    const RESEND_API_KEY = config.api_key;
-    const fromEmail = config.from_email;
-    const fromName = config.from_name || '';
+    const RESEND_API_KEY = companySettings.resend_api_key;
+    const fromEmail = companySettings.email_from_address;
+    const fromName = companySettings.company_name || '';
 
     const emailRequest: EmailRequest = await req.json();
     const { to, subject, template, data, html: customHtml, attachments, shortCodeData } = emailRequest;
