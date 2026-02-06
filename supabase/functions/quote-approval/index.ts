@@ -152,6 +152,13 @@ Deno.serve(async (req: Request) => {
       if (responseError) throw responseError;
 
       // Update quote status
+      // Note: The database trigger 'process_quote_approval()' will automatically:
+      // - Lock the quote
+      // - Capture approval metadata
+      // - Create work order
+      // - Create invoice
+      // - Stage garment requirements for POs
+      // - Create production schedule entries
       const newStatus = body.approved ? "approved" : "rejected";
       const statusField = body.approved ? "approved_at" : "rejected_at";
 
@@ -171,7 +178,7 @@ Deno.serve(async (req: Request) => {
           .eq("id", approval.id);
       }
 
-      // Log activity
+      // Log initial activity (additional logs will be created by the trigger)
       await supabase
         .from("quote_activity_log")
         .insert([{
@@ -186,78 +193,6 @@ Deno.serve(async (req: Request) => {
             ip_address: ipAddress,
           },
         }]);
-
-      // Auto-convert if enabled and approved
-      if (body.approved && approval.auto_convert_on_approval) {
-        const productionJobId = crypto.randomUUID();
-
-        await supabase
-          .from("quotes")
-          .update({
-            status: "converted",
-            converted_at: new Date().toISOString(),
-            production_job_id: productionJobId,
-          })
-          .eq("id", approval.quote_id);
-
-        await supabase
-          .from("quote_activity_log")
-          .insert([{
-            quote_id: approval.quote_id,
-            company_id: approval.company_id,
-            action: "auto_converted_to_production",
-            performed_by: null,
-            performed_by_name: "System",
-            meta: { production_job_id: productionJobId },
-          }]);
-      }
-
-      // Create production schedule entries for approved quotes
-      if (body.approved) {
-        try {
-          // Get quote details
-          const { data: quote } = await supabase
-            .from("quotes")
-            .select("*, customer:customers(*)")
-            .eq("id", approval.quote_id)
-            .single();
-
-          if (quote) {
-            // Get all imprints for this quote
-            const { data: imprints } = await supabase
-              .from("quote_imprints")
-              .select("*, line_item:quote_line_items(quantity)")
-              .eq("quote_id", approval.quote_id);
-
-            if (imprints && imprints.length > 0) {
-              // Create schedule entry for each imprint
-              const scheduleEntries = imprints.map(imprint => ({
-                company_id: approval.company_id,
-                quote_id: approval.quote_id,
-                line_item_id: imprint.line_item_id,
-                imprint_id: imprint.id,
-                type_of_work: imprint.type_of_work,
-                imprint_number: imprint.imprint_number || null,
-                artwork_thumb_url: imprint.artwork_url || null,
-                production_due_date: quote.production_due_date || quote.due_date,
-                station: null,
-                quantity: imprint.line_item?.quantity || 0,
-                step_statuses: {},
-                priority_order: 0,
-                customer_name: quote.customer?.customer_name || quote.customer_name || null,
-                quote_number: quote.quote_number || null,
-              }));
-
-              await supabase
-                .from("production_schedule_entries")
-                .insert(scheduleEntries);
-            }
-          }
-        } catch (scheduleError) {
-          console.error("Error creating schedule entries:", scheduleError);
-          // Don't fail the approval if schedule creation fails
-        }
-      }
 
       // TODO: Send notification email to company
       // This would integrate with the send-email function
