@@ -39,7 +39,7 @@ interface RecentPO {
   id: string;
   po_number: string;
   vendor_name: string;
-  total_amount: number;
+  total_cost: number;
   status: string;
   receiving_status: string;
   created_at: string;
@@ -255,7 +255,7 @@ export function ManageGoodsDashboard({ onNavigate }: ManageGoodsDashboardProps) 
       .select(`
         id,
         po_number,
-        total_amount,
+        total_cost,
         status,
         receiving_status,
         created_at,
@@ -338,7 +338,7 @@ export function ManageGoodsDashboard({ onNavigate }: ManageGoodsDashboardProps) 
       .from('purchase_order_line_items')
       .select('style_number, color, size, quantity_ordered, quantity_received, quantity_short')
       .in('po_id', pos.map(p => p.id))
-      .or('quantity_short.gt.0,quantity_received.lt.quantity_ordered')
+      .gt('quantity_short', 0)
       .limit(20);
 
     if (shortLineItems) {
@@ -587,7 +587,7 @@ export function ManageGoodsDashboard({ onNavigate }: ManageGoodsDashboardProps) 
                     <div className="flex items-center gap-3">
                       <div className="text-right">
                         <p className="text-sm font-medium text-gray-900 dark:text-white">
-                          ${po.total_amount?.toFixed(2) || '0.00'}
+                          ${po.total_cost?.toFixed(2) || '0.00'}
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
                           {format(parseISO(po.created_at), 'MMM d')}
