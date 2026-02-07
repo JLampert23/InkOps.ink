@@ -418,12 +418,20 @@ Deno.serve(async (req: Request) => {
         .eq("id", approval.company_id)
         .maybeSingle();
 
+      let approvalStatus = 'pending';
+      if (approval.is_used) {
+        const quoteStatus = approval.quote?.status;
+        if (quoteStatus === 'approved') approvalStatus = 'approved';
+        else if (quoteStatus === 'rejected') approvalStatus = 'rejected';
+        else approvalStatus = 'responded';
+      }
+
       return new Response(
         JSON.stringify({
           quote: approval.quote,
           line_items: lineItems || [],
           company_settings: companySettings || {},
-          approval_status: approval.status,
+          approval_status: approvalStatus,
           expires_at: approval.expires_at,
           is_expired: approval.expires_at && new Date(approval.expires_at) < new Date(),
         }),
