@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { WorkflowBoard } from './WorkflowBoard';
+import WorkOrdersList from './WorkOrdersList';
 import { WorkOrderDetail } from './WorkOrderDetail';
 
 export function WorkOrdersManager() {
@@ -16,5 +16,5 @@ export function WorkOrdersManager() {
     );
   }
 
-  return <WorkflowBoard onWorkOrderClick={setSelectedWorkOrderId} />;
+  return <WorkOrdersList onSelectWorkOrder={setSelectedWorkOrderId} />;
 }
