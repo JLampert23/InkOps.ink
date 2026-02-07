@@ -261,7 +261,7 @@ export const invoiceDetailService = {
         customerId: invoice.customer_id || customer.id || null,
 
         lineItems: useInvoiceLineItems
-          ? (invoiceLineItems || []).map((item: any) => {
+          ? (invoiceLineItems || []).filter((item: any) => item.item_type !== 'fee').map((item: any) => {
               let sizes = '-';
               if (item.sizes && typeof item.sizes === 'object') {
                 const sizeEntries = Object.entries(item.sizes)
