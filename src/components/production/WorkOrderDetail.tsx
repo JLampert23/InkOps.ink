@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   ArrowLeft,
   Package,
@@ -10,6 +10,12 @@ import {
   FileText,
   ExternalLink,
   Edit,
+  Paintbrush,
+  MapPin,
+  Palette,
+  Hash,
+  DollarSign,
+  Layers,
 } from 'lucide-react';
 import {
   WorkOrderService,
@@ -57,36 +63,6 @@ export function WorkOrderDetail({
       await WorkOrderService.completeLineItem(lineItem.id);
     }
     await loadWorkOrder();
-  };
-
-  const getPriorityBadgeColor = (priority: string) => {
-    switch (priority) {
-      case 'urgent':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
-      case 'high':
-        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400';
-      case 'medium':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
-      case 'low':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
-    }
-  };
-
-  const getStatusBadgeColor = (status: string) => {
-    switch (status) {
-      case 'Completed':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
-      case 'In Production':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
-      case 'Quality Check':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
-      case 'Ready to Ship':
-        return 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
-    }
   };
 
   const formatDate = (dateString: string | null) => {
@@ -151,22 +127,6 @@ export function WorkOrderDetail({
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                 {workOrder.work_order_number}
               </h1>
-              <span
-                className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusBadgeColor(
-                  workOrder.status
-                )}`}
-              >
-                {workOrder.status}
-              </span>
-              <span
-                className={`px-3 py-1 rounded-full text-sm font-medium ${getPriorityBadgeColor(
-                  workOrder.priority
-                )}`}
-              >
-                {workOrder.priority.charAt(0).toUpperCase() +
-                  workOrder.priority.slice(1)}{' '}
-                Priority
-              </span>
             </div>
             <p className="text-lg text-gray-600 dark:text-gray-300">{workOrder.customer_name}</p>
           </div>
@@ -424,6 +384,122 @@ export function WorkOrderDetail({
                   No schedule entries found
                 </p>
               )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700">
+          <div className="flex items-center gap-2">
+            <Paintbrush className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Imprints
+            </h2>
+            <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300">
+              {workOrder.imprints?.length || 0}
+            </span>
+          </div>
+        </div>
+        <div className="p-6">
+          {workOrder.imprints && workOrder.imprints.length > 0 ? (
+            <div className="grid gap-4">
+              {workOrder.imprints.map((imprint, index) => (
+                <div
+                  key={imprint.id}
+                  className="border border-gray-200 dark:border-slate-700 rounded-lg overflow-hidden"
+                >
+                  <div className="flex items-center gap-3 px-5 py-3 bg-gray-50 dark:bg-slate-900/40 border-b border-gray-200 dark:border-slate-700">
+                    <span className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-xs font-bold">
+                      {index + 1}
+                    </span>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">
+                      {imprint.type_of_work || 'Unspecified Type'}
+                    </h3>
+                    {imprint.imprint_number && (
+                      <span className="ml-auto text-xs font-mono text-gray-500 dark:text-gray-400">
+                        {imprint.imprint_number}
+                      </span>
+                    )}
+                  </div>
+                  <div className="p-5">
+                    <div className="flex gap-6">
+                      {imprint.artwork_url && (
+                        <div className="flex-shrink-0">
+                          <img
+                            src={imprint.artwork_url}
+                            alt="Artwork"
+                            className="w-24 h-24 object-contain bg-gray-50 dark:bg-slate-700 rounded-lg border border-gray-200 dark:border-slate-600"
+                          />
+                        </div>
+                      )}
+                      <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3">
+                        <div className="flex items-start gap-2">
+                          <MapPin className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Location</p>
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">
+                              {imprint.location || imprint.matrix || '--'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <Palette className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Colors</p>
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">
+                              {imprint.thread_ink_color || '--'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <Hash className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Num Colors</p>
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">
+                              {imprint.num_colors ?? '--'}
+                            </p>
+                          </div>
+                        </div>
+                        {imprint.price != null && imprint.price > 0 && (
+                          <div className="flex items-start gap-2">
+                            <DollarSign className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Price</p>
+                              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                ${Number(imprint.price).toFixed(2)}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        {imprint.group_label && (
+                          <div className="flex items-start gap-2">
+                            <Layers className="h-4 w-4 text-gray-400 dark:text-gray-500 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">Group</p>
+                              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                {imprint.group_label}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {imprint.details && (
+                      <div className="mt-3 pt-3 border-t border-gray-100 dark:border-slate-700">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {imprint.details}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-10">
+              <Paintbrush className="h-10 w-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+              <p className="text-gray-500 dark:text-gray-400">No imprints associated with this work order</p>
             </div>
           )}
         </div>
