@@ -19,6 +19,7 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
   const [customerIdForQuote, setCustomerIdForQuote] = useState<string | undefined>(initialCustomerId);
   const [typesOfWork, setTypesOfWork] = useState<Array<{ id: string; work_type_name: string }>>([]);
   const [selectedScheduleType, setSelectedScheduleType] = useState<string>('');
+  const [navigateToWorkOrderId, setNavigateToWorkOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialCustomerId) {
@@ -69,6 +70,11 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
     { id: 'manage-goods' as ProductionTab, label: 'Manage Goods', icon: Package, description: 'Purchase orders & inventory' },
   ];
 
+  const handleNavigateToWorkOrder = (workOrderId: string) => {
+    setNavigateToWorkOrderId(workOrderId);
+    setActiveTab('work-orders');
+  };
+
   const handleQuoteCustomerConsumed = () => {
     setCustomerIdForQuote(undefined);
     if (onCustomerIdConsumed) {
@@ -86,7 +92,7 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
           />
         );
       case 'work-orders':
-        return <WorkOrdersManager />;
+        return <WorkOrdersManager initialWorkOrderId={navigateToWorkOrderId} />;
       case 'scheduling':
         return (
           <div className="space-y-4">
@@ -118,7 +124,7 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
 
                 {/* Selected Schedule */}
                 {selectedScheduleType && (
-                  <ProductionScheduler typeOfWork={selectedScheduleType} />
+                  <ProductionScheduler typeOfWork={selectedScheduleType} onNavigateToWorkOrder={handleNavigateToWorkOrder} />
                 )}
               </>
             )}
