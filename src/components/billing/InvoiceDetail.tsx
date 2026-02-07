@@ -565,6 +565,17 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                     </a>
                   </div>
                 )}
+                {invoiceDetailService.hasAddress(invoice.billingAddress) && (
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5" />
+                      Address
+                    </p>
+                    <p className="font-medium text-gray-900 dark:text-white whitespace-pre-line">
+                      {invoiceDetailService.formatAddress(invoice.billingAddress)}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
