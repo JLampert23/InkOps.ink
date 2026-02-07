@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FileText, ClipboardList, CalendarDays, Package, Users } from 'lucide-react';
 import { QuotesManager } from './QuotesManager';
+import { WorkOrdersManager } from './WorkOrdersManager';
 import ProductionScheduler from './ProductionScheduler';
 import { PurchaseOrdersManager } from '../purchase-orders/PurchaseOrdersManager';
 import { supabase } from '../../lib/supabase-client';
@@ -85,13 +86,7 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
           />
         );
       case 'work-orders':
-        return (
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-12 text-center">
-            <ClipboardList className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Work Orders</h3>
-            <p className="text-gray-600 dark:text-gray-400">Work order management coming soon</p>
-          </div>
-        );
+        return <WorkOrdersManager />;
       case 'scheduling':
         return (
           <div className="space-y-4">
