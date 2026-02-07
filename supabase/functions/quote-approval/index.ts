@@ -526,13 +526,18 @@ Deno.serve(async (req: Request) => {
       const newStatus = body.approved ? "approved" : "rejected";
       const statusField = body.approved ? "approved_at" : "rejected_at";
 
-      await supabase
+      const { error: quoteUpdateError } = await supabase
         .from("quotes")
         .update({
           status: newStatus,
           [statusField]: new Date().toISOString(),
         })
         .eq("id", approval.quote_id);
+
+      if (quoteUpdateError) {
+        console.error("Quote update failed:", quoteUpdateError);
+        throw new Error("Failed to update quote status: " + quoteUpdateError.message);
+      }
 
       if (approval.single_use) {
         await supabase
