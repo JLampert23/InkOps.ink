@@ -137,35 +137,22 @@ export function SendQuoteModal({
 
     setSending(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        alert('You must be logged in to send a quote');
-        return;
-      }
+      const { data, error } = await supabase.functions.invoke(
+        `quote-actions/${quoteId}/send`,
+        {
+          body: {
+            template_id: selectedTemplateId,
+            custom_message: customMessage,
+            expires_in_days: expiresInDays,
+            single_use: false,
+            auto_approve_after_days: null,
+            auto_convert_on_approval: false,
+          },
+        }
+      );
 
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const apiUrl = `${supabaseUrl}/functions/v1/quote-actions/${quoteId}/send`;
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          template_id: selectedTemplateId,
-          custom_message: customMessage,
-          expires_in_days: expiresInDays,
-          single_use: false,
-          auto_approve_after_days: null,
-          auto_convert_on_approval: false,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Failed to send quote');
+      if (error) {
+        throw error;
       }
 
       alert(`Quote sent successfully to ${customerEmail}`);

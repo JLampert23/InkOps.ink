@@ -82,24 +82,15 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
 
     setDuplicating(quoteId);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      const { data, error } = await supabase.functions.invoke(
+        `quote-actions/${quoteId}/duplicate`,
+        { method: 'POST' }
+      );
 
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quote-actions/${quoteId}/duplicate`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to duplicate quote');
+      if (error) {
+        throw error;
       }
 
-      const data = await response.json();
       showNotification(`Quote duplicated as ${data.quote.quote_number}`, 'success');
       loadQuotes();
     } catch (error) {
