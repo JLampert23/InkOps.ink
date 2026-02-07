@@ -217,10 +217,31 @@ export class WorkOrderService {
     data: WorkflowColumn[] | null;
     error: any;
   }> {
-    return await supabase
+    const result = await supabase
       .from('production_workflow_columns')
       .select('*')
       .order('column_order');
+
+    if (result.data && result.data.length === 0) {
+      const defaults = [
+        { column_name: 'Pending Scheduling', column_order: 0, color: '#94a3b8', is_default: true },
+        { column_name: 'In Production', column_order: 1, color: '#3b82f6', is_default: false },
+        { column_name: 'Quality Check', column_order: 2, color: '#f59e0b', is_default: false },
+        { column_name: 'Ready to Ship', column_order: 3, color: '#10b981', is_default: false },
+        { column_name: 'Completed', column_order: 4, color: '#6b7280', is_default: false },
+      ];
+
+      const { data: inserted, error: insertError } = await supabase
+        .from('production_workflow_columns')
+        .insert(defaults)
+        .select();
+
+      if (inserted && !insertError) {
+        return { data: inserted, error: null };
+      }
+    }
+
+    return result;
   }
 
   static async createWorkflowColumn(

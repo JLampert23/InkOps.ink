@@ -62,6 +62,8 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
 
       if (statusFilter !== 'all') {
         query = query.eq('status', statusFilter);
+      } else {
+        query = query.not('status', 'in', '("approved","converted")');
       }
 
       const { data, error } = await query;
