@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../../lib/supabase-client';
 import {
   X,
@@ -6,13 +6,10 @@ import {
   CheckCircle2,
   AlertTriangle,
   Scan,
-  Plus,
-  Minus,
   Save,
   Loader2,
   AlertCircle,
 } from 'lucide-react';
-import { format } from 'date-fns';
 import { POSettingsService } from '../../services/po-settings-service';
 import { ReceivingService } from '../../services/receiving-service';
 
@@ -46,10 +43,56 @@ interface PurchaseOrder {
   };
 }
 
+interface GroupedItem {
+  key: string;
+  style_number: string;
+  product_name: string;
+  color: string;
+  items: number[];
+}
+
 interface ReceiveGoodsProps {
   poId: string;
   onClose: () => void;
   onSuccess: () => void;
+}
+
+const SIZE_ORDER = ['XS', '2XS', 'S', 'M', 'L', 'XL', '2XL', 'XXL', '3XL', 'XXXL', '4XL', '5XL', '6XL', 'YXS', 'YS', 'YM', 'YL', 'YXL'];
+
+function sortSizes(a: string, b: string): number {
+  const idxA = SIZE_ORDER.findIndex(s => s.toUpperCase() === a.toUpperCase());
+  const idxB = SIZE_ORDER.findIndex(s => s.toUpperCase() === b.toUpperCase());
+  if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+  if (idxA !== -1) return -1;
+  if (idxB !== -1) return 1;
+  return a.localeCompare(b);
+}
+
+function getSizeStatus(needed: number, received: number): 'none' | 'partial' | 'full' {
+  if (needed <= 0) return 'full';
+  if (received <= 0) return 'none';
+  if (received >= needed) return 'full';
+  return 'partial';
+}
+
+function StatusDot({ needed, received }: { needed: number; received: number }) {
+  const status = getSizeStatus(needed, received);
+  const colors = {
+    none: 'bg-red-500',
+    partial: 'bg-yellow-500',
+    full: 'bg-green-500',
+  };
+  const labels = {
+    none: 'Not received',
+    partial: 'Partially received',
+    full: 'Fully received',
+  };
+  return (
+    <span
+      className={`inline-block w-2.5 h-2.5 rounded-full ${colors[status]}`}
+      title={labels[status]}
+    />
+  );
 }
 
 export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
@@ -109,7 +152,7 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
         .from('purchase_order_line_items')
         .select('*')
         .eq('po_id', poId)
-        .order('style_number');
+        .order('line_number');
 
       if (itemsError) throw itemsError;
 
@@ -137,6 +180,28 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
       setLoading(false);
     }
   };
+
+  const grouped = useMemo<GroupedItem[]>(() => {
+    const map = new Map<string, GroupedItem>();
+    lineItems.forEach((item, idx) => {
+      const key = `${item.style_number}||${item.color}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          style_number: item.style_number,
+          product_name: item.product_name,
+          color: item.color,
+          items: [],
+        });
+      }
+      map.get(key)!.items.push(idx);
+    });
+    const groups = Array.from(map.values());
+    groups.forEach(g => {
+      g.items.sort((a, b) => sortSizes(lineItems[a].size, lineItems[b].size));
+    });
+    return groups;
+  }, [lineItems]);
 
   const handleScan = (e: React.FormEvent) => {
     e.preventDefault();
@@ -172,17 +237,27 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
     setLineItems(updatedItems);
   };
 
-  const updateNotes = (index: number, notes: string) => {
+  const updateNotes = (index: number, notesVal: string) => {
     const updatedItems = [...lineItems];
-    updatedItems[index].receiving.variance_notes = notes;
+    updatedItems[index].receiving.variance_notes = notesVal;
     setLineItems(updatedItems);
   };
 
-  const handleQuickReceiveAll = (index: number) => {
+  const handleReceiveSize = (index: number) => {
     const updatedItems = [...lineItems];
     const item = updatedItems[index];
     const remaining = item.quantity_ordered - item.quantity_received;
-    updatedItems[index].receiving.quantity_received = remaining;
+    updatedItems[index].receiving.quantity_received = Math.max(0, remaining);
+    setLineItems(updatedItems);
+  };
+
+  const handleReceiveAllSizes = (group: GroupedItem) => {
+    const updatedItems = [...lineItems];
+    group.items.forEach(idx => {
+      const item = updatedItems[idx];
+      const remaining = item.quantity_ordered - item.quantity_received;
+      updatedItems[idx].receiving.quantity_received = Math.max(0, remaining);
+    });
     setLineItems(updatedItems);
   };
 
@@ -208,7 +283,6 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
         return;
       }
 
-      // Prepare line items for receiving
       const receivingLineItems = lineItems
         .filter(
           (item) =>
@@ -224,7 +298,6 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
           variance_notes: item.receiving.variance_notes || '',
         }));
 
-      // Use receiving service to process with vendor confirmation enforcement
       const { data: result, error } = await ReceivingService.processReceiving(
         poId,
         user.id,
@@ -268,6 +341,20 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
     );
   };
 
+  const getGroupStatus = (group: GroupedItem): 'none' | 'partial' | 'full' => {
+    let allFull = true;
+    let anyReceived = false;
+    group.items.forEach(idx => {
+      const item = lineItems[idx];
+      const needed = item.quantity_ordered - item.quantity_received;
+      if (item.receiving.quantity_received > 0) anyReceived = true;
+      if (item.receiving.quantity_received < needed) allFull = false;
+    });
+    if (allFull) return 'full';
+    if (anyReceived) return 'partial';
+    return 'none';
+  };
+
   const stats = getTotalStats();
 
   if (loading) {
@@ -285,7 +372,6 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-slate-800 rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
         <div className="p-6 border-b border-gray-200 dark:border-slate-700">
           <div className="flex items-center justify-between">
             <div>
@@ -305,7 +391,6 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
           </div>
         </div>
 
-        {/* Validation Error */}
         {validationError && (
           <div className="p-6 border-b border-gray-200 dark:border-slate-700 bg-red-50 dark:bg-red-900/20">
             <div className="flex items-center gap-3">
@@ -318,7 +403,6 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
           </div>
         )}
 
-        {/* Stats */}
         <div className="p-6 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
           <div className="grid grid-cols-5 gap-4 text-center">
             <div>
@@ -346,7 +430,6 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
           </div>
         </div>
 
-        {/* Scan Mode */}
         <div className="p-4 border-b border-gray-200 dark:border-slate-700 bg-blue-50 dark:bg-blue-900/20">
           <div className="flex items-center gap-4">
             <button
@@ -381,156 +464,205 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
           )}
         </div>
 
-        {/* Line Items */}
         <div className="flex-1 overflow-y-auto p-6">
-          <div className="space-y-4">
-            {lineItems.map((item, index) => {
-              const remaining = item.quantity_ordered - item.quantity_received;
-              const hasVariance =
-                item.receiving.quantity_damaged > 0 || item.receiving.quantity_short > 0;
+          <div className="space-y-6">
+            {grouped.map((group) => {
+              const groupStatus = getGroupStatus(group);
+              const groupTotalOrdered = group.items.reduce((s, idx) => s + lineItems[idx].quantity_ordered, 0);
+              const groupTotalPrev = group.items.reduce((s, idx) => s + lineItems[idx].quantity_received, 0);
+              const groupTotalReceiving = group.items.reduce((s, idx) => s + lineItems[idx].receiving.quantity_received, 0);
+              const groupRemaining = groupTotalOrdered - groupTotalPrev;
+              const allFullyReceived = group.items.every(idx => {
+                const item = lineItems[idx];
+                return item.receiving.quantity_received >= (item.quantity_ordered - item.quantity_received);
+              });
 
               return (
                 <div
-                  key={item.id}
-                  id={`item-${index}`}
-                  className={`border rounded-lg p-4 transition-all ${
-                    hasVariance
-                      ? 'border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/10'
-                      : 'border-gray-200 dark:border-slate-700'
-                  }`}
+                  key={group.key}
+                  className="border border-gray-200 dark:border-slate-700 rounded-lg overflow-hidden"
                 >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-gray-900 dark:text-white">
-                        {item.style_number}
-                      </h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {item.product_name} - {item.color} - {item.size}
-                      </p>
-                      {item.upc_code && (
-                        <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                          UPC: {item.upc_code}
+                  <div className="flex items-center justify-between px-5 py-4 bg-gray-50 dark:bg-slate-900/60 border-b border-gray-200 dark:border-slate-700">
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`w-3 h-3 rounded-full flex-shrink-0 ${
+                          groupStatus === 'full'
+                            ? 'bg-green-500'
+                            : groupStatus === 'partial'
+                            ? 'bg-yellow-500'
+                            : 'bg-red-500'
+                        }`}
+                      />
+                      <div>
+                        <h4 className="font-semibold text-gray-900 dark:text-white">
+                          {group.style_number}
+                        </h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {group.product_name} &mdash; {group.color}
                         </p>
-                      )}
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Ordered: <span className="font-medium">{item.quantity_ordered}</span>
-                      </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Previously: <span className="font-medium">{item.quantity_received}</span>
-                      </p>
-                      <p className="text-sm text-orange-600 dark:text-orange-400">
-                        Remaining: <span className="font-medium">{remaining}</span>
-                      </p>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right text-sm text-gray-600 dark:text-gray-400">
+                        <span>Ordered: <span className="font-semibold text-gray-900 dark:text-white">{groupTotalOrdered}</span></span>
+                        <span className="mx-2">|</span>
+                        <span>Prev: <span className="font-semibold text-blue-600 dark:text-blue-400">{groupTotalPrev}</span></span>
+                        <span className="mx-2">|</span>
+                        <span>Receiving: <span className="font-semibold text-green-600 dark:text-green-400">{groupTotalReceiving}</span></span>
+                      </div>
+                      {!allFullyReceived && groupRemaining > 0 && (
+                        <button
+                          onClick={() => handleReceiveAllSizes(group)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          Receive All Sizes
+                        </button>
+                      )}
+                      {allFullyReceived && (
+                        <span className="flex items-center gap-1.5 text-sm font-medium text-green-600 dark:text-green-400">
+                          <CheckCircle2 className="w-4 h-4" />
+                          All Received
+                        </span>
+                      )}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-4 gap-3">
-                    {/* Received */}
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Received
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() =>
-                            updateReceiving(
-                              index,
-                              'quantity_received',
-                              item.receiving.quantity_received - 1
-                            )
-                          }
-                          className="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
-                        >
-                          <Minus className="w-4 h-4" />
-                        </button>
-                        <input
-                          type="number"
-                          value={item.receiving.quantity_received}
-                          onChange={(e) =>
-                            updateReceiving(
-                              index,
-                              'quantity_received',
-                              parseInt(e.target.value) || 0
-                            )
-                          }
-                          className="flex-1 px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-center dark:bg-slate-700 dark:text-white"
-                        />
-                        <button
-                          onClick={() =>
-                            updateReceiving(
-                              index,
-                              'quantity_received',
-                              item.receiving.quantity_received + 1
-                            )
-                          }
-                          className="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
-                      </div>
-                      {remaining > 0 && (
-                        <button
-                          onClick={() => handleQuickReceiveAll(index)}
-                          className="w-full mt-1 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400"
-                        >
-                          Receive All ({remaining})
-                        </button>
-                      )}
+                  <div className="divide-y divide-gray-100 dark:divide-slate-700/50">
+                    <div className="grid grid-cols-12 gap-2 px-5 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-50/50 dark:bg-slate-800/50">
+                      <div className="col-span-1">Status</div>
+                      <div className="col-span-1">Size</div>
+                      <div className="col-span-1 text-center">Needed</div>
+                      <div className="col-span-1 text-center">Prev</div>
+                      <div className="col-span-3 text-center">Receiving</div>
+                      <div className="col-span-1 text-center">Damaged</div>
+                      <div className="col-span-1 text-center">Short</div>
+                      <div className="col-span-3">Notes</div>
                     </div>
 
-                    {/* Damaged */}
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Damaged
-                      </label>
-                      <input
-                        type="number"
-                        value={item.receiving.quantity_damaged}
-                        onChange={(e) =>
-                          updateReceiving(index, 'quantity_damaged', parseInt(e.target.value) || 0)
-                        }
-                        className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-center dark:bg-slate-700 dark:text-white"
-                      />
-                    </div>
+                    {group.items.map((itemIdx) => {
+                      const item = lineItems[itemIdx];
+                      const needed = item.quantity_ordered - item.quantity_received;
+                      const isFullyReceived = item.receiving.quantity_received >= needed && needed > 0;
+                      const hasVariance = item.receiving.quantity_damaged > 0 || item.receiving.quantity_short > 0;
 
-                    {/* Short */}
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Short
-                      </label>
-                      <input
-                        type="number"
-                        value={item.receiving.quantity_short}
-                        onChange={(e) =>
-                          updateReceiving(index, 'quantity_short', parseInt(e.target.value) || 0)
-                        }
-                        className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-center dark:bg-slate-700 dark:text-white"
-                      />
-                    </div>
+                      return (
+                        <div
+                          key={item.id}
+                          id={`item-${itemIdx}`}
+                          className={`grid grid-cols-12 gap-2 px-5 py-3 items-center transition-colors ${
+                            isFullyReceived
+                              ? 'bg-green-50/50 dark:bg-green-900/10'
+                              : hasVariance
+                              ? 'bg-orange-50/50 dark:bg-orange-900/10'
+                              : 'hover:bg-gray-50 dark:hover:bg-slate-700/30'
+                          }`}
+                        >
+                          <div className="col-span-1 flex items-center">
+                            <StatusDot needed={needed} received={item.receiving.quantity_received} />
+                          </div>
 
-                    {/* Variance Notes */}
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Notes
-                      </label>
-                      <input
-                        type="text"
-                        value={item.receiving.variance_notes}
-                        onChange={(e) => updateNotes(index, e.target.value)}
-                        placeholder="Optional..."
-                        className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded dark:bg-slate-700 dark:text-white text-sm"
-                      />
-                    </div>
+                          <div className="col-span-1">
+                            <span className="inline-flex items-center justify-center px-2.5 py-1 text-sm font-semibold rounded bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-gray-200 min-w-[3rem] text-center">
+                              {item.size}
+                            </span>
+                          </div>
+
+                          <div className="col-span-1 text-center">
+                            <span className="text-sm font-semibold text-gray-900 dark:text-white">{needed}</span>
+                          </div>
+
+                          <div className="col-span-1 text-center">
+                            <span className="text-sm text-blue-600 dark:text-blue-400">{item.quantity_received}</span>
+                          </div>
+
+                          <div className="col-span-3">
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="number"
+                                min={0}
+                                step={1}
+                                value={item.receiving.quantity_received}
+                                onChange={(e) =>
+                                  updateReceiving(
+                                    itemIdx,
+                                    'quantity_received',
+                                    parseInt(e.target.value) || 0
+                                  )
+                                }
+                                className={`w-20 px-2 py-1.5 border rounded text-center text-sm font-medium dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                                  isFullyReceived
+                                    ? 'border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-900/20'
+                                    : 'border-gray-300 dark:border-slate-600'
+                                }`}
+                              />
+                              {!isFullyReceived && needed > 0 && (
+                                <button
+                                  onClick={() => handleReceiveSize(itemIdx)}
+                                  className="px-2 py-1.5 text-xs font-medium text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30 hover:bg-green-200 dark:hover:bg-green-900/50 rounded transition-colors whitespace-nowrap"
+                                >
+                                  Receive All
+                                </button>
+                              )}
+                              {isFullyReceived && (
+                                <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="col-span-1">
+                            <input
+                              type="number"
+                              min={0}
+                              step={1}
+                              value={item.receiving.quantity_damaged}
+                              onChange={(e) =>
+                                updateReceiving(itemIdx, 'quantity_damaged', parseInt(e.target.value) || 0)
+                              }
+                              className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-center text-sm dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+
+                          <div className="col-span-1">
+                            <input
+                              type="number"
+                              min={0}
+                              step={1}
+                              value={item.receiving.quantity_short}
+                              onChange={(e) =>
+                                updateReceiving(itemIdx, 'quantity_short', parseInt(e.target.value) || 0)
+                              }
+                              className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-center text-sm dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+
+                          <div className="col-span-3">
+                            <input
+                              type="text"
+                              value={item.receiving.variance_notes}
+                              onChange={(e) => updateNotes(itemIdx, e.target.value)}
+                              placeholder="Optional..."
+                              className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
             })}
+
+            {grouped.length === 0 && (
+              <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                <Package className="w-12 h-12 mx-auto mb-3 opacity-40" />
+                <p className="text-lg font-medium">No line items found</p>
+                <p className="text-sm mt-1">This purchase order has no items to receive.</p>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Footer */}
         <div className="p-6 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
           <div className="space-y-4">
             <div>
