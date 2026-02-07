@@ -53,6 +53,10 @@ export interface WorkflowColumn {
   created_at: string;
 }
 
+export interface WorkOrderWithImprints extends WorkOrder {
+  types_of_work: string[];
+}
+
 export interface WorkOrderWithDetails extends WorkOrder {
   line_items?: WorkOrderLineItem[];
   imprints?: any[];
@@ -65,7 +69,7 @@ export class WorkOrderService {
     priority?: string;
     assigned_to?: string;
     search?: string;
-  }): Promise<{ data: WorkOrder[] | null; error: any }> {
+  }): Promise<{ data: WorkOrderWithImprints[] | null; error: any }> {
     let query = supabase
       .from('work_orders')
       .select('*')
@@ -89,7 +93,44 @@ export class WorkOrderService {
       );
     }
 
-    return await query;
+    const { data: workOrders, error } = await query;
+
+    if (error || !workOrders || workOrders.length === 0) {
+      return { data: workOrders as WorkOrderWithImprints[] | null, error };
+    }
+
+    const quoteIds = workOrders
+      .map((wo) => wo.quote_id)
+      .filter((id): id is string => !!id);
+
+    let imprintsByQuote: Record<string, string[]> = {};
+
+    if (quoteIds.length > 0) {
+      const { data: imprints } = await supabase
+        .from('quote_imprints')
+        .select('quote_id, type_of_work')
+        .in('quote_id', quoteIds);
+
+      if (imprints) {
+        for (const imp of imprints) {
+          if (imp.type_of_work) {
+            if (!imprintsByQuote[imp.quote_id]) {
+              imprintsByQuote[imp.quote_id] = [];
+            }
+            if (!imprintsByQuote[imp.quote_id].includes(imp.type_of_work)) {
+              imprintsByQuote[imp.quote_id].push(imp.type_of_work);
+            }
+          }
+        }
+      }
+    }
+
+    const enriched: WorkOrderWithImprints[] = workOrders.map((wo) => ({
+      ...wo,
+      types_of_work: wo.quote_id ? imprintsByQuote[wo.quote_id] || [] : [],
+    }));
+
+    return { data: enriched, error: null };
   }
 
   static async getWorkOrderById(

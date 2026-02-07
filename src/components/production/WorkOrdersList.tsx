@@ -2,29 +2,22 @@ import { useState, useEffect } from 'react';
 import {
   Package,
   Search,
-  Calendar,
   AlertCircle,
-  Clock,
-  CheckCircle2,
   Loader2,
   RefreshCw,
   Eye,
-  Truck,
-  ClipboardCheck,
-  CircleDot,
 } from 'lucide-react';
-import { WorkOrderService, WorkOrder } from '../../services/work-order-service';
+import { WorkOrderService, WorkOrderWithImprints } from '../../services/work-order-service';
 
 interface WorkOrdersListProps {
   onSelectWorkOrder: (workOrderId: string) => void;
 }
 
 export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
-  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  const [workOrders, setWorkOrders] = useState<WorkOrderWithImprints[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [priorityFilter, setPriorityFilter] = useState<string>('all');
 
   useEffect(() => {
     loadWorkOrders();
@@ -41,38 +34,6 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
       console.error('Error loading work orders:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const getStatusConfig = (status: string) => {
-    switch (status) {
-      case 'Pending Scheduling':
-        return { color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300', icon: Clock, label: 'Pending' };
-      case 'In Production':
-        return { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400', icon: CircleDot, label: 'In Production' };
-      case 'Quality Check':
-        return { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400', icon: ClipboardCheck, label: 'QC' };
-      case 'Ready to Ship':
-        return { color: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400', icon: Truck, label: 'Ready to Ship' };
-      case 'Completed':
-        return { color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', icon: CheckCircle2, label: 'Completed' };
-      default:
-        return { color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300', icon: Clock, label: status };
-    }
-  };
-
-  const getPriorityConfig = (priority: string) => {
-    switch (priority) {
-      case 'urgent':
-        return { color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', label: 'Urgent' };
-      case 'high':
-        return { color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400', label: 'High' };
-      case 'medium':
-        return { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400', label: 'Medium' };
-      case 'low':
-        return { color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', label: 'Low' };
-      default:
-        return { color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300', label: priority };
     }
   };
 
@@ -96,9 +57,8 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
       wo.customer_name.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus = statusFilter === 'all' || wo.status === statusFilter;
-    const matchesPriority = priorityFilter === 'all' || wo.priority === priorityFilter;
 
-    return matchesSearch && matchesStatus && matchesPriority;
+    return matchesSearch && matchesStatus;
   });
 
   const stats = {
@@ -170,17 +130,6 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
                 <option key={status} value={status}>{status}</option>
               ))}
             </select>
-            <select
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-              className="px-4 py-2.5 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-            >
-              <option value="all">All Priorities</option>
-              <option value="urgent">Urgent</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
           </div>
         </div>
       </div>
@@ -195,7 +144,7 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
           <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No work orders found</h3>
           <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
-            {searchTerm || statusFilter !== 'all' || priorityFilter !== 'all'
+            {searchTerm || statusFilter !== 'all'
               ? 'Try adjusting your filters to see more results'
               : 'Work orders are created automatically when quotes are approved'}
           </p>
@@ -213,10 +162,7 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
                     Customer
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
-                    Priority
+                    Types of Work
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                     Due Date
@@ -231,9 +177,6 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
                 {filteredWorkOrders.map((wo) => {
-                  const statusConfig = getStatusConfig(wo.status);
-                  const priorityConfig = getPriorityConfig(wo.priority);
-                  const StatusIcon = statusConfig.icon;
                   const overdue = isOverdue(wo.production_due_date) && wo.status !== 'Completed';
 
                   return (
@@ -255,16 +198,21 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
                           {wo.customer_name}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${statusConfig.color}`}>
-                          <StatusIcon className="w-3.5 h-3.5" />
-                          {statusConfig.label}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${priorityConfig.color}`}>
-                          {priorityConfig.label}
-                        </span>
+                      <td className="px-6 py-4">
+                        {wo.types_of_work.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {wo.types_of_work.map((type) => (
+                              <span
+                                key={type}
+                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                              >
+                                {type}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400 dark:text-gray-500">--</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
