@@ -412,6 +412,12 @@ Deno.serve(async (req: Request) => {
         .eq("quote_id", approval.quote_id)
         .order("line_number");
 
+      const { data: imprints } = await supabase
+        .from("quote_imprints")
+        .select("*")
+        .eq("quote_id", approval.quote_id)
+        .order("sort_order");
+
       const { data: companySettings } = await supabase
         .from("company_settings")
         .select("company_name, logo_url, company_logo_primary_url, company_email, company_phone, company_website")
@@ -430,6 +436,7 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({
           quote: approval.quote,
           line_items: lineItems || [],
+          imprints: imprints || [],
           company_settings: companySettings || {},
           approval_status: approvalStatus,
           expires_at: approval.expires_at,
