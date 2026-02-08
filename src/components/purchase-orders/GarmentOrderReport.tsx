@@ -418,31 +418,131 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
   };
 
   const exportToPDF = () => {
-    const doc = new jsPDF({ orientation: 'landscape' });
-    doc.setFontSize(18);
-    doc.text('Garment Order Report', 14, 22);
-    doc.setFontSize(10);
-    doc.text(`Generated: ${format(new Date(), 'MMM dd, yyyy')}`, 14, 30);
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 14;
+    let y = 14;
+
+    doc.setFillColor(30, 41, 59);
+    doc.rect(0, 0, pageWidth, 18, 'F');
+    doc.setFontSize(16);
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Garment Order Report', margin, 12);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(format(new Date(), 'MMM dd, yyyy h:mm a'), pageWidth - margin - 50, 12);
+    y = 24;
+
+    const summaryItems = [
+      { label: 'Total Needed', value: stats.totalNeeded.toLocaleString() },
+      { label: 'On PO', value: stats.onPO.toLocaleString() },
+      { label: 'Received', value: stats.received.toLocaleString() },
+      { label: 'Remaining', value: stats.remaining.toLocaleString() },
+    ];
+    const boxW = (pageWidth - margin * 2 - 12) / 4;
+    summaryItems.forEach((item, i) => {
+      const x = margin + i * (boxW + 4);
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(x, y, boxW, 14, 1.5, 1.5, 'F');
+      doc.setFontSize(7);
+      doc.setTextColor(107, 114, 128);
+      doc.text(item.label, x + 3, y + 5);
+      doc.setFontSize(12);
+      doc.setTextColor(17, 24, 39);
+      doc.setFont('helvetica', 'bold');
+      doc.text(item.value, x + 3, y + 11);
+      doc.setFont('helvetica', 'normal');
+    });
+    y += 20;
 
     const headers = [
-      'Style', 'Color', 'Supplier',
-      ...activeSizes, 'Total', 'Remaining',
+      'Style', 'Description', 'Color', 'Vendor',
+      ...activeSizes.map((s) => s),
+      'Total', 'On PO', 'Remain',
     ];
-    const body = filteredGarments.map((g) => [
-      g.style_number, g.color, g.supplier,
-      ...activeSizes.map((s) => (g.sizes[s]?.needed || 0).toString()),
-      g.total_needed.toString(), g.total_remaining.toString(),
-    ]);
 
-    (doc as any).autoTable({
-      head: [headers],
-      body,
-      startY: 35,
-      styles: { fontSize: 7 },
-      headStyles: { fillColor: [66, 139, 202] },
+    const body = filteredGarments.map((g) => {
+      const remaining = g.total_needed - g.total_on_po;
+      return [
+        g.style_number,
+        g.product_name.length > 25 ? g.product_name.substring(0, 25) + '...' : g.product_name,
+        g.color,
+        g.supplier,
+        ...activeSizes.map((s) => {
+          const qty = g.sizes[s]?.needed || 0;
+          return qty > 0 ? qty.toString() : '-';
+        }),
+        g.total_needed.toString(),
+        g.total_on_po.toString(),
+        (remaining > 0 ? remaining : 0).toString(),
+      ];
     });
 
-    doc.save(`garment-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+    const sizeColWidth = Math.min(12, (pageWidth - margin * 2 - 110) / Math.max(activeSizes.length, 1));
+
+    (doc as any).autoTable({
+      startY: y,
+      head: [headers],
+      body,
+      theme: 'grid',
+      headStyles: {
+        fillColor: [30, 41, 59],
+        textColor: [237, 237, 237],
+        fontSize: 6.5,
+        fontStyle: 'bold',
+        cellPadding: 2,
+        halign: 'center',
+      },
+      bodyStyles: {
+        fontSize: 6.5,
+        textColor: [30, 41, 59],
+        cellPadding: 1.8,
+      },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      columnStyles: {
+        0: { cellWidth: 22, fontStyle: 'bold' },
+        1: { cellWidth: 30 },
+        2: { cellWidth: 20 },
+        3: { cellWidth: 22 },
+        ...Object.fromEntries(
+          activeSizes.map((_, i) => [i + 4, { cellWidth: sizeColWidth, halign: 'center' as const }])
+        ),
+        [activeSizes.length + 4]: { cellWidth: 14, halign: 'right' as const, fontStyle: 'bold' },
+        [activeSizes.length + 5]: { cellWidth: 14, halign: 'right' as const, textColor: [37, 99, 235] },
+        [activeSizes.length + 6]: { cellWidth: 14, halign: 'right' as const },
+      },
+      didParseCell: (data: any) => {
+        const colIdx = data.column.index;
+        const remainIdx = activeSizes.length + 6;
+        if (data.section === 'body' && colIdx === remainIdx) {
+          const val = parseInt(data.cell.raw, 10);
+          if (val > 0) {
+            data.cell.styles.textColor = [234, 88, 12];
+            data.cell.styles.fontStyle = 'bold';
+          } else {
+            data.cell.styles.textColor = [156, 163, 175];
+          }
+        }
+      },
+      margin: { left: margin, right: margin },
+    });
+
+    const totalPages = (doc as any).internal.getNumberOfPages();
+    for (let p = 1; p <= totalPages; p++) {
+      doc.setPage(p);
+      const footerY = doc.internal.pageSize.getHeight() - 6;
+      doc.setFontSize(7);
+      doc.setTextColor(156, 163, 175);
+      doc.text(`Page ${p} of ${totalPages}`, margin, footerY);
+      doc.text(
+        `${filteredGarments.length} line items`,
+        pageWidth - margin - 25,
+        footerY
+      );
+    }
+
+    doc.save(`garment-order-report-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
   };
 
   const clearFilters = () => {

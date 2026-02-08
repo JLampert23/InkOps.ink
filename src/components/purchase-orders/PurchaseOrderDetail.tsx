@@ -24,6 +24,7 @@ import {
 import { format } from 'date-fns';
 import { POSettingsService } from '../../services/po-settings-service';
 import { POValidationModal } from './POValidationModal';
+import { generatePurchaseOrderPDF } from '../../utils/po-pdf-export';
 
 interface PurchaseOrder {
   id: string;
@@ -396,8 +397,34 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOr
     }
   };
 
-  const exportPDF = () => {
-    alert('PDF export will be implemented');
+  const exportPDF = async () => {
+    if (!po) return;
+    let companyName = '';
+    let companyAddress = '';
+    let companyPhone = '';
+    let companyEmail = '';
+    try {
+      const cid = await getUserCompanyId();
+      if (cid) {
+        const { data: settings } = await supabase
+          .from('company_settings')
+          .select('company_name, company_address, company_phone, company_email')
+          .eq('company_id', cid)
+          .maybeSingle();
+        if (settings) {
+          companyName = settings.company_name || '';
+          companyAddress = settings.company_address || '';
+          companyPhone = settings.company_phone || '';
+          companyEmail = settings.company_email || '';
+        }
+      }
+    } catch (_) {}
+    generatePurchaseOrderPDF(po, lineItems, {
+      companyName,
+      companyAddress,
+      companyPhone,
+      companyEmail,
+    });
   };
 
   const getStatusBadge = (status: string) => {
