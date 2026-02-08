@@ -150,7 +150,7 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
           id,
           po_number,
           company_id,
-          vendor:vendors!vendor_id (
+          vendors (
             vendor_name
           )
         )
@@ -220,7 +220,7 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
         garment.pos.push({
           po_id: item.purchase_orders.id,
           po_number: item.purchase_orders.po_number,
-          vendor_name: item.purchase_orders.vendor?.vendor_name || 'Unknown',
+          vendor_name: item.purchase_orders.vendors?.vendor_name || 'Unknown',
           quantity_ordered: item.quantity_ordered,
           quantity_received: item.quantity_received,
         });

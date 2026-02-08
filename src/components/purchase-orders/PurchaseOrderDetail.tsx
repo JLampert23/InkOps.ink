@@ -125,14 +125,14 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOr
         .from('purchase_orders')
         .select(`
           *,
-          vendor:vendors!vendor_id (
+          vendors (
             vendor_name,
             vendor_type,
             contact_name,
             contact_email,
             contact_phone
           ),
-          created_by_user:user_profiles!created_by (
+          user_profiles!purchase_orders_created_by_fkey (
             full_name,
             email
           )
@@ -141,7 +141,13 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOr
         .single();
 
       if (poError) throw poError;
-      setPo(poData);
+
+      const formattedPo = {
+        ...poData,
+        vendor: poData.vendors,
+        created_by_user: poData.user_profiles
+      };
+      setPo(formattedPo);
 
       const { data: items, error: itemsError } = await supabase
         .from('purchase_order_line_items')
@@ -180,9 +186,11 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOr
 
       if (logsError) throw logsError;
       setActivityLog(logs || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading purchase order:', error);
-      alert('Failed to load purchase order');
+      console.error('Error message:', error?.message);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      alert(`Failed to load purchase order: ${error?.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
