@@ -59,32 +59,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-
-      if (session?.user) {
-        await refreshUserProfile(session.user.id);
-        await refreshCompanySettings();
-      }
-
-      setLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      (async () => {
+    const initAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
         setSession(session);
         setUser(session?.user ?? null);
 
         if (session?.user) {
           await refreshUserProfile(session.user.id);
           await refreshCompanySettings();
-        } else {
-          setUserProfile(null);
-          setCompanySettings(null);
         }
-
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+      } finally {
         setLoading(false);
+      }
+    };
+
+    initAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      (async () => {
+        try {
+          setSession(session);
+          setUser(session?.user ?? null);
+
+          if (session?.user) {
+            await refreshUserProfile(session.user.id);
+            await refreshCompanySettings();
+          } else {
+            setUserProfile(null);
+            setCompanySettings(null);
+          }
+        } catch (error) {
+          console.error('Error in auth state change:', error);
+        }
       })();
     });
 
