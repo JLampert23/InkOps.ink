@@ -675,7 +675,15 @@ export function PurchaseOrderDetail({ poId, onBack }: PurchaseOrderDetailProps) 
             <div className="p-6 border-b border-gray-200 dark:border-slate-700">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                 <FileText className="w-5 h-5" />
-                Line Items ({lineItems.length})
+                Line Items ({(() => {
+                  const grouped = lineItems.reduce((acc, item) => {
+                    const key = `${item.style_number || item.product_name}|||${item.color}`;
+                    if (!acc[key]) acc[key] = [];
+                    acc[key].push(item);
+                    return acc;
+                  }, {} as Record<string, typeof lineItems>);
+                  return Object.keys(grouped).length;
+                })()})
               </h3>
             </div>
             <div className="overflow-x-auto">
@@ -689,10 +697,10 @@ export function PurchaseOrderDetail({ poId, onBack }: PurchaseOrderDetailProps) 
                       Color
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-bold text-[#EDEDED] uppercase tracking-wider">
-                      Size
+                      Size Breakdown
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-bold text-[#EDEDED] uppercase tracking-wider">
-                      Ordered
+                      Total Qty
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-bold text-[#EDEDED] uppercase tracking-wider">
                       Received
@@ -709,62 +717,125 @@ export function PurchaseOrderDetail({ poId, onBack }: PurchaseOrderDetailProps) 
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-[#1A1A1A] divide-y divide-[#2A2A2A]">
-                  {lineItems.map((item) => {
-                    const remaining = item.quantity_ordered - item.quantity_received;
-                    return (
-                      <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-slate-900/50 transition-colors">
-                        <td className="px-4 py-4">
-                          <div>
-                            <p className="text-sm font-semibold text-gray-900 dark:text-[#EDEDED]">
-                              {item.style_number || '—'}
-                            </p>
-                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                              {item.product_name}
-                            </p>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 text-sm text-gray-700 dark:text-[#EDEDED]">
-                          {item.color || '—'}
-                        </td>
-                        <td className="px-4 py-4 text-sm text-gray-700 dark:text-[#EDEDED]">
-                          {item.size || '—'}
-                        </td>
-                        <td className="px-4 py-4 text-sm text-right font-medium text-gray-900 dark:text-[#EDEDED]">
-                          {item.quantity_ordered}
-                        </td>
-                        <td className="px-4 py-4 text-sm text-right">
-                          <span
-                            className={
-                              item.quantity_received >= item.quantity_ordered
-                                ? 'text-green-600 dark:text-green-400 font-bold'
-                                : 'text-gray-900 dark:text-[#EDEDED] font-medium'
-                            }
-                          >
-                            {item.quantity_received}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 text-sm text-right">
-                          <span
-                            className={
-                              remaining === 0
-                                ? 'text-green-600 dark:text-green-400 font-bold'
-                                : remaining < item.quantity_ordered * 0.5
-                                ? 'text-yellow-600 dark:text-yellow-400 font-medium'
-                                : 'text-gray-900 dark:text-[#EDEDED] font-medium'
-                            }
-                          >
-                            {remaining}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 text-sm text-right text-gray-900 dark:text-[#EDEDED]">
-                          ${item.unit_cost.toFixed(2)}
-                        </td>
-                        <td className="px-4 py-4 text-sm text-right font-bold text-gray-900 dark:text-[#EDEDED]">
-                          ${item.extended_cost.toFixed(2)}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                  {(() => {
+                    const SIZE_ORDER = ['XS', '2XS', 'S', 'M', 'L', 'XL', '2XL', 'XXL', '3XL', 'XXXL', '4XL', '5XL', '6XL', 'YXS', 'YS', 'YM', 'YL', 'YXL'];
+
+                    const grouped = lineItems.reduce((acc, item) => {
+                      const key = `${item.style_number || item.product_name}|||${item.color}`;
+                      if (!acc[key]) {
+                        acc[key] = {
+                          style_number: item.style_number,
+                          product_name: item.product_name,
+                          color: item.color,
+                          unit_cost: item.unit_cost,
+                          sizes: []
+                        };
+                      }
+                      acc[key].sizes.push({
+                        size: item.size || 'N/A',
+                        quantity_ordered: item.quantity_ordered,
+                        quantity_received: item.quantity_received,
+                        extended_cost: item.extended_cost
+                      });
+                      return acc;
+                    }, {} as Record<string, {
+                      style_number: string | null;
+                      product_name: string;
+                      color: string | null;
+                      unit_cost: number;
+                      sizes: Array<{ size: string; quantity_ordered: number; quantity_received: number; extended_cost: number }>;
+                    }>);
+
+                    return Object.values(grouped).map((group, idx) => {
+                      const sortedSizes = [...group.sizes].sort((a, b) => {
+                        const aIdx = SIZE_ORDER.indexOf(a.size);
+                        const bIdx = SIZE_ORDER.indexOf(b.size);
+                        if (aIdx === -1 && bIdx === -1) return a.size.localeCompare(b.size);
+                        if (aIdx === -1) return 1;
+                        if (bIdx === -1) return -1;
+                        return aIdx - bIdx;
+                      });
+
+                      const totalOrdered = sortedSizes.reduce((sum, s) => sum + s.quantity_ordered, 0);
+                      const totalReceived = sortedSizes.reduce((sum, s) => sum + s.quantity_received, 0);
+                      const remaining = totalOrdered - totalReceived;
+                      const totalCost = sortedSizes.reduce((sum, s) => sum + s.extended_cost, 0);
+
+                      return (
+                        <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-slate-900/50 transition-colors">
+                          <td className="px-4 py-4">
+                            <div>
+                              <p className="text-sm font-semibold text-gray-900 dark:text-[#EDEDED]">
+                                {group.style_number || '—'}
+                              </p>
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                {group.product_name}
+                              </p>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-gray-700 dark:text-[#EDEDED]">
+                            {group.color || '—'}
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex flex-wrap gap-2">
+                              {sortedSizes.map((sizeInfo, sIdx) => (
+                                <div
+                                  key={sIdx}
+                                  className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 dark:bg-slate-700 rounded text-xs"
+                                  title={`Received: ${sizeInfo.quantity_received}`}
+                                >
+                                  <span className="font-semibold text-gray-900 dark:text-[#EDEDED]">
+                                    {sizeInfo.size}
+                                  </span>
+                                  <span className="text-gray-600 dark:text-gray-400">
+                                    ×{sizeInfo.quantity_ordered}
+                                  </span>
+                                  {sizeInfo.quantity_received > 0 && (
+                                    <span className="text-green-600 dark:text-green-400 font-medium">
+                                      ({sizeInfo.quantity_received})
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-right font-medium text-gray-900 dark:text-[#EDEDED]">
+                            {totalOrdered}
+                          </td>
+                          <td className="px-4 py-4 text-sm text-right">
+                            <span
+                              className={
+                                totalReceived >= totalOrdered
+                                  ? 'text-green-600 dark:text-green-400 font-bold'
+                                  : 'text-gray-900 dark:text-[#EDEDED] font-medium'
+                              }
+                            >
+                              {totalReceived}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-right">
+                            <span
+                              className={
+                                remaining === 0
+                                  ? 'text-green-600 dark:text-green-400 font-bold'
+                                  : remaining < totalOrdered * 0.5
+                                  ? 'text-yellow-600 dark:text-yellow-400 font-medium'
+                                  : 'text-gray-900 dark:text-[#EDEDED] font-medium'
+                              }
+                            >
+                              {remaining}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-right text-gray-900 dark:text-[#EDEDED]">
+                            ${group.unit_cost.toFixed(2)}
+                          </td>
+                          <td className="px-4 py-4 text-sm text-right font-bold text-gray-900 dark:text-[#EDEDED]">
+                            ${totalCost.toFixed(2)}
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
                 </tbody>
               </table>
             </div>
