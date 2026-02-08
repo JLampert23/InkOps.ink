@@ -152,12 +152,6 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOr
       if (itemsError) throw itemsError;
       setLineItems(items || []);
 
-      const initialQuantities: { [key: string]: number } = {};
-      items?.forEach((item) => {
-        initialQuantities[item.id] = 0;
-      });
-      setReceivingQuantities(initialQuantities);
-
       const { data: attachmentData, error: attachmentError } = await supabase
         .from('purchase_order_attachments')
         .select(`
