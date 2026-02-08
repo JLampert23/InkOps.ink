@@ -135,6 +135,7 @@ export function ProductSearchModal({ vendorId, vendorType, onSelect, onClose }: 
         unit_cost: unitCost,
         extended_cost: unitCost * quantity,
         vendor_product_id: selectedProduct.supplier_product_id,
+        supplier: selectedProduct.supplier,
       };
     });
 

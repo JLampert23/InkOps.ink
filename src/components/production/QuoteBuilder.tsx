@@ -67,6 +67,7 @@ interface QuoteItem {
   garment_lifestyle_image_url?: string;
   garment_images_data?: any;
   supplier_partid?: string;
+  supplier_name?: string;
 }
 
 interface QuoteFee {
@@ -1347,6 +1348,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           color: color?.name?.trim() || '',
           description: `${product.brand} ${product.description}`.trim(),
           unit_price: freshPrice !== null ? freshPrice : (color?.pricing?.wholesale || 0),
+          supplier_name: product.supplier === 'sanmar' ? 'SANMAR' : product.supplier === 'ssactivewear' ? 'SSACTIVEWEAR' : null,
           ...garmentImages,
         };
 
@@ -1559,6 +1561,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
             garment_lifestyle_image_url: item.garment_lifestyle_image_url || null,
             garment_images_data: item.garment_images_data || null,
             supplier_partid: item.supplier_partid || null,
+            supplier_name: item.supplier_name || null,
           };
         })
         );
