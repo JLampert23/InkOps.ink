@@ -93,9 +93,10 @@ interface PurchaseOrderDetailProps {
   poId: string;
   onBack: () => void;
   onEdit?: () => void;
+  onReceiveGoods?: (poId: string) => void;
 }
 
-export function PurchaseOrderDetail({ poId, onBack }: PurchaseOrderDetailProps) {
+export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOrderDetailProps) {
   const [po, setPo] = useState<PurchaseOrder | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -103,8 +104,6 @@ export function PurchaseOrderDetail({ poId, onBack }: PurchaseOrderDetailProps) 
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [showReceiveModal, setShowReceiveModal] = useState(false);
-  const [receivingQuantities, setReceivingQuantities] = useState<{ [key: string]: number }>({});
   const [validationModal, setValidationModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -312,70 +311,6 @@ export function PurchaseOrderDetail({ poId, onBack }: PurchaseOrderDetailProps) 
     }
   };
 
-  const handleReceiveGoods = async () => {
-    if (!po) return;
-
-    const validation = await POSettingsService.canReceiveGoods({
-      status: po.status,
-      confirmed_at: po.confirmed_at,
-    });
-
-    if (!validation.allowed) {
-      setValidationModal({
-        isOpen: true,
-        title: 'Cannot Receive Goods',
-        message: validation.reason || 'Goods cannot be received at this time.',
-      });
-      return;
-    }
-
-    const itemsToUpdate = Object.entries(receivingQuantities)
-      .filter(([_, qty]) => qty > 0)
-      .map(([itemId, qty]) => {
-        const item = lineItems.find((li) => li.id === itemId);
-        return { id: itemId, newReceived: (item?.quantity_received || 0) + qty };
-      });
-
-    if (itemsToUpdate.length === 0) {
-      alert('Please enter quantities to receive');
-      return;
-    }
-
-    try {
-      setUpdating(true);
-
-      for (const { id, newReceived } of itemsToUpdate) {
-        const { error } = await supabase
-          .from('purchase_order_line_items')
-          .update({ quantity_received: newReceived })
-          .eq('id', id);
-
-        if (error) throw error;
-      }
-
-      const { data: { user } } = await supabase.auth.getUser();
-      await supabase.from('purchase_order_activity_log').insert([
-        {
-          company_id: await getUserCompanyId(),
-          po_id: poId,
-          action: 'goods_received',
-          performed_by: user?.id,
-          performed_by_name: user?.email || 'Unknown',
-          notes: `Received ${itemsToUpdate.length} item(s)`,
-          meta: { items: itemsToUpdate },
-        },
-      ]);
-
-      alert('Goods received successfully');
-      setShowReceiveModal(false);
-      loadPurchaseOrder();
-    } catch (error) {
-      console.error('Error receiving goods:', error);
-      alert('Failed to receive goods');
-    } finally {
-      setUpdating(false);
-    }
-  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !po) return;
@@ -639,9 +574,9 @@ export function PurchaseOrderDetail({ poId, onBack }: PurchaseOrderDetailProps) 
             Mark as In Transit
           </button>
         )}
-        {['sent', 'confirmed', 'in_transit', 'partially_received'].includes(po.status) && (
+        {['sent', 'confirmed', 'in_transit', 'partially_received'].includes(po.status) && onReceiveGoods && (
           <button
-            onClick={() => setShowReceiveModal(true)}
+            onClick={() => onReceiveGoods(po.id)}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all"
           >
             <Package className="w-4 h-4" />
@@ -1076,164 +1011,6 @@ export function PurchaseOrderDetail({ poId, onBack }: PurchaseOrderDetailProps) 
           </div>
         </div>
       </div>
-
-      {/* Receive Goods Modal */}
-      {showReceiveModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-4xl w-full max-h-[85vh] overflow-hidden border border-gray-200 dark:border-slate-700">
-            <div className="p-6 border-b border-gray-200 dark:border-slate-700 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                Receive Goods
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Enter quantities received by size for each product/color combination
-              </p>
-            </div>
-            <div className="p-6 overflow-y-auto max-h-[calc(85vh-180px)]">
-              {lineItems.length === 0 ? (
-                <div className="text-center py-12">
-                  <Package className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-                  <p className="text-gray-600 dark:text-gray-400">No items to receive</p>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {(() => {
-                    console.log('Line Items:', lineItems);
-                    const grouped = lineItems.reduce((acc, item) => {
-                      const remaining = item.quantity_ordered - item.quantity_received;
-                      console.log(`Item: ${item.product_name}, Remaining: ${remaining}`);
-                      if (remaining <= 0) return acc;
-
-                      const key = `${item.product_name}|||${item.color || 'NO_COLOR'}`;
-                      if (!acc[key]) {
-                        acc[key] = {
-                          product_name: item.product_name,
-                          color: item.color || '',
-                          sizes: []
-                        };
-                      }
-                      acc[key].sizes.push({
-                        id: item.id,
-                        size: item.size || 'N/A',
-                        remaining
-                      });
-                      return acc;
-                    }, {} as Record<string, { product_name: string; color: string; sizes: Array<{ id: string; size: string; remaining: number }> }>);
-
-                    console.log('Grouped:', grouped);
-                    const SIZE_ORDER = ['XS', '2XS', 'S', 'M', 'L', 'XL', '2XL', 'XXL', '3XL', 'XXXL', '4XL', '5XL', '6XL', 'YXS', 'YS', 'YM', 'YL', 'YXL'];
-
-                    const groupedValues = Object.values(grouped);
-                    console.log('Grouped Values:', groupedValues);
-
-                    if (groupedValues.length === 0) {
-                      return (
-                        <div className="text-center py-12">
-                          <CheckCircle className="w-16 h-16 mx-auto text-green-500 mb-4" />
-                          <p className="text-gray-600 dark:text-gray-400">All items have been received</p>
-                        </div>
-                      );
-                    }
-
-                    return groupedValues.map((group, idx) => {
-                    const sortedSizes = [...group.sizes].sort((a, b) => {
-                      const idxA = SIZE_ORDER.findIndex(s => s.toUpperCase() === a.size.toUpperCase());
-                      const idxB = SIZE_ORDER.findIndex(s => s.toUpperCase() === b.size.toUpperCase());
-                      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-                      if (idxA !== -1) return -1;
-                      if (idxB !== -1) return 1;
-                      return a.size.localeCompare(b.size);
-                    });
-
-                    return (
-                      <div key={idx} className="border-2 border-gray-200 dark:border-slate-700 rounded-lg overflow-hidden">
-                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-4 border-b border-gray-200 dark:border-slate-700">
-                          <h4 className="font-bold text-gray-900 dark:text-white text-lg">
-                            {group.product_name}
-                          </h4>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                            {group.color}
-                          </p>
-                        </div>
-                        <div className="p-4">
-                          <div className="overflow-x-auto">
-                            <table className="w-full">
-                              <thead>
-                                <tr className="border-b-2 border-gray-200 dark:border-slate-700">
-                                  <th className="text-left py-2 px-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
-                                    Size
-                                  </th>
-                                  <th className="text-center py-2 px-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
-                                    Remaining
-                                  </th>
-                                  <th className="text-center py-2 px-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
-                                    Received
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {sortedSizes.map((sizeInfo) => (
-                                  <tr key={sizeInfo.id} className="border-b border-gray-100 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700/50">
-                                    <td className="py-2 px-3 font-medium text-gray-900 dark:text-white">
-                                      {sizeInfo.size}
-                                    </td>
-                                    <td className="py-2 px-3 text-center">
-                                      <span className="inline-flex items-center justify-center px-2 py-1 text-sm font-bold text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/40 rounded">
-                                        {sizeInfo.remaining}
-                                      </span>
-                                    </td>
-                                    <td className="py-2 px-3">
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        max={sizeInfo.remaining}
-                                        value={receivingQuantities[sizeInfo.id] || 0}
-                                        onChange={(e) =>
-                                          setReceivingQuantities({
-                                            ...receivingQuantities,
-                                            [sizeInfo.id]: Math.min(parseInt(e.target.value) || 0, sizeInfo.remaining),
-                                          })
-                                        }
-                                        className="w-full px-3 py-2 border-2 border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-700 dark:text-white text-center font-semibold"
-                                        placeholder="0"
-                                      />
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  });
-                })()}
-                </div>
-              )}
-            </div>
-            <div className="p-6 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 flex gap-3">
-              <button
-                onClick={() => setShowReceiveModal(false)}
-                className="flex-1 px-6 py-3 border-2 border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300 font-semibold transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleReceiveGoods}
-                disabled={updating}
-                className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2 font-semibold shadow-lg hover:shadow-xl transition-all"
-              >
-                {updating ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Package className="w-5 h-5" />
-                )}
-                Complete Receiving
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Validation Modal */}
       <POValidationModal

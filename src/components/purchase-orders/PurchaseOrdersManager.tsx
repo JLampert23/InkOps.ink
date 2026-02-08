@@ -37,6 +37,11 @@ export function PurchaseOrdersManager() {
     setCurrentView('detail');
   };
 
+  const handleReceiveFromDetail = (poId: string) => {
+    setReceivingPoId(poId);
+    setShowReceiveModal(true);
+  };
+
   const handleTabChange = (tab: Tab) => {
     setActiveTab(tab);
     setCurrentView('list');
@@ -53,6 +58,9 @@ export function PurchaseOrdersManager() {
   const handleReceiveSuccess = () => {
     setShowReceiveModal(false);
     setReceivingPoId(null);
+    if (currentView === 'detail' && selectedPoId) {
+      setSelectedPoId(selectedPoId);
+    }
   };
 
   const handleDashboardNavigate = (tab: string, view?: string, id?: string) => {
@@ -173,6 +181,7 @@ export function PurchaseOrdersManager() {
               <PurchaseOrderDetail
                 poId={selectedPoId}
                 onBack={handleBack}
+                onReceiveGoods={handleReceiveFromDetail}
               />
             )}
           </>
