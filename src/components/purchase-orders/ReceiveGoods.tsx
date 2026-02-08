@@ -1,16 +1,15 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase-client';
 import {
   X,
   Package,
-  CheckCircle2,
-  AlertTriangle,
-  Scan,
   Save,
   Loader2,
   AlertCircle,
+  Plus,
+  Minus,
+  CheckCircle2,
 } from 'lucide-react';
-import { POSettingsService } from '../../services/po-settings-service';
 import { ReceivingService } from '../../services/receiving-service';
 
 interface LineItem {
@@ -21,13 +20,7 @@ interface LineItem {
   size: string;
   quantity_ordered: number;
   quantity_received: number;
-  upc_code: string | null;
-  receiving: {
-    quantity_received: number;
-    quantity_damaged: number;
-    quantity_short: number;
-    variance_notes: string;
-  };
+  receiving_quantity: number;
 }
 
 interface PurchaseOrder {
@@ -44,11 +37,10 @@ interface PurchaseOrder {
 }
 
 interface GroupedItem {
-  key: string;
   style_number: string;
   product_name: string;
   color: string;
-  items: number[];
+  items: LineItem[];
 }
 
 interface ReceiveGoodsProps {
@@ -68,56 +60,18 @@ function sortSizes(a: string, b: string): number {
   return a.localeCompare(b);
 }
 
-function getSizeStatus(needed: number, received: number): 'none' | 'partial' | 'full' {
-  if (needed <= 0) return 'full';
-  if (received <= 0) return 'none';
-  if (received >= needed) return 'full';
-  return 'partial';
-}
-
-function StatusDot({ needed, received }: { needed: number; received: number }) {
-  const status = getSizeStatus(needed, received);
-  const colors = {
-    none: 'bg-red-500',
-    partial: 'bg-yellow-500',
-    full: 'bg-green-500',
-  };
-  const labels = {
-    none: 'Not received',
-    partial: 'Partially received',
-    full: 'Fully received',
-  };
-  return (
-    <span
-      className={`inline-block w-2.5 h-2.5 rounded-full ${colors[status]}`}
-      title={labels[status]}
-    />
-  );
-}
-
 export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
-  const [po, setPO] = useState<PurchaseOrder | null>(null);
+  const [po, setPo] = useState<PurchaseOrder | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [scanMode, setScanMode] = useState(false);
-  const [scanInput, setScanInput] = useState('');
-  const [notes, setNotes] = useState('');
-  const [markAsComplete, setMarkAsComplete] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const scanInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    loadPOData();
+    loadPODetails();
   }, [poId]);
 
-  useEffect(() => {
-    if (scanMode && scanInputRef.current) {
-      scanInputRef.current.focus();
-    }
-  }, [scanMode]);
-
-  const loadPOData = async () => {
+  const loadPODetails = async () => {
     try {
       setLoading(true);
 
@@ -126,10 +80,11 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
         .select(`
           id,
           po_number,
-          status,
-          confirmed_at,
+          vendor_name,
           expected_delivery_date,
           receiving_status,
+          status,
+          confirmed_at,
           vendors!vendor_id (
             vendor_name
           )
@@ -139,126 +94,90 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
 
       if (poError) throw poError;
 
-      const validation = await POSettingsService.canReceiveGoods({
-        status: poData.status,
-        confirmed_at: poData.confirmed_at,
-      });
+      const poWithVendorName = {
+        ...poData,
+        vendor_name: poData.vendors?.vendor_name || poData.vendor_name,
+      };
+      setPo(poWithVendorName);
 
-      if (!validation.allowed) {
-        setValidationError(validation.reason || 'Cannot receive goods for this PO.');
+      const settings = await ReceivingService.getSettings();
+      if (settings.require_vendor_confirmation && !poData.confirmed_at) {
+        setValidationError(
+          'This PO has not been confirmed by the vendor yet. Please wait for vendor confirmation before receiving goods.'
+        );
       }
 
       const { data: items, error: itemsError } = await supabase
-        .from('purchase_order_line_items')
+        .from('po_line_items')
         .select('*')
         .eq('po_id', poId)
-        .order('line_number');
+        .order('style_number')
+        .order('color')
+        .order('size');
 
       if (itemsError) throw itemsError;
-
-      setPO({
-        ...poData,
-        vendor_name: poData.vendors?.vendor_name || 'Unknown',
-      });
 
       setLineItems(
         (items || []).map((item) => ({
           ...item,
-          receiving: {
-            quantity_received: 0,
-            quantity_damaged: 0,
-            quantity_short: 0,
-            variance_notes: '',
-          },
+          receiving_quantity: 0,
         }))
       );
     } catch (error) {
-      console.error('Error loading PO data:', error);
-      alert('Failed to load purchase order');
-      onClose();
+      console.error('Error loading PO details:', error);
+      alert('Failed to load PO details');
     } finally {
       setLoading(false);
     }
   };
 
-  const grouped = useMemo<GroupedItem[]>(() => {
-    const map = new Map<string, GroupedItem>();
-    lineItems.forEach((item, idx) => {
-      const key = `${item.style_number}||${item.color}`;
-      if (!map.has(key)) {
-        map.set(key, {
-          key,
+  const groupedItems: GroupedItem[] = React.useMemo(() => {
+    const groups: { [key: string]: GroupedItem } = {};
+
+    lineItems.forEach((item) => {
+      const key = `${item.style_number}-${item.color}`;
+      if (!groups[key]) {
+        groups[key] = {
           style_number: item.style_number,
           product_name: item.product_name,
           color: item.color,
           items: [],
-        });
+        };
       }
-      map.get(key)!.items.push(idx);
+      groups[key].items.push(item);
     });
-    const groups = Array.from(map.values());
-    groups.forEach(g => {
-      g.items.sort((a, b) => sortSizes(lineItems[a].size, lineItems[b].size));
+
+    Object.values(groups).forEach((group) => {
+      group.items.sort((a, b) => sortSizes(a.size, b.size));
     });
-    return groups;
+
+    return Object.values(groups);
   }, [lineItems]);
 
-  const handleScan = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!scanInput.trim()) return;
-
-    const itemIndex = lineItems.findIndex(
-      (item) => item.upc_code === scanInput.trim() || item.style_number === scanInput.trim()
+  const updateQuantity = (itemId: string, delta: number) => {
+    setLineItems((prev) =>
+      prev.map((item) => {
+        if (item.id === itemId) {
+          const remaining = item.quantity_ordered - item.quantity_received;
+          const newQty = Math.max(0, Math.min(remaining, item.receiving_quantity + delta));
+          return { ...item, receiving_quantity: newQty };
+        }
+        return item;
+      })
     );
-
-    if (itemIndex !== -1) {
-      const updatedItems = [...lineItems];
-      updatedItems[itemIndex].receiving.quantity_received += 1;
-      setLineItems(updatedItems);
-      setScanInput('');
-
-      const itemElement = document.getElementById(`item-${itemIndex}`);
-      if (itemElement) {
-        itemElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        itemElement.classList.add('ring-2', 'ring-green-500');
-        setTimeout(() => {
-          itemElement.classList.remove('ring-2', 'ring-green-500');
-        }, 1000);
-      }
-    } else {
-      alert('Item not found in this PO');
-      setScanInput('');
-    }
   };
 
-  const updateReceiving = (index: number, field: keyof LineItem['receiving'], value: number) => {
-    const updatedItems = [...lineItems];
-    updatedItems[index].receiving[field] = Math.max(0, value) as never;
-    setLineItems(updatedItems);
-  };
-
-  const updateNotes = (index: number, notesVal: string) => {
-    const updatedItems = [...lineItems];
-    updatedItems[index].receiving.variance_notes = notesVal;
-    setLineItems(updatedItems);
-  };
-
-  const handleReceiveSize = (index: number) => {
-    const updatedItems = [...lineItems];
-    const item = updatedItems[index];
-    const remaining = item.quantity_ordered - item.quantity_received;
-    updatedItems[index].receiving.quantity_received = Math.max(0, remaining);
-    setLineItems(updatedItems);
-  };
-
-  const handleReceiveAllSizes = (group: GroupedItem) => {
-    const updatedItems = [...lineItems];
-    group.items.forEach(idx => {
-      const item = updatedItems[idx];
-      const remaining = item.quantity_ordered - item.quantity_received;
-      updatedItems[idx].receiving.quantity_received = Math.max(0, remaining);
-    });
-    setLineItems(updatedItems);
+  const setQuantity = (itemId: string, value: number) => {
+    setLineItems((prev) =>
+      prev.map((item) => {
+        if (item.id === itemId) {
+          const remaining = item.quantity_ordered - item.quantity_received;
+          const newQty = Math.max(0, Math.min(remaining, value));
+          return { ...item, receiving_quantity: newQty };
+        }
+        return item;
+      })
+    );
   };
 
   const handleSave = async () => {
@@ -274,7 +193,7 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
       if (!user) throw new Error('Not authenticated');
 
       const totalReceiving = lineItems.reduce(
-        (sum, item) => sum + item.receiving.quantity_received,
+        (sum, item) => sum + item.receiving_quantity,
         0
       );
 
@@ -284,78 +203,31 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
       }
 
       const receivingLineItems = lineItems
-        .filter(
-          (item) =>
-            item.receiving.quantity_received > 0 ||
-            item.receiving.quantity_damaged > 0 ||
-            item.receiving.quantity_short > 0
-        )
+        .filter((item) => item.receiving_quantity > 0)
         .map((item) => ({
           po_line_item_id: item.id,
-          quantity_received: item.receiving.quantity_received,
-          quantity_damaged: item.receiving.quantity_damaged,
-          quantity_short: item.receiving.quantity_short,
-          variance_notes: item.receiving.variance_notes || '',
+          quantity_received: item.receiving_quantity,
+          quantity_damaged: 0,
+          quantity_short: 0,
+          variance_notes: '',
         }));
 
-      const { data: result, error } = await ReceivingService.processReceiving(
-        poId,
-        user.id,
-        receivingLineItems,
-        notes
-      );
+      await ReceivingService.recordReceipt(poId, receivingLineItems, user.id);
 
-      if (error) throw error;
-
-      if (!result?.success) {
-        if (result?.error === 'vendor_confirmation_required') {
-          alert(
-            'This PO requires vendor confirmation before receiving. Please confirm the PO first.'
-          );
-        } else {
-          alert(result?.message || 'Failed to process receiving');
-        }
-        return;
-      }
-
-      alert(result.message || 'Goods received successfully');
+      alert('Goods received successfully!');
       onSuccess();
-    } catch (error) {
-      console.error('Error saving receiving:', error);
-      alert('Failed to save receiving data');
+      onClose();
+    } catch (error: any) {
+      console.error('Error saving receipt:', error);
+      alert(`Failed to record receipt: ${error.message}`);
     } finally {
       setSaving(false);
     }
   };
 
-  const getTotalStats = () => {
-    return lineItems.reduce(
-      (acc, item) => ({
-        ordered: acc.ordered + item.quantity_ordered,
-        previouslyReceived: acc.previouslyReceived + item.quantity_received,
-        receiving: acc.receiving + item.receiving.quantity_received,
-        damaged: acc.damaged + item.receiving.quantity_damaged,
-        short: acc.short + item.receiving.quantity_short,
-      }),
-      { ordered: 0, previouslyReceived: 0, receiving: 0, damaged: 0, short: 0 }
-    );
-  };
-
-  const getGroupStatus = (group: GroupedItem): 'none' | 'partial' | 'full' => {
-    let allFull = true;
-    let anyReceived = false;
-    group.items.forEach(idx => {
-      const item = lineItems[idx];
-      const needed = item.quantity_ordered - item.quantity_received;
-      if (item.receiving.quantity_received > 0) anyReceived = true;
-      if (item.receiving.quantity_received < needed) allFull = false;
-    });
-    if (allFull) return 'full';
-    if (anyReceived) return 'partial';
-    return 'none';
-  };
-
-  const stats = getTotalStats();
+  const totalReceiving = lineItems.reduce((sum, item) => sum + item.receiving_quantity, 0);
+  const totalOrdered = lineItems.reduce((sum, item) => sum + item.quantity_ordered, 0);
+  const totalPreviouslyReceived = lineItems.reduce((sum, item) => sum + item.quantity_received, 0);
 
   if (loading) {
     return (
@@ -371,20 +243,27 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="p-6 border-b border-gray-200 dark:border-slate-700">
+      <div className="bg-white dark:bg-slate-800 rounded-lg max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+        <div className="px-6 py-5 border-b border-gray-200 dark:border-slate-700 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-slate-800 dark:to-slate-900">
           <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                Receive Goods
-              </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                PO: {po.po_number} | Vendor: {po.vendor_name}
-              </p>
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-blue-600 rounded-lg">
+                <Package className="w-7 h-7 text-white" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  Receive Goods
+                </h2>
+                <div className="flex items-center gap-4 mt-1 text-sm text-gray-600 dark:text-gray-400">
+                  <span className="font-medium">PO: {po.po_number}</span>
+                  <span className="text-gray-400">•</span>
+                  <span>{po.vendor_name}</span>
+                </div>
+              </div>
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+              className="p-2 hover:bg-white/50 dark:hover:bg-slate-700 rounded-lg transition-colors"
             >
               <X className="w-6 h-6 text-gray-600 dark:text-gray-400" />
             </button>
@@ -392,9 +271,9 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
         </div>
 
         {validationError && (
-          <div className="p-6 border-b border-gray-200 dark:border-slate-700 bg-red-50 dark:bg-red-900/20">
-            <div className="flex items-center gap-3">
-              <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400 flex-shrink-0" />
+          <div className="mx-6 mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-semibold text-red-900 dark:text-red-200">Cannot Receive Goods</p>
                 <p className="text-sm text-red-700 dark:text-red-300 mt-1">{validationError}</p>
@@ -403,320 +282,203 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
           </div>
         )}
 
-        <div className="p-6 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
-          <div className="grid grid-cols-5 gap-4 text-center">
-            <div>
-              <p className="text-xs text-gray-600 dark:text-gray-400 uppercase mb-1">Ordered</p>
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.ordered}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-600 dark:text-gray-400 uppercase mb-1">Previously</p>
-              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                {stats.previouslyReceived}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-600 dark:text-gray-400 uppercase mb-1">Receiving Now</p>
-              <p className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.receiving}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-600 dark:text-gray-400 uppercase mb-1">Damaged</p>
-              <p className="text-2xl font-bold text-red-600 dark:text-red-400">{stats.damaged}</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-600 dark:text-gray-400 uppercase mb-1">Short</p>
-              <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{stats.short}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="p-4 border-b border-gray-200 dark:border-slate-700 bg-blue-50 dark:bg-blue-900/20">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setScanMode(!scanMode)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                scanMode
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white dark:bg-slate-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-slate-600'
-              }`}
-            >
-              <Scan className="w-5 h-5" />
-              {scanMode ? 'Scanning Active' : 'Enable Scan Mode'}
-            </button>
-            {scanMode && (
-              <form onSubmit={handleScan} className="flex-1">
-                <input
-                  ref={scanInputRef}
-                  type="text"
-                  value={scanInput}
-                  onChange={(e) => setScanInput(e.target.value)}
-                  placeholder="Scan barcode or enter SKU..."
-                  className="w-full px-4 py-2 border border-blue-300 dark:border-blue-700 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
-                />
-              </form>
-            )}
-          </div>
-          {scanMode && (
-            <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
-              <AlertCircle className="w-3 h-3 inline mr-1" />
-              Scan items or enter SKU to automatically increment received quantity
-            </p>
-          )}
-        </div>
-
         <div className="flex-1 overflow-y-auto p-6">
           <div className="space-y-6">
-            {grouped.map((group) => {
-              const groupStatus = getGroupStatus(group);
-              const groupTotalOrdered = group.items.reduce((s, idx) => s + lineItems[idx].quantity_ordered, 0);
-              const groupTotalPrev = group.items.reduce((s, idx) => s + lineItems[idx].quantity_received, 0);
-              const groupTotalReceiving = group.items.reduce((s, idx) => s + lineItems[idx].receiving.quantity_received, 0);
-              const groupRemaining = groupTotalOrdered - groupTotalPrev;
-              const allFullyReceived = group.items.every(idx => {
-                const item = lineItems[idx];
-                return item.receiving.quantity_received >= (item.quantity_ordered - item.quantity_received);
-              });
+            {groupedItems.map((group) => {
+              const groupTotal = group.items.reduce((sum, item) => sum + item.receiving_quantity, 0);
+              const groupOrdered = group.items.reduce((sum, item) => sum + item.quantity_ordered, 0);
+              const groupPrevReceived = group.items.reduce((sum, item) => sum + item.quantity_received, 0);
+              const groupRemaining = groupOrdered - groupPrevReceived;
 
               return (
                 <div
-                  key={group.key}
-                  className="border border-gray-200 dark:border-slate-700 rounded-lg overflow-hidden"
+                  key={`${group.style_number}-${group.color}`}
+                  className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg overflow-hidden"
                 >
-                  <div className="flex items-center justify-between px-5 py-4 bg-gray-50 dark:bg-slate-900/60 border-b border-gray-200 dark:border-slate-700">
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`w-3 h-3 rounded-full flex-shrink-0 ${
-                          groupStatus === 'full'
-                            ? 'bg-green-500'
-                            : groupStatus === 'partial'
-                            ? 'bg-yellow-500'
-                            : 'bg-red-500'
-                        }`}
-                      />
-                      <div>
-                        <h4 className="font-semibold text-gray-900 dark:text-white">
-                          {group.style_number}
-                        </h4>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {group.product_name} &mdash; {group.color}
-                        </p>
+                  <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-slate-800 dark:to-slate-900 px-4 py-3 border-b border-gray-200 dark:border-slate-700">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div>
+                          <h3 className="font-semibold text-gray-900 dark:text-white text-lg">
+                            {group.product_name}
+                          </h3>
+                          <div className="flex items-center gap-3 mt-1 text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">
+                              Style: <span className="font-medium text-gray-900 dark:text-white">{group.style_number}</span>
+                            </span>
+                            <span className="text-gray-400">•</span>
+                            <span className="text-gray-600 dark:text-gray-400">
+                              Color: <span className="font-medium text-gray-900 dark:text-white">{group.color}</span>
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right text-sm text-gray-600 dark:text-gray-400">
-                        <span>Ordered: <span className="font-semibold text-gray-900 dark:text-white">{groupTotalOrdered}</span></span>
-                        <span className="mx-2">|</span>
-                        <span>Prev: <span className="font-semibold text-blue-600 dark:text-blue-400">{groupTotalPrev}</span></span>
-                        <span className="mx-2">|</span>
-                        <span>Receiving: <span className="font-semibold text-green-600 dark:text-green-400">{groupTotalReceiving}</span></span>
+                      <div className="flex items-center gap-6 text-sm">
+                        <div className="text-center">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
+                            Remaining
+                          </div>
+                          <div className="text-xl font-bold text-gray-900 dark:text-white">
+                            {groupRemaining}
+                          </div>
+                        </div>
+                        {groupTotal > 0 && (
+                          <div className="text-center">
+                            <div className="text-xs text-green-600 dark:text-green-400 uppercase tracking-wide mb-1">
+                              Receiving
+                            </div>
+                            <div className="text-xl font-bold text-green-600 dark:text-green-400">
+                              {groupTotal}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      {!allFullyReceived && groupRemaining > 0 && (
-                        <button
-                          onClick={() => handleReceiveAllSizes(group)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-                        >
-                          <CheckCircle2 className="w-4 h-4" />
-                          Receive All Sizes
-                        </button>
-                      )}
-                      {allFullyReceived && (
-                        <span className="flex items-center gap-1.5 text-sm font-medium text-green-600 dark:text-green-400">
-                          <CheckCircle2 className="w-4 h-4" />
-                          All Received
-                        </span>
-                      )}
                     </div>
                   </div>
 
-                  <div className="divide-y divide-gray-100 dark:divide-slate-700/50">
-                    <div className="grid grid-cols-12 gap-2 px-5 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-50/50 dark:bg-slate-800/50">
-                      <div className="col-span-1">Status</div>
-                      <div className="col-span-1">Size</div>
-                      <div className="col-span-1 text-center">Needed</div>
-                      <div className="col-span-1 text-center">Prev</div>
-                      <div className="col-span-3 text-center">Receiving</div>
-                      <div className="col-span-1 text-center">Damaged</div>
-                      <div className="col-span-1 text-center">Short</div>
-                      <div className="col-span-3">Notes</div>
-                    </div>
-
-                    {group.items.map((itemIdx) => {
-                      const item = lineItems[itemIdx];
-                      const needed = item.quantity_ordered - item.quantity_received;
-                      const isFullyReceived = item.receiving.quantity_received >= needed && needed > 0;
-                      const hasVariance = item.receiving.quantity_damaged > 0 || item.receiving.quantity_short > 0;
-
-                      return (
-                        <div
-                          key={item.id}
-                          id={`item-${itemIdx}`}
-                          className={`grid grid-cols-12 gap-2 px-5 py-3 items-center transition-colors ${
-                            isFullyReceived
-                              ? 'bg-green-50/50 dark:bg-green-900/10'
-                              : hasVariance
-                              ? 'bg-orange-50/50 dark:bg-orange-900/10'
-                              : 'hover:bg-gray-50 dark:hover:bg-slate-700/30'
-                          }`}
-                        >
-                          <div className="col-span-1 flex items-center">
-                            <StatusDot needed={needed} received={item.receiving.quantity_received} />
-                          </div>
-
-                          <div className="col-span-1">
-                            <span className="inline-flex items-center justify-center px-2.5 py-1 text-sm font-semibold rounded bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-gray-200 min-w-[3rem] text-center">
-                              {item.size}
-                            </span>
-                          </div>
-
-                          <div className="col-span-1 text-center">
-                            <span className="text-sm font-semibold text-gray-900 dark:text-white">{needed}</span>
-                          </div>
-
-                          <div className="col-span-1 text-center">
-                            <span className="text-sm text-blue-600 dark:text-blue-400">{item.quantity_received}</span>
-                          </div>
-
-                          <div className="col-span-3">
-                            <div className="flex items-center gap-1.5">
-                              <input
-                                type="number"
-                                min={0}
-                                step={1}
-                                value={item.receiving.quantity_received}
-                                onChange={(e) =>
-                                  updateReceiving(
-                                    itemIdx,
-                                    'quantity_received',
-                                    parseInt(e.target.value) || 0
-                                  )
-                                }
-                                className={`w-20 px-2 py-1.5 border rounded text-center text-sm font-medium dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                                  isFullyReceived
-                                    ? 'border-green-400 dark:border-green-600 bg-green-50 dark:bg-green-900/20'
-                                    : 'border-gray-300 dark:border-slate-600'
-                                }`}
-                              />
-                              {!isFullyReceived && needed > 0 && (
-                                <button
-                                  onClick={() => handleReceiveSize(itemIdx)}
-                                  className="px-2 py-1.5 text-xs font-medium text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30 hover:bg-green-200 dark:hover:bg-green-900/50 rounded transition-colors whitespace-nowrap"
-                                >
-                                  Receive All
-                                </button>
-                              )}
-                              {isFullyReceived && (
-                                <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="col-span-1">
-                            <input
-                              type="number"
-                              min={0}
-                              step={1}
-                              value={item.receiving.quantity_damaged}
-                              onChange={(e) =>
-                                updateReceiving(itemIdx, 'quantity_damaged', parseInt(e.target.value) || 0)
-                              }
-                              className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-center text-sm dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500"
-                            />
-                          </div>
-
-                          <div className="col-span-1">
-                            <input
-                              type="number"
-                              min={0}
-                              step={1}
-                              value={item.receiving.quantity_short}
-                              onChange={(e) =>
-                                updateReceiving(itemIdx, 'quantity_short', parseInt(e.target.value) || 0)
-                              }
-                              className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-center text-sm dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500"
-                            />
-                          </div>
-
-                          <div className="col-span-3">
-                            <input
-                              type="text"
-                              value={item.receiving.variance_notes}
-                              onChange={(e) => updateNotes(itemIdx, e.target.value)}
-                              placeholder="Optional..."
-                              className="w-full px-2 py-1.5 border border-gray-300 dark:border-slate-600 rounded text-sm dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500"
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-gray-50 dark:bg-slate-800">
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                            Size
+                          </th>
+                          <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                            Ordered
+                          </th>
+                          <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                            Previously Received
+                          </th>
+                          <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                            Remaining
+                          </th>
+                          <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                            Receive Now
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
+                        {group.items.map((item) => {
+                          const remaining = item.quantity_ordered - item.quantity_received;
+                          return (
+                            <tr
+                              key={item.id}
+                              className="hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors"
+                            >
+                              <td className="px-4 py-4">
+                                <span className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold rounded-lg text-sm shadow-sm">
+                                  {item.size}
+                                </span>
+                              </td>
+                              <td className="px-4 py-4 text-center text-gray-900 dark:text-white font-medium">
+                                {item.quantity_ordered}
+                              </td>
+                              <td className="px-4 py-4 text-center text-gray-600 dark:text-gray-400">
+                                {item.quantity_received}
+                              </td>
+                              <td className="px-4 py-4 text-center">
+                                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
+                                  {remaining}
+                                </span>
+                              </td>
+                              <td className="px-4 py-4">
+                                <div className="flex items-center justify-center gap-3">
+                                  <button
+                                    onClick={() => updateQuantity(item.id, -1)}
+                                    disabled={item.receiving_quantity <= 0}
+                                    className="p-2 rounded-lg bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                  >
+                                    <Minus className="w-4 h-4 text-gray-700 dark:text-gray-300" />
+                                  </button>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max={remaining}
+                                    value={item.receiving_quantity}
+                                    onChange={(e) => setQuantity(item.id, parseInt(e.target.value) || 0)}
+                                    className="w-20 px-3 py-2 text-center text-lg font-bold border-2 border-gray-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                                  />
+                                  <button
+                                    onClick={() => updateQuantity(item.id, 1)}
+                                    disabled={item.receiving_quantity >= remaining}
+                                    className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30 hover:bg-green-200 dark:hover:bg-green-900/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                  >
+                                    <Plus className="w-4 h-4 text-green-700 dark:text-green-400" />
+                                  </button>
+                                  {remaining > 0 && item.receiving_quantity !== remaining && (
+                                    <button
+                                      onClick={() => setQuantity(item.id, remaining)}
+                                      className="ml-2 px-3 py-2 text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                                    >
+                                      All
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               );
             })}
-
-            {grouped.length === 0 && (
-              <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                <Package className="w-12 h-12 mx-auto mb-3 opacity-40" />
-                <p className="text-lg font-medium">No line items found</p>
-                <p className="text-sm mt-1">This purchase order has no items to receive.</p>
-              </div>
-            )}
           </div>
         </div>
 
-        <div className="p-6 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Receiving Notes
-              </label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={2}
-                placeholder="Add any notes about this receiving..."
-                className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={markAsComplete}
-                  onChange={(e) => setMarkAsComplete(e.target.checked)}
-                  className="rounded border-gray-300 dark:border-slate-600"
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">
-                  Mark PO as fully received (close PO)
-                </span>
-              </label>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={onClose}
-                  disabled={saving}
-                  className="px-6 py-2 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300 disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={saving || stats.receiving === 0}
-                  className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4" />
-                      Save Receiving
-                    </>
-                  )}
-                </button>
+        <div className="border-t border-gray-200 dark:border-slate-700 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-slate-800 dark:to-slate-900 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-8">
+              <div>
+                <div className="text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1">
+                  Total Ordered
+                </div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                  {totalOrdered}
+                </div>
               </div>
+              <div>
+                <div className="text-xs text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1">
+                  Previously Received
+                </div>
+                <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
+                  {totalPreviouslyReceived}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-green-600 dark:text-green-400 uppercase tracking-wide mb-1">
+                  Receiving Now
+                </div>
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  {totalReceiving}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={onClose}
+                className="px-6 py-3 text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving || totalReceiving === 0 || !!validationError}
+                className="px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-lg shadow-green-500/20 transition-all flex items-center gap-2"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-5 h-5" />
+                    Complete Receiving ({totalReceiving} items)
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
