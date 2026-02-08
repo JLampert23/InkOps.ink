@@ -786,6 +786,7 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
         vendorId={poModal.vendorId}
         companyId={companyId || ''}
         items={poModal.items}
+        vendors={vendors}
         onSuccess={handlePOSuccess}
       />
 

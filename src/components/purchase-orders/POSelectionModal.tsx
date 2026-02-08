@@ -7,7 +7,6 @@ import {
   FileText,
   Building2,
   CheckCircle,
-  AlertCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { POSettingsService } from '../../services/po-settings-service';
@@ -20,6 +19,11 @@ interface LineItemPayload {
   quantity: number;
 }
 
+interface Vendor {
+  id: string;
+  vendor_name: string;
+}
+
 interface POSelectionModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -27,6 +31,7 @@ interface POSelectionModalProps {
   vendorId: string | null;
   companyId: string;
   items: LineItemPayload[];
+  vendors: Vendor[];
   onSuccess: (poNumber: string) => void;
 }
 
@@ -42,26 +47,38 @@ export function POSelectionModal({
   isOpen,
   onClose,
   vendorName,
-  vendorId,
+  vendorId: initialVendorId,
   companyId,
   items,
+  vendors,
   onSuccess,
 }: POSelectionModalProps) {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [openPOs, setOpenPOs] = useState<OpenPO[]>([]);
   const [selectedPOId, setSelectedPOId] = useState<string>('');
+  const [activeVendorId, setActiveVendorId] = useState<string | null>(initialVendorId);
+  const [activeVendorName, setActiveVendorName] = useState(vendorName);
+  const [needsVendorSelect, setNeedsVendorSelect] = useState(!initialVendorId);
+  const [pickedVendorId, setPickedVendorId] = useState<string>('');
 
   useEffect(() => {
-    if (isOpen && vendorId) {
-      loadOpenPOs();
-    } else if (isOpen) {
-      setLoading(false);
+    if (!isOpen) return;
+    setActiveVendorId(initialVendorId);
+    setActiveVendorName(vendorName);
+    setSelectedPOId('');
+    setPickedVendorId('');
+    if (initialVendorId) {
+      setNeedsVendorSelect(false);
+      loadOpenPOs(initialVendorId);
+    } else {
+      setNeedsVendorSelect(true);
       setOpenPOs([]);
+      setLoading(false);
     }
-  }, [isOpen, vendorId]);
+  }, [isOpen, initialVendorId, vendorName]);
 
-  const loadOpenPOs = async () => {
+  const loadOpenPOs = async (vid: string) => {
     try {
       setLoading(true);
       setSelectedPOId('');
@@ -71,7 +88,7 @@ export function POSelectionModal({
         .from('purchase_orders')
         .select('id, po_number, status, created_at, total_cost')
         .eq('company_id', companyId)
-        .eq('vendor_id', vendorId!)
+        .eq('vendor_id', vid)
         .in('status', ['draft', 'sent'])
         .gte('created_at', `${todayStr}T00:00:00`)
         .lte('created_at', `${todayStr}T23:59:59.999`)
@@ -85,6 +102,16 @@ export function POSelectionModal({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleVendorConfirm = () => {
+    if (!pickedVendorId) return;
+    const v = vendors.find((x) => x.id === pickedVendorId);
+    if (!v) return;
+    setActiveVendorId(v.id);
+    setActiveVendorName(v.vendor_name);
+    setNeedsVendorSelect(false);
+    loadOpenPOs(v.id);
   };
 
   const insertLineItems = async (poId: string) => {
@@ -147,6 +174,7 @@ export function POSelectionModal({
   };
 
   const handleCreateNew = async () => {
+    if (!activeVendorId) return;
     try {
       setProcessing(true);
 
@@ -160,7 +188,7 @@ export function POSelectionModal({
         .insert({
           company_id: companyId,
           po_number: poNumber,
-          vendor_id: vendorId,
+          vendor_id: activeVendorId,
           status: 'draft',
           subtotal: 0,
           tax_amount: 0,
@@ -232,8 +260,7 @@ export function POSelectionModal({
                   Add to Purchase Order
                 </h3>
                 <p className="text-sm text-gray-400 mt-0.5">
-                  {vendorName} &middot; {items.length} line items &middot;{' '}
-                  {totalQty} units
+                  {items.length} line items &middot; {totalQty} units
                 </p>
               </div>
             </div>
@@ -248,32 +275,58 @@ export function POSelectionModal({
         </div>
 
         <div className="p-6">
-          {loading ? (
+          {needsVendorSelect ? (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-300">
+                Select the vendor for this purchase order.
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Vendor
+                </label>
+                <select
+                  value={pickedVendorId}
+                  onChange={(e) => setPickedVendorId(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-slate-800 border border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-white"
+                >
+                  <option value="">Choose a vendor...</option>
+                  {vendors.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.vendor_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleVendorConfirm}
+                  disabled={!pickedVendorId}
+                  className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-1 justify-center"
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
+          ) : loading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
-            </div>
-          ) : !vendorId ? (
-            <div className="text-center py-6">
-              <AlertCircle className="w-10 h-10 text-orange-400 mx-auto mb-3" />
-              <p className="text-white font-medium mb-1">Vendor Not Found</p>
-              <p className="text-sm text-gray-400">
-                &quot;{vendorName}&quot; does not match any vendor in your
-                system. Please add this vendor first.
-              </p>
-              <button
-                onClick={onClose}
-                className="mt-4 px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors"
-              >
-                Close
-              </button>
             </div>
           ) : openPOs.length === 0 ? (
             <div className="text-center py-4">
               <FileText className="w-10 h-10 text-gray-500 mx-auto mb-3" />
               <p className="text-white font-medium mb-1">No Open PO Found</p>
               <p className="text-sm text-gray-400 mb-6">
-                No open purchase order found for {vendorName} today. Create a
-                new one?
+                No open purchase order found for{' '}
+                <span className="text-white font-medium">
+                  {activeVendorName}
+                </span>{' '}
+                today. Create a new one?
               </p>
               <div className="flex gap-3 justify-center">
                 <button
