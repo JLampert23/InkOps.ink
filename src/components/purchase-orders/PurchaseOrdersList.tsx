@@ -17,6 +17,7 @@ import {
   X,
   Archive,
   FileText,
+  Trash2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -260,6 +261,36 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
       newSelected.add(poId);
     }
     setSelectedPos(newSelected);
+  };
+
+  const handleDeletePO = async (po: PurchaseOrder) => {
+    if (!confirm(`Delete purchase order ${po.po_number}? This will also remove all associated line items and cannot be undone.`)) return;
+
+    try {
+      const { error: lineItemsError } = await supabase
+        .from('po_line_items')
+        .delete()
+        .eq('purchase_order_id', po.id);
+
+      if (lineItemsError) throw lineItemsError;
+
+      const { error: poError } = await supabase
+        .from('purchase_orders')
+        .delete()
+        .eq('id', po.id);
+
+      if (poError) throw poError;
+
+      setSelectedPos((prev) => {
+        const next = new Set(prev);
+        next.delete(po.id);
+        return next;
+      });
+      loadPurchaseOrders();
+    } catch (error) {
+      console.error('Error deleting purchase order:', error);
+      alert('Failed to delete purchase order');
+    }
   };
 
   const clearFilters = () => {
@@ -575,6 +606,13 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
                         >
                           <Eye className="w-4 h-4" />
                           View
+                        </button>
+                        <button
+                          onClick={() => handleDeletePO(po)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all font-medium"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Delete
                         </button>
                       </div>
                     </td>
