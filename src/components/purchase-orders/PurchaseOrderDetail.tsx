@@ -1009,61 +1009,113 @@ export function PurchaseOrderDetail({ poId, onBack }: PurchaseOrderDetailProps) 
       {/* Receive Goods Modal */}
       {showReceiveModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden border border-gray-200 dark:border-slate-700">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-4xl w-full max-h-[85vh] overflow-hidden border border-gray-200 dark:border-slate-700">
             <div className="p-6 border-b border-gray-200 dark:border-slate-700 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20">
               <h3 className="text-xl font-bold text-gray-900 dark:text-white">
                 Receive Goods
               </h3>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Enter the quantities received for each item
+                Enter quantities received by size for each product/color combination
               </p>
             </div>
-            <div className="p-6 overflow-y-auto max-h-[calc(80vh-180px)]">
-              <div className="space-y-4">
-                {lineItems.map((item) => {
-                  const remaining = item.quantity_ordered - item.quantity_received;
-                  if (remaining <= 0) return null;
+            <div className="p-6 overflow-y-auto max-h-[calc(85vh-180px)]">
+              <div className="space-y-6">
+                {(() => {
+                  const grouped = lineItems.reduce((acc, item) => {
+                    const remaining = item.quantity_ordered - item.quantity_received;
+                    if (remaining <= 0) return acc;
 
-                  return (
-                    <div
-                      key={item.id}
-                      className="border-2 border-gray-200 dark:border-slate-700 rounded-lg p-4 hover:border-blue-500 dark:hover:border-blue-500 transition-all"
-                    >
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="flex-1">
-                          <p className="font-semibold text-gray-900 dark:text-white">
-                            {item.product_name}
-                          </p>
+                    const key = `${item.product_name}|||${item.color}`;
+                    if (!acc[key]) {
+                      acc[key] = {
+                        product_name: item.product_name,
+                        color: item.color,
+                        sizes: []
+                      };
+                    }
+                    acc[key].sizes.push({
+                      id: item.id,
+                      size: item.size,
+                      remaining
+                    });
+                    return acc;
+                  }, {} as Record<string, { product_name: string; color: string; sizes: Array<{ id: string; size: string; remaining: number }> }>);
+
+                  const SIZE_ORDER = ['XS', '2XS', 'S', 'M', 'L', 'XL', '2XL', 'XXL', '3XL', 'XXXL', '4XL', '5XL', '6XL', 'YXS', 'YS', 'YM', 'YL', 'YXL'];
+
+                  return Object.values(grouped).map((group, idx) => {
+                    const sortedSizes = [...group.sizes].sort((a, b) => {
+                      const idxA = SIZE_ORDER.findIndex(s => s.toUpperCase() === a.size.toUpperCase());
+                      const idxB = SIZE_ORDER.findIndex(s => s.toUpperCase() === b.size.toUpperCase());
+                      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                      if (idxA !== -1) return -1;
+                      if (idxB !== -1) return 1;
+                      return a.size.localeCompare(b.size);
+                    });
+
+                    return (
+                      <div key={idx} className="border-2 border-gray-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 p-4 border-b border-gray-200 dark:border-slate-700">
+                          <h4 className="font-bold text-gray-900 dark:text-white text-lg">
+                            {group.product_name}
+                          </h4>
                           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                            {item.color && item.size
-                              ? `${item.color} / ${item.size}`
-                              : item.color || item.size || ''}
+                            {group.color}
                           </p>
                         </div>
-                        <div className="text-right ml-4">
-                          <p className="text-xs text-gray-500 dark:text-gray-400">Remaining</p>
-                          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                            {remaining}
-                          </p>
+                        <div className="p-4">
+                          <div className="overflow-x-auto">
+                            <table className="w-full">
+                              <thead>
+                                <tr className="border-b-2 border-gray-200 dark:border-slate-700">
+                                  <th className="text-left py-2 px-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                    Size
+                                  </th>
+                                  <th className="text-center py-2 px-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                    Remaining
+                                  </th>
+                                  <th className="text-center py-2 px-3 text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                    Received
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {sortedSizes.map((sizeInfo) => (
+                                  <tr key={sizeInfo.id} className="border-b border-gray-100 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700/50">
+                                    <td className="py-2 px-3 font-medium text-gray-900 dark:text-white">
+                                      {sizeInfo.size}
+                                    </td>
+                                    <td className="py-2 px-3 text-center">
+                                      <span className="inline-flex items-center justify-center px-2 py-1 text-sm font-bold text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/40 rounded">
+                                        {sizeInfo.remaining}
+                                      </span>
+                                    </td>
+                                    <td className="py-2 px-3">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max={sizeInfo.remaining}
+                                        value={receivingQuantities[sizeInfo.id] || 0}
+                                        onChange={(e) =>
+                                          setReceivingQuantities({
+                                            ...receivingQuantities,
+                                            [sizeInfo.id]: Math.min(parseInt(e.target.value) || 0, sizeInfo.remaining),
+                                          })
+                                        }
+                                        className="w-full px-3 py-2 border-2 border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-700 dark:text-white text-center font-semibold"
+                                        placeholder="0"
+                                      />
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
                       </div>
-                      <input
-                        type="number"
-                        min="0"
-                        max={remaining}
-                        value={receivingQuantities[item.id] || 0}
-                        onChange={(e) =>
-                          setReceivingQuantities({
-                            ...receivingQuantities,
-                            [item.id]: Math.min(parseInt(e.target.value) || 0, remaining),
-                          })
-                        }
-                        className="w-full px-4 py-3 border-2 border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-700 dark:text-white text-lg font-semibold"
-                        placeholder="Quantity received"
-                      />
-                    </div>
-                  );
-                })}
+                    );
+                  });
+                })()}
               </div>
             </div>
             <div className="p-6 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 flex gap-3">
@@ -1083,7 +1135,7 @@ export function PurchaseOrderDetail({ poId, onBack }: PurchaseOrderDetailProps) 
                 ) : (
                   <Package className="w-5 h-5" />
                 )}
-                Confirm Receipt
+                Complete Receiving
               </button>
             </div>
           </div>
