@@ -80,6 +80,7 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
   const [selectedCustomer, setSelectedCustomer] = useState<string>('all');
   const [groupBy, setGroupBy] = useState<'style' | 'vendor' | 'job' | 'customer'>('style');
   const [showMissingOnly, setShowMissingOnly] = useState(false);
+  const [hideFullyOnPO, setHideFullyOnPO] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedGarment, setSelectedGarment] = useState<GarmentRow | null>(null);
   const [showDrillDown, setShowDrillDown] = useState(false);
@@ -114,7 +115,7 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
 
   useEffect(() => {
     applyFilters();
-  }, [garments, searchTerm, selectedVendor, selectedCustomer, showMissingOnly]);
+  }, [garments, searchTerm, selectedVendor, selectedCustomer, showMissingOnly, hideFullyOnPO]);
 
   const showToast = (message: string) => {
     setToast({ message, visible: true });
@@ -314,6 +315,10 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
       );
     }
 
+    if (hideFullyOnPO) {
+      filtered = filtered.filter((g) => g.total_on_po < g.total_needed);
+    }
+
     if (showMissingOnly) {
       filtered = filtered.filter((g) => g.total_remaining > 0);
     }
@@ -438,6 +443,7 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
     setSelectedVendor('all');
     setSelectedCustomer('all');
     setShowMissingOnly(false);
+    setHideFullyOnPO(true);
   };
 
   const stats = filteredGarments.reduce(
@@ -587,15 +593,26 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Options</label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={showMissingOnly}
-                  onChange={(e) => setShowMissingOnly(e.target.checked)}
-                  className="rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="text-sm text-gray-300">Show missing items only</span>
-              </label>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={hideFullyOnPO}
+                    onChange={(e) => setHideFullyOnPO(e.target.checked)}
+                    className="rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-300">Hide items fully on PO</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={showMissingOnly}
+                    onChange={(e) => setShowMissingOnly(e.target.checked)}
+                    className="rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-300">Show missing items only</span>
+                </label>
+              </div>
             </div>
             {(searchTerm || selectedVendor !== 'all' || selectedCustomer !== 'all' || showMissingOnly) && (
               <div className="col-span-full">
