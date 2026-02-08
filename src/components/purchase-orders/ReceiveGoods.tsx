@@ -10,7 +10,6 @@ import {
   Minus,
   CheckCircle2,
 } from 'lucide-react';
-import { ReceivingService } from '../../services/receiving-service';
 
 interface LineItem {
   id: string;
@@ -94,11 +93,18 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
       };
       setPo(poWithVendorName);
 
-      const settings = await ReceivingService.getSettings();
-      if (settings.require_vendor_confirmation && !poData.confirmed_at) {
-        setValidationError(
-          'This PO has not been confirmed by the vendor yet. Please wait for vendor confirmation before receiving goods.'
-        );
+      if (poData.company_id) {
+        const { data: settings } = await supabase
+          .from('receiving_settings')
+          .select('require_vendor_confirmation')
+          .eq('company_id', poData.company_id)
+          .maybeSingle();
+
+        if (settings?.require_vendor_confirmation && !poData.confirmed_at) {
+          setValidationError(
+            'This PO has not been confirmed by the vendor yet. Please wait for vendor confirmation before receiving goods.'
+          );
+        }
       }
 
       const { data: items, error: itemsError } = await supabase
