@@ -170,11 +170,12 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
         item_number:style_number, product_name, color, size,
         quantity_ordered, quantity_received, po_id,
         purchase_orders!inner (
-          id, po_number, company_id,
+          id, po_number, status, company_id,
           vendors!purchase_orders_vendor_id_fkey (vendor_name)
         )
       `)
-      .eq('purchase_orders.company_id', cid);
+      .eq('purchase_orders.company_id', cid)
+      .in('purchase_orders.status', ['draft', 'sent', 'partially_received', 'received']);
 
     if (poError) throw poError;
 
@@ -185,6 +186,8 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
       '2XL': 'qty_2xl', '3XL': 'qty_3xl', '4XL': 'qty_4xl', '5XL': 'qty_5xl',
       YXS: 'qty_yxs', YS: 'qty_ys', YM: 'qty_ym', YL: 'qty_yl', YXL: 'qty_yxl',
     };
+
+    const sizeUpperMap = new Map(ALL_SIZES.map((s) => [s.toUpperCase(), s]));
 
     quoteLineItems?.forEach((item: any) => {
       const styleNum = item.item_number || 'N/A';
@@ -234,23 +237,27 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
     });
 
     poLineItems?.forEach((item: any) => {
-      const styleNum = item.item_number || 'N/A';
-      const colorVal = item.color || 'N/A';
-      const sizeVal = item.size || 'N/A';
+      const styleNum = (item.item_number || 'N/A').trim();
+      const colorVal = (item.color || 'N/A').trim();
+      const rawSize = (item.size || '').trim();
+      const normalizedSize = sizeUpperMap.get(rawSize.toUpperCase()) || rawSize;
 
       for (const [, row] of garmentMap) {
-        if (row.style_number === styleNum && row.color === colorVal) {
-          if (row.sizes[sizeVal]) {
-            row.sizes[sizeVal].on_po += item.quantity_ordered;
-            row.sizes[sizeVal].received += item.quantity_received;
-            row.total_on_po += item.quantity_ordered;
-            row.total_received += item.quantity_received;
+        if (
+          row.style_number.toLowerCase() === styleNum.toLowerCase() &&
+          row.color.toLowerCase() === colorVal.toLowerCase()
+        ) {
+          if (row.sizes[normalizedSize]) {
+            row.sizes[normalizedSize].on_po += item.quantity_ordered;
+            row.sizes[normalizedSize].received += item.quantity_received;
           }
+          row.total_on_po += item.quantity_ordered;
+          row.total_received += item.quantity_received;
           row.pos.push({
             po_id: item.purchase_orders.id,
             po_number: item.purchase_orders.po_number,
             vendor_name: item.purchase_orders.vendors?.vendor_name || 'Unknown',
-            size: sizeVal,
+            size: normalizedSize || rawSize || 'N/A',
             quantity_ordered: item.quantity_ordered,
             quantity_received: item.quantity_received,
           });
