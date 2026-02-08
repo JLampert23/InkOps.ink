@@ -31,7 +31,7 @@ interface PurchaseOrder {
   receiving_status: string;
   status: string;
   confirmed_at: string | null;
-  vendor?: {
+  vendors?: {
     vendor_name: string;
   };
 }
@@ -78,13 +78,8 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
       const { data: poData, error: poError } = await supabase
         .from('purchase_orders')
         .select(`
-          id,
-          po_number,
-          expected_delivery_date,
-          receiving_status,
-          status,
-          confirmed_at,
-          vendor:vendors!vendor_id (
+          *,
+          vendors (
             vendor_name
           )
         `)
@@ -95,7 +90,7 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
 
       const poWithVendorName = {
         ...poData,
-        vendor_name: poData.vendor?.vendor_name || 'Unknown Vendor',
+        vendor_name: poData.vendors?.vendor_name || 'Unknown Vendor',
       };
       setPo(poWithVendorName);
 
@@ -122,9 +117,11 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
           receiving_quantity: 0,
         }))
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading PO details:', error);
-      alert('Failed to load PO details');
+      console.error('Error message:', error?.message);
+      console.error('Error details:', JSON.stringify(error, null, 2));
+      alert(`Failed to load purchase order: ${error?.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
