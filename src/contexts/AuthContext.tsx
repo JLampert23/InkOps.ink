@@ -33,6 +33,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
 
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      console.warn('Auth initialization timeout - forcing ready state');
+      setLoading(false);
+    }, 10000);
+
+    return () => clearTimeout(timeout);
+  }, []);
+
   const refreshUserProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase

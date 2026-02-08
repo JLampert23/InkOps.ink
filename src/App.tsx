@@ -589,7 +589,10 @@ function App() {
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
 
+  console.log('AuthenticatedApp render - loading:', loading, 'user:', !!user);
+
   if (loading) {
+    console.log('Rendering loading screen');
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
         <div className="text-center">
@@ -601,9 +604,11 @@ function AuthenticatedApp() {
   }
 
   if (!user) {
+    console.log('Rendering auth screen');
     return <EnhancedAuthScreen />;
   }
 
+  console.log('Rendering app content');
   return <AppContent />;
 }
 

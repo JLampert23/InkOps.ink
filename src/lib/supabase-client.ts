@@ -15,5 +15,17 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
+    flowType: 'pkce',
+  },
+  global: {
+    fetch: (url, options = {}) => {
+      return fetch(url, {
+        ...options,
+        signal: AbortSignal.timeout(30000),
+      }).catch(err => {
+        console.error('Supabase fetch error:', err);
+        throw err;
+      });
+    },
   },
 });
