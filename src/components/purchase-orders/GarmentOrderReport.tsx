@@ -8,7 +8,6 @@ import {
   Package,
   Loader2,
   Eye,
-  Plus,
   FileText,
   Search,
   AlertCircle,
@@ -16,6 +15,9 @@ import {
   Users,
   Layers,
   FileDown,
+  Plus,
+  CheckCircle,
+  Building2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
@@ -46,6 +48,12 @@ interface GarmentNeed {
   }>;
 }
 
+interface Vendor {
+  id: string;
+  vendor_name: string;
+  vendor_type: string;
+}
+
 interface GarmentOrderReportProps {
   onCreatePO?: (items: GarmentNeed[]) => void;
 }
@@ -62,8 +70,15 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedGarment, setSelectedGarment] = useState<GarmentNeed | null>(null);
   const [showDrillDown, setShowDrillDown] = useState(false);
-  const [vendors, setVendors] = useState<Array<{ id: string; vendor_name: string }>>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [customers, setCustomers] = useState<Array<{ id: string; company_name: string }>>([]);
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [showVendorModal, setShowVendorModal] = useState(false);
+  const [vendorModalItems, setVendorModalItems] = useState<GarmentNeed[]>([]);
+  const [modalVendorId, setModalVendorId] = useState('');
+  const [addingToPO, setAddingToPO] = useState(false);
+  const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
 
   useEffect(() => {
     loadData();
@@ -72,6 +87,11 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
   useEffect(() => {
     applyFilters();
   }, [garments, searchTerm, selectedVendor, selectedCustomer, showMissingOnly]);
+
+  const showToast = (message: string) => {
+    setToast({ message, visible: true });
+    setTimeout(() => setToast({ message: '', visible: false }), 4000);
+  };
 
   const loadData = async () => {
     try {
@@ -87,6 +107,7 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
         .single();
 
       if (!profile) throw new Error('User profile not found');
+      setCompanyId(profile.company_id);
 
       await Promise.all([
         loadGarmentNeeds(profile.company_id),
@@ -118,6 +139,7 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
         qty_2xl,
         qty_3xl,
         qty_4xl,
+        qty_5xl,
         qty_yxs,
         qty_ys,
         qty_ym,
@@ -132,7 +154,7 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
         )
       `)
       .eq('quotes.company_id', companyId)
-      .in('quotes.status', ['pending', 'approved', 'in_production']);
+      .in('quotes.status', ['approved', 'converted', 'in_production']);
 
     if (quoteError) throw quoteError;
 
@@ -162,7 +184,7 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
     const garmentMap = new Map<string, GarmentNeed>();
 
     quoteLineItems?.forEach((item: any) => {
-      const sizeQuantities = {
+      const sizeQuantities: Record<string, number> = {
         'XS': item.qty_xs || 0,
         'S': item.qty_s || 0,
         'M': item.qty_m || 0,
@@ -171,11 +193,12 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
         '2XL': item.qty_2xl || 0,
         '3XL': item.qty_3xl || 0,
         '4XL': item.qty_4xl || 0,
-        'Youth XS': item.qty_yxs || 0,
-        'Youth S': item.qty_ys || 0,
-        'Youth M': item.qty_ym || 0,
-        'Youth L': item.qty_yl || 0,
-        'Youth XL': item.qty_yxl || 0,
+        '5XL': item.qty_5xl || 0,
+        'YXS': item.qty_yxs || 0,
+        'YS': item.qty_ys || 0,
+        'YM': item.qty_ym || 0,
+        'YL': item.qty_yl || 0,
+        'YXL': item.qty_yxl || 0,
       };
 
       Object.entries(sizeQuantities).forEach(([size, quantity]) => {
@@ -238,7 +261,7 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
   const loadVendors = async (companyId: string) => {
     const { data, error } = await supabase
       .from('vendors')
-      .select('id, vendor_name')
+      .select('id, vendor_name, vendor_type')
       .eq('company_id', companyId)
       .eq('is_active', true)
       .order('vendor_name');
@@ -291,6 +314,75 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
   const handleDrillDown = (garment: GarmentNeed) => {
     setSelectedGarment(garment);
     setShowDrillDown(true);
+  };
+
+  const getItemKey = (g: GarmentNeed) => `${g.style_number}-${g.color}-${g.size}`;
+
+  const toggleItemSelection = (garment: GarmentNeed) => {
+    const key = getItemKey(garment);
+    setSelectedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const remainingItems = filteredGarments.filter((g) => g.remaining > 0);
+    if (selectedItems.size === remainingItems.length) {
+      setSelectedItems(new Set());
+    } else {
+      setSelectedItems(new Set(remainingItems.map(getItemKey)));
+    }
+  };
+
+  const openAddToPOModal = (items: GarmentNeed[]) => {
+    if (items.length === 0) {
+      alert('No items selected');
+      return;
+    }
+    setVendorModalItems(items);
+    setModalVendorId('');
+    setShowVendorModal(true);
+  };
+
+  const handleAddToPO = async () => {
+    if (!modalVendorId || !companyId) return;
+
+    try {
+      setAddingToPO(true);
+
+      const itemsPayload = vendorModalItems.map((item) => ({
+        style_number: item.style_number,
+        product_name: item.product_name,
+        color: item.color,
+        size: item.size,
+        quantity: item.remaining,
+      }));
+
+      const { data, error } = await supabase.rpc('add_garment_items_to_po', {
+        p_company_id: companyId,
+        p_vendor_id: modalVendorId,
+        p_items: itemsPayload,
+      });
+
+      if (error) throw error;
+
+      setShowVendorModal(false);
+      setSelectedItems(new Set());
+      showToast(`Added to ${data.po_number}`);
+
+      await loadGarmentNeeds(companyId);
+    } catch (error: any) {
+      console.error('Error adding to PO:', error);
+      alert(`Failed to add items to PO: ${error.message}`);
+    } finally {
+      setAddingToPO(false);
+    }
   };
 
   const exportToCSV = () => {
@@ -363,17 +455,6 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
     );
   };
 
-  const handleCreatePOForRemaining = () => {
-    const itemsWithRemaining = filteredGarments.filter((g) => g.remaining > 0);
-    if (itemsWithRemaining.length === 0) {
-      alert('No items with remaining quantities to order');
-      return;
-    }
-    if (onCreatePO) {
-      onCreatePO(itemsWithRemaining);
-    }
-  };
-
   const clearFilters = () => {
     setSearchTerm('');
     setSelectedVendor('all');
@@ -412,6 +493,8 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
 
   const stats = getTotalStats();
   const groupedData = groupGarments();
+  const remainingItems = filteredGarments.filter((g) => g.remaining > 0);
+  const allRemainingSelected = remainingItems.length > 0 && selectedItems.size === remainingItems.length;
 
   if (loading) {
     return (
@@ -423,6 +506,16 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
 
   return (
     <div className="space-y-6">
+      {/* Toast */}
+      {toast.visible && (
+        <div className="fixed top-6 right-6 z-[100] animate-in slide-in-from-right">
+          <div className="flex items-center gap-3 px-5 py-3 bg-green-600 text-white rounded-lg shadow-xl">
+            <CheckCircle className="w-5 h-5 flex-shrink-0" />
+            <span className="font-medium">{toast.message}</span>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -446,13 +539,18 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
             <FileDown className="w-4 h-4" />
             PDF
           </button>
-          <button
-            onClick={handleCreatePOForRemaining}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Create PO for Remaining
-          </button>
+          {selectedItems.size > 0 && (
+            <button
+              onClick={() => {
+                const items = filteredGarments.filter((g) => selectedItems.has(getItemKey(g)) && g.remaining > 0);
+                openAddToPOModal(items);
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add Selected to PO ({selectedItems.size})
+            </button>
+          )}
         </div>
       </div>
 
@@ -474,11 +572,11 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-400 dark:text-gray-400">On PO</p>
-              <p className="text-2xl font-bold text-purple-400 dark:text-purple-400 mt-1">
+              <p className="text-2xl font-bold text-blue-400 dark:text-blue-400 mt-1">
                 {stats.onPO.toLocaleString()}
               </p>
             </div>
-            <FileText className="w-8 h-8 text-purple-400 dark:text-purple-400" />
+            <FileText className="w-8 h-8 text-blue-400 dark:text-blue-400" />
           </div>
         </div>
 
@@ -622,6 +720,15 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
           <table className="w-full">
             <thead className="bg-slate-950 dark:bg-slate-900 sticky top-0 z-10">
               <tr>
+                <th className="px-4 py-3 text-left">
+                  <input
+                    type="checkbox"
+                    checked={allRemainingSelected}
+                    onChange={toggleSelectAll}
+                    className="rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-blue-500"
+                    title="Select all items with remaining quantities"
+                  />
+                </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 dark:text-gray-400 uppercase tracking-wider">
                   Style Number
                 </th>
@@ -657,7 +764,7 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
             <tbody className="divide-y divide-slate-700 dark:divide-slate-700">
               {filteredGarments.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="px-4 py-12 text-center">
+                  <td colSpan={11} className="px-4 py-12 text-center">
                     <div className="flex flex-col items-center justify-center">
                       <Package className="w-16 h-16 text-gray-600 dark:text-gray-600 mb-4" />
                       <p className="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">
@@ -665,7 +772,7 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
                       </p>
                       <p className="text-sm text-gray-600 dark:text-gray-500 mb-4">
                         {garments.length === 0
-                          ? 'Create quotes with garments to see the report.'
+                          ? 'Approve quotes with garments to see them here.'
                           : 'Try adjusting your search criteria or filters.'}
                       </p>
                       {(searchTerm || selectedVendor !== 'all' || selectedCustomer !== 'all' || showMissingOnly) && (
@@ -682,9 +789,8 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
               ) : (
                 groupedData.map(([groupKey, items]) => (
                   <React.Fragment key={groupKey}>
-                    {/* Group Header */}
                     <tr className="bg-slate-800 dark:bg-slate-900">
-                      <td colSpan={10} className="px-4 py-2">
+                      <td colSpan={11} className="px-4 py-2">
                         <div className="flex items-center gap-2 text-sm font-semibold text-white">
                           {groupBy === 'style' && <Layers className="w-4 h-4" />}
                           {groupBy === 'vendor' && <ShoppingCart className="w-4 h-4" />}
@@ -695,16 +801,26 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
                         </div>
                       </td>
                     </tr>
-                    {/* Group Items */}
                     {items.map((garment, index) => {
                       const hasRemaining = garment.remaining > 0;
+                      const isSelected = selectedItems.has(getItemKey(garment));
                       return (
                         <tr
                           key={`${groupKey}-${index}`}
                           className={`hover:bg-slate-800 dark:hover:bg-slate-700 transition-colors ${
                             hasRemaining ? 'bg-yellow-900/10' : ''
-                          }`}
+                          } ${isSelected ? 'bg-blue-900/20' : ''}`}
                         >
+                          <td className="px-4 py-3">
+                            {hasRemaining && (
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleItemSelection(garment)}
+                                className="rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-blue-500"
+                              />
+                            )}
+                          </td>
                           <td className="px-4 py-3 text-sm font-medium text-white">
                             {garment.style_number}
                           </td>
@@ -723,7 +839,7 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
                           <td className="px-4 py-3 text-sm text-right font-medium text-white">
                             {garment.total_needed}
                           </td>
-                          <td className="px-4 py-3 text-sm text-right text-purple-400">
+                          <td className="px-4 py-3 text-sm text-right text-blue-400">
                             {garment.on_po}
                           </td>
                           <td className="px-4 py-3 text-sm text-right text-green-400">
@@ -741,13 +857,25 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
                             </span>
                           </td>
                           <td className="px-4 py-3">
-                            <button
-                              onClick={() => handleDrillDown(garment)}
-                              className="flex items-center gap-1 px-3 py-1.5 text-sm text-blue-400 hover:bg-blue-900/30 rounded transition-colors"
-                            >
-                              <Eye className="w-4 h-4" />
-                              Details
-                            </button>
+                            <div className="flex items-center gap-1">
+                              {hasRemaining && (
+                                <button
+                                  onClick={() => openAddToPOModal([garment])}
+                                  className="flex items-center gap-1 px-3 py-1.5 text-sm text-green-400 hover:bg-green-900/30 rounded transition-colors"
+                                  title="Add to Purchase Order"
+                                >
+                                  <Plus className="w-4 h-4" />
+                                  Add to PO
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleDrillDown(garment)}
+                                className="flex items-center gap-1 px-3 py-1.5 text-sm text-blue-400 hover:bg-blue-900/30 rounded transition-colors"
+                              >
+                                <Eye className="w-4 h-4" />
+                                Details
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -764,6 +892,95 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
       {filteredGarments.length > 0 && (
         <div className="text-sm text-gray-400 dark:text-gray-400">
           Showing {filteredGarments.length} garment variants
+        </div>
+      )}
+
+      {/* Vendor Selection Modal */}
+      {showVendorModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 dark:bg-slate-800 rounded-lg max-w-lg w-full border border-slate-700 shadow-2xl">
+            <div className="p-6 border-b border-slate-700">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-600 rounded-lg">
+                    <Building2 className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">Add to Purchase Order</h3>
+                    <p className="text-sm text-gray-400 mt-0.5">
+                      {vendorModalItems.length} item{vendorModalItems.length !== 1 ? 's' : ''} selected
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowVendorModal(false)}
+                  className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <div className="max-h-40 overflow-y-auto space-y-2">
+                {vendorModalItems.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between px-3 py-2 bg-slate-800 rounded-lg text-sm"
+                  >
+                    <div className="text-gray-300">
+                      <span className="font-medium text-white">{item.style_number}</span>
+                      {' '}/{' '}{item.color}{' '}/{' '}{item.size}
+                    </div>
+                    <span className="text-orange-400 font-medium">{item.remaining} units</span>
+                  </div>
+                ))}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Select Vendor
+                </label>
+                <select
+                  value={modalVendorId}
+                  onChange={(e) => setModalVendorId(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-800 border border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-white text-sm"
+                >
+                  <option value="">Choose a vendor...</option>
+                  {vendors.map((vendor) => (
+                    <option key={vendor.id} value={vendor.id}>
+                      {vendor.vendor_name} ({vendor.vendor_type})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-2">
+                  If a draft PO already exists for this vendor today, items will be added to it.
+                  Otherwise a new PO will be created.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-slate-700 flex justify-end gap-3">
+              <button
+                onClick={() => setShowVendorModal(false)}
+                className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddToPO}
+                disabled={!modalVendorId || addingToPO}
+                className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {addingToPO ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Plus className="w-4 h-4" />
+                )}
+                {addingToPO ? 'Adding...' : 'Add to PO'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -792,7 +1009,6 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
 
             <div className="p-6 overflow-y-auto max-h-[calc(80vh-140px)]">
               <div className="grid grid-cols-2 gap-6">
-                {/* Jobs Requiring This Garment */}
                 <div>
                   <h4 className="text-lg font-semibold text-white dark:text-white mb-4">
                     Jobs Requiring This Garment
@@ -821,7 +1037,6 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
                   </div>
                 </div>
 
-                {/* Purchase Orders */}
                 <div>
                   <h4 className="text-lg font-semibold text-white dark:text-white mb-4">
                     Purchase Orders
@@ -871,7 +1086,6 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
                 </div>
               </div>
 
-              {/* Summary */}
               <div className="mt-6 pt-6 border-t border-slate-700 dark:border-slate-700">
                 <div className="grid grid-cols-4 gap-4 text-center">
                   <div>
@@ -882,7 +1096,7 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
                   </div>
                   <div>
                     <p className="text-sm text-gray-400 dark:text-gray-400">On PO</p>
-                    <p className="text-2xl font-bold text-purple-400 dark:text-purple-400 mt-1">
+                    <p className="text-2xl font-bold text-blue-400 dark:text-blue-400 mt-1">
                       {selectedGarment.on_po}
                     </p>
                   </div>
@@ -902,10 +1116,22 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
               </div>
             </div>
 
-            <div className="p-6 border-t border-slate-700 dark:border-slate-700">
+            <div className="p-6 border-t border-slate-700 dark:border-slate-700 flex gap-3 justify-end">
+              {selectedGarment.remaining > 0 && (
+                <button
+                  onClick={() => {
+                    setShowDrillDown(false);
+                    openAddToPOModal([selectedGarment]);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add to PO
+                </button>
+              )}
               <button
                 onClick={() => setShowDrillDown(false)}
-                className="w-full px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors"
+                className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors"
               >
                 Close
               </button>
