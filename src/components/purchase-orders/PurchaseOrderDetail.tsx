@@ -1019,31 +1019,52 @@ export function PurchaseOrderDetail({ poId, onBack }: PurchaseOrderDetailProps) 
               </p>
             </div>
             <div className="p-6 overflow-y-auto max-h-[calc(85vh-180px)]">
-              <div className="space-y-6">
-                {(() => {
-                  const grouped = lineItems.reduce((acc, item) => {
-                    const remaining = item.quantity_ordered - item.quantity_received;
-                    if (remaining <= 0) return acc;
+              {lineItems.length === 0 ? (
+                <div className="text-center py-12">
+                  <Package className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                  <p className="text-gray-600 dark:text-gray-400">No items to receive</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {(() => {
+                    console.log('Line Items:', lineItems);
+                    const grouped = lineItems.reduce((acc, item) => {
+                      const remaining = item.quantity_ordered - item.quantity_received;
+                      console.log(`Item: ${item.product_name}, Remaining: ${remaining}`);
+                      if (remaining <= 0) return acc;
 
-                    const key = `${item.product_name}|||${item.color}`;
-                    if (!acc[key]) {
-                      acc[key] = {
-                        product_name: item.product_name,
-                        color: item.color,
-                        sizes: []
-                      };
+                      const key = `${item.product_name}|||${item.color || 'NO_COLOR'}`;
+                      if (!acc[key]) {
+                        acc[key] = {
+                          product_name: item.product_name,
+                          color: item.color || '',
+                          sizes: []
+                        };
+                      }
+                      acc[key].sizes.push({
+                        id: item.id,
+                        size: item.size || 'N/A',
+                        remaining
+                      });
+                      return acc;
+                    }, {} as Record<string, { product_name: string; color: string; sizes: Array<{ id: string; size: string; remaining: number }> }>);
+
+                    console.log('Grouped:', grouped);
+                    const SIZE_ORDER = ['XS', '2XS', 'S', 'M', 'L', 'XL', '2XL', 'XXL', '3XL', 'XXXL', '4XL', '5XL', '6XL', 'YXS', 'YS', 'YM', 'YL', 'YXL'];
+
+                    const groupedValues = Object.values(grouped);
+                    console.log('Grouped Values:', groupedValues);
+
+                    if (groupedValues.length === 0) {
+                      return (
+                        <div className="text-center py-12">
+                          <CheckCircle className="w-16 h-16 mx-auto text-green-500 mb-4" />
+                          <p className="text-gray-600 dark:text-gray-400">All items have been received</p>
+                        </div>
+                      );
                     }
-                    acc[key].sizes.push({
-                      id: item.id,
-                      size: item.size,
-                      remaining
-                    });
-                    return acc;
-                  }, {} as Record<string, { product_name: string; color: string; sizes: Array<{ id: string; size: string; remaining: number }> }>);
 
-                  const SIZE_ORDER = ['XS', '2XS', 'S', 'M', 'L', 'XL', '2XL', 'XXL', '3XL', 'XXXL', '4XL', '5XL', '6XL', 'YXS', 'YS', 'YM', 'YL', 'YXL'];
-
-                  return Object.values(grouped).map((group, idx) => {
+                    return groupedValues.map((group, idx) => {
                     const sortedSizes = [...group.sizes].sort((a, b) => {
                       const idxA = SIZE_ORDER.findIndex(s => s.toUpperCase() === a.size.toUpperCase());
                       const idxB = SIZE_ORDER.findIndex(s => s.toUpperCase() === b.size.toUpperCase());
@@ -1116,7 +1137,8 @@ export function PurchaseOrderDetail({ poId, onBack }: PurchaseOrderDetailProps) 
                     );
                   });
                 })()}
-              </div>
+                </div>
+              )}
             </div>
             <div className="p-6 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 flex gap-3">
               <button
