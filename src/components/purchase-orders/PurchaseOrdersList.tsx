@@ -264,15 +264,14 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
   };
 
   const handleDeletePO = async (po: PurchaseOrder) => {
-    if (!confirm(`Delete purchase order ${po.po_number}? This will also remove all associated line items and cannot be undone.`)) return;
+    if (!confirm(`Delete purchase order ${po.po_number}? This will also remove all associated records and cannot be undone.`)) return;
 
     try {
-      const { error: lineItemsError } = await supabase
-        .from('purchase_order_line_items')
-        .delete()
-        .eq('purchase_order_id', po.id);
-
-      if (lineItemsError) throw lineItemsError;
+      await supabase.from('purchase_order_attachments').delete().eq('po_id', po.id);
+      await supabase.from('purchase_order_line_items').delete().eq('po_id', po.id);
+      await supabase.from('purchase_order_activity_log').delete().eq('po_id', po.id);
+      await supabase.from('receiving_logs').delete().eq('po_id', po.id);
+      await supabase.from('garment_requirements_staging').delete().eq('po_id', po.id);
 
       const { error: poError } = await supabase
         .from('purchase_orders')
