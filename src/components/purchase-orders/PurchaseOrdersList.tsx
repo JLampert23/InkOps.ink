@@ -268,7 +268,7 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
 
     try {
       const { error: lineItemsError } = await supabase
-        .from('po_line_items')
+        .from('purchase_order_line_items')
         .delete()
         .eq('purchase_order_id', po.id);
 
