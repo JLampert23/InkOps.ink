@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test PO Query</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <h1>Testing PO Query</h1>
+  <button onclick="testQuery()">Test Query</button>
+  <pre id="output"></pre>
+
+  <script>
+    const supabaseUrl = prompt('Enter Supabase URL:');
+    const supabaseKey = prompt('Enter Supabase Anon Key:');
+    const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+    async function testQuery() {
+      const output = document.getElementById('output');
+      output.textContent = 'Testing...\n\n';
+
+      // First, authenticate
+      const email = prompt('Email:');
+      const password = prompt('Password:');
+
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (authError) {
+        output.textContent += 'Auth Error: ' + JSON.stringify(authError, null, 2) + '\n\n';
+        return;
+      }
+
+      output.textContent += 'Authenticated as: ' + authData.user.email + '\n\n';
+
+      // Test 1: Simple query without join
+      output.textContent += '=== Test 1: Simple PO query ===\n';
+      const { data: pos1, error: error1 } = await supabase
+        .from('purchase_orders')
+        .select('id, po_number, vendor_id')
+        .limit(1);
+
+      output.textContent += 'Result: ' + JSON.stringify(pos1, null, 2) + '\n';
+      output.textContent += 'Error: ' + JSON.stringify(error1, null, 2) + '\n\n';
+
+      // Test 2: Query with automatic join
+      output.textContent += '=== Test 2: PO with automatic vendor join ===\n';
+      const { data: pos2, error: error2 } = await supabase
+        .from('purchase_orders')
+        .select(`
+          id,
+          po_number,
+          vendors (
+            vendor_name,
+            vendor_type
+          )
+        `)
+        .limit(1);
+
+      output.textContent += 'Result: ' + JSON.stringify(pos2, null, 2) + '\n';
+      output.textContent += 'Error: ' + JSON.stringify(error2, null, 2) + '\n\n';
+
+      // Test 3: Query with explicit join name
+      output.textContent += '=== Test 3: PO with explicit vendor join ===\n';
+      const { data: pos3, error: error3 } = await supabase
+        .from('purchase_orders')
+        .select(`
+          id,
+          po_number,
+          vendor:vendors!purchase_orders_vendor_id_fkey (
+            vendor_name,
+            vendor_type
+          )
+        `)
+        .limit(1);
+
+      output.textContent += 'Result: ' + JSON.stringify(pos3, null, 2) + '\n';
+      output.textContent += 'Error: ' + JSON.stringify(error3, null, 2) + '\n\n';
+    }
+  </script>
+</body>
+</html>

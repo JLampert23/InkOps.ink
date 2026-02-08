@@ -125,14 +125,14 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOr
         .from('purchase_orders')
         .select(`
           *,
-          vendors (
+          vendor:vendors!purchase_orders_vendor_id_fkey (
             vendor_name,
             vendor_type,
             contact_name,
             contact_email,
             contact_phone
           ),
-          user_profiles!purchase_orders_created_by_fkey (
+          created_by_user:user_profiles!purchase_orders_created_by_fkey (
             full_name,
             email
           )
@@ -141,13 +141,7 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOr
         .single();
 
       if (poError) throw poError;
-
-      const formattedPo = {
-        ...poData,
-        vendor: poData.vendors,
-        created_by_user: poData.user_profiles
-      };
-      setPo(formattedPo);
+      setPo(poData);
 
       const { data: items, error: itemsError } = await supabase
         .from('purchase_order_line_items')

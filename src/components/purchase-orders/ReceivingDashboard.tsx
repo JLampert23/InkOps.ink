@@ -92,7 +92,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
         expected_delivery_date,
         receiving_status,
         created_at,
-        vendors (
+        vendors!purchase_orders_vendor_id_fkey (
           vendor_name
         )
       `)
@@ -136,7 +136,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
         expected_delivery_date,
         receiving_status,
         created_at,
-        vendors (
+        vendors!purchase_orders_vendor_id_fkey (
           vendor_name
         )
       `)
@@ -240,7 +240,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
           expected_delivery_date,
           receiving_status,
           created_at,
-          vendors (
+          vendors!purchase_orders_vendor_id_fkey (
             vendor_name
           )
         `)

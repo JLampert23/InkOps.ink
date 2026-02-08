@@ -259,7 +259,7 @@ export function ManageGoodsDashboard({ onNavigate }: ManageGoodsDashboardProps) 
         status,
         receiving_status,
         created_at,
-        vendors (
+        vendors!purchase_orders_vendor_id_fkey (
           vendor_name
         )
       `)
@@ -285,7 +285,7 @@ export function ManageGoodsDashboard({ onNavigate }: ManageGoodsDashboardProps) 
       .select(`
         id,
         po_number,
-        vendors (
+        vendors!purchase_orders_vendor_id_fkey (
           vendor_name
         )
       `)

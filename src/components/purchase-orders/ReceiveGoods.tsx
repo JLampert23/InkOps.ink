@@ -79,7 +79,7 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
         .from('purchase_orders')
         .select(`
           *,
-          vendors (
+          vendors!purchase_orders_vendor_id_fkey (
             vendor_name
           )
         `)

@@ -73,7 +73,7 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
           total_cost,
           expected_delivery_date,
           created_at,
-          vendors (
+          vendor:vendors!purchase_orders_vendor_id_fkey (
             id,
             vendor_name,
             vendor_type
@@ -82,12 +82,7 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-
-      const formattedData = data?.map(po => ({
-        ...po,
-        vendor: po.vendors
-      })) || [];
-      setPos(formattedData);
+      setPos(data || []);
     } catch (error) {
       console.error('Error loading purchase orders:', error);
       alert('Failed to load purchase orders');

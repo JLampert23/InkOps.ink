@@ -150,7 +150,7 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
           id,
           po_number,
           company_id,
-          vendors (
+          vendors!purchase_orders_vendor_id_fkey (
             vendor_name
           )
         )
