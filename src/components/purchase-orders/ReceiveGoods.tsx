@@ -26,7 +26,7 @@ interface LineItem {
 interface PurchaseOrder {
   id: string;
   po_number: string;
-  vendor_name: string;
+  vendor_name?: string;
   expected_delivery_date: string | null;
   receiving_status: string;
   status: string;
@@ -80,12 +80,11 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
         .select(`
           id,
           po_number,
-          vendor_name,
           expected_delivery_date,
           receiving_status,
           status,
           confirmed_at,
-          vendors!vendor_id (
+          vendor:vendors!vendor_id (
             vendor_name
           )
         `)
@@ -96,7 +95,7 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
 
       const poWithVendorName = {
         ...poData,
-        vendor_name: poData.vendors?.vendor_name || poData.vendor_name,
+        vendor_name: poData.vendor?.vendor_name || 'Unknown Vendor',
       };
       setPo(poWithVendorName);
 
@@ -108,7 +107,7 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
       }
 
       const { data: items, error: itemsError } = await supabase
-        .from('po_line_items')
+        .from('purchase_order_line_items')
         .select('*')
         .eq('po_id', poId)
         .order('style_number')
