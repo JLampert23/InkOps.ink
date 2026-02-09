@@ -313,17 +313,22 @@ Deno.serve(async (req: Request) => {
                 // Insert all price tiers
                 for (const priceEntry of pricingPart.prices) {
                   const { error: priceError } = await supabase
-                    .from("pricing")
+                    .from("ss_catalog_pricing")
                     .upsert({
                       company_id: company.id,
                       part_id: partForPricing.id,
-                      min_quantity: priceEntry.minQuantity || 1,
-                      price: priceEntry.price,
-                      price_type: "Customer",
-                      currency: "USD",
+                      part_number: pricingPart.partId,
+                      price_type: 'net',
+                      currency: pricingData.pricing?.currency || 'USD',
+                      quantity_min: priceEntry.minQuantity || 1,
+                      quantity_max: null,
+                      unit_price: priceEntry.price,
                       discount_code: priceEntry.discountCode || null,
+                      price_effective_date: priceEntry.priceEffectiveDate || null,
+                      price_expiry_date: priceEntry.priceExpiryDate || null,
+                      last_synced: new Date().toISOString(),
                     }, {
-                      onConflict: "company_id,part_id,min_quantity"
+                      onConflict: "company_id,part_number,price_type,quantity_min"
                     });
 
                   if (priceError) {

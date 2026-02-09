@@ -90,8 +90,50 @@ export async function lookupProductByStyle(styleNumber: string): Promise<PromoSt
   }
 }
 
-export async function getProductPricing(partId: string): Promise<PromoStandardsPricing | null> {
+export async function getCachedPricing(partNumber: string, quantity: number = 1): Promise<number | null> {
   try {
+    const { data: companySettings } = await supabase
+      .from('company_settings')
+      .select('id')
+      .maybeSingle();
+
+    if (!companySettings) {
+      return null;
+    }
+
+    const { data: pricing } = await supabase
+      .from('ss_catalog_pricing')
+      .select('unit_price')
+      .eq('part_number', partNumber)
+      .lte('quantity_min', quantity)
+      .or(`quantity_max.gte.${quantity},quantity_max.is.null`)
+      .or(`price_expiry_date.gte.${new Date().toISOString().split('T')[0]},price_expiry_date.is.null`)
+      .order('quantity_min', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    return pricing?.unit_price || null;
+  } catch (error) {
+    console.error('Error getting cached pricing:', error);
+    return null;
+  }
+}
+
+export async function getProductPricing(partId: string, useCache: boolean = true): Promise<PromoStandardsPricing | null> {
+  try {
+    if (useCache) {
+      const cachedPrice = await getCachedPricing(partId);
+      if (cachedPrice !== null) {
+        console.log(`Using cached price for ${partId}: $${cachedPrice}`);
+        return {
+          partId,
+          priceArray: [{ minQuantity: 1, price: cachedPrice }],
+          currency: 'USD'
+        };
+      }
+      console.log(`No cached price found for ${partId}, fetching from API...`);
+    }
+
     const token = await getAuthToken();
 
     const response = await fetch(
