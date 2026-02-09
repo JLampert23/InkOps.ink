@@ -417,70 +417,116 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Parse Pricing
+    // Parse Pricing - Check cache first
     const pricingData: any = {};
     let pricingAuthError: { code: string; description: string } | null = null;
+    let usedCache = false;
 
-    if (pricingResponse.status === 'fulfilled' && pricingResponse.value) {
-      const xmlDoc = pricingResponse.value;
-      console.log('💰 Pricing XML Response (first 2000 chars):', xmlDoc.substring(0, 2000));
+    // Try to get cached pricing from database
+    console.log('💰 Checking cached pricing for style:', styleNumber);
+    const { data: cachedPricing } = await supabase
+      .from('ss_catalog_pricing')
+      .select('part_number, unit_price, quantity_min, quantity_max, discount_code')
+      .eq('company_id', companyId)
+      .or(`price_expiry_date.gte.${new Date().toISOString().split('T')[0]},price_expiry_date.is.null`)
+      .order('part_number')
+      .order('quantity_min');
 
-      // Check for error 105 (authentication failed)
-      const errorCodeMatch = xmlDoc.match(/<code>(\d+)<\/code>/);
-      const errorDescMatch = xmlDoc.match(/<description>(.*?)<\/description>/);
+    if (cachedPricing && cachedPricing.length > 0) {
+      console.log('💰 Found cached pricing for', cachedPricing.length, 'records');
+      usedCache = true;
 
-      if (errorCodeMatch && errorDescMatch) {
-        pricingAuthError = {
-          code: errorCodeMatch[1],
-          description: errorDescMatch[1]
-        };
-        console.error('💰 Pricing API returned error:', pricingAuthError);
-      } else {
-        const partPattern = /<Part>([\s\S]*?)<\/Part>/gi;
-        const partMatches = getAllXmlMatches(xmlDoc, partPattern);
-        console.log('💰 Found', partMatches.length, 'parts in pricing response');
+      // Group by part_number
+      const partPricingMap = new Map();
+      cachedPricing.forEach(row => {
+        if (!partPricingMap.has(row.part_number)) {
+          partPricingMap.set(row.part_number, []);
+        }
+        partPricingMap.get(row.part_number).push({
+          minQuantity: row.quantity_min,
+          price: parseFloat(row.unit_price),
+          discountCode: row.discount_code,
+        });
+      });
 
-        pricingData.parts = partMatches.map(match => {
-          const partXml = match[1];
-          // S&S uses PartPrice tags, not Price tags
-          const pricePattern = /<PartPrice>([\s\S]*?)<\/PartPrice>/gi;
-          const priceMatches = getAllXmlMatches(partXml, pricePattern);
+      pricingData.parts = Array.from(partPricingMap.entries()).map(([partId, prices]) => ({
+        partId,
+        prices
+      }));
 
-          const partId = getXmlValue(partXml, "partId");
-          const prices = priceMatches.map(priceMatch => {
-            const priceXml = priceMatch[1];
+      // Create pricing map
+      pricingData.pricesByPartId = {};
+      pricingData.parts.forEach((part: any) => {
+        if (part.partId && part.prices && part.prices.length > 0) {
+          pricingData.pricesByPartId[part.partId] = part.prices[0].price;
+        }
+      });
+
+      console.log('💰 Using cached pricing:', pricingData.parts.length, 'parts');
+    } else {
+      console.log('💰 No cached pricing found, using API response');
+
+      if (pricingResponse.status === 'fulfilled' && pricingResponse.value) {
+        const xmlDoc = pricingResponse.value;
+        console.log('💰 Pricing XML Response (first 2000 chars):', xmlDoc.substring(0, 2000));
+
+        // Check for error 105 (authentication failed)
+        const errorCodeMatch = xmlDoc.match(/<code>(\d+)<\/code>/);
+        const errorDescMatch = xmlDoc.match(/<description>(.*?)<\/description>/);
+
+        if (errorCodeMatch && errorDescMatch) {
+          pricingAuthError = {
+            code: errorCodeMatch[1],
+            description: errorDescMatch[1]
+          };
+          console.error('💰 Pricing API returned error:', pricingAuthError);
+        } else {
+          const partPattern = /<Part>([\s\S]*?)<\/Part>/gi;
+          const partMatches = getAllXmlMatches(xmlDoc, partPattern);
+          console.log('💰 Found', partMatches.length, 'parts in pricing response');
+
+          pricingData.parts = partMatches.map(match => {
+            const partXml = match[1];
+            // S&S uses PartPrice tags, not Price tags
+            const pricePattern = /<PartPrice>([\s\S]*?)<\/PartPrice>/gi;
+            const priceMatches = getAllXmlMatches(partXml, pricePattern);
+
+            const partId = getXmlValue(partXml, "partId");
+            const prices = priceMatches.map(priceMatch => {
+              const priceXml = priceMatch[1];
+              return {
+                minQuantity: parseInt(getXmlValue(priceXml, "minQuantity") || "0"),
+                price: parseFloat(getXmlValue(priceXml, "price") || "0"),
+                discountCode: getXmlValue(priceXml, "discountCode"),
+                priceUom: getXmlValue(priceXml, "priceUom"),
+              };
+            });
+
+            console.log(`💰 Part ${partId}:`, prices.length, 'prices', prices[0]);
+
             return {
-              minQuantity: parseInt(getXmlValue(priceXml, "minQuantity") || "0"),
-              price: parseFloat(getXmlValue(priceXml, "price") || "0"),
-              discountCode: getXmlValue(priceXml, "discountCode"),
-              priceUom: getXmlValue(priceXml, "priceUom"),
+              partId,
+              prices
             };
           });
 
-          console.log(`💰 Part ${partId}:`, prices.length, 'prices', prices[0]);
+          console.log('💰 Total pricing data:', pricingData.parts?.length, 'parts');
 
-          return {
-            partId,
-            prices
-          };
-        });
-
-        console.log('💰 Total pricing data:', pricingData.parts?.length, 'parts');
-
-        // Create a pricing map for easy lookup by partId
-        pricingData.pricesByPartId = {};
-        if (pricingData.parts) {
-          pricingData.parts.forEach((part: any) => {
-            if (part.partId && part.prices && part.prices.length > 0) {
-              // Store the first price tier (usually min quantity 1)
-              pricingData.pricesByPartId[part.partId] = part.prices[0].price;
-            }
-          });
+          // Create a pricing map for easy lookup by partId
+          pricingData.pricesByPartId = {};
+          if (pricingData.parts) {
+            pricingData.parts.forEach((part: any) => {
+              if (part.partId && part.prices && part.prices.length > 0) {
+                // Store the first price tier (usually min quantity 1)
+                pricingData.pricesByPartId[part.partId] = part.prices[0].price;
+              }
+            });
+          }
+          console.log('💰 Price map created with', Object.keys(pricingData.pricesByPartId || {}).length, 'entries');
         }
-        console.log('💰 Price map created with', Object.keys(pricingData.pricesByPartId || {}).length, 'entries');
+      } else if (pricingResponse.status === 'rejected') {
+        console.error('💰 Pricing API Error:', pricingResponse.reason);
       }
-    } else if (pricingResponse.status === 'rejected') {
-      console.error('💰 Pricing API Error:', pricingResponse.reason);
     }
 
     // Parse Media Content with fallback for error 105
