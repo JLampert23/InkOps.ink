@@ -404,6 +404,11 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOr
   const handleAddItems = async (selectedProducts: any[]) => {
     if (!po) return;
 
+    if (po.status !== 'draft') {
+      alert('Cannot add items to a PO that has been sent. Only draft POs can be modified.');
+      return;
+    }
+
     try {
       setUpdating(true);
 
@@ -712,7 +717,7 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOr
 
       {/* Action Buttons */}
       <div className="flex flex-wrap gap-2">
-        {(po.status === 'draft' || po.status === 'sent') && (
+        {po.status === 'draft' && (
           <button
             onClick={() => setShowAddItems(true)}
             disabled={updating}
