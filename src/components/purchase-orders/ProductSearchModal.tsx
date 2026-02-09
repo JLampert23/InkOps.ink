@@ -34,6 +34,10 @@ interface ProductSearchModalProps {
 }
 
 export function ProductSearchModal({ vendorId, vendorType, onSelect, onClose }: ProductSearchModalProps) {
+  console.log('🚀 ProductSearchModal RENDERED!');
+  console.log('Vendor ID:', vendorId);
+  console.log('Vendor Type:', vendorType);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<Product[]>([]);
