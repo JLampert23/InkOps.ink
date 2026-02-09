@@ -37,15 +37,20 @@ Deno.serve(async (req: Request) => {
     const token = authHeader.replace("Bearer ", "");
     console.log('Token length:', token.length);
 
-    // Use service role key for auth validation
-    const supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+    // Create a client with the user's JWT to validate it
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: authHeader,
+        },
+      },
       auth: {
         autoRefreshToken: false,
         persistSession: false
       }
     });
 
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
 
     console.log('User lookup result:', { userId: user?.id, error: userError?.message });
 
@@ -64,6 +69,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Now use service role for database operations
     const supabaseAuth = createClient(supabaseUrl, supabaseServiceRoleKey);
 
     const { invoiceId, paymentType, amount, checkNumber, notes, paymentDate, customerId } = await req.json();
