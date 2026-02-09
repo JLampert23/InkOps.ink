@@ -80,6 +80,7 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
             vendor_type
           )
         `)
+        .eq('status', 'draft')
         .order('created_at', { ascending: false });
 
       if (error) throw error;

@@ -90,6 +90,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
         id,
         po_number,
         expected_delivery_date,
+        status,
         receiving_status,
         created_at,
         vendors!purchase_orders_vendor_id_fkey (
@@ -98,7 +99,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
       `)
       .eq('company_id', companyId)
       .eq('expected_delivery_date', today)
-      .neq('receiving_status', 'complete')
+      .in('status', ['sent', 'confirmed', 'in_transit', 'partially_received'])
       .order('po_number');
 
     if (error) throw error;
@@ -134,6 +135,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
         id,
         po_number,
         expected_delivery_date,
+        status,
         receiving_status,
         created_at,
         vendors!purchase_orders_vendor_id_fkey (
@@ -142,7 +144,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
       `)
       .eq('company_id', companyId)
       .lt('expected_delivery_date', today)
-      .neq('receiving_status', 'complete')
+      .in('status', ['sent', 'confirmed', 'in_transit', 'partially_received'])
       .not('expected_delivery_date', 'is', null)
       .order('expected_delivery_date');
 
@@ -238,6 +240,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
           id,
           po_number,
           expected_delivery_date,
+          status,
           receiving_status,
           created_at,
           vendors!purchase_orders_vendor_id_fkey (
@@ -245,6 +248,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
           )
         `)
         .eq('company_id', profile.company_id)
+        .in('status', ['sent', 'confirmed', 'in_transit', 'partially_received'])
         .or(`po_number.ilike.%${term}%`)
         .order('created_at', { ascending: false })
         .limit(20);

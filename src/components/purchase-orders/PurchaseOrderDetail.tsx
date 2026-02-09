@@ -832,6 +832,11 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOr
                     <th className="px-4 py-3 text-right text-xs font-bold text-[#EDEDED] uppercase tracking-wider">
                       Total
                     </th>
+                    {['sent', 'confirmed', 'in_transit', 'partially_received'].includes(po.status) && (
+                      <th className="px-4 py-3 text-center text-xs font-bold text-[#EDEDED] uppercase tracking-wider">
+                        Actions
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-[#1A1A1A] divide-y divide-[#2A2A2A]">
@@ -950,6 +955,18 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOr
                           <td className="px-4 py-4 text-sm text-right font-bold text-gray-900 dark:text-[#EDEDED]">
                             ${totalCost.toFixed(2)}
                           </td>
+                          {['sent', 'confirmed', 'in_transit', 'partially_received'].includes(po.status) && (
+                            <td className="px-4 py-4 text-center">
+                              {remaining > 0 && (
+                                <button
+                                  onClick={() => onReceiveGoods && onReceiveGoods(po.id)}
+                                  className="px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-medium transition-all"
+                                >
+                                  Receive
+                                </button>
+                              )}
+                            </td>
+                          )}
                         </tr>
                       );
                     });
