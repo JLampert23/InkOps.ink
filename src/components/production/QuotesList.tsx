@@ -153,7 +153,11 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
       (quote.customer_email || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus =
-      statusFilter === 'all' ? true : quote.status === statusFilter;
+      statusFilter === 'all'
+        ? true
+        : statusFilter === 'approved'
+        ? ['approved', 'converted'].includes(quote.status)
+        : quote.status === statusFilter;
 
     return matchesSearch && matchesStatus;
   });
@@ -162,7 +166,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
     total: quotes.length,
     draft: quotes.filter(q => q.status === 'draft').length,
     sent: quotes.filter(q => q.status === 'sent').length,
-    approved: quotes.filter(q => q.status === 'approved').length,
+    approved: quotes.filter(q => ['approved', 'converted'].includes(q.status)).length,
     rejected: quotes.filter(q => q.status === 'rejected').length,
     converted: quotes.filter(q => q.status === 'converted').length,
   };
