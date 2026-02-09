@@ -292,6 +292,272 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // POST /quotes/:id/approve
+    if (action === "approve") {
+      const { data: quote, error: fetchError } = await supabaseAdmin
+        .from("quotes")
+        .select("*")
+        .eq("id", quoteId)
+        .eq("company_id", profile.company_id)
+        .maybeSingle();
+
+      if (fetchError) throw fetchError;
+      if (!quote) throw new Error("Quote not found");
+      if (quote.status === "approved") {
+        throw new Error("Quote is already approved");
+      }
+
+      const body = await req.json();
+      const approverName = body.approver_name || profile.full_name || profile.email;
+
+      // Get line items
+      const { data: lineItems } = await supabaseAdmin
+        .from("quote_line_items")
+        .select("*")
+        .eq("quote_id", quoteId)
+        .order("line_number");
+
+      // Generate work order number
+      const { data: existingWOs } = await supabaseAdmin
+        .from("work_orders")
+        .select("work_order_number")
+        .eq("company_id", profile.company_id)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      let workOrderNumber: string;
+      if (existingWOs && existingWOs.length > 0) {
+        const lastNumber = existingWOs[0].work_order_number;
+        const match = lastNumber.match(/WO-(\d+)/);
+        const nextNum = match ? parseInt(match[1]) + 1 : 1;
+        workOrderNumber = `WO-${String(nextNum).padStart(6, '0')}`;
+      } else {
+        workOrderNumber = "WO-000001";
+      }
+
+      // Generate invoice number
+      const { data: existingInvoices } = await supabaseAdmin
+        .from("invoices")
+        .select("invoice_number")
+        .eq("company_id", profile.company_id)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      let invoiceNumber: string;
+      if (existingInvoices && existingInvoices.length > 0) {
+        const lastNumber = existingInvoices[0].invoice_number;
+        const match = lastNumber.match(/INV-(\d+)/);
+        const nextNum = match ? parseInt(match[1]) + 1 : 1;
+        invoiceNumber = `INV-${String(nextNum).padStart(6, '0')}`;
+      } else {
+        invoiceNumber = "INV-000001";
+      }
+
+      // Create work order
+      const { data: workOrder, error: woError } = await supabaseAdmin
+        .from("work_orders")
+        .insert([{
+          work_order_number: workOrderNumber,
+          company_id: profile.company_id,
+          quote_id: quoteId,
+          customer_name: quote.customer_name,
+          customer_email: quote.customer_email,
+          customer_company: quote.customer_company,
+          customer_phone: quote.customer_phone,
+          status: "Pending Scheduling",
+          production_due_date: quote.production_due_date,
+          customer_due_date: quote.customer_due_date,
+          notes: quote.production_notes || quote.notes,
+          created_by: user.id,
+        }])
+        .select()
+        .single();
+
+      if (woError) throw new Error("Failed to create work order: " + woError.message);
+
+      // Create work order line items
+      if (lineItems && lineItems.length > 0) {
+        const woLineItems = lineItems
+          .filter((item: any) => item.line_type === "item" || !item.line_type)
+          .map((item: any) => ({
+            work_order_id: workOrder.id,
+            company_id: profile.company_id,
+            line_number: item.line_number,
+            line_type: "garment",
+            item_number: item.item_number,
+            description: item.description,
+            color: item.color,
+            qty_yxs: item.qty_yxs || 0,
+            qty_ys: item.qty_ys || 0,
+            qty_ym: item.qty_ym || 0,
+            qty_yl: item.qty_yl || 0,
+            qty_yxl: item.qty_yxl || 0,
+            qty_xs: item.qty_xs || 0,
+            qty_s: item.qty_s || 0,
+            qty_m: item.qty_m || 0,
+            qty_l: item.qty_l || 0,
+            qty_xl: item.qty_xl || 0,
+            qty_2xl: item.qty_2xl || 0,
+            qty_3xl: item.qty_3xl || 0,
+            qty_4xl: item.qty_4xl || 0,
+            notes: item.notes,
+          }));
+
+        await supabaseAdmin.from("work_order_line_items").insert(woLineItems);
+      }
+
+      // Create invoice
+      const { data: invoice, error: invError } = await supabaseAdmin
+        .from("invoices")
+        .insert([{
+          invoice_number: invoiceNumber,
+          company_id: profile.company_id,
+          quote_id: quoteId,
+          work_order_id: workOrder.id,
+          customer_name: quote.customer_name,
+          customer_email: quote.customer_email,
+          customer_company: quote.customer_company,
+          customer_phone: quote.customer_phone,
+          bill_company: quote.bill_company,
+          bill_name: quote.bill_name,
+          bill_address_1: quote.bill_address_1,
+          bill_address_2: quote.bill_address_2,
+          bill_city: quote.bill_city,
+          bill_state: quote.bill_state,
+          bill_zip: quote.bill_zip,
+          bill_phone: quote.bill_phone,
+          bill_email: quote.bill_email,
+          ship_company: quote.ship_company,
+          ship_name: quote.ship_name,
+          ship_address_1: quote.ship_address_1,
+          ship_address_2: quote.ship_address_2,
+          ship_city: quote.ship_city,
+          ship_state: quote.ship_state,
+          ship_zip: quote.ship_zip,
+          subtotal: quote.subtotal,
+          tax_rate: quote.tax_rate,
+          tax_amount: quote.tax_amount,
+          discount_amount: quote.discount_amount,
+          total: quote.total,
+          balance_due: quote.total,
+          status: "open",
+          status_stage: "unpaid",
+          invoice_date: new Date().toISOString(),
+          payment_due_date: quote.payment_due_date,
+          terms: quote.terms,
+          notes: quote.customer_notes,
+          created_by: user.id,
+        }])
+        .select()
+        .single();
+
+      if (invError) throw new Error("Failed to create invoice: " + invError.message);
+
+      // Create invoice line items
+      if (lineItems && lineItems.length > 0) {
+        const invLineItems = lineItems.map((item: any) => ({
+          invoice_id: invoice.id,
+          company_id: profile.company_id,
+          line_number: item.line_number,
+          line_type: item.line_type || "item",
+          item_number: item.item_number,
+          description: item.description,
+          quantity: (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) +
+                    (item.qty_yl || 0) + (item.qty_yxl || 0) + (item.qty_xs || 0) +
+                    (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) +
+                    (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
+                    (item.qty_4xl || 0),
+          unit_price: item.unit_price,
+          total_price: item.total_price,
+        }));
+
+        await supabaseAdmin.from("invoice_line_items").insert(invLineItems);
+      }
+
+      // Stage garment requirements
+      const garmentLineItems = lineItems?.filter((item: any) =>
+        item.line_type === "item" || !item.line_type
+      ) || [];
+
+      for (const garment of garmentLineItems) {
+        await supabaseAdmin.from("garment_requirements_staging").insert([{
+          company_id: profile.company_id,
+          quote_id: quoteId,
+          work_order_id: workOrder.id,
+          item_number: garment.item_number,
+          description: garment.description,
+          color: garment.color,
+          qty_yxs: garment.qty_yxs || 0,
+          qty_ys: garment.qty_ys || 0,
+          qty_ym: garment.qty_ym || 0,
+          qty_yl: garment.qty_yl || 0,
+          qty_yxl: garment.qty_yxl || 0,
+          qty_xs: garment.qty_xs || 0,
+          qty_s: garment.qty_s || 0,
+          qty_m: garment.qty_m || 0,
+          qty_l: garment.qty_l || 0,
+          qty_xl: garment.qty_xl || 0,
+          qty_2xl: garment.qty_2xl || 0,
+          qty_3xl: garment.qty_3xl || 0,
+          qty_4xl: garment.qty_4xl || 0,
+          supplier_id: garment.supplier_id,
+          supplier_name: garment.supplier_name,
+          status: "pending",
+        }]);
+      }
+
+      // Add to billing queue
+      await supabaseAdmin.from("billing_queue").insert([{
+        company_id: profile.company_id,
+        invoice_id: invoice.id,
+        customer_name: quote.customer_name,
+        customer_email: quote.customer_email,
+        amount: quote.total,
+        status: "pending",
+      }]);
+
+      // Update quote status
+      await supabaseAdmin
+        .from("quotes")
+        .update({
+          status: "approved",
+          approved_at: new Date().toISOString(),
+          approved_by_name: approverName,
+          converted_at: new Date().toISOString(),
+        })
+        .eq("id", quoteId);
+
+      // Log activity
+      await supabaseAdmin
+        .from("quote_activity_log")
+        .insert([{
+          quote_id: quoteId,
+          company_id: profile.company_id,
+          action: "manually_approved",
+          performed_by: user.id,
+          performed_by_name: approverName,
+          meta: {
+            work_order_number: workOrderNumber,
+            invoice_number: invoiceNumber,
+          },
+        }]);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          work_order: workOrder,
+          invoice: invoice,
+          message: "Quote approved successfully",
+        }),
+        {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+
     // POST /quotes/:id/convert
     if (action === "convert") {
       // Check if quote is approved

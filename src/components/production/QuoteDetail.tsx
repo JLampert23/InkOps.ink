@@ -147,6 +147,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
   const [selectedProofImage, setSelectedProofImage] = useState<string>('');
   const [showLabelModal, setShowLabelModal] = useState(false);
   const [reopening, setReopening] = useState(false);
+  const [approving, setApproving] = useState(false);
 
   useEffect(() => {
     loadQuoteDetails();
@@ -324,6 +325,51 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
     }
   };
 
+  const handleApproveQuote = async () => {
+    if (!quote) return;
+
+    if (!confirm(`Are you sure you want to approve ${quote.quote_number}?\n\nThis will:\n- Create a Work Order\n- Create an Invoice\n- Push garment requirements to the purchase report\n- Trigger all approval automations`)) {
+      return;
+    }
+
+    setApproving(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quote-actions/${quoteId}/approve`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            approver_name: 'Manual Approval',
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to approve quote');
+      }
+
+      const result = await response.json();
+      showNotification(
+        `Quote approved! Work Order ${result.work_order.work_order_number} and Invoice ${result.invoice.invoice_number} created.`,
+        'success'
+      );
+      loadQuoteDetails();
+    } catch (error: any) {
+      console.error('Error approving quote:', error);
+      showNotification(error.message || 'Failed to approve quote', 'error');
+    } finally {
+      setApproving(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'draft': return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
@@ -422,6 +468,20 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                 <Pencil className="w-4 h-4" />
               )}
               Edit Quote
+            </button>
+          )}
+          {quote.status !== 'approved' && (
+            <button
+              onClick={handleApproveQuote}
+              disabled={approving}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-50"
+            >
+              {approving ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <CheckCircle className="w-4 h-4" />
+              )}
+              Approve Quote
             </button>
           )}
           <button
