@@ -6,6 +6,7 @@ import {
   fetchSanMarInventory,
   fetchSanMarPricing,
   fetchSanMarMedia,
+  testSanMarConnection,
   type SanMarCredentials,
   type SanMarUnifiedResponse,
 } from "../_shared/sanmar-promostandards-client.ts";
@@ -89,16 +90,19 @@ Deno.serve(async (req: Request) => {
       companyId = profile.company_id;
     }
 
-    // Get SanMar credentials from company_settings
+    // Get SanMar PromoStandards credentials from company_settings
     const { data: settings } = await supabaseAdmin
       .from("company_settings")
-      .select("sanmar_account_number, sanmar_promo_username, sanmar_promo_password_encrypted")
+      .select("sanmar_promo_username, sanmar_promo_password_encrypted")
       .eq("id", companyId)
       .maybeSingle();
 
     if (!settings?.sanmar_promo_username || !settings?.sanmar_promo_password_encrypted) {
       return new Response(
-        JSON.stringify({ error: "SanMar credentials not configured" }),
+        JSON.stringify({
+          error: "SanMar PromoStandards credentials not configured",
+          message: "Please configure your SanMar username and password in Account Settings > Integrations > SanMar"
+        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -108,7 +112,7 @@ Deno.serve(async (req: Request) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": authHeader,
+        "Authorization": `Bearer ${supabaseServiceRoleKey}`,
       },
       body: JSON.stringify({
         action: "decrypt",
@@ -127,7 +131,7 @@ Deno.serve(async (req: Request) => {
     const { result: decryptedPassword } = await decryptResponse.json();
 
     const credentials: SanMarCredentials = {
-      username: settings.sanmar_promo_username,
+      id: settings.sanmar_promo_username,
       password: decryptedPassword
     };
 
@@ -137,19 +141,31 @@ Deno.serve(async (req: Request) => {
     const style = url.searchParams.get("style");
     const partId = url.searchParams.get("partId") || undefined;
 
-    if (!style) {
-      return new Response(
-        JSON.stringify({ error: "Style number required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     let responseData: any;
 
     // Handle different action types
     switch (action) {
+      case "test":
+        // Test connection using LOG105
+        const testResult = await testSanMarConnection(credentials);
+        responseData = {
+          success: testResult,
+          supplier: "sanmar",
+          action: "test",
+          message: testResult
+            ? "SanMar PromoStandards connection successful"
+            : "SanMar PromoStandards connection failed"
+        };
+        break;
+
       case "unified":
         // Fetch all data in parallel (recommended)
+        if (!style) {
+          return new Response(
+            JSON.stringify({ error: "Style number required" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
         responseData = await fetchUnifiedSanMarData(credentials, {
           styleNumber: style,
           partId
@@ -158,6 +174,12 @@ Deno.serve(async (req: Request) => {
 
       case "product":
         // Fetch only product data
+        if (!style) {
+          return new Response(
+            JSON.stringify({ error: "Style number required" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
         const productData = await fetchSanMarProductData(credentials, style);
         responseData = {
           success: true,
@@ -203,6 +225,12 @@ Deno.serve(async (req: Request) => {
 
       case "media":
         // Fetch media/images
+        if (!style) {
+          return new Response(
+            JSON.stringify({ error: "Style number required" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
         const mediaData = await fetchSanMarMedia(credentials, style, partId);
         responseData = {
           success: true,
@@ -214,6 +242,12 @@ Deno.serve(async (req: Request) => {
 
       case "search":
         // Legacy compatibility - treat as unified product search
+        if (!style) {
+          return new Response(
+            JSON.stringify({ error: "Style number required" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
         const searchData = await fetchUnifiedSanMarData(credentials, {
           styleNumber: style,
           partId
@@ -243,6 +277,19 @@ Deno.serve(async (req: Request) => {
 
   } catch (error: any) {
     console.error("SanMar API function error:", error);
+
+    // Check if it's a PromoStandards authentication error
+    if (error.name === 'PromoStandardsError') {
+      return new Response(
+        JSON.stringify({
+          error: error.message,
+          code: error.code,
+          supplier: "sanmar"
+        }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     return new Response(
       JSON.stringify({
         error: error.message || "Internal server error",

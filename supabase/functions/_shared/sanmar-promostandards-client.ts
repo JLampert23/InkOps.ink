@@ -1,26 +1,37 @@
 /**
- * SanMar PromoStandards SOAP Client
+ * SanMar PromoStandards SOAP Client (v24.2)
  *
- * This module provides a unified interface to call SanMar PromoStandards services:
- * - Product Data Service 2.0.0
- * - Inventory Service 2.0.0
- * - Pricing & Configuration Service 1.0.0
- * - Media Content Service 1.0.0
+ * Official SanMar PromoStandards Web Services implementation.
+ * Uses ONLY PromoStandards authentication with id/password in SOAP body.
  *
- * Authentication: Basic Auth (username:password)
- * Endpoints: https://api.sanmar.com/ps/
+ * CRITICAL: This module uses ONLY PromoStandards Web Services.
+ * NO Standard Web Services. NO FTP. NO customer number authentication.
+ *
+ * Authentication:
+ * - id = SanMar.com username
+ * - password = SanMar.com password
+ *
+ * Endpoints (SanMar v24.2):
+ * - Product Data V2.0.0
+ * - Media Content V1.1.0
+ * - Inventory V2.0.0
+ * - Pricing & Configuration V1.0.0
+ * - Order Status V2.0.0
+ * - Shipment Notification V1.0.0
  */
 
 const SANMAR_PROMOSTANDARDS_ENDPOINTS = {
-  productData: "https://psws.sanmar.com/promostandards/productdataservice.svc",
-  inventory: "https://psws.sanmar.com/promostandards/inventoryservice.svc",
-  pricing: "https://psws.sanmar.com/promostandards/pricingandconfigurationservice.svc",
-  media: "https://psws.sanmar.com/promostandards/mediacontentservice.svc",
+  productData: "https://ws.sanmar.com:8080/promostandards/ProductDataServiceBindingV2?WSDL",
+  media: "https://ws.sanmar.com:8080/promostandards/MediaContentServiceBindingV1?WSDL",
+  inventory: "https://ws.sanmar.com:8080/promostandards/InventoryServiceBindingV2?WSDL",
+  pricing: "https://ws.sanmar.com:8080/promostandards/PricingAndConfigurationServiceBindingV1?WSDL",
+  orderStatus: "https://ws.sanmar.com:8080/promostandards/OrderStatusServiceBindingV2?WSDL",
+  shipment: "https://ws.sanmar.com:8080/promostandards/ShipmentNotificationServiceBindingV1?WSDL",
 };
 
 export interface SanMarCredentials {
-  username: string;
-  password: string;
+  id: string;       // SanMar.com username
+  password: string; // SanMar.com password
 }
 
 export interface SanMarRequest {
@@ -105,65 +116,152 @@ export interface SanMarUnifiedResponse {
   media: SanMarMediaData;
 }
 
+export class PromoStandardsError extends Error {
+  constructor(public code: number, message: string) {
+    super(message);
+    this.name = 'PromoStandardsError';
+  }
+}
+
 /**
- * Makes a SOAP request to SanMar PromoStandards API
+ * Validates credentials before making requests
  */
-async function makeSanMarSOAPRequest(
-  endpoint: string,
+function validateCredentials(credentials: SanMarCredentials): void {
+  if (!credentials.id || !credentials.password) {
+    throw new PromoStandardsError(110, 'Authentication required: id and password must be provided');
+  }
+}
+
+/**
+ * Builds PromoStandards SOAP envelope per SanMar v24.2 specification
+ */
+function buildSOAPEnvelope(
+  service: string,
+  version: string,
+  operation: string,
+  credentials: SanMarCredentials,
+  payload: string
+): string {
+  validateCredentials(credentials);
+
+  return `<?xml version="1.0" encoding="utf-8"?>
+<soapenv:Envelope
+  xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+  xmlns:ns="http://www.promostandards.org/WSDL/${service}/${version}/"
+  xmlns:shar="http://www.promostandards.org/WSDL/${service}/${version}/SharedObjects/">
+  <soapenv:Header/>
+  <soapenv:Body>
+    <ns:${operation}Request>
+      <shar:wsVersion>${version}</shar:wsVersion>
+      <shar:id>${credentials.id}</shar:id>
+      <shar:password>${credentials.password}</shar:password>
+      ${payload}
+    </ns:${operation}Request>
+  </soapenv:Body>
+</soapenv:Envelope>`;
+}
+
+/**
+ * Parses PromoStandards error codes and throws appropriate errors
+ */
+function handlePromoStandardsError(xml: string): void {
+  const errorCodeMatch = xml.match(/<errorCode>(\d+)<\/errorCode>/i);
+  const errorMessageMatch = xml.match(/<errorMessage>([^<]+)<\/errorMessage>/i);
+
+  if (errorCodeMatch) {
+    const code = parseInt(errorCodeMatch[1]);
+    const message = errorMessageMatch ? errorMessageMatch[1] : 'Unknown error';
+
+    switch (code) {
+      case 100:
+        throw new PromoStandardsError(100, 'User not found');
+      case 104:
+        throw new PromoStandardsError(104, 'Account unauthorized for PromoStandards');
+      case 105:
+        throw new PromoStandardsError(105, 'Invalid username or password');
+      case 110:
+        throw new PromoStandardsError(110, 'Authentication required');
+      default:
+        throw new PromoStandardsError(code, message);
+    }
+  }
+}
+
+/**
+ * Makes a SOAP request to SanMar PromoStandards API with retry logic
+ */
+async function callPromoStandardsService(
+  wsdlUrl: string,
   soapAction: string,
-  soapBody: string,
-  credentials: SanMarCredentials
+  soapEnvelope: string,
+  maxRetries = 3
 ): Promise<string> {
-  const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-  <soap:Header>
-    <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
-      <wsse:UsernameToken>
-        <wsse:Username>${credentials.username}</wsse:Username>
-        <wsse:Password>${credentials.password}</wsse:Password>
-      </wsse:UsernameToken>
-    </wsse:Security>
-  </soap:Header>
-  <soap:Body>
-    ${soapBody}
-  </soap:Body>
-</soap:Envelope>`;
+  const startTime = Date.now();
 
-  console.log(`🔐 Making SOAP request to: ${endpoint}`);
-  console.log(`🔐 SOAPAction: ${soapAction}`);
-  console.log(`🔐 Username: ${credentials.username}`);
-  console.log(`🔐 Password length: ${credentials.password?.length || 0}`);
+  console.log(`📡 PromoStandards Request: ${soapAction}`);
+  console.log(`🔗 Endpoint: ${wsdlUrl}`);
 
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "text/xml; charset=utf-8",
-      "SOAPAction": soapAction,
-    },
-    body: soapEnvelope,
-  });
+  let lastError: Error | null = null;
 
-  const responseText = await response.text();
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(wsdlUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/xml; charset=utf-8",
+          "SOAPAction": soapAction,
+        },
+        body: soapEnvelope,
+      });
 
-  console.log(`📥 SOAP response status: ${response.status}`);
-  if (!response.ok) {
-    console.error("SanMar SOAP Error Response:", responseText.slice(0, 500));
+      const responseText = await response.text();
+      const duration = Date.now() - startTime;
+
+      console.log(`⏱️  Duration: ${duration}ms | Status: ${response.status}`);
+
+      // Check for SOAP faults or PromoStandards errors
+      if (responseText.includes('<faultcode>') || responseText.includes('<errorCode>')) {
+        handlePromoStandardsError(responseText);
+      }
+
+      if (!response.ok) {
+        // Don't retry authentication errors (401, 403)
+        if (response.status === 401 || response.status === 403) {
+          throw new PromoStandardsError(105, 'Invalid username or password');
+        }
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      console.log(`✅ PromoStandards success: ${soapAction}`);
+      return responseText;
+
+    } catch (error: any) {
+      lastError = error;
+
+      // Don't retry authentication errors
+      if (error instanceof PromoStandardsError && [100, 104, 105, 110].includes(error.code)) {
+        throw error;
+      }
+
+      // Log retry attempt
+      if (attempt < maxRetries) {
+        console.warn(`⚠️  Attempt ${attempt} failed, retrying... ${error.message}`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
+      }
+    }
   }
 
-  if (!response.ok) {
-    throw new Error(`SanMar PromoStandards request failed: ${response.status} ${response.statusText}`);
-  }
-
-  return responseText;
+  console.error(`❌ PromoStandards failed after ${maxRetries} attempts`);
+  throw lastError || new Error('PromoStandards request failed');
 }
 
 /**
  * Extracts a single XML tag value
  */
 function getXmlValue(xmlText: string, tagName: string): string | null {
-  const regex = new RegExp(`<${tagName}[^>]*>([^<]*)</${tagName}>`, 'i');
+  const regex = new RegExp(`<[^:]*:?${tagName}[^>]*>([^<]*)<\/[^:]*:?${tagName}>`, 'i');
   const match = xmlText.match(regex);
-  return match ? match[1] : null;
+  return match ? match[1].trim() : null;
 }
 
 /**
@@ -179,7 +277,7 @@ function getAllXmlMatches(xmlText: string, pattern: RegExp): RegExpMatchArray[] 
 }
 
 /**
- * Fetches product information from SanMar using getProduct operation
+ * Fetches product data using PromoStandards Product Data Service V2.0.0
  */
 export async function fetchSanMarProductData(
   credentials: SanMarCredentials,
@@ -187,18 +285,20 @@ export async function fetchSanMarProductData(
 ): Promise<SanMarStyleData> {
   console.log('🔍 Fetching SanMar product data:', styleNumber);
 
-  const soapBody = `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
-  <shar:wsVersion>2.0.0</shar:wsVersion>
-  <shar:id>${credentials.username}</shar:id>
-  <shar:password>${credentials.password}</shar:password>
-  <shar:productId>${styleNumber}</shar:productId>
-</ns2:GetProductRequest>`;
+  const payload = `<shar:productId>${styleNumber}</shar:productId>`;
 
-  const responseXml = await makeSanMarSOAPRequest(
+  const soapEnvelope = buildSOAPEnvelope(
+    'ProductDataService',
+    '2.0.0',
+    'GetProduct',
+    credentials,
+    payload
+  );
+
+  const responseXml = await callPromoStandardsService(
     SANMAR_PROMOSTANDARDS_ENDPOINTS.productData,
-    "getProduct",
-    soapBody,
-    credentials
+    'getProduct',
+    soapEnvelope
   );
 
   // Parse XML response
@@ -252,7 +352,7 @@ export async function fetchSanMarProductData(
 }
 
 /**
- * Fetches inventory levels for a specific part
+ * Fetches inventory using PromoStandards Inventory Service V2.0.0
  */
 export async function fetchSanMarInventory(
   credentials: SanMarCredentials,
@@ -260,18 +360,20 @@ export async function fetchSanMarInventory(
 ): Promise<SanMarInventoryData> {
   console.log('📦 Fetching SanMar inventory:', partId);
 
-  const soapBody = `<ns2:GetInventoryLevelsRequest xmlns:ns2="http://www.promostandards.org/WSDL/InventoryService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/Inventory/2.0.0/SharedObjects/">
-  <shar:wsVersion>2.0.0</shar:wsVersion>
-  <shar:id>${credentials.username}</shar:id>
-  <shar:password>${credentials.password}</shar:password>
-  <shar:productId>${partId}</shar:productId>
-</ns2:GetInventoryLevelsRequest>`;
+  const payload = `<shar:productId>${partId}</shar:productId>`;
 
-  const responseXml = await makeSanMarSOAPRequest(
+  const soapEnvelope = buildSOAPEnvelope(
+    'InventoryService',
+    '2.0.0',
+    'GetInventoryLevels',
+    credentials,
+    payload
+  );
+
+  const responseXml = await callPromoStandardsService(
     SANMAR_PROMOSTANDARDS_ENDPOINTS.inventory,
-    "getInventoryLevels",
-    soapBody,
-    credentials
+    'getInventoryLevels',
+    soapEnvelope
   );
 
   // Parse inventory items
@@ -296,7 +398,7 @@ export async function fetchSanMarInventory(
 }
 
 /**
- * Fetches pricing for a specific part
+ * Fetches pricing using PromoStandards Pricing & Configuration Service V1.0.0
  */
 export async function fetchSanMarPricing(
   credentials: SanMarCredentials,
@@ -304,20 +406,22 @@ export async function fetchSanMarPricing(
 ): Promise<SanMarPricingData> {
   console.log('💰 Fetching SanMar pricing:', partId);
 
-  const soapBody = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
-  <shar:wsVersion>1.0.0</shar:wsVersion>
-  <shar:id>${credentials.username}</shar:id>
-  <shar:password>${credentials.password}</shar:password>
-  <shar:productId>${partId}</shar:productId>
-  <shar:currency>USD</shar:currency>
-  <shar:priceType>Customer</shar:priceType>
-</ns2:GetConfigurationAndPricingRequest>`;
+  const payload = `<shar:productId>${partId}</shar:productId>
+      <shar:currency>USD</shar:currency>
+      <shar:priceType>Customer</shar:priceType>`;
 
-  const responseXml = await makeSanMarSOAPRequest(
+  const soapEnvelope = buildSOAPEnvelope(
+    'PricingAndConfiguration',
+    '1.0.0',
+    'GetConfigurationAndPricing',
+    credentials,
+    payload
+  );
+
+  const responseXml = await callPromoStandardsService(
     SANMAR_PROMOSTANDARDS_ENDPOINTS.pricing,
-    "getConfigurationAndPricing",
-    soapBody,
-    credentials
+    'getConfigurationAndPricing',
+    soapEnvelope
   );
 
   // Parse pricing data
@@ -349,7 +453,7 @@ export async function fetchSanMarPricing(
 }
 
 /**
- * Fetches media content (images) for a style
+ * Fetches media content using PromoStandards Media Content Service V1.1.0
  */
 export async function fetchSanMarMedia(
   credentials: SanMarCredentials,
@@ -358,20 +462,22 @@ export async function fetchSanMarMedia(
 ): Promise<SanMarMediaData> {
   console.log('🖼️ Fetching SanMar media:', styleNumber, partId || '(all)');
 
-  const soapBody = `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
-  <shar:wsVersion>1.0.0</shar:wsVersion>
-  <shar:id>${credentials.username}</shar:id>
-  <shar:password>${credentials.password}</shar:password>
-  <shar:mediaType>Image</shar:mediaType>
-  <shar:productId>${styleNumber}</shar:productId>${partId ? `
-  <shar:partId>${partId}</shar:partId>` : ''}
-</ns2:GetMediaContentRequest>`;
+  const payload = `<shar:mediaType>Image</shar:mediaType>
+      <shar:productId>${styleNumber}</shar:productId>${partId ? `
+      <shar:partId>${partId}</shar:partId>` : ''}`;
 
-  const responseXml = await makeSanMarSOAPRequest(
+  const soapEnvelope = buildSOAPEnvelope(
+    'MediaService',
+    '1.0.0',
+    'GetMediaContent',
+    credentials,
+    payload
+  );
+
+  const responseXml = await callPromoStandardsService(
     SANMAR_PROMOSTANDARDS_ENDPOINTS.media,
-    "getMediaContent",
-    soapBody,
-    credentials
+    'getMediaContent',
+    soapEnvelope
   );
 
   // Parse media content
@@ -447,10 +553,6 @@ export async function fetchSanMarMedia(
 
 /**
  * Fetches all product data in parallel (unified call)
- *
- * @param credentials - SanMar username and password
- * @param request - Style number and optional part ID
- * @returns Unified response with style, inventory, pricing, and media data
  */
 export async function fetchUnifiedSanMarData(
   credentials: SanMarCredentials,
@@ -462,13 +564,9 @@ export async function fetchUnifiedSanMarData(
 
   // Make all requests in parallel where possible
   const [productResult, inventoryResult, pricingResult, mediaResult] = await Promise.allSettled([
-    // 1. Product Data (always fetch)
     fetchSanMarProductData(credentials, styleNumber),
-    // 2. Inventory (only if partId provided)
     partId ? fetchSanMarInventory(credentials, partId) : Promise.resolve({ items: [] }),
-    // 3. Pricing (only if partId provided)
     partId ? fetchSanMarPricing(credentials, partId) : Promise.resolve({ parts: [] }),
-    // 4. Media Content (always fetch)
     fetchSanMarMedia(credentials, styleNumber, partId),
   ]);
 
@@ -479,7 +577,7 @@ export async function fetchUnifiedSanMarData(
     media: mediaResult.status,
   });
 
-  // Check if product data fetch failed (this is critical - can't proceed without it)
+  // Check if product data fetch failed (this is critical)
   if (productResult.status === 'rejected') {
     console.error('❌ SanMar Product fetch failed:', productResult.reason);
     throw new Error(`SanMar: ${productResult.reason?.message || 'Product not found'}`);
@@ -487,7 +585,7 @@ export async function fetchUnifiedSanMarData(
 
   const style = productResult.value;
 
-  // Check if product has no parts/colors (means product doesn't exist)
+  // Check if product has no parts/colors
   if (!style.parts || style.parts.length === 0) {
     console.warn(`⚠️ SanMar: Style ${styleNumber} returned no parts/colors`);
     throw new Error(`SanMar: Style ${styleNumber} not found or has no variants`);
@@ -529,4 +627,27 @@ export async function fetchUnifiedSanMarData(
     pricing,
     media,
   };
+}
+
+/**
+ * Test function to verify authentication and connectivity
+ * Uses LOG105 as a test style number
+ */
+export async function testSanMarConnection(credentials: SanMarCredentials): Promise<boolean> {
+  try {
+    console.log('🧪 Testing SanMar PromoStandards connection with LOG105...');
+
+    const result = await fetchSanMarProductData(credentials, 'LOG105');
+
+    if (result.parts.length > 0) {
+      console.log('✅ SanMar connection test successful!');
+      return true;
+    } else {
+      console.warn('⚠️ Connection successful but no product data returned');
+      return false;
+    }
+  } catch (error: any) {
+    console.error('❌ SanMar connection test failed:', error.message);
+    return false;
+  }
 }

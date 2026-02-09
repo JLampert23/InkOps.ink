@@ -1,16 +1,22 @@
 /**
  * SanMar Unified Service for Edge Functions
  *
- * Aggregates data from all SanMar PromoStandards services
- * Adapted for Deno runtime in Supabase Edge Functions
+ * Aggregates data from SanMar PromoStandards services ONLY.
+ * NO Standard Web Services. NO FTP. NO customer number authentication.
+ *
+ * Authentication: id/password in SOAP body per PromoStandards spec.
  */
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-
-interface SanMarCredentials {
-  username: string;
-  password: string;
-}
+import {
+  fetchSanMarProductData,
+  fetchSanMarInventory,
+  fetchSanMarPricing,
+  fetchSanMarMedia,
+  fetchUnifiedSanMarData,
+  type SanMarCredentials,
+  type SanMarUnifiedResponse,
+} from './sanmar-promostandards-client.ts';
 
 interface UnifiedGarment {
   vendor: string;
@@ -20,7 +26,6 @@ interface UnifiedGarment {
   product: {
     partId?: string;
     description?: string;
-    gtin?: string;
     status?: string;
     features?: string[];
     category?: string;
@@ -30,9 +35,6 @@ interface UnifiedGarment {
   };
   pricing: {
     piecePrice?: number;
-    casePrice?: number;
-    msrp?: number;
-    mapPrice?: number;
     priceBreaks?: Array<{ quantity: number; price: number }>;
     currency?: string;
   };
@@ -42,8 +44,6 @@ interface UnifiedGarment {
       partId: string;
       warehouse: string;
       quantityAvailable: number;
-      availableDate?: string;
-      leadTime?: number;
     }>;
   };
   media: {
@@ -53,8 +53,6 @@ interface UnifiedGarment {
     backFlat?: string;
     colorSwatch?: string;
     thumbnail?: string;
-    specSheet?: string;
-    measurementSheet?: string;
     additionalImages?: string[];
   };
   lastUpdated: string;
@@ -68,7 +66,6 @@ interface UnifiedStyle {
   subcategory: string;
   status: string;
   features: string[];
-  companionStyles: string[];
   variants: UnifiedGarment[];
   media: {
     frontModel?: string;
@@ -76,22 +73,14 @@ interface UnifiedStyle {
     frontFlat?: string;
     backFlat?: string;
     thumbnail?: string;
-    specSheet?: string;
-    measurementSheet?: string;
     additionalImages?: string[];
   };
   lastUpdated: string;
 }
 
-const SANMAR_ENDPOINTS = {
-  productData: "https://psws.sanmar.com/ProductDataService.svc",
-  inventory: "https://psws.sanmar.com/InventoryService.svc",
-  pricing: "https://psws.sanmar.com/PricingAndConfigurationService.svc",
-  media: "https://psws.sanmar.com/MediaContentService.svc",
-};
-
 /**
  * Get SanMar credentials from company settings
+ * Uses PromoStandards authentication: id/password
  */
 async function getSanMarCredentials(companyId: string): Promise<SanMarCredentials> {
   const supabase = createClient(
@@ -101,108 +90,37 @@ async function getSanMarCredentials(companyId: string): Promise<SanMarCredential
 
   const { data, error } = await supabase
     .from('company_settings')
-    .select('sanmar_account_number, sanmar_password')
+    .select('sanmar_promo_username, sanmar_promo_password_encrypted')
     .eq('id', companyId)
     .maybeSingle();
 
-  if (error || !data?.sanmar_account_number || !data?.sanmar_password) {
-    throw new Error('SanMar credentials not configured');
+  if (error || !data?.sanmar_promo_username || !data?.sanmar_promo_password_encrypted) {
+    throw new Error('SanMar PromoStandards credentials not configured');
   }
 
-  return {
-    username: data.sanmar_account_number,
-    password: data.sanmar_password,
-  };
-}
-
-/**
- * Call SanMar PromoStandards SOAP service
- */
-async function callPromoStandards(
-  endpoint: string,
-  operation: string,
-  payload: Record<string, any>,
-  credentials: SanMarCredentials
-): Promise<any> {
-  const soapEnvelope = buildSOAPEnvelope(operation, payload, credentials);
-
-  const response = await fetch(endpoint, {
+  // Decrypt password using crypto service
+  const decryptResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/crypto-service`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'text/xml; charset=utf-8',
-      'SOAPAction': operation,
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
     },
-    body: soapEnvelope,
+    body: JSON.stringify({
+      action: 'decrypt',
+      token: data.sanmar_promo_password_encrypted,
+    }),
   });
 
-  if (!response.ok) {
-    throw new Error(`PromoStandards error: ${response.statusText}`);
+  if (!decryptResponse.ok) {
+    throw new Error('Failed to decrypt SanMar credentials');
   }
 
-  const xmlText = await response.text();
-  return parseSOAPResponse(xmlText);
-}
+  const { result: decryptedPassword } = await decryptResponse.json();
 
-/**
- * Build SOAP envelope for PromoStandards request
- */
-function buildSOAPEnvelope(
-  operation: string,
-  payload: Record<string, any>,
-  credentials: SanMarCredentials
-): string {
-  const payloadXML = Object.entries(payload)
-    .map(([key, value]) => `<${key}>${value}</${key}>`)
-    .join('');
-
-  return `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-  <soap:Header>
-    <wsUserId xmlns="http://www.promostandards.org/WSDL/Authentication/1.0.0/">
-      <username>${credentials.username}</username>
-      <password>${credentials.password}</password>
-    </wsUserId>
-  </soap:Header>
-  <soap:Body>
-    <${operation} xmlns="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/">
-      ${payloadXML}
-    </${operation}>
-  </soap:Body>
-</soap:Envelope>`;
-}
-
-/**
- * Parse SOAP XML response to JSON
- */
-function parseSOAPResponse(xml: string): any {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(xml, 'text/xml');
-
-  const result: any = {};
-  const walk = (node: Element, obj: any) => {
-    for (const child of Array.from(node.children)) {
-      const tagName = child.tagName.replace(/.*:/, '');
-
-      if (child.children.length === 0) {
-        obj[tagName] = child.textContent;
-      } else {
-        if (!obj[tagName]) {
-          obj[tagName] = child.children.length === 1 ? {} : [];
-        }
-
-        if (Array.isArray(obj[tagName])) {
-          const item = {};
-          walk(child, item);
-          obj[tagName].push(item);
-        } else {
-          walk(child, obj[tagName]);
-        }
-      }
-    }
+  return {
+    id: data.sanmar_promo_username,
+    password: decryptedPassword,
   };
-
-  walk(doc.documentElement, result);
-  return result;
 }
 
 /**
@@ -216,39 +134,32 @@ export async function getUnifiedGarment(
 ): Promise<UnifiedGarment | null> {
   try {
     const credentials = await getSanMarCredentials(companyId);
-    const partId = `${style}-${color}-${size}`;
 
-    const [productData, pricingData, inventoryData, mediaData] = await Promise.allSettled([
-      callPromoStandards(
-        SANMAR_ENDPOINTS.productData,
-        'getProduct',
-        { productId: style },
-        credentials
-      ),
-      callPromoStandards(
-        SANMAR_ENDPOINTS.pricing,
-        'getConfigurationAndPricing',
-        { productId: style, partId },
-        credentials
-      ),
-      callPromoStandards(
-        SANMAR_ENDPOINTS.inventory,
-        'getInventoryLevels',
-        { productId: style, partId },
-        credentials
-      ),
-      callPromoStandards(
-        SANMAR_ENDPOINTS.media,
-        'getMediaContent',
-        { productId: style, partId },
-        credentials
-      ),
+    // Fetch product data first to get the correct partId
+    const productData = await fetchSanMarProductData(credentials, style);
+
+    // Find the matching part for this color/size combination
+    const matchingPart = productData.parts.find(
+      p => p.colorName === color && p.labelSize === size
+    );
+
+    if (!matchingPart) {
+      console.warn(`No matching part found for ${style}/${color}/${size}`);
+      return null;
+    }
+
+    const partId = matchingPart.partId;
+
+    // Fetch pricing, inventory, and media in parallel
+    const [pricingResult, inventoryResult, mediaResult] = await Promise.allSettled([
+      fetchSanMarPricing(credentials, partId),
+      fetchSanMarInventory(credentials, partId),
+      fetchSanMarMedia(credentials, style, partId),
     ]);
 
-    const product = productData.status === 'fulfilled' ? productData.value : null;
-    const pricing = pricingData.status === 'fulfilled' ? pricingData.value : null;
-    const inventory = inventoryData.status === 'fulfilled' ? inventoryData.value : null;
-    const media = mediaData.status === 'fulfilled' ? mediaData.value : null;
+    const pricing = pricingResult.status === 'fulfilled' ? pricingResult.value : null;
+    const inventory = inventoryResult.status === 'fulfilled' ? inventoryResult.value : null;
+    const media = mediaResult.status === 'fulfilled' ? mediaResult.value : null;
 
     return {
       vendor: 'SanMar',
@@ -257,37 +168,37 @@ export async function getUnifiedGarment(
       size,
       product: {
         partId,
-        description: product?.productName || product?.description,
-        gtin: product?.gtin,
-        status: product?.productStatus || 'Active',
-        features: product?.features ? [product.features] : [],
-        category: product?.productCategory,
-        subcategory: product?.productSubcategory,
+        description: productData.productName,
+        status: 'Active',
+        features: [],
+        category: productData.productCategory,
+        subcategory: '',
         labelSize: size,
         colorName: color,
       },
       pricing: {
-        piecePrice: pricing?.price ? parseFloat(pricing.price) : undefined,
-        casePrice: pricing?.casePrice ? parseFloat(pricing.casePrice) : undefined,
-        msrp: pricing?.msrp ? parseFloat(pricing.msrp) : undefined,
-        mapPrice: pricing?.mapPrice ? parseFloat(pricing.mapPrice) : undefined,
-        priceBreaks: pricing?.priceBreaks || [],
+        piecePrice: pricing?.parts[0]?.prices[0]?.price,
+        priceBreaks: pricing?.parts[0]?.prices.map(p => ({
+          quantity: p.minQuantity,
+          price: p.price
+        })) || [],
         currency: 'USD',
       },
       inventory: {
-        totalAvailable: inventory?.quantityAvailable ? parseInt(inventory.quantityAvailable) : 0,
-        inventoryLevels: inventory?.items || [],
+        totalAvailable: inventory?.items.reduce((sum, item) => sum + item.quantityAvailable, 0) || 0,
+        inventoryLevels: inventory?.items.map(item => ({
+          partId: item.partId,
+          warehouse: item.warehouseName,
+          quantityAvailable: item.quantityAvailable,
+        })) || [],
       },
       media: {
-        frontModel: media?.frontModel,
-        backModel: media?.backModel,
-        frontFlat: media?.frontFlat,
-        backFlat: media?.backFlat,
-        colorSwatch: media?.colorSwatch,
-        thumbnail: media?.thumbnail,
-        specSheet: media?.specSheet,
-        measurementSheet: media?.measurementSheet,
-        additionalImages: media?.additionalImages || [],
+        frontModel: media?.views.front || undefined,
+        backModel: media?.views.rear || undefined,
+        frontFlat: media?.views.frontImages[0] || undefined,
+        backFlat: media?.views.rearImages[0] || undefined,
+        thumbnail: media?.views.front || undefined,
+        additionalImages: media?.images.map(img => img.url) || [],
       },
       lastUpdated: new Date().toISOString(),
     };
@@ -307,105 +218,75 @@ export async function getUnifiedStyle(
   try {
     const credentials = await getSanMarCredentials(companyId);
 
-    const productData = await callPromoStandards(
-      SANMAR_ENDPOINTS.productData,
-      'getProduct',
-      { productId: style },
-      credentials
-    );
+    const unifiedData = await fetchUnifiedSanMarData(credentials, { styleNumber: style });
 
     const variants: UnifiedGarment[] = [];
 
-    if (productData?.parts && Array.isArray(productData.parts)) {
-      for (const part of productData.parts) {
-        const [pricingData, inventoryData, mediaData] = await Promise.allSettled([
-          callPromoStandards(
-            SANMAR_ENDPOINTS.pricing,
-            'getConfigurationAndPricing',
-            { productId: style, partId: part.partId },
-            credentials
-          ),
-          callPromoStandards(
-            SANMAR_ENDPOINTS.inventory,
-            'getInventoryLevels',
-            { productId: style, partId: part.partId },
-            credentials
-          ),
-          callPromoStandards(
-            SANMAR_ENDPOINTS.media,
-            'getMediaContent',
-            { productId: style, partId: part.partId },
-            credentials
-          ),
-        ]);
-
-        const pricing = pricingData.status === 'fulfilled' ? pricingData.value : null;
-        const inventory = inventoryData.status === 'fulfilled' ? inventoryData.value : null;
-        const media = mediaData.status === 'fulfilled' ? mediaData.value : null;
-
-        variants.push({
-          vendor: 'SanMar',
-          style,
-          color: part.colorName,
-          size: part.labelSize,
-          product: {
-            partId: part.partId,
-            description: productData.productName || productData.description,
-            gtin: part.gtin,
-            status: 'Active',
-            features: productData.features ? [productData.features] : [],
-            category: productData.productCategory,
-            subcategory: productData.productSubcategory,
-            labelSize: part.labelSize,
-            colorName: part.colorName,
-          },
-          pricing: {
-            piecePrice: pricing?.price ? parseFloat(pricing.price) : undefined,
-            casePrice: pricing?.casePrice ? parseFloat(pricing.casePrice) : undefined,
-            msrp: pricing?.msrp ? parseFloat(pricing.msrp) : undefined,
-            mapPrice: pricing?.mapPrice ? parseFloat(pricing.mapPrice) : undefined,
-            priceBreaks: pricing?.priceBreaks || [],
-            currency: 'USD',
-          },
-          inventory: {
-            totalAvailable: inventory?.quantityAvailable ? parseInt(inventory.quantityAvailable) : 0,
-            inventoryLevels: inventory?.items || [],
-          },
-          media: {
-            frontModel: media?.frontModel,
-            backModel: media?.backModel,
-            frontFlat: media?.frontFlat,
-            backFlat: media?.backFlat,
-            colorSwatch: media?.colorSwatch,
-            thumbnail: media?.thumbnail,
-            specSheet: media?.specSheet,
-            measurementSheet: media?.measurementSheet,
-            additionalImages: media?.additionalImages || [],
-          },
-          lastUpdated: new Date().toISOString(),
-        });
-      }
+    // Create variants for each part
+    for (const part of unifiedData.style.parts) {
+      variants.push({
+        vendor: 'SanMar',
+        style,
+        color: part.colorName,
+        size: part.labelSize,
+        product: {
+          partId: part.partId,
+          description: unifiedData.style.productName,
+          status: 'Active',
+          features: [],
+          category: unifiedData.style.productCategory,
+          subcategory: '',
+          labelSize: part.labelSize,
+          colorName: part.colorName,
+        },
+        pricing: {
+          piecePrice: unifiedData.pricing.parts.find(p => p.partId === part.partId)?.prices[0]?.price,
+          priceBreaks: unifiedData.pricing.parts.find(p => p.partId === part.partId)?.prices.map(p => ({
+            quantity: p.minQuantity,
+            price: p.price
+          })) || [],
+          currency: 'USD',
+        },
+        inventory: {
+          totalAvailable: unifiedData.inventory.items
+            .filter(i => i.partId === part.partId)
+            .reduce((sum, item) => sum + item.quantityAvailable, 0),
+          inventoryLevels: unifiedData.inventory.items
+            .filter(i => i.partId === part.partId)
+            .map(item => ({
+              partId: item.partId,
+              warehouse: item.warehouseName,
+              quantityAvailable: item.quantityAvailable,
+            })),
+        },
+        media: {
+          frontModel: unifiedData.media.views.front || undefined,
+          backModel: unifiedData.media.views.rear || undefined,
+          frontFlat: unifiedData.media.views.frontImages[0] || undefined,
+          backFlat: unifiedData.media.views.rearImages[0] || undefined,
+          thumbnail: unifiedData.media.views.front || undefined,
+          additionalImages: unifiedData.media.images.map(img => img.url),
+        },
+        lastUpdated: new Date().toISOString(),
+      });
     }
 
     return {
       vendor: 'SanMar',
       style,
-      description: productData?.productName || productData?.description || '',
-      category: productData?.productCategory || '',
-      subcategory: productData?.productSubcategory || '',
-      status: productData?.productStatus || 'Active',
-      features: productData?.features ? [productData.features] : [],
-      companionStyles: productData?.companionStyles || [],
+      description: unifiedData.style.productName,
+      category: unifiedData.style.productCategory,
+      subcategory: '',
+      status: 'Active',
+      features: [],
       variants,
       media: {
-        frontModel: variants[0]?.media.frontModel,
-        backModel: variants[0]?.media.backModel,
-        frontFlat: variants[0]?.media.frontFlat,
-        backFlat: variants[0]?.media.backFlat,
-        thumbnail: variants[0]?.media.thumbnail,
-        specSheet: variants[0]?.media.specSheet,
-        measurementSheet: variants[0]?.media.measurementSheet,
-        additionalImages: variants[0]?.media.additionalImages,
+        frontModel: unifiedData.media.views.front || undefined,
+        backModel: unifiedData.media.views.rear || undefined,
+        frontFlat: unifiedData.media.views.frontImages[0] || undefined,
+        backFlat: unifiedData.media.views.rearImages[0] || undefined,
+        thumbnail: unifiedData.media.views.front || undefined,
+        additionalImages: unifiedData.media.images.map(img => img.url),
       },
       lastUpdated: new Date().toISOString(),
     };
@@ -426,21 +307,25 @@ export async function getGarmentPricing(
 ): Promise<UnifiedGarment['pricing'] | null> {
   try {
     const credentials = await getSanMarCredentials(companyId);
-    const partId = `${style}-${color}-${size}`;
 
-    const pricingData = await callPromoStandards(
-      SANMAR_ENDPOINTS.pricing,
-      'getConfigurationAndPricing',
-      { productId: style, partId },
-      credentials
+    // Need to get product data first to find the partId
+    const productData = await fetchSanMarProductData(credentials, style);
+    const matchingPart = productData.parts.find(
+      p => p.colorName === color && p.labelSize === size
     );
 
+    if (!matchingPart) {
+      return null;
+    }
+
+    const pricingData = await fetchSanMarPricing(credentials, matchingPart.partId);
+
     return {
-      piecePrice: pricingData?.price ? parseFloat(pricingData.price) : undefined,
-      casePrice: pricingData?.casePrice ? parseFloat(pricingData.casePrice) : undefined,
-      msrp: pricingData?.msrp ? parseFloat(pricingData.msrp) : undefined,
-      mapPrice: pricingData?.mapPrice ? parseFloat(pricingData.mapPrice) : undefined,
-      priceBreaks: pricingData?.priceBreaks || [],
+      piecePrice: pricingData.parts[0]?.prices[0]?.price,
+      priceBreaks: pricingData.parts[0]?.prices.map(p => ({
+        quantity: p.minQuantity,
+        price: p.price
+      })) || [],
       currency: 'USD',
     };
   } catch (error) {
@@ -460,18 +345,26 @@ export async function getGarmentInventory(
 ): Promise<UnifiedGarment['inventory'] | null> {
   try {
     const credentials = await getSanMarCredentials(companyId);
-    const partId = `${style}-${color}-${size}`;
 
-    const inventoryData = await callPromoStandards(
-      SANMAR_ENDPOINTS.inventory,
-      'getInventoryLevels',
-      { productId: style, partId },
-      credentials
+    // Need to get product data first to find the partId
+    const productData = await fetchSanMarProductData(credentials, style);
+    const matchingPart = productData.parts.find(
+      p => p.colorName === color && p.labelSize === size
     );
 
+    if (!matchingPart) {
+      return null;
+    }
+
+    const inventoryData = await fetchSanMarInventory(credentials, matchingPart.partId);
+
     return {
-      totalAvailable: inventoryData?.quantityAvailable ? parseInt(inventoryData.quantityAvailable) : 0,
-      inventoryLevels: inventoryData?.items || [],
+      totalAvailable: inventoryData.items.reduce((sum, item) => sum + item.quantityAvailable, 0),
+      inventoryLevels: inventoryData.items.map(item => ({
+        partId: item.partId,
+        warehouse: item.warehouseName,
+        quantityAvailable: item.quantityAvailable,
+      })),
     };
   } catch (error) {
     console.error(`Error fetching inventory for ${style}/${color}/${size}:`, error);
@@ -489,18 +382,9 @@ export async function getAvailableColors(
   try {
     const credentials = await getSanMarCredentials(companyId);
 
-    const productData = await callPromoStandards(
-      SANMAR_ENDPOINTS.productData,
-      'getProduct',
-      { productId: style },
-      credentials
-    );
+    const productData = await fetchSanMarProductData(credentials, style);
 
-    if (!productData?.colors || !Array.isArray(productData.colors)) {
-      return [];
-    }
-
-    return productData.colors.map((c: any) => c.colorName);
+    return productData.colors.map(c => c.colorName);
   } catch (error) {
     console.error(`Error fetching colors for ${style}:`, error);
     return [];
