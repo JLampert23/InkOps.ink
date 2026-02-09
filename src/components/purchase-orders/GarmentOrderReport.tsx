@@ -45,6 +45,9 @@ interface GarmentRow {
   total_on_po: number;
   total_received: number;
   total_remaining: number;
+  requires_review?: boolean;
+  change_reason?: string;
+  original_data?: any;
   jobs: Array<{
     quote_id: string;
     quote_number: string;
@@ -83,6 +86,7 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
   const [selectedCustomer, setSelectedCustomer] = useState<string>('all');
   const [groupBy, setGroupBy] = useState<'style' | 'vendor' | 'job' | 'customer'>('style');
   const [showMissingOnly, setShowMissingOnly] = useState(false);
+  const [showReviewOnly, setShowReviewOnly] = useState(false);
   const [hideFullyOnPO, setHideFullyOnPO] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedGarment, setSelectedGarment] = useState<GarmentRow | null>(null);
@@ -118,7 +122,7 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
 
   useEffect(() => {
     applyFilters();
-  }, [garments, searchTerm, selectedVendor, selectedCustomer, showMissingOnly, hideFullyOnPO]);
+  }, [garments, searchTerm, selectedVendor, selectedCustomer, showMissingOnly, showReviewOnly, hideFullyOnPO]);
 
   const showToast = (message: string) => {
     setToast({ message, visible: true });
@@ -196,6 +200,24 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
 
     if (poError) throw poError;
 
+    const { data: reviewFlags, error: reviewError } = await supabase
+      .from('garment_requirements_staging')
+      .select('style_number, color, supplier_name, requires_review, change_reason, original_data')
+      .eq('company_id', cid)
+      .eq('requires_review', true);
+
+    if (reviewError) console.error('Error loading review flags:', reviewError);
+
+    const reviewMap = new Map<string, { requires_review: boolean; change_reason: string; original_data: any }>();
+    reviewFlags?.forEach((item: any) => {
+      const key = `${item.style_number || 'N/A'}||${item.color || 'N/A'}||${item.supplier_name || 'Unknown'}`;
+      reviewMap.set(key, {
+        requires_review: item.requires_review,
+        change_reason: item.change_reason,
+        original_data: item.original_data,
+      });
+    });
+
     const garmentMap = new Map<string, GarmentRow>();
 
     const sizeFieldMap: Record<string, string> = {
@@ -213,6 +235,7 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
       const key = `${styleNum}||${colorVal}||${supplierVal}`;
 
       if (!garmentMap.has(key)) {
+        const reviewInfo = reviewMap.get(key);
         garmentMap.set(key, {
           style_number: styleNum,
           product_name: item.description || 'Unknown Product',
@@ -223,6 +246,9 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
           total_on_po: 0,
           total_received: 0,
           total_remaining: 0,
+          requires_review: reviewInfo?.requires_review || false,
+          change_reason: reviewInfo?.change_reason,
+          original_data: reviewInfo?.original_data,
           jobs: [],
           pos: [],
         });
@@ -348,6 +374,10 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
 
     if (showMissingOnly) {
       filtered = filtered.filter((g) => g.total_remaining > 0);
+    }
+
+    if (showReviewOnly) {
+      filtered = filtered.filter((g) => g.requires_review === true);
     }
 
     setFilteredGarments(filtered);
@@ -570,6 +600,7 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
     setSelectedVendor('all');
     setSelectedCustomer('all');
     setShowMissingOnly(false);
+    setShowReviewOnly(false);
     setHideFullyOnPO(true);
   };
 
@@ -739,9 +770,18 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
                   />
                   <span className="text-sm text-gray-300">Show missing items only</span>
                 </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={showReviewOnly}
+                    onChange={(e) => setShowReviewOnly(e.target.checked)}
+                    className="rounded border-slate-600 bg-slate-700 text-orange-600 focus:ring-orange-500"
+                  />
+                  <span className="text-sm text-orange-300 font-medium">Show items requiring review</span>
+                </label>
               </div>
             </div>
-            {(searchTerm || selectedVendor !== 'all' || selectedCustomer !== 'all' || showMissingOnly) && (
+            {(searchTerm || selectedVendor !== 'all' || selectedCustomer !== 'all' || showMissingOnly || showReviewOnly) && (
               <div className="col-span-full">
                 <button onClick={clearFilters} className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300">
                   <X className="w-4 h-4" />
@@ -806,7 +846,7 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
                           ? 'Approve quotes with garments to see them here.'
                           : 'Try adjusting your search criteria or filters.'}
                       </p>
-                      {(searchTerm || selectedVendor !== 'all' || selectedCustomer !== 'all' || showMissingOnly) && (
+                      {(searchTerm || selectedVendor !== 'all' || selectedCustomer !== 'all' || showMissingOnly || showReviewOnly) && (
                         <button
                           onClick={clearFilters}
                           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -840,14 +880,36 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
                         <tr
                           key={`${groupKey}-${index}`}
                           className={`hover:bg-slate-800 dark:hover:bg-slate-700 transition-colors ${
-                            hasRemaining ? 'bg-yellow-900/10' : ''
+                            garment.requires_review
+                              ? 'bg-orange-900/20 border-l-4 border-orange-500'
+                              : hasRemaining
+                              ? 'bg-yellow-900/10'
+                              : ''
                           }`}
                         >
                           <td className="px-4 py-3 text-sm font-medium text-white whitespace-nowrap">
-                            {garment.style_number}
+                            <div className="flex items-center gap-2">
+                              {garment.requires_review && (
+                                <AlertCircle
+                                  className="w-4 h-4 text-orange-400 flex-shrink-0"
+                                  title={garment.change_reason || 'Changed After PO'}
+                                />
+                              )}
+                              <span>{garment.style_number}</span>
+                            </div>
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-300 whitespace-nowrap">
-                            {garment.color}
+                            <div className="flex items-center gap-2">
+                              <span>{garment.color}</span>
+                              {garment.requires_review && (
+                                <span
+                                  className="text-xs text-orange-400 font-medium"
+                                  title={garment.change_reason}
+                                >
+                                  (Review Required)
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-4 py-3 text-sm whitespace-nowrap">
                             {garment.jobs.length > 0 && garment.jobs[0].work_order_number ? (
