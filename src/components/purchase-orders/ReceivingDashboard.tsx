@@ -33,9 +33,9 @@ interface ReceivingDashboardProps {
 }
 
 export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboardProps) {
-  const [arrivingToday, setArrivingToday] = useState<PurchaseOrder[]>([]);
+  const [closedPOs, setClosedPOs] = useState<PurchaseOrder[]>([]);
   const [overduePOs, setOverduePOs] = useState<PurchaseOrder[]>([]);
-  const [allPendingPOs, setAllPendingPOs] = useState<PurchaseOrder[]>([]);
+  const [openPOs, setOpenPOs] = useState<PurchaseOrder[]>([]);
   const [recentReceiving, setRecentReceiving] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<PurchaseOrder[]>([]);
@@ -70,9 +70,9 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
       if (!profile) throw new Error('User profile not found');
 
       await Promise.all([
-        loadArrivingToday(profile.company_id),
+        loadClosedPOs(profile.company_id),
         loadOverduePOs(profile.company_id),
-        loadAllPendingPOs(profile.company_id),
+        loadOpenPOs(profile.company_id),
         loadRecentReceiving(profile.company_id),
       ]);
     } catch (error) {
@@ -83,9 +83,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
     }
   };
 
-  const loadArrivingToday = async (companyId: string) => {
-    const today = format(new Date(), 'yyyy-MM-dd');
-
+  const loadClosedPOs = async (companyId: string) => {
     const { data: pos, error } = await supabase
       .from('purchase_orders')
       .select(`
@@ -100,9 +98,9 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
         )
       `)
       .eq('company_id', companyId)
-      .eq('expected_delivery_date', today)
-      .in('status', ['sent', 'confirmed', 'in_transit', 'partially_received'])
-      .order('po_number');
+      .in('status', ['sent', 'fully_received', 'closed'])
+      .order('created_at', { ascending: false })
+      .limit(20);
 
     if (error) throw error;
 
@@ -125,7 +123,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
       })
     );
 
-    setArrivingToday(posWithCounts);
+    setClosedPOs(posWithCounts);
   };
 
   const loadOverduePOs = async (companyId: string) => {
@@ -174,7 +172,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
     setOverduePOs(posWithCounts);
   };
 
-  const loadAllPendingPOs = async (companyId: string) => {
+  const loadOpenPOs = async (companyId: string) => {
     const { data: pos, error } = await supabase
       .from('purchase_orders')
       .select(`
@@ -189,7 +187,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
         )
       `)
       .eq('company_id', companyId)
-      .in('status', ['sent', 'confirmed', 'in_transit', 'partially_received'])
+      .in('status', ['confirmed', 'in_transit', 'partially_received'])
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -213,7 +211,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
       })
     );
 
-    setAllPendingPOs(posWithCounts);
+    setOpenPOs(posWithCounts);
   };
 
   const loadRecentReceiving = async (companyId: string) => {
@@ -375,7 +373,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
             <div>
               <p className="text-sm text-gray-600 dark:text-gray-400">Pending POs</p>
               <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">
-                {allPendingPOs.length}
+                {openPOs.length}
               </p>
             </div>
             <Package className="w-8 h-8 text-blue-600 dark:text-blue-400" />
@@ -450,14 +448,14 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
         )}
       </div>
 
-      {/* All Pending POs */}
+      {/* Open Purchase Orders */}
       <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
         <div className="p-4 border-b border-gray-200 dark:border-slate-700">
           <div className="flex items-center gap-2">
             <Package className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">All Purchase Orders Awaiting Receipt</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Open Purchase Orders</h3>
             <span className="ml-auto px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-sm font-medium rounded">
-              {allPendingPOs.length} POs
+              {openPOs.length} POs
             </span>
           </div>
         </div>
@@ -486,7 +484,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
-              {allPendingPOs.length === 0 ? (
+              {openPOs.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                     <Package className="w-12 h-12 mx-auto mb-2 text-gray-400" />
@@ -494,7 +492,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
                   </td>
                 </tr>
               ) : (
-                allPendingPOs.map((po) => (
+                openPOs.map((po) => (
                   <tr key={po.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
                     <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
                       {po.po_number}
@@ -570,19 +568,22 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
         <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
           <div className="p-4 border-b border-gray-200 dark:border-slate-700">
             <div className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Arriving Today</h3>
+              <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Closed Purchase Orders</h3>
+              <span className="ml-auto px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-sm font-medium rounded">
+                {closedPOs.length}
+              </span>
             </div>
           </div>
           <div className="p-4">
-            {arrivingToday.length === 0 ? (
+            {closedPOs.length === 0 ? (
               <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                 <Package className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                <p>No deliveries expected today</p>
+                <p>No closed purchase orders</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {arrivingToday.map((po) => (
+                {closedPOs.map((po) => (
                   <div
                     key={po.id}
                     className="border border-gray-200 dark:border-slate-700 rounded-lg p-3 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
@@ -592,17 +593,19 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
                         <p className="font-medium text-gray-900 dark:text-white">{po.po_number}</p>
                         <p className="text-sm text-gray-600 dark:text-gray-400">{po.vendor_name}</p>
                       </div>
-                      {getStatusBadge(po.receiving_status)}
+                      <span className="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                        {po.status === 'closed' ? 'CLOSED' : po.status === 'sent' ? 'SENT' : 'FULLY RECEIVED'}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <div className="text-gray-600 dark:text-gray-400">
                         <span className="font-medium">{po.received_items}</span> / {po.total_items} items received
                       </div>
                       <button
-                        onClick={() => onReceivePO(po.id)}
-                        className="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                        onClick={() => onViewPO(po.id)}
+                        className="px-3 py-1.5 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm"
                       >
-                        Receive
+                        View
                       </button>
                     </div>
                   </div>

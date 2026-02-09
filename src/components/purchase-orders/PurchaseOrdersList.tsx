@@ -46,7 +46,7 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
   const [filteredPos, setFilteredPos] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
   const [selectedVendor, setSelectedVendor] = useState<string>('all');
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
   const [showFilters, setShowFilters] = useState(false);
@@ -60,7 +60,7 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
 
   useEffect(() => {
     applyFilters();
-  }, [pos, searchTerm, selectedStatus, selectedVendor, dateRange]);
+  }, [pos, searchTerm, selectedStatusFilter, selectedVendor, dateRange]);
 
   const loadPurchaseOrders = async () => {
     try {
@@ -80,7 +80,6 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
             vendor_type
           )
         `)
-        .eq('status', 'draft')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -120,8 +119,14 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
       );
     }
 
-    if (selectedStatus !== 'all') {
-      filtered = filtered.filter((po) => po.status === selectedStatus);
+    if (selectedStatusFilter === 'open') {
+      filtered = filtered.filter((po) =>
+        ['draft', 'sent', 'confirmed', 'in_transit', 'partially_received'].includes(po.status)
+      );
+    } else if (selectedStatusFilter === 'closed') {
+      filtered = filtered.filter((po) =>
+        ['fully_received', 'closed'].includes(po.status)
+      );
     }
 
     if (selectedVendor !== 'all') {
@@ -295,7 +300,7 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
 
   const clearFilters = () => {
     setSearchTerm('');
-    setSelectedStatus('all');
+    setSelectedStatusFilter('all');
     setSelectedVendor('all');
     setDateRange({ start: '', end: '' });
   };
@@ -368,34 +373,51 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5 pt-5 border-t border-gray-200 dark:border-[#2A2A2A]">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Date Range
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="date"
+                  value={dateRange.start}
+                  onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                  placeholder="Start Date"
+                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-[#2A2A2A] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-[#121212] text-gray-900 dark:text-[#EDEDED]"
+                />
+                <input
+                  type="date"
+                  value={dateRange.end}
+                  onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                  placeholder="End Date"
+                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-[#2A2A2A] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-[#121212] text-gray-900 dark:text-[#EDEDED]"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Status
               </label>
               <select
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
+                value={selectedStatusFilter}
+                onChange={(e) => setSelectedStatusFilter(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-[#2A2A2A] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-[#121212] text-gray-900 dark:text-[#EDEDED]"
               >
-                <option value="all">All Statuses</option>
-                <option value="draft">Draft</option>
-                <option value="sent">Sent</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="in_transit">In Transit</option>
-                <option value="partially_received">Partially Received</option>
-                <option value="fully_received">Fully Received</option>
+                <option value="all">All</option>
+                <option value="open">Open</option>
                 <option value="closed">Closed</option>
               </select>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Vendor
+                Supplier
               </label>
               <select
                 value={selectedVendor}
                 onChange={(e) => setSelectedVendor(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-[#2A2A2A] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-[#121212] text-gray-900 dark:text-[#EDEDED]"
               >
-                <option value="all">All Vendors</option>
+                <option value="all">All Suppliers</option>
                 {vendors.map((vendor) => (
                   <option key={vendor.id} value={vendor.id}>
                     {vendor.vendor_name}
@@ -404,27 +426,7 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Date Range
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="date"
-                  value={dateRange.start}
-                  onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-[#2A2A2A] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-[#121212] text-gray-900 dark:text-[#EDEDED]"
-                />
-                <input
-                  type="date"
-                  value={dateRange.end}
-                  onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-[#2A2A2A] rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-[#121212] text-gray-900 dark:text-[#EDEDED]"
-                />
-              </div>
-            </div>
-
-            {(searchTerm || selectedStatus !== 'all' || selectedVendor !== 'all' || dateRange.start || dateRange.end) && (
+            {(searchTerm || selectedStatusFilter !== 'all' || selectedVendor !== 'all' || dateRange.start || dateRange.end) && (
               <div className="col-span-full">
                 <button
                   onClick={clearFilters}
