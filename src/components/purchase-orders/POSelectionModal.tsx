@@ -82,7 +82,6 @@ export function POSelectionModal({
     try {
       setLoading(true);
       setSelectedPOId('');
-      const todayStr = format(new Date(), 'yyyy-MM-dd');
 
       const { data, error } = await supabase
         .from('purchase_orders')
@@ -90,9 +89,8 @@ export function POSelectionModal({
         .eq('company_id', companyId)
         .eq('vendor_id', vid)
         .in('status', ['draft', 'sent'])
-        .gte('created_at', `${todayStr}T00:00:00`)
-        .lte('created_at', `${todayStr}T23:59:59.999`)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(10);
 
       if (error) throw error;
       setOpenPOs(data || []);
@@ -325,8 +323,8 @@ export function POSelectionModal({
                 No open purchase order found for{' '}
                 <span className="text-white font-medium">
                   {activeVendorName}
-                </span>{' '}
-                today. Create a new one?
+                </span>
+                . Create a new one?
               </p>
               <div className="flex gap-3 justify-center">
                 <button
@@ -368,7 +366,7 @@ export function POSelectionModal({
                     <p className="text-xs text-gray-400">
                       {openPOs[0].status === 'draft' ? 'Draft' : 'Sent'}{' '}
                       &middot; Created{' '}
-                      {format(new Date(openPOs[0].created_at), 'h:mm a')}
+                      {format(new Date(openPOs[0].created_at), 'MMM d, h:mm a')}
                     </p>
                   </div>
                   <span className="text-sm text-gray-400">
@@ -433,7 +431,7 @@ export function POSelectionModal({
                         </p>
                         <p className="text-xs text-gray-400">
                           {po.status === 'draft' ? 'Draft' : 'Sent'} &middot;{' '}
-                          {format(new Date(po.created_at), 'h:mm a')}
+                          {format(new Date(po.created_at), 'MMM d, h:mm a')}
                         </p>
                       </div>
                       <span className="text-sm text-gray-400">
