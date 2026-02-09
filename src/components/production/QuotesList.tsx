@@ -168,7 +168,6 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
     sent: quotes.filter(q => q.status === 'sent').length,
     approved: quotes.filter(q => ['approved', 'converted'].includes(q.status)).length,
     rejected: quotes.filter(q => q.status === 'rejected').length,
-    converted: quotes.filter(q => q.status === 'converted').length,
   };
 
   return (
@@ -197,7 +196,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
         </div>
       </div>
 
-      <div className="grid grid-cols-6 gap-2">
+      <div className="grid grid-cols-5 gap-2">
         <button
           onClick={() => setStatusFilter('all')}
           className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all ${
@@ -253,17 +252,6 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
           <div className="text-xl font-bold text-red-600 dark:text-red-400">{stats.rejected}</div>
           <div className="text-xs text-gray-600 dark:text-gray-400">Rejected</div>
         </button>
-        <button
-          onClick={() => setStatusFilter('converted')}
-          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all ${
-            statusFilter === 'converted'
-              ? 'border-teal-600 dark:border-teal-400 ring-2 ring-teal-600 dark:ring-teal-400'
-              : 'border-gray-200 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
-          } p-3 text-left cursor-pointer`}
-        >
-          <div className="text-xl font-bold text-teal-600 dark:text-teal-400">{stats.converted}</div>
-          <div className="text-xs text-gray-600 dark:text-gray-400">Converted</div>
-        </button>
       </div>
 
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
@@ -290,7 +278,6 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
               <option value="approved">Approved</option>
               <option value="rejected">Rejected</option>
               <option value="expired">Expired</option>
-              <option value="converted">Converted</option>
             </select>
           </div>
         </div>
