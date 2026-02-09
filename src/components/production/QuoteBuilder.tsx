@@ -1075,6 +1075,132 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
     }
   };
 
+  /**
+   * Fetch SanMar garment data using PromoStandards API
+   *
+   * This function calls the garments endpoint which uses sanmarUnifiedService
+   * to retrieve real-time data from SanMar PromoStandards services:
+   * - Product data (title, description, features)
+   * - Pricing (piece, case, MSRP, MAP)
+   * - Inventory (total available, warehouse levels)
+   * - Media (front, back, lifestyle images)
+   *
+   * @param style - Style number (e.g., "PC61")
+   * @param color - Color name (e.g., "Navy")
+   * @param size - Optional size (e.g., "L") for size-specific data
+   * @returns Unified garment data or null on error
+   */
+  const fetchSanMarUnifiedData = async (style: string, color: string, size?: string) => {
+    try {
+      if (!session?.access_token) {
+        throw new Error('No authentication session');
+      }
+
+      const sizeParam = size ? `/${size}` : '';
+      const endpoint = `/garments/${style}/${color}${sizeParam}`;
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1${endpoint}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch SanMar data: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching SanMar unified data:', error);
+      return null;
+    }
+  };
+
+  /**
+   * Fetch pricing data only for a specific garment SKU
+   * Used for real-time pricing updates
+   */
+  const fetchGarmentPricing = async (style: string, color: string, size: string) => {
+    try {
+      if (!session?.access_token) return null;
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/garments/${style}/${color}/${size}/pricing`,
+        {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) return null;
+
+      const data = await response.json();
+      return data.pricing;
+    } catch (error) {
+      console.error('Error fetching garment pricing:', error);
+      return null;
+    }
+  };
+
+  /**
+   * Fetch inventory data only for a specific garment SKU
+   * Used for real-time inventory checks
+   */
+  const fetchGarmentInventory = async (style: string, color: string, size: string) => {
+    try {
+      if (!session?.access_token) return null;
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/garments/${style}/${color}/${size}/inventory`,
+        {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) return null;
+
+      const data = await response.json();
+      return data.inventory;
+    } catch (error) {
+      console.error('Error fetching garment inventory:', error);
+      return null;
+    }
+  };
+
+  /**
+   * Auto-populate line item data when user selects a product color
+   *
+   * This function handles the complete auto-population workflow:
+   *
+   * FOR SANMAR PRODUCTS:
+   * 1. Fetches unified data from PromoStandards API via sanmarUnifiedService
+   * 2. Auto-populates:
+   *    - Product title and description
+   *    - Available colors and sizes (from variants)
+   *    - Pricing: piece price, case price, MAP, MSRP
+   *    - Inventory: total available + warehouse levels
+   *    - Images: front model, back model, flat images, thumbnails
+   * 3. Fallback to cached data if PromoStandards unavailable
+   *
+   * FOR SSACTIVEWEAR PRODUCTS:
+   * 1. Fetches data from PromoStandards API
+   * 2. Auto-populates pricing and media content
+   * 3. Fallback to cached database images if Media API unavailable
+   *
+   * NO FTP LOGIC - All data comes from PromoStandards services
+   */
   const selectProductColor = async (product: ProductSearchResult, colorIdx: number) => {
     console.log('🔵 START selectProductColor:', { product, colorIdx });
     if (!activeSearchItem) return;
@@ -1304,8 +1430,93 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       }
     } else if (product.supplier === 'sanmar' && color) {
       try {
-        console.log('Fetching SanMar garment images for:', { style: product.style, color: color.name });
+        console.log('🔷 Fetching SanMar unified data for:', { style: product.style, color: color.name });
 
+        const unifiedData = await fetchSanMarUnifiedData(product.style, color.name);
+
+        if (unifiedData && unifiedData.variants) {
+          console.log('📦 SanMar unified data received:', {
+            variantCount: unifiedData.variants.length,
+            vendor: unifiedData.vendor,
+          });
+
+          // Get the first variant for initial data (or we can show size selector)
+          const firstVariant = unifiedData.variants[0];
+
+          if (firstVariant) {
+            // Extract pricing
+            if (firstVariant.pricing?.piecePrice) {
+              freshPrice = firstVariant.pricing.piecePrice;
+              console.log('💰 SanMar pricing from PromoStandards:', freshPrice);
+            }
+
+            // Extract media
+            if (firstVariant.media) {
+              const media = firstVariant.media;
+
+              if (media.frontModel || media.frontFlat) {
+                garmentImages.garment_front_image_url = media.frontModel || media.frontFlat;
+                garmentImages.garment_back_image_url = media.frontModel || media.frontFlat;
+                console.log('✅ Set SanMar front image');
+              }
+
+              if (media.backModel || media.backFlat) {
+                garmentImages.garment_rear_image_url = media.backModel || media.backFlat;
+                console.log('✅ Set SanMar rear image');
+              }
+
+              if (media.thumbnail) {
+                garmentImages.garment_lifestyle_image_url = media.thumbnail;
+                console.log('✅ Set SanMar thumbnail');
+              }
+
+              const allImages = [
+                media.frontModel,
+                media.backModel,
+                media.frontFlat,
+                media.backFlat,
+                media.thumbnail,
+                ...(media.additionalImages || [])
+              ].filter(Boolean);
+
+              garmentImages.garment_images_data = {
+                frontImages: [media.frontModel, media.frontFlat].filter(Boolean),
+                rearImages: [media.backModel, media.backFlat].filter(Boolean),
+                sideImages: [],
+                lifestyleImages: [media.thumbnail].filter(Boolean),
+                otherImages: media.additionalImages || [],
+                allImages,
+              };
+
+              console.log('✅ Loaded SanMar images from PromoStandards:', {
+                front: !!garmentImages.garment_front_image_url,
+                rear: !!garmentImages.garment_rear_image_url,
+                lifestyle: !!garmentImages.garment_lifestyle_image_url,
+                totalImages: allImages.length,
+              });
+            }
+          }
+        } else if (color.image_url) {
+          // Fallback to cached image if unified data unavailable
+          console.log('⚠️ Using cached SanMar image as fallback');
+          garmentImages.garment_front_image_url = color.image_url;
+          garmentImages.garment_images_data = {
+            frontImages: [color.image_url],
+            rearImages: [],
+            sideImages: [],
+            lifestyleImages: [],
+            otherImages: [],
+            allImages: [color.image_url],
+          };
+          showNotification('warning', 'Using cached data (PromoStandards unavailable)');
+        } else {
+          console.warn('⚠️ No SanMar data available');
+          showNotification('warning', 'No product data available');
+        }
+      } catch (error: any) {
+        console.error('❌ Failed to fetch SanMar unified data:', error);
+
+        // Fallback to cached image on error
         if (color.image_url) {
           garmentImages.garment_front_image_url = color.image_url;
           garmentImages.garment_images_data = {
@@ -1316,12 +1527,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
             otherImages: [],
             allImages: [color.image_url],
           };
-          console.log('Loaded SanMar thumbnail image');
-        } else {
-          console.warn('No image URL available for SanMar product');
+          showNotification('warning', 'Using cached data (PromoStandards error)');
         }
-      } catch (error: any) {
-        console.error('Failed to fetch SanMar garment images:', error);
       }
     }
 
