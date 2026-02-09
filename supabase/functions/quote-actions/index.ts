@@ -17,52 +17,45 @@ Deno.serve(async (req: Request) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Create Supabase client with the request context (includes auth headers)
-    const supabase = createClient(
-      supabaseUrl,
-      supabaseKey,
-      {
-        global: {
-          headers: {
-            Authorization: req.headers.get("Authorization") ?? "",
-          },
-        },
-      }
-    );
+    // Extract the JWT token from the Authorization header
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Missing Authorization header" }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Create authenticated Supabase client
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: { Authorization: authHeader },
+      },
+    });
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log('Attempting to get authenticated user...');
-
-    // Get authenticated user from the request
+    // Verify the user's JWT and get user details
     const {
       data: { user },
       error: userError,
     } = await supabase.auth.getUser();
 
-    console.log('Auth result:', {
-      success: !!user,
-      userId: user?.id,
-      email: user?.email,
-      error: userError?.message
-    });
-
     if (userError || !user) {
-      console.error('Authentication failed:', userError);
       return new Response(
         JSON.stringify({
-          error: "Authentication required",
-          message: userError?.message || "No authenticated user found",
+          error: "Invalid or expired token",
+          details: userError?.message
         }),
         {
           status: 401,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
     }
