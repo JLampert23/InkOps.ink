@@ -153,9 +153,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
       (quote.customer_email || '').toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesStatus =
-      statusFilter === 'all'
-        ? !['approved', 'converted'].includes(quote.status)
-        : quote.status === statusFilter;
+      statusFilter === 'all' ? true : quote.status === statusFilter;
 
     return matchesSearch && matchesStatus;
   });
@@ -195,31 +193,73 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
-          <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Total Quotes</div>
-        </div>
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
-          <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">{stats.draft}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Unsent</div>
-        </div>
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
-          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.sent}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Sent</div>
-        </div>
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
-          <div className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.approved}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Approved</div>
-        </div>
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
-          <div className="text-2xl font-bold text-red-600 dark:text-red-400">{stats.rejected}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Rejected</div>
-        </div>
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
-          <div className="text-2xl font-bold text-teal-600 dark:text-teal-400">{stats.converted}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Converted</div>
-        </div>
+      <div className="grid grid-cols-6 gap-2">
+        <button
+          onClick={() => setStatusFilter('all')}
+          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all ${
+            statusFilter === 'all'
+              ? 'border-gray-900 dark:border-white ring-2 ring-gray-900 dark:ring-white'
+              : 'border-gray-200 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
+          } p-3 text-left cursor-pointer`}
+        >
+          <div className="text-xl font-bold text-gray-900 dark:text-white">{stats.total}</div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">Total</div>
+        </button>
+        <button
+          onClick={() => setStatusFilter('draft')}
+          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all ${
+            statusFilter === 'draft'
+              ? 'border-gray-600 dark:border-gray-400 ring-2 ring-gray-600 dark:ring-gray-400'
+              : 'border-gray-200 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
+          } p-3 text-left cursor-pointer`}
+        >
+          <div className="text-xl font-bold text-gray-600 dark:text-gray-400">{stats.draft}</div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">Unsent</div>
+        </button>
+        <button
+          onClick={() => setStatusFilter('sent')}
+          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all ${
+            statusFilter === 'sent'
+              ? 'border-blue-600 dark:border-blue-400 ring-2 ring-blue-600 dark:ring-blue-400'
+              : 'border-gray-200 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
+          } p-3 text-left cursor-pointer`}
+        >
+          <div className="text-xl font-bold text-blue-600 dark:text-blue-400">{stats.sent}</div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">Sent</div>
+        </button>
+        <button
+          onClick={() => setStatusFilter('approved')}
+          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all ${
+            statusFilter === 'approved'
+              ? 'border-green-600 dark:border-green-400 ring-2 ring-green-600 dark:ring-green-400'
+              : 'border-gray-200 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
+          } p-3 text-left cursor-pointer`}
+        >
+          <div className="text-xl font-bold text-green-600 dark:text-green-400">{stats.approved}</div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">Approved</div>
+        </button>
+        <button
+          onClick={() => setStatusFilter('rejected')}
+          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all ${
+            statusFilter === 'rejected'
+              ? 'border-red-600 dark:border-red-400 ring-2 ring-red-600 dark:ring-red-400'
+              : 'border-gray-200 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
+          } p-3 text-left cursor-pointer`}
+        >
+          <div className="text-xl font-bold text-red-600 dark:text-red-400">{stats.rejected}</div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">Rejected</div>
+        </button>
+        <button
+          onClick={() => setStatusFilter('converted')}
+          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all ${
+            statusFilter === 'converted'
+              ? 'border-teal-600 dark:border-teal-400 ring-2 ring-teal-600 dark:ring-teal-400'
+              : 'border-gray-200 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
+          } p-3 text-left cursor-pointer`}
+        >
+          <div className="text-xl font-bold text-teal-600 dark:text-teal-400">{stats.converted}</div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">Converted</div>
+        </button>
       </div>
 
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
@@ -240,7 +280,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
               onChange={(e) => setStatusFilter(e.target.value)}
               className="px-4 py-2.5 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
             >
-              <option value="all">All Status</option>
+              <option value="all">All Quotes</option>
               <option value="draft">Unsent</option>
               <option value="sent">Sent</option>
               <option value="approved">Approved</option>
