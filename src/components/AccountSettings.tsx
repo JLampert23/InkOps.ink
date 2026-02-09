@@ -209,7 +209,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   // Supplier Integration States
   const [sanmarEnabled, setSanmarEnabled] = useState(false);
-  const [sanmarAccountNumber, setSanmarAccountNumber] = useState('');
   const [sanmarUsername, setSanmarUsername] = useState('');
   const [sanmarPassword, setSanmarPassword] = useState('');
   const [showSanmarPassword, setShowSanmarPassword] = useState(false);
@@ -499,7 +498,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     try {
       if (!companySettings?.id) return;
 
-      const sanmarHasCreds = !!(companySettings.sanmar_account_number && companySettings.sanmar_promo_username && companySettings.sanmar_promo_password_encrypted);
+      const sanmarHasCreds = !!(companySettings.sanmar_promo_username && companySettings.sanmar_promo_password_encrypted);
       const ssaHasCreds = !!(companySettings.ssactivewear_api_key_encrypted);
 
       setSanmarEnabled(companySettings.sanmar_enabled || false);
@@ -507,7 +506,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setSanmarHasCredentials(sanmarHasCreds);
       setSsaHasCredentials(ssaHasCreds);
 
-      setSanmarAccountNumber(companySettings.sanmar_account_number || '');
       setSanmarUsername(companySettings.sanmar_promo_username || '');
       setSanmarPassword(sanmarHasCreds ? '••••••••••••••••' : '');
       setSsaApiKey(ssaHasCreds ? '••••••••••••••••' : '');
@@ -1770,10 +1768,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
       // Handle SanMar credentials
       if (sanmarEnabled) {
-        if (sanmarAccountNumber.trim()) {
-          settingsData.sanmar_account_number = sanmarAccountNumber.trim();
-        }
-
         if (sanmarUsername.trim()) {
           settingsData.sanmar_promo_username = sanmarUsername.trim();
         }
@@ -1799,7 +1793,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           settingsData.sanmar_promo_password_encrypted = encryptedPassword;
         }
       } else {
-        settingsData.sanmar_account_number = null;
         settingsData.sanmar_promo_username = null;
         settingsData.sanmar_promo_password_encrypted = null;
       }
@@ -1836,8 +1829,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       }
 
       // Validate that if enabled, there are credentials (either existing or new)
-      if (sanmarEnabled && !sanmarHasCredentials && (!settingsData.sanmar_account_number || !settingsData.sanmar_promo_username || !settingsData.sanmar_promo_password_encrypted)) {
-        showNotification('warning', 'SanMar Credentials Required', 'Please enter Account Number, Username, and Password to enable SanMar integration');
+      if (sanmarEnabled && !sanmarHasCredentials && (!settingsData.sanmar_promo_username || !settingsData.sanmar_promo_password_encrypted)) {
+        showNotification('warning', 'SanMar Credentials Required', 'Please enter Username and Password to enable SanMar integration');
         return;
       }
 
@@ -1895,7 +1888,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
-      const sanmarHasCreds = !!(companySettings.sanmar_account_number && companySettings.sanmar_promo_username && companySettings.sanmar_promo_password_encrypted);
+      const sanmarHasCreds = !!(companySettings.sanmar_promo_username && companySettings.sanmar_promo_password_encrypted);
       const ssaHasCreds = !!(companySettings.ssactivewear_api_key_encrypted);
 
       if (!sanmarHasCreds && !ssaHasCreds) {
@@ -2025,7 +2018,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
-      const sanmarHasCreds = !!(companySettings.sanmar_account_number && companySettings.sanmar_promo_username && companySettings.sanmar_promo_password_encrypted);
+      const sanmarHasCreds = !!(companySettings.sanmar_promo_username && companySettings.sanmar_promo_password_encrypted);
 
       if (!sanmarHasCreds) {
         setSanmarTestResult({
@@ -3798,8 +3791,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       <div className={`font-medium text-sm flex items-center gap-2 ${activeTab === 'supplier-integrations' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                         Garment Suppliers
                         <div
-                          className={`w-2 h-2 rounded-full ${((companySettings?.sanmar_account_number && companySettings?.sanmar_promo_username && companySettings?.sanmar_promo_password_encrypted) || companySettings?.ssactivewear_api_key_encrypted) ? 'bg-green-500' : 'bg-red-500'}`}
-                          title={((companySettings?.sanmar_account_number && companySettings?.sanmar_promo_username && companySettings?.sanmar_promo_password_encrypted) || companySettings?.ssactivewear_api_key_encrypted) ? "Credentials saved" : "Credentials missing"}
+                          className={`w-2 h-2 rounded-full ${((companySettings?.sanmar_promo_username && companySettings?.sanmar_promo_password_encrypted) || companySettings?.ssactivewear_api_key_encrypted) ? 'bg-green-500' : 'bg-red-500'}`}
+                          title={((companySettings?.sanmar_promo_username && companySettings?.sanmar_promo_password_encrypted) || companySettings?.ssactivewear_api_key_encrypted) ? "Credentials saved" : "Credentials missing"}
                         />
                       </div>
                     </div>
@@ -5925,22 +5918,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         </div>
                       </div>
                     )}
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Account Number {!sanmarHasCredentials && <span className="text-red-500">*</span>}
-                      </label>
-                      <input
-                        type="text"
-                        value={sanmarAccountNumber}
-                        onChange={(e) => setSanmarAccountNumber(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Your SanMar account number"
-                      />
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Your SanMar account number (for reference)
-                      </p>
-                    </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
