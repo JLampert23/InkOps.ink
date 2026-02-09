@@ -146,38 +146,27 @@ export async function searchSanMarCatalog(
 
     console.log(`📦 Found ${productsData.length} products in cache`);
 
-    // Fetch live pricing and inventory from SOAP API
-    const liveData = await fetchSanMarLiveData(
-      supabaseUrl,
-      supabaseServiceKey,
-      companyId,
-      style
-    );
+    // Fetch cached pricing from database instead of live API
+    const { data: pricingData, error: pricingError } = await supabaseAdmin
+      .from("sanmar_catalog_pricing")
+      .select("sku, piece_price, case_price")
+      .eq("company_id", companyId)
+      .eq("style_id", styleData.id);
 
-    const livePricingMap = new Map<string, any>();
-    const liveInventoryMap = new Map<string, number>();
+    const cachedPricingMap = new Map<string, any>();
 
-    if (liveData.success && liveData.data) {
-      // Extract pricing
-      if (liveData.data.pricing?.parts) {
-        for (const part of liveData.data.pricing.parts) {
-          if (part.partId && part.prices && part.prices.length > 0) {
-            livePricingMap.set(part.partId, part.prices[0]);
-          }
+    if (!pricingError && pricingData && pricingData.length > 0) {
+      for (const priceItem of pricingData) {
+        if (priceItem.sku) {
+          cachedPricingMap.set(priceItem.sku, {
+            price: priceItem.piece_price || 0,
+            casePrice: priceItem.case_price || 0,
+          });
         }
       }
-
-      // Extract inventory
-      if (liveData.data.inventory?.items) {
-        for (const item of liveData.data.inventory.items) {
-          if (item.partId) {
-            liveInventoryMap.set(item.partId, item.quantityAvailable || 0);
-          }
-        }
-      }
-
-      console.log(`💰 Fetched live pricing for ${livePricingMap.size} parts`);
-      console.log(`📊 Fetched live inventory for ${liveInventoryMap.size} parts`);
+      console.log(`💰 Loaded cached pricing for ${cachedPricingMap.size} SKUs`);
+    } else {
+      console.log(`⚠️ No cached pricing found for style ${style}`);
     }
 
     // Group products by color
@@ -188,12 +177,12 @@ export async function searchSanMarCatalog(
       const partId = product.sku || product.unique_key;
 
       if (!colorMap.has(colorName)) {
-        // Get pricing from live data or cache
+        // Get pricing from cached database
         let pricingInfo = { wholesale: 0, retail: 0 };
-        const livePricing = livePricingMap.get(partId);
-        if (livePricing) {
-          pricingInfo.wholesale = livePricing.price || 0;
-          pricingInfo.retail = livePricing.price || 0;
+        const cachedPricing = cachedPricingMap.get(partId);
+        if (cachedPricing) {
+          pricingInfo.wholesale = cachedPricing.price || 0;
+          pricingInfo.retail = cachedPricing.price || 0;
         }
 
         // Resolve image URL from sanmar_image_map (CDN)
@@ -241,11 +230,8 @@ export async function searchSanMarCatalog(
         colorOption.sizes?.push(product.size_name);
       }
 
-      // Add inventory
-      const inventory = liveInventoryMap.get(partId);
-      if (inventory !== undefined && colorOption.stock) {
-        colorOption.stock[partId] = inventory;
-      }
+      // Note: Inventory would be loaded from live API if available
+      // For now, we rely on cached data only to avoid DNS issues
     }
 
     const colors = Array.from(colorMap.values());
