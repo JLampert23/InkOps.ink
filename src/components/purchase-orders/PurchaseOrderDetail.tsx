@@ -446,7 +446,9 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOr
       // Update garment requirements staging for items added to PO
       for (const product of selectedProducts) {
         if (product.style_number && product.color) {
-          await supabase
+          const supplierName = product.supplier || po.vendor.vendor_name;
+
+          const { error: updateError } = await supabase
             .from('garment_requirements_staging')
             .update({
               is_po_created: true,
@@ -456,7 +458,11 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOr
             .eq('company_id', profile.company_id)
             .eq('style_number', product.style_number)
             .eq('color', product.color)
-            .eq('is_po_created', false);
+            .eq('supplier_name', supplierName);
+
+          if (updateError) {
+            console.error('Error updating garment staging:', updateError);
+          }
         }
       }
 
