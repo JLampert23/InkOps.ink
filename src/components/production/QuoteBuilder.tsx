@@ -268,9 +268,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       // If we have an initial quote ID, set it and load
       setQuoteId(initialQuoteId);
       loadQuote(initialQuoteId);
-    } else if (!draftCreatedRef.current) {
-      // If no quote ID exists and we haven't created a draft yet, create one
-      createDraftQuote();
+    } else {
+      // Don't create draft automatically - only create when user takes action
       loadDefaultFees();
     }
   }, [user, initialQuoteId]);
@@ -1426,7 +1425,20 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       return false;
     }
 
-    if (!quoteId) {
+    // Create draft quote if it doesn't exist yet
+    let currentQuoteId = quoteId;
+    if (!currentQuoteId && !draftCreatedRef.current) {
+      const newQuoteId = await createDraftQuote();
+      if (!newQuoteId) {
+        if (!isAutoSave) {
+          showNotification('error', 'Error', 'Failed to create quote');
+        }
+        return false;
+      }
+      currentQuoteId = newQuoteId;
+    }
+
+    if (!currentQuoteId) {
       if (!isAutoSave) {
         showNotification('error', 'Error', 'Quote ID is missing');
       }
@@ -1505,11 +1517,11 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       const { error: updateError } = await supabase
         .from('quotes')
         .update(quoteData)
-        .eq('id', quoteId);
+        .eq('id', currentQuoteId);
 
       if (updateError) throw updateError;
 
-      await supabase.from('quote_line_items').delete().eq('quote_id', quoteId);
+      await supabase.from('quote_line_items').delete().eq('quote_id', currentQuoteId);
 
       const allItems = itemGroups.flatMap((group, groupIdx) =>
         group.items.map((item, itemIdx) => {
@@ -1522,7 +1534,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
             front_image_url: item.garment_front_image_url,
           });
           return {
-          quote_id: quoteId,
+          quote_id: currentQuoteId,
             company_id: userProfile.company_id,
             line_type: 'item',
             sort_order: groupIdx * 1000 + itemIdx,
@@ -1574,7 +1586,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       if (fees.length > 0) {
         const { error: feesError } = await supabase.from('quote_line_items').insert(
           fees.map((fee, index) => ({
-            quote_id: quoteId,
+            quote_id: currentQuoteId,
             company_id: userProfile.company_id,
             line_number: 9000 + index,
             line_type: 'fee',
