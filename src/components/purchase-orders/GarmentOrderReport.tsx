@@ -48,6 +48,7 @@ interface GarmentRow {
   requires_review?: boolean;
   change_reason?: string;
   original_data?: any;
+  is_po_created?: boolean;
   jobs: Array<{
     quote_id: string;
     quote_number: string;
@@ -87,6 +88,7 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
   const [groupBy, setGroupBy] = useState<'style' | 'vendor' | 'job' | 'customer'>('style');
   const [showMissingOnly, setShowMissingOnly] = useState(false);
   const [showReviewOnly, setShowReviewOnly] = useState(false);
+  const [showItemsOnPO, setShowItemsOnPO] = useState(false);
   const [hideFullyOnPO, setHideFullyOnPO] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [selectedGarment, setSelectedGarment] = useState<GarmentRow | null>(null);
@@ -122,7 +124,7 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
 
   useEffect(() => {
     applyFilters();
-  }, [garments, searchTerm, selectedVendor, selectedCustomer, showMissingOnly, showReviewOnly, hideFullyOnPO]);
+  }, [garments, searchTerm, selectedVendor, selectedCustomer, showMissingOnly, showReviewOnly, showItemsOnPO, hideFullyOnPO]);
 
   const showToast = (message: string) => {
     setToast({ message, visible: true });
@@ -200,21 +202,21 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
 
     if (poError) throw poError;
 
-    const { data: reviewFlags, error: reviewError } = await supabase
+    const { data: stagingData, error: stagingError } = await supabase
       .from('garment_requirements_staging')
-      .select('style_number, color, supplier_name, requires_review, change_reason, original_data')
-      .eq('company_id', cid)
-      .eq('requires_review', true);
+      .select('style_number, color, supplier_name, requires_review, change_reason, original_data, is_po_created')
+      .eq('company_id', cid);
 
-    if (reviewError) console.error('Error loading review flags:', reviewError);
+    if (stagingError) console.error('Error loading staging data:', stagingError);
 
-    const reviewMap = new Map<string, { requires_review: boolean; change_reason: string; original_data: any }>();
-    reviewFlags?.forEach((item: any) => {
+    const stagingMap = new Map<string, { requires_review: boolean; change_reason: string; original_data: any; is_po_created: boolean }>();
+    stagingData?.forEach((item: any) => {
       const key = `${item.style_number || 'N/A'}||${item.color || 'N/A'}||${item.supplier_name || 'Unknown'}`;
-      reviewMap.set(key, {
-        requires_review: item.requires_review,
+      stagingMap.set(key, {
+        requires_review: item.requires_review || false,
         change_reason: item.change_reason,
         original_data: item.original_data,
+        is_po_created: item.is_po_created || false,
       });
     });
 
@@ -235,7 +237,7 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
       const key = `${styleNum}||${colorVal}||${supplierVal}`;
 
       if (!garmentMap.has(key)) {
-        const reviewInfo = reviewMap.get(key);
+        const stagingInfo = stagingMap.get(key);
         garmentMap.set(key, {
           style_number: styleNum,
           product_name: item.description || 'Unknown Product',
@@ -246,9 +248,10 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
           total_on_po: 0,
           total_received: 0,
           total_remaining: 0,
-          requires_review: reviewInfo?.requires_review || false,
-          change_reason: reviewInfo?.change_reason,
-          original_data: reviewInfo?.original_data,
+          requires_review: stagingInfo?.requires_review || false,
+          change_reason: stagingInfo?.change_reason,
+          original_data: stagingInfo?.original_data,
+          is_po_created: stagingInfo?.is_po_created || false,
           jobs: [],
           pos: [],
         });
@@ -356,6 +359,11 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
           g.product_name.toLowerCase().includes(term) ||
           g.color.toLowerCase().includes(term)
       );
+    }
+
+    // Filter out items that have been added to POs (unless user wants to see them)
+    if (!showItemsOnPO) {
+      filtered = filtered.filter((g) => !g.is_po_created);
     }
 
     if (selectedVendor !== 'all') {
@@ -601,6 +609,7 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
     setSelectedCustomer('all');
     setShowMissingOnly(false);
     setShowReviewOnly(false);
+    setShowItemsOnPO(false);
     setHideFullyOnPO(true);
   };
 
@@ -779,9 +788,18 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
                   />
                   <span className="text-sm text-orange-300 font-medium">Show items requiring review</span>
                 </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={showItemsOnPO}
+                    onChange={(e) => setShowItemsOnPO(e.target.checked)}
+                    className="rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-300">Show items already on PO</span>
+                </label>
               </div>
             </div>
-            {(searchTerm || selectedVendor !== 'all' || selectedCustomer !== 'all' || showMissingOnly || showReviewOnly) && (
+            {(searchTerm || selectedVendor !== 'all' || selectedCustomer !== 'all' || showMissingOnly || showReviewOnly || showItemsOnPO) && (
               <div className="col-span-full">
                 <button onClick={clearFilters} className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300">
                   <X className="w-4 h-4" />
@@ -846,7 +864,7 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
                           ? 'Approve quotes with garments to see them here.'
                           : 'Try adjusting your search criteria or filters.'}
                       </p>
-                      {(searchTerm || selectedVendor !== 'all' || selectedCustomer !== 'all' || showMissingOnly || showReviewOnly) && (
+                      {(searchTerm || selectedVendor !== 'all' || selectedCustomer !== 'all' || showMissingOnly || showReviewOnly || showItemsOnPO) && (
                         <button
                           onClick={clearFilters}
                           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -882,6 +900,8 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
                           className={`hover:bg-slate-800 dark:hover:bg-slate-700 transition-colors ${
                             garment.requires_review
                               ? 'bg-orange-900/20 border-l-4 border-orange-500'
+                              : garment.is_po_created
+                              ? 'bg-green-900/10 border-l-4 border-green-500'
                               : hasRemaining
                               ? 'bg-yellow-900/10'
                               : ''
@@ -893,6 +913,12 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
                                 <AlertCircle
                                   className="w-4 h-4 text-orange-400 flex-shrink-0"
                                   title={garment.change_reason || 'Changed After PO'}
+                                />
+                              )}
+                              {garment.is_po_created && !garment.requires_review && (
+                                <CheckCircle
+                                  className="w-4 h-4 text-green-400 flex-shrink-0"
+                                  title="Added to Purchase Order"
                                 />
                               )}
                               <span>{garment.style_number}</span>

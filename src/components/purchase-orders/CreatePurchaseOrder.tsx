@@ -322,6 +322,21 @@ export function CreatePurchaseOrder({ onBack, onSave }: CreatePurchaseOrderProps
 
       if (lineItemsError) throw lineItemsError;
 
+      // Update garment requirements staging to mark items as added to PO
+      for (const item of lineItems.filter(i => i.style_number && i.color)) {
+        await supabase
+          .from('garment_requirements_staging')
+          .update({
+            is_po_created: true,
+            po_id: po.id,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('company_id', profile.company_id)
+          .eq('style_number', item.style_number)
+          .eq('color', item.color)
+          .eq('is_po_created', false);
+      }
+
       // Upload attachments if any
       if (attachments.length > 0) {
         for (const file of attachments) {
