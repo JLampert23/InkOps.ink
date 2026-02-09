@@ -135,11 +135,16 @@ Deno.serve(async (req: Request) => {
       password: decryptedPassword
     };
 
+    console.log(`🔑 SanMar credentials loaded for company ${companyId}`);
+    console.log(`👤 Username: ${credentials.id}`);
+
     // Parse request parameters
     const url = new URL(req.url);
     const action = url.searchParams.get("action") || "unified";
     const style = url.searchParams.get("style");
     const partId = url.searchParams.get("partId") || undefined;
+
+    console.log(`📋 Request params: action=${action}, style=${style}, partId=${partId}`);
 
     let responseData: any;
 
