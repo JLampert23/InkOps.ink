@@ -50,11 +50,11 @@ async function getSanMarCredentials(): Promise<SanMarCredentials> {
 
   const { data: settings } = await supabase
     .from('company_settings')
-    .select('sanmar_enabled, sanmar_username, sanmar_password_encrypted')
+    .select('sanmar_enabled, sanmar_promo_username, sanmar_promo_password_encrypted')
     .eq('id', profile.company_id)
     .maybeSingle();
 
-  if (!settings?.sanmar_enabled || !settings?.sanmar_username || !settings?.sanmar_password_encrypted) {
+  if (!settings?.sanmar_enabled || !settings?.sanmar_promo_username || !settings?.sanmar_promo_password_encrypted) {
     throw new Error('SanMar credentials not configured');
   }
 
@@ -68,7 +68,7 @@ async function getSanMarCredentials(): Promise<SanMarCredentials> {
       },
       body: JSON.stringify({
         action: 'decrypt',
-        token: settings.sanmar_password_encrypted,
+        token: settings.sanmar_promo_password_encrypted,
       }),
     }
   );
@@ -80,7 +80,7 @@ async function getSanMarCredentials(): Promise<SanMarCredentials> {
   const decryptResult = await decryptResponse.json();
 
   return {
-    username: settings.sanmar_username,
+    username: settings.sanmar_promo_username,
     password: decryptResult.result,
   };
 }

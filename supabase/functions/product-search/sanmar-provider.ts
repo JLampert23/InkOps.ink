@@ -111,7 +111,7 @@ export async function searchSanMarCatalog(
     // Get SanMar credentials from company settings
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from("company_settings")
-      .select("sanmar_enabled, sanmar_username, sanmar_password_encrypted")
+      .select("sanmar_enabled, sanmar_promo_username, sanmar_promo_password_encrypted")
       .eq("id", companyId)
       .single();
 
@@ -126,7 +126,7 @@ export async function searchSanMarCatalog(
       return { results, errors };
     }
 
-    if (!settings.sanmar_username || !settings.sanmar_password_encrypted) {
+    if (!settings.sanmar_promo_username || !settings.sanmar_promo_password_encrypted) {
       errors.push("SanMar credentials not configured");
       return { results, errors };
     }
@@ -139,7 +139,7 @@ export async function searchSanMarCatalog(
         throw new Error("ENCRYPTION_KEY not configured");
       }
 
-      decryptedPassword = await decryptPassword(settings.sanmar_password_encrypted, encryptionKey);
+      decryptedPassword = await decryptPassword(settings.sanmar_promo_password_encrypted, encryptionKey);
     } catch (decryptError: any) {
       console.error("Password decryption failed:", decryptError);
       errors.push("Failed to decrypt SanMar credentials");
@@ -147,7 +147,7 @@ export async function searchSanMarCatalog(
     }
 
     const credentials: SanMarCredentials = {
-      username: settings.sanmar_username,
+      username: settings.sanmar_promo_username,
       password: decryptedPassword,
     };
 

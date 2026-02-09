@@ -34,8 +34,8 @@ interface CompanySettings {
   stripe_secret_key: string | null;
   stripe_webhook_secret: string | null;
   sanmar_account_number: string | null;
-  sanmar_username: string | null;
-  sanmar_password_encrypted: string | null;
+  sanmar_promo_username: string | null;
+  sanmar_promo_password_encrypted: string | null;
   sanmar_enabled: boolean | null;
   ssactivewear_username: string | null;
   ssactivewear_api_key_encrypted: string | null;
@@ -499,7 +499,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     try {
       if (!companySettings?.id) return;
 
-      const sanmarHasCreds = !!(companySettings.sanmar_account_number && companySettings.sanmar_username && companySettings.sanmar_password_encrypted);
+      const sanmarHasCreds = !!(companySettings.sanmar_account_number && companySettings.sanmar_promo_username && companySettings.sanmar_promo_password_encrypted);
       const ssaHasCreds = !!(companySettings.ssactivewear_api_key_encrypted);
 
       setSanmarEnabled(companySettings.sanmar_enabled || false);
@@ -508,7 +508,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setSsaHasCredentials(ssaHasCreds);
 
       setSanmarAccountNumber(companySettings.sanmar_account_number || '');
-      setSanmarUsername(companySettings.sanmar_username || '');
+      setSanmarUsername(companySettings.sanmar_promo_username || '');
       setSanmarPassword(sanmarHasCreds ? '••••••••••••••••' : '');
       setSsaApiKey(ssaHasCreds ? '••••••••••••••••' : '');
       setSsaAccountNumber(ssaHasCreds ? '••••••••••••••••' : '');
@@ -1775,7 +1775,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         }
 
         if (sanmarUsername.trim()) {
-          settingsData.sanmar_username = sanmarUsername.trim();
+          settingsData.sanmar_promo_username = sanmarUsername.trim();
         }
 
         if (sanmarPassword.trim() && sanmarPassword !== '••••••••••••••••') {
@@ -1796,12 +1796,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           }
 
           const { result: encryptedPassword } = await encryptResponse.json();
-          settingsData.sanmar_password_encrypted = encryptedPassword;
+          settingsData.sanmar_promo_password_encrypted = encryptedPassword;
         }
       } else {
         settingsData.sanmar_account_number = null;
-        settingsData.sanmar_username = null;
-        settingsData.sanmar_password_encrypted = null;
+        settingsData.sanmar_promo_username = null;
+        settingsData.sanmar_promo_password_encrypted = null;
       }
 
       // Handle SSActivewear credentials
@@ -1836,7 +1836,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       }
 
       // Validate that if enabled, there are credentials (either existing or new)
-      if (sanmarEnabled && !sanmarHasCredentials && (!settingsData.sanmar_account_number || !settingsData.sanmar_username || !settingsData.sanmar_password_encrypted)) {
+      if (sanmarEnabled && !sanmarHasCredentials && (!settingsData.sanmar_account_number || !settingsData.sanmar_promo_username || !settingsData.sanmar_promo_password_encrypted)) {
         showNotification('warning', 'SanMar Credentials Required', 'Please enter Account Number, Username, and Password to enable SanMar integration');
         return;
       }
@@ -1895,7 +1895,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
-      const sanmarHasCreds = !!(companySettings.sanmar_account_number && companySettings.sanmar_username && companySettings.sanmar_password_encrypted);
+      const sanmarHasCreds = !!(companySettings.sanmar_account_number && companySettings.sanmar_promo_username && companySettings.sanmar_promo_password_encrypted);
       const ssaHasCreds = !!(companySettings.ssactivewear_api_key_encrypted);
 
       if (!sanmarHasCreds && !ssaHasCreds) {
@@ -2025,7 +2025,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
-      const sanmarHasCreds = !!(companySettings.sanmar_account_number && companySettings.sanmar_username && companySettings.sanmar_password_encrypted);
+      const sanmarHasCreds = !!(companySettings.sanmar_account_number && companySettings.sanmar_promo_username && companySettings.sanmar_promo_password_encrypted);
 
       if (!sanmarHasCreds) {
         setSanmarTestResult({
@@ -3798,8 +3798,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       <div className={`font-medium text-sm flex items-center gap-2 ${activeTab === 'supplier-integrations' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                         Garment Suppliers
                         <div
-                          className={`w-2 h-2 rounded-full ${((companySettings?.sanmar_account_number && companySettings?.sanmar_username && companySettings?.sanmar_password_encrypted) || companySettings?.ssactivewear_api_key_encrypted) ? 'bg-green-500' : 'bg-red-500'}`}
-                          title={((companySettings?.sanmar_account_number && companySettings?.sanmar_username && companySettings?.sanmar_password_encrypted) || companySettings?.ssactivewear_api_key_encrypted) ? "Credentials saved" : "Credentials missing"}
+                          className={`w-2 h-2 rounded-full ${((companySettings?.sanmar_account_number && companySettings?.sanmar_promo_username && companySettings?.sanmar_promo_password_encrypted) || companySettings?.ssactivewear_api_key_encrypted) ? 'bg-green-500' : 'bg-red-500'}`}
+                          title={((companySettings?.sanmar_account_number && companySettings?.sanmar_promo_username && companySettings?.sanmar_promo_password_encrypted) || companySettings?.ssactivewear_api_key_encrypted) ? "Credentials saved" : "Credentials missing"}
                         />
                       </div>
                     </div>
@@ -5900,19 +5900,19 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       onChange={(e) => setSanmarEnabled(e.target.checked)}
                       className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
                     />
-                    <span className="text-lg font-semibold text-gray-900 dark:text-white">SanMar API</span>
+                    <span className="text-lg font-semibold text-gray-900 dark:text-white">SanMar PromoStandards</span>
                   </label>
                 </div>
 
                 {sanmarEnabled && (
                   <div className="ml-7 space-y-4 pl-4 border-l-2 border-blue-200 dark:border-blue-800">
                     <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                      <p className="text-sm font-medium text-amber-900 dark:text-amber-100 mb-2">⚠️ SanMar PromoStandards API Required</p>
+                      <p className="text-sm font-medium text-amber-900 dark:text-amber-100 mb-2">⚠️ SanMar PromoStandards API</p>
                       <p className="text-sm text-amber-800 dark:text-amber-200 mb-2">
-                        Enter your <strong>PromoStandards API credentials</strong> from SanMar. Products are fetched in real-time via their SOAP API (api.sanmar.com).
+                        Enter your <strong>PromoStandards credentials</strong> from SanMar. Inventory is fetched in real-time via their SOAP API (ws.sanmar.com).
                       </p>
                       <p className="text-xs text-amber-700 dark:text-amber-300">
-                        Note: FTP integration is not supported in this environment. Contact SanMar support to get PromoStandards API access.
+                        Note: SanMar does not provide Product Data via PromoStandards. Only inventory and purchase order services are available.
                       </p>
                     </div>
 
@@ -5944,23 +5944,23 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        API Username {!sanmarHasCredentials && <span className="text-red-500">*</span>}
+                        PromoStandards Username {!sanmarHasCredentials && <span className="text-red-500">*</span>}
                       </label>
                       <input
                         type="text"
                         value={sanmarUsername}
                         onChange={(e) => setSanmarUsername(e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Your PromoStandards API username"
+                        placeholder="Your PromoStandards username"
                       />
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Your PromoStandards API username from SanMar
+                        Your PromoStandards username from SanMar
                       </p>
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        API Password {!sanmarHasCredentials && <span className="text-red-500">*</span>}
+                        PromoStandards Password {!sanmarHasCredentials && <span className="text-red-500">*</span>}
                       </label>
                       <div className="relative">
                         <input
@@ -5980,7 +5980,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         </button>
                       </div>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        {sanmarHasCredentials ? 'Enter a new password only if you want to update it' : 'Your SanMar FTP password'}
+                        {sanmarHasCredentials ? 'Enter a new password only if you want to update it' : 'Your SanMar PromoStandards password'}
                       </p>
                     </div>
 
