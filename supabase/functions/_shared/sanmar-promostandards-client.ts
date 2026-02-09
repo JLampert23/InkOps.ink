@@ -12,10 +12,10 @@
  */
 
 const SANMAR_PROMOSTANDARDS_ENDPOINTS = {
-  productData: "https://psws.sanmar.com/ProductDataService.svc",
-  inventory: "https://psws.sanmar.com/InventoryService.svc",
-  pricing: "https://psws.sanmar.com/PricingAndConfigurationService.svc",
-  media: "https://psws.sanmar.com/MediaContentService.svc",
+  productData: "https://ws.sanmar.com:8080/promostandards/ProductDataService",
+  inventory: "https://ws.sanmar.com:8080/promostandards/InventoryService",
+  pricing: "https://ws.sanmar.com:8080/promostandards/PricingAndConfigurationService",
+  media: "https://ws.sanmar.com:8080/promostandards/MediaContentService",
 };
 
 export interface SanMarCredentials {
