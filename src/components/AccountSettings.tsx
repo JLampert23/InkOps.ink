@@ -2030,47 +2030,48 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       if (!sanmarHasCreds) {
         setSanmarTestResult({
           success: false,
-          error: 'SanMar FTP credentials not saved. Please save your credentials first.',
+          error: 'SanMar API credentials not saved. Please save your credentials first.',
         });
         return;
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sanmar-ftp-sync`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sanmar-api?action=product&style=PC54`,
         {
-          method: 'POST',
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
             'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-            'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            companyId: companySettings.id,
-            syncType: 'inventory'
-          })
         }
       );
 
       if (response.ok) {
         const data = await response.json();
-        setSanmarTestResult({
-          success: true,
-          message: `FTP connection successful! Synced ${data.totalProducts || 0} products from SanMar catalog.`,
-        });
+        if (data.success && data.data?.productName) {
+          setSanmarTestResult({
+            success: true,
+            message: `PromoStandards API connected! Found product: ${data.data.productName}`,
+          });
+        } else {
+          setSanmarTestResult({
+            success: false,
+            error: 'API connected but no product data returned',
+          });
+        }
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('SanMar FTP error response:', errorData);
+        console.error('SanMar API error response:', errorData);
         console.error('Response status:', response.status);
         setSanmarTestResult({
           success: false,
-          error: errorData.error || `FTP connection failed (${response.status})`,
+          error: errorData.error || `API connection failed (${response.status})`,
         });
       }
     } catch (err) {
-      console.error('SanMar FTP test exception:', err);
+      console.error('SanMar API test exception:', err);
       setSanmarTestResult({
         success: false,
-        error: err instanceof Error ? err.message : 'FTP connection failed',
+        error: err instanceof Error ? err.message : 'API connection failed',
       });
     } finally {
       setTestingSanmar(false);
@@ -5905,10 +5906,13 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                 {sanmarEnabled && (
                   <div className="ml-7 space-y-4 pl-4 border-l-2 border-blue-200 dark:border-blue-800">
-                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">SanMar FTP Integration</p>
-                      <p className="text-sm text-blue-800 dark:text-blue-200">
-                        These credentials connect to SanMar's FTP server (ftp.sanmar.com:2200) to download the complete product catalog with inventory and pricing. The catalog syncs automatically and products become searchable in Quote Builder.
+                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                      <p className="text-sm font-medium text-amber-900 dark:text-amber-100 mb-2">⚠️ SanMar PromoStandards API Required</p>
+                      <p className="text-sm text-amber-800 dark:text-amber-200 mb-2">
+                        Enter your <strong>PromoStandards API credentials</strong> from SanMar. Products are fetched in real-time via their SOAP API (api.sanmar.com).
+                      </p>
+                      <p className="text-xs text-amber-700 dark:text-amber-300">
+                        Note: FTP integration is not supported in this environment. Contact SanMar support to get PromoStandards API access.
                       </p>
                     </div>
 
@@ -5940,23 +5944,23 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Customer Number (FTP Username) {!sanmarHasCredentials && <span className="text-red-500">*</span>}
+                        API Username {!sanmarHasCredentials && <span className="text-red-500">*</span>}
                       </label>
                       <input
                         type="text"
                         value={sanmarUsername}
                         onChange={(e) => setSanmarUsername(e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Your SanMar customer number"
+                        placeholder="Your PromoStandards API username"
                       />
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        This is your FTP username (typically your customer number)
+                        Your PromoStandards API username from SanMar
                       </p>
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        FTP Password {!sanmarHasCredentials && <span className="text-red-500">*</span>}
+                        API Password {!sanmarHasCredentials && <span className="text-red-500">*</span>}
                       </label>
                       <div className="relative">
                         <input
@@ -5964,7 +5968,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           value={sanmarPassword}
                           onChange={(e) => setSanmarPassword(e.target.value)}
                           className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder={sanmarHasCredentials ? "Leave blank to keep existing" : "Enter your SanMar FTP password"}
+                          placeholder={sanmarHasCredentials ? "Leave blank to keep existing" : "Enter your PromoStandards API password"}
                         />
                         <button
                           type="button"
@@ -5990,12 +5994,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           {testingSanmar ? (
                             <>
                               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              Testing FTP Connection...
+                              Testing API Connection...
                             </>
                           ) : (
                             <>
                               <Zap className="w-4 h-4" />
-                              Test FTP Connection
+                              Test API Connection
                             </>
                           )}
                         </button>
