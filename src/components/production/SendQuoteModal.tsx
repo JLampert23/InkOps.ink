@@ -137,6 +137,13 @@ export function SendQuoteModal({
 
     setSending(true);
     try {
+      // Get current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !session) {
+        throw new Error('You must be logged in to send quotes. Please refresh and try again.');
+      }
+
       const { data, error } = await supabase.functions.invoke(
         `quote-actions/${quoteId}/send`,
         {
@@ -152,7 +159,8 @@ export function SendQuoteModal({
       );
 
       if (error) {
-        throw error;
+        console.error('Edge function error:', error);
+        throw new Error(error.message || 'Failed to send quote');
       }
 
       alert(`Quote sent successfully to ${customerEmail}`);

@@ -21,8 +21,19 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     const authHeader = req.headers.get("Authorization");
+    console.log('Auth header present:', !!authHeader);
+
     if (!authHeader) {
-      throw new Error("Missing authorization header");
+      return new Response(
+        JSON.stringify({ error: "Missing authorization header" }),
+        {
+          status: 401,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey, {
@@ -39,8 +50,19 @@ Deno.serve(async (req: Request) => {
       error: userError,
     } = await supabase.auth.getUser();
 
+    console.log('User auth check:', { hasUser: !!user, error: userError?.message });
+
     if (userError || !user) {
-      throw new Error("Not authenticated");
+      return new Response(
+        JSON.stringify({ error: "Not authenticated: " + (userError?.message || "No user found") }),
+        {
+          status: 401,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
     }
 
     // Get user profile
