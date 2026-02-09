@@ -192,6 +192,7 @@ export function PurchaseOrdersManager() {
             onCreatePO={(items) => {
               alert('Create PO functionality will be implemented');
             }}
+            onNavigate={handleDashboardNavigate}
           />
         )}
 

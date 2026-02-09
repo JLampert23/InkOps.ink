@@ -50,6 +50,8 @@ interface GarmentRow {
     quote_number: string;
     customer_name: string;
     quantity: number;
+    work_order_id?: string;
+    work_order_number?: string;
   }>;
   pos: Array<{
     po_id: string;
@@ -69,9 +71,10 @@ interface Vendor {
 
 interface GarmentOrderReportProps {
   onCreatePO?: (items: GarmentRow[]) => void;
+  onNavigate?: (tab: string, view?: string, id?: string) => void;
 }
 
-export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
+export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderReportProps) {
   const [garments, setGarments] = useState<GarmentRow[]>([]);
   const [filteredGarments, setFilteredGarments] = useState<GarmentRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -164,6 +167,20 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
 
     if (quoteError) throw quoteError;
 
+    const { data: workOrders, error: woError } = await supabase
+      .from('work_orders')
+      .select('id, work_order_number, quote_id')
+      .eq('company_id', cid);
+
+    if (woError) throw woError;
+
+    const workOrderMap = new Map<string, { id: string; work_order_number: string }>();
+    workOrders?.forEach(wo => {
+      if (wo.quote_id) {
+        workOrderMap.set(wo.quote_id, { id: wo.id, work_order_number: wo.work_order_number });
+      }
+    });
+
     const { data: poLineItems, error: poError } = await supabase
       .from('purchase_order_line_items')
       .select(`
@@ -227,11 +244,14 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
       });
 
       if (rowJobQty > 0) {
+        const workOrder = workOrderMap.get(item.quotes.id);
         row.jobs.push({
           quote_id: item.quotes.id,
           quote_number: item.quotes.quote_number,
           customer_name: item.quotes.customer_name,
           quantity: rowJobQty,
+          work_order_id: workOrder?.id,
+          work_order_number: workOrder?.work_order_number,
         });
       }
     });
@@ -745,6 +765,9 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
                   Color
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                  Work Order
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider whitespace-nowrap">
                   Vendor
                 </th>
                 {activeSizes.map((size) => (
@@ -772,7 +795,7 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
             <tbody className="divide-y divide-slate-700">
               {filteredGarments.length === 0 ? (
                 <tr>
-                  <td colSpan={activeSizes.length + 7} className="px-4 py-12 text-center">
+                  <td colSpan={activeSizes.length + 8} className="px-4 py-12 text-center">
                     <div className="flex flex-col items-center justify-center">
                       <Package className="w-16 h-16 text-gray-600 mb-4" />
                       <p className="text-lg font-medium text-gray-500 dark:text-gray-400 mb-2">
@@ -798,7 +821,7 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
                 groupedData.map(([groupKey, items]) => (
                   <React.Fragment key={groupKey}>
                     <tr className="bg-slate-800 dark:bg-slate-900">
-                      <td colSpan={activeSizes.length + 7} className="px-4 py-2">
+                      <td colSpan={activeSizes.length + 8} className="px-4 py-2">
                         <div className="flex items-center gap-2 text-sm font-semibold text-white">
                           {groupBy === 'style' && <Layers className="w-4 h-4" />}
                           {groupBy === 'vendor' && <ShoppingCart className="w-4 h-4" />}
@@ -825,6 +848,18 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-300 whitespace-nowrap">
                             {garment.color}
+                          </td>
+                          <td className="px-4 py-3 text-sm whitespace-nowrap">
+                            {garment.jobs.length > 0 && garment.jobs[0].work_order_number ? (
+                              <button
+                                onClick={() => onNavigate?.('work-orders', 'detail', garment.jobs[0].work_order_id)}
+                                className="text-blue-400 hover:text-blue-300 hover:underline font-medium"
+                              >
+                                {garment.jobs[0].work_order_number}
+                              </button>
+                            ) : (
+                              <span className="text-gray-500">-</span>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-300 whitespace-nowrap">
                             {garment.supplier}
@@ -923,6 +958,7 @@ export function GarmentOrderReport({ onCreatePO }: GarmentOrderReportProps) {
             setShowDrillDown(false);
             handleAddToPO(selectedGarment);
           }}
+          onNavigate={onNavigate}
         />
       )}
     </div>
@@ -934,11 +970,13 @@ function DrillDownModal({
   activeSizes,
   onClose,
   onAddToPO,
+  onNavigate,
 }: {
   garment: GarmentRow;
   activeSizes: string[];
   onClose: () => void;
   onAddToPO: () => void;
+  onNavigate?: (tab: string, view?: string, id?: string) => void;
 }) {
   return (
     <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4">
@@ -1005,9 +1043,17 @@ function DrillDownModal({
                     className="border border-slate-700 rounded-lg p-3 bg-slate-800"
                   >
                     <div className="flex justify-between items-start">
-                      <div>
+                      <div className="flex-1">
                         <p className="font-medium text-white">{job.quote_number}</p>
                         <p className="text-sm text-gray-400">{job.customer_name}</p>
+                        {job.work_order_number && (
+                          <button
+                            onClick={() => onNavigate?.('work-orders', 'detail', job.work_order_id)}
+                            className="text-sm text-blue-400 hover:text-blue-300 hover:underline mt-1"
+                          >
+                            WO: {job.work_order_number}
+                          </button>
+                        )}
                       </div>
                       <span className="px-2 py-1 bg-blue-900/40 text-blue-400 text-xs font-medium rounded">
                         {job.quantity} units
