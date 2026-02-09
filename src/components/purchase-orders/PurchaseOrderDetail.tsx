@@ -20,15 +20,18 @@ import {
   X,
   Printer,
   Edit,
+  Plus,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { POSettingsService } from '../../services/po-settings-service';
 import { POValidationModal } from './POValidationModal';
 import { generatePurchaseOrderPDF } from '../../utils/po-pdf-export';
+import { ProductSearchModal } from './ProductSearchModal';
 
 interface PurchaseOrder {
   id: string;
   po_number: string;
+  vendor_id: string;
   status: string;
   subtotal: number;
   tax_amount: number;
@@ -113,6 +116,7 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOr
     onConfirm?: (justification?: string) => void;
   }>({ isOpen: false, title: '', message: '' });
   const [isEditing, setIsEditing] = useState(false);
+  const [showAddItems, setShowAddItems] = useState(false);
 
   useEffect(() => {
     loadPurchaseOrder();
@@ -397,6 +401,104 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOr
     }
   };
 
+  const handleAddItems = async (selectedProducts: any[]) => {
+    if (!po) return;
+
+    try {
+      setUpdating(true);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .single();
+
+      if (!profile) throw new Error('User profile not found');
+
+      const nextLineNumber = Math.max(...lineItems.map(item => item.line_number), 0) + 1;
+
+      const newLineItems = selectedProducts.map((product, index) => ({
+        company_id: profile.company_id,
+        po_id: po.id,
+        line_number: nextLineNumber + index,
+        sku: product.sku || null,
+        style_number: product.style_number || null,
+        product_name: product.product_name,
+        color: product.color || null,
+        size: product.size || null,
+        quantity_ordered: product.quantity_ordered || 1,
+        quantity_received: 0,
+        unit_cost: product.unit_cost || 0,
+        extended_cost: product.extended_cost || 0,
+        vendor_product_id: product.vendor_product_id || null,
+        notes: null,
+      }));
+
+      const { error: insertError } = await supabase
+        .from('purchase_order_line_items')
+        .insert(newLineItems);
+
+      if (insertError) throw insertError;
+
+      // Update garment requirements staging for items added to PO
+      for (const product of selectedProducts) {
+        if (product.style_number && product.color) {
+          await supabase
+            .from('garment_requirements_staging')
+            .update({
+              is_po_created: true,
+              po_id: po.id,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('company_id', profile.company_id)
+            .eq('style_number', product.style_number)
+            .eq('color', product.color)
+            .eq('is_po_created', false);
+        }
+      }
+
+      // Recalculate PO totals
+      const allItems = [...lineItems, ...newLineItems.map((item, idx) => ({
+        ...item,
+        id: `temp-${idx}`,
+      }))];
+      const newSubtotal = allItems.reduce((sum, item) => sum + item.extended_cost, 0);
+      const newTotal = newSubtotal + (po.tax_amount || 0) + (po.shipping_cost || 0);
+
+      await supabase
+        .from('purchase_orders')
+        .update({
+          subtotal: newSubtotal,
+          total_cost: newTotal,
+        })
+        .eq('id', po.id);
+
+      // Log activity
+      await supabase.from('purchase_order_activity_log').insert([
+        {
+          company_id: profile.company_id,
+          po_id: po.id,
+          action: 'items_added',
+          performed_by: user.id,
+          performed_by_name: user.email || 'Unknown',
+          notes: `Added ${selectedProducts.length} ${selectedProducts.length === 1 ? 'item' : 'items'} to PO`,
+        },
+      ]);
+
+      alert(`Successfully added ${selectedProducts.length} ${selectedProducts.length === 1 ? 'item' : 'items'} to PO`);
+      setShowAddItems(false);
+      loadPurchaseOrder();
+    } catch (error) {
+      console.error('Error adding items to PO:', error);
+      alert('Failed to add items to PO');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   const exportPDF = async () => {
     if (!po) return;
     let companyName = '';
@@ -567,6 +669,16 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOr
 
       {/* Action Buttons */}
       <div className="flex flex-wrap gap-2">
+        {(po.status === 'draft' || po.status === 'sent') && (
+          <button
+            onClick={() => setShowAddItems(true)}
+            disabled={updating}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            Add Items
+          </button>
+        )}
         {po.status === 'draft' && (
           <button
             onClick={() => updateStatus('sent')}
@@ -1034,6 +1146,16 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOr
           </div>
         </div>
       </div>
+
+      {/* Add Items Modal */}
+      {showAddItems && po && (
+        <ProductSearchModal
+          vendorId={po.vendor_id}
+          vendorType={po.vendor.vendor_type}
+          onSelect={handleAddItems}
+          onClose={() => setShowAddItems(false)}
+        />
+      )}
 
       {/* Validation Modal */}
       <POValidationModal
