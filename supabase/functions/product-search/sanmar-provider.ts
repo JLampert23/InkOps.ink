@@ -1,12 +1,68 @@
 /**
- * SanMar Search Provider
+ * SanMar Search Provider - PromoStandards API
  *
- * Searches SanMar catalog cache and enriches with live SOAP data
- * Completely isolated from SSActivewear provider
+ * Uses SanMar's PromoStandards Web Services API directly
+ * Caches results in database for faster subsequent searches
  */
 
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
-import { resolveSanMarImages } from "../_shared/sanmar-image-resolver.ts";
+import {
+  fetchUnifiedSanMarData,
+  type SanMarCredentials,
+} from "../_shared/sanmar-promostandards-client.ts";
+
+/**
+ * Decrypt password using Web Crypto API
+ */
+async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits', 'deriveKey']
+  );
+
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    true,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function decryptPassword(encryptedPassword: string, encryptionKey: string): Promise<string> {
+  try {
+    const combined = new Uint8Array(
+      atob(encryptedPassword).split('').map(c => c.charCodeAt(0))
+    );
+
+    const salt = combined.slice(0, 16);
+    const iv = combined.slice(16, 28);
+    const encryptedData = combined.slice(28);
+
+    const key = await deriveKey(encryptionKey, salt);
+
+    const decryptedData = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: iv },
+      key,
+      encryptedData
+    );
+
+    const decoder = new TextDecoder();
+    return decoder.decode(decryptedData);
+  } catch (error) {
+    console.error('Decryption error:', error);
+    throw new Error('Failed to decrypt password');
+  }
+}
 
 export interface ColorOption {
   name: string;
@@ -33,10 +89,8 @@ export interface ProductResult {
   raw_data?: any;
 }
 
-const SANMAR_CDN_BASE = "https://cdn.ssactivewear.com/";
-
 /**
- * Search SanMar catalog cache and enrich with live SOAP data
+ * Search SanMar catalog using PromoStandards API
  */
 export async function searchSanMarCatalog(
   supabaseAdmin: any,
@@ -52,351 +106,326 @@ export async function searchSanMarCatalog(
   const errors: string[] = [];
 
   try {
-    console.log(`🔍 Searching SanMar catalog cache for style: ${style}`);
+    console.log(`🔍 Searching SanMar via PromoStandards API for: ${style}`);
 
-    // Search sanmar_catalog_styles table
-    const { data: styleData, error: styleError } = await supabaseAdmin
-      .from("sanmar_catalog_styles")
-      .select(`
-        id,
-        style_number,
-        style_name,
-        brand_name,
-        category,
-        product_description,
-        is_active,
-        updated_at
-      `)
-      .eq("company_id", companyId)
-      .ilike("style_number", style)
-      .eq("is_active", true)
-      .maybeSingle();
+    // Get SanMar credentials from company settings
+    const { data: settings, error: settingsError } = await supabaseAdmin
+      .from("company_settings")
+      .select("sanmar_enabled, sanmar_username, sanmar_password_encrypted")
+      .eq("id", companyId)
+      .single();
 
-    if (styleError) {
-      console.error("SanMar style lookup error:", styleError);
-      errors.push(`SanMar cache error: ${styleError.message}`);
+    if (settingsError || !settings) {
+      console.error("Failed to get company settings:", settingsError);
+      errors.push("SanMar integration not configured");
       return { results, errors };
     }
 
-    if (!styleData) {
-      console.log(`❌ Style ${style} not found in SanMar cache - cache unavailable, skipping`);
-      errors.push(`SanMar: Catalog not available. Please contact support to enable SanMar FTP integration.`);
+    if (!settings.sanmar_enabled) {
+      errors.push("SanMar integration is disabled");
       return { results, errors };
     }
 
-    console.log(`✅ Found style in SanMar cache: ${styleData.style_number}`);
-
-    // Get all products (SKUs) for this style
-    const { data: productsData, error: productsError } = await supabaseAdmin
-      .from("sanmar_catalog_products")
-      .select(`
-        id,
-        unique_key,
-        style_number,
-        color_name,
-        color_code,
-        size_name,
-        sku,
-        upc,
-        image_front,
-        image_back,
-        image_side,
-        image_lifestyle
-      `)
-      .eq("company_id", companyId)
-      .eq("style_id", styleData.id)
-      .order("color_name", { ascending: true })
-      .order("size_name", { ascending: true });
-
-    if (productsError) {
-      console.error("SanMar products lookup error:", productsError);
-      errors.push(`SanMar products error: ${productsError.message}`);
+    if (!settings.sanmar_username || !settings.sanmar_password_encrypted) {
+      errors.push("SanMar credentials not configured");
       return { results, errors };
     }
 
-    if (!productsData || productsData.length === 0) {
-      console.log(`⚠️ No products found for style ${style} in cache`);
-      errors.push(`No products found for style ${style}`);
+    // Decrypt the password using inline crypto
+    let decryptedPassword = "";
+    try {
+      const encryptionKey = Deno.env.get("ENCRYPTION_KEY");
+      if (!encryptionKey) {
+        throw new Error("ENCRYPTION_KEY not configured");
+      }
+
+      decryptedPassword = await decryptPassword(settings.sanmar_password_encrypted, encryptionKey);
+    } catch (decryptError: any) {
+      console.error("Password decryption failed:", decryptError);
+      errors.push("Failed to decrypt SanMar credentials");
       return { results, errors };
     }
 
-    console.log(`📦 Found ${productsData.length} products in cache`);
+    const credentials: SanMarCredentials = {
+      username: settings.sanmar_username,
+      password: decryptedPassword,
+    };
 
-    // Fetch cached pricing from database instead of live API
-    const { data: pricingData, error: pricingError } = await supabaseAdmin
-      .from("sanmar_catalog_pricing")
-      .select("sku, piece_price, case_price")
-      .eq("company_id", companyId)
-      .eq("style_id", styleData.id);
-
-    const cachedPricingMap = new Map<string, any>();
-
-    if (!pricingError && pricingData && pricingData.length > 0) {
-      for (const priceItem of pricingData) {
-        if (priceItem.sku) {
-          cachedPricingMap.set(priceItem.sku, {
-            price: priceItem.piece_price || 0,
-            casePrice: priceItem.case_price || 0,
-          });
-        }
-      }
-      console.log(`💰 Loaded cached pricing for ${cachedPricingMap.size} SKUs`);
-    } else {
-      console.log(`⚠️ No cached pricing found for style ${style}`);
+    // Check cache first (if exists)
+    const cachedData = await getCachedProduct(supabaseAdmin, companyId, style);
+    if (cachedData) {
+      console.log(`✅ Found cached SanMar data for ${style}`);
+      results.push(cachedData);
+      return { results, errors };
     }
 
-    // Group products by color
-    const colorMap = new Map<string, ColorOption>();
+    // Fetch from live API
+    console.log(`📞 Fetching live data from SanMar PromoStandards API...`);
+    const apiData = await fetchUnifiedSanMarData(credentials, { styleNumber: style });
 
-    for (const product of productsData) {
-      const colorName = product.color_name || "Default";
-      const partId = product.sku || product.unique_key;
-
-      if (!colorMap.has(colorName)) {
-        // Get pricing from cached database
-        let pricingInfo = { wholesale: 0, retail: 0 };
-        const cachedPricing = cachedPricingMap.get(partId);
-        if (cachedPricing) {
-          pricingInfo.wholesale = cachedPricing.price || 0;
-          pricingInfo.retail = cachedPricing.price || 0;
-        }
-
-        // Resolve image URL from sanmar_image_map (CDN)
-        let imageUrl = "";
-        try {
-          const imageUrls = await resolveSanMarImages(
-            supabaseAdmin,
-            companyId,
-            styleData.style_number,
-            product.color_code
-          );
-          // Use front model, then front flat, then thumbnail as fallback
-          imageUrl = imageUrls.frontModel || imageUrls.frontFlat || imageUrls.thumbnail || "";
-        } catch (err) {
-          console.error(`Failed to resolve images for ${styleData.style_number}:`, err);
-          // Fallback to building URL from filename if image resolver fails
-          imageUrl = buildImageUrl(
-            product.image_front,
-            product.image_back,
-            product.image_side,
-            product.image_lifestyle
-          );
-        }
-
-        colorMap.set(colorName, {
-          name: colorName,
-          code: product.color_code || "",
-          partIds: [],
-          sizes: [],
-          image_url: imageUrl,
-          pricing: pricingInfo,
-          stock: {},
-        });
-      }
-
-      const colorOption = colorMap.get(colorName)!;
-
-      // Add part ID
-      if (partId && !colorOption.partIds?.includes(partId)) {
-        colorOption.partIds?.push(partId);
-      }
-
-      // Add size
-      if (product.size_name && !colorOption.sizes?.includes(product.size_name)) {
-        colorOption.sizes?.push(product.size_name);
-      }
-
-      // Note: Inventory would be loaded from live API if available
-      // For now, we rely on cached data only to avoid DNS issues
+    if (!apiData.success) {
+      errors.push("Failed to fetch SanMar data");
+      return { results, errors };
     }
 
-    const colors = Array.from(colorMap.values());
+    // Transform API response to ProductResult
+    const product = transformSanMarData(apiData);
+    results.push(product);
 
-    results.push({
-      supplier: "sanmar",
-      style: styleData.style_number,
-      brand: styleData.brand_name || "",
-      description: styleData.style_name || styleData.product_description || "",
-      category: styleData.category || "",
-      colors,
-      cached: true,
-      last_synced: styleData.updated_at,
-    });
+    // Cache the result for future searches
+    await cacheProduct(supabaseAdmin, companyId, apiData);
 
-    console.log(`✅ Successfully loaded ${colors.length} colors from SanMar cache`);
+    console.log(`✅ Successfully fetched ${product.colors.length} colors from SanMar API`);
 
   } catch (error: any) {
     console.error("SanMar search error:", error);
-    errors.push(`SanMar search error: ${error.message}`);
+    errors.push(`SanMar error: ${error.message}`);
   }
 
   return { results, errors };
 }
 
 /**
- * Fetch live data from SanMar SOAP API
+ * Get cached product from database
  */
-async function fetchSanMarLiveData(
-  supabaseUrl: string,
-  supabaseServiceKey: string,
+async function getCachedProduct(
+  supabaseAdmin: any,
   companyId: string,
   style: string
-): Promise<{ success: boolean; data?: any; error?: string }> {
+): Promise<ProductResult | null> {
   try {
-    const sanmarUrl = `${supabaseUrl}/functions/v1/sanmar-api?action=unified&style=${encodeURIComponent(style)}&companyId=${encodeURIComponent(companyId)}`;
+    const { data: styleData, error } = await supabaseAdmin
+      .from("sanmar_catalog_styles")
+      .select(`
+        *,
+        sanmar_catalog_products (
+          *
+        ),
+        sanmar_catalog_pricing (
+          *
+        )
+      `)
+      .eq("company_id", companyId)
+      .ilike("style_number", style)
+      .eq("is_active", true)
+      .maybeSingle();
 
-    const response = await fetch(sanmarUrl, {
-      headers: {
-        "Authorization": `Bearer ${supabaseServiceKey}`,
-      },
-    });
+    if (error || !styleData || !styleData.sanmar_catalog_products) {
+      return null;
+    }
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`SanMar API failed: ${response.status} - ${errorText}`);
+    // Check if data is recent (less than 24 hours old)
+    const updatedAt = new Date(styleData.updated_at);
+    const now = new Date();
+    const hoursSinceUpdate = (now.getTime() - updatedAt.getTime()) / (1000 * 60 * 60);
 
-      // Try to parse error message from JSON response
-      let errorMessage = `API returned ${response.status}`;
-      try {
-        const errorData = JSON.parse(errorText);
-        if (errorData.error) {
-          errorMessage = errorData.error;
-        }
-      } catch {
-        // If not JSON, use raw text if it's short enough
-        if (errorText && errorText.length < 100) {
-          errorMessage = errorText;
-        }
+    if (hoursSinceUpdate > 24) {
+      console.log(`⏰ Cached data for ${style} is ${hoursSinceUpdate.toFixed(1)} hours old, refreshing...`);
+      return null;
+    }
+
+    // Build color map from products
+    const colorMap = new Map<string, ColorOption>();
+    const pricingMap = new Map<string, any>();
+
+    // Index pricing by SKU
+    if (styleData.sanmar_catalog_pricing) {
+      for (const price of styleData.sanmar_catalog_pricing) {
+        pricingMap.set(price.sku, price);
+      }
+    }
+
+    for (const product of styleData.sanmar_catalog_products) {
+      const colorName = product.color_name || "Default";
+
+      if (!colorMap.has(colorName)) {
+        const pricing = pricingMap.get(product.sku);
+
+        colorMap.set(colorName, {
+          name: colorName,
+          code: product.color_code || "",
+          partIds: [],
+          sizes: [],
+          image_url: product.image_front || "",
+          pricing: pricing
+            ? {
+                wholesale: pricing.piece_price || 0,
+                retail: pricing.piece_price || 0,
+              }
+            : undefined,
+          stock: {},
+        });
       }
 
-      return {
-        success: false,
-        error: errorMessage,
-      };
+      const color = colorMap.get(colorName)!;
+      if (product.sku && !color.partIds?.includes(product.sku)) {
+        color.partIds?.push(product.sku);
+      }
+      if (product.size_name && !color.sizes?.includes(product.size_name)) {
+        color.sizes?.push(product.size_name);
+      }
     }
 
-    const data = await response.json();
-
-    if (data.success) {
-      return { success: true, data: data.data };
-    } else {
-      return {
-        success: false,
-        error: data.error || "Unknown error",
-      };
-    }
-  } catch (error: any) {
-    console.error("SanMar API fetch error:", error);
     return {
-      success: false,
-      error: error.message,
+      supplier: "sanmar",
+      style: styleData.style_number,
+      brand: styleData.brand_name || "",
+      description: styleData.style_name || styleData.product_description || "",
+      category: styleData.category || "",
+      colors: Array.from(colorMap.values()),
+      cached: true,
+      last_synced: styleData.updated_at,
     };
+  } catch (error) {
+    console.error("Error getting cached product:", error);
+    return null;
   }
 }
 
 /**
- * Transform live SOAP data into ProductResult format
+ * Cache product data in database
  */
-function transformSanMarLiveData(data: any, style: string): ProductResult[] {
-  const products: ProductResult[] = [];
+async function cacheProduct(
+  supabaseAdmin: any,
+  companyId: string,
+  apiData: any
+): Promise<void> {
+  try {
+    const style = apiData.style;
 
-  if (!data || !data.style) {
-    console.error("Invalid SanMar data structure:", data);
-    return products;
+    // Upsert style
+    const { data: styleRow, error: styleError } = await supabaseAdmin
+      .from("sanmar_catalog_styles")
+      .upsert(
+        {
+          company_id: companyId,
+          style_number: style.styleNumber,
+          style_name: style.productName,
+          brand_name: style.productBrand,
+          category: style.productCategory,
+          product_description: style.description,
+          is_active: true,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "company_id,style_number",
+        }
+      )
+      .select()
+      .single();
+
+    if (styleError || !styleRow) {
+      console.error("Failed to cache style:", styleError);
+      return;
+    }
+
+    // Cache products (SKUs)
+    const products = [];
+    for (const part of style.parts) {
+      products.push({
+        company_id: companyId,
+        style_id: styleRow.id,
+        unique_key: part.partId,
+        style_number: style.styleNumber,
+        color_name: part.colorName,
+        color_code: part.hex,
+        size_name: part.labelSize,
+        sku: part.partId,
+        image_front: apiData.media?.views?.front || "",
+      });
+    }
+
+    if (products.length > 0) {
+      await supabaseAdmin.from("sanmar_catalog_products").upsert(products, {
+        onConflict: "company_id,unique_key",
+      });
+    }
+
+    // Cache pricing
+    if (apiData.pricing?.parts) {
+      const pricing = [];
+      for (const part of apiData.pricing.parts) {
+        if (part.prices && part.prices.length > 0) {
+          pricing.push({
+            company_id: companyId,
+            style_id: styleRow.id,
+            sku: part.partId,
+            piece_price: part.prices[0].price,
+            case_price: part.prices[0].price,
+          });
+        }
+      }
+
+      if (pricing.length > 0) {
+        await supabaseAdmin.from("sanmar_catalog_pricing").upsert(pricing, {
+          onConflict: "company_id,sku",
+        });
+      }
+    }
+
+    console.log(`💾 Cached ${products.length} products for ${style.styleNumber}`);
+  } catch (error) {
+    console.error("Error caching product:", error);
   }
+}
 
-  const styleData = data.style;
-  const mediaData = data.media;
-  const pricingData = data.pricing;
-  const inventoryData = data.inventory;
-
+/**
+ * Transform PromoStandards API response to ProductResult
+ */
+function transformSanMarData(apiData: any): ProductResult {
+  const style = apiData.style;
   const colors: ColorOption[] = [];
 
-  if (styleData.colors && Array.isArray(styleData.colors)) {
-    for (const color of styleData.colors) {
-      const partIds = color.partIds || [];
-      const sizes = partIds.map((p: any) => p.size).filter(Boolean);
+  if (style.colors && Array.isArray(style.colors)) {
+    for (const color of style.colors) {
+      const partIds = (color.partIds || []).map((p: any) => p.partId);
+      const sizes = (color.partIds || []).map((p: any) => p.size).filter(Boolean);
 
-      const firstPartId = partIds.length > 0 ? partIds[0].partId : "";
-
-      let pricingInfo = { wholesale: 0, retail: 0 };
-      if (pricingData?.parts && Array.isArray(pricingData.parts)) {
-        const partPricing = pricingData.parts.find((p: any) => p.partId === firstPartId);
+      let pricing = { wholesale: 0, retail: 0 };
+      if (apiData.pricing?.parts) {
+        const firstPartId = partIds[0];
+        const partPricing = apiData.pricing.parts.find((p: any) => p.partId === firstPartId);
         if (partPricing?.prices && partPricing.prices.length > 0) {
-          pricingInfo.wholesale = partPricing.prices[0].price || 0;
-          pricingInfo.retail = partPricing.prices[0].price || 0;
+          pricing.wholesale = partPricing.prices[0].price || 0;
+          pricing.retail = partPricing.prices[0].price || 0;
         }
       }
 
-      let inventoryInfo = {};
-      if (inventoryData?.items && Array.isArray(inventoryData.items)) {
-        const partInventory = inventoryData.items.filter((inv: any) =>
-          partIds.some((p: any) => p.partId === inv.partId)
-        );
-        if (partInventory.length > 0) {
-          inventoryInfo = partInventory.reduce((acc: any, inv: any) => {
-            acc[inv.partId] = inv.quantityAvailable;
-            return acc;
-          }, {});
+      let stock = {};
+      if (apiData.inventory?.items) {
+        for (const inv of apiData.inventory.items) {
+          if (partIds.includes(inv.partId)) {
+            stock[inv.partId] = inv.quantityAvailable || 0;
+          }
         }
       }
 
-      let imageUrl = "";
-      if (mediaData?.views) {
-        imageUrl = mediaData.views.front ||
-                   mediaData.views.lifestyle ||
-                   (mediaData.views.frontImages?.[0]) ||
-                   "";
-      }
+      const imageUrl =
+        apiData.media?.views?.front ||
+        apiData.media?.views?.lifestyle ||
+        (apiData.media?.views?.frontImages?.[0]) ||
+        "";
 
       colors.push({
         name: color.colorName,
         code: color.hex || "",
-        partIds: partIds.map((p: any) => p.partId),
+        partIds,
+        sizes,
         image_url: imageUrl,
-        pricing: pricingInfo,
-        sizes: sizes,
-        stock: inventoryInfo,
+        pricing,
+        stock,
       });
     }
   }
 
-  products.push({
+  return {
     supplier: "sanmar",
-    style: styleData.styleNumber || style,
-    brand: styleData.productBrand || "",
-    description: styleData.productName || styleData.description || "",
-    category: styleData.productCategory || "",
-    colors: colors,
+    style: style.styleNumber,
+    brand: style.productBrand || "",
+    description: style.productName || style.description || "",
+    category: style.productCategory || "",
+    colors,
     cached: false,
-    raw_data: data,
-  });
-
-  return products;
-}
-
-/**
- * Build image URL from EPDD filename or fallback
- */
-function buildImageUrl(
-  imageFront?: string,
-  imageBack?: string,
-  imageSide?: string,
-  imageLifestyle?: string
-): string {
-  // Prefer front image, then lifestyle, then back, then side
-  const imageFilename = imageFront || imageLifestyle || imageBack || imageSide;
-
-  if (!imageFilename) {
-    return "";
-  }
-
-  // If already a full URL, return as-is
-  if (imageFilename.startsWith("http://") || imageFilename.startsWith("https://")) {
-    return imageFilename;
-  }
-
-  // Otherwise, build CDN URL
-  // SanMar images are typically in format: "stylename_colorcode_view.jpg"
-  return `${SANMAR_CDN_BASE}${imageFilename}`;
+    raw_data: apiData,
+  };
 }

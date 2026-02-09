@@ -92,23 +92,31 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // If no authenticated user, try to find any company (dev mode fallback)
+    // If no authenticated user, check for companyId parameter or use fallback
     if (!profile) {
-      console.log("No authenticated user, using first available company");
-      const { data: firstCompany } = await supabaseAdmin
-        .from("company_settings")
-        .select("id")
-        .limit(1)
-        .maybeSingle();
+      const url = new URL(req.url);
+      const companyIdParam = url.searchParams.get("companyId");
 
-      if (firstCompany) {
-        profile = { company_id: firstCompany.id };
-        console.log("Using fallback company:", profile.company_id);
+      if (companyIdParam) {
+        console.log("Using companyId from query parameter:", companyIdParam);
+        profile = { company_id: companyIdParam };
       } else {
-        return new Response(
-          JSON.stringify({ error: "No company found" }),
-          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        console.log("No authenticated user, using first available company");
+        const { data: firstCompany } = await supabaseAdmin
+          .from("company_settings")
+          .select("id")
+          .limit(1)
+          .maybeSingle();
+
+        if (firstCompany) {
+          profile = { company_id: firstCompany.id };
+          console.log("Using fallback company:", profile.company_id);
+        } else {
+          return new Response(
+            JSON.stringify({ error: "No company found" }),
+            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
       }
     }
 
