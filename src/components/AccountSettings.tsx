@@ -5467,28 +5467,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
           {activeTab === 'billing-status-filters' && (
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Billing & Payments Status Filters</h2>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Select which statuses should appear in Billing Queue, then click Save to apply.</p>
-                </div>
-                <button
-                  onClick={syncStatuses}
-                  disabled={syncingStatuses || loadingStatuses}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {syncingStatuses ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Syncing...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="w-4 h-4" />
-                      Sync from Printavo
-                    </>
-                  )}
-                </button>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Billing & Payments Status Filters</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Select which statuses should appear in Billing Queue, then click Save to apply.</p>
               </div>
 
               {billingFiltersSaveMessage && (
