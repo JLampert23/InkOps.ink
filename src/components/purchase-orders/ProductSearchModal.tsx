@@ -145,13 +145,22 @@ export function ProductSearchModal({ vendorId, vendorType, onSelect, onClose }: 
   };
 
   const handleAddToOrder = () => {
+    console.log('🔔 Add to Order button clicked!');
+    console.log('📦 Selected Product:', selectedProduct);
+    console.log('🎨 Selected Color:', selectedColor);
+    console.log('📏 Selected Sizes:', selectedSizes);
+
     if (!selectedProduct || !selectedColor || Object.keys(selectedSizes).length === 0) {
+      console.error('❌ Validation failed - missing required fields');
       alert('Please select a product, color, and at least one size');
       return;
     }
 
     const selectedColorData = selectedProduct.colors.find((c) => c.color_name === selectedColor);
-    if (!selectedColorData) return;
+    if (!selectedColorData) {
+      console.error('❌ Color data not found');
+      return;
+    }
 
     // Create line items for each size
     const items = Object.entries(selectedSizes).map(([size, quantity]) => {
@@ -172,8 +181,13 @@ export function ProductSearchModal({ vendorId, vendorType, onSelect, onClose }: 
       };
     });
 
+    console.log('✅ Items prepared for PO:', items);
+    console.log('🚀 Calling onSelect callback...');
+
     onSelect(items);
     onClose();
+
+    console.log('✅ Modal closed, items should be added to PO');
   };
 
   return (

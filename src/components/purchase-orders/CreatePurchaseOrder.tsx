@@ -162,6 +162,8 @@ export function CreatePurchaseOrder({ onBack, onSave }: CreatePurchaseOrderProps
   };
 
   const addProductsFromSearch = (products: any[]) => {
+    console.log('🛒 Adding products from search:', products);
+
     const newItems = products.map((product, idx) => ({
       id: crypto.randomUUID(),
       line_number: lineItems.length + idx + 1,
@@ -176,7 +178,13 @@ export function CreatePurchaseOrder({ onBack, onSave }: CreatePurchaseOrderProps
       vendor_product_id: product.vendor_product_id,
       notes: '',
     }));
+
+    console.log('✅ New line items created:', newItems);
+    console.log('📋 Current line items before adding:', lineItems);
+
     setLineItems([...lineItems, ...newItems]);
+
+    console.log('✅ Line items updated! Total items:', lineItems.length + newItems.length);
   };
 
   const removeLineItem = (index: number) => {
@@ -557,7 +565,12 @@ export function CreatePurchaseOrder({ onBack, onSave }: CreatePurchaseOrderProps
               <div className="flex gap-2">
                 {selectedVendorData?.vendor_type !== 'independent' && (
                   <button
-                    onClick={() => setShowProductSearch(true)}
+                    onClick={() => {
+                      console.log('🔍 Opening product search modal...');
+                      console.log('Selected vendor:', selectedVendor);
+                      console.log('Vendor data:', selectedVendorData);
+                      setShowProductSearch(true);
+                    }}
                     className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                   >
                     <Search className="w-4 h-4" />
@@ -1058,8 +1071,19 @@ export function CreatePurchaseOrder({ onBack, onSave }: CreatePurchaseOrderProps
           vendorId={selectedVendor}
           vendorType={selectedVendorData.vendor_type}
           onSelect={addProductsFromSearch}
-          onClose={() => setShowProductSearch(false)}
+          onClose={() => {
+            console.log('🚪 Closing product search modal');
+            setShowProductSearch(false);
+          }}
         />
+      )}
+      {showProductSearch && !selectedVendorData && (
+        <>
+          {console.log('⚠️ Product search modal blocked - selectedVendorData is missing')}
+          {console.log('showProductSearch:', showProductSearch)}
+          {console.log('selectedVendor:', selectedVendor)}
+          {console.log('vendors:', vendors)}
+        </>
       )}
 
       {/* Validation Modal */}
