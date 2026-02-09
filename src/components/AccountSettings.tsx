@@ -2030,18 +2030,24 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       if (!sanmarHasCreds) {
         setSanmarTestResult({
           success: false,
-          error: 'SanMar credentials not saved. Please save your credentials first.',
+          error: 'SanMar FTP credentials not saved. Please save your credentials first.',
         });
         return;
       }
 
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sanmar-api?action=search&style=PC54`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sanmar-ftp-sync`,
         {
+          method: 'POST',
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
             'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            'Content-Type': 'application/json',
           },
+          body: JSON.stringify({
+            companyId: companySettings.id,
+            syncType: 'inventory'
+          })
         }
       );
 
@@ -2049,22 +2055,22 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         const data = await response.json();
         setSanmarTestResult({
           success: true,
-          message: 'Connected successfully! Found product data.',
+          message: `FTP connection successful! Synced ${data.totalProducts || 0} products from SanMar catalog.`,
         });
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('SanMar API error response:', errorData);
+        console.error('SanMar FTP error response:', errorData);
         console.error('Response status:', response.status);
         setSanmarTestResult({
           success: false,
-          error: errorData.error || `Connection failed (${response.status})`,
+          error: errorData.error || `FTP connection failed (${response.status})`,
         });
       }
     } catch (err) {
-      console.error('SanMar test exception:', err);
+      console.error('SanMar FTP test exception:', err);
       setSanmarTestResult({
         success: false,
-        error: err instanceof Error ? err.message : 'Connection failed',
+        error: err instanceof Error ? err.message : 'FTP connection failed',
       });
     } finally {
       setTestingSanmar(false);
@@ -5900,8 +5906,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 {sanmarEnabled && (
                   <div className="ml-7 space-y-4 pl-4 border-l-2 border-blue-200 dark:border-blue-800">
                     <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">SanMar FTP Integration</p>
                       <p className="text-sm text-blue-800 dark:text-blue-200">
-                        These credentials are used to connect to SanMar's FTP server (ftp.sanmar.com:2200) to download product catalog and pricing data.
+                        These credentials connect to SanMar's FTP server (ftp.sanmar.com:2200) to download the complete product catalog with inventory and pricing. The catalog syncs automatically and products become searchable in Quote Builder.
                       </p>
                     </div>
 
@@ -5983,12 +5990,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           {testingSanmar ? (
                             <>
                               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              Testing Connection...
+                              Testing FTP Connection...
                             </>
                           ) : (
                             <>
                               <Zap className="w-4 h-4" />
-                              Test SanMar Connection
+                              Test FTP Connection
                             </>
                           )}
                         </button>
