@@ -61,24 +61,46 @@ export function ProductSearchModal({ vendorId, vendorType, onSelect, onClose }: 
       if (!user) return;
 
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/product-search`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/product-search?style=${encodeURIComponent(searchTerm)}`,
         {
-          method: 'POST',
+          method: 'GET',
           headers: {
             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            vendor_type: vendorType,
-            search_term: searchTerm,
-          }),
         }
       );
 
-      if (!response.ok) throw new Error('Search failed');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Search failed:', errorData);
+        throw new Error(errorData.error || 'Search failed');
+      }
 
       const data = await response.json();
-      setResults(data.products || []);
+      console.log('Product search results:', data);
+
+      // Transform results to match Product interface
+      const transformedResults = (data.results || []).map((result: any) => ({
+        id: result.style,
+        style_number: result.style,
+        product_name: result.description,
+        base_price: result.colors[0]?.pricing?.wholesale || 0,
+        supplier: result.supplier,
+        supplier_product_id: result.colors[0]?.code,
+        image_url: result.colors[0]?.image_url,
+        colors: result.colors.map((color: any) => ({
+          color_name: color.name,
+          color_code: color.code,
+          sizes: (color.sizes || []).map((size: string) => ({
+            size,
+            price: color.pricing?.wholesale || 0,
+            in_stock: true,
+          })),
+        })),
+        sizes: result.colors[0]?.sizes || [],
+      }));
+
+      setResults(transformedResults);
     } catch (error) {
       console.error('Error searching products:', error);
     } finally {

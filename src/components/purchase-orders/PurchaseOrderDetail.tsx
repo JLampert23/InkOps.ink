@@ -444,9 +444,18 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOr
       if (insertError) throw insertError;
 
       // Update garment requirements staging for items added to PO
+      console.log('🔍 Updating garment staging for', selectedProducts.length, 'products');
       for (const product of selectedProducts) {
+        console.log('🔍 Processing product:', {
+          style_number: product.style_number,
+          color: product.color,
+          sku: product.sku,
+          product_name: product.product_name,
+        });
+
         if (product.style_number && product.color) {
-          // Since supplier_name in staging is usually NULL, we match on style_number and color only
+          console.log('✓ Product has style_number and color, attempting update...');
+
           const { data: updated, error: updateError } = await supabase
             .from('garment_requirements_staging')
             .update({
@@ -461,10 +470,17 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOr
             .select();
 
           if (updateError) {
-            console.error('Error updating garment staging:', updateError);
+            console.error('❌ Error updating garment staging:', updateError);
           } else {
-            console.log(`Updated ${updated?.length || 0} staging records for ${product.style_number} - ${product.color}`);
+            console.log(`✅ Updated ${updated?.length || 0} staging records for ${product.style_number} - ${product.color}`);
+            if (updated && updated.length > 0) {
+              console.log('📦 Updated records:', updated);
+            } else {
+              console.warn('⚠️ No matching staging records found for this product');
+            }
           }
+        } else {
+          console.warn('⚠️ Product missing style_number or color:', product);
         }
       }
 
