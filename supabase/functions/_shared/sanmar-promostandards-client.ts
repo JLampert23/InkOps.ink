@@ -116,7 +116,14 @@ async function makeSanMarSOAPRequest(
 ): Promise<string> {
   const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-  <soap:Header/>
+  <soap:Header>
+    <wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd">
+      <wsse:UsernameToken>
+        <wsse:Username>${credentials.username}</wsse:Username>
+        <wsse:Password>${credentials.password}</wsse:Password>
+      </wsse:UsernameToken>
+    </wsse:Security>
+  </soap:Header>
   <soap:Body>
     ${soapBody}
   </soap:Body>
@@ -127,7 +134,6 @@ async function makeSanMarSOAPRequest(
   console.log(`🔐 Username: ${credentials.username}`);
   console.log(`🔐 Password length: ${credentials.password?.length || 0}`);
 
-  // SanMar PromoStandards uses credentials in SOAP body only (not Basic Auth header)
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
