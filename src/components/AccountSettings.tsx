@@ -5899,6 +5899,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                 {sanmarEnabled && (
                   <div className="ml-7 space-y-4 pl-4 border-l-2 border-blue-200 dark:border-blue-800">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        These credentials are used to connect to SanMar's FTP server (ftp.sanmar.com:2200) to download product catalog and pricing data.
+                      </p>
+                    </div>
+
                     {sanmarHasCredentials && (
                       <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3 flex items-center gap-2">
                         <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
@@ -5908,6 +5914,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         </div>
                       </div>
                     )}
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Account Number {!sanmarHasCredentials && <span className="text-red-500">*</span>}
@@ -5919,24 +5926,30 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         placeholder="Your SanMar account number"
                       />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Your SanMar account number (for reference)
+                      </p>
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Username {!sanmarHasCredentials && <span className="text-red-500">*</span>}
+                        Customer Number (FTP Username) {!sanmarHasCredentials && <span className="text-red-500">*</span>}
                       </label>
                       <input
                         type="text"
                         value={sanmarUsername}
                         onChange={(e) => setSanmarUsername(e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Your SanMar username"
+                        placeholder="Your SanMar customer number"
                       />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        This is your FTP username (typically your customer number)
+                      </p>
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Password {!sanmarHasCredentials && <span className="text-red-500">*</span>}
+                        FTP Password {!sanmarHasCredentials && <span className="text-red-500">*</span>}
                       </label>
                       <div className="relative">
                         <input
@@ -5944,7 +5957,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           value={sanmarPassword}
                           onChange={(e) => setSanmarPassword(e.target.value)}
                           className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder={sanmarHasCredentials ? "Leave blank to keep existing" : "Enter your SanMar password"}
+                          placeholder={sanmarHasCredentials ? "Leave blank to keep existing" : "Enter your SanMar FTP password"}
                         />
                         <button
                           type="button"
@@ -5956,7 +5969,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         </button>
                       </div>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        {sanmarHasCredentials ? 'Enter a new password only if you want to update it' : 'Your SanMar API password'}
+                        {sanmarHasCredentials ? 'Enter a new password only if you want to update it' : 'Your SanMar FTP password'}
                       </p>
                     </div>
 
