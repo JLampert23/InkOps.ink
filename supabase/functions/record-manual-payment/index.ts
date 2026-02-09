@@ -34,22 +34,16 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const token = authHeader.replace("Bearer ", "");
-    console.log('Token length:', token.length);
-
-    // Create a client with the user's JWT to validate it
+    // Create client with anon key and auth header to get user
     const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
         headers: {
           Authorization: authHeader,
         },
       },
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
     });
 
+    // Get the authenticated user
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
 
     console.log('User lookup result:', { userId: user?.id, error: userError?.message });
@@ -59,8 +53,7 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({
           error: "Unauthorized",
-          details: userError?.message || 'No user found',
-          tokenLength: token.length
+          details: userError?.message || 'No user found'
         }),
         {
           status: 401,
