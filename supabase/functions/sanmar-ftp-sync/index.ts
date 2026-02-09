@@ -19,6 +19,36 @@ import {
   type DIPPricingRow,
 } from "../_shared/sanmar-file-parsers.ts";
 
+// Unified garment model
+interface UnifiedGarment {
+  uniqueKey: string;
+  inventoryKey: string;
+  sizeIndex: number;
+  style: string;
+  color: string;
+  size: string;
+  productTitle: string;
+  description: string;
+  extendedDescription: string;
+  category: string;
+  subcategory: string;
+  msrp: number;
+  mapPricing: number;
+  piecePrice: number;
+  casePrice: number;
+  weight: number;
+  qty: number;
+  gtin: string;
+  images: {
+    frontModel: string;
+    backModel: string;
+    frontFlat: string;
+    backFlat: string;
+    colorSwatch: string;
+    thumbnail: string;
+  };
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -201,10 +231,16 @@ Deno.serve(async (req: Request) => {
 
     console.log("💾 Syncing data to database...");
 
+    // Sync to legacy tables
     await syncStyleData(supabaseAdmin, companyId, Array.from(styles.values()));
     await syncProductData(supabaseAdmin, companyId, products);
     await syncInventoryData(supabaseAdmin, companyId, inventory);
     await syncPricingData(supabaseAdmin, companyId, pricing);
+
+    // Normalize and sync to unified garments table
+    console.log("💾 Creating unified garments...");
+    const unifiedGarments = normalizeToUnifiedGarments(products, inventory, pricing);
+    const savedCount = await syncUnifiedGarments(supabaseAdmin, companyId, unifiedGarments);
 
     console.log("✅ Sync complete!");
 
@@ -217,6 +253,7 @@ Deno.serve(async (req: Request) => {
           products: products.length,
           inventoryRows: inventory.length,
           pricingRows: pricing.length,
+          unifiedGarments: savedCount,
         }
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -390,4 +427,119 @@ async function syncPricingData(
   }
 
   console.log(`✅ Synced ${pricing.length} pricing records`);
+}
+
+function normalizeToUnifiedGarments(
+  products: EPDDRow[],
+  inventory: DIPInventoryRow[],
+  pricing: DIPPricingRow[]
+): UnifiedGarment[] {
+  const garments: UnifiedGarment[] = [];
+
+  // Create lookup maps
+  const inventoryMap = new Map<string, DIPInventoryRow>();
+  for (const inv of inventory) {
+    inventoryMap.set(inv.uniqueKey, inv);
+  }
+
+  const pricingMap = new Map<string, DIPPricingRow[]>();
+  for (const price of pricing) {
+    const existing = pricingMap.get(price.uniqueKey) || [];
+    existing.push(price);
+    pricingMap.set(price.uniqueKey, existing);
+  }
+
+  // Normalize each product
+  for (const product of products) {
+    const inv = inventoryMap.get(product.uniqueKey);
+    const prices = pricingMap.get(product.uniqueKey) || [];
+    const piecePrice = prices.find(p => p.priceType === 'piece')?.unitPrice || 0;
+    const casePrice = prices.find(p => p.priceType === 'case')?.unitPrice || 0;
+
+    garments.push({
+      uniqueKey: product.uniqueKey,
+      inventoryKey: product.sku || product.uniqueKey,
+      sizeIndex: 0,
+      style: product.styleNumber,
+      color: product.colorName || '',
+      size: product.sizeName || '',
+      productTitle: product.styleNumber,
+      description: '',
+      extendedDescription: '',
+      category: '',
+      subcategory: '',
+      msrp: 0,
+      mapPricing: 0,
+      piecePrice: piecePrice,
+      casePrice: casePrice,
+      weight: product.pieceWeight || 0,
+      qty: inv?.quantityAvailable || 0,
+      gtin: product.upc || '',
+      images: {
+        frontModel: product.imageFront || '',
+        backModel: product.imageBack || '',
+        frontFlat: '',
+        backFlat: '',
+        colorSwatch: '',
+        thumbnail: product.imageFront || '',
+      },
+    });
+  }
+
+  return garments;
+}
+
+async function syncUnifiedGarments(
+  supabase: any,
+  companyId: string,
+  garments: UnifiedGarment[]
+): Promise<number> {
+  console.log(`💾 Syncing ${garments.length} unified garments...`);
+
+  let savedCount = 0;
+  const batchSize = 500;
+
+  for (let i = 0; i < garments.length; i += batchSize) {
+    const batch = garments.slice(i, i + batchSize);
+
+    const records = batch.map(g => ({
+      company_id: companyId,
+      unique_key: g.uniqueKey,
+      inventory_key: g.inventoryKey,
+      size_index: g.sizeIndex,
+      style: g.style,
+      color: g.color,
+      size: g.size,
+      product_title: g.productTitle,
+      description: g.description,
+      extended_description: g.extendedDescription,
+      category: g.category,
+      subcategory: g.subcategory,
+      msrp: g.msrp,
+      map_pricing: g.mapPricing,
+      piece_price: g.piecePrice,
+      case_price: g.casePrice,
+      weight: g.weight,
+      qty: g.qty,
+      gtin: g.gtin,
+      images: g.images,
+      source_file: 'ftp_sync',
+      last_synced: new Date().toISOString(),
+    }));
+
+    const { error } = await supabase
+      .from('sanmar_ftp_unified_garments')
+      .upsert(records, {
+        onConflict: 'company_id,unique_key',
+      });
+
+    if (!error) {
+      savedCount += batch.length;
+    } else {
+      console.error(`Error syncing batch ${i / batchSize + 1}:`, error);
+    }
+  }
+
+  console.log(`✅ Synced ${savedCount} unified garments`);
+  return savedCount;
 }
