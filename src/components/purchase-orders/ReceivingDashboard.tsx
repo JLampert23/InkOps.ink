@@ -98,7 +98,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
         )
       `)
       .eq('company_id', companyId)
-      .in('status', ['sent', 'fully_received', 'closed'])
+      .in('status', ['fully_received', 'closed'])
       .order('created_at', { ascending: false })
       .limit(20);
 
@@ -187,7 +187,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
         )
       `)
       .eq('company_id', companyId)
-      .in('status', ['confirmed', 'in_transit', 'partially_received'])
+      .in('status', ['sent', 'confirmed', 'in_transit', 'partially_received'])
       .order('created_at', { ascending: false });
 
     if (error) throw error;
