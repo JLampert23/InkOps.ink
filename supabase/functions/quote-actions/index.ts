@@ -21,9 +21,15 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     const authHeader = req.headers.get("Authorization");
-    console.log('Auth header present:', !!authHeader);
+    console.log('Auth header details:', {
+      present: !!authHeader,
+      length: authHeader?.length,
+      startsWithBearer: authHeader?.startsWith('Bearer '),
+      firstChars: authHeader?.substring(0, 20)
+    });
 
     if (!authHeader) {
+      console.error('No authorization header found');
       return new Response(
         JSON.stringify({ error: "Missing authorization header" }),
         {
@@ -44,17 +50,34 @@ Deno.serve(async (req: Request) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
+    console.log('Calling getUser()...');
+
     // Get authenticated user
     const {
       data: { user },
       error: userError,
     } = await supabase.auth.getUser();
 
-    console.log('User auth check:', { hasUser: !!user, error: userError?.message });
+    console.log('User auth result:', {
+      hasUser: !!user,
+      userId: user?.id,
+      userEmail: user?.email,
+      errorMessage: userError?.message,
+      errorStatus: userError?.status
+    });
 
     if (userError || !user) {
+      console.error('Authentication failed:', userError);
       return new Response(
-        JSON.stringify({ error: "Not authenticated: " + (userError?.message || "No user found") }),
+        JSON.stringify({
+          error: "Not authenticated: " + (userError?.message || "No user found"),
+          details: {
+            hasError: !!userError,
+            errorMessage: userError?.message,
+            errorStatus: userError?.status,
+            errorName: userError?.name
+          }
+        }),
         {
           status: 401,
           headers: {
