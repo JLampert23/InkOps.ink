@@ -20,63 +20,42 @@ Deno.serve(async (req: Request) => {
     const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const authHeader = req.headers.get("Authorization");
-    console.log('Auth header details:', {
-      present: !!authHeader,
-      length: authHeader?.length,
-      startsWithBearer: authHeader?.startsWith('Bearer '),
-      firstChars: authHeader?.substring(0, 20)
-    });
-
-    if (!authHeader) {
-      console.error('No authorization header found');
-      return new Response(
-        JSON.stringify({ error: "Missing authorization header" }),
-        {
-          status: 401,
+    // Create Supabase client with the request context (includes auth headers)
+    const supabase = createClient(
+      supabaseUrl,
+      supabaseKey,
+      {
+        global: {
           headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
+            Authorization: req.headers.get("Authorization") ?? "",
           },
-        }
-      );
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: {
-        headers: { Authorization: authHeader },
-      },
-    });
+        },
+      }
+    );
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log('Calling getUser()...');
+    console.log('Attempting to get authenticated user...');
 
-    // Get authenticated user
+    // Get authenticated user from the request
     const {
       data: { user },
       error: userError,
     } = await supabase.auth.getUser();
 
-    console.log('User auth result:', {
-      hasUser: !!user,
+    console.log('Auth result:', {
+      success: !!user,
       userId: user?.id,
-      userEmail: user?.email,
-      errorMessage: userError?.message,
-      errorStatus: userError?.status
+      email: user?.email,
+      error: userError?.message
     });
 
     if (userError || !user) {
       console.error('Authentication failed:', userError);
       return new Response(
         JSON.stringify({
-          error: "Not authenticated: " + (userError?.message || "No user found"),
-          details: {
-            hasError: !!userError,
-            errorMessage: userError?.message,
-            errorStatus: userError?.status,
-            errorName: userError?.name
-          }
+          error: "Authentication required",
+          message: userError?.message || "No authenticated user found",
         }),
         {
           status: 401,

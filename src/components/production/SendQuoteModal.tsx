@@ -145,14 +145,11 @@ export function SendQuoteModal({
         throw new Error('You must be logged in to send quotes. Please refresh and try again.');
       }
 
-      console.log('Calling edge function with explicit auth header');
+      console.log('Calling edge function (auth will be handled automatically by Supabase client)');
 
       const { data, error } = await supabase.functions.invoke(
         `quote-actions/${quoteId}/send`,
         {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
           body: {
             template_id: selectedTemplateId,
             custom_message: customMessage,
