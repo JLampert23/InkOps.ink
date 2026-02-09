@@ -35,6 +35,7 @@ interface ReceivingDashboardProps {
 export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboardProps) {
   const [arrivingToday, setArrivingToday] = useState<PurchaseOrder[]>([]);
   const [overduePOs, setOverduePOs] = useState<PurchaseOrder[]>([]);
+  const [allPendingPOs, setAllPendingPOs] = useState<PurchaseOrder[]>([]);
   const [recentReceiving, setRecentReceiving] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<PurchaseOrder[]>([]);
@@ -71,6 +72,7 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
       await Promise.all([
         loadArrivingToday(profile.company_id),
         loadOverduePOs(profile.company_id),
+        loadAllPendingPOs(profile.company_id),
         loadRecentReceiving(profile.company_id),
       ]);
     } catch (error) {
@@ -170,6 +172,48 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
     );
 
     setOverduePOs(posWithCounts);
+  };
+
+  const loadAllPendingPOs = async (companyId: string) => {
+    const { data: pos, error } = await supabase
+      .from('purchase_orders')
+      .select(`
+        id,
+        po_number,
+        expected_delivery_date,
+        status,
+        receiving_status,
+        created_at,
+        vendors!purchase_orders_vendor_id_fkey (
+          vendor_name
+        )
+      `)
+      .eq('company_id', companyId)
+      .in('status', ['sent', 'confirmed', 'in_transit', 'partially_received'])
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const posWithCounts = await Promise.all(
+      (pos || []).map(async (po: any) => {
+        const { data: lineItems } = await supabase
+          .from('purchase_order_line_items')
+          .select('quantity_ordered, quantity_received')
+          .eq('po_id', po.id);
+
+        const total = lineItems?.reduce((sum, item) => sum + item.quantity_ordered, 0) || 0;
+        const received = lineItems?.reduce((sum, item) => sum + item.quantity_received, 0) || 0;
+
+        return {
+          ...po,
+          vendor_name: po.vendors?.vendor_name || 'Unknown',
+          total_items: total,
+          received_items: received,
+        };
+      })
+    );
+
+    setAllPendingPOs(posWithCounts);
   };
 
   const loadRecentReceiving = async (companyId: string) => {
@@ -329,12 +373,12 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
         <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Arriving Today</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Pending POs</p>
               <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">
-                {arrivingToday.length}
+                {allPendingPOs.length}
               </p>
             </div>
-            <Calendar className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+            <Package className="w-8 h-8 text-blue-600 dark:text-blue-400" />
           </div>
         </div>
 
@@ -404,6 +448,121 @@ export function ReceivingDashboard({ onReceivePO, onViewPO }: ReceivingDashboard
             ))}
           </div>
         )}
+      </div>
+
+      {/* All Pending POs */}
+      <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
+        <div className="p-4 border-b border-gray-200 dark:border-slate-700">
+          <div className="flex items-center gap-2">
+            <Package className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">All Purchase Orders Awaiting Receipt</h3>
+            <span className="ml-auto px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-sm font-medium rounded">
+              {allPendingPOs.length} POs
+            </span>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 dark:bg-slate-900">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                  PO Number
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                  Vendor
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                  Expected Date
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                  Progress
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
+              {allPendingPOs.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                    <Package className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+                    <p>No purchase orders awaiting receipt</p>
+                  </td>
+                </tr>
+              ) : (
+                allPendingPOs.map((po) => (
+                  <tr key={po.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
+                      {po.po_number}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                      {po.vendor_name}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-1 text-xs font-medium rounded ${
+                        po.status === 'sent'
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                          : po.status === 'confirmed'
+                          ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                          : po.status === 'in_transit'
+                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                          : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                      }`}>
+                        {po.status.replace('_', ' ').toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                      {po.expected_delivery_date ? format(parseISO(po.expected_delivery_date), 'MMM d, yyyy') : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <span className={`font-medium ${
+                          po.received_items === po.total_items
+                            ? 'text-green-600 dark:text-green-400'
+                            : 'text-gray-900 dark:text-white'
+                        }`}>
+                          {po.received_items} / {po.total_items}
+                        </span>
+                        <div className="w-24 h-2 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${
+                              po.received_items === po.total_items
+                                ? 'bg-green-500'
+                                : 'bg-blue-500'
+                            }`}
+                            style={{ width: `${(po.received_items / po.total_items) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => onViewPO(po.id)}
+                          className="px-3 py-1.5 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm font-medium transition-all"
+                        >
+                          View
+                        </button>
+                        {po.received_items < po.total_items && (
+                          <button
+                            onClick={() => onReceivePO(po.id)}
+                            className="px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 text-sm font-medium transition-all"
+                          >
+                            Receive
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
