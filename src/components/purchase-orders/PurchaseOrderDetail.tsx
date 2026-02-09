@@ -445,6 +445,22 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOr
 
       // Update garment requirements staging for items added to PO
       console.log('🔍 Updating garment staging for', selectedProducts.length, 'products');
+      console.log('🏢 Company ID:', profile.company_id);
+      console.log('📦 PO ID:', po.id);
+
+      // First, let's see what's in the staging table
+      const { data: allStaging, error: stagingError } = await supabase
+        .from('garment_requirements_staging')
+        .select('*')
+        .eq('company_id', profile.company_id)
+        .eq('is_po_created', false);
+
+      if (stagingError) {
+        console.error('❌ Error fetching staging records:', stagingError);
+      } else {
+        console.log(`📋 Found ${allStaging?.length || 0} pending staging records:`, allStaging);
+      }
+
       for (const product of selectedProducts) {
         console.log('🔍 Processing product:', {
           style_number: product.style_number,
@@ -456,6 +472,7 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOr
         if (product.style_number && product.color) {
           console.log('✓ Product has style_number and color, attempting update...');
 
+          // Try updating with exact match
           const { data: updated, error: updateError } = await supabase
             .from('garment_requirements_staging')
             .update({
@@ -466,7 +483,7 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOr
             .eq('company_id', profile.company_id)
             .eq('style_number', product.style_number)
             .eq('color', product.color)
-            .is('supplier_name', null)
+            .eq('is_po_created', false)
             .select();
 
           if (updateError) {
@@ -477,6 +494,8 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOr
               console.log('📦 Updated records:', updated);
             } else {
               console.warn('⚠️ No matching staging records found for this product');
+              console.warn('   Looking for style_number:', product.style_number);
+              console.warn('   Looking for color:', product.color);
             }
           }
         } else {

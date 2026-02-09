@@ -77,29 +77,40 @@ export function ProductSearchModal({ vendorId, vendorType, onSelect, onClose }: 
       }
 
       const data = await response.json();
-      console.log('Product search results:', data);
+      console.log('📦 Product search API response:', data);
+
+      if (!data.success || !data.results) {
+        console.error('❌ Invalid API response:', data);
+        setResults([]);
+        return;
+      }
 
       // Transform results to match Product interface
-      const transformedResults = (data.results || []).map((result: any) => ({
-        id: result.style,
-        style_number: result.style,
-        product_name: result.description,
-        base_price: result.colors[0]?.pricing?.wholesale || 0,
-        supplier: result.supplier,
-        supplier_product_id: result.colors[0]?.code,
-        image_url: result.colors[0]?.image_url,
-        colors: result.colors.map((color: any) => ({
-          color_name: color.name,
-          color_code: color.code,
-          sizes: (color.sizes || []).map((size: string) => ({
-            size,
-            price: color.pricing?.wholesale || 0,
-            in_stock: true,
-          })),
-        })),
-        sizes: result.colors[0]?.sizes || [],
-      }));
+      const transformedResults = data.results.map((result: any) => {
+        console.log('🔄 Transforming result:', result);
 
+        return {
+          id: result.style,
+          style_number: result.style,
+          product_name: result.description,
+          base_price: result.colors[0]?.pricing?.wholesale || 0,
+          supplier: result.supplier,
+          supplier_product_id: result.colors[0]?.partIds?.[0] || result.colors[0]?.code,
+          image_url: result.colors[0]?.image_url,
+          colors: result.colors.map((color: any) => ({
+            color_name: color.name,
+            color_code: color.partIds?.[0] || color.code,
+            sizes: (color.sizes || []).map((size: string) => ({
+              size,
+              price: color.pricing?.wholesale || 0,
+              in_stock: true,
+            })),
+          })),
+          sizes: result.colors[0]?.sizes || [],
+        };
+      });
+
+      console.log('✅ Transformed results:', transformedResults);
       setResults(transformedResults);
     } catch (error) {
       console.error('Error searching products:', error);
