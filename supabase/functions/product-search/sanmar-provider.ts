@@ -79,32 +79,8 @@ export async function searchSanMarCatalog(
     }
 
     if (!styleData) {
-      console.log(`❌ Style ${style} not found in SanMar cache`);
-
-      // Try live SOAP API as fallback
-      console.log(`📞 Falling back to SanMar SOAP API...`);
-      const liveResult = await fetchSanMarLiveData(
-        supabaseUrl,
-        supabaseServiceKey,
-        companyId,
-        style
-      );
-
-      if (liveResult.success && liveResult.data) {
-        const transformedProducts = transformSanMarLiveData(liveResult.data, style);
-        if (transformedProducts.length > 0) {
-          results.push(...transformedProducts);
-        } else {
-          // Data was returned but couldn't be transformed (invalid structure)
-          errors.push(`SanMar: Style ${style} not found or invalid data returned`);
-        }
-      } else if (liveResult.error) {
-        errors.push(`SanMar: ${liveResult.error}`);
-      } else {
-        // No success, no error, no data - unexpected state
-        errors.push(`SanMar: Style ${style} not found`);
-      }
-
+      console.log(`❌ Style ${style} not found in SanMar cache - cache unavailable, skipping`);
+      errors.push(`SanMar: Catalog not available. Please contact support to enable SanMar FTP integration.`);
       return { results, errors };
     }
 
