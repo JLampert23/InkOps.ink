@@ -11,7 +11,11 @@ import { ManageGoodsDashboard } from './ManageGoodsDashboard';
 type View = 'list' | 'create' | 'detail';
 type Tab = 'dashboard' | 'purchase-orders' | 'garment-report' | 'receiving';
 
-export function PurchaseOrdersManager() {
+interface PurchaseOrdersManagerProps {
+  onNavigateToWorkOrder?: (workOrderId: string) => void;
+}
+
+export function PurchaseOrdersManager({ onNavigateToWorkOrder }: PurchaseOrdersManagerProps = {}) {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [currentView, setCurrentView] = useState<View>('list');
   const [selectedPoId, setSelectedPoId] = useState<string | null>(null);
@@ -64,6 +68,11 @@ export function PurchaseOrdersManager() {
   };
 
   const handleDashboardNavigate = (tab: string, view?: string, id?: string) => {
+    if (tab === 'work-orders' && id && onNavigateToWorkOrder) {
+      onNavigateToWorkOrder(id);
+      return;
+    }
+
     setActiveTab(tab as Tab);
     if (view) setCurrentView(view as View);
     if (id) {

@@ -131,7 +131,7 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
           </div>
         );
       case 'manage-goods':
-        return <PurchaseOrdersManager />;
+        return <PurchaseOrdersManager onNavigateToWorkOrder={handleNavigateToWorkOrder} />;
       default:
         return null;
     }
