@@ -535,7 +535,7 @@ export function ManageGoodsDashboard({ onNavigate }: ManageGoodsDashboardProps) 
                           {format(parseISO(po.created_at), 'MMM d')}
                         </p>
                       </div>
-                      {getStatusBadge(po.receiving_status)}
+                      {getStatusBadge(po.status)}
                     </div>
                   </button>
                 ))}
