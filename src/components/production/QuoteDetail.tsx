@@ -34,11 +34,13 @@ interface Quote {
   id: string;
   quote_number: string;
   nickname?: string;
+  company_id?: string;
   customer_id?: string;
   customer_name: string;
   customer_email: string;
   customer_company: string;
   customer_phone: string;
+  was_reopened?: boolean;
   bill_company?: string;
   bill_name?: string;
   bill_address_1?: string;
@@ -144,6 +146,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
   const [showProofModal, setShowProofModal] = useState(false);
   const [selectedProofImage, setSelectedProofImage] = useState<string>('');
   const [showLabelModal, setShowLabelModal] = useState(false);
+  const [reopening, setReopening] = useState(false);
 
   useEffect(() => {
     loadQuoteDetails();
@@ -284,6 +287,43 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
     }
   };
 
+  const handleReopenQuote = async () => {
+    if (!quote) return;
+
+    setReopening(true);
+    try {
+      const { error } = await supabase
+        .from('quotes')
+        .update({
+          status: 'draft',
+          was_reopened: true,
+          approved_at: null
+        })
+        .eq('id', quoteId);
+
+      if (error) throw error;
+
+      await supabase
+        .from('quote_activity_log')
+        .insert({
+          quote_id: quoteId,
+          company_id: quote.company_id,
+          action: 'reopened',
+          performed_by_name: 'User',
+          meta: { previous_status: 'approved' }
+        });
+
+      showNotification('Quote reopened for editing', 'success');
+      loadQuoteDetails();
+      onEdit();
+    } catch (error) {
+      console.error('Error reopening quote:', error);
+      showNotification('Failed to reopen quote', 'error');
+    } finally {
+      setReopening(false);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'draft': return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
@@ -370,6 +410,20 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
               Edit Quote
             </button>
           )}
+          {quote.status === 'approved' && (
+            <button
+              onClick={handleReopenQuote}
+              disabled={reopening}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors shadow-sm disabled:opacity-50"
+            >
+              {reopening ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Pencil className="w-4 h-4" />
+              )}
+              Edit Quote
+            </button>
+          )}
           <button
             onClick={() => setShowLabelModal(true)}
             className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors shadow-sm"
@@ -393,6 +447,16 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
           </button>
         </div>
       </div>
+
+      {/* Reopened Banner */}
+      {quote.was_reopened && quote.status === 'draft' && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex items-center gap-3">
+          <RefreshCw className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+          <p className="text-amber-800 dark:text-amber-300 text-sm font-medium">
+            This quote has been reopened for editing.
+          </p>
+        </div>
+      )}
 
       {/* Traditional Invoice Layout */}
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
