@@ -50,21 +50,15 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
 
   useEffect(() => {
     loadQuotes();
-  }, [statusFilter]);
+  }, []);
 
   const loadQuotes = async () => {
     setLoading(true);
     try {
-      let query = supabase
+      const query = supabase
         .from('quotes')
         .select('*')
         .order('created_at', { ascending: false });
-
-      if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
-      } else {
-        query = query.not('status', 'in', '("approved","converted")');
-      }
 
       const { data, error } = await query;
 
@@ -145,19 +139,26 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
       case 'expired':
         return { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400', icon: AlertCircle, label: 'Expired' };
       case 'converted':
-        return { color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400', icon: CheckCircle, label: 'Converted' };
+        return { color: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400', icon: CheckCircle, label: 'Converted' };
       default:
         return { color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300', icon: Clock, label: status };
     }
   };
 
-  const filteredQuotes = quotes.filter(
-    (quote) =>
+  const filteredQuotes = quotes.filter((quote) => {
+    const matchesSearch =
       (quote.customer_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (quote.quote_number || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (quote.customer_company || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (quote.customer_email || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      (quote.customer_email || '').toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus =
+      statusFilter === 'all'
+        ? !['approved', 'converted'].includes(quote.status)
+        : quote.status === statusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
 
   const stats = {
     total: quotes.length,
@@ -165,6 +166,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
     sent: quotes.filter(q => q.status === 'sent').length,
     approved: quotes.filter(q => q.status === 'approved').length,
     rejected: quotes.filter(q => q.status === 'rejected').length,
+    converted: quotes.filter(q => q.status === 'converted').length,
   };
 
   return (
@@ -193,7 +195,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
           <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</div>
           <div className="text-sm text-gray-600 dark:text-gray-400">Total Quotes</div>
@@ -213,6 +215,10 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
           <div className="text-2xl font-bold text-red-600 dark:text-red-400">{stats.rejected}</div>
           <div className="text-sm text-gray-600 dark:text-gray-400">Rejected</div>
+        </div>
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
+          <div className="text-2xl font-bold text-teal-600 dark:text-teal-400">{stats.converted}</div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">Converted</div>
         </div>
       </div>
 
