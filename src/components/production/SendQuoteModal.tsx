@@ -139,14 +139,20 @@ export function SendQuoteModal({
     try {
       // Get current session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      console.log('Session check:', { hasSession: !!session, hasToken: !!session?.access_token, error: sessionError });
 
       if (sessionError || !session) {
         throw new Error('You must be logged in to send quotes. Please refresh and try again.');
       }
 
+      console.log('Calling edge function with explicit auth header');
+
       const { data, error } = await supabase.functions.invoke(
         `quote-actions/${quoteId}/send`,
         {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
           body: {
             template_id: selectedTemplateId,
             custom_message: customMessage,
@@ -158,8 +164,10 @@ export function SendQuoteModal({
         }
       );
 
+      console.log('Edge function response:', { data, error, hasData: !!data, hasError: !!error });
+
       if (error) {
-        console.error('Edge function error:', error);
+        console.error('Edge function error details:', JSON.stringify(error, null, 2));
         throw new Error(error.message || 'Failed to send quote');
       }
 
