@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase-client';
+import { ReceivingService } from '../../services/receiving-service';
 import {
   X,
   Package,
   Save,
   Loader2,
   AlertCircle,
-  Plus,
-  Minus,
   CheckCircle2,
 } from 'lucide-react';
 
@@ -39,6 +38,7 @@ interface GroupedItem {
   style_number: string;
   product_name: string;
   color: string;
+  vendor_name: string;
   items: LineItem[];
 }
 
@@ -125,8 +125,6 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
       );
     } catch (error: any) {
       console.error('Error loading PO details:', error);
-      console.error('Error message:', error?.message);
-      console.error('Error details:', JSON.stringify(error, null, 2));
       alert(`Failed to load purchase order: ${error?.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
@@ -143,6 +141,7 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
           style_number: item.style_number,
           product_name: item.product_name,
           color: item.color,
+          vendor_name: po?.vendor_name || 'Unknown Vendor',
           items: [],
         };
       }
@@ -154,20 +153,7 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
     });
 
     return Object.values(groups);
-  }, [lineItems]);
-
-  const updateQuantity = (itemId: string, delta: number) => {
-    setLineItems((prev) =>
-      prev.map((item) => {
-        if (item.id === itemId) {
-          const remaining = item.quantity_ordered - item.quantity_received;
-          const newQty = Math.max(0, Math.min(remaining, item.receiving_quantity + delta));
-          return { ...item, receiving_quantity: newQty };
-        }
-        return item;
-      })
-    );
-  };
+  }, [lineItems, po]);
 
   const setQuantity = (itemId: string, value: number) => {
     setLineItems((prev) =>
@@ -180,6 +166,37 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
         return item;
       })
     );
+  };
+
+  const receiveAllSize = (itemId: string) => {
+    setLineItems((prev) =>
+      prev.map((item) => {
+        if (item.id === itemId) {
+          const remaining = item.quantity_ordered - item.quantity_received;
+          return { ...item, receiving_quantity: remaining };
+        }
+        return item;
+      })
+    );
+  };
+
+  const receiveAllSizes = (styleNumber: string, color: string) => {
+    setLineItems((prev) =>
+      prev.map((item) => {
+        if (item.style_number === styleNumber && item.color === color) {
+          const remaining = item.quantity_ordered - item.quantity_received;
+          return { ...item, receiving_quantity: remaining };
+        }
+        return item;
+      })
+    );
+  };
+
+  const getStatusColor = (item: LineItem): string => {
+    const remaining = item.quantity_ordered - item.quantity_received;
+    if (item.receiving_quantity === 0) return 'bg-red-500';
+    if (item.receiving_quantity < remaining) return 'bg-yellow-500';
+    return 'bg-green-500';
   };
 
   const handleSave = async () => {
@@ -214,7 +231,14 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
           variance_notes: '',
         }));
 
-      await ReceivingService.recordReceipt(poId, receivingLineItems, user.id);
+      const { error } = await ReceivingService.processReceiving(
+        poId,
+        user.id,
+        receivingLineItems,
+        'Goods received via UI'
+      );
+
+      if (error) throw error;
 
       alert('Goods received successfully!');
       onSuccess();
@@ -245,7 +269,7 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-lg max-w-7xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+      <div className="bg-white dark:bg-slate-800 rounded-lg max-w-[95vw] w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
         <div className="px-6 py-5 border-b border-gray-200 dark:border-slate-700 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-slate-800 dark:to-slate-900">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -285,7 +309,7 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
         )}
 
         <div className="flex-1 overflow-y-auto p-6">
-          <div className="space-y-6">
+          <div className="space-y-3">
             {groupedItems.map((group) => {
               const groupTotal = group.items.reduce((sum, item) => sum + item.receiving_quantity, 0);
               const groupOrdered = group.items.reduce((sum, item) => sum + item.quantity_ordered, 0);
@@ -295,133 +319,102 @@ export function ReceiveGoods({ poId, onClose, onSuccess }: ReceiveGoodsProps) {
               return (
                 <div
                   key={`${group.style_number}-${group.color}`}
-                  className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg overflow-hidden"
+                  className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg p-4"
                 >
-                  <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-slate-800 dark:to-slate-900 px-4 py-3 border-b border-gray-200 dark:border-slate-700">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div>
-                          <h3 className="font-semibold text-gray-900 dark:text-white text-lg">
-                            {group.product_name}
-                          </h3>
-                          <div className="flex items-center gap-3 mt-1 text-sm">
-                            <span className="text-gray-600 dark:text-gray-400">
-                              Style: <span className="font-medium text-gray-900 dark:text-white">{group.style_number}</span>
-                            </span>
-                            <span className="text-gray-400">•</span>
-                            <span className="text-gray-600 dark:text-gray-400">
-                              Color: <span className="font-medium text-gray-900 dark:text-white">{group.color}</span>
-                            </span>
-                          </div>
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <h3 className="font-bold text-gray-900 dark:text-white text-base">
+                          {group.style_number}
+                        </h3>
+                        <span className="text-gray-400">•</span>
+                        <span className="text-gray-600 dark:text-gray-400 text-sm">
+                          {group.product_name}
+                        </span>
+                        <span className="text-gray-400">•</span>
+                        <span className="text-gray-600 dark:text-gray-400 text-sm">
+                          Color: <span className="font-medium text-gray-900 dark:text-white">{group.color}</span>
+                        </span>
+                        <span className="text-gray-400">•</span>
+                        <span className="text-gray-600 dark:text-gray-400 text-sm">
+                          Vendor: <span className="font-medium text-gray-900 dark:text-white">{group.vendor_name}</span>
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-center px-3">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                          Total Needed
+                        </div>
+                        <div className="text-lg font-bold text-gray-900 dark:text-white">
+                          {groupRemaining}
                         </div>
                       </div>
-                      <div className="flex items-center gap-6 text-sm">
-                        <div className="text-center">
-                          <div className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
-                            Remaining
+                      {groupTotal > 0 && (
+                        <div className="text-center px-3">
+                          <div className="text-xs text-green-600 dark:text-green-400 uppercase tracking-wide">
+                            Receiving
                           </div>
-                          <div className="text-xl font-bold text-gray-900 dark:text-white">
-                            {groupRemaining}
+                          <div className="text-lg font-bold text-green-600 dark:text-green-400">
+                            {groupTotal}
                           </div>
                         </div>
-                        {groupTotal > 0 && (
-                          <div className="text-center">
-                            <div className="text-xs text-green-600 dark:text-green-400 uppercase tracking-wide mb-1">
-                              Receiving
-                            </div>
-                            <div className="text-xl font-bold text-green-600 dark:text-green-400">
-                              {groupTotal}
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                      )}
+                      <button
+                        onClick={() => receiveAllSizes(group.style_number, group.color)}
+                        className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors whitespace-nowrap"
+                      >
+                        Receive All Sizes
+                      </button>
                     </div>
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="bg-gray-50 dark:bg-slate-800">
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                            Size
-                          </th>
-                          <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                            Ordered
-                          </th>
-                          <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                            Previously Received
-                          </th>
-                          <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                            Remaining
-                          </th>
-                          <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                            Receive Now
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
-                        {group.items.map((item) => {
-                          const remaining = item.quantity_ordered - item.quantity_received;
-                          return (
-                            <tr
-                              key={item.id}
-                              className="hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors"
+                  <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                    {group.items.map((item) => {
+                      const remaining = item.quantity_ordered - item.quantity_received;
+                      const statusColor = getStatusColor(item);
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="flex-shrink-0 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-3 min-w-[140px]"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-bold text-gray-900 dark:text-white">
+                              {item.size}
+                            </span>
+                            <div className={`w-3 h-3 rounded-full ${statusColor}`} title={
+                              item.receiving_quantity === 0 ? 'Not received' :
+                              item.receiving_quantity < remaining ? 'Partially received' : 'Fully received'
+                            }></div>
+                          </div>
+
+                          <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                            Need: <span className="font-semibold text-gray-900 dark:text-white">{remaining}</span>
+                          </div>
+
+                          <div className="mb-2">
+                            <input
+                              type="number"
+                              min="0"
+                              max={remaining}
+                              value={item.receiving_quantity}
+                              onChange={(e) => setQuantity(item.id, parseInt(e.target.value) || 0)}
+                              className="w-full px-2 py-1.5 text-center text-sm font-bold border-2 border-gray-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                            />
+                          </div>
+
+                          {remaining > 0 && item.receiving_quantity !== remaining && (
+                            <button
+                              onClick={() => receiveAllSize(item.id)}
+                              className="w-full px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors"
                             >
-                              <td className="px-4 py-4">
-                                <span className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 text-white font-bold rounded-lg text-sm shadow-sm">
-                                  {item.size}
-                                </span>
-                              </td>
-                              <td className="px-4 py-4 text-center text-gray-900 dark:text-white font-medium">
-                                {item.quantity_ordered}
-                              </td>
-                              <td className="px-4 py-4 text-center text-gray-600 dark:text-gray-400">
-                                {item.quantity_received}
-                              </td>
-                              <td className="px-4 py-4 text-center">
-                                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
-                                  {remaining}
-                                </span>
-                              </td>
-                              <td className="px-4 py-4">
-                                <div className="flex items-center justify-center gap-3">
-                                  <button
-                                    onClick={() => updateQuantity(item.id, -1)}
-                                    disabled={item.receiving_quantity <= 0}
-                                    className="p-2 rounded-lg bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                                  >
-                                    <Minus className="w-4 h-4 text-gray-700 dark:text-gray-300" />
-                                  </button>
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    max={remaining}
-                                    value={item.receiving_quantity}
-                                    onChange={(e) => setQuantity(item.id, parseInt(e.target.value) || 0)}
-                                    className="w-20 px-3 py-2 text-center text-lg font-bold border-2 border-gray-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
-                                  />
-                                  <button
-                                    onClick={() => updateQuantity(item.id, 1)}
-                                    disabled={item.receiving_quantity >= remaining}
-                                    className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30 hover:bg-green-200 dark:hover:bg-green-900/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                                  >
-                                    <Plus className="w-4 h-4 text-green-700 dark:text-green-400" />
-                                  </button>
-                                  {remaining > 0 && item.receiving_quantity !== remaining && (
-                                    <button
-                                      onClick={() => setQuantity(item.id, remaining)}
-                                      className="ml-2 px-3 py-2 text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
-                                    >
-                                      All
-                                    </button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                              Receive All
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
