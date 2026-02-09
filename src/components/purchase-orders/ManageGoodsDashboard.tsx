@@ -409,64 +409,6 @@ export function ManageGoodsDashboard({ onNavigate }: ManageGoodsDashboardProps) 
         </p>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <Package className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            <TrendingUp className="w-4 h-4 text-gray-400" />
-          </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
-            {kpis.garmentsNeededToday}
-          </p>
-          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Garments Needed Today</p>
-        </div>
-
-        <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <Clock className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-            <TrendingUp className="w-4 h-4 text-gray-400" />
-          </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
-            {kpis.posAwaitingConfirmation}
-          </p>
-          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Awaiting Confirmation</p>
-        </div>
-
-        <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <Calendar className="w-5 h-5 text-green-600 dark:text-green-400" />
-            <TrendingUp className="w-4 h-4 text-gray-400" />
-          </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
-            {kpis.posArrivingToday}
-          </p>
-          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Arriving Today</p>
-        </div>
-
-        <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
-            <TrendingUp className="w-4 h-4 text-gray-400" />
-          </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
-            {kpis.itemsShortOrBackordered}
-          </p>
-          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Items Short</p>
-        </div>
-
-        <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
-            <TrendingUp className="w-4 h-4 text-gray-400" />
-          </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white">
-            {kpis.jobsBlocked}
-          </p>
-          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Jobs Blocked</p>
-        </div>
-      </div>
-
       {/* Alerts Panel */}
       {alerts.length > 0 && (
         <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
