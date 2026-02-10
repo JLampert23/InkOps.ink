@@ -118,10 +118,11 @@ Deno.serve(async (req: Request) => {
     }
 
     if (settings?.sanmar_enabled) {
+      console.log(`🎯 SanMar is enabled, starting search for style: ${style}`);
       searchPromises.push(
         (async () => {
           try {
-            console.log("🔍 Searching SanMar...");
+            console.log("🔍 Calling searchSanMarCatalog...");
             const apiResult = await searchSanMarCatalog(
               supabaseAdmin,
               supabaseUrl,
@@ -129,17 +130,21 @@ Deno.serve(async (req: Request) => {
               companyId,
               style
             );
+            console.log(`📊 SanMar search complete - Results: ${apiResult.results.length}, Errors: ${apiResult.errors.length}`);
             if (apiResult.results.length > 0) {
               console.log(`✅ Found ${apiResult.results.length} SanMar result(s)`);
               results.push(...apiResult.results);
-            } else if (apiResult.errors.length > 0) {
+            }
+            if (apiResult.errors.length > 0) {
               console.log(`⚠️ SanMar errors: ${apiResult.errors.join(", ")}`);
             }
           } catch (error: any) {
-            console.error("SanMar error:", error.message);
+            console.error("❌ SanMar error:", error.message, error.stack);
           }
         })()
       );
+    } else {
+      console.log(`⚠️ SanMar is NOT enabled`);
     }
 
     await Promise.allSettled(searchPromises);
