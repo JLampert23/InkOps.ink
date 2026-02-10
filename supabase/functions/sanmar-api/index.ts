@@ -64,15 +64,29 @@ Deno.serve(async (req: Request) => {
       companyId = companyIdParam;
     } else {
       // User JWT - validate token using admin client
-      const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+      console.log("🔍 Validating user JWT, token length:", token.length);
 
-      if (authError || !user) {
-        console.error("Auth error:", authError);
+      const authResult = await supabaseAdmin.auth.getUser(token);
+      console.log("🔐 Auth result:", {
+        hasUser: !!authResult.data?.user,
+        hasError: !!authResult.error,
+        errorMessage: authResult.error?.message
+      });
+
+      if (authResult.error || !authResult.data?.user) {
+        console.error("❌ Auth error:", authResult.error);
         return new Response(
-          JSON.stringify({ code: 401, message: "Invalid JWT" }),
+          JSON.stringify({
+            code: 401,
+            message: "Invalid JWT",
+            details: authResult.error?.message
+          }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+
+      const user = authResult.data.user;
+      console.log("✅ User validated:", user.id);
 
       // Get user's company_id using admin client
       const { data: profile } = await supabaseAdmin
@@ -82,11 +96,14 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
 
       if (!profile?.company_id) {
+        console.error("❌ Company not found for user:", user.id);
         return new Response(
           JSON.stringify({ error: "Company not found" }),
           { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+
+      console.log("✅ Company ID found:", profile.company_id);
       companyId = profile.company_id;
     }
 
