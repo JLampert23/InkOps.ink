@@ -672,8 +672,7 @@ export async function testSanMarConnection(credentials: SanMarCredentials): Prom
     console.log('🧪 Testing SanMar PromoStandards connection...');
     const startTime = Date.now();
 
-    const payload = `<shar:productId>PC54</shar:productId>
-      <shar:isSellable>true</shar:isSellable>`;
+    const payload = `<shar:productId>PC54</shar:productId>`;
 
     const soapEnvelope = buildSOAPEnvelope(
       'ProductDataService',
