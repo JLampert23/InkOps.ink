@@ -7,6 +7,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+function getXmlValue(xmlText: string, tagName: string): string | null {
+  const regex = new RegExp(`<[^:]*:?${tagName}[^>]*>([^<]*)<\/[^:]*:?${tagName}>`, 'i');
+  const match = xmlText.match(regex);
+  return match ? match[1].trim() : null;
+}
+
 function buildProductDataEnvelope(credentials: any, styleNumber: string): string {
   return `<?xml version="1.0" encoding="utf-8"?>
 <soapenv:Envelope
@@ -27,24 +33,6 @@ function buildProductDataEnvelope(credentials: any, styleNumber: string): string
 </soapenv:Envelope>`;
 }
 
-function buildProductSellableEnvelope(credentials: any, styleNumber: string): string {
-  return `<?xml version="1.0" encoding="utf-8"?>
-<soapenv:Envelope
-  xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-  xmlns:ns="http://www.promostandards.org/WSDL/ProductSellableService/2.0.0/"
-  xmlns:shar="http://www.promostandards.org/WSDL/ProductSellableService/2.0.0/SharedObjects/">
-  <soapenv:Header/>
-  <soapenv:Body>
-    <ns:GetProductSellableRequest>
-      <shar:wsVersion>2.0.0</shar:wsVersion>
-      <shar:id>${credentials.id}</shar:id>
-      <shar:password>${credentials.password}</shar:password>
-      <shar:productId>${styleNumber}</shar:productId>
-    </ns:GetProductSellableRequest>
-  </soapenv:Body>
-</soapenv:Envelope>`;
-}
-
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -54,7 +42,6 @@ Deno.serve(async (req: Request) => {
     const url = new URL(req.url);
     const style = url.searchParams.get("style") || "PC61";
     const companyId = url.searchParams.get("company_id");
-    const service = url.searchParams.get("service") || "product-data";
 
     if (!companyId) {
       return new Response(
@@ -63,7 +50,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Get credentials
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -82,7 +68,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Decrypt password
     const decryptResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/crypto-service`, {
       method: "POST",
       headers: {
@@ -103,31 +88,15 @@ Deno.serve(async (req: Request) => {
     }
 
     const { result: password } = await decryptResponse.json();
-    const credentials = {
-      id: settings.sanmar_promo_username,
-      password,
-    };
+    const credentials = { id: settings.sanmar_promo_username, password };
 
-    // Test the actual SOAP call
     const normalizedStyle = style.toUpperCase().trim();
+    const endpoint = "https://ws.sanmar.com:8080/promostandards/ProductDataServiceBindingV2?WSDL";
+    const soapAction = "getProduct";
+    const soapEnvelope = buildProductDataEnvelope(credentials, normalizedStyle);
 
-    let soapEnvelope: string;
-    let endpoint: string;
-    let soapAction: string;
-
-    if (service === "sellable") {
-      soapEnvelope = buildProductSellableEnvelope(credentials, normalizedStyle);
-      endpoint = "https://ws.sanmar.com:8080/promostandards/ProductSellableServiceBinding?WSDL";
-      soapAction = "getProductSellable";
-    } else {
-      soapEnvelope = buildProductDataEnvelope(credentials, normalizedStyle);
-      endpoint = "https://ws.sanmar.com:8080/promostandards/ProductDataServiceBindingV2?WSDL";
-      soapAction = "getProduct";
-    }
-
-    console.log("Testing SanMar API with style:", normalizedStyle);
-    console.log("Using service:", service);
-    console.log("Using username:", credentials.id);
+    console.log("Testing SanMar Product Data API");
+    console.log("Style:", normalizedStyle);
 
     const response = await fetch(endpoint, {
       method: "POST",
@@ -139,60 +108,85 @@ Deno.serve(async (req: Request) => {
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
       return new Response(
         JSON.stringify({
-          service,
+          success: false,
           style: normalizedStyle,
-          endpoint,
           error: `HTTP ${response.status}: ${response.statusText}`,
-          responseBody: await response.text(),
+          details: errorText.substring(0, 500),
         }, null, 2),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const responseXml = await response.text();
-    const xmlLength = responseXml.length;
 
-    // Parse for parts (memory efficient)
-    const partPattern = /<[^:]*:?Part[^>]*>([\s\S]*?)<\/[^:]*:?Part>/gi;
-    const parts = [];
-    let match;
-    let matchCount = 0;
+    // Check for errors
+    const hasFault = responseXml.includes("<faultcode>");
+    const hasError = responseXml.includes("<errorCode>");
 
-    while ((match = partPattern.exec(responseXml)) !== null && matchCount < 3) {
-      parts.push(match[0].substring(0, 500));
-      matchCount++;
+    if (hasFault || hasError) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          style: normalizedStyle,
+          error: "SOAP Fault or Error in response",
+          preview: responseXml.substring(0, 1000),
+        }, null, 2),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    const totalMatches = (responseXml.match(partPattern) || []).length;
+    // Extract product info
+    const productName = getXmlValue(responseXml, "productName");
+    const description = getXmlValue(responseXml, "description");
+    const productBrand = getXmlValue(responseXml, "productBrand");
 
-    const result = {
-      service,
-      style: normalizedStyle,
-      endpoint,
-      username: credentials.id,
-      response: {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-      },
-      xmlLength,
-      xmlPreview: responseXml.substring(0, 1500),
-      xmlTail: responseXml.substring(Math.max(0, xmlLength - 500)),
-      hasFault: responseXml.includes("<faultcode>"),
-      hasError: responseXml.includes("<errorCode>"),
-      partMatches: totalMatches,
-      sampleParts: parts,
-    };
+    // Parse first 5 parts as examples
+    const partPattern = /<[^:]*:?Part[^>]*>([\s\S]*?)<\/[^:]*:?Part>/gi;
+    const sampleParts = [];
+    let match;
+
+    for (let i = 0; i < 5 && (match = partPattern.exec(responseXml)); i++) {
+      const partXml = match[0];
+      sampleParts.push({
+        partId: getXmlValue(partXml, "partId"),
+        colorName: getXmlValue(partXml, "colorName"),
+        size: getXmlValue(partXml, "labelSize"),
+        hex: getXmlValue(partXml, "hex"),
+      });
+    }
+
+    // Count all parts (efficient)
+    partPattern.lastIndex = 0;
+    let totalParts = 0;
+    while (partPattern.exec(responseXml) !== null) totalParts++;
 
     return new Response(
-      JSON.stringify(result, null, 2),
+      JSON.stringify({
+        success: true,
+        style: normalizedStyle,
+        product: {
+          name: productName,
+          description: description?.substring(0, 200),
+          brand: productBrand,
+        },
+        variants: {
+          totalParts,
+          sampleParts,
+        },
+        info: {
+          endpoint: "Product Data Service V2.0.0",
+          note: "SanMar ONLY implements Product Data service. There is no ProductSellableService.",
+          dataReturned: "Product Data returns all colors, sizes, and part IDs",
+        },
+      }, null, 2),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
     return new Response(
-      JSON.stringify({ error: error.message, stack: error.stack }),
+      JSON.stringify({ success: false, error: error.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
