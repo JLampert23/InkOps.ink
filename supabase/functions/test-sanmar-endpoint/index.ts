@@ -7,7 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-function buildSOAPEnvelope(credentials: any, styleNumber: string): string {
+function buildProductDataEnvelope(credentials: any, styleNumber: string): string {
   return `<?xml version="1.0" encoding="utf-8"?>
 <soapenv:Envelope
   xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
@@ -27,6 +27,24 @@ function buildSOAPEnvelope(credentials: any, styleNumber: string): string {
 </soapenv:Envelope>`;
 }
 
+function buildProductSellableEnvelope(credentials: any, styleNumber: string): string {
+  return `<?xml version="1.0" encoding="utf-8"?>
+<soapenv:Envelope
+  xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+  xmlns:ns="http://www.promostandards.org/WSDL/ProductSellableService/2.0.0/"
+  xmlns:shar="http://www.promostandards.org/WSDL/ProductSellableService/2.0.0/SharedObjects/">
+  <soapenv:Header/>
+  <soapenv:Body>
+    <ns:GetProductSellableRequest>
+      <shar:wsVersion>2.0.0</shar:wsVersion>
+      <shar:id>${credentials.id}</shar:id>
+      <shar:password>${credentials.password}</shar:password>
+      <shar:productId>${styleNumber}</shar:productId>
+    </ns:GetProductSellableRequest>
+  </soapenv:Body>
+</soapenv:Envelope>`;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -36,6 +54,7 @@ Deno.serve(async (req: Request) => {
     const url = new URL(req.url);
     const style = url.searchParams.get("style") || "PC61";
     const companyId = url.searchParams.get("company_id");
+    const service = url.searchParams.get("service") || "product-data";
 
     if (!companyId) {
       return new Response(
@@ -91,17 +110,30 @@ Deno.serve(async (req: Request) => {
 
     // Test the actual SOAP call
     const normalizedStyle = style.toUpperCase().trim();
-    const soapEnvelope = buildSOAPEnvelope(credentials, normalizedStyle);
-    const endpoint = "https://ws.sanmar.com:8080/promostandards/ProductDataServiceBindingV2?WSDL";
+
+    let soapEnvelope: string;
+    let endpoint: string;
+    let soapAction: string;
+
+    if (service === "sellable") {
+      soapEnvelope = buildProductSellableEnvelope(credentials, normalizedStyle);
+      endpoint = "https://ws.sanmar.com:8080/promostandards/ProductSellableServiceV2?WSDL";
+      soapAction = "getProductSellable";
+    } else {
+      soapEnvelope = buildProductDataEnvelope(credentials, normalizedStyle);
+      endpoint = "https://ws.sanmar.com:8080/promostandards/ProductDataServiceBindingV2?WSDL";
+      soapAction = "getProduct";
+    }
 
     console.log("Testing SanMar API with style:", normalizedStyle);
+    console.log("Using service:", service);
     console.log("Using username:", credentials.id);
 
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
-        "SOAPAction": "getProduct",
+        "SOAPAction": soapAction,
       },
       body: soapEnvelope,
     });
@@ -113,11 +145,12 @@ Deno.serve(async (req: Request) => {
     const parts = [];
     let match;
     while ((match = partPattern.exec(responseXml)) !== null) {
-      parts.push(match[0].substring(0, 500)); // First 500 chars of each part
+      parts.push(match[0].substring(0, 500));
     }
 
     return new Response(
       JSON.stringify({
+        service,
         style: normalizedStyle,
         endpoint,
         username: credentials.id,

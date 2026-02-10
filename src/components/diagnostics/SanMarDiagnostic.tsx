@@ -1,38 +1,116 @@
 import React, { useState } from 'react';
-import { Search, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { Search, AlertCircle, CheckCircle, XCircle, Database, ShoppingCart } from 'lucide-react';
 
 export default function SanMarDiagnostic() {
   const [style, setStyle] = useState('PC61');
   const [companyId, setCompanyId] = useState('5f36fe64-8b67-4b62-a023-29590da87c41');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [productDataResult, setProductDataResult] = useState<any>(null);
+  const [sellableResult, setSellableResult] = useState<any>(null);
 
-  const testSanMar = async () => {
+  const testBothEndpoints = async () => {
     setLoading(true);
-    setResult(null);
+    setProductDataResult(null);
+    setSellableResult(null);
 
     try {
-      const url = `https://cuaukcvccxvfpuxaciac.supabase.co/functions/v1/test-sanmar-endpoint?style=${encodeURIComponent(style)}&company_id=${encodeURIComponent(companyId)}`;
+      const baseUrl = 'https://cuaukcvccxvfpuxaciac.supabase.co/functions/v1/test-sanmar-endpoint';
 
-      console.log('Calling:', url);
+      const productDataUrl = `${baseUrl}?style=${encodeURIComponent(style)}&company_id=${encodeURIComponent(companyId)}&service=product-data`;
+      const sellableUrl = `${baseUrl}?style=${encodeURIComponent(style)}&company_id=${encodeURIComponent(companyId)}&service=sellable`;
 
-      const response = await fetch(url);
-      const data = await response.json();
+      console.log('Testing ProductDataService...');
+      const productDataResponse = await fetch(productDataUrl);
+      const productData = await productDataResponse.json();
+      setProductDataResult(productData);
 
-      console.log('Response:', data);
-      setResult(data);
+      console.log('Testing ProductSellableService...');
+      const sellableResponse = await fetch(sellableUrl);
+      const sellableData = await sellableResponse.json();
+      setSellableResult(sellableData);
+
     } catch (error) {
       console.error('Error:', error);
-      setResult({ error: error.message });
+      setProductDataResult({ error: error.message });
     } finally {
       setLoading(false);
     }
   };
 
+  const renderEndpointResult = (result: any, title: string, icon: React.ReactNode) => {
+    if (!result) return null;
+
+    return (
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex items-center gap-2 mb-4">
+          {icon}
+          <h3 className="text-xl font-bold">{title}</h3>
+        </div>
+
+        <div className="mb-4">
+          {result.error ? (
+            <div className="flex items-center gap-2 text-red-600">
+              <XCircle className="w-5 h-5" />
+              <span className="font-bold">ERROR</span>
+            </div>
+          ) : result.hasFault ? (
+            <div className="flex items-center gap-2 text-red-600">
+              <XCircle className="w-5 h-5" />
+              <span className="font-bold">SOAP FAULT DETECTED</span>
+            </div>
+          ) : result.hasError ? (
+            <div className="flex items-center gap-2 text-orange-600">
+              <AlertCircle className="w-5 h-5" />
+              <span className="font-bold">ERROR DETECTED</span>
+            </div>
+          ) : result.partMatches > 0 ? (
+            <div className="flex items-center gap-2 text-green-600">
+              <CheckCircle className="w-5 h-5" />
+              <span className="font-bold">Found {result.partMatches} variants!</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-orange-600">
+              <AlertCircle className="w-5 h-5" />
+              <span className="font-bold">No variants found</span>
+            </div>
+          )}
+        </div>
+
+        <div className="mb-4 bg-gray-50 p-4 rounded text-sm space-y-1">
+          <div><strong>Variants Found:</strong> {result.partMatches || 0}</div>
+          <div><strong>Has Fault:</strong> {result.hasFault ? 'Yes' : 'No'}</div>
+          <div><strong>Has Error:</strong> {result.hasError ? 'Yes' : 'No'}</div>
+          <div><strong>Response Size:</strong> {result.xmlLength?.toLocaleString() || 0} bytes</div>
+        </div>
+
+        {result.sampleParts && result.sampleParts.length > 0 && (
+          <div className="mb-4">
+            <h4 className="font-bold mb-2">Sample Variants (first 3)</h4>
+            <div className="text-sm space-y-2">
+              {result.sampleParts.map((part: string, idx: number) => (
+                <div key={idx} className="bg-gray-50 p-2 rounded font-mono text-xs overflow-x-auto">
+                  {part}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div>
+          <h4 className="font-bold mb-2">Raw XML Response</h4>
+          <div className="bg-gray-900 text-green-400 p-4 rounded font-mono text-xs overflow-x-auto max-h-96 overflow-y-auto">
+            <pre>{result.xmlPreview || JSON.stringify(result, null, 2)}</pre>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6">SanMar API Diagnostic Tool</h1>
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-3xl font-bold mb-2">SanMar API Diagnostic Tool</h1>
+        <p className="text-gray-600 mb-6">Compare ProductDataService vs ProductSellableService</p>
 
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <div className="space-y-4">
@@ -58,76 +136,28 @@ export default function SanMarDiagnostic() {
             </div>
 
             <button
-              onClick={testSanMar}
+              onClick={testBothEndpoints}
               disabled={loading}
               className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
             >
               <Search className="w-4 h-4" />
-              {loading ? 'Testing...' : 'Test SanMar API'}
+              {loading ? 'Testing Both Endpoints...' : 'Test Both Endpoints'}
             </button>
           </div>
         </div>
 
-        {result && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="mb-4">
-              {result.error ? (
-                <div className="flex items-center gap-2 text-red-600">
-                  <XCircle className="w-5 h-5" />
-                  <span className="font-bold">ERROR</span>
-                </div>
-              ) : result.hasFault ? (
-                <div className="flex items-center gap-2 text-red-600">
-                  <XCircle className="w-5 h-5" />
-                  <span className="font-bold">SOAP FAULT DETECTED</span>
-                </div>
-              ) : result.hasError ? (
-                <div className="flex items-center gap-2 text-orange-600">
-                  <AlertCircle className="w-5 h-5" />
-                  <span className="font-bold">ERROR DETECTED</span>
-                </div>
-              ) : result.partMatches > 0 ? (
-                <div className="flex items-center gap-2 text-green-600">
-                  <CheckCircle className="w-5 h-5" />
-                  <span className="font-bold">Found {result.partMatches} parts!</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-orange-600">
-                  <AlertCircle className="w-5 h-5" />
-                  <span className="font-bold">No parts found</span>
-                </div>
-              )}
-            </div>
-
-            <div className="mb-4">
-              <h3 className="font-bold mb-2">Summary</h3>
-              <div className="text-sm space-y-1">
-                <div>Parts Found: {result.partMatches || 0}</div>
-                <div>Has Fault: {result.hasFault ? 'Yes' : 'No'}</div>
-                <div>Has Error: {result.hasError ? 'Yes' : 'No'}</div>
-                <div>Response Length: {result.responseLength || 0} characters</div>
-              </div>
-            </div>
-
-            {result.sampleParts && result.sampleParts.length > 0 && (
-              <div className="mb-4">
-                <h3 className="font-bold mb-2">Sample Parts (first 3)</h3>
-                <div className="text-sm space-y-2">
-                  {result.sampleParts.map((part: string, idx: number) => (
-                    <div key={idx} className="bg-gray-50 p-2 rounded font-mono text-xs overflow-x-auto">
-                      {part}
-                    </div>
-                  ))}
-                </div>
-              </div>
+        {(productDataResult || sellableResult) && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {renderEndpointResult(
+              productDataResult,
+              'ProductDataService',
+              <Database className="w-5 h-5 text-blue-600" />
             )}
-
-            <div>
-              <h3 className="font-bold mb-2">Raw XML Response</h3>
-              <div className="bg-gray-900 text-green-400 p-4 rounded font-mono text-xs overflow-x-auto max-h-96 overflow-y-auto">
-                <pre>{result.rawXml || JSON.stringify(result, null, 2)}</pre>
-              </div>
-            </div>
+            {renderEndpointResult(
+              sellableResult,
+              'ProductSellableService',
+              <ShoppingCart className="w-5 h-5 text-green-600" />
+            )}
           </div>
         )}
       </div>
