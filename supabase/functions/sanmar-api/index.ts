@@ -48,19 +48,17 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // STEP 2: Validate JWT using Supabase client
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: { Authorization: authHeader }
-      },
+    // STEP 2: Extract token and validate JWT
+    const token = authHeader.replace('Bearer ', '');
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false
       }
     });
 
-    // Verify the user is authenticated
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Verify the user is authenticated by passing the token directly
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
     if (authError || !user) {
       console.error("❌ Invalid JWT:", authError?.message);
