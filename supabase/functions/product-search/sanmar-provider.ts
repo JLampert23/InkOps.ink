@@ -1,66 +1,3 @@
-/**
- * SanMar Search Provider - PromoStandards API
- *
- * Uses SanMar's PromoStandards Web Services API directly
- * Caches results in sanmar_product_cache and sanmar_media_cache tables
- */
-
-import { createClient } from "npm:@supabase/supabase-js@2.57.4";
-import {
-  fetchUnifiedSanMarData,
-  type SanMarCredentials,
-} from "../_shared/sanmar-promostandards-client.ts";
-
-async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
-  const encoder = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(password),
-    'PBKDF2',
-    false,
-    ['deriveBits', 'deriveKey']
-  );
-
-  return crypto.subtle.deriveKey(
-    {
-      name: 'PBKDF2',
-      salt: salt,
-      iterations: 100000,
-      hash: 'SHA-256',
-    },
-    keyMaterial,
-    { name: 'AES-GCM', length: 256 },
-    true,
-    ['encrypt', 'decrypt']
-  );
-}
-
-async function decryptPassword(encryptedPassword: string, encryptionKey: string): Promise<string> {
-  try {
-    const combined = new Uint8Array(
-      atob(encryptedPassword).split('').map(c => c.charCodeAt(0))
-    );
-
-    const salt = combined.slice(0, 16);
-    const iv = combined.slice(16, 28);
-    const encryptedData = combined.slice(28);
-
-    const key = await deriveKey(encryptionKey, salt);
-
-    const decryptedData = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: iv },
-      key,
-      encryptedData
-    );
-
-    const decoder = new TextDecoder();
-    return decoder.decode(decryptedData);
-  } catch (error) {
-    console.error('Decryption error:', error);
-    throw new Error('Failed to decrypt password');
-  }
-}
-
 export interface ColorOption {
   name: string;
   code: string;
@@ -100,136 +37,72 @@ export async function searchSanMarCatalog(
   const errors: string[] = [];
 
   try {
-    console.log(`🔍 Searching SanMar via PromoStandards API for: ${style}`);
-
-    const { data: settings, error: settingsError } = await supabaseAdmin
-      .from("company_settings")
-      .select("sanmar_enabled, sanmar_promo_username, sanmar_promo_password_encrypted")
-      .eq("id", companyId)
-      .single();
-
-    if (settingsError || !settings) {
-      console.error("Failed to get company settings:", settingsError);
-      errors.push("SanMar integration not configured");
-      return { results, errors };
-    }
-
-    if (!settings.sanmar_enabled) {
-      errors.push("SanMar integration is disabled");
-      return { results, errors };
-    }
-
-    if (!settings.sanmar_promo_username || !settings.sanmar_promo_password_encrypted) {
-      errors.push("SanMar credentials not configured");
-      return { results, errors };
-    }
-
-    let decryptedPassword = "";
-    try {
-      const encryptionKey = Deno.env.get("ENCRYPTION_KEY");
-      if (!encryptionKey) {
-        throw new Error("ENCRYPTION_KEY not configured");
-      }
-
-      decryptedPassword = await decryptPassword(settings.sanmar_promo_password_encrypted, encryptionKey);
-    } catch (decryptError: any) {
-      console.error("Password decryption failed:", decryptError);
-      errors.push("Failed to decrypt SanMar credentials");
-      return { results, errors };
-    }
-
-    const credentials: SanMarCredentials = {
-      id: settings.sanmar_promo_username,
-      password: decryptedPassword,
-    };
+    console.log(`SanMar search for: ${style}`);
 
     const cachedData = await getCachedProduct(supabaseAdmin, companyId, style);
     if (cachedData) {
-      console.log(`✅ Found cached SanMar data for ${style}`);
+      console.log(`Cache hit for ${style}`);
       results.push(cachedData);
       return { results, errors };
     }
 
-    console.log(`📞 Fetching live data from SanMar PromoStandards API for style: ${style}...`);
-    console.log(`📞 Using credentials - Username: ${credentials.id}, Password length: ${credentials.password?.length || 0}`);
+    console.log(`Cache miss, calling sanmar-api edge function for ${style}`);
 
-    const { fetchSanMarProductData, fetchSanMarMedia } = await import("../_shared/sanmar-promostandards-client.ts");
+    const apiUrl = `${supabaseUrl}/functions/v1/sanmar-api?action=product&style=${encodeURIComponent(style)}&companyId=${encodeURIComponent(companyId)}`;
+    const productResponse = await fetch(apiUrl, {
+      headers: { "Authorization": `Bearer ${supabaseServiceKey}` },
+    });
 
-    console.log(`🌐 Calling fetchSanMarProductData...`);
-    const startTime = Date.now();
-
-    // Fetch product data first (this is the critical one)
-    let productResult;
-    try {
-      const productData = await fetchSanMarProductData(credentials, style);
-      productResult = { status: 'fulfilled' as const, value: productData };
-    } catch (error: any) {
-      productResult = { status: 'rejected' as const, reason: error };
-    }
-
-    const elapsed = Date.now() - startTime;
-    console.log(`⏱️ Product API call completed in ${elapsed}ms`);
-
-    console.log(`📊 Product result status: ${productResult.status}`);
-    if (productResult.status === 'rejected') {
-      const errorMessage = productResult.reason?.message || 'Product not found';
-      const errorStack = productResult.reason?.stack || '';
-      console.error(`❌ Product fetch rejected: ${errorMessage}`);
-      console.error(`❌ Error stack: ${errorStack}`);
-      errors.push(`SanMar error: ${errorMessage}`);
+    if (!productResponse.ok) {
+      const errText = await productResponse.text();
+      console.error(`sanmar-api returned ${productResponse.status}: ${errText}`);
+      errors.push(`SanMar API error: ${productResponse.status}`);
       return { results, errors };
     }
 
-    const productData = productResult.value;
+    const productData = await productResponse.json();
 
-    if (!productData.parts || productData.parts.length === 0) {
-      errors.push(`SanMar: Style ${style} not found or has no variants`);
+    if (!productData?.data?.parts || productData.data.parts.length === 0) {
+      console.log(`No parts found for ${style}`);
       return { results, errors };
     }
 
-    // Try to fetch media but don't fail if it times out
     let mediaData = null;
     try {
-      console.log(`🖼️ Fetching media for ${style}...`);
-      const mediaStartTime = Date.now();
-      mediaData = await fetchSanMarMedia(credentials, style);
-      const mediaElapsed = Date.now() - mediaStartTime;
-      console.log(`✅ Media fetch completed in ${mediaElapsed}ms`);
+      const mediaUrl = `${supabaseUrl}/functions/v1/sanmar-api?action=media&style=${encodeURIComponent(style)}&companyId=${encodeURIComponent(companyId)}`;
+      const mediaResponse = await fetch(mediaUrl, {
+        headers: { "Authorization": `Bearer ${supabaseServiceKey}` },
+      });
+      if (mediaResponse.ok) {
+        const mediaJson = await mediaResponse.json();
+        mediaData = mediaJson.data || null;
+      }
     } catch (mediaError: any) {
-      console.warn(`⚠️ Media fetch failed (non-critical): ${mediaError.message}`);
-      // Continue without media - we'll show product without images
+      console.warn(`Media fetch failed (non-critical): ${mediaError.message}`);
     }
 
-    const apiData = {
+    const apiDataForTransform = {
       success: true,
       styleNumber: style,
       partId: null,
-      style: productData,
+      style: productData.data,
       inventory: { items: [] },
       pricing: { parts: [] },
       media: mediaData || {
         images: [],
         views: {
-          front: null,
-          rear: null,
-          side: null,
-          lifestyle: null,
-          frontImages: [],
-          rearImages: [],
-          sideImages: [],
-          lifestyleImages: [],
-          otherImages: [],
+          front: null, rear: null, side: null, lifestyle: null,
+          frontImages: [], rearImages: [], sideImages: [],
+          lifestyleImages: [], otherImages: [],
         }
       },
     };
 
-    const product = transformSanMarData(apiData);
+    const product = transformSanMarData(apiDataForTransform);
     results.push(product);
 
-    // Cache product and media
-    await cacheProduct(supabaseAdmin, companyId, style, productData, mediaData);
-
-    console.log(`✅ Successfully fetched ${product.colors.length} colors from SanMar API`);
+    await cacheProduct(supabaseAdmin, companyId, style, productData.data, mediaData);
+    console.log(`Found ${product.colors.length} colors from SanMar`);
 
   } catch (error: any) {
     console.error("SanMar search error:", error);
@@ -255,12 +128,10 @@ async function getCachedProduct(
       .eq("cache_type", "style")
       .maybeSingle();
 
-    if (!productCache) {
-      return null;
-    }
+    if (!productCache) return null;
 
     if (new Date(productCache.expires_at) < new Date()) {
-      console.log(`⏰ Cache expired for ${style}`);
+      console.log(`Cache expired for ${style}`);
       return null;
     }
 
@@ -285,15 +156,9 @@ async function getCachedProduct(
       media: mediaData || {
         images: [],
         views: {
-          front: null,
-          rear: null,
-          side: null,
-          lifestyle: null,
-          frontImages: [],
-          rearImages: [],
-          sideImages: [],
-          lifestyleImages: [],
-          otherImages: [],
+          front: null, rear: null, side: null, lifestyle: null,
+          frontImages: [], rearImages: [], sideImages: [],
+          lifestyleImages: [], otherImages: [],
         }
       },
     };
@@ -301,7 +166,6 @@ async function getCachedProduct(
     const product = transformSanMarData(apiData);
     product.cached = true;
     product.last_synced = productCache.expires_at;
-
     return product;
   } catch (error) {
     console.error("Error getting cached product:", error);
@@ -329,9 +193,7 @@ async function cacheProduct(
         cache_type: "style",
         data: productData,
         expires_at: expiresAt.toISOString(),
-      }, {
-        onConflict: "company_id,cache_key"
-      });
+      }, { onConflict: "company_id,cache_key" });
 
     if (mediaData) {
       await supabaseAdmin
@@ -342,12 +204,10 @@ async function cacheProduct(
           cache_type: "style",
           data: mediaData,
           expires_at: expiresAt.toISOString(),
-        }, {
-          onConflict: "company_id,cache_key"
-        });
+        }, { onConflict: "company_id,cache_key" });
     }
 
-    console.log(`💾 Cached product and media data for ${style}`);
+    console.log(`Cached product data for ${style}`);
   } catch (error) {
     console.error("Error caching product:", error);
   }
@@ -372,7 +232,7 @@ function transformSanMarData(apiData: any): ProductResult {
         }
       }
 
-      let stock = {};
+      const stock: Record<string, number> = {};
       if (apiData.inventory?.items) {
         for (const inv of apiData.inventory.items) {
           if (partIds.includes(inv.partId)) {
