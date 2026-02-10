@@ -50,6 +50,8 @@ Deno.serve(async (req: Request) => {
 
     // STEP 2: Extract token and validate JWT
     const token = authHeader.replace('Bearer ', '');
+    console.log("🔑 Token extracted, length:", token.length);
+
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
       auth: {
         autoRefreshToken: false,
@@ -60,13 +62,20 @@ Deno.serve(async (req: Request) => {
     // Verify the user is authenticated by passing the token directly
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
+    console.log("🔍 Auth result:", {
+      hasUser: !!user,
+      hasError: !!authError,
+      errorMessage: authError?.message,
+      errorStatus: authError?.status
+    });
+
     if (authError || !user) {
-      console.error("❌ Invalid JWT:", authError?.message);
+      console.error("❌ Invalid JWT:", JSON.stringify(authError));
       return new Response(
         JSON.stringify({
-          code: 401,
-          message: "Authentication failed: invalid or missing Supabase session",
-          details: authError?.message || "Invalid JWT"
+          error: "Authentication failed: invalid or missing Supabase session",
+          message: `Invalid JWT: ${authError?.message || 'No user found'}`,
+          details: authError,
         }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
