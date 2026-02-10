@@ -123,10 +123,24 @@ Deno.serve(async (req: Request) => {
           try {
             const cached = await searchSanMarCache(supabaseAdmin, companyId, style);
             if (cached) {
+              console.log("✅ Found SanMar in cache");
               results.push(cached);
+            } else {
+              console.log("📞 Calling SanMar PromoStandards API...");
+              const apiResult = await searchSanMarCatalog(
+                supabaseAdmin,
+                supabaseUrl,
+                supabaseServiceKey,
+                companyId,
+                style
+              );
+              if (apiResult.results.length > 0) {
+                console.log("✅ Found SanMar via API");
+                results.push(...apiResult.results);
+              }
             }
           } catch (error: any) {
-            console.error("SanMar cache error:", error.message);
+            console.error("SanMar error:", error.message);
           }
         })()
       );
