@@ -63,18 +63,30 @@ Deno.serve(async (req: Request) => {
       }
       companyId = companyIdParam;
     } else {
-      // User JWT - validate and get company_id from profile
-      const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+      // User JWT - create user client to validate token
+      const supabaseUser = createClient(supabaseUrl, supabaseServiceRoleKey, {
+        global: {
+          headers: {
+            Authorization: authHeader
+          }
+        },
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      });
+
+      const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
 
       if (authError || !user) {
         console.error("Auth error:", authError);
         return new Response(
-          JSON.stringify({ error: "Unauthorized", details: authError?.message }),
+          JSON.stringify({ code: 401, message: "Invalid JWT" }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Get user's company_id
+      // Get user's company_id using admin client
       const { data: profile } = await supabaseAdmin
         .from("user_profiles")
         .select("company_id")
