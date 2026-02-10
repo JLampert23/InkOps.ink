@@ -2,7 +2,7 @@
  * SanMar Search Provider - PromoStandards API
  *
  * Uses SanMar's PromoStandards Web Services API directly
- * Caches results in database for faster subsequent searches
+ * Caches results in sanmar_product_cache and sanmar_media_cache tables
  */
 
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
@@ -11,9 +11,6 @@ import {
   type SanMarCredentials,
 } from "../_shared/sanmar-promostandards-client.ts";
 
-/**
- * Decrypt password using Web Crypto API
- */
 async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
   const encoder = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
@@ -89,9 +86,6 @@ export interface ProductResult {
   raw_data?: any;
 }
 
-/**
- * Search SanMar catalog using PromoStandards API
- */
 export async function searchSanMarCatalog(
   supabaseAdmin: any,
   supabaseUrl: string,
@@ -108,7 +102,6 @@ export async function searchSanMarCatalog(
   try {
     console.log(`🔍 Searching SanMar via PromoStandards API for: ${style}`);
 
-    // Get SanMar credentials from company settings
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from("company_settings")
       .select("sanmar_enabled, sanmar_promo_username, sanmar_promo_password_encrypted")
@@ -131,7 +124,6 @@ export async function searchSanMarCatalog(
       return { results, errors };
     }
 
-    // Decrypt the password using inline crypto
     let decryptedPassword = "";
     try {
       const encryptionKey = Deno.env.get("ENCRYPTION_KEY");
@@ -151,7 +143,6 @@ export async function searchSanMarCatalog(
       password: decryptedPassword,
     };
 
-    // Check cache first (if exists)
     const cachedData = await getCachedProduct(supabaseAdmin, companyId, style);
     if (cachedData) {
       console.log(`✅ Found cached SanMar data for ${style}`);
@@ -159,13 +150,10 @@ export async function searchSanMarCatalog(
       return { results, errors };
     }
 
-    // Fetch from live API - only fetch product data for faster search
     console.log(`📞 Fetching live data from SanMar PromoStandards API...`);
 
-    // Import individual functions for more control
     const { fetchSanMarProductData, fetchSanMarMedia } = await import("../_shared/sanmar-promostandards-client.ts");
 
-    // Only fetch product data and media (skip slow inventory/pricing calls)
     const [productResult, mediaResult] = await Promise.allSettled([
       fetchSanMarProductData(credentials, style),
       fetchSanMarMedia(credentials, style),
@@ -179,7 +167,6 @@ export async function searchSanMarCatalog(
 
     const productData = productResult.value;
 
-    // Check if product has no parts/colors
     if (!productData.parts || productData.parts.length === 0) {
       errors.push(`SanMar: Style ${style} not found or has no variants`);
       return { results, errors };
@@ -187,7 +174,6 @@ export async function searchSanMarCatalog(
 
     const mediaData = mediaResult.status === 'fulfilled' ? mediaResult.value : null;
 
-    // Build simplified API data structure
     const apiData = {
       success: true,
       styleNumber: style,
@@ -211,12 +197,10 @@ export async function searchSanMarCatalog(
       },
     };
 
-    // Transform API response to ProductResult
     const product = transformSanMarData(apiData);
     results.push(product);
 
-    // Cache the result for future searches
-    await cacheProduct(supabaseAdmin, companyId, apiData);
+    await cacheProduct(supabaseAdmin, companyId, style, productData, mediaData);
 
     console.log(`✅ Successfully fetched ${product.colors.length} colors from SanMar API`);
 
@@ -228,193 +212,120 @@ export async function searchSanMarCatalog(
   return { results, errors };
 }
 
-/**
- * Get cached product from database
- */
 async function getCachedProduct(
   supabaseAdmin: any,
   companyId: string,
   style: string
 ): Promise<ProductResult | null> {
   try {
-    const { data: styleData, error } = await supabaseAdmin
-      .from("sanmar_catalog_styles")
-      .select(`
-        *,
-        sanmar_catalog_products (
-          *
-        ),
-        sanmar_catalog_pricing (
-          *
-        )
-      `)
+    const cacheKey = `style:${style.toUpperCase()}`;
+
+    const { data: productCache } = await supabaseAdmin
+      .from("sanmar_product_cache")
+      .select("data, expires_at")
       .eq("company_id", companyId)
-      .ilike("style_number", style)
-      .eq("is_active", true)
+      .eq("cache_key", cacheKey)
+      .eq("cache_type", "style")
       .maybeSingle();
 
-    if (error || !styleData || !styleData.sanmar_catalog_products) {
+    if (!productCache) {
       return null;
     }
 
-    // Check if data is recent (less than 24 hours old)
-    const updatedAt = new Date(styleData.updated_at);
-    const now = new Date();
-    const hoursSinceUpdate = (now.getTime() - updatedAt.getTime()) / (1000 * 60 * 60);
-
-    if (hoursSinceUpdate > 24) {
-      console.log(`⏰ Cached data for ${style} is ${hoursSinceUpdate.toFixed(1)} hours old, refreshing...`);
+    if (new Date(productCache.expires_at) < new Date()) {
+      console.log(`⏰ Cache expired for ${style}`);
       return null;
     }
 
-    // Build color map from products
-    const colorMap = new Map<string, ColorOption>();
-    const pricingMap = new Map<string, any>();
+    const { data: mediaCache } = await supabaseAdmin
+      .from("sanmar_media_cache")
+      .select("data, expires_at")
+      .eq("company_id", companyId)
+      .eq("cache_key", cacheKey)
+      .eq("cache_type", "style")
+      .maybeSingle();
 
-    // Index pricing by SKU
-    if (styleData.sanmar_catalog_pricing) {
-      for (const price of styleData.sanmar_catalog_pricing) {
-        pricingMap.set(price.sku, price);
-      }
-    }
+    const productData = productCache.data;
+    const mediaData = mediaCache?.data || null;
 
-    for (const product of styleData.sanmar_catalog_products) {
-      const colorName = product.color_name || "Default";
-
-      if (!colorMap.has(colorName)) {
-        const pricing = pricingMap.get(product.sku);
-
-        colorMap.set(colorName, {
-          name: colorName,
-          code: product.color_code || "",
-          partIds: [],
-          sizes: [],
-          image_url: product.image_front || "",
-          pricing: pricing
-            ? {
-                wholesale: pricing.piece_price || 0,
-                retail: pricing.piece_price || 0,
-              }
-            : undefined,
-          stock: {},
-        });
-      }
-
-      const color = colorMap.get(colorName)!;
-      if (product.sku && !color.partIds?.includes(product.sku)) {
-        color.partIds?.push(product.sku);
-      }
-      if (product.size_name && !color.sizes?.includes(product.size_name)) {
-        color.sizes?.push(product.size_name);
-      }
-    }
-
-    return {
-      supplier: "sanmar",
-      style: styleData.style_number,
-      brand: styleData.brand_name || "",
-      description: styleData.style_name || styleData.product_description || "",
-      category: styleData.category || "",
-      colors: Array.from(colorMap.values()),
-      cached: true,
-      last_synced: styleData.updated_at,
+    const apiData = {
+      success: true,
+      styleNumber: style,
+      partId: null,
+      style: productData,
+      inventory: { items: [] },
+      pricing: { parts: [] },
+      media: mediaData || {
+        images: [],
+        views: {
+          front: null,
+          rear: null,
+          side: null,
+          lifestyle: null,
+          frontImages: [],
+          rearImages: [],
+          sideImages: [],
+          lifestyleImages: [],
+          otherImages: [],
+        }
+      },
     };
+
+    const product = transformSanMarData(apiData);
+    product.cached = true;
+    product.last_synced = productCache.expires_at;
+
+    return product;
   } catch (error) {
     console.error("Error getting cached product:", error);
     return null;
   }
 }
 
-/**
- * Cache product data in database
- */
 async function cacheProduct(
   supabaseAdmin: any,
   companyId: string,
-  apiData: any
+  style: string,
+  productData: any,
+  mediaData: any
 ): Promise<void> {
   try {
-    const style = apiData.style;
+    const cacheKey = `style:${style.toUpperCase()}`;
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 24);
 
-    // Upsert style
-    const { data: styleRow, error: styleError } = await supabaseAdmin
-      .from("sanmar_catalog_styles")
-      .upsert(
-        {
-          company_id: companyId,
-          style_number: style.styleNumber,
-          style_name: style.productName,
-          brand_name: style.productBrand,
-          category: style.productCategory,
-          product_description: style.description,
-          is_active: true,
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: "company_id,style_number",
-        }
-      )
-      .select()
-      .single();
-
-    if (styleError || !styleRow) {
-      console.error("Failed to cache style:", styleError);
-      return;
-    }
-
-    // Cache products (SKUs)
-    const products = [];
-    for (const part of style.parts) {
-      products.push({
+    await supabaseAdmin
+      .from("sanmar_product_cache")
+      .upsert({
         company_id: companyId,
-        style_id: styleRow.id,
-        unique_key: part.partId,
-        style_number: style.styleNumber,
-        color_name: part.colorName,
-        color_code: part.hex,
-        size_name: part.labelSize,
-        sku: part.partId,
-        image_front: apiData.media?.views?.front || "",
+        cache_key: cacheKey,
+        cache_type: "style",
+        data: productData,
+        expires_at: expiresAt.toISOString(),
+      }, {
+        onConflict: "company_id,cache_key"
       });
-    }
 
-    if (products.length > 0) {
-      await supabaseAdmin.from("sanmar_catalog_products").upsert(products, {
-        onConflict: "company_id,unique_key",
-      });
-    }
-
-    // Cache pricing
-    if (apiData.pricing?.parts) {
-      const pricing = [];
-      for (const part of apiData.pricing.parts) {
-        if (part.prices && part.prices.length > 0) {
-          pricing.push({
-            company_id: companyId,
-            style_id: styleRow.id,
-            sku: part.partId,
-            piece_price: part.prices[0].price,
-            case_price: part.prices[0].price,
-          });
-        }
-      }
-
-      if (pricing.length > 0) {
-        await supabaseAdmin.from("sanmar_catalog_pricing").upsert(pricing, {
-          onConflict: "company_id,sku",
+    if (mediaData) {
+      await supabaseAdmin
+        .from("sanmar_media_cache")
+        .upsert({
+          company_id: companyId,
+          cache_key: cacheKey,
+          cache_type: "style",
+          data: mediaData,
+          expires_at: expiresAt.toISOString(),
+        }, {
+          onConflict: "company_id,cache_key"
         });
-      }
     }
 
-    console.log(`💾 Cached ${products.length} products for ${style.styleNumber}`);
+    console.log(`💾 Cached product and media data for ${style}`);
   } catch (error) {
     console.error("Error caching product:", error);
   }
 }
 
-/**
- * Transform PromoStandards API response to ProductResult
- */
 function transformSanMarData(apiData: any): ProductResult {
   const style = apiData.style;
   const colors: ColorOption[] = [];
