@@ -30,83 +30,57 @@ Deno.serve(async (req: Request) => {
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    console.log("🔧 SanMar API Edge Function starting...");
-
-    // STEP 1: Validate JWT is present
-    const authHeader = req.headers.get("Authorization");
-    console.log("🔑 Authorization header:", authHeader ? "present" : "missing");
-
-    if (!authHeader) {
-      console.error("❌ Missing JWT");
-      return new Response(
-        JSON.stringify({
-          code: 401,
-          message: "Authentication failed: invalid or missing Supabase session",
-          details: "Missing Authorization header"
-        }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // STEP 2: Extract token and validate JWT
-    const token = authHeader.replace('Bearer ', '');
-    console.log("🔑 Token extracted, length:", token.length);
-
-    // Use anon key for user token validation (tokens are issued against anon key)
-    const userAuthClient = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
-
-    // Verify the user is authenticated by passing the token directly
-    const { data: { user }, error: authError } = await userAuthClient.auth.getUser(token);
-
-    console.log("🔍 Auth result:", {
-      hasUser: !!user,
-      hasError: !!authError,
-      errorMessage: authError?.message,
-      errorStatus: authError?.status
-    });
-
-    if (authError || !user) {
-      console.error("❌ Invalid JWT:", JSON.stringify(authError));
-      return new Response(
-        JSON.stringify({
-          error: "Authentication failed: invalid or missing Supabase session",
-          message: `Invalid JWT: ${authError?.message || 'No user found'}`,
-          details: authError,
-        }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const userId = user.id;
-    console.log("✅ User authenticated:", userId);
-
-    // STEP 3: Get user's company_id using service role for direct database access
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from("user_profiles")
-      .select("company_id")
-      .eq("id", userId)
-      .maybeSingle();
 
-    if (profileError || !profile?.company_id) {
-      console.error("❌ Company not found for user:", userId);
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
       return new Response(
-        JSON.stringify({
-          code: 404,
-          message: "Company not found",
-          details: "User profile does not have an associated company"
-        }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ code: 401, message: "Missing Authorization header" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const companyId = profile.company_id;
-    console.log("✅ Company ID:", companyId);
+    const token = authHeader.replace('Bearer ', '');
+    const url = new URL(req.url);
+
+    let companyId: string;
+
+    if (token === supabaseServiceRoleKey) {
+      const qsCompanyId = url.searchParams.get("companyId");
+      if (!qsCompanyId) {
+        return new Response(
+          JSON.stringify({ code: 400, message: "companyId query param required for service-role calls" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      companyId = qsCompanyId;
+    } else {
+      const userAuthClient = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: { autoRefreshToken: false, persistSession: false }
+      });
+      const { data: { user }, error: authError } = await userAuthClient.auth.getUser(token);
+
+      if (authError || !user) {
+        return new Response(
+          JSON.stringify({ code: 401, message: `Invalid JWT: ${authError?.message || 'No user found'}` }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { data: profile } = await supabaseAdmin
+        .from("user_profiles")
+        .select("company_id")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (!profile?.company_id) {
+        return new Response(
+          JSON.stringify({ code: 404, message: "Company not found for user" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      companyId = profile.company_id;
+    }
 
     // Get SanMar PromoStandards credentials from company_settings
     const { data: settings } = await supabaseAdmin
@@ -156,8 +130,6 @@ Deno.serve(async (req: Request) => {
     console.log(`🔑 SanMar credentials loaded for company ${companyId}`);
     console.log(`👤 Username: ${credentials.id}`);
 
-    // Parse request parameters
-    const url = new URL(req.url);
     const action = url.searchParams.get("action") || "unified";
     const style = url.searchParams.get("style");
     const partId = url.searchParams.get("partId") || undefined;
