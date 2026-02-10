@@ -155,6 +155,8 @@ function buildSOAPEnvelope(
       <shar:wsVersion>${version}</shar:wsVersion>
       <shar:id>${credentials.id}</shar:id>
       <shar:password>${credentials.password}</shar:password>
+      <shar:localizationCountry>US</shar:localizationCountry>
+      <shar:localizationLanguage>en</shar:localizationLanguage>
       ${payload}
     </ns:${operation}Request>
   </soapenv:Body>
