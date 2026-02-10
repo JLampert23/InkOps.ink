@@ -183,10 +183,11 @@ Deno.serve(async (req: Request) => {
               results.push(...apiResult.results);
             }
             if (apiResult.errors.length > 0) {
-              console.log(`⚠️ SanMar errors: ${apiResult.errors.join(", ")}`);
+              console.error(`⚠️ SanMar ERRORS: ${JSON.stringify(apiResult.errors)}`);
             }
           } catch (error: any) {
-            console.error("❌ SanMar error:", error.message, error.stack);
+            console.error("❌ SanMar search exception:", error.message);
+            console.error("❌ Stack trace:", error.stack);
           }
         })()
       );
