@@ -2105,7 +2105,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
         console.error('❌ SanMar connection failed:', {
           status: response.status,
-          errorData
+          errorData,
+          errorMessage: errorData.error,
+          errorDetails: errorData.message,
+          fullResponse: JSON.stringify(errorData, null, 2)
         });
 
         // Check for JWT expiration
@@ -2119,7 +2122,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
         setSanmarTestResult({
           success: false,
-          error: errorData.error || `API connection failed (${response.status})`,
+          error: errorData.error || errorData.message || `API connection failed (${response.status})`,
         });
       }
     } catch (err) {
