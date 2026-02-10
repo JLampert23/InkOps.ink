@@ -2086,6 +2086,16 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           status: response.status,
           errorData
         });
+
+        // Check for JWT expiration
+        if (response.status === 401 && errorData.message?.includes('Invalid JWT')) {
+          setSanmarTestResult({
+            success: false,
+            error: 'Your session has expired. Please sign out and sign back in to continue.',
+          });
+          return;
+        }
+
         setSanmarTestResult({
           success: false,
           error: errorData.error || `API connection failed (${response.status})`,
@@ -2183,6 +2193,16 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         } catch {
           errorData = { error: errorText || 'Unknown error' };
         }
+
+        // Check for JWT expiration
+        if (response.status === 401 && (errorData.message?.includes('Invalid JWT') || errorText.includes('Invalid JWT'))) {
+          setSsaTestResult({
+            success: false,
+            error: 'Your session has expired. Please sign out and sign back in to continue.',
+          });
+          return;
+        }
+
         setSsaTestResult({
           success: false,
           error: errorData.error || `Connection failed (${response.status})`,
