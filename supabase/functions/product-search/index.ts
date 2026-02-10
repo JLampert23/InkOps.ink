@@ -121,23 +121,19 @@ Deno.serve(async (req: Request) => {
       searchPromises.push(
         (async () => {
           try {
-            const cached = await searchSanMarCache(supabaseAdmin, companyId, style);
-            if (cached) {
-              console.log("✅ Found SanMar in cache");
-              results.push(cached);
-            } else {
-              console.log("📞 Calling SanMar PromoStandards API...");
-              const apiResult = await searchSanMarCatalog(
-                supabaseAdmin,
-                supabaseUrl,
-                supabaseServiceKey,
-                companyId,
-                style
-              );
-              if (apiResult.results.length > 0) {
-                console.log("✅ Found SanMar via API");
-                results.push(...apiResult.results);
-              }
+            console.log("🔍 Searching SanMar...");
+            const apiResult = await searchSanMarCatalog(
+              supabaseAdmin,
+              supabaseUrl,
+              supabaseServiceKey,
+              companyId,
+              style
+            );
+            if (apiResult.results.length > 0) {
+              console.log(`✅ Found ${apiResult.results.length} SanMar result(s)`);
+              results.push(...apiResult.results);
+            } else if (apiResult.errors.length > 0) {
+              console.log(`⚠️ SanMar errors: ${apiResult.errors.join(", ")}`);
             }
           } catch (error: any) {
             console.error("SanMar error:", error.message);
