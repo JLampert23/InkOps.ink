@@ -679,10 +679,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     try {
       setLoadingStatuses(true);
 
-      // Refresh the session to get a fresh access token
-      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
+      // Get fresh session token
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !session) {
-        console.warn('Unable to refresh session for status loading, falling back to local data');
+        console.warn('Unable to get session for status loading, falling back to local data');
         const { data, error } = await supabase
           .from('printavo_invoices_calculated')
           .select('status')
@@ -1068,15 +1068,23 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setTestResult(null);
 
       // Get fresh session token
-      const session = await getFreshSession();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
+      if (!token) {
+        setTestResult({
+          success: false,
+          error: 'No authentication token available. Please sign in again.',
+        });
+        return;
+      }
 
       // Call the edge function with manual fetch to get full error details
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-printavo`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({}),
       });
@@ -1868,18 +1876,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setTestingSuppliers(true);
       setSupplierTestResult(null);
 
-      // Get a fresh session token
-      let session;
-      try {
-        session = await getFreshSession();
-      } catch (err) {
-        setSupplierTestResult({
-          success: false,
-          error: err instanceof Error ? err.message : 'Authentication error',
-        });
-        return;
-      }
-
       if (!companySettings?.id) {
         setSupplierTestResult({
           success: false,
@@ -1899,6 +1895,18 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
+      // Get fresh session token
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
+      if (!token) {
+        setSupplierTestResult({
+          success: false,
+          error: 'No authentication token available. Please sign in again.',
+        });
+        return;
+      }
+
       const results: string[] = [];
       let hasError = false;
 
@@ -1908,9 +1916,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           const response = await fetch(
             `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sanmar-api?action=search&style=PC54`,
             {
+              method: 'GET',
               headers: {
-                'Authorization': `Bearer ${session.access_token}`,
-                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
               },
             }
           );
@@ -1999,17 +2008,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setTestingSanmar(true);
       setSanmarTestResult(null);
 
-      let session;
-      try {
-        session = await getFreshSession();
-      } catch (err) {
-        setSanmarTestResult({
-          success: false,
-          error: err instanceof Error ? err.message : 'Authentication error',
-        });
-        return;
-      }
-
       if (!companySettings?.id) {
         setSanmarTestResult({
           success: false,
@@ -2028,12 +2026,25 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
+      // Get fresh session token
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
+      if (!token) {
+        setSanmarTestResult({
+          success: false,
+          error: 'No authentication token available. Please sign in again.',
+        });
+        return;
+      }
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sanmar-api?action=product&style=PC54`,
         {
+          method: 'GET',
           headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
           },
         }
       );
@@ -2076,17 +2087,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setTestingSSA(true);
       setSsaTestResult(null);
 
-      let session;
-      try {
-        session = await getFreshSession();
-      } catch (err) {
-        setSsaTestResult({
-          success: false,
-          error: err instanceof Error ? err.message : 'Authentication error',
-        });
-        return;
-      }
-
       if (!companySettings?.id) {
         setSsaTestResult({
           success: false,
@@ -2105,12 +2105,25 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
+      // Get fresh session token
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
+      if (!token) {
+        setSsaTestResult({
+          success: false,
+          error: 'No authentication token available. Please sign in again.',
+        });
+        return;
+      }
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ssactivewear-api?action=brands`,
         {
+          method: 'GET',
           headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
           },
         }
       );
@@ -2150,17 +2163,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setSyncingCatalog(true);
       setCatalogSyncResult(null);
 
-      let session;
-      try {
-        session = await getFreshSession();
-      } catch (err) {
-        setCatalogSyncResult({
-          success: false,
-          error: err instanceof Error ? err.message : 'Authentication error',
-        });
-        return;
-      }
-
       if (!companySettings?.id) {
         setCatalogSyncResult({
           success: false,
@@ -2179,13 +2181,24 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
+      // Get fresh session token
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
+      if (!token) {
+        setCatalogSyncResult({
+          success: false,
+          error: 'No authentication token available. Please sign in again.',
+        });
+        return;
+      }
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-ss-catalog`,
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({}),
@@ -2281,24 +2294,25 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setTestingResend(true);
       setResendTestResult(null);
 
-      const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
-      if (refreshError || !session?.access_token) {
-        console.error('Session refresh failed:', refreshError);
-        throw new Error('Your session has expired. Please refresh the page and try again.');
+      // Get fresh session token
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
+      if (!token) {
+        throw new Error('No authentication token available. Please sign in again.');
       }
 
       if (!user?.email) {
         throw new Error('User email not found');
       }
 
-      console.log('Testing Resend with refreshed token...');
+      console.log('Testing Resend with fresh token...');
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           to: user.email,
