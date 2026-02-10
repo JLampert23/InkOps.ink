@@ -283,18 +283,16 @@ async function callPromoStandardsService(
   throw lastError || new Error('PromoStandards request failed');
 }
 
-/**
- * Extracts a single XML tag value
- */
 function getXmlValue(xmlText: string, tagName: string): string | null {
-  const regex = new RegExp(`<[^:]*:?${tagName}[^>]*>([^<]*)<\/[^:]*:?${tagName}>`, 'i');
+  const regex = new RegExp(`<(?:[^:>]*:)?${tagName}(?:\\s[^>]*)?>([^<]*)<\\/(?:[^:>]*:)?${tagName}>`, 'i');
   const match = xmlText.match(regex);
   return match ? match[1].trim() : null;
 }
 
-/**
- * Extracts all occurrences of an XML pattern
- */
+function nsElementPattern(tagName: string): RegExp {
+  return new RegExp(`<(?:[^:>]*:)?${tagName}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/(?:[^:>]*:)?${tagName}>`, 'gi');
+}
+
 function getAllXmlMatches(xmlText: string, pattern: RegExp): RegExpMatchArray[] {
   const matches = [];
   let match;
@@ -342,9 +340,12 @@ export async function fetchSanMarProductData(
     colors: []
   };
 
-  // Parse parts (handle namespaced tags like ns:Part or shar:Part)
-  const partPattern = /<[^:]*:?Part[^>]*>([\s\S]*?)<\/[^:]*:?Part>/gi;
+  console.log(`📄 Response XML length: ${responseXml.length}`);
+  console.log(`📄 Response preview: ${responseXml.substring(0, 300)}`);
+
+  const partPattern = nsElementPattern("ProductPart");
   const partMatches = getAllXmlMatches(responseXml, partPattern);
+  console.log(`📄 ProductPart matches found: ${partMatches.length}`);
 
   styleData.parts = partMatches.map(match => {
     const partXml = match[1];
@@ -408,7 +409,7 @@ export async function fetchSanMarInventory(
 
   // Parse inventory items
   const inventoryData: SanMarInventoryData = { items: [] };
-  const inventoryPattern = /<Inventory>([\s\S]*?)<\/Inventory>/gi;
+  const inventoryPattern = nsElementPattern("Inventory");
   const inventoryMatches = getAllXmlMatches(responseXml, inventoryPattern);
 
   inventoryData.items = inventoryMatches.map(match => {
@@ -456,12 +457,12 @@ export async function fetchSanMarPricing(
 
   // Parse pricing data
   const pricingData: SanMarPricingData = { parts: [] };
-  const partPattern = /<Part>([\s\S]*?)<\/Part>/gi;
-  const partMatches = getAllXmlMatches(responseXml, partPattern);
+  const pricingPartPattern = nsElementPattern("Part");
+  const partMatches = getAllXmlMatches(responseXml, pricingPartPattern);
 
   pricingData.parts = partMatches.map(match => {
     const partXml = match[1];
-    const pricePattern = /<Price>([\s\S]*?)<\/Price>/gi;
+    const pricePattern = nsElementPattern("Price");
     const priceMatches = getAllXmlMatches(partXml, pricePattern);
 
     return {
@@ -528,7 +529,7 @@ export async function fetchSanMarMedia(
     }
   };
 
-  const mediaPattern = /<MediaContent>([\s\S]*?)<\/MediaContent>/gi;
+  const mediaPattern = nsElementPattern("MediaContent");
   const mediaMatches = getAllXmlMatches(responseXml, mediaPattern);
 
   mediaData.images = mediaMatches.map(match => {
