@@ -983,6 +983,11 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       const data = await response.json();
       console.log('📦 Product search response:', data);
 
+      // Log diagnostics if present
+      if (data.diagnostics) {
+        console.log('🔍 DIAGNOSTICS:', JSON.stringify(data.diagnostics, null, 2));
+      }
+
       // Log errors if present
       if (data.errors && data.errors.length > 0) {
         console.error('Product search errors:', data.errors);
