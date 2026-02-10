@@ -394,12 +394,38 @@ export async function fetchSanMarProductData(
     console.log(`📄 Sample parsed parts: ${JSON.stringify(sampleParts)}`);
   }
 
+  const allColorNameRegex = /<(?:[^:>]*:)?colorName(?:\s[^>]*)?>([^<]*)<\/(?:[^:>]*:)?colorName>/gi;
+  const allXmlColorNames: string[] = [];
+  let colorNameMatch;
+  while ((colorNameMatch = allColorNameRegex.exec(responseXml)) !== null) {
+    allXmlColorNames.push(colorNameMatch[1].trim());
+  }
+  const uniqueXmlColors = [...new Set(allXmlColorNames)];
+
+  const sampleIndices = [0, 12, 24, 36, partMatches.length - 1].filter(i => i < partMatches.length);
+  const matchSamples = sampleIndices.map(idx => {
+    const m = partMatches[idx];
+    return {
+      index: idx,
+      matchPosition: m.index,
+      contentLength: m[1].length,
+      contentPreview: m[1].substring(0, 600),
+      extractedPartId: getXmlValue(m[1], "partId"),
+      extractedColorName: getXmlValue(m[1], "colorName"),
+      extractedLabelSize: getXmlValue(m[1], "labelSize"),
+    };
+  });
+
   (styleData as any)._debug = {
     xmlLength: responseXml.length,
+    xmlPreview: responseXml.substring(0, 1500),
     productPartMatches: partMatches.length,
-    firstPartSample: partMatches.length > 0 ? partMatches[0][1].substring(0, 300) : null,
+    matchSamples,
+    allColorNamesCountInXml: allXmlColorNames.length,
+    uniqueColorsInEntireXml: uniqueXmlColors.slice(0, 30),
     sampleParts: styleData.parts.slice(0, 3),
-    uniqueColors: [...new Set(styleData.parts.map(p => p.colorName))].slice(0, 10),
+    uniqueParsedColors: [...new Set(styleData.parts.map(p => p.colorName))].slice(0, 10),
+    uniqueSizes: [...new Set(styleData.parts.map(p => p.labelSize))],
   };
 
   return styleData;
