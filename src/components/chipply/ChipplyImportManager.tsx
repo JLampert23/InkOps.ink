@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Settings, FileText, Package, ArrowRight } from 'lucide-react';
+import { ChipplyIntegrationSettings } from './ChipplyIntegrationSettings';
 
 type ChipplyView = 'home' | 'settings' | 'imports';
 
@@ -8,7 +9,7 @@ export function ChipplyImportManager() {
 
   if (activeView === 'settings') {
     return (
-      <ChipplySettings onBack={() => setActiveView('home')} />
+      <ChipplyIntegrationSettings onBack={() => setActiveView('home')} />
     );
   }
 
@@ -58,37 +59,6 @@ export function ChipplyImportManager() {
             Configure your endpoint to begin receiving imports.
           </p>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function ChipplySettings({ onBack }: { onBack: () => void }) {
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <button
-          onClick={onBack}
-          className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-medium flex items-center gap-1"
-        >
-          <ArrowRight className="w-4 h-4 rotate-180" />
-          Back
-        </button>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Integration Settings
-        </h1>
-      </div>
-
-      <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-sm p-10 flex flex-col items-center justify-center text-center">
-        <div className="w-14 h-14 rounded-full bg-gray-100 dark:bg-slate-700 flex items-center justify-center mb-4">
-          <Settings className="w-7 h-7 text-gray-400 dark:text-gray-500" />
-        </div>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-          Settings coming soon
-        </h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400 max-w-md">
-          Chipply integration settings will be configured here.
-        </p>
       </div>
     </div>
   );
