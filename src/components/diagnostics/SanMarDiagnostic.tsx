@@ -19,17 +19,48 @@ export default function SanMarDiagnostic() {
       const productDataUrl = `${baseUrl}?style=${encodeURIComponent(style)}&company_id=${encodeURIComponent(companyId)}&service=product-data`;
       const sellableUrl = `${baseUrl}?style=${encodeURIComponent(style)}&company_id=${encodeURIComponent(companyId)}&service=sellable`;
 
+      // Test ProductDataService first
       console.log('Testing ProductDataService...');
-      const productDataResponse = await fetch(productDataUrl);
-      const productData = await productDataResponse.json();
-      setProductDataResult(productData);
+      try {
+        const productDataResponse = await fetch(productDataUrl);
+        if (!productDataResponse.ok) {
+          const errorText = await productDataResponse.text();
+          setProductDataResult({
+            error: `HTTP ${productDataResponse.status}: ${productDataResponse.statusText}`,
+            details: errorText
+          });
+        } else {
+          const productData = await productDataResponse.json();
+          setProductDataResult(productData);
+        }
+      } catch (error: any) {
+        console.error('ProductDataService error:', error);
+        setProductDataResult({ error: error.message });
+      }
 
+      // Wait 2 seconds before testing second endpoint to avoid worker limits
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Test ProductSellableService
       console.log('Testing ProductSellableService...');
-      const sellableResponse = await fetch(sellableUrl);
-      const sellableData = await sellableResponse.json();
-      setSellableResult(sellableData);
+      try {
+        const sellableResponse = await fetch(sellableUrl);
+        if (!sellableResponse.ok) {
+          const errorText = await sellableResponse.text();
+          setSellableResult({
+            error: `HTTP ${sellableResponse.status}: ${sellableResponse.statusText}`,
+            details: errorText
+          });
+        } else {
+          const sellableData = await sellableResponse.json();
+          setSellableResult(sellableData);
+        }
+      } catch (error: any) {
+        console.error('ProductSellableService error:', error);
+        setSellableResult({ error: error.message });
+      }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error:', error);
       setProductDataResult({ error: error.message });
     } finally {

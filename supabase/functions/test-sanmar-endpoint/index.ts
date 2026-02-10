@@ -68,17 +68,35 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const decryptResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/crypto-service`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-      },
-      body: JSON.stringify({
-        action: "decrypt",
-        token: settings.sanmar_promo_password_encrypted,
-      }),
-    });
+    // Optimize: Decrypt with timeout
+    const decryptController = new AbortController();
+    const decryptTimeout = setTimeout(() => decryptController.abort(), 5000);
+
+    let decryptResponse;
+    try {
+      decryptResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/crypto-service`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+        },
+        body: JSON.stringify({
+          action: "decrypt",
+          token: settings.sanmar_promo_password_encrypted,
+        }),
+        signal: decryptController.signal,
+      });
+    } catch (error: any) {
+      clearTimeout(decryptTimeout);
+      if (error.name === 'AbortError') {
+        return new Response(
+          JSON.stringify({ error: "Decrypt timeout" }),
+          { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      throw error;
+    }
+    clearTimeout(decryptTimeout);
 
     if (!decryptResponse.ok) {
       return new Response(
