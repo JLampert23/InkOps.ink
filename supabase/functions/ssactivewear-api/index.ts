@@ -116,6 +116,11 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+    console.log("🔧 Edge Function environment:", {
+      supabaseUrl: supabaseUrl?.substring(0, 40) + "...",
+      hasServiceRole: !!supabaseServiceRoleKey
+    });
+
     const authHeader = req.headers.get("Authorization");
 
     if (!authHeader) {
@@ -128,6 +133,12 @@ Deno.serve(async (req: Request) => {
     // Check if it's a service role key (internal call) or user JWT
     const token = authHeader.replace("Bearer ", "");
     const isServiceRoleKey = token === supabaseServiceRoleKey;
+
+    console.log("🔑 Auth check:", {
+      tokenLength: token.length,
+      tokenStart: token.substring(0, 20),
+      isServiceRoleKey
+    });
 
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
       auth: {
@@ -153,10 +164,13 @@ Deno.serve(async (req: Request) => {
     } else {
       // User JWT - validate using anon key client with user's JWT
       console.log("User JWT - validating token");
-      console.log("Auth header present:", !!authHeader);
-      console.log("Token length:", token.length);
 
       const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+      console.log("🔧 Using anon key:", {
+        hasAnonKey: !!supabaseAnonKey,
+        anonKeyLength: supabaseAnonKey?.length
+      });
+
       const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
         global: { headers: { Authorization: authHeader } },
         auth: {
@@ -165,19 +179,26 @@ Deno.serve(async (req: Request) => {
         }
       });
 
+      console.log("🔍 Attempting JWT validation...");
       const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
 
       if (authError || !user) {
-        console.error("❌ JWT validation failed");
-        console.error("Auth error:", authError);
-        console.error("Error message:", authError?.message);
-        console.error("Error status:", authError?.status);
+        console.error("❌ JWT validation failed:", {
+          error: authError?.message,
+          status: authError?.status,
+          name: authError?.name,
+          hasUser: !!user
+        });
         return new Response(
           JSON.stringify({
             code: 401,
             message: "Invalid JWT",
             error: "Unauthorized",
-            details: authError?.message
+            details: authError?.message,
+            debugInfo: {
+              errorName: authError?.name,
+              errorStatus: authError?.status
+            }
           }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );

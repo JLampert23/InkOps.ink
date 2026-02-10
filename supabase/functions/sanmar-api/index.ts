@@ -30,6 +30,12 @@ Deno.serve(async (req: Request) => {
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+    console.log("🔧 Edge Function environment:", {
+      supabaseUrl: supabaseUrl?.substring(0, 40) + "...",
+      hasAnonKey: !!supabaseAnonKey,
+      anonKeyLength: supabaseAnonKey?.length
+    });
+
     // Get JWT from Authorization header
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
@@ -38,6 +44,13 @@ Deno.serve(async (req: Request) => {
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    const token = authHeader.replace("Bearer ", "");
+    console.log("🔑 Received JWT:", {
+      tokenLength: token.length,
+      tokenStart: token.substring(0, 20),
+      authHeaderPresent: !!authHeader
+    });
 
     // Create Supabase client with user's JWT for auth context
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -50,16 +63,26 @@ Deno.serve(async (req: Request) => {
       }
     });
 
+    console.log("🔍 Attempting JWT validation...");
     // Get authenticated user from JWT (automatically validated by Supabase)
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      console.error("❌ JWT validation failed:", authError?.message);
+      console.error("❌ JWT validation failed:", {
+        error: authError?.message,
+        status: authError?.status,
+        name: authError?.name,
+        hasUser: !!user
+      });
       return new Response(
         JSON.stringify({
           code: 401,
           message: "Invalid JWT",
-          details: authError?.message
+          details: authError?.message,
+          debugInfo: {
+            errorName: authError?.name,
+            errorStatus: authError?.status
+          }
         }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
