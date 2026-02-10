@@ -237,19 +237,73 @@ Deno.serve(async (req: Request) => {
 
     switch (action) {
       case "brands": {
-        return new Response(
-          JSON.stringify({
-            success: true,
-            supplier: "ssactivewear",
-            action,
-            message: "SSActivewear connection verified. Use 'product' action to search products.",
-            authenticated: true,
-          }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" }
+        // Test actual connection by fetching a known product
+        const testProductId = "PC54";
+
+        const soapBody = `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
+  <shar:wsVersion>2.0.0</shar:wsVersion>
+  <shar:id>${credentials.accountNumber}</shar:id>
+  <shar:password>${decryptedApiKey}</shar:password>
+  <shar:productId>${testProductId}</shar:productId>
+</ns2:GetProductRequest>`;
+
+        try {
+          const xmlResponse = await makePromoStandardsRequest(
+            PROMOSTANDARDS_ENDPOINTS.productData,
+            "getProduct",
+            soapBody,
+            credentials.accountNumber,
+            decryptedApiKey
+          );
+
+          const parseResult = parseXmlResponse(xmlResponse);
+
+          if (!parseResult.success) {
+            return new Response(
+              JSON.stringify({
+                success: false,
+                supplier: "ssactivewear",
+                action,
+                error: `Connection test failed: ${parseResult.error?.description}`,
+                errorCode: parseResult.error?.code,
+              }),
+              {
+                status: 200,
+                headers: { ...corsHeaders, "Content-Type": "application/json" }
+              }
+            );
           }
-        );
+
+          const productName = getXmlValue(parseResult.xmlText!, "productName");
+
+          return new Response(
+            JSON.stringify({
+              success: true,
+              supplier: "ssactivewear",
+              action,
+              message: `SSActivewear PromoStandards API connected! Test product found: ${productName || testProductId}`,
+              authenticated: true,
+            }),
+            {
+              status: 200,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            }
+          );
+        } catch (error: any) {
+          console.error("Brands/test connection error:", error);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              supplier: "ssactivewear",
+              action,
+              error: `Connection test failed: ${error.message}`,
+            }),
+            {
+              status: 200,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            }
+          );
+        }
       }
 
       case "product":
