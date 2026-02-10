@@ -460,7 +460,7 @@ export class ProductionWorkflowService {
       return { data, error: null };
     } catch (error) {
       console.error('Error fetching QC inspections:', error);
-      return { data, null, error };
+      return { data: null, error };
     }
   }
 
