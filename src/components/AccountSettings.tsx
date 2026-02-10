@@ -6178,53 +6178,52 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       </button>
                     </div>
 
-                        {ssaTestResult && (
-                          <div className={`p-4 rounded-lg border ${ssaTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
-                            <div className="flex items-start gap-3">
-                              <div className={`flex-shrink-0 w-6 h-6 rounded-full ${ssaTestResult.success ? 'bg-green-500' : 'bg-red-500'} flex items-center justify-center text-white text-sm font-bold`}>
-                                {ssaTestResult.success ? '✓' : '✕'}
-                              </div>
-                              <div className="flex-1">
-                                <h4 className={`font-medium ${ssaTestResult.success ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'}`}>
-                                  {ssaTestResult.success ? 'Connection Successful!' : 'Connection Failed'}
-                                </h4>
-                                <p className={`text-sm mt-1 ${ssaTestResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
-                                  {ssaTestResult.message || ssaTestResult.error}
-                                </p>
-                              </div>
-                            </div>
+                    {ssaTestResult && (
+                      <div className={`p-4 rounded-lg border ${ssaTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
+                        <div className="flex items-start gap-3">
+                          <div className={`flex-shrink-0 w-6 h-6 rounded-full ${ssaTestResult.success ? 'bg-green-500' : 'bg-red-500'} flex items-center justify-center text-white text-sm font-bold`}>
+                            {ssaTestResult.success ? '✓' : '✕'}
                           </div>
-                        )}
+                          <div className="flex-1">
+                            <h4 className={`font-medium ${ssaTestResult.success ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'}`}>
+                              {ssaTestResult.success ? 'Connection Successful!' : 'Connection Failed'}
+                            </h4>
+                            <p className={`text-sm mt-1 ${ssaTestResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
+                              {ssaTestResult.message || ssaTestResult.error}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
-                        {catalogSyncResult && (
-                          <div className={`p-4 rounded-lg border ${catalogSyncResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
-                            <div className="flex items-start gap-3">
-                              <div className={`flex-shrink-0 w-6 h-6 rounded-full ${catalogSyncResult.success ? 'bg-green-500' : 'bg-red-500'} flex items-center justify-center text-white text-sm font-bold`}>
-                                {catalogSyncResult.success ? '✓' : '✕'}
-                              </div>
-                              <div className="flex-1">
-                                <h4 className={`font-medium ${catalogSyncResult.success ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'}`}>
-                                  {catalogSyncResult.success ? 'Catalog Sync Successful!' : 'Catalog Sync Failed'}
-                                </h4>
-                                <p className={`text-sm mt-1 ${catalogSyncResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
-                                  {catalogSyncResult.message || catalogSyncResult.error}
-                                </p>
-                                {catalogSyncResult.success && catalogSyncResult.details && (
-                                  <div className="mt-2 text-xs space-y-1 text-green-700 dark:text-green-300">
-                                    <p>Total Companies: {catalogSyncResult.details.totalCompanies || 0}</p>
-                                    <p>Total Styles: {catalogSyncResult.details.totalStyles || 0}</p>
-                                    {catalogSyncResult.details.errors && catalogSyncResult.details.errors.length > 0 && (
-                                      <p className="text-orange-600 dark:text-orange-400">
-                                        {catalogSyncResult.details.errors.length} error(s) occurred
-                                      </p>
-                                    )}
-                                  </div>
+                    {catalogSyncResult && (
+                      <div className={`p-4 rounded-lg border ${catalogSyncResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
+                        <div className="flex items-start gap-3">
+                          <div className={`flex-shrink-0 w-6 h-6 rounded-full ${catalogSyncResult.success ? 'bg-green-500' : 'bg-red-500'} flex items-center justify-center text-white text-sm font-bold`}>
+                            {catalogSyncResult.success ? '✓' : '✕'}
+                          </div>
+                          <div className="flex-1">
+                            <h4 className={`font-medium ${catalogSyncResult.success ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'}`}>
+                              {catalogSyncResult.success ? 'Catalog Sync Successful!' : 'Catalog Sync Failed'}
+                            </h4>
+                            <p className={`text-sm mt-1 ${catalogSyncResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
+                              {catalogSyncResult.message || catalogSyncResult.error}
+                            </p>
+                            {catalogSyncResult.success && catalogSyncResult.details && (
+                              <div className="mt-2 text-xs space-y-1 text-green-700 dark:text-green-300">
+                                <p>Total Companies: {catalogSyncResult.details.totalCompanies || 0}</p>
+                                <p>Total Styles: {catalogSyncResult.details.totalStyles || 0}</p>
+                                {catalogSyncResult.details.errors && catalogSyncResult.details.errors.length > 0 && (
+                                  <p className="text-orange-600 dark:text-orange-400">
+                                    {catalogSyncResult.details.errors.length} error(s) occurred
+                                  </p>
                                 )}
                               </div>
-                            </div>
+                            )}
                           </div>
-                        )}
-                    </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
