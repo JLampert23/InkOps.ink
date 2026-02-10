@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import { RefreshCw, AlertCircle, TrendingUp, Menu, X, LogOut, Loader2, Settings, CreditCard, Package, ChevronDown, ChevronUp, Send, Mail, Wallet, Users, CheckCircle, Sun, Moon, UserPlus } from 'lucide-react';
+import { RefreshCw, AlertCircle, TrendingUp, Menu, X, LogOut, Loader2, Settings, CreditCard, Package, ChevronDown, ChevronUp, Send, Mail, Wallet, Users, CheckCircle, Sun, Moon, UserPlus, Bug } from 'lucide-react';
 import { AccountSettings } from './components/AccountSettings';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider, useNotification } from './contexts/NotificationContext';
@@ -9,6 +9,7 @@ import { supabase } from './lib/supabase-client';
 import { billingService } from './services/billing-service';
 import { useRBAC } from './hooks/useRBAC';
 import PublicQuoteApprovalPage from './components/production/PublicQuoteApprovalPage';
+import SanMarDiagnostic from './components/diagnostics/SanMarDiagnostic';
 
 const SquareData = lazy(() => import('./components/SquareData'));
 const ProductionManagement = lazy(() => import('./components/ProductionManagement').then(m => ({ default: m.ProductionManagement })));
@@ -25,7 +26,8 @@ type Tab =
   | 'accounts-receivable'
   | 'paid-invoices'
   | 'customers'
-  | 'payments';
+  | 'payments'
+  | 'sanmar-diagnostic';
 
 interface CompanySettings {
   company_name: string;
@@ -344,6 +346,13 @@ function AppContent() {
             <span className="text-sm font-medium">Account Settings</span>
           </button>
           <button
+            onClick={() => setActiveTab('sanmar-diagnostic')}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
+          >
+            <Bug className="w-4 h-4" />
+            <span className="text-sm font-medium">SanMar Diagnostic</span>
+          </button>
+          <button
             onClick={toggleDarkMode}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
           >
@@ -373,6 +382,7 @@ function AppContent() {
                  activeTab === 'customers' ? 'Customers' :
                  activeTab === 'payments' ? 'Payments' :
                  activeTab === 'production' ? 'Production Dashboard' :
+                 activeTab === 'sanmar-diagnostic' ? 'SanMar API Diagnostic' :
                  [...accountingNavItems, ...squareNavItems, ...productionNavItems].find(item => item.id === activeTab)?.name ||
                  (activeTab === 'settings' ? 'Account Settings' : 'Dashboard')}
               </h2>
@@ -390,6 +400,8 @@ function AppContent() {
                     'Payment history and Stripe transaction records'
                   ) : activeTab === 'square' ? (
                     'Square payment data and reports'
+                  ) : activeTab === 'sanmar-diagnostic' ? (
+                    'Test SanMar API and view raw XML responses'
                   ) : activeTab === 'settings' ? (
                     'Configure your integrations and preferences'
                   ) : (
@@ -544,6 +556,10 @@ function AppContent() {
                 onCustomerIdConsumed={() => setQuoteCustomerId(undefined)}
               />
             </Suspense>
+          )}
+
+          {activeTab === 'sanmar-diagnostic' && (
+            <SanMarDiagnostic />
           )}
 
           {activeTab === 'settings' && (
