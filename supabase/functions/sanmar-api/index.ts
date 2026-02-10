@@ -52,7 +52,8 @@ Deno.serve(async (req: Request) => {
     const token = authHeader.replace('Bearer ', '');
     console.log("🔑 Token extracted, length:", token.length);
 
-    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
+    // Use anon key for user token validation (tokens are issued against anon key)
+    const userAuthClient = createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false
@@ -60,7 +61,7 @@ Deno.serve(async (req: Request) => {
     });
 
     // Verify the user is authenticated by passing the token directly
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const { data: { user }, error: authError } = await userAuthClient.auth.getUser(token);
 
     console.log("🔍 Auth result:", {
       hasUser: !!user,
