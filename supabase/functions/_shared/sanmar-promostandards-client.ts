@@ -298,9 +298,11 @@ export async function fetchSanMarProductData(
   credentials: SanMarCredentials,
   styleNumber: string
 ): Promise<SanMarStyleData> {
-  console.log('🔍 Fetching SanMar product data:', styleNumber);
+  // SanMar style numbers are case-sensitive and must be uppercase
+  const normalizedStyle = styleNumber.toUpperCase().trim();
+  console.log('🔍 Fetching SanMar product data:', normalizedStyle);
 
-  const payload = `<shar:productId>${styleNumber}</shar:productId>`;
+  const payload = `<shar:productId>${normalizedStyle}</shar:productId>`;
 
   const soapEnvelope = buildSOAPEnvelope(
     'ProductDataService',
@@ -318,7 +320,7 @@ export async function fetchSanMarProductData(
 
   // Parse XML response
   const styleData: SanMarStyleData = {
-    styleNumber,
+    styleNumber: normalizedStyle,
     productName: getXmlValue(responseXml, "productName") || "",
     description: getXmlValue(responseXml, "description") || "",
     productBrand: getXmlValue(responseXml, "productBrand") || "",
@@ -475,10 +477,12 @@ export async function fetchSanMarMedia(
   styleNumber: string,
   partId?: string
 ): Promise<SanMarMediaData> {
-  console.log('🖼️ Fetching SanMar media:', styleNumber, partId || '(all)');
+  // SanMar style numbers are case-sensitive and must be uppercase
+  const normalizedStyle = styleNumber.toUpperCase().trim();
+  console.log('🖼️ Fetching SanMar media:', normalizedStyle, partId || '(all)');
 
   const payload = `<shar:mediaType>Image</shar:mediaType>
-      <shar:productId>${styleNumber}</shar:productId>${partId ? `
+      <shar:productId>${normalizedStyle}</shar:productId>${partId ? `
       <shar:partId>${partId}</shar:partId>` : ''}`;
 
   const soapEnvelope = buildSOAPEnvelope(
@@ -573,7 +577,9 @@ export async function fetchUnifiedSanMarData(
   credentials: SanMarCredentials,
   request: SanMarRequest
 ): Promise<SanMarUnifiedResponse> {
-  const { styleNumber, partId } = request;
+  const { partId } = request;
+  // SanMar style numbers are case-sensitive and must be uppercase
+  const styleNumber = request.styleNumber.toUpperCase().trim();
 
   console.log('🔄 Fetching unified SanMar data:', { styleNumber, partId });
 
