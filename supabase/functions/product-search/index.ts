@@ -132,6 +132,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const results: ProductResult[] = [];
+    const searchErrors: string[] = [];
 
     const { data: settings } = await supabaseAdmin
       .from("company_settings")
@@ -145,13 +146,13 @@ Deno.serve(async (req: Request) => {
       searchPromises.push(
         (async () => {
           try {
-            const cached = await searchSSActivewearCache(supabaseAdmin, companyId, style);
+            const cached = await searchSSActivewearCache(supabaseAdmin, companyId!, style);
             if (cached) {
               results.push(cached);
             } else {
               console.log(`SSA cache miss for ${style}, calling live API...`);
               const liveResult = await fetchAndCacheSSActivewear(
-                supabaseAdmin, supabaseUrl, supabaseServiceKey, companyId, style
+                supabaseAdmin, supabaseUrl, supabaseServiceKey, companyId!, style
               );
               if (liveResult) {
                 results.push(liveResult);
@@ -159,57 +160,50 @@ Deno.serve(async (req: Request) => {
             }
           } catch (error: any) {
             console.error("SSA search error:", error.message);
+            searchErrors.push(`SSA: ${error.message}`);
           }
         })()
       );
     }
 
     if (settings?.sanmar_enabled) {
-      console.log(`🎯 SanMar is enabled, starting search for style: ${style}`);
       searchPromises.push(
         (async () => {
           try {
-            console.log("🔍 Calling searchSanMarCatalog...");
             const apiResult = await withTimeout(
               searchSanMarCatalog(
                 supabaseAdmin,
                 supabaseUrl,
                 supabaseServiceKey,
-                companyId,
+                companyId!,
                 style
               ),
               20000,
               "SanMar search timeout"
             );
-            console.log(`📊 SanMar search complete - Results: ${apiResult.results.length}, Errors: ${apiResult.errors.length}`);
             if (apiResult.results.length > 0) {
-              console.log(`✅ Found ${apiResult.results.length} SanMar result(s)`);
               results.push(...apiResult.results);
             }
             if (apiResult.errors.length > 0) {
-              console.error(`⚠️ SanMar ERRORS: ${JSON.stringify(apiResult.errors)}`);
+              searchErrors.push(...apiResult.errors);
             }
           } catch (error: any) {
-            console.error("❌ SanMar search exception:", error.message);
-            console.error("❌ Stack trace:", error.stack);
+            console.error("SanMar search exception:", error.message);
+            searchErrors.push(`SanMar: ${error.message}`);
           }
         })()
       );
-    } else {
-      console.log(`⚠️ SanMar is NOT enabled`);
     }
 
     await Promise.allSettled(searchPromises);
 
-    console.log(`✅ Found ${results.length} result(s)`);
-
-    // Collect diagnostic info
     const diagnostics = {
       companyId,
       settingsChecked: !!settings,
       sanmarEnabled: settings?.sanmar_enabled || false,
       ssaEnabled: settings?.ssactivewear_enabled || false,
       searchPromisesCount: searchPromises.length,
+      errors: searchErrors,
     };
 
     return new Response(
