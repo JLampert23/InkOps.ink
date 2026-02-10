@@ -82,55 +82,49 @@ export default function SanMarDiagnostic() {
           {result.error ? (
             <div className="flex items-center gap-2 text-red-600">
               <XCircle className="w-5 h-5" />
-              <span className="font-bold">ERROR</span>
+              <span className="font-bold">ERROR: {result.error}</span>
             </div>
-          ) : result.hasFault ? (
-            <div className="flex items-center gap-2 text-red-600">
-              <XCircle className="w-5 h-5" />
-              <span className="font-bold">SOAP FAULT DETECTED</span>
-            </div>
-          ) : result.hasError ? (
-            <div className="flex items-center gap-2 text-orange-600">
-              <AlertCircle className="w-5 h-5" />
-              <span className="font-bold">ERROR DETECTED</span>
-            </div>
-          ) : result.partMatches > 0 ? (
+          ) : result.success ? (
             <div className="flex items-center gap-2 text-green-600">
               <CheckCircle className="w-5 h-5" />
-              <span className="font-bold">Found {result.partMatches} variants!</span>
+              <span className="font-bold">SUCCESS</span>
             </div>
           ) : (
             <div className="flex items-center gap-2 text-orange-600">
               <AlertCircle className="w-5 h-5" />
-              <span className="font-bold">No variants found</span>
+              <span className="font-bold">UNKNOWN STATUS</span>
             </div>
           )}
         </div>
 
-        <div className="mb-4 bg-gray-50 p-4 rounded text-sm space-y-1">
-          <div><strong>Variants Found:</strong> {result.partMatches || 0}</div>
-          <div><strong>Has Fault:</strong> {result.hasFault ? 'Yes' : 'No'}</div>
-          <div><strong>Has Error:</strong> {result.hasError ? 'Yes' : 'No'}</div>
-          <div><strong>Response Size:</strong> {result.xmlLength?.toLocaleString() || 0} bytes</div>
-        </div>
+        {result.message && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm">
+            {result.message}
+          </div>
+        )}
 
-        {result.sampleParts && result.sampleParts.length > 0 && (
-          <div className="mb-4">
-            <h4 className="font-bold mb-2">Sample Variants (first 3)</h4>
-            <div className="text-sm space-y-2">
-              {result.sampleParts.map((part: string, idx: number) => (
-                <div key={idx} className="bg-gray-50 p-2 rounded font-mono text-xs overflow-x-auto">
-                  {part}
-                </div>
-              ))}
-            </div>
+        {result.info && (
+          <div className="mb-4 bg-gray-50 p-4 rounded text-sm space-y-2">
+            <h4 className="font-bold mb-2">Information</h4>
+            {Object.entries(result.info).map(([key, value]) => (
+              <div key={key}>
+                <strong className="capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</strong>{' '}
+                {typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value)}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {result.mock && (
+          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm">
+            <strong>Note:</strong> This is a mock response. {result.reason}
           </div>
         )}
 
         <div>
-          <h4 className="font-bold mb-2">Raw XML Response</h4>
+          <h4 className="font-bold mb-2">Full Response</h4>
           <div className="bg-gray-900 text-green-400 p-4 rounded font-mono text-xs overflow-x-auto max-h-96 overflow-y-auto">
-            <pre>{result.xmlPreview || JSON.stringify(result, null, 2)}</pre>
+            <pre>{JSON.stringify(result, null, 2)}</pre>
           </div>
         </div>
       </div>
