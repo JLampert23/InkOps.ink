@@ -221,14 +221,27 @@ async function callPromoStandardsService(
 
       // Check for SOAP faults or PromoStandards errors
       if (responseText.includes('<faultcode>') || responseText.includes('<errorCode>')) {
+        console.log(`🚨 SOAP Fault detected in response`);
         handlePromoStandardsError(responseText);
       }
 
       if (!response.ok) {
+        // Log the full response for debugging
+        console.error(`❌ SanMar API returned error ${response.status}`);
+        console.error(`Response body (first 500 chars):`, responseText.substring(0, 500));
+
         // Don't retry authentication errors (401, 403)
         if (response.status === 401 || response.status === 403) {
           throw new PromoStandardsError(105, 'Invalid username or password');
         }
+
+        // Check if response contains a SOAP fault
+        if (responseText.includes('<faultstring>')) {
+          const faultMatch = responseText.match(/<faultstring>([^<]+)<\/faultstring>/);
+          const faultString = faultMatch ? faultMatch[1] : 'Unknown SOAP fault';
+          throw new Error(`SanMar SOAP Error: ${faultString}`);
+        }
+
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
