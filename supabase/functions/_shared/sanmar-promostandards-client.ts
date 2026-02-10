@@ -361,12 +361,21 @@ export async function fetchSanMarProductData(
 
   styleData.parts = partMatches.map(match => {
     const partXml = match[1];
+
+    const standardColor = getXmlValue(partXml, "standardColorName") || "";
+
+    let vendorColor = "";
+    const colorArrayMatch = partXml.match(/<(?:[^:>]*:)?ColorArray(?:\s[^>]*)?>[\s\S]*?<\/(?:[^:>]*:)?ColorArray>/i);
+    if (colorArrayMatch) {
+      vendorColor = getXmlValue(colorArrayMatch[0], "colorName") || "";
+    }
+
     return {
       partId: getXmlValue(partXml, "partId") || "",
-      colorName: getXmlValue(partXml, "colorName") || "",
+      colorName: standardColor || vendorColor || getXmlValue(partXml, "colorName") || "",
       labelSize: getXmlValue(partXml, "labelSize") || "",
       hex: getXmlValue(partXml, "hex") || "",
-      approximatePmsColor: getXmlValue(partXml, "approximatePmsColor") || "",
+      approximatePmsColor: getXmlValue(partXml, "approximatePms") || getXmlValue(partXml, "approximatePmsColor") || "",
     };
   });
 
