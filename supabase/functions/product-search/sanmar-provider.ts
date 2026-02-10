@@ -159,14 +159,57 @@ export async function searchSanMarCatalog(
       return { results, errors };
     }
 
-    // Fetch from live API
+    // Fetch from live API - only fetch product data for faster search
     console.log(`📞 Fetching live data from SanMar PromoStandards API...`);
-    const apiData = await fetchUnifiedSanMarData(credentials, { styleNumber: style });
 
-    if (!apiData.success) {
-      errors.push("Failed to fetch SanMar data");
+    // Import individual functions for more control
+    const { fetchSanMarProductData, fetchSanMarMedia } = await import("../_shared/sanmar-promostandards-client.ts");
+
+    // Only fetch product data and media (skip slow inventory/pricing calls)
+    const [productResult, mediaResult] = await Promise.allSettled([
+      fetchSanMarProductData(credentials, style),
+      fetchSanMarMedia(credentials, style),
+    ]);
+
+    if (productResult.status === 'rejected') {
+      const errorMessage = productResult.reason?.message || 'Product not found';
+      errors.push(`SanMar error: ${errorMessage}`);
       return { results, errors };
     }
+
+    const productData = productResult.value;
+
+    // Check if product has no parts/colors
+    if (!productData.parts || productData.parts.length === 0) {
+      errors.push(`SanMar: Style ${style} not found or has no variants`);
+      return { results, errors };
+    }
+
+    const mediaData = mediaResult.status === 'fulfilled' ? mediaResult.value : null;
+
+    // Build simplified API data structure
+    const apiData = {
+      success: true,
+      styleNumber: style,
+      partId: null,
+      style: productData,
+      inventory: { items: [] },
+      pricing: { parts: [] },
+      media: mediaData || {
+        images: [],
+        views: {
+          front: null,
+          rear: null,
+          side: null,
+          lifestyle: null,
+          frontImages: [],
+          rearImages: [],
+          sideImages: [],
+          lifestyleImages: [],
+          otherImages: [],
+        }
+      },
+    };
 
     // Transform API response to ProductResult
     const product = transformSanMarData(apiData);
