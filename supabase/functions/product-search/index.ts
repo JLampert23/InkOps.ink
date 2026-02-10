@@ -170,12 +170,16 @@ Deno.serve(async (req: Request) => {
         (async () => {
           try {
             console.log("🔍 Calling searchSanMarCatalog...");
-            const apiResult = await searchSanMarCatalog(
-              supabaseAdmin,
-              supabaseUrl,
-              supabaseServiceKey,
-              companyId,
-              style
+            const apiResult = await withTimeout(
+              searchSanMarCatalog(
+                supabaseAdmin,
+                supabaseUrl,
+                supabaseServiceKey,
+                companyId,
+                style
+              ),
+              20000,
+              "SanMar search timeout"
             );
             console.log(`📊 SanMar search complete - Results: ${apiResult.results.length}, Errors: ${apiResult.errors.length}`);
             if (apiResult.results.length > 0) {
