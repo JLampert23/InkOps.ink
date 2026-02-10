@@ -29,26 +29,27 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Missing authorization header" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Check if it's a service role key (internal call) or user JWT
-    const token = authHeader.replace("Bearer ", "");
-    const isServiceRoleKey = token === supabaseServiceRoleKey;
-
-    // Create admin client for all operations
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
+    // Create admin client for validating user JWT
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false
       }
     });
 
+    // Validate JWT from Authorization header
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ code: 401, message: "Missing authorization header" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+
+    // Check if it's a service role key (internal call)
+    const isServiceRoleKey = token === supabaseServiceRoleKey;
     let companyId: string;
 
     if (isServiceRoleKey) {
@@ -57,54 +58,49 @@ Deno.serve(async (req: Request) => {
       const companyIdParam = url.searchParams.get("companyId");
       if (!companyIdParam) {
         return new Response(
-          JSON.stringify({ error: "Company ID required for service calls" }),
+          JSON.stringify({ code: 400, message: "Company ID required for service calls" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
       companyId = companyIdParam;
+      console.log("🔧 Service role call for company:", companyId);
     } else {
-      // User JWT - validate token using admin client
-      console.log("🔍 Validating user JWT, token length:", token.length);
+      // Validate user JWT using built-in Supabase auth
+      console.log("🔍 Validating user JWT");
 
-      const authResult = await supabaseAdmin.auth.getUser(token);
-      console.log("🔐 Auth result:", {
-        hasUser: !!authResult.data?.user,
-        hasError: !!authResult.error,
-        errorMessage: authResult.error?.message
-      });
+      const { data: { user }, error } = await supabase.auth.getUser(token);
 
-      if (authResult.error || !authResult.data?.user) {
-        console.error("❌ Auth error:", authResult.error);
+      if (error || !user) {
+        console.error("❌ JWT validation failed:", error?.message);
         return new Response(
           JSON.stringify({
             code: 401,
             message: "Invalid JWT",
-            details: authResult.error?.message
+            details: error?.message
           }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      const user = authResult.data.user;
-      console.log("✅ User validated:", user.id);
+      console.log("✅ User authenticated:", user.id);
 
-      // Get user's company_id using admin client
-      const { data: profile } = await supabaseAdmin
+      // Get user's company_id
+      const { data: profile, error: profileError } = await supabase
         .from("user_profiles")
         .select("company_id")
         .eq("id", user.id)
         .maybeSingle();
 
-      if (!profile?.company_id) {
+      if (profileError || !profile?.company_id) {
         console.error("❌ Company not found for user:", user.id);
         return new Response(
-          JSON.stringify({ error: "Company not found" }),
+          JSON.stringify({ code: 404, message: "Company not found" }),
           { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      console.log("✅ Company ID found:", profile.company_id);
       companyId = profile.company_id;
+      console.log("✅ Company ID:", companyId);
     }
 
     // Get SanMar PromoStandards credentials from company_settings
