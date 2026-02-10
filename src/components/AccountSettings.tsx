@@ -2068,7 +2068,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
-      const testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sanmar-api?action=product&style=PC54`;
+      const testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sanmar-api?action=test`;
       console.log('📡 Calling SanMar API:', testUrl);
       console.log('🔑 Token length:', token.length, 'First 20 chars:', token.substring(0, 20));
 
@@ -2089,15 +2089,15 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       if (response.ok) {
         const data = await response.json();
         console.log('✅ SanMar connection successful!', data);
-        if (data.success && data.data?.productName) {
+        if (data.success) {
           setSanmarTestResult({
             success: true,
-            message: `PromoStandards API connected! Found product: ${data.data.productName}`,
+            message: data.message || 'PromoStandards API connected successfully!',
           });
         } else {
           setSanmarTestResult({
             success: false,
-            error: 'API connected but no product data returned',
+            error: data.message || 'API connection test failed',
           });
         }
       } else {
