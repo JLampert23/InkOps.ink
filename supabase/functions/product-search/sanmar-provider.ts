@@ -150,17 +150,21 @@ export async function searchSanMarCatalog(
       return { results, errors };
     }
 
-    console.log(`📞 Fetching live data from SanMar PromoStandards API...`);
+    console.log(`📞 Fetching live data from SanMar PromoStandards API for style: ${style}...`);
+    console.log(`📞 Using credentials - Username: ${credentials.id}`);
 
     const { fetchSanMarProductData, fetchSanMarMedia } = await import("../_shared/sanmar-promostandards-client.ts");
 
+    console.log(`🌐 Calling fetchSanMarProductData...`);
     const [productResult, mediaResult] = await Promise.allSettled([
       fetchSanMarProductData(credentials, style),
       fetchSanMarMedia(credentials, style),
     ]);
 
+    console.log(`📊 Product result status: ${productResult.status}`);
     if (productResult.status === 'rejected') {
       const errorMessage = productResult.reason?.message || 'Product not found';
+      console.error(`❌ Product fetch rejected: ${errorMessage}`);
       errors.push(`SanMar error: ${errorMessage}`);
       return { results, errors };
     }
