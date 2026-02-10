@@ -147,7 +147,7 @@ export async function searchSanMarCatalog(
     }
 
     const credentials: SanMarCredentials = {
-      username: settings.sanmar_promo_username,
+      id: settings.sanmar_promo_username,
       password: decryptedPassword,
     };
 
