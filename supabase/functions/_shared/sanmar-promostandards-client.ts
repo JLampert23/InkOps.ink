@@ -329,8 +329,8 @@ export async function fetchSanMarProductData(
     colors: []
   };
 
-  // Parse parts
-  const partPattern = /<Part>([\s\S]*?)<\/Part>/gi;
+  // Parse parts (handle namespaced tags like ns:Part or shar:Part)
+  const partPattern = /<[^:]*:?Part[^>]*>([\s\S]*?)<\/[^:]*:?Part>/gi;
   const partMatches = getAllXmlMatches(responseXml, partPattern);
 
   styleData.parts = partMatches.map(match => {
