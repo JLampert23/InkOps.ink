@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { searchSanMarCatalog } from "./sanmar-provider.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -115,28 +116,67 @@ Deno.serve(async (req: Request) => {
     const style = rawStyle.trim();
     const results: ProductResult[] = [];
 
-    // ONLY search caches - no live API calls
     const { data: settings } = await supabaseAdmin
       .from("company_settings")
       .select("sanmar_enabled, ssactivewear_enabled")
       .eq("id", companyId)
       .maybeSingle();
 
-    // Search SSActivewear cache
+    console.log(`🔍 Searching for style: ${style}`);
+
+    // 1. Try SSActivewear cache first
     if (settings?.ssactivewear_enabled) {
-      const ssaResult = await searchSSActivewearCache(supabaseAdmin, companyId, style);
-      if (ssaResult) {
-        results.push(ssaResult);
+      console.log("📦 Checking SSActivewear cache...");
+      const ssaCached = await searchSSActivewearCache(supabaseAdmin, companyId, style);
+
+      if (ssaCached) {
+        console.log("✅ Found in SSActivewear cache");
+        results.push(ssaCached);
+      } else {
+        // Not in cache - fetch from API
+        console.log("❌ Not in SSActivewear cache, fetching from API...");
+        const ssaLive = await fetchAndCacheSSActivewear(
+          supabaseAdmin,
+          supabaseUrl,
+          supabaseServiceKey,
+          companyId,
+          style
+        );
+
+        if (ssaLive) {
+          console.log("✅ Found and cached SSActivewear product");
+          results.push(ssaLive);
+        }
       }
     }
 
-    // Search SanMar cache
+    // 2. Try SanMar cache
     if (settings?.sanmar_enabled) {
-      const sanmarResult = await searchSanMarCache(supabaseAdmin, companyId, style);
-      if (sanmarResult) {
-        results.push(sanmarResult);
+      console.log("📦 Checking SanMar cache...");
+      const sanmarCached = await searchSanMarCache(supabaseAdmin, companyId, style);
+
+      if (sanmarCached) {
+        console.log("✅ Found in SanMar cache");
+        results.push(sanmarCached);
+      } else {
+        // Not in cache - fetch from API
+        console.log("❌ Not in SanMar cache, fetching from API...");
+        const sanmarResult = await searchSanMarCatalog(
+          supabaseAdmin,
+          supabaseUrl,
+          supabaseServiceKey,
+          companyId,
+          style
+        );
+
+        if (sanmarResult.results.length > 0) {
+          console.log("✅ Found and cached SanMar product");
+          results.push(...sanmarResult.results);
+        }
       }
     }
+
+    console.log(`🏁 Search complete: found ${results.length} result(s)`);
 
     return new Response(
       JSON.stringify({
@@ -181,9 +221,11 @@ async function searchSSActivewearCache(
       .eq("style_id", styleData.id)
       .order("color_name", { ascending: true });
 
+    if (!partsData || partsData.length === 0) return null;
+
     const colorMap = new Map<string, ColorOption>();
 
-    for (const part of partsData || []) {
+    for (const part of partsData) {
       const colorName = part.color_name || "Default";
 
       if (!colorMap.has(colorName)) {
@@ -210,7 +252,7 @@ async function searchSSActivewearCache(
     // Get images for first part of each color
     for (const [_, color] of colorMap) {
       if (color.partIds && color.partIds.length > 0) {
-        const firstPart = partsData?.find(p => p.part_id === color.partIds![0]);
+        const firstPart = partsData.find(p => p.part_id === color.partIds![0]);
         if (firstPart) {
           const { data: imageData } = await supabaseAdmin
             .from("images")
@@ -242,6 +284,125 @@ async function searchSSActivewearCache(
   }
 }
 
+async function fetchAndCacheSSActivewear(
+  supabaseAdmin: any,
+  supabaseUrl: string,
+  supabaseServiceKey: string,
+  companyId: string,
+  style: string
+): Promise<ProductResult | null> {
+  try {
+    // Fetch product data
+    const productUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=product&productId=${encodeURIComponent(style)}&companyId=${encodeURIComponent(companyId)}`;
+    const productResponse = await fetch(productUrl, {
+      headers: { "Authorization": `Bearer ${supabaseServiceKey}` },
+    });
+
+    if (!productResponse.ok) {
+      console.log(`SSActivewear API returned ${productResponse.status}`);
+      return null;
+    }
+
+    const ssaData = await productResponse.json();
+
+    if (ssaData.success === false || !ssaData.data?.[0]) {
+      console.log("SSActivewear: Product not found");
+      return null;
+    }
+
+    const productData = ssaData.data[0];
+
+    // Cache the style
+    const { data: newStyleData } = await supabaseAdmin
+      .from("styles")
+      .upsert({
+        company_id: companyId,
+        style_number: style,
+        brand: productData.productBrand || null,
+        name: productData.productName || null,
+        description: productData.description || null,
+        category: null,
+        primary_image: null,
+        last_synced: new Date().toISOString(),
+      }, {
+        onConflict: "company_id,style_number"
+      })
+      .select("id")
+      .maybeSingle();
+
+    if (!newStyleData) {
+      console.error("Failed to cache style");
+      return null;
+    }
+
+    const styleId = newStyleData.id;
+
+    // Cache parts
+    if (productData.parts && Array.isArray(productData.parts)) {
+      for (const part of productData.parts) {
+        if (!part.partId) continue;
+
+        await supabaseAdmin
+          .from("parts")
+          .upsert({
+            company_id: companyId,
+            style_id: styleId,
+            part_id: part.partId,
+            color_name: part.colorName || null,
+            hex: null,
+            size: part.labelSize || null,
+            weight: null,
+            gtin: null,
+          }, {
+            onConflict: "company_id,part_id"
+          });
+      }
+    }
+
+    // Fetch and cache media (images)
+    const mediaUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=media&productId=${encodeURIComponent(style)}&companyId=${encodeURIComponent(companyId)}`;
+    const mediaResponse = await fetch(mediaUrl, {
+      headers: { "Authorization": `Bearer ${supabaseServiceKey}` },
+    });
+
+    if (mediaResponse.ok) {
+      const mediaData = await mediaResponse.json();
+      const mediaContent = mediaData.data?.mediaContent || [];
+
+      for (const media of mediaContent) {
+        if (!media.url) continue;
+
+        const { data: partForImage } = await supabaseAdmin
+          .from("parts")
+          .select("id")
+          .eq("company_id", companyId)
+          .eq("style_id", styleId)
+          .eq("part_id", media.partId || productData.parts?.[0]?.partId)
+          .maybeSingle();
+
+        if (partForImage) {
+          await supabaseAdmin
+            .from("images")
+            .upsert({
+              company_id: companyId,
+              part_id: partForImage.id,
+              class_type: media.classTypeName || null,
+              url: media.url,
+            }, {
+              onConflict: "company_id,part_id,class_type"
+            });
+        }
+      }
+    }
+
+    // Now return the cached data
+    return await searchSSActivewearCache(supabaseAdmin, companyId, style);
+  } catch (error: any) {
+    console.error("Error fetching/caching SSActivewear:", error);
+    return null;
+  }
+}
+
 async function searchSanMarCache(
   supabaseAdmin: any,
   companyId: string,
@@ -250,14 +411,7 @@ async function searchSanMarCache(
   try {
     const { data: styleData } = await supabaseAdmin
       .from("sanmar_catalog_styles")
-      .select(`
-        id,
-        style_number,
-        style_name,
-        brand_name,
-        category,
-        updated_at
-      `)
+      .select("id, style_number, style_name, brand_name, category, updated_at")
       .eq("company_id", companyId)
       .ilike("style_number", style)
       .eq("is_active", true)
@@ -271,9 +425,11 @@ async function searchSanMarCache(
       .eq("style_id", styleData.id)
       .order("color_name", { ascending: true });
 
+    if (!productsData || productsData.length === 0) return null;
+
     const colorMap = new Map<string, ColorOption>();
 
-    for (const product of productsData || []) {
+    for (const product of productsData) {
       const colorName = product.color_name || "Default";
 
       if (!colorMap.has(colorName)) {
