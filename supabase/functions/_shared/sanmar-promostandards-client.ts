@@ -652,21 +652,58 @@ export async function fetchUnifiedSanMarData(
 
 /**
  * Test function to verify authentication and connectivity
- * Uses LOG105 as a test style number
+ * Makes a minimal SOAP request to check credentials
  */
 export async function testSanMarConnection(credentials: SanMarCredentials): Promise<boolean> {
   try {
-    console.log('🧪 Testing SanMar PromoStandards connection with LOG105...');
+    console.log('🧪 Testing SanMar PromoStandards connection...');
 
-    const result = await fetchSanMarProductData(credentials, 'LOG105');
+    // Make a minimal SOAP request to Product Data endpoint
+    const soapBody = `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/">
+  <soap:Body>
+    <ns:GetProductRequest>
+      <ns:id>${escapeXml(credentials.id)}</ns:id>
+      <ns:password>${escapeXml(credentials.password)}</ns:password>
+      <ns:localizationCountry>US</ns:localizationCountry>
+      <ns:localizationLanguage>en</ns:localizationLanguage>
+      <ns:productId>PC54</ns:productId>
+    </ns:GetProductRequest>
+  </soap:Body>
+</soap:Envelope>`;
 
-    if (result.parts.length > 0) {
-      console.log('✅ SanMar connection test successful!');
-      return true;
-    } else {
-      console.warn('⚠️ Connection successful but no product data returned');
+    const response = await fetch(SANMAR_PROMOSTANDARDS_ENDPOINTS.productData, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/xml; charset=utf-8',
+        'SOAPAction': 'getProduct',
+      },
+      body: soapBody,
+    });
+
+    const responseText = await response.text();
+
+    // Check for authentication error
+    if (responseText.includes('AuthenticationError') || responseText.includes('Invalid credentials')) {
+      console.error('❌ SanMar authentication failed - invalid credentials');
       return false;
     }
+
+    // Check for any SOAP fault
+    if (responseText.includes('soap:Fault') || responseText.includes('faultstring')) {
+      console.error('❌ SanMar API returned an error');
+      return false;
+    }
+
+    // If we got a response without errors, credentials are valid
+    if (response.ok && responseText.includes('GetProductResponse')) {
+      console.log('✅ SanMar connection test successful!');
+      return true;
+    }
+
+    console.warn('⚠️ Unexpected response from SanMar API');
+    return false;
+
   } catch (error: any) {
     console.error('❌ SanMar connection test failed:', error.message);
     return false;
