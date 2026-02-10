@@ -1,74 +1,118 @@
 import React, { useState } from 'react';
 import { Search, AlertCircle, CheckCircle, XCircle, Database, ShoppingCart } from 'lucide-react';
+import { supabase } from '../../lib/supabase-client';
 
 export default function SanMarDiagnostic() {
-  const [style, setStyle] = useState('PC61');
-  const [companyId, setCompanyId] = useState('5f36fe64-8b67-4b62-a023-29590da87c41');
+  const [style, setStyle] = useState('PC54');
   const [loading, setLoading] = useState(false);
-  const [productDataResult, setProductDataResult] = useState<any>(null);
-  const [sellableResult, setSellableResult] = useState<any>(null);
+  const [testResult, setTestResult] = useState<any>(null);
+  const [productResult, setProductResult] = useState<any>(null);
 
-  const testBothEndpoints = async () => {
+  const testConnection = async () => {
     setLoading(true);
-    setProductDataResult(null);
-    setSellableResult(null);
+    setTestResult(null);
 
     try {
-      const baseUrl = 'https://cuaukcvccxvfpuxaciac.supabase.co/functions/v1/test-sanmar-endpoint';
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
 
-      const productDataUrl = `${baseUrl}?style=${encodeURIComponent(style)}&company_id=${encodeURIComponent(companyId)}&service=product-data`;
-      const sellableUrl = `${baseUrl}?style=${encodeURIComponent(style)}&company_id=${encodeURIComponent(companyId)}&service=sellable`;
-
-      // Test ProductDataService first
-      console.log('Testing ProductDataService...');
-      try {
-        const productDataResponse = await fetch(productDataUrl);
-        if (!productDataResponse.ok) {
-          const errorText = await productDataResponse.text();
-          setProductDataResult({
-            error: `HTTP ${productDataResponse.status}: ${productDataResponse.statusText}`,
-            details: errorText
-          });
-        } else {
-          const productData = await productDataResponse.json();
-          setProductDataResult(productData);
-        }
-      } catch (error: any) {
-        console.error('ProductDataService error:', error);
-        setProductDataResult({ error: error.message });
+      if (!token) {
+        setTestResult({
+          error: 'No active session',
+          message: 'Please log in to test SanMar connection'
+        });
+        setLoading(false);
+        return;
       }
 
-      // Wait 2 seconds before testing second endpoint to avoid worker limits
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sanmar-api?action=test`;
 
-      // Test ProductSellableService
-      console.log('Testing ProductSellableService...');
-      try {
-        const sellableResponse = await fetch(sellableUrl);
-        if (!sellableResponse.ok) {
-          const errorText = await sellableResponse.text();
-          setSellableResult({
-            error: `HTTP ${sellableResponse.status}: ${sellableResponse.statusText}`,
-            details: errorText
-          });
-        } else {
-          const sellableData = await sellableResponse.json();
-          setSellableResult(sellableData);
+      console.log('Testing SanMar connection...');
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
-      } catch (error: any) {
-        console.error('ProductSellableService error:', error);
-        setSellableResult({ error: error.message });
-      }
+      });
 
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText };
+        }
+        setTestResult({
+          error: `HTTP ${response.status}: ${response.statusText}`,
+          details: errorData
+        });
+      } else {
+        const data = await response.json();
+        setTestResult(data);
+      }
     } catch (error: any) {
-      console.error('Error:', error);
-      setProductDataResult({ error: error.message });
+      console.error('Connection test error:', error);
+      setTestResult({ error: error.message });
     } finally {
       setLoading(false);
     }
   };
 
-  const renderEndpointResult = (result: any, title: string, icon: React.ReactNode) => {
+  const testProductLookup = async () => {
+    setLoading(true);
+    setProductResult(null);
+
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+
+      if (!token) {
+        setProductResult({
+          error: 'No active session',
+          message: 'Please log in to test product lookup'
+        });
+        setLoading(false);
+        return;
+      }
+
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sanmar-api?action=unified&style=${encodeURIComponent(style)}`;
+
+      console.log('Testing SanMar product lookup...');
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText };
+        }
+        setProductResult({
+          error: `HTTP ${response.status}: ${response.statusText}`,
+          details: errorData
+        });
+      } else {
+        const data = await response.json();
+        setProductResult(data);
+      }
+    } catch (error: any) {
+      console.error('Product lookup error:', error);
+      setProductResult({ error: error.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderResult = (result: any, title: string, icon: React.ReactNode) => {
     if (!result) return null;
 
     return (
@@ -84,7 +128,7 @@ export default function SanMarDiagnostic() {
               <XCircle className="w-5 h-5" />
               <span className="font-bold">ERROR: {result.error}</span>
             </div>
-          ) : result.success ? (
+          ) : result.success || result.authenticated ? (
             <div className="flex items-center gap-2 text-green-600">
               <CheckCircle className="w-5 h-5" />
               <span className="font-bold">SUCCESS</span>
@@ -103,21 +147,10 @@ export default function SanMarDiagnostic() {
           </div>
         )}
 
-        {result.info && (
-          <div className="mb-4 bg-gray-50 p-4 rounded text-sm space-y-2">
-            <h4 className="font-bold mb-2">Information</h4>
-            {Object.entries(result.info).map(([key, value]) => (
-              <div key={key}>
-                <strong className="capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</strong>{' '}
-                {typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value)}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {result.mock && (
-          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-sm">
-            <strong>Note:</strong> This is a mock response. {result.reason}
+        {result.details && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm">
+            <strong>Details:</strong>
+            <pre className="mt-2 text-xs overflow-x-auto">{JSON.stringify(result.details, null, 2)}</pre>
           </div>
         )}
 
@@ -134,8 +167,8 @@ export default function SanMarDiagnostic() {
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold mb-2">SanMar API Diagnostic Tool</h1>
-        <p className="text-gray-600 mb-6">Compare ProductDataService vs ProductSellableService</p>
+        <h1 className="text-3xl font-bold mb-2">SanMar PromoStandards Diagnostic</h1>
+        <p className="text-gray-600 mb-6">Test SanMar PromoStandards API connection and product lookup</p>
 
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <div className="space-y-4">
@@ -146,42 +179,44 @@ export default function SanMarDiagnostic() {
                 value={style}
                 onChange={(e) => setStyle(e.target.value)}
                 className="w-full px-4 py-2 border rounded-lg"
-                placeholder="e.g., PC61, ST350"
+                placeholder="e.g., PC54, PC61"
               />
+              <p className="text-xs text-gray-500 mt-1">Default: PC54 (Port & Company Core Cotton Tee)</p>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-2">Company ID</label>
-              <input
-                type="text"
-                value={companyId}
-                onChange={(e) => setCompanyId(e.target.value)}
-                className="w-full px-4 py-2 border rounded-lg"
-              />
-            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={testConnection}
+                disabled={loading}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                <Database className="w-4 h-4" />
+                {loading ? 'Testing...' : 'Test Connection'}
+              </button>
 
-            <button
-              onClick={testBothEndpoints}
-              disabled={loading}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
-            >
-              <Search className="w-4 h-4" />
-              {loading ? 'Testing Both Endpoints...' : 'Test Both Endpoints'}
-            </button>
+              <button
+                onClick={testProductLookup}
+                disabled={loading}
+                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                <Search className="w-4 h-4" />
+                {loading ? 'Searching...' : 'Lookup Product'}
+              </button>
+            </div>
           </div>
         </div>
 
-        {(productDataResult || sellableResult) && (
+        {(testResult || productResult) && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {renderEndpointResult(
-              productDataResult,
-              'ProductDataService',
+            {renderResult(
+              testResult,
+              'Connection Test',
               <Database className="w-5 h-5 text-blue-600" />
             )}
-            {renderEndpointResult(
-              sellableResult,
-              'ProductSellableService',
-              <ShoppingCart className="w-5 h-5 text-green-600" />
+            {renderResult(
+              productResult,
+              'Product Lookup',
+              <Search className="w-5 h-5 text-green-600" />
             )}
           </div>
         )}

@@ -30,29 +30,25 @@ Deno.serve(async (req: Request) => {
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    console.log("🔧 Edge Function environment:", {
-      supabaseUrl: supabaseUrl?.substring(0, 40) + "...",
-      hasAnonKey: !!supabaseAnonKey,
-      anonKeyLength: supabaseAnonKey?.length
-    });
+    console.log("🔧 SanMar API Edge Function starting...");
 
-    // Get JWT from Authorization header
+    // STEP 1: Validate JWT is present
     const authHeader = req.headers.get("Authorization");
+    console.log("🔑 Authorization header:", authHeader ? "present" : "missing");
+
     if (!authHeader) {
+      console.error("❌ Missing JWT");
       return new Response(
-        JSON.stringify({ code: 401, message: "Missing authorization header" }),
+        JSON.stringify({
+          code: 401,
+          message: "Authentication failed: invalid or missing Supabase session",
+          details: "Missing Authorization header"
+        }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const token = authHeader.replace("Bearer ", "");
-    console.log("🔑 Received JWT:", {
-      tokenLength: token.length,
-      tokenStart: token.substring(0, 20),
-      authHeaderPresent: !!authHeader
-    });
-
-    // Create Supabase client with user's JWT for auth context
+    // STEP 2: Validate JWT using Supabase client
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
         headers: { Authorization: authHeader }
@@ -63,31 +59,25 @@ Deno.serve(async (req: Request) => {
       }
     });
 
-    console.log("🔍 Decoding JWT...");
-    // Decode JWT to get user ID (JWT is already validated by API Gateway)
-    const jwtParts = token.split('.');
-    if (jwtParts.length !== 3) {
-      console.error("❌ Invalid JWT format");
+    // Verify the user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      console.error("❌ Invalid JWT:", authError?.message);
       return new Response(
-        JSON.stringify({ code: 401, message: "Invalid JWT format" }),
+        JSON.stringify({
+          code: 401,
+          message: "Authentication failed: invalid or missing Supabase session",
+          details: authError?.message || "Invalid JWT"
+        }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    let userId: string;
-    try {
-      const payload = JSON.parse(atob(jwtParts[1]));
-      userId = payload.sub;
-      console.log("✅ JWT decoded, user ID:", userId);
-    } catch (e) {
-      console.error("❌ Failed to decode JWT:", e);
-      return new Response(
-        JSON.stringify({ code: 401, message: "Failed to decode JWT" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    const userId = user.id;
+    console.log("✅ User authenticated:", userId);
 
-    // Get user's company_id using service role for direct database access
+    // STEP 3: Get user's company_id using service role for direct database access
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
     const { data: profile, error: profileError } = await supabaseAdmin
       .from("user_profiles")
@@ -98,7 +88,11 @@ Deno.serve(async (req: Request) => {
     if (profileError || !profile?.company_id) {
       console.error("❌ Company not found for user:", userId);
       return new Response(
-        JSON.stringify({ code: 404, message: "Company not found" }),
+        JSON.stringify({
+          code: 404,
+          message: "Company not found",
+          details: "User profile does not have an associated company"
+        }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -325,17 +319,22 @@ Deno.serve(async (req: Request) => {
     if (error.name === 'PromoStandardsError') {
       return new Response(
         JSON.stringify({
+          success: false,
           error: error.message,
           code: error.code,
-          supplier: "sanmar"
+          supplier: "sanmar",
+          message: `SanMar PromoStandards authentication failed: ${error.message}`
         }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    // Return clear error messages
     return new Response(
       JSON.stringify({
+        success: false,
         error: error.message || "Internal server error",
+        supplier: "sanmar",
         details: error.stack
       }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
