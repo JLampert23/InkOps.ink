@@ -148,17 +148,37 @@ Deno.serve(async (req: Request) => {
     switch (action) {
       case "test":
       case "brands":
-        // Test connection using LOG105 (SanMar style number)
-        const testResult = await testSanMarConnection(credentials);
-        responseData = {
-          success: testResult,
-          supplier: "sanmar",
-          action,
-          authenticated: testResult,
-          message: testResult
-            ? "SanMar PromoStandards connection successful! Test product (LOG105) found."
-            : "SanMar PromoStandards connection failed - check credentials"
-        };
+        // Test connection using PC54 (SanMar style number)
+        console.log('🧪 Starting SanMar connection test...');
+        try {
+          const testResult = await Promise.race([
+            testSanMarConnection(credentials),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Connection test timed out after 25 seconds')), 25000)
+            )
+          ]) as boolean;
+
+          responseData = {
+            success: testResult,
+            supplier: "sanmar",
+            action,
+            authenticated: testResult,
+            message: testResult
+              ? "SanMar PromoStandards connection successful! Test product (PC54) found."
+              : "SanMar PromoStandards connection failed - check credentials"
+          };
+          console.log('✅ SanMar connection test completed:', testResult);
+        } catch (error: any) {
+          console.error('❌ SanMar connection test error:', error.message);
+          responseData = {
+            success: false,
+            supplier: "sanmar",
+            action,
+            authenticated: false,
+            error: error.message || 'Connection test failed',
+            message: `SanMar connection test failed: ${error.message}`
+          };
+        }
         break;
 
       case "unified":

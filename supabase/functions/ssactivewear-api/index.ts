@@ -153,6 +153,8 @@ Deno.serve(async (req: Request) => {
     } else {
       // User JWT - validate using anon key client with user's JWT
       console.log("User JWT - validating token");
+      console.log("Auth header present:", !!authHeader);
+      console.log("Token length:", token.length);
 
       const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
       const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
@@ -166,12 +168,22 @@ Deno.serve(async (req: Request) => {
       const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
 
       if (authError || !user) {
+        console.error("❌ JWT validation failed");
         console.error("Auth error:", authError);
+        console.error("Error message:", authError?.message);
+        console.error("Error status:", authError?.status);
         return new Response(
-          JSON.stringify({ error: "Unauthorized", details: authError?.message }),
+          JSON.stringify({
+            code: 401,
+            message: "Invalid JWT",
+            error: "Unauthorized",
+            details: authError?.message
+          }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+
+      console.log("✅ JWT validated successfully, user:", user.id);
 
       // Get user's company_id using service role client
       const { data: profile } = await supabase
