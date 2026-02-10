@@ -271,7 +271,7 @@ Deno.serve(async (req: Request) => {
                 error: "Authentication failed - invalid credentials",
               }),
               {
-                status: 200,
+                status: 401,
                 headers: { ...corsHeaders, "Content-Type": "application/json" }
               }
             );
@@ -290,7 +290,7 @@ Deno.serve(async (req: Request) => {
                 error: `API error: ${faultString}`,
               }),
               {
-                status: 200,
+                status: 500,
                 headers: { ...corsHeaders, "Content-Type": "application/json" }
               }
             );
@@ -310,7 +310,7 @@ Deno.serve(async (req: Request) => {
                 errorCode: parseResult.error?.code,
               }),
               {
-                status: 200,
+                status: 401,
                 headers: { ...corsHeaders, "Content-Type": "application/json" }
               }
             );
@@ -328,7 +328,7 @@ Deno.serve(async (req: Request) => {
                 error: "Unexpected API response format",
               }),
               {
-                status: 200,
+                status: 500,
                 headers: { ...corsHeaders, "Content-Type": "application/json" }
               }
             );
