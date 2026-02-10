@@ -151,12 +151,22 @@ Deno.serve(async (req: Request) => {
 
     console.log(`✅ Found ${results.length} result(s)`);
 
+    // Collect diagnostic info
+    const diagnostics = {
+      companyId,
+      settingsChecked: !!settings,
+      sanmarEnabled: settings?.sanmar_enabled || false,
+      ssaEnabled: settings?.ssactivewear_enabled || false,
+      searchPromisesCount: searchPromises.length,
+    };
+
     return new Response(
       JSON.stringify({
         success: true,
         style,
         results,
         count: results.length,
+        diagnostics,
       }),
       {
         status: 200,

@@ -151,20 +151,25 @@ export async function searchSanMarCatalog(
     }
 
     console.log(`📞 Fetching live data from SanMar PromoStandards API for style: ${style}...`);
-    console.log(`📞 Using credentials - Username: ${credentials.id}`);
+    console.log(`📞 Using credentials - Username: ${credentials.id}, Password length: ${credentials.password?.length || 0}`);
 
     const { fetchSanMarProductData, fetchSanMarMedia } = await import("../_shared/sanmar-promostandards-client.ts");
 
     console.log(`🌐 Calling fetchSanMarProductData...`);
+    const startTime = Date.now();
     const [productResult, mediaResult] = await Promise.allSettled([
       fetchSanMarProductData(credentials, style),
       fetchSanMarMedia(credentials, style),
     ]);
+    const elapsed = Date.now() - startTime;
+    console.log(`⏱️ API calls completed in ${elapsed}ms`);
 
     console.log(`📊 Product result status: ${productResult.status}`);
     if (productResult.status === 'rejected') {
       const errorMessage = productResult.reason?.message || 'Product not found';
+      const errorStack = productResult.reason?.stack || '';
       console.error(`❌ Product fetch rejected: ${errorMessage}`);
+      console.error(`❌ Error stack: ${errorStack}`);
       errors.push(`SanMar error: ${errorMessage}`);
       return { results, errors };
     }
