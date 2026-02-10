@@ -104,7 +104,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Get SanMar PromoStandards credentials from company_settings
-    const { data: settings } = await supabaseAdmin
+    const { data: settings } = await supabase
       .from("company_settings")
       .select("sanmar_promo_username, sanmar_promo_password_encrypted")
       .eq("id", companyId)
