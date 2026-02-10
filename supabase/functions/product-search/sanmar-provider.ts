@@ -99,6 +99,9 @@ export async function searchSanMarCatalog(
     };
 
     const product = transformSanMarData(apiDataForTransform);
+    if (productData.data?._debug) {
+      product.raw_data = { _debug: productData.data._debug };
+    }
     results.push(product);
 
     await cacheProduct(supabaseAdmin, companyId, style, productData.data, mediaData);

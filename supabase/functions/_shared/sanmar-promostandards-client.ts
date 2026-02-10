@@ -341,11 +341,23 @@ export async function fetchSanMarProductData(
   };
 
   console.log(`📄 Response XML length: ${responseXml.length}`);
-  console.log(`📄 Response preview: ${responseXml.substring(0, 300)}`);
 
   const partPattern = nsElementPattern("ProductPart");
   const partMatches = getAllXmlMatches(responseXml, partPattern);
   console.log(`📄 ProductPart matches found: ${partMatches.length}`);
+
+  if (partMatches.length > 0) {
+    console.log(`📄 First ProductPart sample (500 chars): ${partMatches[0][1].substring(0, 500)}`);
+  }
+
+  if (partMatches.length === 0) {
+    const arrayPattern = nsElementPattern("ProductPartArray");
+    const arrayMatches = getAllXmlMatches(responseXml, arrayPattern);
+    console.log(`📄 ProductPartArray matches: ${arrayMatches.length}`);
+    if (arrayMatches.length > 0) {
+      console.log(`📄 ProductPartArray sample (500 chars): ${arrayMatches[0][1].substring(0, 500)}`);
+    }
+  }
 
   styleData.parts = partMatches.map(match => {
     const partXml = match[1];
@@ -358,8 +370,7 @@ export async function fetchSanMarProductData(
     };
   });
 
-  // Group parts by color
-  const colorMap = new Map();
+  const colorMap = new Map<string, { colorName: string; hex: string; approximatePmsColor: string; partIds: { partId: string; size: string }[] }>();
   styleData.parts.forEach((part) => {
     if (!colorMap.has(part.colorName)) {
       colorMap.set(part.colorName, {
@@ -369,7 +380,7 @@ export async function fetchSanMarProductData(
         partIds: []
       });
     }
-    colorMap.get(part.colorName).partIds.push({
+    colorMap.get(part.colorName)!.partIds.push({
       partId: part.partId,
       size: part.labelSize
     });
@@ -378,6 +389,18 @@ export async function fetchSanMarProductData(
   styleData.colors = Array.from(colorMap.values());
 
   console.log(`✅ Found ${styleData.parts.length} parts, ${styleData.colors.length} colors`);
+  if (styleData.parts.length > 0) {
+    const sampleParts = styleData.parts.slice(0, 3);
+    console.log(`📄 Sample parsed parts: ${JSON.stringify(sampleParts)}`);
+  }
+
+  (styleData as any)._debug = {
+    xmlLength: responseXml.length,
+    productPartMatches: partMatches.length,
+    firstPartSample: partMatches.length > 0 ? partMatches[0][1].substring(0, 300) : null,
+    sampleParts: styleData.parts.slice(0, 3),
+    uniqueColors: [...new Set(styleData.parts.map(p => p.colorName))].slice(0, 10),
+  };
 
   return styleData;
 }
