@@ -77,12 +77,51 @@ Deno.serve(async (req: Request) => {
     if (companyIdParam) {
       companyId = companyIdParam;
     } else {
-      const { data: firstCompany } = await supabaseAdmin
-        .from("company_settings")
-        .select("id")
-        .limit(1)
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader) {
+        return new Response(
+          JSON.stringify({ error: "Missing authorization header" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const token = authHeader.replace("Bearer ", "");
+      const jwtParts = token.split('.');
+
+      if (jwtParts.length !== 3) {
+        return new Response(
+          JSON.stringify({ error: "Invalid JWT format" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      let userId: string;
+      try {
+        const payload = JSON.parse(atob(jwtParts[1]));
+        userId = payload.sub;
+        console.log("Decoded user ID from JWT:", userId);
+      } catch (e) {
+        return new Response(
+          JSON.stringify({ error: "Failed to decode JWT" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const { data: profile } = await supabaseAdmin
+        .from("user_profiles")
+        .select("company_id")
+        .eq("id", userId)
         .maybeSingle();
-      companyId = firstCompany?.id || null;
+
+      if (!profile?.company_id) {
+        return new Response(
+          JSON.stringify({ error: "User company not found" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      companyId = profile.company_id;
+      console.log("Using company_id from user profile:", companyId);
     }
 
     if (!companyId) {
