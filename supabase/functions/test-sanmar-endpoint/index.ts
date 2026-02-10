@@ -7,6 +7,52 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+// Inline decryption to avoid nested edge function calls
+async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits', 'deriveKey']
+  );
+
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    true,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function decryptToken(encryptedToken: string, encryptionKey: string): Promise<string> {
+  const combined = new Uint8Array(
+    atob(encryptedToken).split('').map(c => c.charCodeAt(0))
+  );
+
+  const salt = combined.slice(0, 16);
+  const iv = combined.slice(16, 28);
+  const encryptedData = combined.slice(28);
+
+  const key = await deriveKey(encryptionKey, salt);
+
+  const decryptedData = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: iv },
+    key,
+    encryptedData
+  );
+
+  const decoder = new TextDecoder();
+  return decoder.decode(decryptedData);
+}
+
 function getXmlValue(xmlText: string, tagName: string): string | null {
   const regex = new RegExp(`<[^:]*:?${tagName}[^>]*>([^<]*)<\/[^:]*:?${tagName}>`, 'i');
   const match = xmlText.match(regex);
@@ -68,44 +114,25 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Optimize: Decrypt with timeout
-    const decryptController = new AbortController();
-    const decryptTimeout = setTimeout(() => decryptController.abort(), 5000);
-
-    let decryptResponse;
-    try {
-      decryptResponse = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/crypto-service`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-        },
-        body: JSON.stringify({
-          action: "decrypt",
-          token: settings.sanmar_promo_password_encrypted,
-        }),
-        signal: decryptController.signal,
-      });
-    } catch (error: any) {
-      clearTimeout(decryptTimeout);
-      if (error.name === 'AbortError') {
-        return new Response(
-          JSON.stringify({ error: "Decrypt timeout" }),
-          { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      throw error;
-    }
-    clearTimeout(decryptTimeout);
-
-    if (!decryptResponse.ok) {
+    // Use inline decryption to avoid nested edge function calls
+    const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
+    if (!encryptionKey) {
       return new Response(
-        JSON.stringify({ error: "Failed to decrypt credentials" }),
+        JSON.stringify({ error: "ENCRYPTION_KEY not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const { result: password } = await decryptResponse.json();
+    let password: string;
+    try {
+      password = await decryptToken(settings.sanmar_promo_password_encrypted, encryptionKey);
+    } catch (error: any) {
+      return new Response(
+        JSON.stringify({ error: "Failed to decrypt credentials", details: error.message }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const credentials = { id: settings.sanmar_promo_username, password };
 
     const normalizedStyle = style.toUpperCase().trim();
