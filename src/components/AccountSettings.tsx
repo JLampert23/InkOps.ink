@@ -2004,11 +2004,20 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   };
 
   const testSanmarConnection = async () => {
+    console.log('🧪 Testing SanMar connection...', {
+      enabled: sanmarEnabled,
+      hasCredentials: sanmarHasCredentials,
+      companySettingsId: companySettings?.id,
+      hasUsername: !!companySettings?.sanmar_promo_username,
+      hasPassword: !!companySettings?.sanmar_promo_password_encrypted
+    });
+
     try {
       setTestingSanmar(true);
       setSanmarTestResult(null);
 
       if (!companySettings?.id) {
+        console.error('❌ Company settings not loaded');
         setSanmarTestResult({
           success: false,
           error: 'Company settings not loaded. Please refresh the page.',
@@ -2019,6 +2028,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       const sanmarHasCreds = !!(companySettings.sanmar_promo_username && companySettings.sanmar_promo_password_encrypted);
 
       if (!sanmarHasCreds) {
+        console.error('❌ SanMar credentials not saved');
         setSanmarTestResult({
           success: false,
           error: 'SanMar API credentials not saved. Please save your credentials first.',
@@ -2031,6 +2041,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       const token = sessionData.session?.access_token;
 
       if (!token) {
+        console.error('❌ No auth token available');
         setSanmarTestResult({
           success: false,
           error: 'No authentication token available. Please sign in again.',
@@ -2038,19 +2049,26 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sanmar-api?action=product&style=PC54`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sanmar-api?action=product&style=PC54`;
+      console.log('📡 Calling SanMar API:', testUrl);
+
+      const response = await fetch(testUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('📥 SanMar response:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
 
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ SanMar connection successful!', data);
         if (data.success && data.data?.productName) {
           setSanmarTestResult({
             success: true,
@@ -2064,8 +2082,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         }
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('SanMar API error response:', errorData);
-        console.error('Response status:', response.status);
+        console.error('❌ SanMar connection failed:', {
+          status: response.status,
+          errorData
+        });
         setSanmarTestResult({
           success: false,
           error: errorData.error || `API connection failed (${response.status})`,
@@ -2083,11 +2103,19 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   };
 
   const testSSAConnection = async () => {
+    console.log('🧪 Testing SSActivewear connection...', {
+      enabled: ssaEnabled,
+      hasCredentials: ssaHasCredentials,
+      companySettingsId: companySettings?.id,
+      hasEncryptedKey: !!companySettings?.ssactivewear_api_key_encrypted
+    });
+
     try {
       setTestingSSA(true);
       setSsaTestResult(null);
 
       if (!companySettings?.id) {
+        console.error('❌ Company settings not loaded');
         setSsaTestResult({
           success: false,
           error: 'Company settings not loaded. Please refresh the page.',
@@ -2098,6 +2126,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       const ssaHasCreds = !!(companySettings.ssactivewear_api_key_encrypted);
 
       if (!ssaHasCreds) {
+        console.error('❌ SSActivewear credentials not saved');
         setSsaTestResult({
           success: false,
           error: 'SSActivewear credentials not saved. Please save your credentials first.',
@@ -2110,6 +2139,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       const token = sessionData.session?.access_token;
 
       if (!token) {
+        console.error('❌ No auth token available');
         setSsaTestResult({
           success: false,
           error: 'No authentication token available. Please sign in again.',
@@ -2117,25 +2147,36 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ssactivewear-api?action=brands`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ssactivewear-api?action=brands`;
+      console.log('📡 Calling SSActivewear API:', testUrl);
+
+      const response = await fetch(testUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('📥 SSActivewear response:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
 
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ SSActivewear connection successful!', data);
         setSsaTestResult({
           success: true,
-          message: 'Connected successfully! Retrieved brand list.',
+          message: data.message || 'Connected successfully! Retrieved brand list.',
         });
       } else {
         const errorText = await response.text();
+        console.error('❌ SSActivewear connection failed:', {
+          status: response.status,
+          errorText
+        });
         let errorData;
         try {
           errorData = JSON.parse(errorText);
@@ -2144,7 +2185,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         }
         setSsaTestResult({
           success: false,
-          error: errorData.error || 'Connection failed',
+          error: errorData.error || `Connection failed (${response.status})`,
         });
       }
     } catch (err) {
@@ -6099,45 +6140,43 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       )}
                     </div>
 
-                    {ssaHasCredentials && (
-                      <>
-                        <div className="grid grid-cols-2 gap-3">
-                          <button
-                            onClick={testSSAConnection}
-                            disabled={testingSSA}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                          >
-                            {testingSSA ? (
-                              <>
-                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                Testing...
-                              </>
-                            ) : (
-                              <>
-                                <Zap className="w-4 h-4" />
-                                Test Connection
-                              </>
-                            )}
-                          </button>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={testSSAConnection}
+                        disabled={testingSSA || !ssaEnabled}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                      >
+                        {testingSSA ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Testing...
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="w-4 h-4" />
+                            Test Connection
+                          </>
+                        )}
+                      </button>
 
-                          <button
-                            onClick={syncSSACatalog}
-                            disabled={syncingCatalog}
-                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                          >
-                            {syncingCatalog ? (
-                              <>
-                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                Syncing...
-                              </>
-                            ) : (
-                              <>
-                                <RefreshCw className="w-4 h-4" />
-                                Sync Catalog
-                              </>
-                            )}
-                          </button>
-                        </div>
+                      <button
+                        onClick={syncSSACatalog}
+                        disabled={syncingCatalog || !ssaEnabled || !ssaHasCredentials}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                      >
+                        {syncingCatalog ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Syncing...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="w-4 h-4" />
+                            Sync Catalog
+                          </>
+                        )}
+                      </button>
+                    </div>
 
                         {ssaTestResult && (
                           <div className={`p-4 rounded-lg border ${ssaTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
@@ -6185,8 +6224,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                             </div>
                           </div>
                         )}
-                      </>
-                    )}
+                    </div>
                   </div>
                 )}
               </div>
