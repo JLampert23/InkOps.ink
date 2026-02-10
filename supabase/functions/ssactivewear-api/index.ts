@@ -275,8 +275,16 @@ Deno.serve(async (req: Request) => {
 
     switch (action) {
       case "brands": {
-        // Test actual connection by fetching a known SSActivewear product (Gildan 64000)
-        console.log('🧪 Testing SSActivewear PromoStandards connection...');
+        console.log('');
+        console.log('==================================================');
+        console.log('🧪 SSActivewear CONNECTION TEST - CALLING LIVE API');
+        console.log('==================================================');
+        console.log('📍 This is NOT using cached data from the database');
+        console.log('📍 Making a REAL HTTP request to SSActivewear servers');
+        console.log('📍 Endpoint: https://promostandards.ssactivewear.com');
+        console.log('==================================================');
+        console.log('');
+
         const testProductId = "64000";
 
         const soapBody = `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
@@ -287,6 +295,11 @@ Deno.serve(async (req: Request) => {
 </ns2:GetProductRequest>`;
 
         try {
+          console.log('🌐 Calling makePromoStandardsRequest...');
+          console.log('🌐 Target: SSActivewear PromoStandards SOAP API');
+          console.log('🌐 Action: getProduct');
+          console.log('🌐 Product ID:', testProductId);
+
           const xmlResponse = await makePromoStandardsRequest(
             PROMOSTANDARDS_ENDPOINTS.productData,
             "getProduct",
@@ -295,7 +308,11 @@ Deno.serve(async (req: Request) => {
             decryptedApiKey
           );
 
-          console.log('📥 SSActivewear test response received, length:', xmlResponse.length);
+          console.log('');
+          console.log('✅ RECEIVED RESPONSE FROM SSACTIVEWEAR SERVERS');
+          console.log('📥 Response length:', xmlResponse.length, 'bytes');
+          console.log('📥 Response preview (first 500 chars):', xmlResponse.substring(0, 500));
+          console.log('');
 
           // Check for authentication error
           if (xmlResponse.includes('AuthenticationError') || xmlResponse.includes('Invalid credentials') || xmlResponse.includes('Unauthorized')) {
