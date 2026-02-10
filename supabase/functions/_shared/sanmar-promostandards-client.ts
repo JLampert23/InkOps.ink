@@ -202,10 +202,10 @@ async function callPromoStandardsService(
   wsdlUrl: string,
   soapAction: string,
   soapEnvelope: string,
-  maxRetries = 2
+  maxRetries = 1
 ): Promise<string> {
   const startTime = Date.now();
-  const REQUEST_TIMEOUT_MS = 20000;
+  const REQUEST_TIMEOUT_MS = 15000;
 
   console.log(`📡 PromoStandards Request: ${soapAction}`);
   console.log(`🔗 Endpoint: ${wsdlUrl}`);

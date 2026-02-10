@@ -187,8 +187,19 @@ export async function searchSanMarCatalog(
       return { results, errors };
     }
 
-    // For search results, we don't need media yet - just basic product info
-    // Media will be fetched when user selects the product
+    // Try to fetch media but don't fail if it times out
+    let mediaData = null;
+    try {
+      console.log(`🖼️ Fetching media for ${style}...`);
+      const mediaStartTime = Date.now();
+      mediaData = await fetchSanMarMedia(credentials, style);
+      const mediaElapsed = Date.now() - mediaStartTime;
+      console.log(`✅ Media fetch completed in ${mediaElapsed}ms`);
+    } catch (mediaError: any) {
+      console.warn(`⚠️ Media fetch failed (non-critical): ${mediaError.message}`);
+      // Continue without media - we'll show product without images
+    }
+
     const apiData = {
       success: true,
       styleNumber: style,
@@ -196,7 +207,7 @@ export async function searchSanMarCatalog(
       style: productData,
       inventory: { items: [] },
       pricing: { parts: [] },
-      media: {
+      media: mediaData || {
         images: [],
         views: {
           front: null,
@@ -215,8 +226,8 @@ export async function searchSanMarCatalog(
     const product = transformSanMarData(apiData);
     results.push(product);
 
-    // Cache only product data for now
-    await cacheProduct(supabaseAdmin, companyId, style, productData, null);
+    // Cache product and media
+    await cacheProduct(supabaseAdmin, companyId, style, productData, mediaData);
 
     console.log(`✅ Successfully fetched ${product.colors.length} colors from SanMar API`);
 
