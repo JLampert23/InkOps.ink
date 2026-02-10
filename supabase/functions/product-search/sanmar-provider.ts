@@ -157,12 +157,18 @@ export async function searchSanMarCatalog(
 
     console.log(`🌐 Calling fetchSanMarProductData...`);
     const startTime = Date.now();
-    const [productResult, mediaResult] = await Promise.allSettled([
-      fetchSanMarProductData(credentials, style),
-      fetchSanMarMedia(credentials, style),
-    ]);
+
+    // Fetch product data first (this is the critical one)
+    let productResult;
+    try {
+      const productData = await fetchSanMarProductData(credentials, style);
+      productResult = { status: 'fulfilled' as const, value: productData };
+    } catch (error: any) {
+      productResult = { status: 'rejected' as const, reason: error };
+    }
+
     const elapsed = Date.now() - startTime;
-    console.log(`⏱️ API calls completed in ${elapsed}ms`);
+    console.log(`⏱️ Product API call completed in ${elapsed}ms`);
 
     console.log(`📊 Product result status: ${productResult.status}`);
     if (productResult.status === 'rejected') {
@@ -181,8 +187,8 @@ export async function searchSanMarCatalog(
       return { results, errors };
     }
 
-    const mediaData = mediaResult.status === 'fulfilled' ? mediaResult.value : null;
-
+    // For search results, we don't need media yet - just basic product info
+    // Media will be fetched when user selects the product
     const apiData = {
       success: true,
       styleNumber: style,
@@ -190,7 +196,7 @@ export async function searchSanMarCatalog(
       style: productData,
       inventory: { items: [] },
       pricing: { parts: [] },
-      media: mediaData || {
+      media: {
         images: [],
         views: {
           front: null,
@@ -209,7 +215,8 @@ export async function searchSanMarCatalog(
     const product = transformSanMarData(apiData);
     results.push(product);
 
-    await cacheProduct(supabaseAdmin, companyId, style, productData, mediaData);
+    // Cache only product data for now
+    await cacheProduct(supabaseAdmin, companyId, style, productData, null);
 
     console.log(`✅ Successfully fetched ${product.colors.length} colors from SanMar API`);
 
