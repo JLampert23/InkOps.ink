@@ -56,6 +56,9 @@ Deno.serve(async (req: Request) => {
     // and match against the provided credentials
 
     const authHeader = req.headers.get('Authorization');
+
+    console.log('[DEBUG] Received Authorization header:', authHeader ? `${authHeader.substring(0, 20)}...` : 'null');
+
     if (!authHeader) {
       return new Response(
         JSON.stringify({ error: 'Missing Authorization header' }),
@@ -84,8 +87,11 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    console.log(`[DEBUG] Found ${allSettings.length} company settings`);
+
     // Try to authenticate against each company's settings
     let authenticatedCompanyId: string | null = null;
+    let debugInfo: string[] = [];
 
     for (const setting of allSettings) {
       const config = setting.value as ChipplyEndpointSettings;
@@ -97,16 +103,24 @@ Deno.serve(async (req: Request) => {
           const decoded = atob(base64Creds);
           const [username, password] = decoded.split(':');
 
+          console.log(`[DEBUG] Basic Auth - Expected username: ${config.username}, Got: ${username}`);
+          debugInfo.push(`Basic Auth - Username match: ${username === config.username}, Password match: ${password === config.password}`);
+
           if (username === config.username && password === config.password) {
             authenticatedCompanyId = setting.company_id;
             break;
           }
+        } else {
+          debugInfo.push(`Auth header doesn't start with "Basic "`);
         }
       } else if (config.auth_type === 'api_key') {
         // API Key format: "Bearer <api_key>" or just the key
         const providedKey = authHeader.startsWith('Bearer ')
           ? authHeader.substring(7)
           : authHeader;
+
+        console.log(`[DEBUG] API Key - Provided key length: ${providedKey.length}, Expected key length: ${config.api_key.length}`);
+        debugInfo.push(`API Key - Match: ${providedKey === config.api_key}`);
 
         if (providedKey === config.api_key) {
           authenticatedCompanyId = setting.company_id;
@@ -116,8 +130,12 @@ Deno.serve(async (req: Request) => {
     }
 
     if (!authenticatedCompanyId) {
+      console.log('[DEBUG] Authentication failed:', debugInfo.join('; '));
       return new Response(
-        JSON.stringify({ error: 'Invalid credentials' }),
+        JSON.stringify({
+          error: 'Invalid credentials',
+          debug: debugInfo.join('; ')
+        }),
         {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
