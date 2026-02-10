@@ -63,20 +63,8 @@ Deno.serve(async (req: Request) => {
       }
       companyId = companyIdParam;
     } else {
-      // User JWT - create user client to validate token
-      const supabaseUser = createClient(supabaseUrl, supabaseServiceRoleKey, {
-        global: {
-          headers: {
-            Authorization: authHeader
-          }
-        },
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      });
-
-      const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
+      // User JWT - validate token using admin client
+      const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
 
       if (authError || !user) {
         console.error("Auth error:", authError);
