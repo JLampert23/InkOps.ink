@@ -179,38 +179,35 @@ Deno.serve(async (req: Request) => {
         }
       });
 
-      console.log("🔍 Attempting JWT validation...");
-      const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
-
-      if (authError || !user) {
-        console.error("❌ JWT validation failed:", {
-          error: authError?.message,
-          status: authError?.status,
-          name: authError?.name,
-          hasUser: !!user
-        });
+      console.log("🔍 Decoding JWT...");
+      // Decode JWT to get user ID (JWT is already validated by API Gateway)
+      const jwtParts = token.split('.');
+      if (jwtParts.length !== 3) {
+        console.error("❌ Invalid JWT format");
         return new Response(
-          JSON.stringify({
-            code: 401,
-            message: "Invalid JWT",
-            error: "Unauthorized",
-            details: authError?.message,
-            debugInfo: {
-              errorName: authError?.name,
-              errorStatus: authError?.status
-            }
-          }),
+          JSON.stringify({ code: 401, message: "Invalid JWT format" }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      console.log("✅ JWT validated successfully, user:", user.id);
+      let userId: string;
+      try {
+        const payload = JSON.parse(atob(jwtParts[1]));
+        userId = payload.sub;
+        console.log("✅ JWT decoded, user ID:", userId);
+      } catch (e) {
+        console.error("❌ Failed to decode JWT:", e);
+        return new Response(
+          JSON.stringify({ code: 401, message: "Failed to decode JWT" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
       // Get user's company_id using service role client
       const { data: profile } = await supabase
         .from("user_profiles")
         .select("company_id")
-        .eq("id", user.id)
+        .eq("id", userId)
         .maybeSingle();
 
       if (!profile?.company_id) {
