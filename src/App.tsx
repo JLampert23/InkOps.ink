@@ -9,7 +9,7 @@ import { supabase } from './lib/supabase-client';
 import { billingService } from './services/billing-service';
 import { useRBAC } from './hooks/useRBAC';
 import PublicQuoteApprovalPage from './components/production/PublicQuoteApprovalPage';
-import SanMarDiagnostic from './components/diagnostics/SanMarDiagnostic';
+import { IntegrationsDiagnostic } from './components/diagnostics/IntegrationsDiagnostic';
 
 const SquareData = lazy(() => import('./components/SquareData'));
 const ProductionManagement = lazy(() => import('./components/ProductionManagement').then(m => ({ default: m.ProductionManagement })));
@@ -27,7 +27,7 @@ type Tab =
   | 'paid-invoices'
   | 'customers'
   | 'payments'
-  | 'sanmar-diagnostic';
+  | 'integrations-diagnostic';
 
 interface CompanySettings {
   company_name: string;
@@ -346,11 +346,11 @@ function AppContent() {
             <span className="text-sm font-medium">Account Settings</span>
           </button>
           <button
-            onClick={() => setActiveTab('sanmar-diagnostic')}
+            onClick={() => setActiveTab('integrations-diagnostic')}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg transition-colors"
           >
             <Bug className="w-4 h-4" />
-            <span className="text-sm font-medium">SanMar Diagnostic</span>
+            <span className="text-sm font-medium">Integrations Diagnostic</span>
           </button>
           <button
             onClick={toggleDarkMode}
@@ -382,7 +382,7 @@ function AppContent() {
                  activeTab === 'customers' ? 'Customers' :
                  activeTab === 'payments' ? 'Payments' :
                  activeTab === 'production' ? 'Production Dashboard' :
-                 activeTab === 'sanmar-diagnostic' ? 'SanMar API Diagnostic' :
+                 activeTab === 'integrations-diagnostic' ? 'Integrations Diagnostic' :
                  [...accountingNavItems, ...squareNavItems, ...productionNavItems].find(item => item.id === activeTab)?.name ||
                  (activeTab === 'settings' ? 'Account Settings' : 'Dashboard')}
               </h2>
@@ -400,8 +400,8 @@ function AppContent() {
                     'Payment history and Stripe transaction records'
                   ) : activeTab === 'square' ? (
                     'Square payment data and reports'
-                  ) : activeTab === 'sanmar-diagnostic' ? (
-                    'Test SanMar API and view raw XML responses'
+                  ) : activeTab === 'integrations-diagnostic' ? (
+                    'Test SanMar and SSActivewear integrations'
                   ) : activeTab === 'settings' ? (
                     'Configure your integrations and preferences'
                   ) : (
@@ -558,8 +558,8 @@ function AppContent() {
             </Suspense>
           )}
 
-          {activeTab === 'sanmar-diagnostic' && (
-            <SanMarDiagnostic />
+          {activeTab === 'integrations-diagnostic' && (
+            <IntegrationsDiagnostic />
           )}
 
           {activeTab === 'settings' && (

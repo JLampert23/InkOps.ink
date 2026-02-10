@@ -60,31 +60,49 @@ export function ProductSearchModal({ vendorId, vendorType, onSelect, onClose }: 
     try {
       setSearching(true);
 
-      // Call the product search edge function
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      // Call the product search edge function with proper auth
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.error('❌ Not authenticated - no session found');
+        throw new Error('Not authenticated');
+      }
+
+      console.log('🔐 Using session token for product search');
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/product-search?style=${encodeURIComponent(searchTerm)}`,
         {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
           },
         }
       );
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        console.error('Search failed:', errorData);
+        console.error('❌ Search failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
+        alert(`Search failed: ${errorData.error || response.statusText}`);
         throw new Error(errorData.error || 'Search failed');
       }
 
       const data = await response.json();
       console.log('📦 Product search API response:', data);
 
-      if (!data.success || !data.results) {
-        console.error('❌ Invalid API response:', data);
+      if (!data.success) {
+        console.error('❌ API returned error:', data);
+        alert(`Search failed: ${data.error || 'Unknown error'}`);
+        setResults([]);
+        return;
+      }
+
+      if (!data.results || data.results.length === 0) {
+        console.warn('⚠️ No products found for:', searchTerm);
         setResults([]);
         return;
       }
@@ -116,8 +134,10 @@ export function ProductSearchModal({ vendorId, vendorType, onSelect, onClose }: 
 
       console.log('✅ Transformed results:', transformedResults);
       setResults(transformedResults);
-    } catch (error) {
-      console.error('Error searching products:', error);
+    } catch (error: any) {
+      console.error('❌ Error searching products:', error);
+      alert(`Search error: ${error.message || 'Unknown error'}`);
+      setResults([]);
     } finally {
       setSearching(false);
     }

@@ -1,0 +1,257 @@
+import React, { useState, useEffect } from 'react';
+import { Check, X, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { supabase } from '../../lib/supabase-client';
+
+interface DiagnosticResult {
+  name: string;
+  status: 'checking' | 'success' | 'error' | 'disabled';
+  message: string;
+  details?: any;
+}
+
+export function IntegrationsDiagnostic() {
+  const [results, setResults] = useState<DiagnosticResult[]>([]);
+  const [testing, setTesting] = useState(false);
+
+  useEffect(() => {
+    runDiagnostics();
+  }, []);
+
+  const runDiagnostics = async () => {
+    setTesting(true);
+    const diagnostics: DiagnosticResult[] = [];
+
+    // 1. Check authentication
+    diagnostics.push({ name: 'Authentication', status: 'checking', message: 'Checking...' });
+    setResults([...diagnostics]);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        diagnostics[0] = { name: 'Authentication', status: 'error', message: 'Not authenticated' };
+        setResults([...diagnostics]);
+        setTesting(false);
+        return;
+      }
+      diagnostics[0] = { name: 'Authentication', status: 'success', message: 'Authenticated', details: { userId: session.user.id } };
+      setResults([...diagnostics]);
+
+      // 2. Check company settings
+      diagnostics.push({ name: 'Company Settings', status: 'checking', message: 'Loading...' });
+      setResults([...diagnostics]);
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
+      if (!profile?.company_id) {
+        diagnostics[1] = { name: 'Company Settings', status: 'error', message: 'No company found' };
+        setResults([...diagnostics]);
+        setTesting(false);
+        return;
+      }
+
+      const { data: settings } = await supabase
+        .from('company_settings')
+        .select('sanmar_enabled, ssactivewear_enabled, sanmar_promo_username, sanmar_promo_password_encrypted, ssactivewear_username, ssactivewear_api_key_encrypted')
+        .eq('id', profile.company_id)
+        .maybeSingle();
+
+      diagnostics[1] = {
+        name: 'Company Settings',
+        status: 'success',
+        message: 'Loaded',
+        details: {
+          companyId: profile.company_id,
+          sanmarEnabled: settings?.sanmar_enabled || false,
+          ssaEnabled: settings?.ssactivewear_enabled || false,
+        }
+      };
+      setResults([...diagnostics]);
+
+      // 3. Check SanMar configuration
+      diagnostics.push({ name: 'SanMar Configuration', status: 'checking', message: 'Checking...' });
+      setResults([...diagnostics]);
+
+      if (!settings?.sanmar_enabled) {
+        diagnostics[2] = { name: 'SanMar Configuration', status: 'disabled', message: 'SanMar integration is disabled' };
+      } else if (!settings?.sanmar_promo_username || !settings?.sanmar_promo_password_encrypted) {
+        diagnostics[2] = { name: 'SanMar Configuration', status: 'error', message: 'SanMar credentials not configured' };
+      } else {
+        diagnostics[2] = {
+          name: 'SanMar Configuration',
+          status: 'success',
+          message: 'Credentials configured',
+          details: {
+            username: settings.sanmar_promo_username,
+            hasPassword: !!settings.sanmar_promo_password_encrypted
+          }
+        };
+      }
+      setResults([...diagnostics]);
+
+      // 4. Check SSActivewear configuration
+      diagnostics.push({ name: 'SSActivewear Configuration', status: 'checking', message: 'Checking...' });
+      setResults([...diagnostics]);
+
+      if (!settings?.ssactivewear_enabled) {
+        diagnostics[3] = { name: 'SSActivewear Configuration', status: 'disabled', message: 'SSActivewear integration is disabled' };
+      } else if (!settings?.ssactivewear_username || !settings?.ssactivewear_api_key_encrypted) {
+        diagnostics[3] = { name: 'SSActivewear Configuration', status: 'error', message: 'SSActivewear credentials not configured' };
+      } else {
+        diagnostics[3] = {
+          name: 'SSActivewear Configuration',
+          status: 'success',
+          message: 'Credentials configured',
+          details: {
+            accountNumber: settings.ssactivewear_username,
+            hasApiKey: !!settings.ssactivewear_api_key_encrypted
+          }
+        };
+      }
+      setResults([...diagnostics]);
+
+      // 5. Test product search endpoint
+      if (settings?.sanmar_enabled || settings?.ssactivewear_enabled) {
+        diagnostics.push({ name: 'Product Search API', status: 'checking', message: 'Testing with PC54...' });
+        setResults([...diagnostics]);
+
+        try {
+          const response = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/product-search?style=PC54`,
+            {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+            }
+          );
+
+          const data = await response.json();
+
+          if (response.ok && data.success) {
+            diagnostics[4] = {
+              name: 'Product Search API',
+              status: 'success',
+              message: `Found ${data.count} result(s)`,
+              details: data
+            };
+          } else {
+            diagnostics[4] = {
+              name: 'Product Search API',
+              status: 'error',
+              message: data.error || 'Search failed',
+              details: data
+            };
+          }
+        } catch (error: any) {
+          diagnostics[4] = {
+            name: 'Product Search API',
+            status: 'error',
+            message: error.message || 'Network error',
+            details: { error: error.toString() }
+          };
+        }
+        setResults([...diagnostics]);
+      }
+
+    } catch (error: any) {
+      console.error('Diagnostic error:', error);
+    }
+
+    setTesting(false);
+  };
+
+  const getStatusIcon = (status: DiagnosticResult['status']) => {
+    switch (status) {
+      case 'checking':
+        return <Loader2 className="w-5 h-5 animate-spin text-blue-600" />;
+      case 'success':
+        return <Check className="w-5 h-5 text-green-600" />;
+      case 'error':
+        return <X className="w-5 h-5 text-red-600" />;
+      case 'disabled':
+        return <AlertCircle className="w-5 h-5 text-gray-400" />;
+    }
+  };
+
+  const getStatusColor = (status: DiagnosticResult['status']) => {
+    switch (status) {
+      case 'checking':
+        return 'bg-blue-50 border-blue-200 dark:bg-blue-900/10 dark:border-blue-800';
+      case 'success':
+        return 'bg-green-50 border-green-200 dark:bg-green-900/10 dark:border-green-800';
+      case 'error':
+        return 'bg-red-50 border-red-200 dark:bg-red-900/10 dark:border-red-800';
+      case 'disabled':
+        return 'bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700';
+    }
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto p-6">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              Integrations Diagnostic
+            </h1>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Check the status of your vendor integrations
+            </p>
+          </div>
+          <button
+            onClick={runDiagnostics}
+            disabled={testing}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          >
+            <RefreshCw className={`w-4 h-4 ${testing ? 'animate-spin' : ''}`} />
+            Retest
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {results.map((result, index) => (
+            <div
+              key={index}
+              className={`border-2 rounded-lg p-4 transition-all ${getStatusColor(result.status)}`}
+            >
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5">
+                  {getStatusIcon(result.status)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-gray-900 dark:text-white">
+                    {result.name}
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    {result.message}
+                  </p>
+                  {result.details && (
+                    <details className="mt-2">
+                      <summary className="text-xs text-gray-500 dark:text-gray-500 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">
+                        View details
+                      </summary>
+                      <pre className="mt-2 text-xs bg-gray-900 dark:bg-black text-gray-100 p-3 rounded overflow-x-auto">
+                        {JSON.stringify(result.details, null, 2)}
+                      </pre>
+                    </details>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {results.length === 0 && !testing && (
+          <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+            Click "Retest" to run diagnostics
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
