@@ -123,9 +123,15 @@ export class PromoStandardsError extends Error {
   }
 }
 
-/**
- * Validates credentials before making requests
- */
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 function validateCredentials(credentials: SanMarCredentials): void {
   if (!credentials.id || !credentials.password) {
     throw new PromoStandardsError(110, 'Authentication required: id and password must be provided');
@@ -153,8 +159,8 @@ function buildSOAPEnvelope(
   <soapenv:Body>
     <ns:${operation}Request>
       <shar:wsVersion>${version}</shar:wsVersion>
-      <shar:id>${credentials.id}</shar:id>
-      <shar:password>${credentials.password}</shar:password>
+      <shar:id>${escapeXml(credentials.id)}</shar:id>
+      <shar:password>${escapeXml(credentials.password)}</shar:password>
       <shar:localizationCountry>US</shar:localizationCountry>
       <shar:localizationLanguage>en</shar:localizationLanguage>
       ${payload}
@@ -196,9 +202,10 @@ async function callPromoStandardsService(
   wsdlUrl: string,
   soapAction: string,
   soapEnvelope: string,
-  maxRetries = 3
+  maxRetries = 2
 ): Promise<string> {
   const startTime = Date.now();
+  const REQUEST_TIMEOUT_MS = 20000;
 
   console.log(`📡 PromoStandards Request: ${soapAction}`);
   console.log(`🔗 Endpoint: ${wsdlUrl}`);
@@ -207,6 +214,9 @@ async function callPromoStandardsService(
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
       const response = await fetch(wsdlUrl, {
         method: "POST",
         headers: {
@@ -214,7 +224,10 @@ async function callPromoStandardsService(
           "SOAPAction": soapAction,
         },
         body: soapEnvelope,
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       const responseText = await response.text();
       const duration = Date.now() - startTime;
@@ -659,57 +672,27 @@ export async function testSanMarConnection(credentials: SanMarCredentials): Prom
     console.log('🧪 Testing SanMar PromoStandards connection...');
     const startTime = Date.now();
 
-    // Make a minimal SOAP request to Product Data endpoint
-    const soapBody = `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/">
-  <soap:Body>
-    <ns:GetProductRequest>
-      <ns:id>${escapeXml(credentials.id)}</ns:id>
-      <ns:password>${escapeXml(credentials.password)}</ns:password>
-      <ns:localizationCountry>US</ns:localizationCountry>
-      <ns:localizationLanguage>en</ns:localizationLanguage>
-      <ns:productId>PC54</ns:productId>
-    </ns:GetProductRequest>
-  </soap:Body>
-</soap:Envelope>`;
+    const payload = `<shar:productId>PC54</shar:productId>
+      <shar:isSellable>true</shar:isSellable>`;
+
+    const soapEnvelope = buildSOAPEnvelope(
+      'ProductDataService',
+      '2.0.0',
+      'GetProduct',
+      credentials,
+      payload
+    );
 
     console.log(`📡 Sending SOAP request to: ${SANMAR_PROMOSTANDARDS_ENDPOINTS.productData}`);
-    console.log(`📦 Request body size: ${soapBody.length} bytes`);
 
-    const fetchStart = Date.now();
-    const response = await fetch(SANMAR_PROMOSTANDARDS_ENDPOINTS.productData, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'text/xml; charset=utf-8',
-        'SOAPAction': 'getProduct',
-      },
-      body: soapBody,
-    });
-    const fetchDuration = Date.now() - fetchStart;
-    console.log(`⏱️ Fetch completed in ${fetchDuration}ms, status: ${response.status}`);
+    const responseText = await callPromoStandardsService(
+      SANMAR_PROMOSTANDARDS_ENDPOINTS.productData,
+      'getProduct',
+      soapEnvelope,
+      1
+    );
 
-    const textStart = Date.now();
-    const responseText = await response.text();
-    const textDuration = Date.now() - textStart;
-    console.log(`📥 Response received: ${responseText.length} bytes (read in ${textDuration}ms)`);
-
-    // Check for authentication error
-    if (responseText.includes('AuthenticationError') || responseText.includes('Invalid credentials')) {
-      console.error('❌ SanMar authentication failed - invalid credentials');
-      console.error(`Total time: ${Date.now() - startTime}ms`);
-      return false;
-    }
-
-    // Check for any SOAP fault
-    if (responseText.includes('soap:Fault') || responseText.includes('faultstring')) {
-      console.error('❌ SanMar API returned an error');
-      console.error(`Response preview: ${responseText.substring(0, 500)}`);
-      console.error(`Total time: ${Date.now() - startTime}ms`);
-      return false;
-    }
-
-    // If we got a response without errors, credentials are valid
-    if (response.ok && responseText.includes('GetProductResponse')) {
+    if (responseText.includes('GetProductResponse') || responseText.includes('productName')) {
       const totalTime = Date.now() - startTime;
       console.log(`✅ SanMar connection test successful! Total time: ${totalTime}ms`);
       return true;
@@ -717,12 +700,10 @@ export async function testSanMarConnection(credentials: SanMarCredentials): Prom
 
     console.warn('⚠️ Unexpected response from SanMar API');
     console.warn(`Response preview: ${responseText.substring(0, 500)}`);
-    console.warn(`Total time: ${Date.now() - startTime}ms`);
     return false;
 
   } catch (error: any) {
     console.error('❌ SanMar connection test failed:', error.message);
-    console.error('Error details:', error);
-    return false;
+    throw error;
   }
 }

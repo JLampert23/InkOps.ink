@@ -80,15 +80,23 @@ function getXmlValues(xmlText: string, tagName: string): string[] {
 }
 
 function parseXmlResponse(xmlText: string): { success: boolean; xmlText?: string; error?: { code: string; description: string } } {
-  const errorCode = getXmlValue(xmlText, 'code');
-  const errorDesc = getXmlValue(xmlText, 'description');
+  if (xmlText.includes('soap:Fault') || xmlText.includes('faultstring')) {
+    const faultString = getXmlValue(xmlText, 'faultstring') || 'Unknown SOAP fault';
+    return {
+      success: false,
+      error: { code: 'SOAP_FAULT', description: faultString }
+    };
+  }
 
-  if (errorCode && errorDesc) {
+  const errorCodeMatch = xmlText.match(/<errorCode[^>]*>([^<]*)<\/errorCode>/i);
+  const errorMessageMatch = xmlText.match(/<errorMessage[^>]*>([^<]*)<\/errorMessage>/i);
+
+  if (errorCodeMatch && errorMessageMatch) {
     return {
       success: false,
       error: {
-        code: errorCode,
-        description: errorDesc
+        code: errorCodeMatch[1],
+        description: errorMessageMatch[1]
       }
     };
   }

@@ -109,9 +109,17 @@ Deno.serve(async (req: Request) => {
             const cached = await searchSSActivewearCache(supabaseAdmin, companyId, style);
             if (cached) {
               results.push(cached);
+            } else {
+              console.log(`SSA cache miss for ${style}, calling live API...`);
+              const liveResult = await fetchAndCacheSSActivewear(
+                supabaseAdmin, supabaseUrl, supabaseServiceKey, companyId, style
+              );
+              if (liveResult) {
+                results.push(liveResult);
+              }
             }
           } catch (error: any) {
-            console.error("SSA cache error:", error.message);
+            console.error("SSA search error:", error.message);
           }
         })()
       );
