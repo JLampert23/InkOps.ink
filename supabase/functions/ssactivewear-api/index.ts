@@ -237,8 +237,8 @@ Deno.serve(async (req: Request) => {
 
     switch (action) {
       case "brands": {
-        // Test actual connection by fetching a known product
-        const testProductId = "PC54";
+        // Test actual connection by fetching a known SSActivewear product (Gildan 64000)
+        const testProductId = "64000";
 
         const soapBody = `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
   <shar:wsVersion>2.0.0</shar:wsVersion>
