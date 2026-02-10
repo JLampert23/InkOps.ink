@@ -2076,6 +2076,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
           'Content-Type': 'application/json',
         },
       });
@@ -2204,6 +2205,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
           'Content-Type': 'application/json',
         },
       });
