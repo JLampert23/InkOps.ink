@@ -995,9 +995,14 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       }
 
       if (data.success && data.results) {
-        // Log first result to see structure
         if (data.results.length > 0) {
-          console.log('Sample raw result:', data.results[0]);
+          const r = data.results[0];
+          console.log('Sample raw result:', r);
+          console.log('COLORS COUNT:', r.colors?.length, 'colors');
+          console.log('COLOR NAMES:', r.colors?.map((c: any) => c.name).join(', '));
+          if (r.raw_data?._debug) {
+            console.log('SANMAR DEBUG:', JSON.stringify(r.raw_data._debug, null, 2));
+          }
         }
 
         // Filter results to only include products that match the search term
