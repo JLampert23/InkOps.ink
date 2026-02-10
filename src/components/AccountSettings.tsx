@@ -2036,8 +2036,27 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
+      // Try to refresh the session first
+      console.log('🔄 Attempting to refresh session...');
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+
+      if (refreshError) {
+        console.warn('⚠️ Session refresh failed:', refreshError.message);
+      } else {
+        console.log('✅ Session refreshed successfully');
+      }
+
       // Get fresh session token
-      const { data: sessionData } = await supabase.auth.getSession();
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+      console.log('🔍 Session check:', {
+        hasSession: !!sessionData.session,
+        hasToken: !!sessionData.session?.access_token,
+        expiresAt: sessionData.session?.expires_at,
+        now: Math.floor(Date.now() / 1000),
+        sessionError: sessionError?.message
+      });
+
       const token = sessionData.session?.access_token;
 
       if (!token) {
@@ -2051,6 +2070,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
       const testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sanmar-api?action=product&style=PC54`;
       console.log('📡 Calling SanMar API:', testUrl);
+      console.log('🔑 Token length:', token.length, 'First 20 chars:', token.substring(0, 20));
 
       const response = await fetch(testUrl, {
         method: 'GET',
@@ -2144,8 +2164,27 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
+      // Try to refresh the session first
+      console.log('🔄 Attempting to refresh session...');
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+
+      if (refreshError) {
+        console.warn('⚠️ Session refresh failed:', refreshError.message);
+      } else {
+        console.log('✅ Session refreshed successfully');
+      }
+
       // Get fresh session token
-      const { data: sessionData } = await supabase.auth.getSession();
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+      console.log('🔍 Session check:', {
+        hasSession: !!sessionData.session,
+        hasToken: !!sessionData.session?.access_token,
+        expiresAt: sessionData.session?.expires_at,
+        now: Math.floor(Date.now() / 1000),
+        sessionError: sessionError?.message
+      });
+
       const token = sessionData.session?.access_token;
 
       if (!token) {
@@ -2159,6 +2198,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
       const testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ssactivewear-api?action=brands`;
       console.log('📡 Calling SSActivewear API:', testUrl);
+      console.log('🔑 Token length:', token.length, 'First 20 chars:', token.substring(0, 20));
 
       const response = await fetch(testUrl, {
         method: 'GET',
