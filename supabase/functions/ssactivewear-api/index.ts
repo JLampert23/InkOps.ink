@@ -238,6 +238,7 @@ Deno.serve(async (req: Request) => {
     switch (action) {
       case "brands": {
         // Test actual connection by fetching a known SSActivewear product (Gildan 64000)
+        console.log('🧪 Testing SSActivewear PromoStandards connection...');
         const testProductId = "64000";
 
         const soapBody = `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
@@ -256,14 +257,55 @@ Deno.serve(async (req: Request) => {
             decryptedApiKey
           );
 
-          const parseResult = parseXmlResponse(xmlResponse);
+          console.log('📥 SSActivewear test response received, length:', xmlResponse.length);
 
-          if (!parseResult.success) {
+          // Check for authentication error
+          if (xmlResponse.includes('AuthenticationError') || xmlResponse.includes('Invalid credentials') || xmlResponse.includes('Unauthorized')) {
+            console.error('❌ SSActivewear authentication failed - invalid credentials');
             return new Response(
               JSON.stringify({
                 success: false,
                 supplier: "ssactivewear",
                 action,
+                authenticated: false,
+                error: "Authentication failed - invalid credentials",
+              }),
+              {
+                status: 200,
+                headers: { ...corsHeaders, "Content-Type": "application/json" }
+              }
+            );
+          }
+
+          // Check for any SOAP fault
+          if (xmlResponse.includes('soap:Fault') || xmlResponse.includes('faultstring')) {
+            console.error('❌ SSActivewear API returned a SOAP fault');
+            const faultString = getXmlValue(xmlResponse, 'faultstring') || 'Unknown error';
+            return new Response(
+              JSON.stringify({
+                success: false,
+                supplier: "ssactivewear",
+                action,
+                authenticated: false,
+                error: `API error: ${faultString}`,
+              }),
+              {
+                status: 200,
+                headers: { ...corsHeaders, "Content-Type": "application/json" }
+              }
+            );
+          }
+
+          // Check for error code/description in response
+          const parseResult = parseXmlResponse(xmlResponse);
+          if (!parseResult.success) {
+            console.error('❌ SSActivewear error response:', parseResult.error);
+            return new Response(
+              JSON.stringify({
+                success: false,
+                supplier: "ssactivewear",
+                action,
+                authenticated: false,
                 error: `Connection test failed: ${parseResult.error?.description}`,
                 errorCode: parseResult.error?.code,
               }),
@@ -274,7 +316,26 @@ Deno.serve(async (req: Request) => {
             );
           }
 
+          // Verify we got a valid product response
+          if (!xmlResponse.includes('GetProductResponse') && !xmlResponse.includes('productName')) {
+            console.warn('⚠️ Unexpected response from SSActivewear API');
+            return new Response(
+              JSON.stringify({
+                success: false,
+                supplier: "ssactivewear",
+                action,
+                authenticated: false,
+                error: "Unexpected API response format",
+              }),
+              {
+                status: 200,
+                headers: { ...corsHeaders, "Content-Type": "application/json" }
+              }
+            );
+          }
+
           const productName = getXmlValue(parseResult.xmlText!, "productName");
+          console.log('✅ SSActivewear connection test successful! Product found:', productName || testProductId);
 
           return new Response(
             JSON.stringify({
@@ -290,12 +351,13 @@ Deno.serve(async (req: Request) => {
             }
           );
         } catch (error: any) {
-          console.error("Brands/test connection error:", error);
+          console.error("❌ SSActivewear connection test failed:", error);
           return new Response(
             JSON.stringify({
               success: false,
               supplier: "ssactivewear",
               action,
+              authenticated: false,
               error: `Connection test failed: ${error.message}`,
             }),
             {

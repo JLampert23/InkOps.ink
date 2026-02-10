@@ -147,15 +147,17 @@ Deno.serve(async (req: Request) => {
     // Handle different action types
     switch (action) {
       case "test":
-        // Test connection using LOG105
+      case "brands":
+        // Test connection using LOG105 (SanMar style number)
         const testResult = await testSanMarConnection(credentials);
         responseData = {
           success: testResult,
           supplier: "sanmar",
-          action: "test",
+          action,
+          authenticated: testResult,
           message: testResult
-            ? "SanMar PromoStandards connection successful"
-            : "SanMar PromoStandards connection failed"
+            ? "SanMar PromoStandards connection successful! Test product (LOG105) found."
+            : "SanMar PromoStandards connection failed - check credentials"
         };
         break;
 
