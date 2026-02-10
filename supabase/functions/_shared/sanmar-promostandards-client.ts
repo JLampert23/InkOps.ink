@@ -657,6 +657,7 @@ export async function fetchUnifiedSanMarData(
 export async function testSanMarConnection(credentials: SanMarCredentials): Promise<boolean> {
   try {
     console.log('🧪 Testing SanMar PromoStandards connection...');
+    const startTime = Date.now();
 
     // Make a minimal SOAP request to Product Data endpoint
     const soapBody = `<?xml version="1.0" encoding="utf-8"?>
@@ -672,6 +673,10 @@ export async function testSanMarConnection(credentials: SanMarCredentials): Prom
   </soap:Body>
 </soap:Envelope>`;
 
+    console.log(`📡 Sending SOAP request to: ${SANMAR_PROMOSTANDARDS_ENDPOINTS.productData}`);
+    console.log(`📦 Request body size: ${soapBody.length} bytes`);
+
+    const fetchStart = Date.now();
     const response = await fetch(SANMAR_PROMOSTANDARDS_ENDPOINTS.productData, {
       method: 'POST',
       headers: {
@@ -680,32 +685,44 @@ export async function testSanMarConnection(credentials: SanMarCredentials): Prom
       },
       body: soapBody,
     });
+    const fetchDuration = Date.now() - fetchStart;
+    console.log(`⏱️ Fetch completed in ${fetchDuration}ms, status: ${response.status}`);
 
+    const textStart = Date.now();
     const responseText = await response.text();
+    const textDuration = Date.now() - textStart;
+    console.log(`📥 Response received: ${responseText.length} bytes (read in ${textDuration}ms)`);
 
     // Check for authentication error
     if (responseText.includes('AuthenticationError') || responseText.includes('Invalid credentials')) {
       console.error('❌ SanMar authentication failed - invalid credentials');
+      console.error(`Total time: ${Date.now() - startTime}ms`);
       return false;
     }
 
     // Check for any SOAP fault
     if (responseText.includes('soap:Fault') || responseText.includes('faultstring')) {
       console.error('❌ SanMar API returned an error');
+      console.error(`Response preview: ${responseText.substring(0, 500)}`);
+      console.error(`Total time: ${Date.now() - startTime}ms`);
       return false;
     }
 
     // If we got a response without errors, credentials are valid
     if (response.ok && responseText.includes('GetProductResponse')) {
-      console.log('✅ SanMar connection test successful!');
+      const totalTime = Date.now() - startTime;
+      console.log(`✅ SanMar connection test successful! Total time: ${totalTime}ms`);
       return true;
     }
 
     console.warn('⚠️ Unexpected response from SanMar API');
+    console.warn(`Response preview: ${responseText.substring(0, 500)}`);
+    console.warn(`Total time: ${Date.now() - startTime}ms`);
     return false;
 
   } catch (error: any) {
     console.error('❌ SanMar connection test failed:', error.message);
+    console.error('Error details:', error);
     return false;
   }
 }
