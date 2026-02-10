@@ -9,6 +9,15 @@ const corsHeaders = {
   "Access-Control-Max-Age": "86400",
 };
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
+    ),
+  ]);
+}
+
 interface ColorOption {
   name: string;
   code: string;
@@ -124,57 +133,98 @@ Deno.serve(async (req: Request) => {
 
     console.log(`🔍 Searching for style: ${style}`);
 
-    // 1. Try SSActivewear cache first
+    // Run both searches in parallel with timeout
+    const searchPromises: Promise<void>[] = [];
+
+    // 1. SSActivewear search
     if (settings?.ssactivewear_enabled) {
-      console.log("📦 Checking SSActivewear cache...");
-      const ssaCached = await searchSSActivewearCache(supabaseAdmin, companyId, style);
+      searchPromises.push(
+        (async () => {
+          try {
+            console.log("📦 Checking SSActivewear cache...");
+            const ssaCached = await withTimeout(
+              searchSSActivewearCache(supabaseAdmin, companyId, style),
+              5000,
+              "SSActivewear cache timeout"
+            );
 
-      if (ssaCached) {
-        console.log("✅ Found in SSActivewear cache");
-        results.push(ssaCached);
-      } else {
-        // Not in cache - fetch from API
-        console.log("❌ Not in SSActivewear cache, fetching from API...");
-        const ssaLive = await fetchAndCacheSSActivewear(
-          supabaseAdmin,
-          supabaseUrl,
-          supabaseServiceKey,
-          companyId,
-          style
-        );
+            if (ssaCached) {
+              console.log("✅ Found in SSActivewear cache");
+              results.push(ssaCached);
+            } else {
+              console.log("❌ Not in SSActivewear cache, fetching from API...");
+              const ssaLive = await withTimeout(
+                fetchAndCacheSSActivewear(
+                  supabaseAdmin,
+                  supabaseUrl,
+                  supabaseServiceKey,
+                  companyId,
+                  style
+                ),
+                15000,
+                "SSActivewear API timeout"
+              );
 
-        if (ssaLive) {
-          console.log("✅ Found and cached SSActivewear product");
-          results.push(ssaLive);
-        }
-      }
+              if (ssaLive) {
+                console.log("✅ Found and cached SSActivewear product");
+                results.push(ssaLive);
+              }
+            }
+          } catch (error: any) {
+            console.error("SSActivewear search failed:", error.message);
+          }
+        })()
+      );
     }
 
-    // 2. Try SanMar cache
+    // 2. SanMar search
     if (settings?.sanmar_enabled) {
-      console.log("📦 Checking SanMar cache...");
-      const sanmarCached = await searchSanMarCache(supabaseAdmin, companyId, style);
+      searchPromises.push(
+        (async () => {
+          try {
+            console.log("📦 Checking SanMar cache...");
+            const sanmarCached = await withTimeout(
+              searchSanMarCache(supabaseAdmin, companyId, style),
+              5000,
+              "SanMar cache timeout"
+            );
 
-      if (sanmarCached) {
-        console.log("✅ Found in SanMar cache");
-        results.push(sanmarCached);
-      } else {
-        // Not in cache - fetch from API
-        console.log("❌ Not in SanMar cache, fetching from API...");
-        const sanmarResult = await searchSanMarCatalog(
-          supabaseAdmin,
-          supabaseUrl,
-          supabaseServiceKey,
-          companyId,
-          style
-        );
+            if (sanmarCached) {
+              console.log("✅ Found in SanMar cache");
+              results.push(sanmarCached);
+            } else {
+              console.log("❌ Not in SanMar cache, fetching from API...");
+              const sanmarResult = await withTimeout(
+                searchSanMarCatalog(
+                  supabaseAdmin,
+                  supabaseUrl,
+                  supabaseServiceKey,
+                  companyId,
+                  style
+                ),
+                15000,
+                "SanMar API timeout"
+              );
 
-        if (sanmarResult.results.length > 0) {
-          console.log("✅ Found and cached SanMar product");
-          results.push(...sanmarResult.results);
-        }
-      }
+              if (sanmarResult.results.length > 0) {
+                console.log("✅ Found and cached SanMar product");
+                results.push(...sanmarResult.results);
+              }
+            }
+          } catch (error: any) {
+            console.error("SanMar search failed:", error.message);
+          }
+        })()
+      );
     }
+
+    // Wait for all searches to complete (max 20 seconds total)
+    await Promise.race([
+      Promise.allSettled(searchPromises),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Global search timeout")), 20000))
+    ]).catch(err => {
+      console.error("Search timeout:", err);
+    });
 
     console.log(`🏁 Search complete: found ${results.length} result(s)`);
 
