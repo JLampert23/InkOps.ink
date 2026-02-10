@@ -21,6 +21,7 @@ const PaymentsReport = lazy(() => import('./components/accounting/UnifiedPayment
 import CreateCustomerModal from './components/accounting/CreateCustomerModal';
 
 const ChipplyImportManager = lazy(() => import('./components/chipply/ChipplyImportManager').then(m => ({ default: m.ChipplyImportManager })));
+const ImportedQuotes = lazy(() => import('./components/chipply/ImportedQuotes'));
 
 type Tab =
   | 'square' | 'production' | 'settings'
@@ -29,7 +30,8 @@ type Tab =
   | 'paid-invoices'
   | 'customers'
   | 'payments'
-  | 'chipply'
+  | 'chipply-imports'
+  | 'chipply-imported-quotes'
   | 'integrations-diagnostic';
 
 interface CompanySettings {
@@ -40,6 +42,7 @@ interface CompanySettings {
 function AppContent() {
   const [activeTab, setActiveTab] = useState<Tab>('production');
   const [accountingExpanded, setAccountingExpanded] = useState(false);
+  const [chipplyExpanded, setChipplyExpanded] = useState(false);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [settingsInitialTab, setSettingsInitialTab] = useState<string | undefined>(undefined);
   const [syncing, setSyncing] = useState(false);
@@ -156,6 +159,21 @@ function AppContent() {
     },
   ];
 
+  const chipplyNavItems = [
+    {
+      id: 'chipply-imports' as Tab,
+      name: 'Import Manager',
+      icon: Send,
+      description: 'Manage Chipply work order imports'
+    },
+    {
+      id: 'chipply-imported-quotes' as Tab,
+      name: 'Imported Quotes',
+      icon: Package,
+      description: 'View quotes created from Chipply'
+    },
+  ];
+
   const handleSync = async () => {
     setSyncing(true);
     try {
@@ -239,26 +257,64 @@ function AppContent() {
             })}
           </div>
 
-          {/* CHIPPLY - Top-level link (Admin / Production Manager only) */}
+          {/* CHIPPLY - Collapsible section (Admin / Production Manager only) */}
           {(isAdmin || isSuperAdmin) && (
-            <div className="space-y-1">
+            <div>
+              {/* Chipply Header - Collapsible trigger */}
               <button
-                onClick={() => setActiveTab('chipply')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
-                  activeTab === 'chipply'
-                    ? 'bg-teal-50 dark:bg-blue-600/20 text-teal-700 dark:text-blue-400 shadow-sm'
-                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
-                }`}
+                onClick={() => setChipplyExpanded(!chipplyExpanded)}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-slate-700/50"
                 aria-label="Chipply"
+                aria-expanded={chipplyExpanded}
+                aria-controls="chipply-submenu"
               >
-                <ShoppingBag className={`w-5 h-5 flex-shrink-0 ${activeTab === 'chipply' ? 'text-teal-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                <ShoppingBag className="w-5 h-5 flex-shrink-0 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
                 <div className="flex-1 text-left">
-                  <div className={`font-bold text-xs uppercase tracking-wide leading-tight ${activeTab === 'chipply' ? 'text-teal-700 dark:text-blue-400' : 'text-gray-900 dark:text-gray-100'}`}>
+                  <div className="font-bold text-sm uppercase tracking-wide text-gray-900 dark:text-gray-100">
                     Chipply
                   </div>
                 </div>
-                {activeTab === 'chipply' && <div className="w-1 h-8 bg-teal-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                {chipplyExpanded ? (
+                  <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200" />
+                ) : (
+                  <ChevronUp className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200 rotate-180" />
+                )}
               </button>
+
+              {/* Chipply Sub-items - Collapsible content with animation */}
+              {chipplyExpanded && (
+                <div
+                  id="chipply-submenu"
+                  className="mt-1 space-y-1 ml-2 collapsible-section collapsible-section-enter"
+                  role="group"
+                  aria-label="Chipply submenu"
+                >
+                  {chipplyNavItems.map((item, index) => {
+                    const Icon = item.icon;
+                    const isActive = activeTab === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => setActiveTab(item.id)}
+                        className={`collapsible-item w-full flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 group ${
+                          isActive
+                            ? 'bg-teal-50 dark:bg-blue-600/20 text-teal-700 dark:text-blue-400 shadow-sm'
+                            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                        }`}
+                        style={{ animationDelay: `${index * 20}ms` }}
+                      >
+                        <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-teal-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                        <div className="flex-1 text-left">
+                          <div className={`font-medium text-sm ${isActive ? 'text-teal-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                            {item.name}
+                          </div>
+                        </div>
+                        {isActive && <div className="w-1 h-6 bg-teal-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -408,9 +464,10 @@ function AppContent() {
                  activeTab === 'customers' ? 'Customers' :
                  activeTab === 'payments' ? 'Payments' :
                  activeTab === 'production' ? 'Production Dashboard' :
-                 activeTab === 'chipply' ? 'Chipply Import Manager' :
+                 activeTab === 'chipply-imports' ? 'Chipply Import Manager' :
+                 activeTab === 'chipply-imported-quotes' ? 'Imported Quotes' :
                  activeTab === 'integrations-diagnostic' ? 'Integrations Diagnostic' :
-                 [...accountingNavItems, ...squareNavItems, ...productionNavItems].find(item => item.id === activeTab)?.name ||
+                 [...accountingNavItems, ...squareNavItems, ...productionNavItems, ...chipplyNavItems].find(item => item.id === activeTab)?.name ||
                  (activeTab === 'settings' ? 'Account Settings' : 'Dashboard')}
               </h2>
               {activeTab !== 'production' && (
@@ -427,8 +484,10 @@ function AppContent() {
                     'Payment history and Stripe transaction records'
                   ) : activeTab === 'square' ? (
                     'Square payment data and reports'
-                  ) : activeTab === 'chipply' ? (
+                  ) : activeTab === 'chipply-imports' ? (
                     'Manage inbound Chipply Work Order imports'
+                  ) : activeTab === 'chipply-imported-quotes' ? (
+                    'View all quotes imported from Chipply'
                   ) : activeTab === 'integrations-diagnostic' ? (
                     'Test SanMar and SSActivewear integrations'
                   ) : activeTab === 'settings' ? (
@@ -587,17 +646,31 @@ function AppContent() {
             </Suspense>
           )}
 
-          {activeTab === 'chipply' && (
+          {activeTab === 'chipply-imports' && (
             <Suspense fallback={
               <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-8">
                 <div className="text-center">
                   <Loader2 className="w-12 h-12 text-teal-600 dark:text-blue-500 animate-spin mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Loading Chipply</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Loading Import Manager</h3>
                   <p className="text-gray-600 dark:text-gray-400">Initializing Chipply module...</p>
                 </div>
               </div>
             }>
               <ChipplyImportManager />
+            </Suspense>
+          )}
+
+          {activeTab === 'chipply-imported-quotes' && (
+            <Suspense fallback={
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-8">
+                <div className="text-center">
+                  <Loader2 className="w-12 h-12 text-teal-600 dark:text-blue-500 animate-spin mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Loading Imported Quotes</h3>
+                  <p className="text-gray-600 dark:text-gray-400">Loading imported quotes...</p>
+                </div>
+              </div>
+            }>
+              <ImportedQuotes />
             </Suspense>
           )}
 
