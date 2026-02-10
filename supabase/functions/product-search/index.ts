@@ -51,67 +51,6 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
-
-    const authHeader = req.headers.get("Authorization");
-    let companyId: string | null = null;
-
-    if (authHeader) {
-      try {
-        const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-        const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
-          global: { headers: { Authorization: authHeader } },
-          auth: { persistSession: false }
-        });
-
-        const { data: { user } } = await supabaseClient.auth.getUser();
-
-        if (user) {
-          const { data: profileData } = await supabaseAdmin
-            .from("user_profiles")
-            .select("company_id")
-            .eq("id", user.id)
-            .maybeSingle();
-
-          companyId = profileData?.company_id || null;
-        }
-      } catch {
-        // Continue without auth
-      }
-    }
-
-    if (!companyId) {
-      const url = new URL(req.url);
-      const companyIdParam = url.searchParams.get("companyId");
-
-      if (companyIdParam) {
-        companyId = companyIdParam;
-      } else {
-        const { data: firstCompany } = await supabaseAdmin
-          .from("company_settings")
-          .select("id")
-          .limit(1)
-          .maybeSingle();
-
-        companyId = firstCompany?.id || null;
-      }
-    }
-
-    if (!companyId) {
-      return new Response(
-        JSON.stringify({ error: "No company found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     const url = new URL(req.url);
     const rawStyle = url.searchParams.get("style");
 
@@ -123,6 +62,36 @@ Deno.serve(async (req: Request) => {
     }
 
     const style = rawStyle.trim();
+    console.log(`🔍 Quick search for: ${style}`);
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+
+    let companyId: string | null = null;
+    const companyIdParam = url.searchParams.get("companyId");
+
+    if (companyIdParam) {
+      companyId = companyIdParam;
+    } else {
+      const { data: firstCompany } = await supabaseAdmin
+        .from("company_settings")
+        .select("id")
+        .limit(1)
+        .maybeSingle();
+      companyId = firstCompany?.id || null;
+    }
+
+    if (!companyId) {
+      return new Response(
+        JSON.stringify({ error: "No company found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const results: ProductResult[] = [];
 
     const { data: settings } = await supabaseAdmin
@@ -131,102 +100,41 @@ Deno.serve(async (req: Request) => {
       .eq("id", companyId)
       .maybeSingle();
 
-    console.log(`🔍 Searching for style: ${style}`);
-
-    // Run both searches in parallel with timeout
     const searchPromises: Promise<void>[] = [];
 
-    // 1. SSActivewear search
     if (settings?.ssactivewear_enabled) {
       searchPromises.push(
         (async () => {
           try {
-            console.log("📦 Checking SSActivewear cache...");
-            const ssaCached = await withTimeout(
-              searchSSActivewearCache(supabaseAdmin, companyId, style),
-              5000,
-              "SSActivewear cache timeout"
-            );
-
-            if (ssaCached) {
-              console.log("✅ Found in SSActivewear cache");
-              results.push(ssaCached);
-            } else {
-              console.log("❌ Not in SSActivewear cache, fetching from API...");
-              const ssaLive = await withTimeout(
-                fetchAndCacheSSActivewear(
-                  supabaseAdmin,
-                  supabaseUrl,
-                  supabaseServiceKey,
-                  companyId,
-                  style
-                ),
-                15000,
-                "SSActivewear API timeout"
-              );
-
-              if (ssaLive) {
-                console.log("✅ Found and cached SSActivewear product");
-                results.push(ssaLive);
-              }
+            const cached = await searchSSActivewearCache(supabaseAdmin, companyId, style);
+            if (cached) {
+              results.push(cached);
             }
           } catch (error: any) {
-            console.error("SSActivewear search failed:", error.message);
+            console.error("SSA cache error:", error.message);
           }
         })()
       );
     }
 
-    // 2. SanMar search
     if (settings?.sanmar_enabled) {
       searchPromises.push(
         (async () => {
           try {
-            console.log("📦 Checking SanMar cache...");
-            const sanmarCached = await withTimeout(
-              searchSanMarCache(supabaseAdmin, companyId, style),
-              5000,
-              "SanMar cache timeout"
-            );
-
-            if (sanmarCached) {
-              console.log("✅ Found in SanMar cache");
-              results.push(sanmarCached);
-            } else {
-              console.log("❌ Not in SanMar cache, fetching from API...");
-              const sanmarResult = await withTimeout(
-                searchSanMarCatalog(
-                  supabaseAdmin,
-                  supabaseUrl,
-                  supabaseServiceKey,
-                  companyId,
-                  style
-                ),
-                15000,
-                "SanMar API timeout"
-              );
-
-              if (sanmarResult.results.length > 0) {
-                console.log("✅ Found and cached SanMar product");
-                results.push(...sanmarResult.results);
-              }
+            const cached = await searchSanMarCache(supabaseAdmin, companyId, style);
+            if (cached) {
+              results.push(cached);
             }
           } catch (error: any) {
-            console.error("SanMar search failed:", error.message);
+            console.error("SanMar cache error:", error.message);
           }
         })()
       );
     }
 
-    // Wait for all searches to complete (max 20 seconds total)
-    await Promise.race([
-      Promise.allSettled(searchPromises),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Global search timeout")), 20000))
-    ]).catch(err => {
-      console.error("Search timeout:", err);
-    });
+    await Promise.allSettled(searchPromises);
 
-    console.log(`🏁 Search complete: found ${results.length} result(s)`);
+    console.log(`✅ Found ${results.length} result(s)`);
 
     return new Response(
       JSON.stringify({
@@ -242,7 +150,7 @@ Deno.serve(async (req: Request) => {
     );
 
   } catch (error: any) {
-    console.error("Product search error:", error);
+    console.error("Search error:", error);
     return new Response(
       JSON.stringify({ error: error.message || "Internal server error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
