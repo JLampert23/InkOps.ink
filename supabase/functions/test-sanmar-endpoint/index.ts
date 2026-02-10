@@ -117,7 +117,7 @@ Deno.serve(async (req: Request) => {
 
     if (service === "sellable") {
       soapEnvelope = buildProductSellableEnvelope(credentials, normalizedStyle);
-      endpoint = "https://ws.sanmar.com:8080/promostandards/ProductSellableServiceV2?WSDL";
+      endpoint = "https://ws.sanmar.com:8080/promostandards/ProductSellableServiceBinding?WSDL";
       soapAction = "getProductSellable";
     } else {
       soapEnvelope = buildProductDataEnvelope(credentials, normalizedStyle);
@@ -138,35 +138,56 @@ Deno.serve(async (req: Request) => {
       body: soapEnvelope,
     });
 
-    const responseXml = await response.text();
+    if (!response.ok) {
+      return new Response(
+        JSON.stringify({
+          service,
+          style: normalizedStyle,
+          endpoint,
+          error: `HTTP ${response.status}: ${response.statusText}`,
+          responseBody: await response.text(),
+        }, null, 2),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    // Parse for parts
+    const responseXml = await response.text();
+    const xmlLength = responseXml.length;
+
+    // Parse for parts (memory efficient)
     const partPattern = /<[^:]*:?Part[^>]*>([\s\S]*?)<\/[^:]*:?Part>/gi;
     const parts = [];
     let match;
-    while ((match = partPattern.exec(responseXml)) !== null) {
+    let matchCount = 0;
+
+    while ((match = partPattern.exec(responseXml)) !== null && matchCount < 3) {
       parts.push(match[0].substring(0, 500));
+      matchCount++;
     }
 
+    const totalMatches = (responseXml.match(partPattern) || []).length;
+
+    const result = {
+      service,
+      style: normalizedStyle,
+      endpoint,
+      username: credentials.id,
+      response: {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+      },
+      xmlLength,
+      xmlPreview: responseXml.substring(0, 1500),
+      xmlTail: responseXml.substring(Math.max(0, xmlLength - 500)),
+      hasFault: responseXml.includes("<faultcode>"),
+      hasError: responseXml.includes("<errorCode>"),
+      partMatches: totalMatches,
+      sampleParts: parts,
+    };
+
     return new Response(
-      JSON.stringify({
-        service,
-        style: normalizedStyle,
-        endpoint,
-        username: credentials.id,
-        response: {
-          status: response.status,
-          statusText: response.statusText,
-          ok: response.ok,
-        },
-        xmlLength: responseXml.length,
-        xmlPreview: responseXml.substring(0, 2000),
-        xmlTail: responseXml.substring(responseXml.length - 500),
-        hasFault: responseXml.includes("<faultcode>"),
-        hasError: responseXml.includes("<errorCode>"),
-        partMatches: parts.length,
-        partSamples: parts.slice(0, 3),
-      }, null, 2),
+      JSON.stringify(result, null, 2),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
