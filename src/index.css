@@ -3,6 +3,26 @@
 @tailwind utilities;
 
 @layer base {
+  /* Reset cursor and ensure proper selection */
+  * {
+    cursor: default;
+    user-select: auto;
+  }
+
+  body, html, #root {
+    cursor: default !important;
+  }
+
+  /* Standard text cursor for text elements */
+  input, textarea, [contenteditable] {
+    cursor: text;
+  }
+
+  /* Pointer cursor for interactive elements */
+  button, a, [role="button"], select {
+    cursor: pointer;
+  }
+
   /* Mobile-friendly touch targets */
   @media (max-width: 1023px) {
     button, a {
