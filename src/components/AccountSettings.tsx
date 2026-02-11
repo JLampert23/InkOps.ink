@@ -6041,11 +6041,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   <div className="ml-7 space-y-4 pl-4 border-l-2 border-blue-200 dark:border-blue-800">
                     <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
                       <p className="text-sm font-medium text-amber-900 dark:text-amber-100 mb-2">⚠️ SanMar PromoStandards API</p>
-                      <p className="text-sm text-amber-800 dark:text-amber-200 mb-2">
+                      <p className="text-sm text-amber-800 dark:text-amber-200">
                         Enter your <strong>PromoStandards credentials</strong> from SanMar. Inventory is fetched in real-time via their SOAP API (ws.sanmar.com).
-                      </p>
-                      <p className="text-xs text-amber-700 dark:text-amber-300">
-                        Note: SanMar does not provide Product Data via PromoStandards. Only inventory and purchase order services are available.
                       </p>
                     </div>
 
