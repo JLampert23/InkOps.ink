@@ -38,14 +38,40 @@ export default function FixChipplyImages() {
   ): Promise<{ success: boolean; url?: string; error?: string }> => {
     try {
       console.log(`    🌐 Fetching from: ${imageUrl}`);
-      // Download the image from the original URL
-      const response = await fetch(imageUrl);
-      if (!response.ok) {
-        console.error(`    ❌ Fetch failed: ${response.status} ${response.statusText}`);
-        return { success: false, error: `Failed to download: ${response.statusText}` };
+
+      let blob: Blob;
+
+      // Check if this is an external Chipply CDN URL that needs proxying
+      if (imageUrl.includes('cdn.chipply.net')) {
+        console.log(`    🔄 Using proxy for external CDN image`);
+        // Use our edge function proxy to bypass CORS
+        const proxyUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/proxy-image-download`;
+        const response = await fetch(proxyUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ imageUrl }),
+        });
+
+        if (!response.ok) {
+          console.error(`    ❌ Proxy fetch failed: ${response.status} ${response.statusText}`);
+          return { success: false, error: `Failed to download via proxy: ${response.statusText}` };
+        }
+
+        blob = await response.blob();
+      } else {
+        // Direct download for Supabase storage URLs
+        const response = await fetch(imageUrl);
+        if (!response.ok) {
+          console.error(`    ❌ Fetch failed: ${response.status} ${response.statusText}`);
+          return { success: false, error: `Failed to download: ${response.statusText}` };
+        }
+
+        blob = await response.blob();
       }
 
-      const blob = await response.blob();
       console.log(`    📦 Downloaded blob: ${blob.size} bytes, type: ${blob.type}`);
 
       // Generate filename
