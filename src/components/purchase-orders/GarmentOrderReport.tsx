@@ -64,6 +64,8 @@ interface GarmentRow {
     size: string;
     quantity_ordered: number;
     quantity_received: number;
+    work_order_id?: string;
+    work_order_number?: string;
   }>;
 }
 
@@ -204,7 +206,13 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
 
     const { data: stagingData, error: stagingError } = await supabase
       .from('garment_requirements_staging')
-      .select('style_number, color, supplier_name, requires_review, change_reason, original_data, is_po_created')
+      .select(`
+        style_number, color, supplier_name, requires_review, change_reason, original_data, is_po_created,
+        po_id, work_order_id,
+        work_orders!garment_requirements_staging_work_order_id_fkey (
+          work_order_number
+        )
+      `)
       .eq('company_id', cid);
 
     if (stagingError) console.error('Error loading staging data:', stagingError);
@@ -218,6 +226,17 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
         original_data: item.original_data,
         is_po_created: item.is_po_created || false,
       });
+    });
+
+    // Create a map of PO ID to work order info
+    const poToWorkOrderMap = new Map<string, { work_order_id: string; work_order_number: string }>();
+    stagingData?.forEach((item: any) => {
+      if (item.po_id && item.work_order_id && item.work_orders) {
+        poToWorkOrderMap.set(item.po_id, {
+          work_order_id: item.work_order_id,
+          work_order_number: item.work_orders.work_order_number,
+        });
+      }
     });
 
     const garmentMap = new Map<string, GarmentRow>();
@@ -302,6 +321,8 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
           }
           row.total_on_po += item.quantity_ordered;
           row.total_received += item.quantity_received;
+
+          const workOrderInfo = poToWorkOrderMap.get(item.purchase_orders.id);
           row.pos.push({
             po_id: item.purchase_orders.id,
             po_number: item.purchase_orders.po_number,
@@ -309,6 +330,8 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
             size: normalizedSize || rawSize || 'N/A',
             quantity_ordered: item.quantity_ordered,
             quantity_received: item.quantity_received,
+            work_order_id: workOrderInfo?.work_order_id,
+            work_order_number: workOrderInfo?.work_order_number,
           });
           break;
         }
@@ -1169,12 +1192,26 @@ function DrillDownModal({
                       className="border border-slate-700 rounded-lg p-3 bg-slate-800"
                     >
                       <div className="flex justify-between items-start mb-2">
-                        <div>
+                        <div className="flex-1">
                           <p className="font-medium text-white">{po.po_number}</p>
                           <p className="text-sm text-gray-400">
                             {po.vendor_name} &middot; Size {po.size}
                           </p>
+                          {po.work_order_number && (
+                            <p className="text-xs text-blue-400 mt-1">
+                              WO: {po.work_order_number}
+                            </p>
+                          )}
                         </div>
+                        {po.work_order_id && po.work_order_number && (
+                          <button
+                            onClick={() => onNavigate?.('work-orders', 'detail', po.work_order_id)}
+                            className="flex items-center gap-1 px-2 py-1 text-xs text-blue-400 hover:bg-blue-900/30 rounded transition-colors"
+                          >
+                            <Eye className="w-3 h-3" />
+                            View
+                          </button>
+                        )}
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         <div>
