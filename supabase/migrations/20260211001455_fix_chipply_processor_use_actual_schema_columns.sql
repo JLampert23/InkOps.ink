@@ -1,0 +1,242 @@
+/*
+  # Fix Chipply Processor - Use Actual Schema Columns
+
+  1. Changes
+    - Use `notes` instead of `production_notes`
+    - Use `subtotal` and `total` instead of `total_cost` and `total_price`
+    - Remove `due_date` and `nickname` (don't exist in quotes table)
+    - Use `valid_until` for the due date
+    - Fix quote_line_items columns to match actual schema
+*/
+
+CREATE OR REPLACE FUNCTION process_chipply_import(log_id uuid)
+RETURNS void AS $$
+DECLARE
+  v_log_record chipply_import_logs%ROWTYPE;
+  v_company_id uuid;
+  v_payload jsonb;
+  v_quote_id uuid;
+  v_quote_number text;
+  v_next_number integer;
+  v_customer_name text;
+  v_due_date date;
+  v_notes text;
+  v_process jsonb;
+  v_product jsonb;
+  v_color jsonb;
+  v_size jsonb;
+  v_component jsonb;
+  v_imprint_id uuid;
+  v_line_item_id uuid;
+  v_imprint_number integer := 1;
+  v_size_data jsonb;
+  v_account_summary jsonb;
+  v_work_order_data jsonb;
+BEGIN
+  -- Fetch the log record
+  SELECT * INTO v_log_record
+  FROM chipply_import_logs
+  WHERE id = log_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Import log not found: %', log_id;
+  END IF;
+
+  v_company_id := v_log_record.company_id;
+  v_payload := v_log_record.raw_json;
+
+  -- Handle array wrapper if present
+  IF jsonb_typeof(v_payload) = 'array' THEN
+    v_payload := v_payload->0;
+  END IF;
+
+  v_account_summary := v_payload->'accountSummary';
+  v_work_order_data := v_payload->'workOrderData';
+
+  -- Extract customer data
+  v_customer_name := v_account_summary->>'customerName';
+  v_due_date := (v_account_summary->>'dueDate')::date;
+  v_notes := 'Chipply Sale Order: ' || COALESCE(v_account_summary->>'saleOrder', 'N/A') ||
+             E'\nStore: ' || COALESCE(v_account_summary->>'parentStoreName', 'N/A') ||
+             E'\nBatch: ' || COALESCE(v_account_summary->>'batchId', 'N/A');
+
+  -- Generate quote number using company's numbering settings
+  SELECT 
+    COALESCE(quote_prefix, 'QTE') || '-' || 
+    LPAD((COALESCE(quote_start_number, 1))::text, 4, '0'),
+    COALESCE(quote_start_number, 1)
+  INTO v_quote_number, v_next_number
+  FROM company_settings
+  WHERE id = v_company_id;
+
+  IF v_quote_number IS NULL THEN
+    v_quote_number := 'QTE-' || LPAD('1', 4, '0');
+    v_next_number := 1;
+  END IF;
+
+  -- Create the Quote
+  INSERT INTO quotes (
+    company_id,
+    quote_number,
+    customer_name,
+    valid_until,
+    notes,
+    status,
+    subtotal,
+    total,
+    chipply_import_log_id,
+    created_at
+  ) VALUES (
+    v_company_id,
+    v_quote_number,
+    v_customer_name,
+    v_due_date,
+    v_notes,
+    'draft',
+    0,
+    0,
+    log_id,
+    now()
+  )
+  RETURNING id INTO v_quote_id;
+
+  -- Update company's next quote number
+  UPDATE company_settings
+  SET quote_start_number = v_next_number + 1
+  WHERE id = v_company_id;
+
+  -- Process each process in workOrderData.processes
+  FOR v_process IN 
+    SELECT * FROM jsonb_array_elements(v_work_order_data->'processes')
+  LOOP
+    -- Create Imprint for this process
+    INSERT INTO quote_imprints (
+      quote_id,
+      imprint_number,
+      imprint_type,
+      imprint_description,
+      created_at
+    ) VALUES (
+      v_quote_id,
+      v_imprint_number,
+      v_process->>'processName',
+      v_process->>'processDescription',
+      now()
+    )
+    RETURNING id INTO v_imprint_id;
+
+    v_imprint_number := v_imprint_number + 1;
+
+    -- Process each product under this process
+    FOR v_product IN 
+      SELECT * FROM jsonb_array_elements(v_process->'products')
+    LOOP
+      -- Process each color variant (productColors array)
+      FOR v_color IN 
+        SELECT * FROM jsonb_array_elements(v_product->'productColors')
+      LOOP
+        -- Build size data from sizes array
+        v_size_data := jsonb_build_object(
+          'sizes', (
+            SELECT jsonb_agg(
+              jsonb_build_object(
+                'size', s->>'size',
+                'quantity', (s->>'qty')::integer
+              )
+            )
+            FROM jsonb_array_elements(v_color->'sizes') s
+          )
+        );
+
+        -- Create Line Item for this color variant
+        INSERT INTO quote_line_items (
+          quote_id,
+          company_id,
+          description,
+          quantity,
+          unit_price,
+          total_price,
+          notes,
+          created_at
+        ) VALUES (
+          v_quote_id,
+          v_company_id,
+          v_product->>'productName' || ' - ' || v_product->>'styleName' || ' - ' || v_color->>'colorName',
+          (
+            SELECT COALESCE(SUM((s->>'qty')::integer), 0)
+            FROM jsonb_array_elements(v_color->'sizes') s
+          ),
+          (v_color->>'productPrice')::numeric,
+          (v_color->>'productPrice')::numeric * (
+            SELECT COALESCE(SUM((s->>'qty')::integer), 0)
+            FROM jsonb_array_elements(v_color->'sizes') s
+          ),
+          'Vendor: ' || v_product->>'vendorName' ||
+          E'\nCost: $' || v_color->>'productCost' ||
+          E'\nSKU: ' || COALESCE((v_color->'sizes'->0->>'sku')::text, 'N/A') ||
+          E'\nSizes: ' || v_size_data::text,
+          now()
+        )
+        RETURNING id INTO v_line_item_id;
+      END LOOP;
+    END LOOP;
+
+    -- Process components at the process level (not product level)
+    FOR v_component IN 
+      SELECT * FROM jsonb_array_elements(v_process->'components')
+    LOOP
+      -- Create decoration line item for this component
+      INSERT INTO quote_line_items (
+        quote_id,
+        company_id,
+        description,
+        quantity,
+        unit_price,
+        total_price,
+        decoration_method,
+        decoration_location,
+        notes,
+        created_at
+      ) VALUES (
+        v_quote_id,
+        v_company_id,
+        'Decoration: ' || v_component->>'artworkName',
+        (v_component->>'qty')::integer,
+        (v_component->>'processPrice')::numeric,
+        (v_component->>'processPrice')::numeric * (v_component->>'qty')::integer,
+        v_component->>'typeCode',
+        v_component->>'artworkLocationName',
+        'Location: ' || COALESCE(v_component->>'artworkLocationName', '') ||
+        E'\nNotes: ' || COALESCE(v_component->>'notes', ''),
+        now()
+      );
+    END LOOP;
+  END LOOP;
+
+  -- Calculate totals
+  UPDATE quotes
+  SET 
+    subtotal = (SELECT COALESCE(SUM(total_price), 0) FROM quote_line_items WHERE quote_id = v_quote_id),
+    total = (SELECT COALESCE(SUM(total_price), 0) FROM quote_line_items WHERE quote_id = v_quote_id)
+  WHERE id = v_quote_id;
+
+  -- Mark import as processed
+  UPDATE chipply_import_logs
+  SET 
+    status = 'processed',
+    error_message = NULL,
+    updated_at = now()
+  WHERE id = log_id;
+
+EXCEPTION WHEN OTHERS THEN
+  -- Mark import as failed and save error message
+  UPDATE chipply_import_logs
+  SET 
+    status = 'failed',
+    error_message = SQLERRM,
+    updated_at = now()
+  WHERE id = log_id;
+  
+  RAISE NOTICE 'Error processing Chipply import %: %', log_id, SQLERRM;
+END;
+$$ LANGUAGE plpgsql;
