@@ -53,6 +53,22 @@ async function downloadAndStoreImages(supabase: any, payload: any, companyId: st
           }
         }
       }
+
+      // Download and store artwork images from components
+      const components = process.components || [];
+      for (let c = 0; c < components.length; c++) {
+        const component = components[c];
+        const artworkVariations = component.artworkVariations || [];
+
+        for (let v = 0; v < artworkVariations.length; v++) {
+          const variation = artworkVariations[v];
+
+          if (variation.imageSrc) {
+            const newUrl = await downloadAndStoreArtwork(supabase, variation.imageSrc, companyId, i, c, v);
+            if (newUrl) variation.imageSrc = newUrl;
+          }
+        }
+      }
     }
 
     return payload;
@@ -116,6 +132,63 @@ async function downloadAndStoreImage(
     return urlData.publicUrl;
   } catch (error) {
     console.error(`[IMAGE] Error downloading/storing image:`, error);
+    return null;
+  }
+}
+
+async function downloadAndStoreArtwork(
+  supabase: any,
+  artworkUrl: string,
+  companyId: string,
+  processIdx: number,
+  componentIdx: number,
+  variationIdx: number
+): Promise<string | null> {
+  try {
+    console.log(`[ARTWORK] Downloading artwork from: ${artworkUrl}`);
+
+    // Download the artwork
+    const response = await fetch(artworkUrl);
+    if (!response.ok) {
+      console.error(`[ARTWORK] Failed to download: ${response.status} ${response.statusText}`);
+      return null;
+    }
+
+    const blob = await response.blob();
+    const arrayBuffer = await blob.arrayBuffer();
+    const buffer = new Uint8Array(arrayBuffer);
+
+    // Generate filename
+    const timestamp = Date.now();
+    const ext = artworkUrl.split('.').pop()?.split('?')[0] || 'png';
+    const filename = `${timestamp}_p${processIdx}_c${componentIdx}_v${variationIdx}_artwork.${ext}`;
+    const storagePath = `${companyId}/artwork/${filename}`;
+
+    console.log(`[ARTWORK] Uploading to storage path: ${storagePath}`);
+
+    // Upload to Supabase Storage (using same bucket for now)
+    const { data, error } = await supabase.storage
+      .from('chipply-garment-images')
+      .upload(storagePath, buffer, {
+        contentType: blob.type || 'image/png',
+        cacheControl: '3600',
+        upsert: true
+      });
+
+    if (error) {
+      console.error(`[ARTWORK] Upload error:`, error);
+      return null;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('chipply-garment-images')
+      .getPublicUrl(storagePath);
+
+    console.log(`[ARTWORK] Successfully stored at: ${urlData.publicUrl}`);
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error(`[ARTWORK] Error downloading/storing artwork:`, error);
     return null;
   }
 }
