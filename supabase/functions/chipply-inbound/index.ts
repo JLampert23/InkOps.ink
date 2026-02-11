@@ -144,16 +144,18 @@ Deno.serve(async (req: Request) => {
     }
 
     // Successfully authenticated - log the import
-    const { error: insertError } = await supabase
+    const { data: logData, error: insertError } = await supabase
       .from('chipply_import_logs')
       .insert({
         company_id: authenticatedCompanyId,
         received_at: new Date().toISOString(),
         raw_json: payload,
         status: 'pending',
-      });
+      })
+      .select()
+      .single();
 
-    if (insertError) {
+    if (insertError || !logData) {
       console.error('Error inserting log:', insertError);
       return new Response(
         JSON.stringify({ error: 'Failed to log import' }),
@@ -164,8 +166,30 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Process the import immediately
+    const { error: processError } = await supabase.rpc('process_chipply_import', {
+      log_id: logData.id
+    });
+
+    if (processError) {
+      console.error('Error processing import:', processError);
+      return new Response(
+        JSON.stringify({
+          status: 'received_but_processing_failed',
+          error: processError.message
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     return new Response(
-      JSON.stringify({ status: 'received' }),
+      JSON.stringify({
+        status: 'processed',
+        import_log_id: logData.id
+      }),
       {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
