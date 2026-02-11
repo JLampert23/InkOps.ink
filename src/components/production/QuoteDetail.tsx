@@ -131,7 +131,6 @@ interface QuoteImprint {
   num_colors?: number;
   description?: string;
   artwork_description?: string;
-  artwork_url?: string;
 }
 
 export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProps) {
@@ -830,30 +829,8 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                       </div>
                                     )}
 
-                                    {imprint.artwork_url && (
-                                      <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
-                                        <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                                          Art File:
-                                        </div>
-                                        <div className="aspect-square max-w-[200px]">
-                                          <img
-                                            src={imprint.artwork_url}
-                                            alt={`Artwork for ${imprint.type_of_work}`}
-                                            className="w-full h-full object-contain rounded border border-gray-200 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800"
-                                            onClick={() => {
-                                              setSelectedProofImage(imprint.artwork_url!);
-                                              setShowProofModal(true);
-                                            }}
-                                          />
-                                        </div>
-                                      </div>
-                                    )}
-
                                     {hasMockups && (
                                       <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
-                                        <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                                          Mockups:
-                                        </div>
                                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                                           {imprint.mockups.map((mockup: any, mockupIdx: number) => {
                                             const mockupUrl = typeof mockup === 'string' ? mockup : mockup?.url;
