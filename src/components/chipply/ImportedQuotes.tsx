@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase-client';
-import { Calendar, ExternalLink, Filter } from 'lucide-react';
+import { Calendar, ExternalLink, Filter, ChevronDown, ChevronUp, Image as ImageIcon } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface ImportedQuote {
@@ -15,12 +15,37 @@ interface ImportedQuote {
   error_message?: string;
 }
 
+interface QuoteLineItem {
+  id: string;
+  line_number: number;
+  line_type: string;
+  item_number: string | null;
+  description: string;
+  color: string | null;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  group_label: string | null;
+  garment_image_url: string | null;
+  garment_rear_image_url: string | null;
+  garment_side_image_url: string | null;
+  supplier_name: string | null;
+  decoration_method: string | null;
+  decoration_location: string | null;
+}
+
+interface GroupedLineItems {
+  [groupLabel: string]: QuoteLineItem[];
+}
+
 export default function ImportedQuotes() {
   const [imports, setImports] = useState<ImportedQuote[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  const [expandedQuotes, setExpandedQuotes] = useState<Set<string>>(new Set());
+  const [quoteLineItems, setQuoteLineItems] = useState<{ [quoteId: string]: QuoteLineItem[] }>({});
 
   useEffect(() => {
     fetchImports();
@@ -107,6 +132,143 @@ export default function ImportedQuotes() {
   function handleViewQuote(quoteId: string) {
     if (!quoteId) return;
     window.location.href = `#quotes/${quoteId}`;
+  }
+
+  async function toggleQuoteExpansion(quoteId: string) {
+    const newExpanded = new Set(expandedQuotes);
+
+    if (newExpanded.has(quoteId)) {
+      newExpanded.delete(quoteId);
+    } else {
+      newExpanded.add(quoteId);
+
+      if (!quoteLineItems[quoteId]) {
+        try {
+          const { data, error } = await supabase
+            .from('quote_line_items')
+            .select('*')
+            .eq('quote_id', quoteId)
+            .order('line_number', { ascending: true });
+
+          if (error) throw error;
+
+          setQuoteLineItems(prev => ({
+            ...prev,
+            [quoteId]: data || []
+          }));
+        } catch (error) {
+          console.error('Error fetching line items:', error);
+        }
+      }
+    }
+
+    setExpandedQuotes(newExpanded);
+  }
+
+  function groupLineItemsByLabel(items: QuoteLineItem[]): GroupedLineItems {
+    const grouped: GroupedLineItems = {};
+
+    items.forEach(item => {
+      const label = item.group_label || 'Ungrouped';
+      if (!grouped[label]) {
+        grouped[label] = [];
+      }
+      grouped[label].push(item);
+    });
+
+    return grouped;
+  }
+
+  function renderLineItemGroup(groupLabel: string, items: QuoteLineItem[]) {
+    const garmentItems = items.filter(item => item.line_type === 'item');
+    const feeItems = items.filter(item => item.line_type === 'fee');
+
+    const images: string[] = [];
+    garmentItems.forEach(item => {
+      if (item.garment_image_url) images.push(item.garment_image_url);
+      if (item.garment_rear_image_url) images.push(item.garment_rear_image_url);
+      if (item.garment_side_image_url) images.push(item.garment_side_image_url);
+    });
+
+    return (
+      <div key={groupLabel} className="bg-gray-50 dark:bg-slate-900 rounded-lg p-4 mb-4">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+          {groupLabel}
+        </h3>
+
+        {images.length > 0 && (
+          <div className="flex gap-3 mb-4 overflow-x-auto pb-2">
+            {images.map((imageUrl, idx) => (
+              <div key={idx} className="flex-shrink-0">
+                <img
+                  src={imageUrl}
+                  alt={`Product ${idx + 1}`}
+                  className="w-24 h-24 object-contain bg-white rounded border border-gray-200 dark:border-slate-600"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="space-y-2">
+          {garmentItems.map(item => (
+            <div key={item.id} className="flex justify-between items-start text-sm">
+              <div className="flex-1">
+                <div className="font-medium text-gray-900 dark:text-white">
+                  {item.description}
+                </div>
+                <div className="text-gray-600 dark:text-gray-400 text-xs mt-1">
+                  {item.item_number && <span>SKU: {item.item_number} • </span>}
+                  {item.color && <span>Color: {item.color} • </span>}
+                  <span>Qty: {item.quantity}</span>
+                  {item.supplier_name && <span> • Supplier: {item.supplier_name}</span>}
+                </div>
+              </div>
+              <div className="text-right ml-4">
+                <div className="font-medium text-gray-900 dark:text-white">
+                  ${item.total_price.toFixed(2)}
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  ${item.unit_price.toFixed(2)} ea
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {feeItems.length > 0 && (
+            <div className="border-t border-gray-200 dark:border-slate-700 pt-2 mt-2">
+              {feeItems.map(item => (
+                <div key={item.id} className="flex justify-between items-start text-sm">
+                  <div className="flex-1">
+                    <div className="font-medium text-blue-600 dark:text-blue-400">
+                      {item.description}
+                    </div>
+                    <div className="text-gray-600 dark:text-gray-400 text-xs mt-1">
+                      {item.decoration_method && <span>Method: {item.decoration_method} • </span>}
+                      {item.decoration_location && <span>Location: {item.decoration_location} • </span>}
+                      <span>Qty: {item.quantity}</span>
+                    </div>
+                  </div>
+                  <div className="text-right ml-4">
+                    <div className="font-medium text-gray-900 dark:text-white">
+                      ${item.total_price.toFixed(2)}
+                    </div>
+                    {item.unit_price > 0 && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        ${item.unit_price.toFixed(2)} ea
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -221,50 +383,94 @@ export default function ImportedQuotes() {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
-                {imports.map((imp) => (
-                  <tr key={imp.import_id} className="hover:bg-gray-50 dark:hover:bg-slate-700">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                      {format(new Date(imp.received_at), 'MMM dd, yyyy HH:mm')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 font-medium">
-                      {imp.sale_order}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                      {imp.store_name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                      {imp.batch_id}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900 dark:text-gray-100">
-                      {imp.quote_number}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex flex-col gap-1">
-                        {getStatusBadge(imp.status)}
-                        {imp.status === 'failed' && imp.error_message && (
-                          <span className="text-xs text-red-600 dark:text-red-400 mt-1" title={imp.error_message}>
-                            {imp.error_message.length > 50
-                              ? imp.error_message.substring(0, 50) + '...'
-                              : imp.error_message}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {imp.quote_id ? (
-                        <button
-                          onClick={() => handleViewQuote(imp.quote_id)}
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
-                        >
-                          View Quote
-                          <ExternalLink className="w-4 h-4" />
-                        </button>
-                      ) : (
-                        <span className="text-gray-400 dark:text-gray-500 text-xs">No quote created</span>
+                {imports.map((imp) => {
+                  const isExpanded = expandedQuotes.has(imp.quote_id);
+                  const lineItems = quoteLineItems[imp.quote_id] || [];
+                  const groupedItems = groupLineItemsByLabel(lineItems);
+
+                  return (
+                    <React.Fragment key={imp.import_id}>
+                      <tr className="hover:bg-gray-50 dark:hover:bg-slate-700">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                          {format(new Date(imp.received_at), 'MMM dd, yyyy HH:mm')}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 font-medium">
+                          {imp.sale_order}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                          {imp.store_name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                          {imp.batch_id}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900 dark:text-gray-100">
+                          {imp.quote_number}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex flex-col gap-1">
+                            {getStatusBadge(imp.status)}
+                            {imp.status === 'failed' && imp.error_message && (
+                              <span className="text-xs text-red-600 dark:text-red-400 mt-1" title={imp.error_message}>
+                                {imp.error_message.length > 50
+                                  ? imp.error_message.substring(0, 50) + '...'
+                                  : imp.error_message}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <div className="flex gap-2">
+                            {imp.quote_id && imp.status === 'processed' && (
+                              <button
+                                onClick={() => toggleQuoteExpansion(imp.quote_id)}
+                                className="inline-flex items-center gap-1 px-3 py-2 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+                                title={isExpanded ? 'Hide details' : 'Show details'}
+                              >
+                                {isExpanded ? (
+                                  <>
+                                    <ChevronUp className="w-4 h-4" />
+                                    Hide
+                                  </>
+                                ) : (
+                                  <>
+                                    <ChevronDown className="w-4 h-4" />
+                                    Details
+                                  </>
+                                )}
+                              </button>
+                            )}
+                            {imp.quote_id ? (
+                              <button
+                                onClick={() => handleViewQuote(imp.quote_id)}
+                                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
+                              >
+                                View Quote
+                                <ExternalLink className="w-4 h-4" />
+                              </button>
+                            ) : (
+                              <span className="text-gray-400 dark:text-gray-500 text-xs">No quote created</span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr>
+                          <td colSpan={7} className="px-6 py-4 bg-gray-50 dark:bg-slate-900/50">
+                            <div className="max-w-5xl">
+                              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                                <ImageIcon className="w-4 h-4" />
+                                Quote Line Items
+                              </h3>
+                              {Object.entries(groupedItems).map(([groupLabel, items]) =>
+                                renderLineItemGroup(groupLabel, items)
+                              )}
+                            </div>
+                          </td>
+                        </tr>
                       )}
-                    </td>
-                  </tr>
-                ))}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
