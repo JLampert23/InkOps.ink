@@ -452,9 +452,9 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
           {(quote.status === 'draft' || quote.status === 'sent') && (
             <button
               onClick={onEdit}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors shadow-sm"
             >
-              <Edit className="w-4 h-4" />
+              <Edit className="w-3.5 h-3.5" />
               Edit Quote
             </button>
           )}
@@ -462,12 +462,12 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             <button
               onClick={handleReopenQuote}
               disabled={reopening}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors shadow-sm disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-amber-500 text-white rounded-md hover:bg-amber-600 transition-colors shadow-sm disabled:opacity-50"
             >
               {reopening ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <Pencil className="w-4 h-4" />
+                <Pencil className="w-3.5 h-3.5" />
               )}
               Edit Quote
             </button>
@@ -476,35 +476,35 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             <button
               onClick={handleApproveQuote}
               disabled={approving}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-emerald-500 text-white rounded-md hover:bg-emerald-600 transition-colors shadow-sm disabled:opacity-50"
             >
               {approving ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <CheckCircle className="w-4 h-4" />
+                <CheckCircle className="w-3.5 h-3.5" />
               )}
               Approve Quote
             </button>
           )}
           <button
             onClick={() => setShowLabelModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-cyan-500 text-white rounded-md hover:bg-cyan-600 transition-colors shadow-sm"
           >
-            <Tag className="w-4 h-4" />
+            <Tag className="w-3.5 h-3.5" />
             + Label
           </button>
           <button
             onClick={handleDownloadQuote}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-slate-500 text-white rounded-md hover:bg-slate-600 transition-colors shadow-sm"
           >
-            <Download className="w-4 h-4" />
+            <Download className="w-3.5 h-3.5" />
             Download PDF
           </button>
           <button
             onClick={() => setShowSendModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors shadow-sm"
           >
-            <Send className="w-4 h-4" />
+            <Send className="w-3.5 h-3.5" />
             {quote.status === 'draft' ? 'Send to Customer' : 'Resend to Customer'}
           </button>
         </div>
