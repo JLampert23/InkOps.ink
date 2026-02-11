@@ -203,44 +203,54 @@ export default function ImportedQuotes() {
         </h3>
 
         {imageData.length > 0 ? (
-          <div className="flex gap-3 mb-4 overflow-x-auto pb-2">
-            {imageData.map((img, idx) => (
-              <div key={idx} className="flex-shrink-0 relative group">
-                <a
-                  href={img.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block"
-                  title="Click to open full image"
-                >
-                  <img
-                    src={img.url}
-                    alt={`${img.item.description} - ${img.type}`}
-                    className="w-32 h-32 object-contain bg-white dark:bg-slate-800 rounded-lg border-2 border-gray-200 dark:border-slate-600 shadow-sm hover:border-blue-500 dark:hover:border-blue-400 transition-colors cursor-pointer"
-                    crossOrigin="anonymous"
-                    onError={(e) => {
-                      console.error('Failed to load image:', img.url);
-                      const target = e.currentTarget;
-                      target.style.display = 'none';
-                      const parent = target.parentElement;
-                      if (parent && parent.parentElement) {
-                        const errorDiv = document.createElement('div');
-                        errorDiv.className = 'w-32 h-32 bg-gray-100 dark:bg-slate-700 rounded-lg border-2 border-gray-300 dark:border-slate-600 flex flex-col items-center justify-center text-xs text-gray-500 dark:text-gray-400 p-2 text-center cursor-pointer hover:bg-gray-200 dark:hover:bg-slate-600';
-                        errorDiv.innerHTML = `<svg class="w-8 h-8 mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><span>Click to view</span>`;
-                        parent.parentElement.replaceChild(errorDiv, parent);
-                        errorDiv.onclick = () => window.open(img.url, '_blank');
-                      }
-                    }}
-                    onLoad={() => {
-                      console.log('Image loaded:', img.url);
-                    }}
-                  />
-                </a>
-                <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs py-1 px-2 rounded-b-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                  {img.type} - {img.item.color}
+          <div className="mb-4">
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-3 text-sm text-blue-800 dark:text-blue-300">
+              <ImageIcon className="inline w-4 h-4 mr-1" />
+              Found {imageData.length} product image{imageData.length !== 1 ? 's' : ''} - Images should appear below
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {imageData.map((img, idx) => (
+                <div key={idx} className="flex-shrink-0 relative group">
+                  <div className="w-32 h-32 bg-white dark:bg-slate-800 rounded-lg border-2 border-gray-200 dark:border-slate-600 shadow-sm overflow-hidden">
+                    <a
+                      href={img.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-full h-full"
+                      title={`Click to open full image: ${img.url}`}
+                    >
+                      <img
+                        src={img.url}
+                        alt={`${img.item.description} - ${img.type}`}
+                        className="w-full h-full object-contain hover:scale-105 transition-transform cursor-pointer"
+                        onError={(e) => {
+                          console.error('❌ Failed to load image:', img.url);
+                          const target = e.currentTarget;
+                          const container = target.parentElement?.parentElement;
+                          if (container) {
+                            container.innerHTML = `
+                              <div class="w-full h-full bg-red-50 dark:bg-red-900/20 flex flex-col items-center justify-center p-2 text-center">
+                                <svg class="w-8 h-8 mb-1 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <span class="text-xs text-red-600 dark:text-red-400">Failed to load</span>
+                                <a href="${img.url}" target="_blank" class="text-xs text-blue-600 dark:text-blue-400 underline mt-1">Open URL</a>
+                              </div>
+                            `;
+                          }
+                        }}
+                        onLoad={() => {
+                          console.log('✅ Image loaded successfully:', img.url);
+                        }}
+                      />
+                    </a>
+                  </div>
+                  <div className="absolute -bottom-6 left-0 right-0 bg-gray-900 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                    {img.type} - {img.item.color}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         ) : (
           <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 mb-4 text-sm text-yellow-800 dark:text-yellow-300">
@@ -496,10 +506,19 @@ export default function ImportedQuotes() {
                             <div className="max-w-5xl">
                               <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
                                 <ImageIcon className="w-4 h-4" />
-                                Quote Line Items
+                                Quote Line Items ({lineItems.length} total)
                               </h3>
-                              {Object.entries(groupedItems).map(([groupLabel, items]) =>
-                                renderLineItemGroup(groupLabel, items)
+                              {lineItems.length === 0 ? (
+                                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 text-sm text-red-800 dark:text-red-300">
+                                  <p className="font-semibold mb-2">No line items found for this quote</p>
+                                  <p className="text-xs">Quote ID: {imp.quote_id}</p>
+                                </div>
+                              ) : (
+                                <>
+                                  {Object.entries(groupedItems).map(([groupLabel, items]) =>
+                                    renderLineItemGroup(groupLabel, items)
+                                  )}
+                                </>
                               )}
                             </div>
                           </td>
