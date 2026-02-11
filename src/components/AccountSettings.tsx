@@ -6039,13 +6039,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                 {sanmarEnabled && (
                   <div className="ml-7 space-y-4 pl-4 border-l-2 border-blue-200 dark:border-blue-800">
-                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                      <p className="text-sm font-medium text-amber-900 dark:text-amber-100 mb-2">⚠️ SanMar PromoStandards API</p>
-                      <p className="text-sm text-amber-800 dark:text-amber-200">
-                        Enter your <strong>PromoStandards credentials</strong> from SanMar. Inventory is fetched in real-time via their SOAP API (ws.sanmar.com).
-                      </p>
-                    </div>
-
                     {sanmarHasCredentials && (
                       <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3 flex items-center gap-2">
                         <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
