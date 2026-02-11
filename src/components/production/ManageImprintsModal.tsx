@@ -17,7 +17,7 @@ interface Proof {
 interface Imprint {
   id?: string;
   location: string;
-  price_matrix_id: string;
+  price_matrix_id: string | null;
   matrix: string;
   column_number: string;
   type_of_work: string;
@@ -90,7 +90,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
   const [workTypes, setWorkTypes] = useState<TypeOfWork[]>([]);
   const [currentImprint, setCurrentImprint] = useState<Imprint>({
     location: '',
-    price_matrix_id: '',
+    price_matrix_id: null,
     matrix: '',
     column_number: '',
     type_of_work: '',
@@ -126,7 +126,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
     } else {
       setCurrentImprint({
         location: '',
-        price_matrix_id: '',
+        price_matrix_id: null,
         matrix: '',
         column_number: '',
         type_of_work: '',
@@ -289,7 +289,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
           return {
             id: imp.id,
             location: imp.location || '',
-            price_matrix_id: imp.price_matrix_id || '',
+            price_matrix_id: imp.price_matrix_id || null,
             matrix: imp.matrix || '',
             column_number: imp.column_number || '',
             type_of_work: imp.type_of_work || '',
@@ -417,7 +417,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
 
     setCurrentImprint({
       location: '',
-      price_matrix_id: '',
+      price_matrix_id: null,
       matrix: '',
       column_number: '',
       type_of_work: '',
@@ -453,7 +453,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
     if (editingIndex === index) {
       setCurrentImprint({
         location: '',
-        price_matrix_id: '',
+        price_matrix_id: null,
         matrix: '',
         column_number: '',
         type_of_work: '',
@@ -604,7 +604,7 @@ export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabe
             company_id: profile.company_id,
             sort_order: idx + 1,
             location: imp.location,
-            price_matrix_id: imp.price_matrix_id,
+            price_matrix_id: imp.price_matrix_id || null,
             matrix: imp.matrix,
             column_number: imp.column_number,
             type_of_work: imp.type_of_work,
