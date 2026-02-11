@@ -617,13 +617,13 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
                         <p className="text-xs text-gray-700 font-medium uppercase mb-1">{imprint.type_of_work}</p>
                       )}
                       {artworkImages.length > 0 && (
-                        <div className="my-2 flex gap-2 flex-wrap">
+                        <div className="my-2 flex gap-3 flex-wrap">
                           {artworkImages.map((url: string, imgIdx: number) => (
                             <img
                               key={imgIdx}
                               src={url}
                               alt={`Artwork ${imgIdx + 1}`}
-                              className="h-16 w-16 object-contain border border-gray-300 bg-white"
+                              className="h-24 w-24 object-contain border-2 border-gray-400 bg-white rounded shadow-sm"
                             />
                           ))}
                         </div>
