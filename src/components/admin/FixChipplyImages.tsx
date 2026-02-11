@@ -37,13 +37,16 @@ export default function FixChipplyImages() {
     imageType: 'front' | 'rear' | 'side'
   ): Promise<{ success: boolean; url?: string; error?: string }> => {
     try {
+      console.log(`    🌐 Fetching from: ${imageUrl}`);
       // Download the image from the original URL
       const response = await fetch(imageUrl);
       if (!response.ok) {
+        console.error(`    ❌ Fetch failed: ${response.status} ${response.statusText}`);
         return { success: false, error: `Failed to download: ${response.statusText}` };
       }
 
       const blob = await response.blob();
+      console.log(`    📦 Downloaded blob: ${blob.size} bytes, type: ${blob.type}`);
 
       // Generate filename
       const ext = imageUrl.split('.').pop()?.split('?')[0] || 'jpg';
@@ -53,6 +56,7 @@ export default function FixChipplyImages() {
       // Get company ID from current user
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) {
+        console.error('    ❌ Not authenticated');
         return { success: false, error: 'Not authenticated' };
       }
 
@@ -63,10 +67,12 @@ export default function FixChipplyImages() {
         .single();
 
       if (!profile) {
+        console.error('    ❌ Profile not found');
         return { success: false, error: 'Profile not found' };
       }
 
       const storagePath = `${profile.company_id}/${filename}`;
+      console.log(`    📤 Uploading to: ${storagePath}`);
 
       // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
@@ -78,6 +84,7 @@ export default function FixChipplyImages() {
         });
 
       if (uploadError) {
+        console.error(`    ❌ Upload failed:`, uploadError);
         return { success: false, error: uploadError.message };
       }
 
@@ -86,8 +93,10 @@ export default function FixChipplyImages() {
         .from('chipply-garment-images')
         .getPublicUrl(storagePath);
 
+      console.log(`    ✅ Upload successful: ${urlData.publicUrl}`);
       return { success: true, url: urlData.publicUrl };
     } catch (error: any) {
+      console.error(`    ❌ Exception:`, error);
       return { success: false, error: error.message };
     }
   };
@@ -97,9 +106,12 @@ export default function FixChipplyImages() {
     setResults([]);
     const newResults: ImageFixResult[] = [];
 
+    console.log('🔄 Starting Chipply image fix process...');
+
     // Step 1: Check if bucket exists
     const bucketExists = await checkBucketExists();
     if (!bucketExists) {
+      console.error('❌ Storage bucket does not exist');
       newResults.push({
         success: false,
         message: 'Storage bucket "chipply-garment-images" does not exist. Please create it first.',
@@ -109,18 +121,22 @@ export default function FixChipplyImages() {
       return;
     }
 
+    console.log('✅ Storage bucket exists');
     newResults.push({
       success: true,
       message: '✓ Storage bucket exists',
     });
+    setResults([...newResults]);
 
     // Step 2: Get all line items with external image URLs
+    console.log('🔍 Searching for Chipply images...');
     const { data: lineItems, error: fetchError } = await supabase
       .from('quote_line_items')
       .select('id, description, garment_image_url, garment_image_rear_url, garment_image_side_url')
       .or('garment_image_url.like.%chipply%,garment_image_rear_url.like.%chipply%,garment_image_side_url.like.%chipply%');
 
     if (fetchError) {
+      console.error('❌ Failed to fetch line items:', fetchError);
       newResults.push({
         success: false,
         message: `Failed to fetch line items: ${fetchError.message}`,
@@ -129,6 +145,8 @@ export default function FixChipplyImages() {
       setIsProcessing(false);
       return;
     }
+
+    console.log(`📊 Found ${lineItems?.length || 0} line items with Chipply images`, lineItems);
 
     if (!lineItems || lineItems.length === 0) {
       newResults.push({
@@ -150,18 +168,26 @@ export default function FixChipplyImages() {
     let successCount = 0;
     let errorCount = 0;
 
-    for (const item of lineItems) {
+    console.log(`🔄 Processing ${lineItems.length} line items...`);
+
+    for (let i = 0; i < lineItems.length; i++) {
+      const item = lineItems[i];
+      console.log(`\n📦 [${i + 1}/${lineItems.length}] Processing: ${item.description}`);
+
       const updates: any = {};
       let hasChanges = false;
 
       // Process front image
       if (item.garment_image_url && item.garment_image_url.includes('chipply')) {
+        console.log(`  📥 Downloading front image: ${item.garment_image_url}`);
         const result = await downloadAndStoreImage(item.garment_image_url, item.id, 'front');
         if (result.success && result.url) {
+          console.log(`  ✅ Front image uploaded: ${result.url}`);
           updates.garment_image_url = result.url;
           hasChanges = true;
           successCount++;
         } else {
+          console.error(`  ❌ Failed to process front image: ${result.error}`);
           errorCount++;
           newResults.push({
             success: false,
@@ -172,41 +198,50 @@ export default function FixChipplyImages() {
 
       // Process rear image
       if (item.garment_image_rear_url && item.garment_image_rear_url.includes('chipply')) {
+        console.log(`  📥 Downloading rear image: ${item.garment_image_rear_url}`);
         const result = await downloadAndStoreImage(item.garment_image_rear_url, item.id, 'rear');
         if (result.success && result.url) {
+          console.log(`  ✅ Rear image uploaded: ${result.url}`);
           updates.garment_image_rear_url = result.url;
           hasChanges = true;
           successCount++;
         } else {
+          console.error(`  ❌ Failed to process rear image: ${result.error}`);
           errorCount++;
         }
       }
 
       // Process side image
       if (item.garment_image_side_url && item.garment_image_side_url.includes('chipply')) {
+        console.log(`  📥 Downloading side image: ${item.garment_image_side_url}`);
         const result = await downloadAndStoreImage(item.garment_image_side_url, item.id, 'side');
         if (result.success && result.url) {
+          console.log(`  ✅ Side image uploaded: ${result.url}`);
           updates.garment_image_side_url = result.url;
           hasChanges = true;
           successCount++;
         } else {
+          console.error(`  ❌ Failed to process side image: ${result.error}`);
           errorCount++;
         }
       }
 
       // Update the database if we have changes
       if (hasChanges) {
+        console.log(`  💾 Updating database for ${item.description}...`);
         const { error: updateError } = await supabase
           .from('quote_line_items')
           .update(updates)
           .eq('id', item.id);
 
         if (updateError) {
+          console.error(`  ❌ Database update failed:`, updateError);
           newResults.push({
             success: false,
             message: `Failed to update ${item.description}: ${updateError.message}`,
           });
         } else {
+          console.log(`  ✅ Database updated successfully`);
           newResults.push({
             success: true,
             message: `✓ Updated ${item.description}`,
@@ -215,6 +250,10 @@ export default function FixChipplyImages() {
         setResults([...newResults]);
       }
     }
+
+    console.log(`\n🎉 Processing complete!`);
+    console.log(`  ✅ Success: ${successCount} images`);
+    console.log(`  ❌ Errors: ${errorCount} images`);
 
     newResults.push({
       success: true,
