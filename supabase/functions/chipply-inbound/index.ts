@@ -13,6 +13,186 @@ interface ChipplyEndpointSettings {
   api_key: string;
 }
 
+async function downloadAndStoreImages(supabase: any, payload: any, companyId: string): Promise<any> {
+  try {
+    // Extract the work order data
+    const workOrderData = Array.isArray(payload) ? payload[0]?.workOrderData : payload?.workOrderData;
+
+    if (!workOrderData?.processes) {
+      console.log('[IMAGE] No processes found in payload');
+      return payload;
+    }
+
+    const processes = workOrderData.processes;
+
+    for (let i = 0; i < processes.length; i++) {
+      const process = processes[i];
+      const products = process.products || [];
+
+      for (let j = 0; j < products.length; j++) {
+        const product = products[j];
+        const colors = product.productColors || [];
+
+        for (let k = 0; k < colors.length; k++) {
+          const color = colors[k];
+
+          // Download and store each image type
+          if (color.image1Url) {
+            const newUrl = await downloadAndStoreImage(supabase, color.image1Url, companyId, 'front', i, j, k);
+            if (newUrl) color.image1Url = newUrl;
+          }
+
+          if (color.image2Url) {
+            const newUrl = await downloadAndStoreImage(supabase, color.image2Url, companyId, 'rear', i, j, k);
+            if (newUrl) color.image2Url = newUrl;
+          }
+
+          if (color.image3Url) {
+            const newUrl = await downloadAndStoreImage(supabase, color.image3Url, companyId, 'side', i, j, k);
+            if (newUrl) color.image3Url = newUrl;
+          }
+        }
+      }
+
+      // Download and store artwork images from components
+      const components = process.components || [];
+      for (let c = 0; c < components.length; c++) {
+        const component = components[c];
+        const artworkVariations = component.artworkVariations || [];
+
+        for (let v = 0; v < artworkVariations.length; v++) {
+          const variation = artworkVariations[v];
+
+          if (variation.imageSrc) {
+            const newUrl = await downloadAndStoreArtwork(supabase, variation.imageSrc, companyId, i, c, v);
+            if (newUrl) variation.imageSrc = newUrl;
+          }
+        }
+      }
+    }
+
+    return payload;
+  } catch (error) {
+    console.error('[IMAGE] Error processing images:', error);
+    return payload;
+  }
+}
+
+async function downloadAndStoreImage(
+  supabase: any,
+  imageUrl: string,
+  companyId: string,
+  imageType: string,
+  processIdx: number,
+  productIdx: number,
+  colorIdx: number
+): Promise<string | null> {
+  try {
+    console.log(`[IMAGE] Downloading ${imageType} image from: ${imageUrl}`);
+
+    // Download the image
+    const response = await fetch(imageUrl);
+    if (!response.ok) {
+      console.error(`[IMAGE] Failed to download: ${response.status} ${response.statusText}`);
+      return null;
+    }
+
+    const blob = await response.blob();
+    const arrayBuffer = await blob.arrayBuffer();
+    const buffer = new Uint8Array(arrayBuffer);
+
+    // Generate filename
+    const timestamp = Date.now();
+    const ext = imageUrl.split('.').pop()?.split('?')[0] || 'jpg';
+    const filename = `${timestamp}_p${processIdx}_pr${productIdx}_c${colorIdx}_${imageType}.${ext}`;
+    const storagePath = `${companyId}/${filename}`;
+
+    console.log(`[IMAGE] Uploading to storage path: ${storagePath}`);
+
+    // Upload to Supabase Storage
+    const { data, error } = await supabase.storage
+      .from('chipply-garment-images')
+      .upload(storagePath, buffer, {
+        contentType: blob.type || 'image/jpeg',
+        cacheControl: '3600',
+        upsert: true
+      });
+
+    if (error) {
+      console.error(`[IMAGE] Upload error:`, error);
+      return null;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('chipply-garment-images')
+      .getPublicUrl(storagePath);
+
+    console.log(`[IMAGE] Successfully stored at: ${urlData.publicUrl}`);
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error(`[IMAGE] Error downloading/storing image:`, error);
+    return null;
+  }
+}
+
+async function downloadAndStoreArtwork(
+  supabase: any,
+  artworkUrl: string,
+  companyId: string,
+  processIdx: number,
+  componentIdx: number,
+  variationIdx: number
+): Promise<string | null> {
+  try {
+    console.log(`[ARTWORK] Downloading artwork from: ${artworkUrl}`);
+
+    // Download the artwork
+    const response = await fetch(artworkUrl);
+    if (!response.ok) {
+      console.error(`[ARTWORK] Failed to download: ${response.status} ${response.statusText}`);
+      return null;
+    }
+
+    const blob = await response.blob();
+    const arrayBuffer = await blob.arrayBuffer();
+    const buffer = new Uint8Array(arrayBuffer);
+
+    // Generate filename
+    const timestamp = Date.now();
+    const ext = artworkUrl.split('.').pop()?.split('?')[0] || 'png';
+    const filename = `${timestamp}_p${processIdx}_c${componentIdx}_v${variationIdx}_artwork.${ext}`;
+    const storagePath = `${companyId}/artwork/${filename}`;
+
+    console.log(`[ARTWORK] Uploading to storage path: ${storagePath}`);
+
+    // Upload to Supabase Storage (using same bucket for now)
+    const { data, error } = await supabase.storage
+      .from('chipply-garment-images')
+      .upload(storagePath, buffer, {
+        contentType: blob.type || 'image/png',
+        cacheControl: '3600',
+        upsert: true
+      });
+
+    if (error) {
+      console.error(`[ARTWORK] Upload error:`, error);
+      return null;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('chipply-garment-images')
+      .getPublicUrl(storagePath);
+
+    console.log(`[ARTWORK] Successfully stored at: ${urlData.publicUrl}`);
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error(`[ARTWORK] Error downloading/storing artwork:`, error);
+    return null;
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -143,13 +323,18 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Download and store images before processing
+    console.log('[DEBUG] Starting image download and storage');
+    const processedPayload = await downloadAndStoreImages(supabase, payload, authenticatedCompanyId);
+    console.log('[DEBUG] Image processing completed');
+
     // Successfully authenticated - log the import
     const { data: logData, error: insertError } = await supabase
       .from('chipply_import_logs')
       .insert({
         company_id: authenticatedCompanyId,
         received_at: new Date().toISOString(),
-        raw_json: payload,
+        raw_json: processedPayload,
         status: 'pending',
       })
       .select()
