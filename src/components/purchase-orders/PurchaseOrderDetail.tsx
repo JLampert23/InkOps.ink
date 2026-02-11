@@ -21,6 +21,7 @@ import {
   Printer,
   Edit,
   Plus,
+  Eye,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { POSettingsService } from '../../services/po-settings-service';
@@ -190,8 +191,11 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods, onNavigateTo
       if (logsError) throw logsError;
       setActivityLog(logs || []);
 
-      // Load associated work orders
-      const { data: workOrdersData, error: workOrdersError } = await supabase
+      // Load associated work orders through multiple methods
+      let workOrdersMap = new Map<string, WorkOrder>();
+
+      // Method 1: Direct link through garment_requirements_staging
+      const { data: directWorkOrders, error: directError } = await supabase
         .from('garment_requirements_staging')
         .select(`
           work_order_id,
@@ -208,14 +212,10 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods, onNavigateTo
         .eq('po_id', poId)
         .not('work_order_id', 'is', null);
 
-      if (workOrdersError) {
-        console.error('Error loading work orders:', workOrdersError);
-      } else {
-        // Deduplicate work orders by ID
-        const uniqueWorkOrders = new Map<string, WorkOrder>();
-        workOrdersData?.forEach((item: any) => {
+      if (!directError && directWorkOrders) {
+        directWorkOrders.forEach((item: any) => {
           if (item.work_orders && item.quotes) {
-            uniqueWorkOrders.set(item.work_orders.id, {
+            workOrdersMap.set(item.work_orders.id, {
               id: item.work_orders.id,
               work_order_number: item.work_orders.work_order_number,
               quote_id: item.quote_id,
@@ -224,8 +224,51 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods, onNavigateTo
             });
           }
         });
-        setWorkOrders(Array.from(uniqueWorkOrders.values()));
       }
+
+      // Method 2: Link through work_order_line_items by matching style/color
+      // Get all line items from this PO
+      const poLineItems = items || [];
+
+      if (poLineItems.length > 0) {
+        // For each PO line item, find matching work order line items
+        for (const lineItem of poLineItems) {
+          if (lineItem.style_number) {
+            const { data: matchingWOLines, error: woLineError } = await supabase
+              .from('work_order_line_items')
+              .select(`
+                work_order_id,
+                work_orders!work_order_line_items_work_order_id_fkey (
+                  id,
+                  work_order_number,
+                  quote_id,
+                  quotes!work_orders_quote_id_fkey (
+                    quote_number,
+                    customer_name
+                  )
+                )
+              `)
+              .eq('style_number', lineItem.style_number)
+              .eq('color', lineItem.color || '');
+
+            if (!woLineError && matchingWOLines) {
+              matchingWOLines.forEach((item: any) => {
+                if (item.work_orders && item.work_orders.quotes) {
+                  workOrdersMap.set(item.work_orders.id, {
+                    id: item.work_orders.id,
+                    work_order_number: item.work_orders.work_order_number,
+                    quote_id: item.work_orders.quote_id,
+                    quote_number: item.work_orders.quotes.quote_number,
+                    customer_name: item.work_orders.quotes.customer_name,
+                  });
+                }
+              });
+            }
+          }
+        }
+      }
+
+      setWorkOrders(Array.from(workOrdersMap.values()));
     } catch (error: any) {
       console.error('Error loading purchase order:', error);
       console.error('Error message:', error?.message);
