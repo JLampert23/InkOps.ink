@@ -132,6 +132,7 @@ interface QuoteImprint {
   description?: string;
   artwork_description?: string;
   artwork_url?: string;
+  artwork_images?: string[];
 }
 
 export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProps) {
@@ -830,24 +831,38 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                       </div>
                                     )}
 
-                                    {imprint.artwork_url && (
-                                      <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
-                                        <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                                          Art File:
+                                    {(() => {
+                                      const artworkImages = imprint.artwork_images && Array.isArray(imprint.artwork_images)
+                                        ? imprint.artwork_images
+                                        : imprint.artwork_url
+                                          ? [imprint.artwork_url]
+                                          : [];
+
+                                      if (artworkImages.length === 0) return null;
+
+                                      return (
+                                        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
+                                          <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                            Art Files {artworkImages.length > 1 && `(${artworkImages.length} variations)`}:
+                                          </div>
+                                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                                            {artworkImages.map((url: string, imgIdx: number) => (
+                                              <div key={imgIdx} className="aspect-square">
+                                                <img
+                                                  src={url}
+                                                  alt={`Artwork ${imgIdx + 1}`}
+                                                  className="w-full h-full object-contain rounded border-2 border-gray-300 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800 shadow-sm"
+                                                  onClick={() => {
+                                                    setSelectedProofImage(url);
+                                                    setShowProofModal(true);
+                                                  }}
+                                                />
+                                              </div>
+                                            ))}
+                                          </div>
                                         </div>
-                                        <div className="aspect-square max-w-[200px]">
-                                          <img
-                                            src={imprint.artwork_url}
-                                            alt={`Artwork for ${imprint.type_of_work}`}
-                                            className="w-full h-full object-contain rounded border border-gray-200 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800"
-                                            onClick={() => {
-                                              setSelectedProofImage(imprint.artwork_url!);
-                                              setShowProofModal(true);
-                                            }}
-                                          />
-                                        </div>
-                                      </div>
-                                    )}
+                                      );
+                                    })()}
 
                                     {hasMockups && (
                                       <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
