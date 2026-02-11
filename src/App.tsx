@@ -182,27 +182,13 @@ function AppContent() {
       <aside className="fixed top-0 left-0 h-full bg-white dark:bg-[#1a2744] border-r border-gray-200 dark:border-slate-700 shadow-xl z-30 w-56">
         {/* Logo/Brand */}
         <div className="h-20 border-b border-gray-200 dark:border-slate-700 flex items-center justify-center px-4 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-slate-800 dark:to-slate-700">
-          {companySettings?.logo_url ? (
-            <div className="flex items-center justify-center w-full h-full py-1.5">
-              <img
-                src={companySettings.logo_url}
-                alt={companySettings.company_name || 'Company Logo'}
-                className="max-h-full max-w-full object-contain"
-              />
-            </div>
-          ) : (
-            <div className="flex items-center gap-3 min-w-0 w-full">
-              <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm flex-shrink-0">
-                <TrendingUp className="w-6 h-6 text-white" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h1 className="text-white font-bold text-lg truncate">
-                  {companySettings?.company_name || 'Printavo'}
-                </h1>
-                <p className="text-blue-100 text-xs truncate">Financial Dashboard</p>
-              </div>
-            </div>
-          )}
+          <div className="flex items-center justify-center w-full h-full py-1.5">
+            <img
+              src="/inkops_logo-05.png"
+              alt="InkOps"
+              className="max-h-full max-w-full object-contain"
+            />
+          </div>
         </div>
 
         {/* Navigation */}
