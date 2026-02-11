@@ -93,18 +93,28 @@ interface ActivityLog {
   created_at: string;
 }
 
+interface WorkOrder {
+  id: string;
+  work_order_number: string;
+  quote_id: string;
+  quote_number: string;
+  customer_name: string;
+}
+
 interface PurchaseOrderDetailProps {
   poId: string;
   onBack: () => void;
   onEdit?: () => void;
   onReceiveGoods?: (poId: string) => void;
+  onNavigateToWorkOrder?: (workOrderId: string) => void;
 }
 
-export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOrderDetailProps) {
+export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods, onNavigateToWorkOrder }: PurchaseOrderDetailProps) {
   const [po, setPo] = useState<PurchaseOrder | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [activityLog, setActivityLog] = useState<ActivityLog[]>([]);
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -179,6 +189,43 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOr
 
       if (logsError) throw logsError;
       setActivityLog(logs || []);
+
+      // Load associated work orders
+      const { data: workOrdersData, error: workOrdersError } = await supabase
+        .from('garment_requirements_staging')
+        .select(`
+          work_order_id,
+          quote_id,
+          work_orders!garment_requirements_staging_work_order_id_fkey (
+            id,
+            work_order_number
+          ),
+          quotes!garment_requirements_staging_quote_id_fkey (
+            quote_number,
+            customer_name
+          )
+        `)
+        .eq('po_id', poId)
+        .not('work_order_id', 'is', null);
+
+      if (workOrdersError) {
+        console.error('Error loading work orders:', workOrdersError);
+      } else {
+        // Deduplicate work orders by ID
+        const uniqueWorkOrders = new Map<string, WorkOrder>();
+        workOrdersData?.forEach((item: any) => {
+          if (item.work_orders && item.quotes) {
+            uniqueWorkOrders.set(item.work_orders.id, {
+              id: item.work_orders.id,
+              work_order_number: item.work_orders.work_order_number,
+              quote_id: item.quote_id,
+              quote_number: item.quotes.quote_number,
+              customer_name: item.quotes.customer_name,
+            });
+          }
+        });
+        setWorkOrders(Array.from(uniqueWorkOrders.values()));
+      }
     } catch (error: any) {
       console.error('Error loading purchase order:', error);
       console.error('Error message:', error?.message);
@@ -1153,6 +1200,47 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods }: PurchaseOr
               )}
             </div>
           </div>
+
+          {/* Work Orders */}
+          {workOrders.length > 0 && (
+            <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Work Orders ({workOrders.length})
+              </h3>
+              <div className="space-y-3">
+                {workOrders.map((wo) => (
+                  <div
+                    key={wo.id}
+                    className="p-3 rounded-lg border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-900 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 dark:text-white text-sm">
+                          {wo.work_order_number}
+                        </p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                          {wo.customer_name}
+                        </p>
+                      </div>
+                      {onNavigateToWorkOrder && (
+                        <button
+                          onClick={() => onNavigateToWorkOrder(wo.id)}
+                          className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors flex-shrink-0"
+                        >
+                          <Eye className="w-3 h-3" />
+                          View
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-500">
+                      Quote: {wo.quote_number}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Delivery Date */}
           {po.expected_delivery_date && (

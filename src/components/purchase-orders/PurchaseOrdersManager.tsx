@@ -191,6 +191,7 @@ export function PurchaseOrdersManager({ onNavigateToWorkOrder }: PurchaseOrdersM
                 poId={selectedPoId}
                 onBack={handleBack}
                 onReceiveGoods={handleReceiveFromDetail}
+                onNavigateToWorkOrder={onNavigateToWorkOrder}
               />
             )}
           </>
