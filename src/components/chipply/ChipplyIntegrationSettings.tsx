@@ -6,6 +6,7 @@ import {
   ChipplyEndpointSettings,
   ChipplyImportBehavior,
 } from '../../services/chipply-settings-service';
+import FixChipplyImages from '../admin/FixChipplyImages';
 
 interface Props {
   onBack: () => void;
@@ -370,6 +371,9 @@ export function ChipplyIntegrationSettings({ onBack }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Image Fix Tool */}
+      <FixChipplyImages />
     </div>
   );
 }
