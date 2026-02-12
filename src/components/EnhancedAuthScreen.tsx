@@ -79,9 +79,9 @@ export function EnhancedAuthScreen() {
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center mb-6 transform hover:scale-105 transition-transform duration-200">
               <img
-                src="/create_variation_b_f.png"
-                alt="InkOps Logo"
-                className="h-40 w-auto"
+                src="/inkops_logo-05.png"
+                alt="INKOPS"
+                className="h-16 w-auto"
               />
             </div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">
@@ -91,7 +91,7 @@ export function EnhancedAuthScreen() {
               {isForgotPassword
                 ? 'Enter your email to receive a password reset link'
                 : isSignUp
-                ? 'Get started with InkOps'
+                ? 'Get started with INKOPS'
                 : 'Welcome back'}
             </p>
           </div>
