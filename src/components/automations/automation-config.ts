@@ -35,13 +35,13 @@ export const TRIGGER_OPTIONS: TriggerOption[] = [
     value: 'task_created',
     label: 'New Task Created',
     description: 'Triggers when a new task is created',
-    icon: 'ListTodo',
+    icon: 'ClipboardList',
   },
   {
     value: 'task_status_changed',
     label: 'Task Status Changed',
     description: 'Triggers when a task status changes',
-    icon: 'ClipboardCheck',
+    icon: 'CheckSquare',
   },
   {
     value: 'quote_approved',
@@ -95,7 +95,7 @@ export const TRIGGER_OPTIONS: TriggerOption[] = [
     value: 'preset_task_list_completed',
     label: 'Preset Task List Completed',
     description: 'Triggers when a preset task list is completed',
-    icon: 'ListChecks',
+    icon: 'CheckCircle',
   },
   {
     value: 'imprints_added_to_scheduler',
@@ -119,7 +119,7 @@ export const TRIGGER_OPTIONS: TriggerOption[] = [
     value: 'scheduled_datetime_trigger',
     label: 'Scheduled Date/Time',
     description: 'Triggers at a specific date and time',
-    icon: 'CalendarClock',
+    icon: 'Calendar',
   },
   {
     value: 'recurring_schedule_trigger',
