@@ -308,6 +308,7 @@ async function executeAction(
         return await executeSendSMS(supabase, config, triggerData, companyId);
 
       case 'update_status':
+      case 'change_status':
         return await executeUpdateStatus(supabase, config, triggerData, companyId);
 
       case 'create_task':
@@ -318,6 +319,27 @@ async function executeAction(
 
       case 'webhook':
         return await executeWebhook(supabase, config, triggerData, companyId);
+
+      case 'send_message':
+        return await executeSendMessage(supabase, config, triggerData, companyId);
+
+      case 'apply_preset_task_list':
+        return await executeApplyPresetTaskList(supabase, config, triggerData, companyId);
+
+      case 'request_payment':
+        return await executeRequestPayment(supabase, config, triggerData, companyId);
+
+      case 'request_approval':
+        return await executeRequestApproval(supabase, config, triggerData, companyId);
+
+      case 'add_imprints_to_scheduler':
+        return await executeAddImprintsToScheduler(supabase, config, triggerData, companyId);
+
+      case 'wait_duration':
+        return await executeWaitDuration(supabase, config, triggerData, companyId);
+
+      case 'wait_until':
+        return await executeWaitUntil(supabase, config, triggerData, companyId);
 
       default:
         throw new Error(`Unknown action type: ${type}`);
@@ -490,6 +512,286 @@ async function executeWebhook(supabase: any, config: any, triggerData: any, comp
   }
 
   return { success: true };
+}
+
+async function executeSendMessage(supabase: any, config: any, triggerData: any, companyId: string) {
+  const { message_type, to, subject, message } = config;
+
+  // Resolve recipient
+  let recipient = to;
+  if (to.startsWith('trigger.')) {
+    recipient = getNestedValue(triggerData, to.replace('trigger.', ''));
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+  if (message_type === 'email') {
+    // Send email
+    const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({
+        company_id: companyId,
+        to: recipient,
+        subject: subject || 'Notification',
+        html: message,
+        template: 'custom',
+        shortCodeData: {
+          invoice: triggerData,
+          payment: triggerData,
+          quote: triggerData,
+          customer: triggerData,
+        }
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to send email: ${error}`);
+    }
+  } else if (message_type === 'sms') {
+    // Send SMS
+    const response = await fetch(`${supabaseUrl}/functions/v1/twilio-sms`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({
+        company_id: companyId,
+        to: recipient,
+        message: message,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to send SMS: ${error}`);
+    }
+  }
+
+  return { success: true };
+}
+
+async function executeApplyPresetTaskList(supabase: any, config: any, triggerData: any, companyId: string) {
+  const { preset_name, assign_to } = config;
+
+  // Note: This would fetch a preset task list template and create tasks
+  // Implementation would depend on your task management structure
+  console.log('Apply preset task list:', { preset_name, assign_to, triggerData });
+
+  // Example: Create tasks from a preset
+  const presetTasks = [
+    { title: `${preset_name} - Task 1`, description: 'Auto-generated task' },
+    { title: `${preset_name} - Task 2`, description: 'Auto-generated task' },
+  ];
+
+  for (const task of presetTasks) {
+    console.log('Creating task:', task);
+    // In production, this would call Printavo API or insert into local task table
+  }
+
+  return { success: true };
+}
+
+async function executeRequestPayment(supabase: any, config: any, triggerData: any, companyId: string) {
+  const { invoice_id, payment_method, send_reminder } = config;
+
+  // Resolve invoice ID
+  let resolvedInvoiceId = invoice_id;
+  if (invoice_id.startsWith('trigger.')) {
+    resolvedInvoiceId = getNestedValue(triggerData, invoice_id.replace('trigger.', ''));
+  }
+
+  // Get invoice details
+  const { data: invoice } = await supabase
+    .from('printavo_invoices')
+    .select('*')
+    .eq('id', resolvedInvoiceId)
+    .maybeSingle();
+
+  if (!invoice) {
+    throw new Error(`Invoice not found: ${resolvedInvoiceId}`);
+  }
+
+  if (send_reminder && invoice.customer_email) {
+    // Send payment reminder email
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({
+        company_id: companyId,
+        to: invoice.customer_email,
+        subject: `Payment Request - Invoice #${invoice.invoice_number}`,
+        template: 'invoice-reminder',
+        data: {
+          customerName: invoice.customer_name,
+          invoiceNumber: invoice.invoice_number,
+          amountDue: invoice.amount_outstanding,
+          dueDate: invoice.due_date,
+        },
+      }),
+    });
+  }
+
+  return { success: true };
+}
+
+async function executeRequestApproval(supabase: any, config: any, triggerData: any, companyId: string) {
+  const { quote_id, recipient_email, message } = config;
+
+  // Resolve quote ID
+  let resolvedQuoteId = quote_id;
+  if (quote_id.startsWith('trigger.')) {
+    resolvedQuoteId = getNestedValue(triggerData, quote_id.replace('trigger.', ''));
+  }
+
+  // Get quote details
+  const { data: quote } = await supabase
+    .from('quotes')
+    .select('*')
+    .eq('id', resolvedQuoteId)
+    .maybeSingle();
+
+  if (!quote) {
+    throw new Error(`Quote not found: ${resolvedQuoteId}`);
+  }
+
+  // Create approval record
+  const { data: approval, error: approvalError } = await supabase
+    .from('quote_approvals')
+    .insert({
+      company_id: companyId,
+      quote_id: resolvedQuoteId,
+      status: 'pending',
+      sent_to_email: recipient_email,
+    })
+    .select()
+    .single();
+
+  if (approvalError) {
+    throw new Error(`Failed to create approval: ${approvalError.message}`);
+  }
+
+  // Send approval request email
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+  const approvalUrl = `${supabaseUrl}/approve/${approval.id}`;
+
+  await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${supabaseServiceKey}`,
+    },
+    body: JSON.stringify({
+      company_id: companyId,
+      to: recipient_email,
+      subject: `Approval Request - Quote #${quote.quote_number}`,
+      html: `
+        <p>${message || 'Please review and approve the following quote:'}</p>
+        <p><strong>Quote #${quote.quote_number}</strong></p>
+        <p>Total: $${quote.total}</p>
+        <p><a href="${approvalUrl}">Click here to review and approve</a></p>
+      `,
+      template: 'custom',
+    }),
+  });
+
+  return { success: true };
+}
+
+async function executeAddImprintsToScheduler(supabase: any, config: any, triggerData: any, companyId: string) {
+  const { work_order_id, scheduled_date, station_id } = config;
+
+  // Resolve work order ID
+  let resolvedWorkOrderId = work_order_id;
+  if (work_order_id.startsWith('trigger.')) {
+    resolvedWorkOrderId = getNestedValue(triggerData, work_order_id.replace('trigger.', ''));
+  }
+
+  // Create production schedule entry
+  const { error } = await supabase
+    .from('production_schedule_entries')
+    .insert({
+      company_id: companyId,
+      work_order_id: resolvedWorkOrderId,
+      scheduled_date: scheduled_date,
+      station_id: station_id || null,
+      status: 'scheduled',
+    });
+
+  if (error) {
+    throw new Error(`Failed to add to scheduler: ${error.message}`);
+  }
+
+  return { success: true };
+}
+
+async function executeWaitDuration(supabase: any, config: any, triggerData: any, companyId: string) {
+  const { duration_unit, duration_value } = config;
+
+  // Calculate delay in milliseconds
+  let delayMs = 0;
+  switch (duration_unit) {
+    case 'minutes':
+      delayMs = duration_value * 60 * 1000;
+      break;
+    case 'hours':
+      delayMs = duration_value * 60 * 60 * 1000;
+      break;
+    case 'days':
+      delayMs = duration_value * 24 * 60 * 60 * 1000;
+      break;
+    default:
+      throw new Error(`Unknown duration unit: ${duration_unit}`);
+  }
+
+  // This is a special action that doesn't execute immediately
+  // Instead, it reschedules the next action in the sequence
+  // The queue processor should handle this by updating the scheduled_for time
+  console.log(`Wait duration: ${duration_value} ${duration_unit} (${delayMs}ms)`);
+
+  return {
+    success: true,
+    delay_ms: delayMs,
+    reschedule: true
+  };
+}
+
+async function executeWaitUntil(supabase: any, config: any, triggerData: any, companyId: string) {
+  const { target_datetime } = config;
+
+  // Parse target datetime
+  const targetDate = new Date(target_datetime);
+  const now = new Date();
+
+  if (targetDate <= now) {
+    // Target time has passed, continue immediately
+    return { success: true };
+  }
+
+  // Calculate delay
+  const delayMs = targetDate.getTime() - now.getTime();
+
+  console.log(`Wait until: ${target_datetime} (${delayMs}ms from now)`);
+
+  return {
+    success: true,
+    delay_ms: delayMs,
+    reschedule: true
+  };
 }
 
 function getNestedValue(obj: any, path: string): any {

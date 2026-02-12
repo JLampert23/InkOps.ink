@@ -335,6 +335,124 @@ export const ACTION_OPTIONS: ActionOption[] = [
       { name: 'message', label: 'Notification Message', type: 'text', required: true },
     ],
   },
+  {
+    value: 'send_message',
+    label: 'Send Message',
+    description: 'Send an email or SMS message',
+    icon: 'MessageCircle',
+    configFields: [
+      {
+        name: 'message_type',
+        label: 'Message Type',
+        type: 'select',
+        required: true,
+        options: [
+          { value: 'email', label: 'Email' },
+          { value: 'sms', label: 'SMS' },
+        ],
+      },
+      { name: 'to', label: 'Recipient', type: 'text', required: true },
+      { name: 'subject', label: 'Subject (Email only)', type: 'text', required: false },
+      { name: 'message', label: 'Message', type: 'textarea', required: true },
+    ],
+  },
+  {
+    value: 'apply_preset_task_list',
+    label: 'Apply Preset Task List',
+    description: 'Create tasks from a preset template',
+    icon: 'ListChecks',
+    configFields: [
+      { name: 'preset_name', label: 'Preset Name', type: 'text', required: true },
+      { name: 'assign_to', label: 'Assign To (User ID)', type: 'text', required: false },
+    ],
+  },
+  {
+    value: 'request_payment',
+    label: 'Request Payment',
+    description: 'Send a payment request to customer',
+    icon: 'DollarSign',
+    configFields: [
+      { name: 'invoice_id', label: 'Invoice ID', type: 'text', required: true },
+      { name: 'payment_method', label: 'Payment Method', type: 'select', options: [
+        { value: 'stripe', label: 'Stripe' },
+        { value: 'manual', label: 'Manual' },
+      ]},
+      { name: 'send_reminder', label: 'Send Reminder Email', type: 'checkbox', required: false },
+    ],
+  },
+  {
+    value: 'request_approval',
+    label: 'Request Approval',
+    description: 'Send an approval request',
+    icon: 'CheckCircle',
+    configFields: [
+      { name: 'quote_id', label: 'Quote ID', type: 'text', required: true },
+      { name: 'recipient_email', label: 'Recipient Email', type: 'text', required: true },
+      { name: 'message', label: 'Custom Message', type: 'textarea', required: false },
+    ],
+  },
+  {
+    value: 'change_status',
+    label: 'Change Status',
+    description: 'Update status of an entity',
+    icon: 'RefreshCw',
+    configFields: [
+      {
+        name: 'entity_type',
+        label: 'Entity Type',
+        type: 'select',
+        required: true,
+        options: [
+          { value: 'invoice', label: 'Invoice' },
+          { value: 'quote', label: 'Quote' },
+          { value: 'work_order', label: 'Work Order' },
+          { value: 'purchase_order', label: 'Purchase Order' },
+        ],
+      },
+      { name: 'entity_id_field', label: 'Entity ID Field', type: 'text', required: true },
+      { name: 'new_status', label: 'New Status', type: 'text', required: true },
+    ],
+  },
+  {
+    value: 'add_imprints_to_scheduler',
+    label: 'Add Imprints to Scheduler',
+    description: 'Schedule imprints for production',
+    icon: 'Calendar',
+    configFields: [
+      { name: 'work_order_id', label: 'Work Order ID', type: 'text', required: true },
+      { name: 'scheduled_date', label: 'Scheduled Date', type: 'date', required: true },
+      { name: 'station_id', label: 'Station ID (optional)', type: 'text', required: false },
+    ],
+  },
+  {
+    value: 'wait_duration',
+    label: 'Wait Duration',
+    description: 'Wait for a specified amount of time',
+    icon: 'Clock',
+    configFields: [
+      {
+        name: 'duration_unit',
+        label: 'Duration Unit',
+        type: 'select',
+        required: true,
+        options: [
+          { value: 'minutes', label: 'Minutes' },
+          { value: 'hours', label: 'Hours' },
+          { value: 'days', label: 'Days' },
+        ],
+      },
+      { name: 'duration_value', label: 'Duration Value', type: 'number', required: true },
+    ],
+  },
+  {
+    value: 'wait_until',
+    label: 'Wait Until',
+    description: 'Wait until a specific date/time',
+    icon: 'CalendarDays',
+    configFields: [
+      { name: 'target_datetime', label: 'Target Date/Time', type: 'datetime', required: true },
+    ],
+  },
 ];
 
 export const OPERATOR_LABELS: Record<string, string> = {
