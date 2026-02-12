@@ -19,18 +19,18 @@ export function SchedulingEditor({ scheduling, onChange }: SchedulingEditorProps
   ];
 
   return (
-    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-4">
+    <div className="bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700 rounded-lg p-4 space-y-4">
       <div className="flex items-center gap-2">
-        <Clock className="w-5 h-5 text-blue-600" />
-        <h4 className="font-medium text-gray-900">When should this automation run?</h4>
+        <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+        <h4 className="font-medium text-gray-900 dark:text-white">When should this automation run?</h4>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           Execution Type
         </label>
         <div className="space-y-2">
-          <label className="flex items-center gap-2 p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-white">
+          <label className="flex items-center gap-2 p-3 border border-gray-300 dark:border-slate-600 rounded-lg cursor-pointer hover:bg-white dark:hover:bg-slate-700/50">
             <input
               type="radio"
               name="scheduling-type"
@@ -40,12 +40,12 @@ export function SchedulingEditor({ scheduling, onChange }: SchedulingEditorProps
               className="text-blue-600"
             />
             <div>
-              <div className="font-medium text-gray-900">Immediately</div>
-              <div className="text-sm text-gray-600">Run as soon as the trigger fires</div>
+              <div className="font-medium text-gray-900 dark:text-white">Immediately</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Run as soon as the trigger fires</div>
             </div>
           </label>
 
-          <label className="flex items-center gap-2 p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-white">
+          <label className="flex items-center gap-2 p-3 border border-gray-300 dark:border-slate-600 rounded-lg cursor-pointer hover:bg-white dark:hover:bg-slate-700/50">
             <input
               type="radio"
               name="scheduling-type"
@@ -55,25 +55,25 @@ export function SchedulingEditor({ scheduling, onChange }: SchedulingEditorProps
               className="text-blue-600"
             />
             <div className="flex-1">
-              <div className="font-medium text-gray-900">With a delay</div>
-              <div className="text-sm text-gray-600">Wait before executing</div>
+              <div className="font-medium text-gray-900 dark:text-white">With a delay</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Wait before executing</div>
             </div>
           </label>
 
           {scheduling.type === 'delayed' && (
             <div className="ml-8 flex items-center gap-2">
-              <span className="text-sm text-gray-700">Wait</span>
+              <span className="text-sm text-gray-700 dark:text-gray-300">Wait</span>
               <input
                 type="number"
                 min="1"
                 value={scheduling.delay || 1}
                 onChange={(e) => onChange({ ...scheduling, delay: parseInt(e.target.value) })}
-                className="w-20 px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-20 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
               />
               <select
                 value={scheduling.delayUnit || 'hours'}
                 onChange={(e) => onChange({ ...scheduling, delayUnit: e.target.value as any })}
-                className="px-3 py-2 border border-gray-300 rounded-lg"
+                className="px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
               >
                 <option value="minutes">Minutes</option>
                 <option value="hours">Hours</option>
@@ -82,7 +82,7 @@ export function SchedulingEditor({ scheduling, onChange }: SchedulingEditorProps
             </div>
           )}
 
-          <label className="flex items-center gap-2 p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-white">
+          <label className="flex items-center gap-2 p-3 border border-gray-300 dark:border-slate-600 rounded-lg cursor-pointer hover:bg-white dark:hover:bg-slate-700/50">
             <input
               type="radio"
               name="scheduling-type"
@@ -96,8 +96,8 @@ export function SchedulingEditor({ scheduling, onChange }: SchedulingEditorProps
               className="text-blue-600"
             />
             <div className="flex-1">
-              <div className="font-medium text-gray-900">On a schedule</div>
-              <div className="text-sm text-gray-600">Run at specific times</div>
+              <div className="font-medium text-gray-900 dark:text-white">On a schedule</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">Run at specific times</div>
             </div>
           </label>
 
@@ -105,7 +105,7 @@ export function SchedulingEditor({ scheduling, onChange }: SchedulingEditorProps
             <div className="ml-8 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Frequency
                   </label>
                   <select
@@ -114,7 +114,7 @@ export function SchedulingEditor({ scheduling, onChange }: SchedulingEditorProps
                       ...scheduling,
                       schedule: { ...scheduling.schedule!, frequency: e.target.value as any }
                     })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
                   >
                     <option value="daily">Daily</option>
                     <option value="weekly">Weekly</option>
@@ -123,7 +123,7 @@ export function SchedulingEditor({ scheduling, onChange }: SchedulingEditorProps
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Time
                   </label>
                   <input
@@ -133,14 +133,14 @@ export function SchedulingEditor({ scheduling, onChange }: SchedulingEditorProps
                       ...scheduling,
                       schedule: { ...scheduling.schedule!, time: e.target.value }
                     })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
                   />
                 </div>
               </div>
 
               {scheduling.schedule?.frequency === 'weekly' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Day of Week
                   </label>
                   <select
@@ -149,7 +149,7 @@ export function SchedulingEditor({ scheduling, onChange }: SchedulingEditorProps
                       ...scheduling,
                       schedule: { ...scheduling.schedule!, dayOfWeek: parseInt(e.target.value) }
                     })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
                   >
                     <option value={1}>Monday</option>
                     <option value={2}>Tuesday</option>
@@ -164,7 +164,7 @@ export function SchedulingEditor({ scheduling, onChange }: SchedulingEditorProps
 
               {scheduling.schedule?.frequency === 'monthly' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Day of Month
                   </label>
                   <input
@@ -176,7 +176,7 @@ export function SchedulingEditor({ scheduling, onChange }: SchedulingEditorProps
                       ...scheduling,
                       schedule: { ...scheduling.schedule!, dayOfMonth: parseInt(e.target.value) }
                     })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
                   />
                 </div>
               )}
@@ -186,13 +186,13 @@ export function SchedulingEditor({ scheduling, onChange }: SchedulingEditorProps
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Timezone
         </label>
         <select
           value={scheduling.timezone || 'America/New_York'}
           onChange={(e) => onChange({ ...scheduling, timezone: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+          className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
         >
           {timezones.map(tz => (
             <option key={tz.value} value={tz.value}>
