@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider, useNotification } from './contexts/NotificationContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { EnhancedAuthScreen } from './components/EnhancedAuthScreen';
+import { LandingPage } from './components/LandingPage';
 import { supabase } from './lib/supabase-client';
 import { billingService } from './services/billing-service';
 import { useRBAC } from './hooks/useRBAC';
@@ -575,6 +576,14 @@ function App() {
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
+  const [showLogin, setShowLogin] = useState(false);
+
+  useEffect(() => {
+    const path = window.location.pathname;
+    if (path === '/login' || path === '/signup') {
+      setShowLogin(true);
+    }
+  }, []);
 
   console.log('AuthenticatedApp render - loading:', loading, 'user:', !!user);
 
@@ -591,8 +600,11 @@ function AuthenticatedApp() {
   }
 
   if (!user) {
-    console.log('Rendering auth screen');
-    return <EnhancedAuthScreen />;
+    console.log('Rendering landing or auth screen');
+    if (showLogin) {
+      return <EnhancedAuthScreen />;
+    }
+    return <LandingPage onLoginClick={() => setShowLogin(true)} />;
   }
 
   console.log('Rendering app content');
