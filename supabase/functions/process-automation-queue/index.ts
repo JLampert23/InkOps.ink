@@ -155,25 +155,58 @@ async function processQueueItem(supabase: any, queueItem: AutomationQueue) {
       return { success: true, skipped: true, reason: 'Conditions not met' };
     }
 
-    // Execute actions
-    const actionResults = await Promise.all(
-      automation.actions.map((action: any) =>
-        executeAction(supabase, action, queueItem.trigger_data, queueItem.company_id)
-      )
-    );
+    // Execute actions sequentially (not in parallel) to support wait actions
+    const startStep = queueItem.current_step || 0;
+    let currentStep = startStep;
 
-    const allActionsSuccessful = actionResults.every(r => r.success);
+    for (let i = startStep; i < automation.actions.length; i++) {
+      const action = automation.actions[i];
+      currentStep = i;
 
-    if (!allActionsSuccessful) {
-      throw new Error('One or more actions failed');
+      const actionResult = await executeAction(
+        supabase,
+        action,
+        queueItem.trigger_data,
+        queueItem.company_id
+      );
+
+      if (!actionResult.success) {
+        throw new Error(`Action ${i} failed: ${actionResult.error}`);
+      }
+
+      // Check if action requires rescheduling (wait_duration or wait_until)
+      if (actionResult.reschedule && actionResult.delay_ms) {
+        const resumeAfter = new Date(Date.now() + actionResult.delay_ms).toISOString();
+
+        // Update queue item to pause and resume later
+        await supabase
+          .from('automation_queue')
+          .update({
+            status: 'pending',
+            current_step: i + 1, // Resume from next step
+            pause_reason: action.type,
+            resume_after: resumeAfter,
+          })
+          .eq('id', queueItem.id);
+
+        console.log(`Pausing automation ${queueItem.id} at step ${i}, will resume after ${resumeAfter}`);
+
+        return {
+          success: true,
+          paused: true,
+          resume_after: resumeAfter,
+          current_step: i + 1
+        };
+      }
     }
 
-    // Mark as completed
+    // All actions completed successfully
     await supabase
       .from('automation_queue')
       .update({
         status: 'completed',
-        processed_at: new Date().toISOString()
+        processed_at: new Date().toISOString(),
+        current_step: automation.actions.length
       })
       .eq('id', queueItem.id);
 
