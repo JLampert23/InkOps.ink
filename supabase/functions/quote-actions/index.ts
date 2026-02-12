@@ -208,8 +208,8 @@ Deno.serve(async (req: Request) => {
         })
         .eq("id", quoteId);
 
-      // Generate public approval URL - use app URL instead of edge function URL
-      const appUrl = Deno.env.get("APP_URL") || req.headers.get("origin") || supabaseUrl;
+      // Generate public approval URL - use origin header or supabase URL
+      const appUrl = req.headers.get("origin") || supabaseUrl.replace('/rest/v1', '');
       const approvalUrl = `${appUrl}/quote-approval/${approvalToken}`;
 
       // Send email with template or default
