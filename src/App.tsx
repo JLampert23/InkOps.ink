@@ -602,7 +602,7 @@ function AuthenticatedApp() {
   if (!user) {
     console.log('Rendering landing or auth screen');
     if (showLogin) {
-      return <EnhancedAuthScreen />;
+      return <EnhancedAuthScreen onBackClick={() => setShowLogin(false)} />;
     }
     return <LandingPage onLoginClick={() => setShowLogin(true)} />;
   }

@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Lock, Mail, AlertCircle, Loader2, Building2, Eye, EyeOff } from 'lucide-react';
+import { Lock, Mail, AlertCircle, Loader2, Building2, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 
-export function EnhancedAuthScreen() {
+interface EnhancedAuthScreenProps {
+  onBackClick?: () => void;
+}
+
+export function EnhancedAuthScreen({ onBackClick }: EnhancedAuthScreenProps) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
@@ -76,6 +80,15 @@ export function EnhancedAuthScreen() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 flex items-center justify-center p-4 sm:p-6">
       <div className="w-full max-w-md">
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 p-8 sm:p-10 backdrop-blur-sm">
+          {onBackClick && (
+            <button
+              onClick={onBackClick}
+              className="mb-6 flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors group"
+            >
+              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+              <span className="text-sm font-medium">Back to Home</span>
+            </button>
+          )}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center mb-6 transform hover:scale-105 transition-transform duration-200">
               <img
