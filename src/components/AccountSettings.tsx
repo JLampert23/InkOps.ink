@@ -70,6 +70,8 @@ interface InvoiceFee {
   is_taxed: boolean;
   show_by_default: boolean;
   is_active: boolean;
+  category: string | null;
+  sort_order: number;
   created_at: string;
   updated_at: string;
 }
@@ -273,6 +275,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [feeFormData, setFeeFormData] = useState({
     fee_name: '',
     description: '',
+    category: '',
     amount: '',
     amount_type: 'dollar' as 'dollar' | 'percent',
     is_taxed: false,
@@ -2769,7 +2772,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         .from('invoice_fees')
         .select('*')
         .eq('is_active', true)
-        .order('created_at', { ascending: false });
+        .order('category', { ascending: true, nullsFirst: false })
+        .order('sort_order', { ascending: true });
 
       if (error) throw error;
       setInvoiceFees(data || []);
@@ -2785,6 +2789,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     setFeeFormData({
       fee_name: '',
       description: '',
+      category: '',
       amount: '',
       amount_type: 'dollar',
       is_taxed: false,
@@ -2802,6 +2807,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     setFeeFormData({
       fee_name: fee.fee_name,
       description: fee.description,
+      category: fee.category || '',
       amount: fee.amount.toString(),
       amount_type: fee.amount_type,
       is_taxed: fee.is_taxed,
@@ -2837,6 +2843,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           .update({
             fee_name: feeFormData.fee_name,
             description: feeFormData.description,
+            category: feeFormData.category || null,
             amount: amount,
             amount_type: feeFormData.amount_type,
             is_taxed: feeFormData.is_taxed,
@@ -2855,16 +2862,31 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
         console.log('Creating invoice fee with company_id:', currentUserProfile.company_id);
 
+        // Calculate max sort_order for the category
+        const category = feeFormData.category || null;
+        const { data: existingFees } = await supabase
+          .from('invoice_fees')
+          .select('sort_order')
+          .eq('company_id', currentUserProfile.company_id)
+          .eq('is_active', true)
+          .is('category', category);
+
+        const maxSortOrder = existingFees && existingFees.length > 0
+          ? Math.max(...existingFees.map(f => f.sort_order))
+          : -1;
+
         const { data, error } = await supabase
           .from('invoice_fees')
           .insert([{
             company_id: currentUserProfile.company_id,
             fee_name: feeFormData.fee_name,
             description: feeFormData.description,
+            category: category,
             amount: amount,
             amount_type: feeFormData.amount_type,
             is_taxed: feeFormData.is_taxed,
             show_by_default: feeFormData.show_by_default,
+            sort_order: maxSortOrder + 1,
           }])
           .select();
 
@@ -2894,8 +2916,13 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     e.preventDefault();
     if (draggedFeeIndex === null || draggedFeeIndex === index) return;
 
+    const draggedFee = invoiceFees[draggedFeeIndex];
+    const targetFee = invoiceFees[index];
+
+    // Only allow dragging within the same category
+    if ((draggedFee.category || null) !== (targetFee.category || null)) return;
+
     const newFees = [...invoiceFees];
-    const draggedFee = newFees[draggedFeeIndex];
     newFees.splice(draggedFeeIndex, 1);
     newFees.splice(index, 0, draggedFee);
 
@@ -2903,8 +2930,29 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     setDraggedFeeIndex(index);
   };
 
-  const handleFeeDragEnd = () => {
-    setDraggedFeeIndex(null);
+  const handleFeeDragEnd = async () => {
+    if (draggedFeeIndex === null) return;
+
+    try {
+      // Update sort_order for all fees in the UI
+      const updates = invoiceFees.map((fee, index) => ({
+        id: fee.id,
+        sort_order: index
+      }));
+
+      for (const update of updates) {
+        await supabase
+          .from('invoice_fees')
+          .update({ sort_order: update.sort_order })
+          .eq('id', update.id);
+      }
+    } catch (err) {
+      console.error('Error updating sort order:', err);
+      showNotification('error', 'Sort Failed', 'Failed to save new order.');
+      loadInvoiceFees(); // Reload to reset
+    } finally {
+      setDraggedFeeIndex(null);
+    }
   };
 
   const deleteFee = async (feeId: string) => {
@@ -2969,15 +3017,32 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
-      const newFees = lines.map(feeName => ({
-        company_id: currentUserProfile!.company_id,
-        fee_name: feeName,
-        description: '',
-        amount: 0,
-        amount_type: 'dollar',
-        is_taxed: false,
-        show_by_default: false,
-      }));
+      // Get max sort_order for uncategorized fees
+      const { data: existingFees } = await supabase
+        .from('invoice_fees')
+        .select('sort_order')
+        .eq('company_id', currentUserProfile!.company_id)
+        .eq('is_active', true)
+        .is('category', null);
+
+      let maxSortOrder = existingFees && existingFees.length > 0
+        ? Math.max(...existingFees.map(f => f.sort_order))
+        : -1;
+
+      const newFees = lines.map(feeName => {
+        maxSortOrder++;
+        return {
+          company_id: currentUserProfile!.company_id,
+          fee_name: feeName,
+          description: '',
+          category: null,
+          amount: 0,
+          amount_type: 'dollar',
+          is_taxed: false,
+          show_by_default: false,
+          sort_order: maxSortOrder,
+        };
+      });
 
       const { error } = await supabase
         .from('invoice_fees')
@@ -6829,13 +6894,22 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Invoice Fees</h2>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Configure additional fees that can be applied to invoices</p>
                 </div>
-                <button
-                  onClick={openAddFeeModal}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Fee
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowBulkAddFeesModal(true)}
+                    className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Bulk
+                  </button>
+                  <button
+                    onClick={openAddFeeModal}
+                    className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add
+                  </button>
+                </div>
               </div>
 
               <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
@@ -6844,7 +6918,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   <div>
                     <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">Invoice Fee Management</h3>
                     <p className="text-sm text-blue-800 dark:text-blue-200">
-                      Create fees that auto-populate in quotes/invoices. Fees marked as "Show By Default" will be automatically added to new quotes and invoices.
+                      Create fees that auto-populate in quotes/invoices. Drag to reorder within categories. Fees marked as "Auto-Add" will be automatically added to new quotes and invoices.
                     </p>
                   </div>
                 </div>
@@ -6859,71 +6933,86 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   <CreditCard className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-3" />
                   <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Invoice Fees</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                    You haven't created any invoice fees yet. Click "Add Fee" to create your first fee.
+                    You haven't created any invoice fees yet. Click "Add" to create your first fee.
                   </p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {invoiceFees.map((fee) => (
-                    <div
-                      key={fee.id}
-                      className="border border-gray-200 dark:border-slate-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-semibold text-gray-900 dark:text-white">{fee.fee_name}</h3>
-                            {fee.show_by_default && (
-                              <span className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full font-medium">
-                                Auto-Add
-                              </span>
-                            )}
-                            {fee.is_taxed && (
-                              <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full font-medium">
-                                Taxed
-                              </span>
-                            )}
-                          </div>
-                          {fee.description && (
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{fee.description}</p>
-                          )}
-                          <div className="text-lg font-bold text-gray-900 dark:text-white">
-                            {fee.amount_type === 'dollar' ? `$${fee.amount.toFixed(2)}` : `${fee.amount}%`}
+                (() => {
+                  // Group fees by category
+                  const groupedFees: { [key: string]: InvoiceFee[] } = {};
+                  invoiceFees.forEach(fee => {
+                    const category = fee.category || 'Uncategorized';
+                    if (!groupedFees[category]) {
+                      groupedFees[category] = [];
+                    }
+                    groupedFees[category].push(fee);
+                  });
+
+                  const categories = Object.keys(groupedFees).sort((a, b) => {
+                    if (a === 'Uncategorized') return 1;
+                    if (b === 'Uncategorized') return -1;
+                    return a.localeCompare(b);
+                  });
+
+                  return (
+                    <div className="space-y-4">
+                      {categories.map(category => (
+                        <div key={category}>
+                          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 px-2">
+                            {category}
+                          </h3>
+                          <div className="space-y-1">
+                            {groupedFees[category].map((fee, localIndex) => {
+                              const globalIndex = invoiceFees.indexOf(fee);
+                              return (
+                                <div
+                                  key={fee.id}
+                                  draggable
+                                  onDragStart={() => handleFeeDragStart(globalIndex)}
+                                  onDragOver={(e) => handleFeeDragOver(e, globalIndex)}
+                                  onDragEnd={handleFeeDragEnd}
+                                  className={`flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors cursor-move ${
+                                    draggedFeeIndex === globalIndex ? 'opacity-50' : ''
+                                  }`}
+                                >
+                                  <GripVertical className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                        {fee.fee_name}
+                                      </span>
+                                      {fee.show_by_default && (
+                                        <span className="text-xs px-1.5 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded font-medium">
+                                          Auto-Add
+                                        </span>
+                                      )}
+                                      {fee.is_taxed && (
+                                        <span className="text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded font-medium">
+                                          Taxed
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-3 flex-shrink-0">
+                                    <span className="text-sm font-semibold text-gray-900 dark:text-white whitespace-nowrap">
+                                      {fee.amount_type === 'dollar' ? `$${fee.amount.toFixed(2)}` : `${fee.amount}%`}
+                                    </span>
+                                    <button
+                                      onClick={() => deleteFee(fee.id)}
+                                      className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => toggleFeeDefault(fee.id, fee.show_by_default)}
-                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-gray-100 dark:hover:bg-slate-600 rounded-lg transition-colors"
-                            title={fee.show_by_default ? 'Disable auto-add' : 'Enable auto-add'}
-                          >
-                            {fee.show_by_default ? (
-                              <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                              </svg>
-                            ) : (
-                              <svg className="w-5 h-5" fill="none" viewBox="0 0 20 20" stroke="currentColor">
-                                <circle cx="10" cy="10" r="8" strokeWidth="2" />
-                              </svg>
-                            )}
-                          </button>
-                          <button
-                            onClick={() => openEditFeeModal(fee)}
-                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-slate-600 rounded-lg transition-colors"
-                          >
-                            <Edit className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => deleteFee(fee.id)}
-                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-gray-100 dark:hover:bg-slate-600 rounded-lg transition-colors"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  );
+                })()
               )}
             </div>
           )}
@@ -6959,6 +7048,22 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         placeholder="e.g., Processing Fee, Late Fee"
                         className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
                       />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Category
+                      </label>
+                      <input
+                        type="text"
+                        value={feeFormData.category}
+                        onChange={(e) => setFeeFormData({ ...feeFormData, category: e.target.value })}
+                        placeholder="e.g., Screen Printing, Embroidery, Setup Fees (optional)"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Group related fees together by category. Leave empty for "Uncategorized".
+                      </p>
                     </div>
 
                     <div>
