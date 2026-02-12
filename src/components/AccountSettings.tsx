@@ -15,6 +15,7 @@ const CommunicationTemplatesManager = lazy(() => import('./email/CommunicationTe
 const ReceivingSettings = lazy(() => import('./settings/ReceivingSettings').then(m => ({ default: m.default })));
 const POSettings = lazy(() => import('./settings/POSettings').then(m => ({ default: m.default })));
 const ChipplyIntegrationSettings = lazy(() => import('./chipply/ChipplyIntegrationSettings').then(m => ({ default: m.ChipplyIntegrationSettings })));
+const CustomInvoiceStatusManager = lazy(() => import('./settings/CustomInvoiceStatusManager').then(m => ({ default: m.CustomInvoiceStatusManager })));
 
 interface CompanySettings {
   id: string;
@@ -8018,34 +8019,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               </div>
 
               {/* Custom Invoice Status */}
-              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Custom Invoice Status</h2>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Create and manage custom invoice status labels for your workflow</p>
-                </div>
-
-              <div className="space-y-4">
-                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <Filter className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <h3 className="text-sm font-semibold text-green-900 dark:text-green-100 mb-1">Custom Status Management</h3>
-                      <p className="text-sm text-green-800 dark:text-green-200">
-                        Define custom status labels beyond the standard Printavo statuses to better match your unique business processes and workflows.
-                      </p>
-                    </div>
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
+                <Suspense fallback={
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-spin" />
                   </div>
-                </div>
-
-                <div className="border border-gray-200 dark:border-slate-700 rounded-lg p-6 text-center">
-                  <Filter className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-3" />
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Custom Status Labels Coming Soon</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 max-w-md mx-auto">
-                    The ability to create custom invoice status labels will be available in an upcoming release. This feature will enable you to define status categories that align with your specific business needs and reporting requirements.
-                  </p>
-                </div>
+                }>
+                  {companySettings && (
+                    <CustomInvoiceStatusManager companyId={companySettings.id} />
+                  )}
+                </Suspense>
               </div>
-            </div>
 
               {/* Email Short Codes Reference */}
               <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
