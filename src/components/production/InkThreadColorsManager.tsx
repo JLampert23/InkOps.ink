@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Palette, Plus, Edit as EditIcon, Trash2, Loader2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Palette, Plus, Edit as EditIcon, Trash2, Loader2, Upload } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useNotification } from '../../contexts/NotificationContext';
 
@@ -33,6 +33,8 @@ export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProp
     color_code: '#000000',
   });
   const [saving, setSaving] = useState(false);
+  const [uploadingCSV, setUploadingCSV] = useState(false);
+  const csvFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadColors();
@@ -222,6 +224,99 @@ export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProp
     }
   };
 
+  const handleCSVUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploadingCSV(true);
+
+      const text = await file.text();
+      const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+
+      if (lines.length === 0) {
+        showNotification('error', 'Empty File', 'The CSV file is empty.');
+        return;
+      }
+
+      const { data: companyData } = await supabase
+        .from('company_settings')
+        .select('id')
+        .single();
+
+      if (!companyData?.id) {
+        showNotification('error', 'Error', 'Company settings not found. Please refresh the page.');
+        return;
+      }
+
+      const maxSortOrder = colors.reduce((max, color) => Math.max(max, color.sort_order), 0);
+      const typeOfWork = colorType === 'ink' ? 'screen_printing' : 'embroidery';
+
+      // Get existing color names to avoid duplicates
+      const existingNames = new Set(colors.map(c => c.name.toLowerCase()));
+
+      const newColors: Array<{
+        company_id: string;
+        name: string;
+        color_code: string;
+        type_of_work: string;
+        sort_order: number;
+      }> = [];
+
+      let sortIndex = 0;
+
+      for (const line of lines) {
+        // Skip header row if it contains "name" or "color"
+        if (line.toLowerCase().includes('color_name') || line.toLowerCase().includes('name,')) {
+          continue;
+        }
+
+        const parts = line.split(',').map(p => p.trim());
+        const colorName = parts[0];
+        const colorCode = parts[1] || '#000000';
+
+        if (!colorName) continue;
+
+        // Skip duplicates
+        if (existingNames.has(colorName.toLowerCase())) {
+          console.log(`Skipping duplicate color: ${colorName}`);
+          continue;
+        }
+
+        newColors.push({
+          company_id: companyData.id,
+          name: colorName,
+          color_code: colorCode.startsWith('#') ? colorCode : '#000000',
+          type_of_work: typeOfWork,
+          sort_order: maxSortOrder + sortIndex + 1,
+        });
+
+        existingNames.add(colorName.toLowerCase());
+        sortIndex++;
+      }
+
+      if (newColors.length === 0) {
+        showNotification('warning', 'No New Colors', 'All colors in the CSV already exist.');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('production_colors')
+        .insert(newColors);
+
+      if (error) throw error;
+
+      showNotification('success', 'CSV Import Complete', `Added ${newColors.length} ${colorType} color(s) from CSV!`);
+      loadColors();
+    } catch (err: any) {
+      console.error('Error uploading CSV:', err);
+      showNotification('error', 'CSV Upload Failed', err?.message || 'Failed to upload CSV. Please check the format.');
+    } finally {
+      setUploadingCSV(false);
+      if (event.target) event.target.value = '';
+    }
+  };
+
   const title = colorType === 'ink' ? 'Ink Colors' : 'Thread Colors';
   const description = colorType === 'ink' ? 'For screen printing, DTG, and other ink-based methods' : 'For embroidery';
   const badgeColor = colorType === 'ink' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200' : 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200';
@@ -235,6 +330,18 @@ export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProp
             <p className="text-xs text-gray-600 dark:text-gray-400">{description}</p>
           </div>
           <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => csvFileInputRef.current?.click()}
+              disabled={uploadingCSV}
+              className="flex items-center gap-1 px-2 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {uploadingCSV ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <Upload className="w-3 h-3" />
+              )}
+              CSV
+            </button>
             <button
               onClick={() => setShowBulkAddModal(true)}
               className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
@@ -250,6 +357,13 @@ export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProp
               Add
             </button>
           </div>
+          <input
+            ref={csvFileInputRef}
+            type="file"
+            accept=".csv"
+            onChange={handleCSVUpload}
+            className="hidden"
+          />
         </div>
 
         {loading ? (
@@ -261,34 +375,32 @@ export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProp
             <p className="text-xs">No {colorType} colors yet. Click "Add" to create one.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1.5">
+          <div className="space-y-1">
             {colors.map((color) => (
               <div
                 key={color.id}
-                className="flex items-center justify-between p-1.5 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
+                className="flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
               >
-                <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                  <div
-                    className="w-5 h-5 rounded border border-gray-300 dark:border-slate-600 flex-shrink-0"
-                    style={{ backgroundColor: color.color_code }}
-                    title={color.color_code}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-xs font-medium text-gray-900 dark:text-white truncate">{color.name}</h3>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">{color.name}</h3>
+                    {color.color_code && color.color_code !== '#000000' && (
+                      <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">{color.color_code}</span>
+                    )}
                   </div>
                 </div>
-                <div className="flex items-center gap-0.5 ml-1">
+                <div className="flex items-center gap-1 ml-2">
                   <button
                     onClick={() => openEditColorModal(color)}
-                    className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                    className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
                   >
-                    <EditIcon className="w-3 h-3" />
+                    <EditIcon className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => deleteColor(color.id)}
-                    className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                    className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
                   >
-                    <Trash2 className="w-3 h-3" />
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               </div>

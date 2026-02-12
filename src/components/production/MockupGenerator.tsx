@@ -1260,16 +1260,21 @@ export default function MockupGenerator({
                 ];
               }
 
+              // Update with mockups and selected colors
+              const colorString = selectedColors.map(c => c.name).join(', ');
               const { error: updateError } = await supabase
                 .from('quote_imprints')
-                .update({ mockups: updatedMockups })
+                .update({
+                  mockups: updatedMockups,
+                  thread_ink_color: colorString || null
+                })
                 .eq('id', selectedImprintId);
 
               if (updateError) {
                 console.error('MockupGenerator: Error updating imprint mockup:', updateError);
                 throw updateError;
               }
-              console.log('MockupGenerator: Successfully replaced mockup');
+              console.log('MockupGenerator: Successfully replaced mockup and updated colors');
               imprintsUpdated = true;
             } else {
               // Creating a new mockup - add to the array
@@ -1283,16 +1288,21 @@ export default function MockupGenerator({
                 }
               ];
 
+              // Update with mockups and selected colors
+              const colorString = selectedColors.map(c => c.name).join(', ');
               const { error: updateError } = await supabase
                 .from('quote_imprints')
-                .update({ mockups: updatedMockups })
+                .update({
+                  mockups: updatedMockups,
+                  thread_ink_color: colorString || null
+                })
                 .eq('id', selectedImprintId);
 
               if (updateError) {
                 console.error('MockupGenerator: Error adding new mockup:', updateError);
                 throw updateError;
               }
-              console.log('MockupGenerator: Successfully added new mockup');
+              console.log('MockupGenerator: Successfully added new mockup and updated colors');
               imprintsUpdated = true;
             }
           } else {
@@ -1378,9 +1388,14 @@ export default function MockupGenerator({
                 ];
               }
 
+              // Update with mockups and selected colors
+              const colorString = selectedColors.map(c => c.name).join(', ');
               const { error: updateError } = await supabase
                 .from('quote_imprints')
-                .update({ mockups: updatedMockups })
+                .update({
+                  mockups: updatedMockups,
+                  thread_ink_color: colorString || null
+                })
                 .eq('id', imprint.id);
 
               if (updateError) {
@@ -2446,7 +2461,7 @@ export default function MockupGenerator({
                   return (inkColors.length > 0 || threadColors.length > 0) && typeOfWorkColorType !== 'none';
                 })() ? (
                   <>
-                    <div className="grid grid-cols-6 gap-1.5">
+                    <div className="max-h-48 overflow-y-auto space-y-1 border border-gray-200 dark:border-slate-600 rounded p-2 bg-gray-50 dark:bg-slate-900/30">
                       {(() => {
                         // Use the color_type from type_of_work_settings
                         let colorsToShow = [];
@@ -2462,31 +2477,24 @@ export default function MockupGenerator({
                         return colorsToShow.map((color) => {
                           const isSelected = selectedColors.some(c => c.name === color.name);
                           return (
-                            <button
+                            <label
                               key={color.id}
-                              onClick={() => {
-                                if (isSelected) {
-                                  setSelectedColors(selectedColors.filter(c => c.name !== color.name));
-                                } else {
-                                  setSelectedColors([...selectedColors, { name: color.name, hex: color.color_code }]);
-                                }
-                              }}
-                              className={`relative h-7 rounded border-2 transition-all ${
-                                isSelected
-                                  ? 'border-blue-500 ring-1 ring-blue-300 dark:ring-blue-600'
-                                  : 'border-gray-300 dark:border-slate-600 hover:border-gray-400'
-                              }`}
-                              style={{ backgroundColor: color.color_code || '#cccccc' }}
-                              title={color.name}
+                              className="flex items-center gap-2 p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded cursor-pointer transition-colors"
                             >
-                              {isSelected && (
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                  <div className="w-3 h-3 bg-white rounded-full flex items-center justify-center shadow-sm">
-                                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
-                                  </div>
-                                </div>
-                              )}
-                            </button>
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedColors([...selectedColors, { name: color.name, hex: color.color_code }]);
+                                  } else {
+                                    setSelectedColors(selectedColors.filter(c => c.name !== color.name));
+                                  }
+                                }}
+                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:border-slate-600 dark:bg-slate-700"
+                              />
+                              <span className="text-xs text-gray-900 dark:text-white flex-1">{color.name}</span>
+                            </label>
                           );
                         });
                       })()}
@@ -2500,10 +2508,6 @@ export default function MockupGenerator({
                               key={idx}
                               className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded text-xs"
                             >
-                              <span
-                                className="w-2 h-2 rounded-full border border-gray-300"
-                                style={{ backgroundColor: color.hex }}
-                              />
                               {color.name}
                             </span>
                           ))}
