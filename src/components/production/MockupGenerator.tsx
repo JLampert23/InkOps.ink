@@ -906,6 +906,8 @@ export default function MockupGenerator({
     if (!files || files.length === 0) return;
 
     if (!companyId || companyId.trim() === '') {
+      alert('Unable to upload: Company information not loaded yet. Please try again in a moment.');
+      event.target.value = '';
       return;
     }
 
@@ -977,6 +979,12 @@ export default function MockupGenerator({
   const handleGarmentUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    if (!companyId || companyId.trim() === '') {
+      alert('Unable to upload: Company information not loaded yet. Please try again in a moment.');
+      event.target.value = '';
+      return;
+    }
 
     setUploadingGarment(true);
     try {
@@ -1886,7 +1894,7 @@ export default function MockupGenerator({
                 <button
                   type="button"
                   onClick={() => garmentFileInputRef.current?.click()}
-                  disabled={uploadingGarment}
+                  disabled={uploadingGarment || !companyId}
                   className="w-full flex items-center justify-center px-3 py-2 bg-green-500 text-white rounded text-sm font-medium hover:bg-green-600 disabled:bg-green-300 disabled:cursor-not-allowed transition-colors"
                 >
                   {uploadingGarment ? (
@@ -1996,7 +2004,7 @@ export default function MockupGenerator({
                               const input = imprintFileInputRefs.current[imprint.id];
                               if (input) input.click();
                             }}
-                            disabled={uploadingImprintId === imprint.id}
+                            disabled={uploadingImprintId === imprint.id || !companyId}
                             className="flex-shrink-0 flex items-center justify-center px-2 py-1 bg-blue-500 text-white rounded text-xs font-medium hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors"
                           >
                             {uploadingImprintId === imprint.id ? (
