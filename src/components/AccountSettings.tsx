@@ -6566,6 +6566,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                                         {fee.amount_type === 'dollar' ? `$${fee.amount.toFixed(2)}` : `${fee.amount}%`}
                                       </span>
                                       <button
+                                        onClick={() => openEditFeeModal(fee)}
+                                        className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                                      >
+                                        <Edit className="w-3 h-3" />
+                                      </button>
+                                      <button
                                         onClick={() => deleteFee(fee.id)}
                                         className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
                                       >
