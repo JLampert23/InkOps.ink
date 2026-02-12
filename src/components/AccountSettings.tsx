@@ -303,6 +303,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [customLineItemOptions, setCustomLineItemOptions] = useState<string[]>([]);
   const [newLineItemOption, setNewLineItemOption] = useState('');
   const [savingLineItemOptions, setSavingLineItemOptions] = useState(false);
+  const [draggedLineItemIndex, setDraggedLineItemIndex] = useState<number | null>(null);
   const [showAddWorkTypeModal, setShowAddWorkTypeModal] = useState(false);
   const [showBulkAddWorkTypesModal, setShowBulkAddWorkTypesModal] = useState(false);
   const [bulkWorkTypesText, setBulkWorkTypesText] = useState('');
@@ -3441,6 +3442,28 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       showNotification('error', 'Remove Failed', 'Failed to remove option. Please try again.');
     } finally {
       setSavingLineItemOptions(false);
+    }
+  };
+
+  const reorderLineItemOptions = async (fromIndex: number, toIndex: number) => {
+    if (!companySettings?.id || fromIndex === toIndex) return;
+
+    try {
+      const updatedOptions = [...customLineItemOptions];
+      const [movedItem] = updatedOptions.splice(fromIndex, 1);
+      updatedOptions.splice(toIndex, 0, movedItem);
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update({ custom_line_item_options: updatedOptions })
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
+
+      setCustomLineItemOptions(updatedOptions);
+    } catch (err: any) {
+      console.error('Error reordering line item options:', err);
+      showNotification('error', 'Reorder Failed', 'Failed to reorder options. Please try again.');
     }
   };
 
@@ -6714,9 +6737,31 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     {customLineItemOptions.map((option, index) => (
                       <div
                         key={index}
-                        className="flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
+                        draggable
+                        onDragStart={(e) => {
+                          setDraggedLineItemIndex(index);
+                          e.dataTransfer.effectAllowed = 'move';
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = 'move';
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          if (draggedLineItemIndex !== null && draggedLineItemIndex !== index) {
+                            reorderLineItemOptions(draggedLineItemIndex, index);
+                          }
+                          setDraggedLineItemIndex(null);
+                        }}
+                        onDragEnd={() => setDraggedLineItemIndex(null)}
+                        className={`flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors ${
+                          draggedLineItemIndex === index ? 'opacity-50' : ''
+                        }`}
                       >
-                        <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <div className="cursor-grab active:cursor-grabbing text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">
+                            <GripVertical className="w-4 h-4" />
+                          </div>
                           <h3 className="text-xs font-medium text-gray-900 dark:text-white truncate">{option}</h3>
                         </div>
                         <div className="flex items-center gap-0.5 ml-2">
