@@ -6476,7 +6476,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Invoice Fees</h2>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">Configure additional fees for invoices</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Drag to reorder within categories</p>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button
@@ -6505,52 +6505,82 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     <p className="text-xs">No fees yet</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-1">
-                    {invoiceFees.map((fee, index) => (
-                      <div
-                        key={fee.id}
-                        draggable
-                        onDragStart={() => handleFeeDragStart(index)}
-                        onDragOver={(e) => handleFeeDragOver(e, index)}
-                        onDragEnd={handleFeeDragEnd}
-                        className="flex items-center gap-1 p-1.5 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors cursor-move group"
-                      >
-                        <GripVertical className="w-3 h-3 text-gray-400 dark:text-gray-500 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-xs font-medium text-gray-900 dark:text-white truncate">{fee.fee_name}</h3>
-                          <div className="flex items-center gap-0.5 flex-wrap mt-0.5">
-                            <span className="px-1 py-0.5 text-[10px] font-medium rounded bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 whitespace-nowrap">
-                              {fee.amount_type === 'dollar' ? `$${fee.amount.toFixed(2)}` : `${fee.amount}%`}
-                            </span>
-                            {fee.is_taxed && (
-                              <span className="px-1 py-0.5 text-[10px] font-medium rounded bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 whitespace-nowrap">
-                                T
-                              </span>
-                            )}
-                            {fee.show_by_default && (
-                              <span className="px-1 py-0.5 text-[10px] font-medium rounded bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 whitespace-nowrap">
-                                A
-                              </span>
-                            )}
+                  (() => {
+                    // Group fees by category
+                    const groupedFees: { [key: string]: InvoiceFee[] } = {};
+                    invoiceFees.forEach(fee => {
+                      const category = fee.category || 'Uncategorized';
+                      if (!groupedFees[category]) {
+                        groupedFees[category] = [];
+                      }
+                      groupedFees[category].push(fee);
+                    });
+
+                    const categories = Object.keys(groupedFees).sort((a, b) => {
+                      if (a === 'Uncategorized') return 1;
+                      if (b === 'Uncategorized') return -1;
+                      return a.localeCompare(b);
+                    });
+
+                    return (
+                      <div className="space-y-2">
+                        {categories.map(category => (
+                          <div key={category}>
+                            <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 px-1">
+                              {category}
+                            </h3>
+                            <div className="space-y-0.5">
+                              {groupedFees[category].map((fee) => {
+                                const globalIndex = invoiceFees.indexOf(fee);
+                                return (
+                                  <div
+                                    key={fee.id}
+                                    draggable
+                                    onDragStart={() => handleFeeDragStart(globalIndex)}
+                                    onDragOver={(e) => handleFeeDragOver(e, globalIndex)}
+                                    onDragEnd={handleFeeDragEnd}
+                                    className={`flex items-center gap-2 px-2 py-1.5 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors cursor-move ${
+                                      draggedFeeIndex === globalIndex ? 'opacity-50' : ''
+                                    }`}
+                                  >
+                                    <GripVertical className="w-3 h-3 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-xs font-medium text-gray-900 dark:text-white">
+                                          {fee.fee_name}
+                                        </span>
+                                        {fee.show_by_default && (
+                                          <span className="text-[10px] px-1 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded font-medium">
+                                            Auto
+                                          </span>
+                                        )}
+                                        {fee.is_taxed && (
+                                          <span className="text-[10px] px-1 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded font-medium">
+                                            Tax
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                      <span className="text-xs font-semibold text-gray-900 dark:text-white whitespace-nowrap">
+                                        {fee.amount_type === 'dollar' ? `$${fee.amount.toFixed(2)}` : `${fee.amount}%`}
+                                      </span>
+                                      <button
+                                        onClick={() => deleteFee(fee.id)}
+                                        className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex flex-col gap-0.5 flex-shrink-0">
-                          <button
-                            onClick={() => openEditFeeModal(fee)}
-                            className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
-                          >
-                            <Edit className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={() => deleteFee(fee.id)}
-                            className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })()
                 )}
               </div>
 
