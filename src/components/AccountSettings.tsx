@@ -7090,15 +7090,20 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Category
                       </label>
-                      <input
-                        type="text"
+                      <select
                         value={feeFormData.category}
                         onChange={(e) => setFeeFormData({ ...feeFormData, category: e.target.value })}
-                        placeholder="e.g., Screen Printing, Embroidery, Setup Fees (optional)"
                         className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
-                      />
+                      >
+                        <option value="">Uncategorized</option>
+                        {workTypes.map((workType) => (
+                          <option key={workType.id} value={workType.work_type_name}>
+                            {workType.work_type_name}
+                          </option>
+                        ))}
+                      </select>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Group related fees together by category. Leave empty for "Uncategorized".
+                        Group related fees by work type category.
                       </p>
                     </div>
 
