@@ -61,6 +61,72 @@ export const TRIGGER_OPTIONS: TriggerOption[] = [
     description: 'Triggers when a new customer is added',
     icon: 'Users',
   },
+  {
+    value: 'approval_approved',
+    label: 'Approval Approved',
+    description: 'Triggers when an approval is approved',
+    icon: 'CheckCircle',
+  },
+  {
+    value: 'approval_declined',
+    label: 'Approval Declined',
+    description: 'Triggers when an approval is declined',
+    icon: 'XCircle',
+  },
+  {
+    value: 'approval_sent',
+    label: 'Approval Sent',
+    description: 'Triggers when an approval request is sent',
+    icon: 'Send',
+  },
+  {
+    value: 'quote_invoice_paid_in_full',
+    label: 'Quote Invoice Paid in Full',
+    description: 'Triggers when a quote invoice is paid in full',
+    icon: 'DollarSign',
+  },
+  {
+    value: 'status_changed',
+    label: 'Status Changed',
+    description: 'Triggers when a status changes',
+    icon: 'RefreshCw',
+  },
+  {
+    value: 'preset_task_list_completed',
+    label: 'Preset Task List Completed',
+    description: 'Triggers when a preset task list is completed',
+    icon: 'ListChecks',
+  },
+  {
+    value: 'imprints_added_to_scheduler',
+    label: 'Imprints Added to Scheduler',
+    description: 'Triggers when imprints are added to the scheduler',
+    icon: 'Calendar',
+  },
+  {
+    value: 'work_step_status_changed',
+    label: 'Work Step Status Changed',
+    description: 'Triggers when a work step status changes',
+    icon: 'GitBranch',
+  },
+  {
+    value: 'time_delay_trigger',
+    label: 'Time Delay',
+    description: 'Triggers after a specified time delay',
+    icon: 'Clock',
+  },
+  {
+    value: 'scheduled_datetime_trigger',
+    label: 'Scheduled Date/Time',
+    description: 'Triggers at a specific date and time',
+    icon: 'CalendarClock',
+  },
+  {
+    value: 'recurring_schedule_trigger',
+    label: 'Recurring Schedule',
+    description: 'Triggers on a recurring schedule',
+    icon: 'CalendarDays',
+  },
 ];
 
 export const CONDITION_OPTIONS: ConditionOption[] = [
