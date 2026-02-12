@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Palette, Plus, Edit as EditIcon, Trash2, Loader2, Upload } from 'lucide-react';
+import { Palette, Plus, Trash2, Loader2, Upload, GripVertical } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useNotification } from '../../contexts/NotificationContext';
 
@@ -17,13 +17,13 @@ interface ProductionColor {
 
 interface InkThreadColorsManagerProps {
   colorType: 'ink' | 'thread';
+  onColorsChange?: () => void;
 }
 
-export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProps) {
+export function InkThreadColorsManager({ colorType, onColorsChange }: InkThreadColorsManagerProps) {
   const { showNotification, confirm } = useNotification();
   const [colors, setColors] = useState<ProductionColor[]>([]);
   const [loading, setLoading] = useState(false);
-  const [editingColorId, setEditingColorId] = useState<string | null>(null);
   const [showAddColorModal, setShowAddColorModal] = useState(false);
   const [showBulkAddModal, setShowBulkAddModal] = useState(false);
   const [bulkColorText, setBulkColorText] = useState('');
@@ -35,6 +35,7 @@ export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProp
   const [saving, setSaving] = useState(false);
   const [uploadingCSV, setUploadingCSV] = useState(false);
   const csvFileInputRef = useRef<HTMLInputElement>(null);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   useEffect(() => {
     loadColors();
@@ -53,6 +54,7 @@ export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProp
 
       if (error) throw error;
       setColors(data || []);
+      onColorsChange?.();
     } catch (err) {
       console.error('Error loading colors:', err);
       showNotification('error', 'Load Failed', `Failed to load ${colorType} colors.`);
@@ -66,20 +68,10 @@ export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProp
       name: '',
       color_code: '#000000',
     });
-    setEditingColorId(null);
   };
 
   const openAddColorModal = () => {
     resetColorForm();
-    setShowAddColorModal(true);
-  };
-
-  const openEditColorModal = (color: ProductionColor) => {
-    setColorFormData({
-      name: color.name,
-      color_code: color.color_code,
-    });
-    setEditingColorId(color.id);
     setShowAddColorModal(true);
   };
 
@@ -93,44 +85,31 @@ export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProp
       setSaving(true);
       const typeOfWork = colorType === 'ink' ? 'screen_printing' : 'embroidery';
 
-      if (editingColorId) {
-        const { error } = await supabase
-          .from('production_colors')
-          .update({
-            name: colorFormData.name,
-            color_code: colorFormData.color_code,
-          })
-          .eq('id', editingColorId);
+      const { data: companyData } = await supabase
+        .from('company_settings')
+        .select('id')
+        .single();
 
-        if (error) throw error;
-        showNotification('success', 'Color Updated', 'Color updated successfully!');
-      } else {
-        const { data: companyData } = await supabase
-          .from('company_settings')
-          .select('id')
-          .single();
-
-        if (!companyData?.id) {
-          showNotification('error', 'Error', 'Company settings not found. Please refresh the page.');
-          setSaving(false);
-          return;
-        }
-
-        const maxSortOrder = colors.reduce((max, color) => Math.max(max, color.sort_order), 0);
-
-        const { error } = await supabase
-          .from('production_colors')
-          .insert([{
-            company_id: companyData.id,
-            name: colorFormData.name,
-            color_code: colorFormData.color_code,
-            type_of_work: typeOfWork,
-            sort_order: maxSortOrder + 1,
-          }]);
-
-        if (error) throw error;
-        showNotification('success', 'Color Created', 'Color created successfully!');
+      if (!companyData?.id) {
+        showNotification('error', 'Error', 'Company settings not found. Please refresh the page.');
+        setSaving(false);
+        return;
       }
+
+      const maxSortOrder = colors.reduce((max, color) => Math.max(max, color.sort_order), 0);
+
+      const { error } = await supabase
+        .from('production_colors')
+        .insert([{
+          company_id: companyData.id,
+          name: colorFormData.name,
+          color_code: colorFormData.color_code,
+          type_of_work: typeOfWork,
+          sort_order: maxSortOrder + 1,
+        }]);
+
+      if (error) throw error;
+      showNotification('success', 'Color Created', 'Color created successfully!');
 
       setShowAddColorModal(false);
       resetColorForm();
@@ -317,9 +296,52 @@ export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProp
     }
   };
 
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+
+    const newColors = [...colors];
+    const draggedColor = newColors[draggedIndex];
+    newColors.splice(draggedIndex, 1);
+    newColors.splice(index, 0, draggedColor);
+
+    setColors(newColors);
+    setDraggedIndex(index);
+  };
+
+  const handleDragEnd = async () => {
+    if (draggedIndex === null) return;
+
+    try {
+      // Update sort_order for all colors
+      const updates = colors.map((color, index) => ({
+        id: color.id,
+        sort_order: index
+      }));
+
+      for (const update of updates) {
+        await supabase
+          .from('production_colors')
+          .update({ sort_order: update.sort_order })
+          .eq('id', update.id);
+      }
+
+      onColorsChange?.();
+    } catch (err) {
+      console.error('Error updating sort order:', err);
+      showNotification('error', 'Sort Failed', 'Failed to save new order.');
+      loadColors(); // Reload to reset
+    } finally {
+      setDraggedIndex(null);
+    }
+  };
+
   const title = colorType === 'ink' ? 'Ink Colors' : 'Thread Colors';
   const description = colorType === 'ink' ? 'For screen printing, DTG, and other ink-based methods' : 'For embroidery';
-  const badgeColor = colorType === 'ink' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200' : 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200';
 
   return (
     <>
@@ -376,33 +398,27 @@ export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProp
           </div>
         ) : (
           <div className="space-y-1">
-            {colors.map((color) => (
+            {colors.map((color, index) => (
               <div
                 key={color.id}
-                className="flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
+                draggable
+                onDragStart={() => handleDragStart(index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDragEnd={handleDragEnd}
+                className={`flex items-center gap-2 p-2 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors cursor-move ${
+                  draggedIndex === index ? 'opacity-50' : ''
+                }`}
               >
+                <GripVertical className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">{color.name}</h3>
-                    {color.color_code && color.color_code !== '#000000' && (
-                      <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">{color.color_code}</span>
-                    )}
-                  </div>
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">{color.name}</h3>
                 </div>
-                <div className="flex items-center gap-1 ml-2">
-                  <button
-                    onClick={() => openEditColorModal(color)}
-                    className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
-                  >
-                    <EditIcon className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => deleteColor(color.id)}
-                    className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                <button
+                  onClick={() => deleteColor(color.id)}
+                  className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors flex-shrink-0"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
             ))}
           </div>
@@ -415,7 +431,7 @@ export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProp
             <div className="p-6 space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  {editingColorId ? `Edit ${colorType === 'ink' ? 'Ink' : 'Thread'} Color` : `Add ${colorType === 'ink' ? 'Ink' : 'Thread'} Color`}
+                  Add {colorType === 'ink' ? 'Ink' : 'Thread'} Color
                 </h2>
                 <button
                   onClick={() => setShowAddColorModal(false)}
@@ -484,7 +500,7 @@ export function InkThreadColorsManager({ colorType }: InkThreadColorsManagerProp
                   ) : (
                     <>
                       <Palette className="w-4 h-4" />
-                      {editingColorId ? 'Update Color' : 'Create Color'}
+                      Create Color
                     </>
                   )}
                 </button>

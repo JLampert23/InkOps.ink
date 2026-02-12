@@ -6557,15 +6557,15 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 )}
               </div>
 
-              {/* Ink Colors */}
-              <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" /></div>}>
-                <InkThreadColorsManager colorType="ink" />
-              </Suspense>
-
-              {/* Thread Colors */}
-              <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" /></div>}>
-                <InkThreadColorsManager colorType="thread" />
-              </Suspense>
+              {/* Ink & Thread Colors - Side by Side */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" /></div>}>
+                  <InkThreadColorsManager colorType="ink" />
+                </Suspense>
+                <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" /></div>}>
+                  <InkThreadColorsManager colorType="thread" />
+                </Suspense>
+              </div>
 
               {/* Custom Line Item Options */}
               <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-3 space-y-2">

@@ -278,6 +278,52 @@ export default function MockupGenerator({
     loadColorsForWorkType();
   }, [typeOfWork, typeOfWorkColorType, companyId]);
 
+  // Subscribe to real-time changes in production_colors
+  useEffect(() => {
+    if (!companyId) return;
+
+    const channel = supabase
+      .channel('production-colors-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'production_colors',
+          filter: `company_id=eq.${companyId}`
+        },
+        async (payload) => {
+          console.log('MockupGenerator: Production colors changed:', payload);
+          // Reload colors for the current work type
+          if (typeOfWork && companyId) {
+            const normalizedTypeOfWork = normalizeTypeOfWork(typeOfWork);
+            try {
+              const { data: colorsData } = await supabase
+                .from('production_colors')
+                .select('id, name, color_code, type_of_work')
+                .eq('company_id', companyId)
+                .eq('type_of_work', normalizedTypeOfWork)
+                .eq('is_active', true)
+                .order('sort_order');
+
+              if (typeOfWorkColorType === 'ink') {
+                setInkColors(colorsData || []);
+              } else if (typeOfWorkColorType === 'thread') {
+                setThreadColors(colorsData || []);
+              }
+            } catch (err) {
+              console.error('MockupGenerator: Error reloading colors:', err);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [companyId, typeOfWork, typeOfWorkColorType]);
+
   // Load imprint details when an imprint is selected
   useEffect(() => {
     if (!selectedImprintId || imprints.length === 0) {
