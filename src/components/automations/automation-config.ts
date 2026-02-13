@@ -2,111 +2,45 @@ import { TriggerOption, ConditionOption, ActionOption } from '../../types/automa
 
 export const TRIGGER_OPTIONS: TriggerOption[] = [
   {
-    value: 'invoice_created',
-    label: 'New Invoice Created',
-    description: 'Triggers when a new invoice is created in Printavo',
-    icon: 'FileText',
-  },
-  {
-    value: 'invoice_status_changed',
-    label: 'Invoice Status Changed',
-    description: 'Triggers when an invoice status changes',
-    icon: 'RefreshCw',
-  },
-  {
-    value: 'invoice_overdue',
-    label: 'Invoice Becomes Overdue',
-    description: 'Triggers when an invoice passes its due date',
-    icon: 'AlertTriangle',
-  },
-  {
-    value: 'payment_received',
-    label: 'Payment Received',
-    description: 'Triggers when a payment is recorded',
-    icon: 'DollarSign',
-  },
-  {
-    value: 'payment_balance_matched',
-    label: 'Payment Matches Balance',
-    description: 'Triggers when payment amount equals invoice balance',
-    icon: 'CheckCircle',
-  },
-  {
-    value: 'task_created',
-    label: 'New Task Created',
-    description: 'Triggers when a new task is created',
-    icon: 'ClipboardList',
-  },
-  {
-    value: 'task_status_changed',
-    label: 'Task Status Changed',
-    description: 'Triggers when a task status changes',
-    icon: 'CheckSquare',
-  },
-  {
-    value: 'quote_approved',
-    label: 'Quote Approved',
-    description: 'Triggers when a quote is approved',
-    icon: 'ThumbsUp',
-  },
-  {
-    value: 'artwork_uploaded',
-    label: 'Artwork Uploaded',
-    description: 'Triggers when artwork is uploaded to an order',
-    icon: 'Image',
-  },
-  {
-    value: 'customer_created',
-    label: 'New Customer Created',
-    description: 'Triggers when a new customer is added',
-    icon: 'Users',
-  },
-  {
     value: 'approval_approved',
-    label: 'Approval Approved',
+    label: 'If _____ approval is approved',
     description: 'Triggers when an approval is approved',
     icon: 'CheckCircle',
   },
   {
     value: 'approval_declined',
-    label: 'Approval Declined',
+    label: 'If _____ approval is declined',
     description: 'Triggers when an approval is declined',
     icon: 'XCircle',
   },
   {
     value: 'approval_sent',
-    label: 'Approval Sent',
+    label: 'If _____ approval is sent',
     description: 'Triggers when an approval request is sent',
     icon: 'Send',
   },
   {
     value: 'quote_invoice_paid_in_full',
-    label: 'Quote Invoice Paid in Full',
-    description: 'Triggers when a quote invoice is paid in full',
+    label: 'If a quote/invoice is paid in full',
+    description: 'Triggers when a quote or invoice is paid in full',
     icon: 'DollarSign',
   },
   {
     value: 'status_changed',
-    label: 'Status Changed',
-    description: 'Triggers when a status changes',
+    label: 'If status changed to _____',
+    description: 'Triggers when a status changes to a specific value',
     icon: 'RefreshCw',
   },
   {
-    value: 'preset_task_list_completed',
-    label: 'Preset Task List Completed',
-    description: 'Triggers when a preset task list is completed',
-    icon: 'CheckCircle',
-  },
-  {
     value: 'imprints_added_to_scheduler',
-    label: 'Imprints Added to Scheduler',
-    description: 'Triggers when imprints are added to the scheduler',
+    label: 'If the quote/invoice imprints are added to the Power Scheduler',
+    description: 'Triggers when imprints are added to the Power Scheduler',
     icon: 'Calendar',
   },
   {
     value: 'work_step_status_changed',
-    label: 'Work Step Status Changed',
-    description: 'Triggers when a work step status changes',
+    label: 'If a type of work step status is changed to _____',
+    description: 'Triggers when a type of work step status changes',
     icon: 'GitBranch',
   },
   {
@@ -214,130 +148,8 @@ export const CONDITION_OPTIONS: ConditionOption[] = [
 
 export const ACTION_OPTIONS: ActionOption[] = [
   {
-    value: 'send_email',
-    label: 'Send Email',
-    description: 'Send an email via Resend',
-    icon: 'Mail',
-    configFields: [
-      { name: 'to', label: 'To Email', type: 'text', required: true },
-      { name: 'subject', label: 'Subject', type: 'text', required: true },
-      { name: 'body', label: 'Email Body', type: 'textarea', required: true },
-    ],
-  },
-  {
-    value: 'update_invoice_status',
-    label: 'Update Invoice Status',
-    description: 'Change the status of an invoice',
-    icon: 'Edit',
-    configFields: [
-      {
-        name: 'status',
-        label: 'New Status',
-        type: 'select',
-        required: true,
-        options: [
-          { value: 'Quote', label: 'Quote' },
-          { value: 'Approved', label: 'Approved' },
-          { value: 'In Production', label: 'In Production' },
-          { value: 'Ready', label: 'Ready' },
-          { value: 'Complete', label: 'Complete' },
-          { value: 'Invoiced', label: 'Invoiced' },
-          { value: 'Paid', label: 'Paid' },
-        ],
-      },
-    ],
-  },
-  {
-    value: 'update_task_status',
-    label: 'Update Task Status',
-    description: 'Change the status of a task',
-    icon: 'CheckSquare',
-    configFields: [
-      {
-        name: 'status',
-        label: 'New Status',
-        type: 'select',
-        required: true,
-        options: [
-          { value: 'pending', label: 'Pending' },
-          { value: 'in_progress', label: 'In Progress' },
-          { value: 'completed', label: 'Completed' },
-        ],
-      },
-    ],
-  },
-  {
-    value: 'assign_task',
-    label: 'Assign Task to User',
-    description: 'Assign a task to a specific user',
-    icon: 'UserPlus',
-    configFields: [
-      { name: 'user_id', label: 'User ID', type: 'text', required: true },
-    ],
-  },
-  {
-    value: 'add_invoice_note',
-    label: 'Add Invoice Note',
-    description: 'Add an internal note to the invoice',
-    icon: 'MessageSquare',
-    configFields: [
-      { name: 'note', label: 'Note Text', type: 'textarea', required: true },
-    ],
-  },
-  {
-    value: 'add_task_note',
-    label: 'Add Task Note',
-    description: 'Add a note to a task',
-    icon: 'FileText',
-    configFields: [
-      { name: 'note', label: 'Note Text', type: 'textarea', required: true },
-    ],
-  },
-  {
-    value: 'send_report',
-    label: 'Send Report',
-    description: 'Generate and send a PDF or CSV report',
-    icon: 'FileDown',
-    configFields: [
-      {
-        name: 'format',
-        label: 'Format',
-        type: 'select',
-        required: true,
-        options: [
-          { value: 'pdf', label: 'PDF' },
-          { value: 'csv', label: 'CSV' },
-        ],
-      },
-      { name: 'recipient', label: 'Send To', type: 'text', required: true },
-    ],
-  },
-  {
-    value: 'trigger_webhook',
-    label: 'Trigger Webhook',
-    description: 'Send data to an external webhook URL',
-    icon: 'Webhook',
-    configFields: [
-      { name: 'url', label: 'Webhook URL', type: 'text', required: true },
-      { name: 'method', label: 'HTTP Method', type: 'select', options: [
-        { value: 'POST', label: 'POST' },
-        { value: 'PUT', label: 'PUT' },
-      ]},
-    ],
-  },
-  {
-    value: 'notify_user',
-    label: 'Notify User',
-    description: 'Send an in-app notification',
-    icon: 'Bell',
-    configFields: [
-      { name: 'user_id', label: 'User ID', type: 'text', required: true },
-      { name: 'message', label: 'Notification Message', type: 'text', required: true },
-    ],
-  },
-  {
     value: 'send_message',
-    label: 'Send Message',
+    label: 'Send an email and/or text message to _____',
     description: 'Send an email or SMS message',
     icon: 'MessageCircle',
     configFields: [
@@ -349,6 +161,7 @@ export const ACTION_OPTIONS: ActionOption[] = [
         options: [
           { value: 'email', label: 'Email' },
           { value: 'sms', label: 'SMS' },
+          { value: 'both', label: 'Both Email and SMS' },
         ],
       },
       { name: 'to', label: 'Recipient', type: 'text', required: true },
@@ -357,22 +170,13 @@ export const ACTION_OPTIONS: ActionOption[] = [
     ],
   },
   {
-    value: 'apply_preset_task_list',
-    label: 'Apply Preset Task List',
-    description: 'Create tasks from a preset template',
-    icon: 'ListChecks',
-    configFields: [
-      { name: 'preset_name', label: 'Preset Name', type: 'text', required: true },
-      { name: 'assign_to', label: 'Assign To (User ID)', type: 'text', required: false },
-    ],
-  },
-  {
     value: 'request_payment',
-    label: 'Request Payment',
+    label: 'Request payment for _____% amount',
     description: 'Send a payment request to customer',
     icon: 'DollarSign',
     configFields: [
       { name: 'invoice_id', label: 'Invoice ID', type: 'text', required: true },
+      { name: 'percentage', label: 'Payment Percentage', type: 'number', required: true },
       { name: 'payment_method', label: 'Payment Method', type: 'select', options: [
         { value: 'stripe', label: 'Stripe' },
         { value: 'manual', label: 'Manual' },
@@ -382,10 +186,11 @@ export const ACTION_OPTIONS: ActionOption[] = [
   },
   {
     value: 'request_approval',
-    label: 'Request Approval',
+    label: 'Request _____ approval',
     description: 'Send an approval request',
     icon: 'CheckCircle',
     configFields: [
+      { name: 'approval_type', label: 'Approval Type', type: 'text', required: true },
       { name: 'quote_id', label: 'Quote ID', type: 'text', required: true },
       { name: 'recipient_email', label: 'Recipient Email', type: 'text', required: true },
       { name: 'message', label: 'Custom Message', type: 'textarea', required: false },
@@ -393,7 +198,7 @@ export const ACTION_OPTIONS: ActionOption[] = [
   },
   {
     value: 'change_status',
-    label: 'Change Status',
+    label: 'Change status to _____',
     description: 'Update status of an entity',
     icon: 'RefreshCw',
     configFields: [
@@ -415,8 +220,8 @@ export const ACTION_OPTIONS: ActionOption[] = [
   },
   {
     value: 'add_imprints_to_scheduler',
-    label: 'Add Imprints to Scheduler',
-    description: 'Schedule imprints for production',
+    label: 'Add the quote/invoice imprints to the Power Scheduler',
+    description: 'Schedule imprints for production in the Power Scheduler',
     icon: 'Calendar',
     configFields: [
       { name: 'work_order_id', label: 'Work Order ID', type: 'text', required: true },
