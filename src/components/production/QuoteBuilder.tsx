@@ -673,6 +673,19 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
     setItemGroups(newGroups);
   };
 
+  const calculateSizeTotal = (item: QuoteItem): number => {
+    return (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) + (item.qty_yl || 0) + (item.qty_yxl || 0) +
+      (item.qty_xs || 0) + (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) + (item.qty_xl || 0) +
+      (item.qty_2xl || 0) + (item.qty_3xl || 0) + (item.qty_4xl || 0) +
+      (item.qty_sm || 0) + (item.qty_lxl || 0) + (item.qty_ysym || 0) + (item.qty_ylyxl || 0);
+  };
+
+  const calculateItemsTotal = (item: QuoteItem): number => {
+    const sizeTotal = calculateSizeTotal(item);
+    const quantityValue = item.total_quantity || 0;
+    return sizeTotal + quantityValue;
+  };
+
   const updateItem = async (groupId: string, itemIndex: number, field: keyof QuoteItem, value: any) => {
     let updatedGroups: any[] = [];
 
@@ -681,19 +694,10 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         const newItems = [...group.items];
         newItems[itemIndex] = { ...newItems[itemIndex], [field]: value };
 
-        if (field.startsWith('qty_') || field === 'unit_price') {
+        if (field.startsWith('qty_') || field === 'unit_price' || field === 'total_quantity') {
           const item = newItems[itemIndex];
-          item.total_quantity =
-            (item.qty_yxs || 0) + item.qty_ys + item.qty_ym + item.qty_yl + item.qty_yxl +
-            item.qty_xs + item.qty_s + item.qty_m + item.qty_l + item.qty_xl +
-            item.qty_2xl + item.qty_3xl + (item.qty_4xl || 0) +
-            (item.qty_sm || 0) + (item.qty_lxl || 0) + (item.qty_ysym || 0) + (item.qty_ylyxl || 0);
-          item.total_price = item.total_quantity * item.unit_price;
-        }
-
-        if (field === 'total_quantity') {
-          const item = newItems[itemIndex];
-          item.total_price = item.total_quantity * item.unit_price;
+          const itemsTotal = calculateItemsTotal(item);
+          item.total_price = itemsTotal * item.unit_price;
         }
 
         return { ...group, items: newItems };
@@ -1627,7 +1631,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
     const totalDue = afterDiscount + salesTax;
 
     return {
-      totalQuantity: allItems.reduce((sum, item) => sum + item.total_quantity, 0),
+      totalQuantity: allItems.reduce((sum, item) => sum + calculateItemsTotal(item), 0),
       itemTotal,
       feeTotal,
       subtotal,
@@ -2242,6 +2246,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                         <th key={size.key} className="p-2 text-center border border-gray-300 dark:border-slate-800 w-10">{size.label}</th>
                       ))}
                       <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-14">Qty</th>
+                      <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-14">Items</th>
                       <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-24">Unit Price</th>
                       <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-24">Total</th>
                       <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-20">Actions</th>
@@ -2254,13 +2259,13 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                       {/* Spacer Row Between Groups */}
                       {groupIdx > 0 && (
                         <tr key={`spacer-${group.id}`} className="bg-transparent">
-                          <td colSpan={getSizeColumns(group).length + 8} className="p-4 border-0"></td>
+                          <td colSpan={getSizeColumns(group).length + 9} className="p-4 border-0"></td>
                         </tr>
                       )}
                       {/* Group Header Row with Label - All Groups */}
                       {(itemGroups.length > 1 || group.label) && (
                         <tr key={`header-${group.id}`} className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-slate-800 dark:to-slate-700">
-                          <td colSpan={getSizeColumns(group).length + 8} className="p-2 border border-gray-300 dark:border-slate-800">
+                          <td colSpan={getSizeColumns(group).length + 9} className="p-2 border border-gray-300 dark:border-slate-800">
                             <div className="flex items-center justify-between gap-4">
                               <div className="flex items-center gap-4 flex-1">
                                 <input
@@ -2315,6 +2320,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                             <th key={size.key} className="p-2 text-center border border-gray-300 dark:border-slate-800 w-10">{size.label}</th>
                           ))}
                           <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-14">Qty</th>
+                          <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-14">Items</th>
                           <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-24">Unit Price</th>
                           <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-24">Total</th>
                           <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-20">Actions</th>
@@ -2441,6 +2447,9 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                           className="w-full px-1 py-2 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-base text-center font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                       </td>
+                      <td className="p-1 border border-gray-300 dark:border-slate-800 text-center text-base text-blue-600 dark:text-blue-400 font-bold">
+                        {calculateItemsTotal(item)}
+                      </td>
                       <td className="p-0 border border-gray-300 dark:border-slate-800">
                         <input
                           type="number"
@@ -2476,7 +2485,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                       ))}
                       {/* Group Actions Row */}
                       <tr key={`actions-${group.id}`}>
-                        <td colSpan={getSizeColumns(group).length + 8} className="p-2 border-t-2 border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
+                        <td colSpan={getSizeColumns(group).length + 9} className="p-2 border-t-2 border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50">
                           <div className="space-y-3">
                             <div className="flex gap-2 justify-between items-start">
                               <div className="flex gap-2">
