@@ -691,6 +691,11 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           item.total_price = item.total_quantity * item.unit_price;
         }
 
+        if (field === 'total_quantity') {
+          const item = newItems[itemIndex];
+          item.total_price = item.total_quantity * item.unit_price;
+        }
+
         return { ...group, items: newItems };
       }
       return group;
@@ -2427,8 +2432,14 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                               />
                             </td>
                           ))}
-                      <td className="p-1 border border-gray-300 dark:border-slate-800 text-center text-base text-gray-900 dark:text-white font-semibold">
-                        {item.total_quantity}
+                      <td className="p-0 border border-gray-300 dark:border-slate-800">
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.total_quantity}
+                          onChange={(e) => updateItem(group.id, itemIdx, 'total_quantity', parseInt(e.target.value) || 0)}
+                          className="w-full px-1 py-2 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-base text-center font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
                       </td>
                       <td className="p-0 border border-gray-300 dark:border-slate-800">
                         <input
@@ -2669,8 +2680,15 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                         className="w-full px-2 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-center"
                       />
                     </td>
-                    <td className="p-2 border border-gray-300 dark:border-slate-800 text-right text-sm text-gray-900 dark:text-white">
-                      ${fee.unit_amount.toFixed(2)}
+                    <td className="p-0 border border-gray-300 dark:border-slate-800">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={fee.unit_amount}
+                        onChange={(e) => updateFee(idx, 'unit_amount', parseFloat(e.target.value) || 0)}
+                        className="w-full px-2 py-1 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-xs text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
                     </td>
                     <td className="p-2 border border-gray-300 dark:border-slate-800 text-right text-sm">
                       ${fee.total_amount.toFixed(2)}
