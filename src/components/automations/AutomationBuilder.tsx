@@ -20,6 +20,7 @@ export function AutomationBuilder({ automation, onSave, onCancel }: AutomationBu
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [triggerType, setTriggerType] = useState('');
+  const [triggerConfig, setTriggerConfig] = useState<Record<string, any>>({});
   const [conditions, setConditions] = useState<Condition[]>([]);
   const [actions, setActions] = useState<Action[]>([]);
   const [scheduling, setScheduling] = useState<SchedulingConfig>({
@@ -33,6 +34,7 @@ export function AutomationBuilder({ automation, onSave, onCancel }: AutomationBu
       setName(automation.name);
       setDescription(automation.description || '');
       setTriggerType(automation.trigger_type);
+      setTriggerConfig(automation.trigger_config || {});
       setConditions(automation.conditions || []);
       setActions(automation.actions || []);
       setScheduling(automation.scheduling);
@@ -62,7 +64,7 @@ export function AutomationBuilder({ automation, onSave, onCancel }: AutomationBu
         name,
         description,
         trigger_type: triggerType,
-        trigger_config: { type: triggerType },
+        trigger_config: triggerConfig,
         conditions,
         actions,
         scheduling,
@@ -83,6 +85,11 @@ export function AutomationBuilder({ automation, onSave, onCancel }: AutomationBu
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleTriggerChange = (newTriggerType: string) => {
+    setTriggerType(newTriggerType);
+    setTriggerConfig({});
   };
 
   const addCondition = () => {
@@ -211,7 +218,9 @@ export function AutomationBuilder({ automation, onSave, onCancel }: AutomationBu
             </div>
             <TriggerSelector
               value={triggerType}
-              onChange={setTriggerType}
+              triggerConfig={triggerConfig}
+              onChange={handleTriggerChange}
+              onConfigChange={setTriggerConfig}
             />
           </section>
 

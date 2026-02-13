@@ -269,3 +269,59 @@ export const OPERATOR_LABELS: Record<string, string> = {
   not_contains: 'Does Not Contain',
   within_days: 'Within (days)',
 };
+
+export const TRIGGER_CONDITION_OPTIONS: Record<string, { label: string; options: Array<{ value: string; label: string }> }> = {
+  approval_approved: {
+    label: 'Approval Type',
+    options: [
+      { value: 'quote', label: 'Quote' },
+      { value: 'proof', label: 'Proof' },
+      { value: 'artwork', label: 'Artwork' },
+      { value: 'mockup', label: 'Mockup' },
+      { value: 'design', label: 'Design' },
+    ],
+  },
+  approval_declined: {
+    label: 'Approval Type',
+    options: [
+      { value: 'quote', label: 'Quote' },
+      { value: 'proof', label: 'Proof' },
+      { value: 'artwork', label: 'Artwork' },
+      { value: 'mockup', label: 'Mockup' },
+      { value: 'design', label: 'Design' },
+    ],
+  },
+  approval_sent: {
+    label: 'Approval Type',
+    options: [
+      { value: 'quote', label: 'Quote' },
+      { value: 'proof', label: 'Proof' },
+      { value: 'artwork', label: 'Artwork' },
+      { value: 'mockup', label: 'Mockup' },
+      { value: 'design', label: 'Design' },
+    ],
+  },
+  status_changed: {
+    label: 'Status',
+    options: [
+      { value: 'Quote', label: 'Quote' },
+      { value: 'Approved', label: 'Approved' },
+      { value: 'In Production', label: 'In Production' },
+      { value: 'Ready', label: 'Ready' },
+      { value: 'Complete', label: 'Complete' },
+      { value: 'Invoiced', label: 'Invoiced' },
+      { value: 'Paid', label: 'Paid' },
+      { value: 'Cancelled', label: 'Cancelled' },
+    ],
+  },
+  work_step_status_changed: {
+    label: 'Work Step Status',
+    options: [
+      { value: 'not_started', label: 'Not Started' },
+      { value: 'in_progress', label: 'In Progress' },
+      { value: 'completed', label: 'Completed' },
+      { value: 'on_hold', label: 'On Hold' },
+      { value: 'cancelled', label: 'Cancelled' },
+    ],
+  },
+};
