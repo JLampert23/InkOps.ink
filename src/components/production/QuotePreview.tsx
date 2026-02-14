@@ -221,7 +221,7 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
           item.qty_2xl || '',
           item.qty_3xl || '',
           item.qty_4xl || '',
-          item.quantity || 0,
+          item.quantity || '',
           totalItems,
           `$${(item.unit_price || 0).toFixed(2)}`,
           `$${(item.total_price || 0).toFixed(2)}`,
@@ -591,7 +591,7 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
                                 <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_2xl || ''}</td>
                                 <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_3xl || ''}</td>
                                 <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_4xl || ''}</td>
-                                <td className="border border-gray-400 px-1 py-0.5 text-center">{item.quantity || 0}</td>
+                                <td className="border border-gray-400 px-1 py-0.5 text-center">{item.quantity || ''}</td>
                                 <td className="border border-gray-400 px-1 py-0.5 text-center font-semibold text-blue-600">{totalItems}</td>
                                 <td className="border border-gray-400 px-1 py-0.5 text-right">${(item.unit_price || 0).toFixed(2)}</td>
                                 <td className="border border-gray-400 px-1 py-0.5 text-right">${(item.total_price || 0).toFixed(2)}</td>

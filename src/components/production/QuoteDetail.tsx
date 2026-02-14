@@ -760,7 +760,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                         {item.qty_4xl || ''}
                       </td>
                       <td className="px-4 py-4 text-center text-gray-700 dark:text-gray-300 text-base">
-                        {(item as any).quantity || 0}
+                        {(item as any).quantity || ''}
                       </td>
                       <td className="px-4 py-4 text-center text-gray-900 dark:text-white font-bold text-base text-blue-600 dark:text-blue-400">
                         {totalItems}
