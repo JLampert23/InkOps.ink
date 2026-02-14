@@ -646,6 +646,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                   <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">3XL</th>
                   <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">4XL</th>
                   <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Qty</th>
+                  <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Items</th>
                   <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[100px]">Unit Price</th>
                   <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[100px]">Total</th>
                 </tr>
@@ -657,13 +658,13 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                   {/* Spacer between groups */}
                   {groupIdx > 0 && (
                     <tr>
-                      <td colSpan={18} className="h-4 bg-transparent"></td>
+                      <td colSpan={20} className="h-4 bg-transparent"></td>
                     </tr>
                   )}
                   {/* Group header */}
                   {groupLabel && (
                     <tr className="bg-gray-100 dark:bg-slate-800 border-t-2 border-b-2 border-gray-300 dark:border-slate-600">
-                      <td colSpan={18} className="px-4 py-3">
+                      <td colSpan={20} className="px-4 py-3">
                         <div className="font-semibold text-gray-900 dark:text-white text-base">
                           {groupLabel}
                         </div>
@@ -690,17 +691,19 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                       <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">3XL</th>
                       <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">4XL</th>
                       <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Qty</th>
+                      <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Items</th>
                       <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[100px]">Unit Price</th>
                       <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[100px]">Total</th>
                     </tr>
                   )}
                   {/* Group items */}
                   {groupItems.map((item) => {
-                    const itemQty = (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) +
+                    const sizeQty = (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) +
                                    (item.qty_yl || 0) + (item.qty_yxl || 0) + (item.qty_xs || 0) +
                                    (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) +
                                    (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
                                    (item.qty_4xl || 0);
+                    const totalItems = sizeQty + ((item as any).quantity || 0);
 
                     return (
                       <React.Fragment key={item.id}>
@@ -756,8 +759,11 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                       <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_4xl || ''}
                       </td>
-                      <td className="px-4 py-4 text-center text-gray-900 dark:text-white font-semibold text-base">
-                        {itemQty}
+                      <td className="px-4 py-4 text-center text-gray-700 dark:text-gray-300 text-base">
+                        {(item as any).quantity || 0}
+                      </td>
+                      <td className="px-4 py-4 text-center text-gray-900 dark:text-white font-bold text-base text-blue-600 dark:text-blue-400">
+                        {totalItems}
                       </td>
                       <td className="px-4 py-4 text-right text-gray-700 dark:text-gray-300 text-base">
                         ${item.unit_price.toFixed(2)}
@@ -771,7 +777,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
               })}
                   {/* List imprints for this group */}
                   <tr>
-                    <td colSpan={18} className="px-4 py-2 bg-gray-50 dark:bg-slate-800/50">
+                    <td colSpan={20} className="px-4 py-2 bg-gray-50 dark:bg-slate-800/50">
                       <div className="space-y-3">
                         {/* List imprints for this group */}
                         {(() => {

@@ -196,31 +196,41 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
     const fees = lineItems.filter(item => item.line_type === 'fee');
 
     if (items.length > 0) {
-      const itemRows = items.map(item => [
-        item.item_number || '',
-        item.color || '',
-        item.description || '',
-        item.qty_yxs || '',
-        item.qty_ys || '',
-        item.qty_ym || '',
-        item.qty_yl || '',
-        item.qty_yxl || '',
-        item.qty_xs || '',
-        item.qty_s || '',
-        item.qty_m || '',
-        item.qty_l || '',
-        item.qty_xl || '',
-        item.qty_2xl || '',
-        item.qty_3xl || '',
-        item.qty_4xl || '',
-        item.quantity || 0,
-        `$${(item.unit_price || 0).toFixed(2)}`,
-        `$${(item.total_price || 0).toFixed(2)}`,
-      ]);
+      const itemRows = items.map(item => {
+        const sizeQty = (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) +
+                       (item.qty_yl || 0) + (item.qty_yxl || 0) + (item.qty_xs || 0) +
+                       (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) +
+                       (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
+                       (item.qty_4xl || 0);
+        const totalItems = sizeQty + (item.quantity || 0);
+
+        return [
+          item.item_number || '',
+          item.color || '',
+          item.description || '',
+          item.qty_yxs || '',
+          item.qty_ys || '',
+          item.qty_ym || '',
+          item.qty_yl || '',
+          item.qty_yxl || '',
+          item.qty_xs || '',
+          item.qty_s || '',
+          item.qty_m || '',
+          item.qty_l || '',
+          item.qty_xl || '',
+          item.qty_2xl || '',
+          item.qty_3xl || '',
+          item.qty_4xl || '',
+          item.quantity || 0,
+          totalItems,
+          `$${(item.unit_price || 0).toFixed(2)}`,
+          `$${(item.total_price || 0).toFixed(2)}`,
+        ];
+      });
 
       autoTable(doc, {
         startY: yPos,
-        head: [['Item #', 'Color', 'Description', 'YXS', 'YS', 'YM', 'YL', 'YXL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', 'Qty', 'Price', 'Total']],
+        head: [['Item #', 'Color', 'Description', 'YXS', 'YS', 'YM', 'YL', 'YXL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', 'Qty', 'Items', 'Price', 'Total']],
         body: itemRows,
         theme: 'grid',
         styles: { fontSize: 6, cellPadding: 0.5 },
@@ -529,6 +539,7 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
                       <th className="border border-gray-400 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>3XL</th>
                       <th className="border border-gray-400 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>4XL</th>
                       <th className="border border-gray-400 px-1 py-0.5 text-center font-semibold">Qty</th>
+                      <th className="border border-gray-400 px-1 py-0.5 text-center font-semibold">Items</th>
                       <th className="border border-gray-400 px-1 py-0.5 text-right font-semibold">Unit Price</th>
                       <th className="border border-gray-400 px-1 py-0.5 text-right font-semibold">Total</th>
                     </tr>
@@ -550,17 +561,18 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
                         <>
                           {groupLabel && (
                             <tr key={`group-${groupIdx}`} className="bg-gray-200">
-                              <td colSpan={18} className="border border-gray-400 px-2 py-1 font-bold text-gray-900">
+                              <td colSpan={20} className="border border-gray-400 px-2 py-1 font-bold text-gray-900">
                                 {groupLabel}
                               </td>
                             </tr>
                           )}
                           {groupItems.map((item, idx) => {
-                            const totalQty = (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) +
+                            const sizeQty = (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) +
                                             (item.qty_yl || 0) + (item.qty_yxl || 0) + (item.qty_xs || 0) +
                                             (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) +
                                             (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
                                             (item.qty_4xl || 0);
+                            const totalItems = sizeQty + (item.quantity || 0);
                             return (
                               <tr key={`${groupIdx}-${idx}`}>
                                 <td className="border border-gray-400 px-1 py-0.5">{item.item_number || ''}</td>
@@ -579,7 +591,8 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
                                 <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_2xl || ''}</td>
                                 <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_3xl || ''}</td>
                                 <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_4xl || ''}</td>
-                                <td className="border border-gray-400 px-1 py-0.5 text-center">{totalQty}</td>
+                                <td className="border border-gray-400 px-1 py-0.5 text-center">{item.quantity || 0}</td>
+                                <td className="border border-gray-400 px-1 py-0.5 text-center font-semibold text-blue-600">{totalItems}</td>
                                 <td className="border border-gray-400 px-1 py-0.5 text-right">${(item.unit_price || 0).toFixed(2)}</td>
                                 <td className="border border-gray-400 px-1 py-0.5 text-right">${(item.total_price || 0).toFixed(2)}</td>
                               </tr>
