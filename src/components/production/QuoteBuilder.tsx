@@ -215,17 +215,24 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const createDraftQuote = async () => {
-    if (!user || !session?.access_token || draftCreatedRef.current) return;
+    if (!user || draftCreatedRef.current) return;
 
     draftCreatedRef.current = true;
 
     try {
+      const { data: { session: freshSession }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !freshSession?.access_token) {
+        console.error('Session error:', sessionError);
+        throw new Error('No valid session found');
+      }
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quotes-api/draft`,
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${session.access_token}`,
+            'Authorization': `Bearer ${freshSession.access_token}`,
             'Content-Type': 'application/json',
             'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
           },
@@ -1111,7 +1118,9 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
    */
   const fetchSanMarUnifiedData = async (style: string, color: string, size?: string) => {
     try {
-      if (!session?.access_token) {
+      const { data: { session: freshSession }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !freshSession?.access_token) {
         throw new Error('No authentication session');
       }
 
@@ -1122,7 +1131,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1${endpoint}`,
         {
           headers: {
-            'Authorization': `Bearer ${session.access_token}`,
+            'Authorization': `Bearer ${freshSession.access_token}`,
             'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
             'Content-Type': 'application/json',
           },
@@ -1146,13 +1155,15 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
    */
   const fetchGarmentPricing = async (style: string, color: string, size: string) => {
     try {
-      if (!session?.access_token) return null;
+      const { data: { session: freshSession }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !freshSession?.access_token) return null;
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/garments/${style}/${color}/${size}/pricing`,
         {
           headers: {
-            'Authorization': `Bearer ${session.access_token}`,
+            'Authorization': `Bearer ${freshSession.access_token}`,
             'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
             'Content-Type': 'application/json',
           },
@@ -1175,13 +1186,15 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
    */
   const fetchGarmentInventory = async (style: string, color: string, size: string) => {
     try {
-      if (!session?.access_token) return null;
+      const { data: { session: freshSession }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !freshSession?.access_token) return null;
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/garments/${style}/${color}/${size}/inventory`,
         {
           headers: {
-            'Authorization': `Bearer ${session.access_token}`,
+            'Authorization': `Bearer ${freshSession.access_token}`,
             'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
             'Content-Type': 'application/json',
           },
