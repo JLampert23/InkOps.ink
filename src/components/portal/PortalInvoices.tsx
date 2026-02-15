@@ -4,6 +4,7 @@ import { useCustomerPortal } from '../../contexts/CustomerPortalContext';
 import { supabase } from '../../lib/supabase-client';
 import { FileText, Download, CreditCard, Eye, Loader2 } from 'lucide-react';
 import { PaymentModal } from './PaymentModal';
+import { portalAnalyticsService } from '../../services/portal-analytics-service';
 
 interface Invoice {
   id: string;
@@ -63,8 +64,18 @@ export function PortalInvoices() {
     }
   };
 
-  const handleViewInvoice = (invoice: Invoice) => {
+  const handleViewInvoice = async (invoice: Invoice) => {
     setSelectedInvoice(invoice);
+
+    if (user?.company_id && user?.customer_id) {
+      await portalAnalyticsService.trackEvent({
+        companyId: user.company_id,
+        customerId: user.customer_id,
+        eventType: 'invoice_viewed',
+        resourceType: 'invoice',
+        resourceId: invoice.id
+      });
+    }
   };
 
   const handlePayInvoice = (invoice: Invoice) => {

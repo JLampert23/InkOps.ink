@@ -3,6 +3,7 @@ import { PortalLayout } from './PortalLayout';
 import { useCustomerPortal } from '../../contexts/CustomerPortalContext';
 import { supabase } from '../../lib/supabase-client';
 import { FileText, CheckCircle, XCircle, Eye, Loader2, Download } from 'lucide-react';
+import { portalAnalyticsService } from '../../services/portal-analytics-service';
 
 interface Quote {
   id: string;
@@ -82,8 +83,18 @@ export function PortalQuotes() {
     }
   };
 
-  const handleViewQuote = (quote: Quote) => {
+  const handleViewQuote = async (quote: Quote) => {
     setSelectedQuote(quote);
+
+    if (user?.company_id && user?.customer_id) {
+      await portalAnalyticsService.trackEvent({
+        companyId: user.company_id,
+        customerId: user.customer_id,
+        eventType: 'quote_viewed',
+        resourceType: 'quote',
+        resourceId: quote.id
+      });
+    }
   };
 
   if (loading) {

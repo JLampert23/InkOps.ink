@@ -3,6 +3,7 @@ import { PortalLayout } from './PortalLayout';
 import { useCustomerPortal } from '../../contexts/CustomerPortalContext';
 import { supabase } from '../../lib/supabase-client';
 import { CheckCircle, XCircle, Eye, Loader2, MessageSquare } from 'lucide-react';
+import { portalAnalyticsService } from '../../services/portal-analytics-service';
 
 interface Proof {
   id: string;
@@ -94,6 +95,20 @@ export function PortalProofs() {
     }
   };
 
+  const handleViewProof = async (proof: Proof) => {
+    setSelectedProof(proof);
+
+    if (user?.company_id && user?.customer_id) {
+      await portalAnalyticsService.trackEvent({
+        companyId: user.company_id,
+        customerId: user.customer_id,
+        eventType: 'proof_viewed',
+        resourceType: 'proof',
+        resourceId: proof.id
+      });
+    }
+  };
+
   const handleApprove = async () => {
     if (!selectedProof) return;
 
@@ -109,6 +124,16 @@ export function PortalProofs() {
         .eq('id', selectedProof.id);
 
       if (error) throw error;
+
+      if (user?.company_id && user?.customer_id) {
+        await portalAnalyticsService.trackEvent({
+          companyId: user.company_id,
+          customerId: user.customer_id,
+          eventType: 'proof_approved',
+          resourceType: 'proof',
+          resourceId: selectedProof.id
+        });
+      }
 
       alert('Proof approved successfully!');
       setSelectedProof(null);
@@ -142,6 +167,16 @@ export function PortalProofs() {
         .eq('id', selectedProof.id);
 
       if (error) throw error;
+
+      if (user?.company_id && user?.customer_id) {
+        await portalAnalyticsService.trackEvent({
+          companyId: user.company_id,
+          customerId: user.customer_id,
+          eventType: 'proof_rejected',
+          resourceType: 'proof',
+          resourceId: selectedProof.id
+        });
+      }
 
       alert('Proof rejected. Feedback has been sent.');
       setSelectedProof(null);
@@ -302,7 +337,7 @@ export function PortalProofs() {
                       {new Date(proof.created_at).toLocaleDateString()}
                     </span>
                     <button
-                      onClick={() => setSelectedProof(proof)}
+                      onClick={() => handleViewProof(proof)}
                       className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
                     >
                       <Eye className="w-4 h-4" />
