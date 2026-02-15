@@ -96,7 +96,6 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
       case 'work-orders':
         return <WorkOrdersManager initialWorkOrderId={navigateToWorkOrderId} />;
       case 'scheduling':
-      case 'kanban':
         return (
           <div className="space-y-4">
             {typesOfWork.length === 0 ? (
@@ -125,27 +124,46 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
                   </select>
                 </div>
 
-                {/* Split View: Scheduling and Kanban */}
+                {/* Selected Schedule */}
                 {selectedScheduleType && (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {/* Scheduling Side */}
-                    <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                        <CalendarDays className="w-5 h-5 text-green-600" />
-                        Scheduling
-                      </h3>
-                      <ProductionScheduler typeOfWork={selectedScheduleType} onNavigateToWorkOrder={handleNavigateToWorkOrder} />
-                    </div>
+                  <ProductionScheduler typeOfWork={selectedScheduleType} onNavigateToWorkOrder={handleNavigateToWorkOrder} />
+                )}
+              </>
+            )}
+          </div>
+        );
+      case 'kanban':
+        return (
+          <div className="space-y-4">
+            {typesOfWork.length === 0 ? (
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-12 text-center">
+                <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No Types of Work Configured</h3>
+                <p className="text-gray-600 dark:text-gray-400">Configure types of work in Settings to use the kanban calendar</p>
+              </div>
+            ) : (
+              <>
+                {/* Type of Work Dropdown */}
+                <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Type of Work
+                  </label>
+                  <select
+                    value={selectedScheduleType}
+                    onChange={(e) => setSelectedScheduleType(e.target.value)}
+                    className="w-full md:w-64 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
+                  >
+                    {typesOfWork.map((type) => (
+                      <option key={type.id} value={type.work_type_name}>
+                        {type.work_type_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                    {/* Kanban Side */}
-                    <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                        <Calendar className="w-5 h-5 text-green-600" />
-                        Kanban Calendar
-                      </h3>
-                      <KanbanCalendar typeOfWork={selectedScheduleType} onNavigateToWorkOrder={handleNavigateToWorkOrder} inline />
-                    </div>
-                  </div>
+                {/* Kanban Calendar Full Screen */}
+                {selectedScheduleType && (
+                  <KanbanCalendar typeOfWork={selectedScheduleType} onNavigateToWorkOrder={handleNavigateToWorkOrder} inline />
                 )}
               </>
             )}
