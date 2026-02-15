@@ -10,6 +10,12 @@ import { supabase } from './lib/supabase-client';
 import { billingService } from './services/billing-service';
 import { useRBAC } from './hooks/useRBAC';
 import PublicQuoteApprovalPage from './components/production/PublicQuoteApprovalPage';
+import { CustomerPortalProvider } from './contexts/CustomerPortalContext';
+import { PortalLogin } from './components/portal/PortalLogin';
+import { PortalInvoices } from './components/portal/PortalInvoices';
+import { PortalQuotes } from './components/portal/PortalQuotes';
+import { PortalProofs } from './components/portal/PortalProofs';
+import { PortalOrderHistory } from './components/portal/PortalOrderHistory';
 
 const SquareData = lazy(() => import('./components/SquareData'));
 const ProductionManagement = lazy(() => import('./components/ProductionManagement').then(m => ({ default: m.ProductionManagement })));
@@ -558,9 +564,35 @@ function AppContent() {
 
 function App() {
   const isQuoteApprovalPage = window.location.pathname.startsWith('/quote-approval/');
+  const isPortalPage = window.location.pathname.startsWith('/portal');
 
   if (isQuoteApprovalPage) {
     return <PublicQuoteApprovalPage />;
+  }
+
+  if (isPortalPage) {
+    const path = window.location.pathname;
+    return (
+      <CustomerPortalProvider>
+        <ThemeProvider>
+          <NotificationProvider>
+            {path === '/portal' || path === '/portal/' ? (
+              <PortalLogin />
+            ) : path.startsWith('/portal/invoices') ? (
+              <PortalInvoices />
+            ) : path.startsWith('/portal/quotes') ? (
+              <PortalQuotes />
+            ) : path.startsWith('/portal/proofs') ? (
+              <PortalProofs />
+            ) : path.startsWith('/portal/orders') ? (
+              <PortalOrderHistory />
+            ) : (
+              <PortalLogin />
+            )}
+          </NotificationProvider>
+        </ThemeProvider>
+      </CustomerPortalProvider>
+    );
   }
 
   return (
