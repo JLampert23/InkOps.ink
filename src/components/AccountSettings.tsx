@@ -42,6 +42,7 @@ interface CompanySettings {
   ssactivewear_username: string | null;
   ssactivewear_api_key_encrypted: string | null;
   ssactivewear_enabled: boolean | null;
+  customer_url: string | null;
 }
 
 interface UserProfile {
@@ -129,7 +130,7 @@ type SettingsTab =
   | 'automated-reports' | 'automations'
   | 'manage-goods' | 'receiving-settings' | 'po-settings'
   | 'production-general' | 'scheduler-settings' | 'invoice-fees' | 'price-matrices'
-  | 'email-templates';
+  | 'email-templates' | 'urls';
 
 interface AccountSettingsProps {
   initialTab?: SettingsTab;
@@ -188,6 +189,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [savingResend, setSavingResend] = useState(false);
   const [testingResend, setTestingResend] = useState(false);
   const [resendTestResult, setResendTestResult] = useState<any>(null);
+
+  const [customerUrl, setCustomerUrl] = useState('');
+  const [savingCustomerUrl, setSavingCustomerUrl] = useState(false);
 
   const [stripePublicKey, setStripePublicKey] = useState('');
   const [showStripePublicKey, setShowStripePublicKey] = useState(false);
@@ -480,6 +484,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setSquareLocationId(data.square_location_id || '');
         setEmailFromAddress(data.email_from_address || '');
         setResendApiKey(data.resend_api_key ? '••••••••••••••••' : '');
+        setCustomerUrl(data.customer_url || '');
         setStripePublicKey(data.stripe_public_key ? '••••••••••••••••' : '');
         setStripeSecretKey(data.stripe_secret_key ? '••••••••••••••••' : '');
         setStripeWebhookSecret(data.stripe_webhook_secret ? '••••••••••••••••' : '');
@@ -1371,6 +1376,69 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save Resend settings. Please try again.');
     } finally {
       setSavingResend(false);
+    }
+  };
+
+  const saveCustomerUrl = async () => {
+    try {
+      setSavingCustomerUrl(true);
+
+      if (!companySettings?.id) {
+        showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
+        return;
+      }
+
+      // Validate URL format
+      let urlToSave = customerUrl.trim();
+
+      if (urlToSave) {
+        // Must start with https://
+        if (!urlToSave.startsWith('https://')) {
+          showNotification('error', 'Invalid URL', 'Customer URL must start with https://');
+          return;
+        }
+
+        // Strip trailing slashes
+        urlToSave = urlToSave.replace(/\/+$/, '');
+
+        // Validate URL format
+        try {
+          new URL(urlToSave);
+        } catch {
+          showNotification('error', 'Invalid URL', 'Please enter a valid URL format');
+          return;
+        }
+      }
+
+      // Check for uniqueness if URL is being set
+      if (urlToSave) {
+        const { data: existing } = await supabase
+          .from('company_settings')
+          .select('id')
+          .eq('customer_url', urlToSave)
+          .neq('id', companySettings.id)
+          .maybeSingle();
+
+        if (existing) {
+          showNotification('error', 'URL Already In Use', 'This custom URL is already being used by another company. Please choose a different URL.');
+          return;
+        }
+      }
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update({ customer_url: urlToSave || null })
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
+
+      showNotification('success', 'Customer URL Saved', 'Your custom URL has been saved successfully!');
+      await loadSettings();
+    } catch (err) {
+      console.error('Error saving customer URL:', err);
+      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save customer URL. Please try again.');
+    } finally {
+      setSavingCustomerUrl(false);
     }
   };
 
@@ -4280,6 +4348,23 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   </div>
                   {activeTab === 'email-templates' && <div className="w-1 h-6 bg-purple-600 dark:bg-purple-500 rounded-full absolute right-0" />}
                 </button>
+
+                <button
+                  onClick={() => setActiveTab('urls')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'urls'
+                      ? 'bg-purple-50 dark:bg-purple-600/20 text-purple-700 dark:text-purple-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  <LinkIcon className={`w-4 h-4 flex-shrink-0 ${activeTab === 'urls' ? 'text-purple-600 dark:text-purple-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'urls' ? 'text-purple-700 dark:text-purple-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      URLs
+                    </div>
+                  </div>
+                  {activeTab === 'urls' && <div className="w-1 h-6 bg-purple-600 dark:bg-purple-500 rounded-full absolute right-0" />}
+                </button>
               </div>
             )}
           </div>
@@ -5900,6 +5985,98 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             }>
               <CommunicationTemplatesManager />
             </Suspense>
+          )}
+
+          {activeTab === 'urls' && (
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Customer-Facing URLs</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                  Configure custom branded domains for customer-facing invoice and quote links
+                </p>
+                {!isAdmin && (
+                  <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-800 dark:text-amber-200 text-sm">
+                    Access Denied: Only Admins and Super Admins can edit URL settings.
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Customer URL
+                  </label>
+                  <input
+                    type="url"
+                    value={customerUrl}
+                    onChange={(e) => setCustomerUrl(e.target.value)}
+                    disabled={!isAdmin}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-slate-800 disabled:cursor-not-allowed"
+                    placeholder="https://yourdomain.com"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    This URL will be used for all customer-facing invoice and quote links.
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Examples: <code className="bg-gray-100 dark:bg-slate-700 px-1 rounded">https://acmeprinting.com</code> or <code className="bg-gray-100 dark:bg-slate-700 px-1 rounded">https://acme.inkops.com</code>
+                  </p>
+                </div>
+
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">Requirements</h3>
+                  <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
+                    <li>Must be a valid URL format</li>
+                    <li>Must include <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">https://</code></li>
+                    <li>Trailing slashes will be automatically removed</li>
+                    <li>Must be unique across all companies</li>
+                    <li>If not set, system falls back to default INKOPS domain</li>
+                  </ul>
+                </div>
+
+                {companySettings?.customer_url && (
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-green-900 dark:text-green-100 mb-2">Active Custom URL</h3>
+                    <p className="text-xs text-green-800 dark:text-green-200">
+                      Your invoices and quotes will use: <code className="bg-green-100 dark:bg-green-800 px-1 rounded font-mono">{companySettings.customer_url}</code>
+                    </p>
+                  </div>
+                )}
+
+                {isAdmin && (
+                  <div className="flex gap-3">
+                    <button
+                      onClick={saveCustomerUrl}
+                      disabled={savingCustomerUrl}
+                      className="px-6 py-2 bg-purple-600 dark:bg-purple-500 text-white rounded-lg hover:bg-purple-700 dark:hover:bg-purple-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                    >
+                      {savingCustomerUrl ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4" />
+                          Save Customer URL
+                        </>
+                      )}
+                    </button>
+
+                    {customerUrl && (
+                      <button
+                        onClick={() => {
+                          setCustomerUrl('');
+                        }}
+                        disabled={savingCustomerUrl}
+                        className="px-6 py-2 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
           )}
 
           {activeTab === 'stripe-payments' && canAccessIntegrations && (

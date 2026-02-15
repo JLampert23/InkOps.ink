@@ -101,7 +101,14 @@ export function SendQuoteModal({
 
       if (!quote) return;
 
-      const approvalUrl = `${window.location.origin}/quote-approval/PREVIEW_TOKEN`;
+      // Get company settings to check for custom URL
+      const { data: companySettings } = await supabase
+        .from('company_settings')
+        .select('customer_url')
+        .maybeSingle();
+
+      const baseUrl = companySettings?.customer_url || window.location.origin;
+      const approvalUrl = `${baseUrl}/quote-approval/PREVIEW_TOKEN`;
       const expiryDate = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
 
       const shortcodeData = {

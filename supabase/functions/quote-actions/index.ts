@@ -210,8 +210,15 @@ Deno.serve(async (req: Request) => {
         })
         .eq("id", quoteId);
 
-      // Generate public approval URL - use origin header or supabase URL
-      const appUrl = req.headers.get("origin") || supabaseUrl.replace('/rest/v1', '');
+      // Get company settings to check for custom URL
+      const { data: companySettings } = await supabase
+        .from("company_settings")
+        .select("customer_url")
+        .eq("id", profile.company_id)
+        .maybeSingle();
+
+      // Generate public approval URL - use custom URL if set, otherwise fallback to origin or supabase URL
+      const appUrl = companySettings?.customer_url || req.headers.get("origin") || supabaseUrl.replace('/rest/v1', '');
       const approvalUrl = `${appUrl}/quote-approval/${approvalToken}`;
 
       // Send email with template or default
