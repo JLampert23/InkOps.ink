@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Portal Button Fixed</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .card {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      width: 100%;
+      margin-top: 10px;
+    }
+    button:hover {
+      background: #1d4ed8;
+    }
+    .success {
+      color: #10b981;
+      font-weight: bold;
+    }
+    .error {
+      color: #ef4444;
+      font-weight: bold;
+    }
+    .output {
+      background: #f9fafb;
+      padding: 15px;
+      margin-top: 15px;
+      border-radius: 4px;
+      border: 1px solid #e5e7eb;
+      white-space: pre-wrap;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>✅ Test Portal Button (Fixed)</h1>
+    <p>Testing the exact same flow as the "Test Portal" button in Account Settings</p>
+
+    <label>Customer Email:</label>
+    <input type="email" id="email" value="jamie@toddssportinggoods.com" />
+
+    <button onclick="testPortalButton()">Test Portal Button Flow</button>
+
+    <div id="output" class="output"></div>
+  </div>
+
+  <script>
+    const supabaseUrl = 'https://cuaukcvccxvfpuxaciac.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1YXVrY3ZjY3h2ZnB1eGFjaWFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU2ODEyOTQsImV4cCI6MjA1MTI1NzI5NH0.c-o4IB5hFSZQaIJY1pE5fvJCBBXKuKMQGQdgQXnNF0A';
+
+    async function testPortalButton() {
+      const output = document.getElementById('output');
+      const email = document.getElementById('email').value;
+
+      output.innerHTML = '<span class="success">Starting portal button test...</span>\n\n';
+
+      try {
+        output.innerHTML += '1️⃣ Creating portal session via RPC...\n';
+
+        // This mimics exactly what the button does
+        const response = await fetch(`${supabaseUrl}/rest/v1/rpc/create_portal_session`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`
+          },
+          body: JSON.stringify({ p_email: email })
+        });
+
+        const data = await response.json();
+
+        output.innerHTML += `Response: ${JSON.stringify(data, null, 2)}\n\n`;
+
+        if (!data.success) {
+          output.innerHTML += `<span class="error">❌ Error: ${data.error}</span>\n`;
+          return;
+        }
+
+        output.innerHTML += '<span class="success">✅ Portal session created!</span>\n';
+        output.innerHTML += `   Token: ${data.token.substring(0, 20)}...\n`;
+        output.innerHTML += `   Customer ID: ${data.customer_id}\n`;
+        output.innerHTML += `   Company ID: ${data.company_id}\n\n`;
+
+        // Test fetching data with the token
+        output.innerHTML += '2️⃣ Testing data fetch with token...\n';
+
+        const quotesResponse = await fetch(
+          `${supabaseUrl}/functions/v1/portal-data?type=quotes`,
+          {
+            headers: {
+              'X-Customer-Token': data.token,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (!quotesResponse.ok) {
+          const errorText = await quotesResponse.text();
+          output.innerHTML += `<span class="error">❌ Failed to fetch quotes: ${errorText}</span>\n`;
+          return;
+        }
+
+        const quotesResult = await quotesResponse.json();
+        output.innerHTML += '<span class="success">✅ Data fetch successful!</span>\n';
+        output.innerHTML += `   Found ${quotesResult.data?.length || 0} quotes\n\n`;
+
+        // Simulate opening the portal
+        const portalUrl = `${window.location.origin}/portal/login?token=${data.token}`;
+        output.innerHTML += '3️⃣ Portal URL generated:\n';
+        output.innerHTML += `   ${portalUrl}\n\n`;
+
+        output.innerHTML += '<span class="success">🎉 TEST PASSED!</span>\n';
+        output.innerHTML += '\n✅ create_portal_session works\n';
+        output.innerHTML += '✅ Token is valid\n';
+        output.innerHTML += '✅ Data can be fetched\n';
+        output.innerHTML += '✅ Portal button should work now!\n\n';
+
+        output.innerHTML += '<span style="color: #2563eb; font-weight: bold;">Click below to open the actual portal:</span>\n';
+
+        // Add a link to actually test the portal
+        const linkDiv = document.createElement('div');
+        linkDiv.innerHTML = `<a href="${portalUrl}" target="_blank" style="display: inline-block; margin-top: 10px; padding: 10px 20px; background: #10b981; color: white; text-decoration: none; border-radius: 6px;">Open Portal in New Tab</a>`;
+        document.getElementById('output').parentElement.appendChild(linkDiv);
+
+      } catch (error) {
+        output.innerHTML += `\n<span class="error">❌ ERROR: ${error.message}</span>\n`;
+        console.error('Full error:', error);
+      }
+    }
+  </script>
+</body>
+</html>
