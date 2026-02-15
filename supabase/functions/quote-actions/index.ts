@@ -97,7 +97,9 @@ Deno.serve(async (req: Request) => {
         .order("line_number");
 
       // Generate new quote number
-      const { data: quoteNumber } = await supabase.rpc("generate_quote_number");
+      const { data: quoteNumber } = await supabase.rpc("generate_quote_number", {
+        p_company_id: profile.company_id
+      });
 
       // Create duplicate
       const duplicateData = {

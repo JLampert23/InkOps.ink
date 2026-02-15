@@ -70,7 +70,9 @@ Deno.serve(async (req: Request) => {
     // POST /draft - Create minimal draft quote
     if (req.method === "POST" && (lastPath === "draft" || url.pathname.endsWith("/draft"))) {
       // Generate quote number
-      const { data: quoteNumber } = await supabase.rpc("generate_quote_number");
+      const { data: quoteNumber } = await supabase.rpc("generate_quote_number", {
+        p_company_id: profile.company_id
+      });
 
       const quoteData = {
         quote_number: quoteNumber,
