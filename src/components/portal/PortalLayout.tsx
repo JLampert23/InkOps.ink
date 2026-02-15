@@ -1,10 +1,10 @@
 import { ReactNode } from 'react';
 import { useCustomerPortal } from '../../contexts/CustomerPortalContext';
-import { FileText, Package, CheckCircle, Clock, LogOut } from 'lucide-react';
+import { FileText, Package, CheckCircle, Clock, LogOut, CreditCard, LayoutDashboard } from 'lucide-react';
 
 interface PortalLayoutProps {
   children: ReactNode;
-  activeTab?: 'invoices' | 'quotes' | 'proofs' | 'orders';
+  activeTab?: 'dashboard' | 'invoices' | 'quotes' | 'proofs' | 'orders' | 'payment-methods';
 }
 
 export function PortalLayout({ children, activeTab }: PortalLayoutProps) {
@@ -53,6 +53,17 @@ export function PortalLayout({ children, activeTab }: PortalLayoutProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex gap-1 overflow-x-auto">
             <a
+              href="/portal/dashboard"
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap ${
+                activeTab === 'dashboard'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+              }`}
+            >
+              <LayoutDashboard className="w-4 h-4" />
+              Dashboard
+            </a>
+            <a
               href="/portal/invoices"
               className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap ${
                 activeTab === 'invoices'
@@ -95,6 +106,17 @@ export function PortalLayout({ children, activeTab }: PortalLayoutProps) {
             >
               <Package className="w-4 h-4" />
               Order History
+            </a>
+            <a
+              href="/portal/payment-methods"
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap ${
+                activeTab === 'payment-methods'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+              }`}
+            >
+              <CreditCard className="w-4 h-4" />
+              Payment Methods
             </a>
           </div>
         </div>

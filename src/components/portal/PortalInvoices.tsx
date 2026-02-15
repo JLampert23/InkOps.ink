@@ -3,6 +3,7 @@ import { PortalLayout } from './PortalLayout';
 import { useCustomerPortal } from '../../contexts/CustomerPortalContext';
 import { supabase } from '../../lib/supabase-client';
 import { FileText, Download, CreditCard, Eye, Loader2 } from 'lucide-react';
+import { PaymentModal } from './PaymentModal';
 
 interface Invoice {
   id: string;
@@ -21,6 +22,7 @@ export function PortalInvoices() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -66,7 +68,7 @@ export function PortalInvoices() {
   };
 
   const handlePayInvoice = (invoice: Invoice) => {
-    window.location.href = `/invoice/${invoice.id}`;
+    setPaymentInvoice(invoice);
   };
 
   if (loading) {
@@ -257,6 +259,20 @@ export function PortalInvoices() {
           </div>
         )}
       </div>
+
+      {paymentInvoice && user && (
+        <PaymentModal
+          invoiceId={paymentInvoice.id}
+          invoiceNumber={paymentInvoice.invoice_number}
+          amount={paymentInvoice.balance}
+          companyId={user.company_id}
+          onClose={() => setPaymentInvoice(null)}
+          onSuccess={() => {
+            setPaymentInvoice(null);
+            loadInvoices();
+          }}
+        />
+      )}
     </PortalLayout>
   );
 }

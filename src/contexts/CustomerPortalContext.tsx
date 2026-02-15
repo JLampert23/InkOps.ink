@@ -58,48 +58,76 @@ export function CustomerPortalProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
 
-      // Check if token is for a quote approval
-      const { data: quoteApproval } = await supabase
-        .from('quote_approvals')
-        .select('quote_id, company_id')
-        .eq('approval_token', token)
-        .maybeSingle();
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-      if (quoteApproval) {
-        const { data: quote } = await supabase
-          .from('quotes')
-          .select('customer_email, customer_name')
-          .eq('id', quoteApproval.quote_id)
+      const response = await fetch(`${supabaseUrl}/functions/v1/verify-magic-link`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseAnonKey
+        },
+        body: JSON.stringify({ token })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        const { data: quoteApproval } = await supabase
+          .from('quote_approvals')
+          .select('quote_id, company_id')
+          .eq('approval_token', token)
           .maybeSingle();
 
-        const { data: company } = await supabase
-          .from('company_settings')
-          .select('company_name, logo_url, company_logo_primary_url, company_address, company_phone, company_email, customer_url')
-          .eq('id', quoteApproval.company_id)
-          .maybeSingle();
+        if (quoteApproval) {
+          const { data: quote } = await supabase
+            .from('quotes')
+            .select('customer_email, customer_name')
+            .eq('id', quoteApproval.quote_id)
+            .maybeSingle();
 
-        if (quote && company) {
-          const portalUser = {
-            email: quote.customer_email || '',
-            name: quote.customer_name || '',
-            company_id: quoteApproval.company_id,
-          };
+          const { data: company } = await supabase
+            .from('company_settings')
+            .select('company_name, logo_url, company_logo_primary_url, company_address, company_phone, company_email, customer_url')
+            .eq('id', quoteApproval.company_id)
+            .maybeSingle();
 
-          setUser(portalUser);
-          setBranding(company);
+          if (quote && company) {
+            const portalUser = {
+              email: quote.customer_email || '',
+              name: quote.customer_name || '',
+              company_id: quoteApproval.company_id,
+            };
 
-          localStorage.setItem('customer_portal_user', JSON.stringify(portalUser));
-          localStorage.setItem('customer_portal_branding', JSON.stringify(company));
-          localStorage.setItem('customer_portal_token', token);
+            setUser(portalUser);
+            setBranding(company);
 
-          return true;
+            localStorage.setItem('customer_portal_user', JSON.stringify(portalUser));
+            localStorage.setItem('customer_portal_branding', JSON.stringify(company));
+            localStorage.setItem('customer_portal_token', token);
+
+            return true;
+          }
         }
+
+        return false;
       }
 
-      // Check if token is for an invoice
-      // Invoice tokens would need to be implemented similarly
+      const portalUser = {
+        email: result.customer.email,
+        name: result.customer.name,
+        company_id: result.customer.company_id,
+        customer_id: result.customer.id,
+      };
 
-      return false;
+      setUser(portalUser);
+      setBranding(result.branding);
+
+      localStorage.setItem('customer_portal_user', JSON.stringify(portalUser));
+      localStorage.setItem('customer_portal_branding', JSON.stringify(result.branding));
+      localStorage.setItem('customer_portal_token', token);
+
+      return true;
     } catch (error) {
       console.error('Error logging in with token:', error);
       return false;
@@ -112,41 +140,27 @@ export function CustomerPortalProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
 
-      // Find customer by email
-      const { data: customer } = await supabase
-        .from('customers')
-        .select('id, company_id, customer_name, customer_email')
-        .eq('customer_email', email)
-        .maybeSingle();
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-      if (customer) {
-        const { data: company } = await supabase
-          .from('company_settings')
-          .select('company_name, logo_url, company_logo_primary_url, company_address, company_phone, company_email, customer_url')
-          .eq('id', customer.company_id)
-          .maybeSingle();
+      const response = await fetch(`${supabaseUrl}/functions/v1/send-magic-link`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseAnonKey
+        },
+        body: JSON.stringify({ email })
+      });
 
-        if (company) {
-          const portalUser = {
-            email: customer.customer_email || '',
-            name: customer.customer_name || '',
-            company_id: customer.company_id,
-            customer_id: customer.id,
-          };
+      const result = await response.json();
 
-          setUser(portalUser);
-          setBranding(company);
-
-          localStorage.setItem('customer_portal_user', JSON.stringify(portalUser));
-          localStorage.setItem('customer_portal_branding', JSON.stringify(company));
-
-          return true;
-        }
+      if (!response.ok || !result.success) {
+        return false;
       }
 
-      return false;
+      return true;
     } catch (error) {
-      console.error('Error logging in with email:', error);
+      console.error('Error sending magic link:', error);
       return false;
     } finally {
       setLoading(false);

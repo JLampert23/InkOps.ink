@@ -41,7 +41,7 @@ export function PortalLogin() {
 
     const success = await loginWithEmail(email);
     if (success) {
-      window.location.href = '/portal/invoices';
+      setMessage('Magic link sent! Check your email to sign in.');
     } else {
       setMessage('Email not found. Please check your email address or contact support.');
     }
