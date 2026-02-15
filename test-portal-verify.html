@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Portal Token Verification</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 900px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .card {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      width: 100%;
+      margin-top: 10px;
+    }
+    button:hover {
+      background: #1d4ed8;
+    }
+    .success {
+      color: #10b981;
+      font-weight: bold;
+    }
+    .error {
+      color: #ef4444;
+      font-weight: bold;
+    }
+    .output {
+      background: #f9fafb;
+      padding: 15px;
+      margin-top: 15px;
+      border-radius: 4px;
+      border: 1px solid #e5e7eb;
+      white-space: pre-wrap;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 500px;
+      overflow-y: auto;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🔍 Portal Token Verification Test</h1>
+    <p>This tests the full flow from creating a token to verifying it</p>
+
+    <label>Customer Email:</label>
+    <input type="email" id="email" value="jamie@toddssportinggoods.com" />
+
+    <button onclick="testFullFlow()">Test Full Flow</button>
+
+    <div id="output" class="output"></div>
+  </div>
+
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+    const supabaseUrl = 'https://cuaukcvccxvfpuxaciac.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1YXVrY3ZjY3h2ZnB1eGFjaWFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU2ODEyOTQsImV4cCI6MjA1MTI1NzI5NH0.c-o4IB5hFSZQaIJY1pE5fvJCBBXKuKMQGQdgQXnNF0A';
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    window.testFullFlow = async function() {
+      const output = document.getElementById('output');
+      const email = document.getElementById('email').value;
+
+      output.innerHTML = '<span class="success">Starting full portal flow test...</span>\n\n';
+
+      try {
+        // Step 1: Create portal session
+        output.innerHTML += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+        output.innerHTML += 'STEP 1: Create Portal Session\n';
+        output.innerHTML += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+        output.innerHTML += `Calling create_portal_session for: ${email}\n\n`;
+
+        const { data: createData, error: createError } = await supabase.rpc('create_portal_session', {
+          p_email: email
+        });
+
+        if (createError) {
+          output.innerHTML += `<span class="error">❌ Error creating session: ${createError.message}</span>\n`;
+          return;
+        }
+
+        output.innerHTML += `Response:\n${JSON.stringify(createData, null, 2)}\n\n`;
+
+        if (!createData || !createData.success) {
+          output.innerHTML += `<span class="error">❌ Failed: ${createData?.error || 'Unknown error'}</span>\n`;
+          return;
+        }
+
+        const token = createData.token;
+        output.innerHTML += `<span class="success">✅ Token created: ${token.substring(0, 20)}...</span>\n\n`;
+
+        // Step 2: Verify the token via edge function
+        output.innerHTML += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+        output.innerHTML += 'STEP 2: Verify Token via Edge Function\n';
+        output.innerHTML += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+        output.innerHTML += `Calling verify-magic-link edge function...\n\n`;
+
+        const verifyResponse = await fetch(`${supabaseUrl}/functions/v1/verify-magic-link`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': supabaseKey
+          },
+          body: JSON.stringify({ token })
+        });
+
+        output.innerHTML += `HTTP Status: ${verifyResponse.status} ${verifyResponse.statusText}\n\n`;
+
+        const verifyData = await verifyResponse.json();
+        output.innerHTML += `Response:\n${JSON.stringify(verifyData, null, 2)}\n\n`;
+
+        if (!verifyResponse.ok || !verifyData.success) {
+          output.innerHTML += `<span class="error">❌ Verification failed</span>\n`;
+          return;
+        }
+
+        output.innerHTML += '<span class="success">✅ Token verified successfully!</span>\n\n';
+        output.innerHTML += `Customer Data:\n`;
+        output.innerHTML += `  ID: ${verifyData.customer.id}\n`;
+        output.innerHTML += `  Email: ${verifyData.customer.email}\n`;
+        output.innerHTML += `  Name: ${verifyData.customer.name}\n`;
+        output.innerHTML += `  Company ID: ${verifyData.customer.company_id}\n\n`;
+
+        output.innerHTML += `Branding Data:\n`;
+        output.innerHTML += `  Company: ${verifyData.branding.company_name}\n`;
+        output.innerHTML += `  Logo: ${verifyData.branding.logo_url || 'None'}\n\n`;
+
+        // Step 3: Try to use the token again (should fail - already used)
+        output.innerHTML += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+        output.innerHTML += 'STEP 3: Try Reusing Token (Should Fail)\n';
+        output.innerHTML += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+        output.innerHTML += `Attempting to verify token again...\n\n`;
+
+        const reVerifyResponse = await fetch(`${supabaseUrl}/functions/v1/verify-magic-link`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': supabaseKey
+          },
+          body: JSON.stringify({ token })
+        });
+
+        const reVerifyData = await reVerifyResponse.json();
+        output.innerHTML += `Response:\n${JSON.stringify(reVerifyData, null, 2)}\n\n`;
+
+        if (!reVerifyResponse.ok || !reVerifyData.success) {
+          output.innerHTML += '<span class="success">✅ Correctly rejected reused token</span>\n\n';
+        } else {
+          output.innerHTML += '<span class="error">⚠️ WARNING: Token was reused (security issue!)</span>\n\n';
+        }
+
+        output.innerHTML += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+        output.innerHTML += '<span class="success">🎉 ALL TESTS PASSED!</span>\n';
+        output.innerHTML += '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+
+      } catch (err) {
+        output.innerHTML += `\n<span class="error">❌ ERROR: ${err.message}</span>\n`;
+        output.innerHTML += `Stack: ${err.stack}\n`;
+        console.error('Full error:', err);
+      }
+    };
+  </script>
+</body>
+</html>
