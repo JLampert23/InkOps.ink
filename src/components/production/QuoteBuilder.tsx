@@ -220,22 +220,51 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
     draftCreatedRef.current = true;
 
     try {
-      // Force a session refresh to get a valid token
-      const { data: { session: freshSession }, error: sessionError } = await supabase.auth.refreshSession();
+      // Get the current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-      if (sessionError || !freshSession?.access_token) {
-        console.error('Session refresh error:', sessionError);
-        throw new Error('No valid session found. Please try logging out and back in.');
+      if (sessionError || !session?.access_token) {
+        console.error('Session error:', sessionError);
+        // Force logout if session is invalid
+        await supabase.auth.signOut();
+        showNotification('error', 'Session expired. Please log in again.');
+        window.location.href = '/';
+        return;
       }
 
-      console.log('Creating draft with fresh token...');
+      // Check if token is expired
+      const tokenParts = session.access_token.split('.');
+      if (tokenParts.length === 3) {
+        const payload = JSON.parse(atob(tokenParts[1]));
+        const exp = payload.exp * 1000; // Convert to milliseconds
+        const now = Date.now();
+
+        // If token expires in less than 60 seconds, refresh it
+        if (exp - now < 60000) {
+          console.log('Token expiring soon, refreshing...');
+          const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+
+          if (refreshError || !refreshedSession?.access_token) {
+            console.error('Refresh failed:', refreshError);
+            await supabase.auth.signOut();
+            showNotification('error', 'Session expired. Please log in again.');
+            window.location.href = '/';
+            return;
+          }
+
+          // Use the refreshed session
+          session.access_token = refreshedSession.access_token;
+        }
+      }
+
+      console.log('Creating draft with token...');
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quotes-api/draft`,
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${freshSession.access_token}`,
+            'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
             'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
           },
@@ -245,6 +274,15 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Draft creation failed:', response.status, errorText);
+
+        // If it's a 401, the session is invalid
+        if (response.status === 401) {
+          await supabase.auth.signOut();
+          showNotification('error', 'Authentication failed. Please log in again.');
+          window.location.href = '/';
+          return;
+        }
+
         throw new Error(`Failed to create draft quote: ${response.status}`);
       }
 

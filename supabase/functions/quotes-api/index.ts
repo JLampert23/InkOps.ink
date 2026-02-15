@@ -22,10 +22,12 @@ Deno.serve(async (req: Request) => {
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
+      console.error("Missing authorization header");
       throw new Error("Missing authorization header");
     }
 
     const token = authHeader.replace("Bearer ", "");
+    console.log("Token received (first 20 chars):", token.substring(0, 20) + "...");
 
     // Use service role to validate the token
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
@@ -40,9 +42,17 @@ Deno.serve(async (req: Request) => {
       error: userError,
     } = await supabaseAdmin.auth.getUser(token);
 
-    if (userError || !user) {
-      throw new Error("Not authenticated");
+    if (userError) {
+      console.error("JWT validation error:", userError);
+      throw new Error(`Invalid JWT: ${userError.message}`);
     }
+
+    if (!user) {
+      console.error("No user found for token");
+      throw new Error("Not authenticated - no user found");
+    }
+
+    console.log("User authenticated:", user.id);
 
     // Create client with user's token for RLS
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
