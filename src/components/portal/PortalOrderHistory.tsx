@@ -92,7 +92,7 @@ export function PortalOrderHistory() {
     return type === 'invoice' ? (
       <FileText className="w-5 h-5 text-blue-600" />
     ) : (
-      <FileText className="w-5 h-5 text-purple-600" />
+      <FileText className="w-5 h-5 text-green-600" />
     );
   };
 
