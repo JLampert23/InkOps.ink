@@ -220,12 +220,15 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
     draftCreatedRef.current = true;
 
     try {
-      const { data: { session: freshSession }, error: sessionError } = await supabase.auth.getSession();
+      // Force a session refresh to get a valid token
+      const { data: { session: freshSession }, error: sessionError } = await supabase.auth.refreshSession();
 
       if (sessionError || !freshSession?.access_token) {
-        console.error('Session error:', sessionError);
-        throw new Error('No valid session found');
+        console.error('Session refresh error:', sessionError);
+        throw new Error('No valid session found. Please try logging out and back in.');
       }
+
+      console.log('Creating draft with fresh token...');
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quotes-api/draft`,
