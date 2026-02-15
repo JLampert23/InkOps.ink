@@ -220,73 +220,53 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
     draftCreatedRef.current = true;
 
     try {
-      // Get the current session
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      // Get company_id from user profile
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .maybeSingle();
 
-      if (sessionError || !session?.access_token) {
-        console.error('Session error:', sessionError);
-        // Force logout if session is invalid
-        await supabase.auth.signOut();
-        showNotification('error', 'Session expired. Please log in again.');
-        window.location.href = '/';
-        return;
+      if (profileError || !profile?.company_id) {
+        console.error('Profile error:', profileError);
+        throw new Error('User profile not found');
       }
 
-      // Check if token is expired
-      const tokenParts = session.access_token.split('.');
-      if (tokenParts.length === 3) {
-        const payload = JSON.parse(atob(tokenParts[1]));
-        const exp = payload.exp * 1000; // Convert to milliseconds
-        const now = Date.now();
+      // Generate quote number
+      const { data: quoteNumber, error: quoteNumberError } = await supabase
+        .rpc('generate_quote_number', {
+          p_company_id: profile.company_id
+        });
 
-        // If token expires in less than 60 seconds, refresh it
-        if (exp - now < 60000) {
-          console.log('Token expiring soon, refreshing...');
-          const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
-
-          if (refreshError || !refreshedSession?.access_token) {
-            console.error('Refresh failed:', refreshError);
-            await supabase.auth.signOut();
-            showNotification('error', 'Session expired. Please log in again.');
-            window.location.href = '/';
-            return;
-          }
-
-          // Use the refreshed session
-          session.access_token = refreshedSession.access_token;
-        }
+      if (quoteNumberError) {
+        console.error('Quote number generation error:', quoteNumberError);
+        throw new Error('Failed to generate quote number');
       }
 
-      console.log('Creating draft with token...');
+      // Create draft quote
+      const { data: quote, error: quoteError } = await supabase
+        .from('quotes')
+        .insert({
+          quote_number: quoteNumber,
+          company_id: profile.company_id,
+          customer_id: null,
+          customer_name: 'Draft Quote',
+          status: 'draft',
+          subtotal: 0,
+          tax_rate: 0,
+          tax_amount: 0,
+          total: 0,
+          autosave_enabled: true,
+          created_by: user.id,
+        })
+        .select()
+        .single();
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quotes-api/draft`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Draft creation failed:', response.status, errorText);
-
-        // If it's a 401, the session is invalid
-        if (response.status === 401) {
-          await supabase.auth.signOut();
-          showNotification('error', 'Authentication failed. Please log in again.');
-          window.location.href = '/';
-          return;
-        }
-
-        throw new Error(`Failed to create draft quote: ${response.status}`);
+      if (quoteError) {
+        console.error('Quote creation error:', quoteError);
+        throw new Error('Failed to create draft quote');
       }
 
-      const { quote } = await response.json();
       setQuoteId(quote.id);
       setQuoteNumber(quote.quote_number);
       setCreatedDate(quote.created_date || new Date().toISOString().split('T')[0]);
