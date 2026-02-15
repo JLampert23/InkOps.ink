@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { FileText, ClipboardList, CalendarDays, Package, Users } from 'lucide-react';
+import { FileText, ClipboardList, CalendarDays, Package, Users, Calendar } from 'lucide-react';
 import { QuotesManager } from './QuotesManager';
 import { WorkOrdersManager } from './WorkOrdersManager';
 import ProductionScheduler from './ProductionScheduler';
+import KanbanCalendar from './KanbanCalendar';
 import { PurchaseOrdersManager } from '../purchase-orders/PurchaseOrdersManager';
 import { supabase } from '../../lib/supabase-client';
 
-type ProductionTab = 'quotes' | 'work-orders' | 'scheduling' | 'manage-goods';
+type ProductionTab = 'quotes' | 'work-orders' | 'scheduling' | 'kanban' | 'manage-goods';
 
 interface ProductionDashboardProps {
   onNavigateToCustomers: () => void;
@@ -67,6 +68,7 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
     { id: 'quotes' as ProductionTab, label: 'Quotes', icon: FileText, description: 'Quote management & approvals' },
     { id: 'work-orders' as ProductionTab, label: 'Work Orders', icon: ClipboardList, description: 'Production work orders' },
     { id: 'scheduling' as ProductionTab, label: 'Scheduling', icon: CalendarDays, description: 'Production scheduling' },
+    { id: 'kanban' as ProductionTab, label: 'Kanban Calendar', icon: Calendar, description: 'Visual calendar view' },
     { id: 'manage-goods' as ProductionTab, label: 'Manage Goods', icon: Package, description: 'Purchase orders & inventory' },
   ];
 
@@ -94,6 +96,7 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
       case 'work-orders':
         return <WorkOrdersManager initialWorkOrderId={navigateToWorkOrderId} />;
       case 'scheduling':
+      case 'kanban':
         return (
           <div className="space-y-4">
             {typesOfWork.length === 0 ? (
@@ -122,9 +125,27 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
                   </select>
                 </div>
 
-                {/* Selected Schedule */}
+                {/* Split View: Scheduling and Kanban */}
                 {selectedScheduleType && (
-                  <ProductionScheduler typeOfWork={selectedScheduleType} onNavigateToWorkOrder={handleNavigateToWorkOrder} />
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* Scheduling Side */}
+                    <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                        <CalendarDays className="w-5 h-5 text-green-600" />
+                        Scheduling
+                      </h3>
+                      <ProductionScheduler typeOfWork={selectedScheduleType} onNavigateToWorkOrder={handleNavigateToWorkOrder} />
+                    </div>
+
+                    {/* Kanban Side */}
+                    <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                        <Calendar className="w-5 h-5 text-green-600" />
+                        Kanban Calendar
+                      </h3>
+                      <KanbanCalendar typeOfWork={selectedScheduleType} onNavigateToWorkOrder={handleNavigateToWorkOrder} inline />
+                    </div>
+                  </div>
                 )}
               </>
             )}

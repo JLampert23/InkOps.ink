@@ -22,11 +22,12 @@ type ViewMode = 'week' | 'month';
 
 interface KanbanCalendarProps {
   typeOfWork: string;
-  onClose: () => void;
+  onClose?: () => void;
   onNavigateToWorkOrder?: (workOrderId: string) => void;
+  inline?: boolean;
 }
 
-export default function KanbanCalendar({ typeOfWork, onClose, onNavigateToWorkOrder }: KanbanCalendarProps) {
+export default function KanbanCalendar({ typeOfWork, onClose, onNavigateToWorkOrder, inline = false }: KanbanCalendarProps) {
   const { companySettings } = useAuth();
   const [jobs, setJobs] = useState<KanbanJob[]>([]);
   const [loading, setLoading] = useState(true);
@@ -275,7 +276,9 @@ export default function KanbanCalendar({ typeOfWork, onClose, onNavigateToWorkOr
   const handleJobClick = (job: KanbanJob) => {
     if (job.work_order_id && onNavigateToWorkOrder) {
       onNavigateToWorkOrder(job.work_order_id);
-      onClose();
+      if (onClose) {
+        onClose();
+      }
     }
   };
 
@@ -299,66 +302,67 @@ export default function KanbanCalendar({ typeOfWork, onClose, onNavigateToWorkOr
     return colors[type] || '#6b7280';
   };
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-7xl max-h-[90vh] flex flex-col">
+  const calendarContent = (
+    <div className={inline ? "flex flex-col h-full" : "bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-7xl max-h-[90vh] flex flex-col"}>
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-slate-700">
-          <div className="flex items-center gap-3">
-            <Calendar className="w-6 h-6 text-green-600" />
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                Kanban Calendar
-              </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {typeOfWork} Production Schedule
-              </p>
+        {!inline && (
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-slate-700">
+            <div className="flex items-center gap-3">
+              <Calendar className="w-6 h-6 text-green-600" />
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                  Kanban Calendar
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {typeOfWork} Production Schedule
+                </p>
+              </div>
             </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
-        </div>
+        )}
 
         {/* Controls */}
-        <div className="p-4 border-b border-gray-200 dark:border-slate-700 space-y-4">
-          <div className="flex items-center justify-between">
+        <div className={`border-b border-gray-200 dark:border-slate-700 ${inline ? 'p-2 space-y-2' : 'p-4 space-y-4'}`}>
+          <div className={`flex items-center ${inline ? 'flex-col gap-2' : 'justify-between'}`}>
             {/* Date Navigation */}
             <div className="flex items-center gap-2">
               <button
                 onClick={() => navigateDate('prev')}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg"
+                className="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg"
               >
-                <ChevronLeft className="w-5 h-5" />
+                <ChevronLeft className={inline ? 'w-4 h-4' : 'w-5 h-5'} />
               </button>
-              <span className="font-semibold text-gray-900 dark:text-white min-w-[200px] text-center">
+              <span className={`font-semibold text-gray-900 dark:text-white ${inline ? 'text-sm min-w-[150px]' : 'min-w-[200px]'} text-center`}>
                 {viewMode === 'week'
-                  ? `Week of ${format(startOfWeek(currentDate), 'MMM d, yyyy')}`
-                  : format(currentDate, 'MMMM yyyy')
+                  ? `Week of ${format(startOfWeek(currentDate), 'MMM d')}`
+                  : format(currentDate, 'MMM yyyy')
                 }
               </span>
               <button
                 onClick={() => navigateDate('next')}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg"
+                className="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg"
               >
-                <ChevronRight className="w-5 h-5" />
+                <ChevronRight className={inline ? 'w-4 h-4' : 'w-5 h-5'} />
               </button>
               <button
                 onClick={() => setCurrentDate(new Date())}
-                className="px-3 py-2 text-sm bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-lg"
+                className={`${inline ? 'px-2 py-1 text-xs' : 'px-3 py-2 text-sm'} bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-lg`}
               >
                 Today
               </button>
             </div>
 
-            {/* View Mode Toggle */}
+            {/* View Mode Toggle & Actions */}
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setViewMode('week')}
-                className={`px-4 py-2 text-sm font-medium rounded-lg ${
+                className={`${inline ? 'px-2 py-1 text-xs' : 'px-4 py-2 text-sm'} font-medium rounded-lg ${
                   viewMode === 'week'
                     ? 'bg-green-600 text-white'
                     : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300'
@@ -368,7 +372,7 @@ export default function KanbanCalendar({ typeOfWork, onClose, onNavigateToWorkOr
               </button>
               <button
                 onClick={() => setViewMode('month')}
-                className={`px-4 py-2 text-sm font-medium rounded-lg ${
+                className={`${inline ? 'px-2 py-1 text-xs' : 'px-4 py-2 text-sm'} font-medium rounded-lg ${
                   viewMode === 'month'
                     ? 'bg-green-600 text-white'
                     : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300'
@@ -376,22 +380,18 @@ export default function KanbanCalendar({ typeOfWork, onClose, onNavigateToWorkOr
               >
                 Month
               </button>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 flex items-center gap-2"
+                className={`${inline ? 'p-1' : 'px-3 py-2'} text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 flex items-center gap-1`}
               >
                 <Filter className="w-4 h-4" />
-                Filters
+                {!inline && 'Filters'}
               </button>
               <button
                 onClick={loadJobs}
-                className="p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg"
+                className="p-1 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg"
               >
-                <RefreshCw className="w-5 h-5" />
+                <RefreshCw className={inline ? 'w-4 h-4' : 'w-5 h-5'} />
               </button>
             </div>
           </div>
@@ -447,13 +447,13 @@ export default function KanbanCalendar({ typeOfWork, onClose, onNavigateToWorkOr
         </div>
 
         {/* Calendar Grid */}
-        <div className="flex-1 overflow-auto p-4">
+        <div className={`flex-1 overflow-auto ${inline ? 'p-2' : 'p-4'}`}>
           {loading ? (
             <div className="flex items-center justify-center h-full">
               <RefreshCw className="w-8 h-8 text-green-600 animate-spin" />
             </div>
           ) : (
-            <div className={`grid gap-2 ${viewMode === 'week' ? 'grid-cols-7' : 'grid-cols-7'}`}>
+            <div className={`grid ${inline ? 'gap-1' : 'gap-2'} ${viewMode === 'week' ? 'grid-cols-7' : 'grid-cols-7'}`}>
               {dateRange.map((date, idx) => {
                 const dateKey = format(date, 'yyyy-MM-dd');
                 const dayJobs = jobsByDate[dateKey] || [];
@@ -464,20 +464,20 @@ export default function KanbanCalendar({ typeOfWork, onClose, onNavigateToWorkOr
                     key={idx}
                     onDragOver={handleDragOver}
                     onDrop={(e) => handleDrop(e, date)}
-                    className={`border rounded-lg p-2 min-h-[150px] ${
+                    className={`border rounded-lg ${inline ? 'p-1 min-h-[120px]' : 'p-2 min-h-[150px]'} ${
                       isToday
                         ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
                         : 'border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900'
                     }`}
                   >
                     {/* Date Header */}
-                    <div className={`text-center mb-2 pb-2 border-b ${
+                    <div className={`text-center ${inline ? 'mb-1 pb-1' : 'mb-2 pb-2'} border-b ${
                       isToday ? 'border-green-300' : 'border-gray-200 dark:border-slate-700'
                     }`}>
                       <div className="text-xs text-gray-600 dark:text-gray-400">
                         {format(date, 'EEE')}
                       </div>
-                      <div className={`text-lg font-bold ${
+                      <div className={`${inline ? 'text-base' : 'text-lg'} font-bold ${
                         isToday ? 'text-green-600' : 'text-gray-900 dark:text-white'
                       }`}>
                         {format(date, 'd')}
@@ -485,14 +485,14 @@ export default function KanbanCalendar({ typeOfWork, onClose, onNavigateToWorkOr
                     </div>
 
                     {/* Job Blocks */}
-                    <div className="space-y-2">
+                    <div className={inline ? 'space-y-1' : 'space-y-2'}>
                       {dayJobs.map(job => (
                         <div
                           key={job.id}
                           draggable
                           onDragStart={(e) => handleDragStart(e, job.id)}
                           onClick={() => handleJobClick(job)}
-                          className={`p-2 rounded-lg border-l-4 cursor-pointer hover:shadow-md transition-all ${
+                          className={`${inline ? 'p-1' : 'p-2'} rounded-lg border-l-4 cursor-pointer hover:shadow-md transition-all ${
                             draggedJob === job.id ? 'opacity-50' : ''
                           }`}
                           style={{
@@ -502,22 +502,22 @@ export default function KanbanCalendar({ typeOfWork, onClose, onNavigateToWorkOr
                         >
                           {/* Imprint Type Badge */}
                           <div
-                            className="text-xs font-medium px-2 py-1 rounded mb-1 inline-block"
+                            className={`text-xs font-medium ${inline ? 'px-1 py-0.5' : 'px-2 py-1'} rounded mb-1 inline-block`}
                             style={{
                               backgroundColor: getImprintColor(job.imprint_type),
                               color: 'white'
                             }}
                           >
-                            {job.imprint_type}
+                            {inline ? job.imprint_type.substring(0, 3) : job.imprint_type}
                           </div>
 
                           {/* Total Pieces */}
-                          <div className="text-sm font-bold text-gray-900 dark:text-white">
+                          <div className={`${inline ? 'text-xs' : 'text-sm'} font-bold text-gray-900 dark:text-white`}>
                             {job.total_pieces} pcs
                           </div>
 
                           {/* Color */}
-                          {job.primary_color && (
+                          {!inline && job.primary_color && (
                             <div className="flex items-center gap-1 mt-1">
                               <div
                                 className="w-3 h-3 rounded-full border border-gray-300"
@@ -536,10 +536,12 @@ export default function KanbanCalendar({ typeOfWork, onClose, onNavigateToWorkOr
                             </div>
                           )}
 
-                          {/* Quote/WO Number */}
-                          <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                            {job.work_order_number || job.quote_number}
-                          </div>
+                          {/* Quote/WO Number - Only if not inline */}
+                          {!inline && (
+                            <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                              {job.work_order_number || job.quote_number}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -551,26 +553,37 @@ export default function KanbanCalendar({ typeOfWork, onClose, onNavigateToWorkOr
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-200 dark:border-slate-700 flex items-center justify-between">
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            {filteredJobs.length} {filteredJobs.length === 1 ? 'job' : 'jobs'} scheduled
-          </div>
-          <div className="flex items-center gap-4">
-            {/* Legend */}
-            <div className="flex items-center gap-3">
-              {imprintTypes.map(type => (
-                <div key={type} className="flex items-center gap-1">
-                  <div
-                    className="w-3 h-3 rounded"
-                    style={{ backgroundColor: getImprintColor(type) }}
-                  />
-                  <span className="text-xs text-gray-600 dark:text-gray-400">{type}</span>
-                </div>
-              ))}
+        {!inline && (
+          <div className="p-4 border-t border-gray-200 dark:border-slate-700 flex items-center justify-between">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              {filteredJobs.length} {filteredJobs.length === 1 ? 'job' : 'jobs'} scheduled
+            </div>
+            <div className="flex items-center gap-4">
+              {/* Legend */}
+              <div className="flex items-center gap-3">
+                {imprintTypes.map(type => (
+                  <div key={type} className="flex items-center gap-1">
+                    <div
+                      className="w-3 h-3 rounded"
+                      style={{ backgroundColor: getImprintColor(type) }}
+                    />
+                    <span className="text-xs text-gray-600 dark:text-gray-400">{type}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
+  );
+
+  if (inline) {
+    return calendarContent;
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      {calendarContent}
     </div>
   );
 }

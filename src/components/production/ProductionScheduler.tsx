@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Calendar, Filter, GripVertical, Save, X, Plus, Search, RefreshCw, CalendarDays, Menu, Kanban } from 'lucide-react';
+import { Calendar, Filter, GripVertical, Save, X, Plus, Search, RefreshCw, CalendarDays, Menu } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format, startOfWeek, endOfWeek, addDays, parseISO } from 'date-fns';
 import SchedulerTabManager from './SchedulerTabManager';
-import KanbanCalendar from './KanbanCalendar';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface ScheduleEntry {
@@ -83,7 +82,6 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
   const [showFilters, setShowFilters] = useState(false);
   const [stepStatusFilters, setStepStatusFilters] = useState<Record<string, string[]>>({});
   const [openColumnMenu, setOpenColumnMenu] = useState<string | null>(null);
-  const [showKanbanCalendar, setShowKanbanCalendar] = useState(false);
 
   // Stations from database
   const [availableStations, setAvailableStations] = useState<Array<{ id: string; station_name: string }>>([]);
@@ -385,33 +383,20 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
   }
 
   return (
-    <>
-      {/* Kanban Calendar Modal */}
-      {showKanbanCalendar && (
-        <KanbanCalendar
-          typeOfWork={typeOfWork}
-          onClose={() => setShowKanbanCalendar(false)}
-          onNavigateToWorkOrder={onNavigateToWorkOrder}
-        />
+    <div className="space-y-4">
+      {/* Tabs */}
+      {companyId && user?.id && (
+        <div className="mb-4">
+          <SchedulerTabManager
+            typeOfWork={typeOfWork}
+            companyId={companyId}
+            userId={user.id}
+            currentFilters={currentFilters}
+            onSelectTab={handleTabSelect}
+            activeTabId={activeTab?.id || null}
+          />
+        </div>
       )}
-
-      {/* Main Layout - Split into two sections */}
-      <div className="flex gap-4 h-full">
-        {/* Left Side - Existing Scheduling (70%) */}
-        <div className="flex-[7] space-y-4">
-          {/* Tabs */}
-          {companyId && user?.id && (
-            <div className="mb-4">
-              <SchedulerTabManager
-                typeOfWork={typeOfWork}
-                companyId={companyId}
-                userId={user.id}
-                currentFilters={currentFilters}
-                onSelectTab={handleTabSelect}
-                activeTabId={activeTab?.id || null}
-              />
-            </div>
-          )}
 
       {/* Header and Filters */}
       <div className="flex items-center justify-between">
@@ -775,41 +760,10 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
         </div>
       </div>
 
-          {/* Entry Count */}
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            Showing {entries.length} scheduled {entries.length === 1 ? 'job' : 'jobs'}
-          </div>
-        </div>
-
-        {/* Right Side - Kanban Calendar Panel (30%) */}
-        <div className="flex-[3] min-w-[300px]">
-          <div className="bg-gradient-to-br from-green-50 to-blue-50 dark:from-slate-800 dark:to-slate-900 rounded-lg border border-gray-200 dark:border-slate-700 p-6 h-full flex flex-col items-center justify-center space-y-4">
-            <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-              <Calendar className="w-8 h-8 text-green-600 dark:text-green-400" />
-            </div>
-            <div className="text-center">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
-                Kanban Calendar View
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                Visualize your production schedule in a drag-and-drop calendar format
-              </p>
-            </div>
-            <button
-              onClick={() => setShowKanbanCalendar(true)}
-              className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors shadow-md hover:shadow-lg"
-            >
-              <Calendar className="w-5 h-5" />
-              Open Kanban Calendar
-            </button>
-            <div className="text-xs text-gray-500 dark:text-gray-500 text-center mt-4 space-y-1">
-              <div>• Drag jobs between dates</div>
-              <div>• Filter by type, status & customer</div>
-              <div>• Week & month views</div>
-            </div>
-          </div>
-        </div>
+      {/* Entry Count */}
+      <div className="text-sm text-gray-600 dark:text-gray-400">
+        Showing {entries.length} scheduled {entries.length === 1 ? 'job' : 'jobs'}
       </div>
-    </>
+    </div>
   );
 }
