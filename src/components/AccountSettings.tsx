@@ -1,8 +1,9 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, CreditCard as Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, RefreshCw, Bug, MessageSquare, Eye, EyeOff, Grid3x3, FileText, CheckCircle, GripVertical, Workflow, Mail, Package } from 'lucide-react';
+import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, CreditCard as Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, RefreshCw, Bug, MessageSquare, Eye, EyeOff, Grid3x3, FileText, CheckCircle, GripVertical, Workflow, Mail, Package, AlertTriangle, Copy, Check } from 'lucide-react';
 import { supabase } from '../lib/supabase-client';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
+import { domainVerificationService } from '../services/domain-verification-service';
 import AutomatedReports from './automation/AutomatedReports';
 import WorkflowBuilder from './production/WorkflowBuilder';
 import ShortCodeReference from './email/ShortCodeReference';
@@ -43,6 +44,10 @@ interface CompanySettings {
   ssactivewear_api_key_encrypted: string | null;
   ssactivewear_enabled: boolean | null;
   customer_url: string | null;
+  customer_url_verification_status: string | null;
+  customer_url_verification_token: string | null;
+  customer_url_verified_at: string | null;
+  customer_url_verification_expires_at: string | null;
 }
 
 interface UserProfile {
@@ -192,6 +197,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   const [customerUrl, setCustomerUrl] = useState('');
   const [savingCustomerUrl, setSavingCustomerUrl] = useState(false);
+  const [verificationStatus, setVerificationStatus] = useState<'unverified' | 'verified' | 'failed'>('unverified');
+  const [verificationToken, setVerificationToken] = useState<string | null>(null);
+  const [verifyingDomain, setVerifyingDomain] = useState(false);
+  const [copiedToken, setCopiedToken] = useState(false);
 
   const [stripePublicKey, setStripePublicKey] = useState('');
   const [showStripePublicKey, setShowStripePublicKey] = useState(false);
@@ -485,6 +494,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setEmailFromAddress(data.email_from_address || '');
         setResendApiKey(data.resend_api_key ? '••••••••••••••••' : '');
         setCustomerUrl(data.customer_url || '');
+        setVerificationStatus(data.customer_url_verification_status || 'unverified');
+        setVerificationToken(data.customer_url_verification_token || null);
         setStripePublicKey(data.stripe_public_key ? '••••••••••••••••' : '');
         setStripeSecretKey(data.stripe_secret_key ? '••••••••••••••••' : '');
         setStripeWebhookSecret(data.stripe_webhook_secret ? '••••••••••••••••' : '');
@@ -1391,54 +1402,100 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       // Validate URL format
       let urlToSave = customerUrl.trim();
 
-      if (urlToSave) {
-        // Must start with https://
-        if (!urlToSave.startsWith('https://')) {
-          showNotification('error', 'Invalid URL', 'Customer URL must start with https://');
-          return;
-        }
-
-        // Strip trailing slashes
-        urlToSave = urlToSave.replace(/\/+$/, '');
-
-        // Validate URL format
-        try {
-          new URL(urlToSave);
-        } catch {
-          showNotification('error', 'Invalid URL', 'Please enter a valid URL format');
-          return;
-        }
-      }
-
-      // Check for uniqueness if URL is being set
-      if (urlToSave) {
-        const { data: existing } = await supabase
+      if (!urlToSave) {
+        // Allow clearing the URL
+        const { error } = await supabase
           .from('company_settings')
-          .select('id')
-          .eq('customer_url', urlToSave)
-          .neq('id', companySettings.id)
-          .maybeSingle();
+          .update({
+            customer_url: null,
+            customer_url_verification_status: 'unverified',
+            customer_url_verification_token: null,
+            customer_url_verified_at: null,
+            customer_url_verification_expires_at: null
+          })
+          .eq('id', companySettings.id);
 
-        if (existing) {
-          showNotification('error', 'URL Already In Use', 'This custom URL is already being used by another company. Please choose a different URL.');
-          return;
-        }
+        if (error) throw error;
+
+        showNotification('success', 'Customer URL Cleared', 'Your custom URL has been cleared.');
+        await loadSettings();
+        return;
       }
 
-      const { error } = await supabase
-        .from('company_settings')
-        .update({ customer_url: urlToSave || null })
-        .eq('id', companySettings.id);
+      // Must start with https://
+      if (!urlToSave.startsWith('https://')) {
+        showNotification('error', 'Invalid URL', 'Customer URL must start with https://');
+        return;
+      }
 
-      if (error) throw error;
+      // Strip trailing slashes
+      urlToSave = urlToSave.replace(/\/+$/, '');
 
-      showNotification('success', 'Customer URL Saved', 'Your custom URL has been saved successfully!');
+      // Validate URL format
+      try {
+        new URL(urlToSave);
+      } catch {
+        showNotification('error', 'Invalid URL', 'Please enter a valid URL format');
+        return;
+      }
+
+      // Request domain verification
+      const result = await domainVerificationService.requestVerification(companySettings.id, urlToSave);
+
+      if (!result.success) {
+        showNotification('error', 'Verification Request Failed', result.error || 'Failed to request domain verification');
+        return;
+      }
+
+      setVerificationToken(result.token || null);
+      setVerificationStatus('unverified');
+      showNotification('success', 'Verification Requested', 'Please add the DNS TXT record to verify your domain ownership.');
       await loadSettings();
     } catch (err) {
       console.error('Error saving customer URL:', err);
       showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save customer URL. Please try again.');
     } finally {
       setSavingCustomerUrl(false);
+    }
+  };
+
+  const verifyDomain = async () => {
+    try {
+      setVerifyingDomain(true);
+
+      if (!companySettings?.id) {
+        showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
+        return;
+      }
+
+      const result = await domainVerificationService.verifyDomain(companySettings.id);
+
+      if (result.success) {
+        showNotification('success', 'Domain Verified!', 'Your domain has been successfully verified and is now active.');
+        setVerificationStatus('verified');
+        await loadSettings();
+      } else {
+        showNotification('error', 'Verification Failed', result.error || 'Failed to verify domain');
+        setVerificationStatus('failed');
+      }
+    } catch (err) {
+      console.error('Error verifying domain:', err);
+      showNotification('error', 'Verification Failed', err instanceof Error ? err.message : 'Failed to verify domain. Please try again.');
+    } finally {
+      setVerifyingDomain(false);
+    }
+  };
+
+  const copyTokenToClipboard = async () => {
+    if (verificationToken) {
+      try {
+        await navigator.clipboard.writeText(verificationToken);
+        setCopiedToken(true);
+        setTimeout(() => setCopiedToken(false), 2000);
+        showNotification('success', 'Copied!', 'Verification token copied to clipboard');
+      } catch (err) {
+        showNotification('error', 'Copy Failed', 'Failed to copy token to clipboard');
+      }
     }
   };
 
@@ -6006,14 +6063,38 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Customer URL
                   </label>
-                  <input
-                    type="url"
-                    value={customerUrl}
-                    onChange={(e) => setCustomerUrl(e.target.value)}
-                    disabled={!isAdmin}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-slate-800 disabled:cursor-not-allowed"
-                    placeholder="https://yourdomain.com"
-                  />
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="url"
+                      value={customerUrl}
+                      onChange={(e) => setCustomerUrl(e.target.value)}
+                      disabled={!isAdmin || verificationStatus === 'verified'}
+                      className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-slate-800 disabled:cursor-not-allowed"
+                      placeholder="https://yourdomain.com"
+                    />
+                    {companySettings?.customer_url && (
+                      <div className="flex items-center gap-2">
+                        {verificationStatus === 'verified' && (
+                          <span className="inline-flex items-center gap-1 px-3 py-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-lg text-sm font-medium">
+                            <CheckCircle className="w-4 h-4" />
+                            Verified
+                          </span>
+                        )}
+                        {verificationStatus === 'unverified' && (
+                          <span className="inline-flex items-center gap-1 px-3 py-2 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 rounded-lg text-sm font-medium">
+                            <Clock className="w-4 h-4" />
+                            Unverified
+                          </span>
+                        )}
+                        {verificationStatus === 'failed' && (
+                          <span className="inline-flex items-center gap-1 px-3 py-2 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 rounded-lg text-sm font-medium">
+                            <AlertTriangle className="w-4 h-4" />
+                            Failed
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                     This URL will be used for all customer-facing invoice and quote links.
                   </p>
@@ -6022,6 +6103,68 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   </p>
                 </div>
 
+                {verificationToken && verificationStatus === 'unverified' && (
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-yellow-900 dark:text-yellow-100 mb-3 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      Domain Verification Required
+                    </h3>
+                    <p className="text-xs text-yellow-800 dark:text-yellow-200 mb-3">
+                      To verify ownership of your domain, add the following TXT record to your DNS settings:
+                    </p>
+                    <div className="bg-yellow-100 dark:bg-yellow-900/40 rounded-lg p-3 space-y-2">
+                      <div>
+                        <span className="text-xs font-medium text-yellow-900 dark:text-yellow-100">Type:</span>
+                        <code className="ml-2 text-xs text-yellow-800 dark:text-yellow-200">TXT</code>
+                      </div>
+                      <div>
+                        <span className="text-xs font-medium text-yellow-900 dark:text-yellow-100">Name:</span>
+                        <code className="ml-2 text-xs text-yellow-800 dark:text-yellow-200">@ (or root domain)</code>
+                      </div>
+                      <div>
+                        <span className="text-xs font-medium text-yellow-900 dark:text-yellow-100">Value:</span>
+                        <div className="flex items-center gap-2 mt-1">
+                          <code className="flex-1 text-xs bg-yellow-200 dark:bg-yellow-900/60 text-yellow-900 dark:text-yellow-100 px-2 py-1 rounded break-all">
+                            {verificationToken}
+                          </code>
+                          <button
+                            onClick={copyTokenToClipboard}
+                            className="px-3 py-1 bg-yellow-600 dark:bg-yellow-700 text-white rounded hover:bg-yellow-700 dark:hover:bg-yellow-600 transition-colors flex items-center gap-1 text-xs"
+                          >
+                            {copiedToken ? (
+                              <>
+                                <Check className="w-3 h-3" />
+                                Copied!
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3 h-3" />
+                                Copy
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-yellow-800 dark:text-yellow-200 mt-3">
+                      After adding the DNS record, click the "Verify Domain" button below. DNS propagation can take up to 48 hours.
+                    </p>
+                  </div>
+                )}
+
+                {verificationStatus === 'failed' && (
+                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-red-900 dark:text-red-100 mb-2 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      Verification Failed
+                    </h3>
+                    <p className="text-xs text-red-800 dark:text-red-200">
+                      We couldn't verify your domain. Please ensure the TXT record is correctly added and try again.
+                      DNS changes can take up to 48 hours to propagate.
+                    </p>
+                  </div>
+                )}
+
                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                   <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">Requirements</h3>
                   <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
@@ -6029,13 +6172,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     <li>Must include <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">https://</code></li>
                     <li>Trailing slashes will be automatically removed</li>
                     <li>Must be unique across all companies</li>
+                    <li>Domain ownership must be verified via DNS TXT record</li>
                     <li>If not set, system falls back to default INKOPS domain</li>
                   </ul>
                 </div>
 
-                {companySettings?.customer_url && (
+                {companySettings?.customer_url && verificationStatus === 'verified' && (
                   <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                    <h3 className="text-sm font-semibold text-green-900 dark:text-green-100 mb-2">Active Custom URL</h3>
+                    <h3 className="text-sm font-semibold text-green-900 dark:text-green-100 mb-2 flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4" />
+                      Active Custom URL
+                    </h3>
                     <p className="text-xs text-green-800 dark:text-green-200">
                       Your invoices and quotes will use: <code className="bg-green-100 dark:bg-green-800 px-1 rounded font-mono">{companySettings.customer_url}</code>
                     </p>
@@ -6044,28 +6191,72 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                 {isAdmin && (
                   <div className="flex gap-3">
-                    <button
-                      onClick={saveCustomerUrl}
-                      disabled={savingCustomerUrl}
-                      className="px-6 py-2 bg-purple-600 dark:bg-purple-500 text-white rounded-lg hover:bg-purple-700 dark:hover:bg-purple-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                    >
-                      {savingCustomerUrl ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="w-4 h-4" />
-                          Save Customer URL
-                        </>
-                      )}
-                    </button>
+                    {verificationStatus !== 'verified' && (
+                      <button
+                        onClick={saveCustomerUrl}
+                        disabled={savingCustomerUrl}
+                        className="px-6 py-2 bg-purple-600 dark:bg-purple-500 text-white rounded-lg hover:bg-purple-700 dark:hover:bg-purple-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                      >
+                        {savingCustomerUrl ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Requesting...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4" />
+                            Request Verification
+                          </>
+                        )}
+                      </button>
+                    )}
 
-                    {customerUrl && (
+                    {verificationToken && verificationStatus === 'unverified' && (
+                      <button
+                        onClick={verifyDomain}
+                        disabled={verifyingDomain}
+                        className="px-6 py-2 bg-green-600 dark:bg-green-500 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                      >
+                        {verifyingDomain ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Verifying...
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="w-4 h-4" />
+                            Verify Domain
+                          </>
+                        )}
+                      </button>
+                    )}
+
+                    {verificationStatus === 'failed' && (
+                      <button
+                        onClick={saveCustomerUrl}
+                        disabled={savingCustomerUrl}
+                        className="px-6 py-2 bg-orange-600 dark:bg-orange-500 text-white rounded-lg hover:bg-orange-700 dark:hover:bg-orange-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                      >
+                        {savingCustomerUrl ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Retrying...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="w-4 h-4" />
+                            Retry Verification
+                          </>
+                        )}
+                      </button>
+                    )}
+
+                    {customerUrl && verificationStatus !== 'verified' && (
                       <button
                         onClick={() => {
                           setCustomerUrl('');
+                          setVerificationToken(null);
+                          setVerificationStatus('unverified');
                         }}
                         disabled={savingCustomerUrl}
                         className="px-6 py-2 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
