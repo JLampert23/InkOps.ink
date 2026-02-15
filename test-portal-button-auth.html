@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Portal Button with Auth</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .card {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      width: 100%;
+      margin-top: 10px;
+    }
+    button:hover {
+      background: #1d4ed8;
+    }
+    button:disabled {
+      background: #94a3b8;
+      cursor: not-allowed;
+    }
+    .success {
+      color: #10b981;
+      font-weight: bold;
+    }
+    .error {
+      color: #ef4444;
+      font-weight: bold;
+    }
+    .output {
+      background: #f9fafb;
+      padding: 15px;
+      margin-top: 15px;
+      border-radius: 4px;
+      border: 1px solid #e5e7eb;
+      white-space: pre-wrap;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+    .auth-status {
+      padding: 10px;
+      border-radius: 4px;
+      margin-bottom: 15px;
+    }
+    .auth-success {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    .auth-pending {
+      background: #fef3c7;
+      color: #92400e;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🔐 Test Portal Button (With Auth)</h1>
+    <p>This test mimics the exact flow from Account Settings with authentication</p>
+
+    <div id="auth-status" class="auth-status auth-pending">
+      Checking authentication...
+    </div>
+
+    <label>Customer Email:</label>
+    <input type="email" id="email" value="mplampert@gmail.com" />
+
+    <button id="testBtn" onclick="testPortalButton()" disabled>Test Portal Button Flow</button>
+
+    <div id="output" class="output"></div>
+  </div>
+
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+    const supabaseUrl = 'https://cuaukcvccxvfpuxaciac.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1YXVrY3ZjY3h2ZnB1eGFjaWFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU2ODEyOTQsImV4cCI6MjA1MTI1NzI5NH0.c-o4IB5hFSZQaIJY1pE5fvJCBBXKuKMQGQdgQXnNF0A';
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Check if user is authenticated
+    const { data: { session } } = await supabase.auth.getSession();
+    const authStatus = document.getElementById('auth-status');
+    const testBtn = document.getElementById('testBtn');
+
+    if (session) {
+      authStatus.className = 'auth-status auth-success';
+      authStatus.textContent = `✅ Authenticated as: ${session.user.email}`;
+      testBtn.disabled = false;
+    } else {
+      authStatus.className = 'auth-status auth-pending';
+      authStatus.innerHTML = `⚠️ Not authenticated. <a href="/" style="color: #2563eb;">Go to main app to login</a>`;
+    }
+
+    window.testPortalButton = async function() {
+      const output = document.getElementById('output');
+      const email = document.getElementById('email').value;
+
+      output.innerHTML = '<span class="success">Starting portal button test with authentication...</span>\n\n';
+
+      try {
+        // Check session again
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          output.innerHTML += '<span class="error">❌ Not authenticated</span>\n';
+          return;
+        }
+
+        output.innerHTML += `🔐 Using auth token: ${session.access_token.substring(0, 30)}...\n\n`;
+        output.innerHTML += '1️⃣ Calling create_portal_session RPC...\n';
+
+        // Call the RPC function exactly as the button does
+        const { data, error } = await supabase.rpc('create_portal_session', {
+          p_email: email
+        });
+
+        output.innerHTML += `\nRPC Response:\n`;
+        output.innerHTML += `  Data: ${JSON.stringify(data, null, 2)}\n`;
+        output.innerHTML += `  Error: ${error ? JSON.stringify(error, null, 2) : 'null'}\n\n`;
+
+        if (error) {
+          output.innerHTML += `<span class="error">❌ RPC Error: ${error.message}</span>\n`;
+          output.innerHTML += `   Code: ${error.code}\n`;
+          output.innerHTML += `   Details: ${error.details}\n`;
+          output.innerHTML += `   Hint: ${error.hint}\n`;
+          return;
+        }
+
+        if (!data) {
+          output.innerHTML += '<span class="error">❌ No response from server</span>\n';
+          return;
+        }
+
+        if (!data.success) {
+          output.innerHTML += `<span class="error">❌ Error: ${data.error}</span>\n`;
+          return;
+        }
+
+        output.innerHTML += '<span class="success">✅ Portal session created!</span>\n';
+        output.innerHTML += `   Token: ${data.token.substring(0, 20)}...\n`;
+        output.innerHTML += `   Customer ID: ${data.customer_id}\n`;
+        output.innerHTML += `   Company ID: ${data.company_id}\n`;
+        output.innerHTML += `   Expires: ${data.expires_at}\n\n`;
+
+        // Generate portal URL
+        const portalUrl = `${window.location.origin}/portal/login?token=${data.token}`;
+        output.innerHTML += '2️⃣ Portal URL:\n';
+        output.innerHTML += `   ${portalUrl}\n\n`;
+
+        output.innerHTML += '<span class="success">🎉 SUCCESS! Opening portal in new tab...</span>\n';
+
+        // Open in new tab
+        window.open(portalUrl, '_blank');
+
+      } catch (err) {
+        output.innerHTML += `\n<span class="error">❌ ERROR: ${err.message}</span>\n`;
+        output.innerHTML += `   Stack: ${err.stack}\n`;
+        console.error('Full error:', err);
+      }
+    };
+  </script>
+</body>
+</html>
