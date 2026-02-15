@@ -576,7 +576,7 @@ function App() {
       <CustomerPortalProvider>
         <ThemeProvider>
           <NotificationProvider>
-            {path === '/portal' || path === '/portal/' ? (
+            {path === '/portal' || path === '/portal/' || path === '/portal/login' ? (
               <PortalLogin />
             ) : path.startsWith('/portal/invoices') ? (
               <PortalInvoices />

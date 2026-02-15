@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Portal Button</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+    }
+    .section {
+      margin: 20px 0;
+      padding: 20px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    button {
+      background: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    .output {
+      background: #f5f5f5;
+      padding: 10px;
+      margin-top: 10px;
+      border-radius: 4px;
+      white-space: pre-wrap;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    input {
+      padding: 8px;
+      margin: 5px;
+      width: 300px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Portal Test Button Diagnostic</h1>
+
+  <div class="section">
+    <h2>1. Check Environment Variables</h2>
+    <button onclick="checkEnv()">Check Env</button>
+    <div id="env-output" class="output"></div>
+  </div>
+
+  <div class="section">
+    <h2>2. List Customers</h2>
+    <button onclick="listCustomers()">List Customers</button>
+    <div id="customers-output" class="output"></div>
+  </div>
+
+  <div class="section">
+    <h2>3. Test create_portal_session Function</h2>
+    <input type="email" id="test-email" value="mplampert@gmail.com" placeholder="Customer email">
+    <button onclick="testCreateSession()">Create Session</button>
+    <div id="session-output" class="output"></div>
+  </div>
+
+  <div class="section">
+    <h2>4. Test Full Portal Flow</h2>
+    <input type="email" id="portal-email" value="mplampert@gmail.com" placeholder="Customer email">
+    <button onclick="testPortalFlow()">Test Portal Flow</button>
+    <div id="portal-output" class="output"></div>
+  </div>
+
+  <script>
+    // You need to set these - get them from your .env file
+    const SUPABASE_URL = prompt('Enter SUPABASE_URL:', 'https://your-project.supabase.co');
+    const SUPABASE_ANON_KEY = prompt('Enter SUPABASE_ANON_KEY:', 'your-anon-key');
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    function checkEnv() {
+      const output = document.getElementById('env-output');
+      output.textContent = `SUPABASE_URL: ${SUPABASE_URL}\n`;
+      output.textContent += `SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY.substring(0, 20)}...\n`;
+      output.textContent += `Supabase Client: ${supabase ? 'Created ✓' : 'Failed ✗'}`;
+    }
+
+    async function listCustomers() {
+      const output = document.getElementById('customers-output');
+      output.textContent = 'Loading...';
+
+      try {
+        const { data, error } = await supabase
+          .from('customers')
+          .select('id, customer_name, customer_email')
+          .limit(10);
+
+        if (error) throw error;
+
+        output.textContent = `Found ${data.length} customers:\n\n`;
+        output.textContent += JSON.stringify(data, null, 2);
+      } catch (err) {
+        output.textContent = `Error: ${err.message}\n\n${JSON.stringify(err, null, 2)}`;
+      }
+    }
+
+    async function testCreateSession() {
+      const email = document.getElementById('test-email').value;
+      const output = document.getElementById('session-output');
+      output.textContent = 'Creating session...';
+
+      try {
+        console.log('Calling RPC with email:', email);
+
+        const { data, error } = await supabase.rpc('create_portal_session', {
+          p_email: email
+        });
+
+        console.log('RPC Response:', { data, error });
+
+        if (error) throw error;
+
+        output.textContent = 'Response:\n\n';
+        output.textContent += JSON.stringify(data, null, 2);
+
+        if (data && data.success && data.token) {
+          output.textContent += '\n\nToken: ' + data.token;
+          output.textContent += '\n\nPortal URL:\n';
+          output.textContent += `${window.location.origin}/portal/login?token=${data.token}`;
+        }
+      } catch (err) {
+        output.textContent = `Error: ${err.message}\n\n`;
+        output.textContent += JSON.stringify(err, null, 2);
+      }
+    }
+
+    async function testPortalFlow() {
+      const email = document.getElementById('portal-email').value;
+      const output = document.getElementById('portal-output');
+      output.textContent = 'Testing full flow...\n\n';
+
+      try {
+        // Step 1: Create session
+        output.textContent += 'Step 1: Creating portal session...\n';
+        const { data, error } = await supabase.rpc('create_portal_session', {
+          p_email: email
+        });
+
+        if (error) throw error;
+
+        if (!data || !data.success) {
+          output.textContent += `Failed: ${data?.error || 'Unknown error'}\n`;
+          return;
+        }
+
+        output.textContent += `✓ Session created\n`;
+        output.textContent += `  Token: ${data.token}\n`;
+        output.textContent += `  Expires: ${data.expires_at}\n\n`;
+
+        // Step 2: Open portal
+        const portalUrl = `${window.location.origin}/portal/login?token=${data.token}`;
+        output.textContent += `Step 2: Opening portal...\n`;
+        output.textContent += `URL: ${portalUrl}\n\n`;
+
+        output.textContent += '✓ Opening portal in new window...\n';
+        window.open(portalUrl, '_blank');
+
+        output.textContent += '\nTest completed! Check the new window.';
+
+      } catch (err) {
+        output.textContent += `\nError: ${err.message}\n\n`;
+        output.textContent += JSON.stringify(err, null, 2);
+      }
+    }
+  </script>
+</body>
+</html>

@@ -4662,12 +4662,27 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           return;
                         }
 
+                        showNotification('Generating portal link...', 'info');
+
                         try {
+                          console.log('Creating portal session for:', email);
+
                           const { data, error } = await supabase.rpc('create_portal_session', {
                             p_email: email
                           });
 
-                          if (error) throw error;
+                          console.log('RPC Response:', { data, error });
+
+                          if (error) {
+                            console.error('RPC Error:', error);
+                            showNotification(`Error: ${error.message}`, 'error');
+                            return;
+                          }
+
+                          if (!data) {
+                            showNotification('No response from server', 'error');
+                            return;
+                          }
 
                           if (!data.success) {
                             showNotification(data.error || 'Customer not found', 'error');
@@ -4675,11 +4690,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           }
 
                           const portalUrl = `${window.location.origin}/portal/login?token=${data.token}`;
+                          console.log('Opening portal URL:', portalUrl);
                           window.open(portalUrl, '_blank');
-                          showNotification('Opening portal in new tab...', 'success');
+                          showNotification('Portal opened in new tab', 'success');
                         } catch (err) {
                           console.error('Error generating portal link:', err);
-                          showNotification('Failed to generate portal link', 'error');
+                          showNotification(`Failed: ${err instanceof Error ? err.message : 'Unknown error'}`, 'error');
                         }
                       }}
                       className="flex items-center gap-2 px-6 py-2 bg-green-600 dark:bg-green-700 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 transition-colors whitespace-nowrap"
