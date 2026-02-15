@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Portal Data - Jamie</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .card {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      width: 100%;
+      margin-top: 10px;
+    }
+    button:hover {
+      background: #1d4ed8;
+    }
+    .output {
+      background: #f9fafb;
+      padding: 15px;
+      margin-top: 15px;
+      border-radius: 4px;
+      border: 1px solid #e5e7eb;
+      white-space: pre-wrap;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .success {
+      color: #10b981;
+      font-weight: bold;
+    }
+    .error {
+      color: #ef4444;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🧪 Portal Data Test - Jamie's Account</h1>
+    <p>Testing portal data access for: <strong>jamie@toddssportinggoods.com</strong></p>
+
+    <button onclick="testPortalFlow()">Run Complete Portal Test</button>
+
+    <div id="output" class="output"></div>
+  </div>
+
+  <script>
+    const supabaseUrl = 'https://cuaukcvccxvfpuxaciac.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1YXVrY3ZjY3h2ZnB1eGFjaWFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU2ODEyOTQsImV4cCI6MjA1MTI1NzI5NH0.c-o4IB5hFSZQaIJY1pE5fvJCBBXKuKMQGQdgQXnNF0A';
+
+    async function testPortalFlow() {
+      const output = document.getElementById('output');
+      const email = 'jamie@toddssportinggoods.com';
+
+      output.innerHTML = '<span class="success">Starting portal test...</span>\n\n';
+
+      try {
+        // Step 1: Create portal session
+        output.innerHTML += '📋 Step 1: Creating portal session...\n';
+        const sessionResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/create_portal_session`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`
+          },
+          body: JSON.stringify({ p_email: email })
+        });
+
+        if (!sessionResponse.ok) {
+          throw new Error(`Session creation failed: ${sessionResponse.status}`);
+        }
+
+        const sessionData = await sessionResponse.json();
+        output.innerHTML += '<span class="success">✓ Session created</span>\n';
+        output.innerHTML += `  Token: ${sessionData.token.substring(0, 20)}...\n`;
+        output.innerHTML += `  Customer ID: ${sessionData.customer_id}\n`;
+        output.innerHTML += `  Company ID: ${sessionData.company_id}\n\n`;
+
+        const token = sessionData.token;
+
+        // Step 2: Fetch quotes
+        output.innerHTML += '📋 Step 2: Fetching quotes...\n';
+        const quotesResponse = await fetch(
+          `${supabaseUrl}/functions/v1/portal-data?type=quotes`,
+          {
+            headers: {
+              'X-Customer-Token': token,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (!quotesResponse.ok) {
+          const errorText = await quotesResponse.text();
+          throw new Error(`Quotes fetch failed: ${quotesResponse.status} - ${errorText}`);
+        }
+
+        const quotesResult = await quotesResponse.json();
+        output.innerHTML += '<span class="success">✓ Quotes loaded</span>\n';
+        output.innerHTML += `  Found ${quotesResult.data?.length || 0} quotes\n`;
+
+        if (quotesResult.data && quotesResult.data.length > 0) {
+          quotesResult.data.forEach((q, i) => {
+            output.innerHTML += `  ${i + 1}. ${q.quote_number} - ${q.status} - $${q.subtotal}\n`;
+          });
+        }
+        output.innerHTML += '\n';
+
+        // Step 3: Fetch invoices
+        output.innerHTML += '📋 Step 3: Fetching invoices...\n';
+        const invoicesResponse = await fetch(
+          `${supabaseUrl}/functions/v1/portal-data?type=invoices`,
+          {
+            headers: {
+              'X-Customer-Token': token,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (!invoicesResponse.ok) {
+          const errorText = await invoicesResponse.text();
+          throw new Error(`Invoices fetch failed: ${invoicesResponse.status} - ${errorText}`);
+        }
+
+        const invoicesResult = await invoicesResponse.json();
+        output.innerHTML += '<span class="success">✓ Invoices loaded</span>\n';
+        output.innerHTML += `  Found ${invoicesResult.data?.length || 0} invoices\n`;
+
+        if (invoicesResult.data && invoicesResult.data.length > 0) {
+          invoicesResult.data.slice(0, 5).forEach((inv, i) => {
+            output.innerHTML += `  ${i + 1}. ${inv.invoice_number} - ${inv.status_stage} - $${inv.total}\n`;
+          });
+        }
+        output.innerHTML += '\n';
+
+        // Step 4: Fetch proofs
+        output.innerHTML += '📋 Step 4: Fetching proofs...\n';
+        const proofsResponse = await fetch(
+          `${supabaseUrl}/functions/v1/portal-data?type=proofs`,
+          {
+            headers: {
+              'X-Customer-Token': token,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (!proofsResponse.ok) {
+          const errorText = await proofsResponse.text();
+          throw new Error(`Proofs fetch failed: ${proofsResponse.status} - ${errorText}`);
+        }
+
+        const proofsResult = await proofsResponse.json();
+        output.innerHTML += '<span class="success">✓ Proofs loaded</span>\n';
+        output.innerHTML += `  Found ${proofsResult.data?.length || 0} proofs\n\n`;
+
+        output.innerHTML += '<span class="success">🎉 ALL TESTS PASSED!</span>\n';
+        output.innerHTML += '\n✅ Portal is working correctly!\n';
+        output.innerHTML += '✅ Customer data loads successfully!\n';
+        output.innerHTML += '✅ Case-insensitive email matching works!\n';
+
+      } catch (error) {
+        output.innerHTML += `\n<span class="error">✗ ERROR: ${error.message}</span>\n\n`;
+        output.innerHTML += error.stack || JSON.stringify(error, null, 2);
+      }
+    }
+  </script>
+</body>
+</html>

@@ -35,15 +35,27 @@ export function PortalInvoices() {
     try {
       setLoading(true);
 
-      const { data, error } = await supabase
-        .from('printavo_invoices')
-        .select('id, invoice_number, invoice_date, due_date, total, balance, status_stage, customer_name, customer_email')
-        .eq('company_id', user!.company_id)
-        .eq('customer_email', user!.email)
-        .order('invoice_date', { ascending: false });
+      const token = localStorage.getItem('customer_portal_token');
+      if (!token) {
+        throw new Error('No portal session found');
+      }
 
-      if (error) throw error;
-      setInvoices(data || []);
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/portal-data?type=invoices`,
+        {
+          headers: {
+            'X-Customer-Token': token,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to load invoices');
+      }
+
+      const result = await response.json();
+      setInvoices(result.data || []);
     } catch (error) {
       console.error('Error loading invoices:', error);
     } finally {

@@ -34,15 +34,41 @@ export function PortalQuotes() {
     try {
       setLoading(true);
 
-      const { data, error } = await supabase
-        .from('quotes')
-        .select('id, quote_number, created_date, expiry_date, total_amount, status, customer_name, customer_email, notes')
-        .eq('company_id', user!.company_id)
-        .eq('customer_email', user!.email)
-        .order('created_date', { ascending: false });
+      const token = localStorage.getItem('customer_portal_token');
+      if (!token) {
+        throw new Error('No portal session found');
+      }
 
-      if (error) throw error;
-      setQuotes(data || []);
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/portal-data?type=quotes`,
+        {
+          headers: {
+            'X-Customer-Token': token,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to load quotes');
+      }
+
+      const result = await response.json();
+
+      // Map the data to match the expected Quote interface
+      const mappedQuotes = (result.data || []).map((q: any) => ({
+        id: q.id,
+        quote_number: q.quote_number,
+        created_date: q.created_at,
+        expiry_date: q.expiry_date,
+        total_amount: parseFloat(q.subtotal || 0) + parseFloat(q.tax_amount || 0),
+        status: q.status,
+        customer_name: q.customer_name,
+        customer_email: q.customer_email,
+        notes: q.notes
+      }));
+
+      setQuotes(mappedQuotes);
     } catch (error) {
       console.error('Error loading quotes:', error);
     } finally {

@@ -36,43 +36,39 @@ export function PortalProofs() {
     try {
       setLoading(true);
 
-      const { data: quoteData } = await supabase
-        .from('quotes')
-        .select('id')
-        .eq('company_id', user!.company_id)
-        .eq('customer_email', user!.email);
-
-      if (!quoteData || quoteData.length === 0) {
-        setProofs([]);
-        setLoading(false);
-        return;
+      const token = localStorage.getItem('customer_portal_token');
+      if (!token) {
+        throw new Error('No portal session found');
       }
 
-      const quoteIds = quoteData.map(q => q.id);
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/portal-data?type=proofs`,
+        {
+          headers: {
+            'X-Customer-Token': token,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-      const { data, error } = await supabase
-        .from('proofs')
-        .select(`
-          id,
-          quote_id,
-          proof_version,
-          status,
-          composite_image_url,
-          created_at,
-          approved_at,
-          rejected_at,
-          feedback,
-          quotes!inner(quote_number)
-        `)
-        .in('quote_id', quoteIds)
-        .order('created_at', { ascending: false });
+      if (!response.ok) {
+        throw new Error('Failed to load proofs');
+      }
 
-      if (error) throw error;
+      const result = await response.json();
 
-      const formattedProofs = data?.map((proof: any) => ({
-        ...proof,
+      const formattedProofs = (result.data || []).map((proof: any) => ({
+        id: proof.id,
+        quote_id: proof.quote_id,
         quote_number: proof.quotes?.quote_number || 'N/A',
-      })) || [];
+        proof_version: proof.proof_version || 1,
+        status: proof.status,
+        composite_image_url: proof.composite_image_url,
+        created_at: proof.created_at,
+        approved_at: proof.approved_at,
+        rejected_at: proof.rejected_at,
+        feedback: proof.feedback
+      }));
 
       setProofs(formattedProofs);
     } catch (error) {

@@ -30,21 +30,26 @@ export function PortalOrderHistory() {
     try {
       setLoading(true);
 
-      const invoicesPromise = supabase
-        .from('printavo_invoices')
-        .select('id, invoice_number, invoice_date, total, status_stage')
-        .eq('company_id', user!.company_id)
-        .eq('customer_email', user!.email);
+      const token = localStorage.getItem('customer_portal_token');
+      if (!token) {
+        throw new Error('No portal session found');
+      }
 
-      const quotesPromise = supabase
-        .from('quotes')
-        .select('id, quote_number, created_date, total_amount, status')
-        .eq('company_id', user!.company_id)
-        .eq('customer_email', user!.email);
+      const [invoicesResponse, quotesResponse] = await Promise.all([
+        fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/portal-data?type=invoices`, {
+          headers: { 'X-Customer-Token': token, 'Content-Type': 'application/json' },
+        }),
+        fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/portal-data?type=quotes`, {
+          headers: { 'X-Customer-Token': token, 'Content-Type': 'application/json' },
+        })
+      ]);
 
-      const [invoicesResult, quotesResult] = await Promise.all([invoicesPromise, quotesPromise]);
+      const [invoicesResult, quotesResult] = await Promise.all([
+        invoicesResponse.json(),
+        quotesResponse.json()
+      ]);
 
-      const invoiceOrders: Order[] = (invoicesResult.data || []).map(inv => ({
+      const invoiceOrders: Order[] = (invoicesResult.data || []).map((inv: any) => ({
         id: inv.id,
         type: 'invoice' as const,
         number: inv.invoice_number,
@@ -53,12 +58,12 @@ export function PortalOrderHistory() {
         status: inv.status_stage,
       }));
 
-      const quoteOrders: Order[] = (quotesResult.data || []).map(quote => ({
+      const quoteOrders: Order[] = (quotesResult.data || []).map((quote: any) => ({
         id: quote.id,
         type: 'quote' as const,
         number: quote.quote_number,
-        date: quote.created_date,
-        amount: quote.total_amount,
+        date: quote.created_at,
+        amount: parseFloat(quote.subtotal || 0) + parseFloat(quote.tax_amount || 0),
         status: quote.status,
       }));
 
