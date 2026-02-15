@@ -4635,6 +4635,64 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   </div>
                 </div>
 
+                <div className="border-b border-gray-200 dark:border-slate-700 pb-6">
+                  <h3 className="text-md font-semibold text-gray-800 dark:text-gray-100 mb-4">Customer Portal Testing</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    Test the customer portal experience by generating a magic link for any customer email
+                  </p>
+                  <div className="flex items-end gap-3">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Customer Email
+                      </label>
+                      <input
+                        type="email"
+                        id="portal-test-email"
+                        defaultValue="mplampert@gmail.com"
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="customer@example.com"
+                      />
+                    </div>
+                    <button
+                      onClick={async () => {
+                        const emailInput = document.getElementById('portal-test-email') as HTMLInputElement;
+                        const email = emailInput?.value;
+                        if (!email) {
+                          showNotification('Please enter a customer email', 'error');
+                          return;
+                        }
+
+                        try {
+                          const { data, error } = await supabase.rpc('create_portal_session', {
+                            p_email: email
+                          });
+
+                          if (error) throw error;
+
+                          if (!data.success) {
+                            showNotification(data.error || 'Customer not found', 'error');
+                            return;
+                          }
+
+                          const portalUrl = `${window.location.origin}/portal/login?token=${data.token}`;
+                          window.open(portalUrl, '_blank');
+                          showNotification('Opening portal in new tab...', 'success');
+                        } catch (err) {
+                          console.error('Error generating portal link:', err);
+                          showNotification('Failed to generate portal link', 'error');
+                        }
+                      }}
+                      className="flex items-center gap-2 px-6 py-2 bg-green-600 dark:bg-green-700 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 transition-colors whitespace-nowrap"
+                    >
+                      <LinkIcon className="w-4 h-4" />
+                      Test Portal
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
+                    This will create a magic link for the specified customer and open it in a new tab. The link expires in 15 minutes.
+                  </p>
+                </div>
+
                 {isAdmin && (
                   <div className="pt-4">
                     <button
