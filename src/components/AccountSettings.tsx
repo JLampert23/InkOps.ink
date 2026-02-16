@@ -110,6 +110,7 @@ interface TypeOfWork {
   company_id: string;
   work_type_name: string;
   color_type: 'ink' | 'thread' | 'none';
+  imprint_color: string | null;
   sort_order: number;
   is_active: boolean;
   created_at: string;
@@ -326,6 +327,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [workTypeFormData, setWorkTypeFormData] = useState({
     work_type_name: '',
     color_type: 'ink' as 'ink' | 'thread' | 'none',
+    imprint_color: '#6b7280' as string,
   });
   const [savingWorkType, setSavingWorkType] = useState(false);
 
@@ -3439,6 +3441,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     setWorkTypeFormData({
       work_type_name: '',
       color_type: 'ink',
+      imprint_color: '#6b7280',
     });
     setEditingWorkTypeId(null);
   };
@@ -3452,6 +3455,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     setWorkTypeFormData({
       work_type_name: workType.work_type_name,
       color_type: workType.color_type,
+      imprint_color: workType.imprint_color || '#6b7280',
     });
     setEditingWorkTypeId(workType.id);
     setShowAddWorkTypeModal(true);
@@ -3477,6 +3481,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           .update({
             work_type_name: workTypeFormData.work_type_name,
             color_type: workTypeFormData.color_type,
+            imprint_color: workTypeFormData.imprint_color,
           })
           .eq('id', editingWorkTypeId);
 
@@ -3493,6 +3498,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             company_id: currentUserProfile.company_id,
             work_type_name: workTypeFormData.work_type_name,
             color_type: workTypeFormData.color_type,
+            imprint_color: workTypeFormData.imprint_color,
             sort_order: nextSortOrder,
           }]);
 
@@ -7266,6 +7272,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         key={workType.id}
                         className="flex items-center gap-1 p-1.5 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
                       >
+                        <div
+                          className="w-3 h-3 rounded-full border-2 border-white dark:border-slate-800 shadow-sm flex-shrink-0"
+                          style={{ backgroundColor: workType.imprint_color || '#6b7280' }}
+                          title="Imprint Color"
+                        />
                         <div className="flex-1 min-w-0">
                           <h3 className="text-xs font-medium text-gray-900 dark:text-white truncate">{workType.work_type_name}</h3>
                           <span className={`px-1 py-0.5 text-[10px] font-medium rounded whitespace-nowrap inline-block mt-0.5 ${
@@ -7848,6 +7859,32 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                             <p className="text-xs text-gray-600 dark:text-gray-400">Laser Engraving, Heat Press, etc.</p>
                           </div>
                         </label>
+                      </div>
+                    </div>
+
+                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                      <h3 className="text-sm font-semibold text-green-900 dark:text-green-100 mb-2">Imprint Color</h3>
+                      <p className="text-sm text-green-800 dark:text-green-200 mb-3">
+                        Choose a color to visually identify this work type in the Kanban Calendar and other views.
+                      </p>
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="color"
+                            value={workTypeFormData.imprint_color}
+                            onChange={(e) => setWorkTypeFormData({ ...workTypeFormData, imprint_color: e.target.value })}
+                            className="w-16 h-10 rounded cursor-pointer border-2 border-gray-300 dark:border-slate-600"
+                          />
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-8 h-8 rounded-full border-2 border-white shadow-md"
+                              style={{ backgroundColor: workTypeFormData.imprint_color }}
+                            />
+                            <span className="text-sm font-mono text-gray-700 dark:text-gray-300">
+                              {workTypeFormData.imprint_color}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>

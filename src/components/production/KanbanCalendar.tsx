@@ -34,6 +34,7 @@ export default function KanbanCalendar({ typeOfWork, onClose, onNavigateToWorkOr
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showFilters, setShowFilters] = useState(false);
+  const [imprintColors, setImprintColors] = useState<Record<string, string>>({});
 
   // Filters
   const [imprintTypeFilter, setImprintTypeFilter] = useState('');
@@ -64,8 +65,33 @@ export default function KanbanCalendar({ typeOfWork, onClose, onNavigateToWorkOr
   useEffect(() => {
     if (companyId) {
       loadJobs();
+      loadImprintColors();
     }
   }, [companyId, typeOfWork]);
+
+  const loadImprintColors = async () => {
+    if (!companyId) return;
+
+    try {
+      const { data: workTypes } = await supabase
+        .from('type_of_work_settings')
+        .select('work_type_name, imprint_color')
+        .eq('company_id', companyId)
+        .eq('is_active', true);
+
+      if (workTypes) {
+        const colorMap: Record<string, string> = {};
+        workTypes.forEach(wt => {
+          if (wt.work_type_name && wt.imprint_color) {
+            colorMap[wt.work_type_name] = wt.imprint_color;
+          }
+        });
+        setImprintColors(colorMap);
+      }
+    } catch (error) {
+      console.error('Error loading imprint colors:', error);
+    }
+  };
 
   const loadJobs = async () => {
     if (!companyId) return;
@@ -291,15 +317,22 @@ export default function KanbanCalendar({ typeOfWork, onClose, onNavigateToWorkOr
   };
 
   const getImprintColor = (type: string) => {
-    const colors: Record<string, string> = {
-      'Screen Print': '#10b981',
-      'Embroidery': '#3b82f6',
-      'DTG': '#8b5cf6',
-      'DTF': '#ec4899',
-      'Heat Transfer': '#f59e0b',
-      'Sublimation': '#06b6d4'
-    };
-    return colors[type] || '#6b7280';
+    // Use custom color from database if available, otherwise fall back to neutral gray
+    return imprintColors[type] || '#6b7280';
+  };
+
+  const getTextColor = (backgroundColor: string): string => {
+    // Convert hex to RGB
+    const hex = backgroundColor.replace('#', '');
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+
+    // Calculate relative luminance
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+    // Return white for dark backgrounds, dark for light backgrounds
+    return luminance > 0.5 ? '#1f2937' : '#ffffff';
   };
 
   const calendarContent = (
@@ -486,26 +519,36 @@ export default function KanbanCalendar({ typeOfWork, onClose, onNavigateToWorkOr
 
                     {/* Job Blocks */}
                     <div className={inline ? 'space-y-1' : 'space-y-2'}>
-                      {dayJobs.map(job => (
+                      {dayJobs.map(job => {
+                        const bgColor = getImprintColor(job.imprint_type);
+                        const textColor = getTextColor(bgColor);
+
+                        return (
                         <div
                           key={job.id}
                           draggable
                           onDragStart={(e) => handleDragStart(e, job.id)}
                           onClick={() => handleJobClick(job)}
-                          className={`${inline ? 'p-1' : 'p-2'} rounded-lg border-l-4 cursor-pointer hover:shadow-md transition-all ${
+                          className={`${inline ? 'p-1' : 'p-2'} rounded-lg border-l-4 cursor-pointer hover:shadow-md hover:brightness-95 transition-all relative ${
                             draggedJob === job.id ? 'opacity-50' : ''
                           }`}
                           style={{
-                            borderLeftColor: getImprintColor(job.imprint_type),
-                            backgroundColor: `${getImprintColor(job.imprint_type)}10`
+                            borderLeftColor: bgColor,
+                            backgroundColor: `${bgColor}15`
                           }}
                         >
+                          {/* Color Dot in top-left corner */}
+                          <div
+                            className="absolute top-1 left-1 w-2 h-2 rounded-full border border-white shadow-sm"
+                            style={{ backgroundColor: bgColor }}
+                          />
+
                           {/* Imprint Type Badge */}
                           <div
-                            className={`text-xs font-medium ${inline ? 'px-1 py-0.5' : 'px-2 py-1'} rounded mb-1 inline-block`}
+                            className={`text-xs font-medium ${inline ? 'px-1 py-0.5 ml-3' : 'px-2 py-1 ml-4'} rounded mb-1 inline-block`}
                             style={{
-                              backgroundColor: getImprintColor(job.imprint_type),
-                              color: 'white'
+                              backgroundColor: bgColor,
+                              color: textColor
                             }}
                           >
                             {inline ? job.imprint_type.substring(0, 3) : job.imprint_type}
@@ -543,7 +586,8 @@ export default function KanbanCalendar({ typeOfWork, onClose, onNavigateToWorkOr
                             </div>
                           )}
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 );
