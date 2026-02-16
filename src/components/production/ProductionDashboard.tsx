@@ -57,7 +57,7 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
 
       if (workTypes && workTypes.length > 0) {
         setTypesOfWork(workTypes);
-        setSelectedScheduleType(workTypes[0].work_type_name);
+        setSelectedScheduleType('all');
       }
     } catch (error) {
       console.error('Error loading types of work:', error);
@@ -153,6 +153,7 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
                     onChange={(e) => setSelectedScheduleType(e.target.value)}
                     className="w-full md:w-64 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
                   >
+                    <option value="all">View All</option>
                     {typesOfWork.map((type) => (
                       <option key={type.id} value={type.work_type_name}>
                         {type.work_type_name}
