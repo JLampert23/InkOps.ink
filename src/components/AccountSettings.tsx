@@ -43,6 +43,8 @@ interface CompanySettings {
   ssactivewear_username: string | null;
   ssactivewear_api_key_encrypted: string | null;
   ssactivewear_enabled: boolean | null;
+  shipstation_api_key: string | null;
+  shipstation_api_secret: string | null;
   customer_url: string | null;
   customer_url_verification_status: string | null;
   customer_url_verification_token: string | null;
@@ -130,7 +132,7 @@ interface ProductionStation {
 
 type SettingsTab =
   | 'company-info' | 'quote-invoice-settings'
-  | 'printavo-integration' | 'square-integration' | 'resend-integration' | 'twilio-integration' | 'stripe-payments' | 'supplier-integrations' | 'chipply-integration'
+  | 'printavo-integration' | 'square-integration' | 'resend-integration' | 'twilio-integration' | 'stripe-payments' | 'supplier-integrations' | 'shipstation-integration' | 'chipply-integration'
   | 'user-management' | 'user-security'
   | 'billing-status-filters'
   | 'automated-reports' | 'automations'
@@ -4142,13 +4144,35 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   </button>
 
                   <button
+                    onClick={() => setActiveTab('shipstation-integration')}
+                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group relative ${
+                      activeTab === 'shipstation-integration'
+                        ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
+                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                    style={{ animationDelay: '80ms' }}
+                  >
+                    <Package className={`w-4 h-4 flex-shrink-0 ${activeTab === 'shipstation-integration' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                    <div className="flex-1 text-left">
+                      <div className={`font-medium text-sm flex items-center gap-2 ${activeTab === 'shipstation-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                        ShipStation
+                        <div
+                          className={`w-2 h-2 rounded-full ${(companySettings?.shipstation_api_key && companySettings?.shipstation_api_secret) ? 'bg-green-500' : 'bg-red-500'}`}
+                          title={(companySettings?.shipstation_api_key && companySettings?.shipstation_api_secret) ? "Credentials saved" : "Credentials missing"}
+                        />
+                      </div>
+                    </div>
+                    {activeTab === 'shipstation-integration' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                  </button>
+
+                  <button
                     onClick={() => setActiveTab('chipply-integration')}
                     className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group relative ${
                       activeTab === 'chipply-integration'
                         ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
                         : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
                     }`}
-                    style={{ animationDelay: '80ms' }}
+                    style={{ animationDelay: '90ms' }}
                   >
                     <Package className={`w-4 h-4 flex-shrink-0 ${activeTab === 'chipply-integration' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                     <div className="flex-1 text-left">
@@ -6924,6 +6948,117 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ShipStation Integration Section */}
+          {activeTab === 'shipstation-integration' && canAccessIntegrations && (
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">ShipStation Integration</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Connect your ShipStation account to manage order fulfillment and shipping directly from InkOps.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">Getting Your API Credentials</h3>
+                  <ol className="text-sm text-blue-800 dark:text-blue-200 space-y-2 list-decimal list-inside">
+                    <li>Log in to your ShipStation account</li>
+                    <li>Go to Settings → API Settings</li>
+                    <li>Generate a new API Key and Secret</li>
+                    <li>Copy both values and paste them below</li>
+                  </ol>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    API Key
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={companySettings?.shipstation_api_key || ''}
+                      onChange={(e) => setCompanySettings(prev => prev ? { ...prev, shipstation_api_key: e.target.value } : null)}
+                      placeholder="Enter your ShipStation API Key"
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    API Secret
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="password"
+                      value={companySettings?.shipstation_api_secret || ''}
+                      onChange={(e) => setCompanySettings(prev => prev ? { ...prev, shipstation_api_secret: e.target.value } : null)}
+                      placeholder="Enter your ShipStation API Secret"
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-gray-200 dark:border-slate-700">
+                  <button
+                    onClick={async () => {
+                      if (!companySettings?.id) return;
+
+                      try {
+                        setSaving(true);
+                        const { error } = await supabase
+                          .from('company_settings')
+                          .update({
+                            shipstation_api_key: companySettings.shipstation_api_key,
+                            shipstation_api_secret: companySettings.shipstation_api_secret
+                          })
+                          .eq('id', companySettings.id);
+
+                        if (error) throw error;
+
+                        showNotification('success', 'ShipStation Saved', 'ShipStation credentials have been saved successfully!');
+                        await loadSettings();
+                      } catch (err) {
+                        console.error('Error saving ShipStation credentials:', err);
+                        showNotification('error', 'Save Failed', 'Failed to save ShipStation credentials. Please try again.');
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                    disabled={saving}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {saving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Save ShipStation Settings
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {companySettings?.shipstation_api_key && companySettings?.shipstation_api_secret && (
+                  <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                    <div className="flex items-start gap-2 text-green-800 dark:text-green-200">
+                      <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium">ShipStation Connected</p>
+                        <p className="text-sm mt-1">
+                          Your ShipStation account is connected and ready to use for order fulfillment.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
