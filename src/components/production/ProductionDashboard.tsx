@@ -180,7 +180,7 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
   return (
     <div className="space-y-6">
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-gray-200 dark:divide-slate-700">
+        <div className="grid grid-cols-6 divide-x divide-gray-200 dark:divide-slate-700">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -188,17 +188,17 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`p-4 text-center transition-colors hover:bg-gray-50 dark:hover:bg-slate-700 ${
+                className={`p-3 text-center transition-colors hover:bg-gray-50 dark:hover:bg-slate-700 ${
                   isActive ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                 }`}
               >
-                <div className="flex flex-col items-center gap-2">
-                  <Icon className={`w-6 h-6 ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`} />
+                <div className="flex flex-col items-center gap-1.5">
+                  <Icon className={`w-5 h-5 ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'}`} />
                   <div>
-                    <div className={`text-sm font-semibold ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
+                    <div className={`text-xs font-semibold ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
                       {tab.label}
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 leading-tight">
                       {tab.description}
                     </div>
                   </div>
@@ -209,15 +209,15 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
 
           <button
             onClick={onNavigateToCustomers}
-            className="p-4 text-center transition-colors hover:bg-gray-50 dark:hover:bg-slate-700"
+            className="p-3 text-center transition-colors hover:bg-gray-50 dark:hover:bg-slate-700"
           >
-            <div className="flex flex-col items-center gap-2">
-              <Users className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+            <div className="flex flex-col items-center gap-1.5">
+              <Users className="w-5 h-5 text-gray-600 dark:text-gray-400" />
               <div>
-                <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                <div className="text-xs font-semibold text-gray-900 dark:text-white">
                   Customers
                 </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 leading-tight">
                   Customer database
                 </div>
               </div>
