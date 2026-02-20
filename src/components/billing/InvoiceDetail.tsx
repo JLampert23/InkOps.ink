@@ -593,19 +593,13 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                       onClick={() => onNavigateToCustomer(invoice.contact.company || invoice.contact.name, invoice.contact.email)}
                       className="font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left p-0 border-0 bg-transparent cursor-pointer"
                     >
-                      {invoice.contact.company && invoice.contact.name !== invoice.contact.company
-                        ? invoice.contact.name
-                        : invoice.contact.company || invoice.contact.name || 'N/A'}
+                      {invoice.contact.name || 'N/A'}
                     </button>
                   ) : (
-                    <p className="font-medium text-gray-900 dark:text-white">
-                      {invoice.contact.company && invoice.contact.name !== invoice.contact.company
-                        ? invoice.contact.name
-                        : invoice.contact.company || invoice.contact.name || 'N/A'}
-                    </p>
+                    <p className="font-medium text-gray-900 dark:text-white">{invoice.contact.name || 'N/A'}</p>
                   )}
                 </div>
-                {invoice.contact.company && invoice.contact.name !== invoice.contact.company && (
+                {invoice.contact.company && (
                   <div>
                     <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
                       <Building2 className="w-3.5 h-3.5" />
