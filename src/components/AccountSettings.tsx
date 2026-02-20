@@ -15,6 +15,7 @@ const InkThreadColorsManager = lazy(() => import('./production/InkThreadColorsMa
 const CommunicationTemplatesManager = lazy(() => import('./email/CommunicationTemplatesManager').then(m => ({ default: m.default })));
 const ReceivingSettings = lazy(() => import('./settings/ReceivingSettings').then(m => ({ default: m.default })));
 const POSettings = lazy(() => import('./settings/POSettings').then(m => ({ default: m.default })));
+const ShipStationSettings = lazy(() => import('./settings/ShipStationSettings').then(m => ({ default: m.default })));
 const ChipplyIntegrationSettings = lazy(() => import('./chipply/ChipplyIntegrationSettings').then(m => ({ default: m.ChipplyIntegrationSettings })));
 const CustomInvoiceStatusManager = lazy(() => import('./settings/CustomInvoiceStatusManager').then(m => ({ default: m.CustomInvoiceStatusManager })));
 
@@ -45,6 +46,16 @@ interface CompanySettings {
   ssactivewear_enabled: boolean | null;
   shipstation_api_key: string | null;
   shipstation_api_secret: string | null;
+  shipstation_default_ship_from_name: string | null;
+  shipstation_default_ship_from_company: string | null;
+  shipstation_default_ship_from_address1: string | null;
+  shipstation_default_ship_from_address2: string | null;
+  shipstation_default_ship_from_city: string | null;
+  shipstation_default_ship_from_state: string | null;
+  shipstation_default_ship_from_postal_code: string | null;
+  shipstation_default_ship_from_country: string | null;
+  shipstation_default_carrier_code: string | null;
+  shipstation_default_service_code: string | null;
   customer_url: string | null;
   customer_url_verification_status: string | null;
   customer_url_verification_token: string | null;
@@ -6953,113 +6964,15 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
           {/* ShipStation Integration Section */}
           {activeTab === 'shipstation-integration' && canAccessIntegrations && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">ShipStation Integration</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Connect your ShipStation account to manage order fulfillment and shipping directly from InkOps.
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                  <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">Getting Your API Credentials</h3>
-                  <ol className="text-sm text-blue-800 dark:text-blue-200 space-y-2 list-decimal list-inside">
-                    <li>Log in to your ShipStation account</li>
-                    <li>Go to Settings → API Settings</li>
-                    <li>Generate a new API Key and Secret</li>
-                    <li>Copy both values and paste them below</li>
-                  </ol>
+            <Suspense
+              fallback={
+                <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 flex items-center justify-center">
+                  <Loader2 className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-spin" />
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    API Key
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={companySettings?.shipstation_api_key || ''}
-                      onChange={(e) => setCompanySettings(prev => prev ? { ...prev, shipstation_api_key: e.target.value } : null)}
-                      placeholder="Enter your ShipStation API Key"
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    API Secret
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="password"
-                      value={companySettings?.shipstation_api_secret || ''}
-                      onChange={(e) => setCompanySettings(prev => prev ? { ...prev, shipstation_api_secret: e.target.value } : null)}
-                      placeholder="Enter your ShipStation API Secret"
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-gray-200 dark:border-slate-700">
-                  <button
-                    onClick={async () => {
-                      if (!companySettings?.id) return;
-
-                      try {
-                        setSaving(true);
-                        const { error } = await supabase
-                          .from('company_settings')
-                          .update({
-                            shipstation_api_key: companySettings.shipstation_api_key,
-                            shipstation_api_secret: companySettings.shipstation_api_secret
-                          })
-                          .eq('id', companySettings.id);
-
-                        if (error) throw error;
-
-                        showNotification('success', 'ShipStation Saved', 'ShipStation credentials have been saved successfully!');
-                        await loadSettings();
-                      } catch (err) {
-                        console.error('Error saving ShipStation credentials:', err);
-                        showNotification('error', 'Save Failed', 'Failed to save ShipStation credentials. Please try again.');
-                      } finally {
-                        setSaving(false);
-                      }
-                    }}
-                    disabled={saving}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {saving ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4" />
-                        Save ShipStation Settings
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {companySettings?.shipstation_api_key && companySettings?.shipstation_api_secret && (
-                  <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                    <div className="flex items-start gap-2 text-green-800 dark:text-green-200">
-                      <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-medium">ShipStation Connected</p>
-                        <p className="text-sm mt-1">
-                          Your ShipStation account is connected and ready to use for order fulfillment.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+              }
+            >
+              <ShipStationSettings />
+            </Suspense>
           )}
 
           {/* Chipply Integration Section */}
