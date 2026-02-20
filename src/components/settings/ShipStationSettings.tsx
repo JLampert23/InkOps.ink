@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Package, Save, Loader2, AlertCircle, CheckCircle, Eye, EyeOff, TestTube } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useNotification } from '../../contexts/NotificationContext';
-import { encryptToken } from '../../services/crypto-service';
+import { encryptToken, decryptToken } from '../../services/crypto-service';
 
 interface ShipStationSettings {
   api_key: string;
@@ -208,8 +208,8 @@ export function ShipStationSettings() {
           return;
         }
 
-        apiKeyToTest = companySettings.shipstation_api_key;
-        apiSecretToTest = companySettings.shipstation_api_secret;
+        apiKeyToTest = await decryptToken(companySettings.shipstation_api_key);
+        apiSecretToTest = await decryptToken(companySettings.shipstation_api_secret);
       }
 
       const { data: { session } } = await supabase.auth.getSession();
