@@ -64,8 +64,9 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
   const [userRole, setUserRole] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [reverting, setReverting] = useState(false);
-  const [sendingToShipStation, setSendingToShipStation] = useState(false);
-  const [showShipStationConfirm, setShowShipStationConfirm] = useState(false);
+  const [shippingWithShipStation, setShippingWithShipStation] = useState(false);
+  const [showShipConfirm, setShowShipConfirm] = useState(false);
+  const [labelUrl, setLabelUrl] = useState<string | null>(null);
   const [companySettings, setCompanySettings] = useState<{
     company_name: string | null;
     company_address: string | null;
@@ -128,6 +129,20 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
         console.log('Raw Data:', data.rawData);
         setInvoice(data);
         setCustomerPhone(data.contact.phone);
+
+        if (data.rawData?.shipping_status === 'label_created') {
+          const { data: labelData } = await supabase
+            .from('shipping_labels')
+            .select('label_url')
+            .eq('invoice_id', invoiceId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (labelData?.label_url) {
+            setLabelUrl(labelData.label_url);
+          }
+        }
       }
     } catch (err) {
       setError('Failed to load invoice');
@@ -325,17 +340,17 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
     }
   };
 
-  const handleSendToShipStation = async () => {
+  const handleShipWithShipStation = async () => {
     if (!invoice) return;
-    setShowShipStationConfirm(false);
-    setSendingToShipStation(true);
+    setShowShipConfirm(false);
+    setShippingWithShipStation(true);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-shipstation-order`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ship-invoice`,
         {
           method: 'POST',
           headers: {
@@ -351,15 +366,16 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
       const result = await response.json();
 
       if (!result.success) {
-        throw new Error(result.error || 'Failed to send order to ShipStation');
+        throw new Error(result.error || 'Failed to create shipping label');
       }
 
-      alert('Invoice sent to ShipStation successfully!');
+      setLabelUrl(result.label_url);
+      alert(`Shipping label created! Tracking #: ${result.tracking_number}`);
       await loadInvoice();
     } catch (err: any) {
-      alert(err.message || 'Failed to send to ShipStation');
+      alert(err.message || 'Failed to create shipping label');
     } finally {
-      setSendingToShipStation(false);
+      setShippingWithShipStation(false);
     }
   };
 
@@ -522,19 +538,31 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
           <div className="flex items-center gap-2 lg:gap-3 flex-wrap">
             {invoice.statusStage !== 'draft' &&
               (!invoice.rawData?.shipping_status ||
-                invoice.rawData?.shipping_status === 'not_sent') && (
+                invoice.rawData?.shipping_status === 'not_sent' ||
+                invoice.rawData?.shipping_status === 'sent_to_shipstation') &&
+              !labelUrl && (
               <button
-                onClick={() => setShowShipStationConfirm(true)}
-                disabled={sendingToShipStation}
+                onClick={() => setShowShipConfirm(true)}
+                disabled={shippingWithShipStation}
                 className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-white bg-blue-600 dark:bg-blue-700 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 whitespace-nowrap"
               >
-                {sendingToShipStation ? (
+                {shippingWithShipStation ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <Truck className="w-4 h-4" />
                 )}
-                <span className="hidden lg:inline">Send to ShipStation</span>
-                <span className="lg:hidden hidden sm:inline">ShipStation</span>
+                <span className="hidden lg:inline">Ship with ShipStation</span>
+                <span className="lg:hidden hidden sm:inline">Ship</span>
+              </button>
+            )}
+            {(invoice.rawData?.shipping_status === 'label_created' || labelUrl) && labelUrl && (
+              <button
+                onClick={() => window.open(labelUrl, '_blank')}
+                className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors whitespace-nowrap"
+              >
+                <Download className="w-4 h-4" />
+                <span className="hidden lg:inline">Print Label</span>
+                <span className="lg:hidden hidden sm:inline">Label</span>
               </button>
             )}
             <button
@@ -1518,34 +1546,34 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
         />
       )}
 
-      {/* ShipStation Confirmation Modal */}
-      {showShipStationConfirm && (
+      {/* Ship with ShipStation Confirmation Modal */}
+      {showShipConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-md mx-4">
             <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Send to ShipStation</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Ship with ShipStation</h3>
             </div>
             <div className="p-6">
               <p className="text-gray-700 dark:text-gray-300">
-                Send this invoice to ShipStation as a shipping order?
+                Create a shipping label for this invoice using ShipStation?
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                Invoice #{invoice?.visualId} will be created as an order in ShipStation with status "awaiting_shipment".
+                This will create an order in ShipStation (if needed) and generate a shipping label with tracking number.
               </p>
             </div>
             <div className="px-6 py-4 border-t border-gray-200 dark:border-slate-700 flex justify-end gap-3">
               <button
-                onClick={() => setShowShipStationConfirm(false)}
+                onClick={() => setShowShipConfirm(false)}
                 className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={handleSendToShipStation}
+                onClick={handleShipWithShipStation}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 <Truck className="w-4 h-4" />
-                Send to ShipStation
+                Create Label
               </button>
             </div>
           </div>
