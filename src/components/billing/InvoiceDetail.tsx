@@ -28,6 +28,7 @@ import {
   AlertCircle,
   Lock,
   Unlock,
+  Truck,
 } from 'lucide-react';
 import { invoiceDetailService, InvoiceDetail as InvoiceDetailType } from '../../services/invoice-detail-service';
 import { billingService } from '../../services/billing-service';
@@ -63,6 +64,8 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
   const [userRole, setUserRole] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [reverting, setReverting] = useState(false);
+  const [sendingToShipStation, setSendingToShipStation] = useState(false);
+  const [showShipStationConfirm, setShowShipStationConfirm] = useState(false);
   const [companySettings, setCompanySettings] = useState<{
     company_name: string | null;
     company_address: string | null;
@@ -322,6 +325,44 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
     }
   };
 
+  const handleSendToShipStation = async () => {
+    if (!invoice) return;
+    setShowShipStationConfirm(false);
+    setSendingToShipStation(true);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-shipstation-order`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            invoice_id: invoice.id,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to send order to ShipStation');
+      }
+
+      alert('Invoice sent to ShipStation successfully!');
+      await loadInvoice();
+    } catch (err: any) {
+      alert(err.message || 'Failed to send to ShipStation');
+    } finally {
+      setSendingToShipStation(false);
+    }
+  };
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -453,12 +494,49 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                   )}
                 </div>
               </div>
-              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1 truncate">
-                Printavo ID: {invoice.printavoInvoiceId}
-              </p>
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">
+                  Printavo ID: {invoice.printavoInvoiceId}
+                </p>
+                {invoice.rawData?.shipping_status && (
+                  <span
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
+                      invoice.rawData.shipping_status === 'sent_to_shipstation'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                        : 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-400'
+                    }`}
+                  >
+                    <Truck className="w-3 h-3" />
+                    {invoice.rawData.shipping_status === 'sent_to_shipstation' ? 'Order Created' : 'Not Sent'}
+                  </span>
+                )}
+                {!invoice.rawData?.shipping_status && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-400">
+                    <Truck className="w-3 h-3" />
+                    Not Sent
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2 lg:gap-3 flex-wrap">
+            {invoice.statusStage !== 'draft' &&
+              (!invoice.rawData?.shipping_status ||
+                invoice.rawData?.shipping_status === 'not_sent') && (
+              <button
+                onClick={() => setShowShipStationConfirm(true)}
+                disabled={sendingToShipStation}
+                className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-white bg-blue-600 dark:bg-blue-700 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 whitespace-nowrap"
+              >
+                {sendingToShipStation ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Truck className="w-4 h-4" />
+                )}
+                <span className="hidden lg:inline">Send to ShipStation</span>
+                <span className="lg:hidden hidden sm:inline">ShipStation</span>
+              </button>
+            )}
             <button
               onClick={handleSync}
               disabled={syncing}
@@ -1438,6 +1516,40 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
           onClose={() => setShowPaymentModal(false)}
           onSuccess={handlePaymentSuccess}
         />
+      )}
+
+      {/* ShipStation Confirmation Modal */}
+      {showShipStationConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Send to ShipStation</h3>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-700 dark:text-gray-300">
+                Send this invoice to ShipStation as a shipping order?
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                Invoice #{invoice?.visualId} will be created as an order in ShipStation with status "awaiting_shipment".
+              </p>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-slate-700 flex justify-end gap-3">
+              <button
+                onClick={() => setShowShipStationConfirm(false)}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSendToShipStation}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Truck className="w-4 h-4" />
+                Send to ShipStation
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
