@@ -151,3 +151,35 @@ export function buildShipStationOrderPayload(
 
   return payload;
 }
+
+export function validateShipStationPayload(payload: ShipStationOrderPayload): {
+  valid: boolean;
+  errors: string[];
+} {
+  const errors: string[] = [];
+
+  if (!payload.shipTo.street1) {
+    errors.push('Shipping address is required');
+  }
+
+  if (!payload.shipTo.city) {
+    errors.push('Shipping city is required');
+  }
+
+  if (!payload.shipTo.state) {
+    errors.push('Shipping state is required');
+  }
+
+  if (!payload.shipTo.postalCode) {
+    errors.push('Shipping postal code is required');
+  }
+
+  if (!payload.items || payload.items.length === 0) {
+    errors.push('At least one line item is required');
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
+}
