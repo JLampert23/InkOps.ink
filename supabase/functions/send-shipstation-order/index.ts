@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { buildShipStationOrderPayload } from "../_shared/shipstation-payload-builder.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -300,59 +301,10 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const orderKey = invoice_id;
-
-    const shipStationItems = (lineItems || []).map((item: LineItem) => ({
-      lineItemKey: item.id,
-      sku: item.sku || item.id,
-      name: item.product_name || item.description || 'Custom Item',
-      quantity: item.quantity || 1,
-      unitPrice: item.unit_price || 0,
-      weightUnits: 'ounces',
-      weight: {
-        value: 8,
-        units: 'ounces',
-      },
-    }));
-
-    const shipStationPayload = {
-      orderNumber: invoiceData.invoice_number,
-      orderKey: orderKey,
-      orderDate: invoiceData.created_at,
-      orderStatus: "awaiting_shipment",
-      customerUsername: invoiceData.customer_email,
-      customerEmail: invoiceData.customer_email,
-      billTo: {
-        name: invoiceData.customer_name || 'Customer',
-        company: '',
-        street1: invoiceData.customer_address || '',
-        street2: invoiceData.customer_address2 || '',
-        city: invoiceData.customer_city || '',
-        state: invoiceData.customer_state || '',
-        postalCode: invoiceData.customer_zip_code || '',
-        country: invoiceData.customer_country || 'US',
-        phone: invoiceData.customer_phone || '',
-      },
-      shipTo: {
-        name: invoiceData.customer_name || 'Customer',
-        company: '',
-        street1: invoiceData.customer_address || '',
-        street2: invoiceData.customer_address2 || '',
-        city: invoiceData.customer_city || '',
-        state: invoiceData.customer_state || '',
-        postalCode: invoiceData.customer_zip_code || '',
-        country: invoiceData.customer_country || 'US',
-        phone: invoiceData.customer_phone || '',
-      },
-      items: shipStationItems,
-      amountPaid: invoiceData.total || 0,
-      taxAmount: 0,
-      shippingAmount: 0,
-      internalNotes: `InkOps Invoice: ${invoiceData.invoice_number}`,
-      advancedOptions: {
-        source: 'InkOps',
-      },
-    };
+    const shipStationPayload = buildShipStationOrderPayload(
+      invoiceData,
+      lineItems || []
+    );
 
     console.log('Sending order to ShipStation:', JSON.stringify(shipStationPayload, null, 2));
 
