@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { buildShipStationOrderPayload } from "../_shared/shipstation-payload-builder.ts";
+import { buildShipStationOrderPayload, validateShipStationPayload } from "../_shared/shipstation-payload-builder.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -347,6 +347,37 @@ Deno.serve(async (req: Request) => {
         invoiceData,
         lineItems || []
       );
+
+      const validation = validateShipStationPayload(shipStationPayload);
+      if (!validation.valid) {
+        await logShipStationAction(
+          supabaseClient,
+          invoiceData.company_id,
+          invoice_id,
+          invoiceData.invoice_number,
+          'validation_error',
+          shipStationPayload,
+          null,
+          0,
+          `Validation failed: ${validation.errors.join(', ')}`,
+          user.id
+        );
+
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: `Cannot create label: ${validation.errors.join(', ')}`,
+            validation_errors: validation.errors,
+          }),
+          {
+            status: 400,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
 
       console.log('Creating ShipStation order:', JSON.stringify(shipStationPayload, null, 2));
 

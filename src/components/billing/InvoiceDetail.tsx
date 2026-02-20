@@ -368,7 +368,10 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
 
       const result = await response.json();
 
+      console.log('ShipStation response:', result);
+
       if (!result.success) {
+        console.error('ShipStation error:', result);
         throw new Error(result.error || 'Failed to create shipping label');
       }
 
@@ -376,6 +379,7 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
       alert(`Shipping label created! Tracking #: ${result.tracking_number}`);
       await loadInvoice();
     } catch (err: any) {
+      console.error('ShipStation error:', err);
       alert(err.message || 'Failed to create shipping label');
     } finally {
       setShippingWithShipStation(false);
