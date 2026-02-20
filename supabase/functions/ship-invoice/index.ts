@@ -205,7 +205,21 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const invoiceData = invoice as InvoiceData;
+    // Map invoice fields to expected format
+    const invoiceData: InvoiceData = {
+      ...invoice,
+      shipping_address1: invoice.ship_address_1 || invoice.customer_address || '',
+      shipping_address2: invoice.ship_address_2 || invoice.customer_address2 || '',
+      shipping_city: invoice.ship_city || invoice.customer_city || '',
+      shipping_state: invoice.ship_state || invoice.customer_state || '',
+      shipping_zip_code: invoice.ship_zip || invoice.customer_zip_code || '',
+      shipping_country: invoice.customer_country || 'US',
+      customer_address: invoice.customer_address || '',
+      customer_city: invoice.customer_city || '',
+      customer_state: invoice.customer_state || '',
+      customer_zip_code: invoice.customer_zip_code || '',
+      customer_country: invoice.customer_country || 'US',
+    };
 
     // Fetch line items
     const { data: lineItems, error: lineItemsError } = await supabaseClient

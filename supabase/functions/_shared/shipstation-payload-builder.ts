@@ -6,17 +6,17 @@ interface Invoice {
   customer_company?: string;
   customer_email: string;
   customer_phone?: string;
-  billing_address1?: string;
-  billing_address2?: string;
-  billing_city?: string;
-  billing_state?: string;
-  billing_zip?: string;
-  billing_country?: string;
+  customer_address?: string;
+  customer_address2?: string;
+  customer_city?: string;
+  customer_state?: string;
+  customer_zip_code?: string;
+  customer_country?: string;
   shipping_address1?: string;
   shipping_address2?: string;
   shipping_city?: string;
   shipping_state?: string;
-  shipping_zip?: string;
+  shipping_zip_code?: string;
   shipping_country?: string;
   created_at: string;
   total?: number;
@@ -89,12 +89,12 @@ export function buildShipStationOrderPayload(
   const billToAddress = {
     name: invoice.customer_name || 'Customer',
     company: invoice.customer_company || undefined,
-    street1: invoice.billing_address1 || '',
-    street2: invoice.billing_address2 || undefined,
-    city: invoice.billing_city || '',
-    state: invoice.billing_state || '',
-    postalCode: invoice.billing_zip || '',
-    country: invoice.billing_country || 'US',
+    street1: invoice.customer_address || '',
+    street2: invoice.customer_address2 || undefined,
+    city: invoice.customer_city || '',
+    state: invoice.customer_state || '',
+    postalCode: invoice.customer_zip_code || '',
+    country: invoice.customer_country || 'US',
     phone: invoice.customer_phone || undefined,
   };
 
@@ -102,7 +102,7 @@ export function buildShipStationOrderPayload(
     invoice.shipping_address1 ||
     invoice.shipping_city ||
     invoice.shipping_state ||
-    invoice.shipping_zip;
+    invoice.shipping_zip_code;
 
   const shipToAddress = hasShippingAddress
     ? {
@@ -112,7 +112,7 @@ export function buildShipStationOrderPayload(
         street2: invoice.shipping_address2 || undefined,
         city: invoice.shipping_city || '',
         state: invoice.shipping_state || '',
-        postalCode: invoice.shipping_zip || '',
+        postalCode: invoice.shipping_zip_code || '',
         country: invoice.shipping_country || 'US',
         phone: invoice.customer_phone || undefined,
       }
