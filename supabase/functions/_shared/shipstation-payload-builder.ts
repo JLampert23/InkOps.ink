@@ -1,21 +1,22 @@
 interface Invoice {
   id: string;
+  uuid?: string;
   invoice_number: string;
   customer_name: string;
   customer_company?: string;
   customer_email: string;
   customer_phone?: string;
-  customer_address?: string;
-  customer_address2?: string;
-  customer_city?: string;
-  customer_state?: string;
-  customer_zip_code?: string;
-  customer_country?: string;
-  shipping_address?: string;
+  billing_address1?: string;
+  billing_address2?: string;
+  billing_city?: string;
+  billing_state?: string;
+  billing_zip?: string;
+  billing_country?: string;
+  shipping_address1?: string;
   shipping_address2?: string;
   shipping_city?: string;
   shipping_state?: string;
-  shipping_zip_code?: string;
+  shipping_zip?: string;
   shipping_country?: string;
   created_at: string;
   total?: number;
@@ -26,8 +27,7 @@ interface Invoice {
 interface LineItem {
   id: string;
   sku?: string;
-  product_name?: string;
-  description?: string;
+  name?: string;
   quantity: number;
   unit_price: number;
   weight_oz?: number;
@@ -89,30 +89,30 @@ export function buildShipStationOrderPayload(
   const billToAddress = {
     name: invoice.customer_name || 'Customer',
     company: invoice.customer_company || undefined,
-    street1: invoice.customer_address || '',
-    street2: invoice.customer_address2 || undefined,
-    city: invoice.customer_city || '',
-    state: invoice.customer_state || '',
-    postalCode: invoice.customer_zip_code || '',
-    country: invoice.customer_country || 'US',
+    street1: invoice.billing_address1 || '',
+    street2: invoice.billing_address2 || undefined,
+    city: invoice.billing_city || '',
+    state: invoice.billing_state || '',
+    postalCode: invoice.billing_zip || '',
+    country: invoice.billing_country || 'US',
     phone: invoice.customer_phone || undefined,
   };
 
   const hasShippingAddress =
-    invoice.shipping_address ||
+    invoice.shipping_address1 ||
     invoice.shipping_city ||
     invoice.shipping_state ||
-    invoice.shipping_zip_code;
+    invoice.shipping_zip;
 
   const shipToAddress = hasShippingAddress
     ? {
         name: invoice.customer_name || 'Customer',
         company: invoice.customer_company || undefined,
-        street1: invoice.shipping_address || '',
+        street1: invoice.shipping_address1 || '',
         street2: invoice.shipping_address2 || undefined,
         city: invoice.shipping_city || '',
         state: invoice.shipping_state || '',
-        postalCode: invoice.shipping_zip_code || '',
+        postalCode: invoice.shipping_zip || '',
         country: invoice.shipping_country || 'US',
         phone: invoice.customer_phone || undefined,
       }
@@ -121,7 +121,7 @@ export function buildShipStationOrderPayload(
   const items = lineItems.map((item) => ({
     lineItemKey: item.id,
     sku: item.sku || item.id,
-    name: item.product_name || item.description || 'Custom Item',
+    name: item.name || 'Custom Item',
     quantity: item.quantity || 1,
     unitPrice: item.unit_price || 0,
     weight: {
@@ -132,7 +132,7 @@ export function buildShipStationOrderPayload(
 
   const payload: ShipStationOrderPayload = {
     orderNumber: invoice.invoice_number,
-    orderKey: invoice.id,
+    orderKey: invoice.uuid || invoice.id,
     orderDate: invoice.created_at,
     orderStatus: 'awaiting_shipment',
     customerUsername: invoice.customer_email,
