@@ -14,18 +14,21 @@ interface InvoiceData {
   customer_name: string;
   customer_company?: string;
   customer_email: string;
-  customer_phone: string;
-  customer_address: string;
-  customer_address2: string;
-  customer_city: string;
-  customer_state: string;
-  customer_zip_code: string;
-  customer_country: string;
+  customer_phone?: string;
+  billing_address?: string;
+  billing_address_line1?: string;
+  billing_address_line2?: string;
+  billing_city?: string;
+  billing_state?: string;
+  billing_zip?: string;
   shipping_address?: string;
-  shipping_address2?: string;
+  shipping_line1?: string;
+  shipping_line2?: string;
+  shipping_address_line1?: string;
+  shipping_address_line2?: string;
   shipping_city?: string;
   shipping_state?: string;
-  shipping_zip_code?: string;
+  shipping_zip?: string;
   shipping_country?: string;
   total: number;
   tax?: number;
@@ -33,10 +36,11 @@ interface InvoiceData {
   created_at: string;
   company_id: string;
   shipstation_order_id?: string;
-  total_weight_oz: number;
-  package_length: number;
-  package_width: number;
-  package_height: number;
+  shipstation_order_key?: string;
+  total_weight_oz?: number;
+  package_length?: number;
+  package_width?: number;
+  package_height?: number;
 }
 
 interface LineItem {
@@ -205,21 +209,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Map invoice fields to expected format
-    const invoiceData: InvoiceData = {
-      ...invoice,
-      shipping_address1: invoice.ship_address_1 || invoice.customer_address || '',
-      shipping_address2: invoice.ship_address_2 || invoice.customer_address2 || '',
-      shipping_city: invoice.ship_city || invoice.customer_city || '',
-      shipping_state: invoice.ship_state || invoice.customer_state || '',
-      shipping_zip_code: invoice.ship_zip || invoice.customer_zip_code || '',
-      shipping_country: invoice.customer_country || 'US',
-      customer_address: invoice.customer_address || '',
-      customer_city: invoice.customer_city || '',
-      customer_state: invoice.customer_state || '',
-      customer_zip_code: invoice.customer_zip_code || '',
-      customer_country: invoice.customer_country || 'US',
-    };
+    const invoiceData: InvoiceData = invoice as InvoiceData;
 
     // Fetch line items
     const { data: lineItems, error: lineItemsError } = await supabaseClient
@@ -361,18 +351,16 @@ Deno.serve(async (req: Request) => {
         id: invoiceData.id,
         customer_name: invoiceData.customer_name,
         customer_email: invoiceData.customer_email,
-        ship_address_1: invoiceData.ship_address_1,
-        ship_city: invoiceData.ship_city,
-        ship_state: invoiceData.ship_state,
-        ship_zip: invoiceData.ship_zip,
-        shipping_address1: invoiceData.shipping_address1,
+        billing_address_line1: invoiceData.billing_address_line1,
+        billing_city: invoiceData.billing_city,
+        billing_state: invoiceData.billing_state,
+        billing_zip: invoiceData.billing_zip,
+        shipping_address: invoiceData.shipping_address,
+        shipping_line1: invoiceData.shipping_line1,
+        shipping_address_line1: invoiceData.shipping_address_line1,
         shipping_city: invoiceData.shipping_city,
         shipping_state: invoiceData.shipping_state,
-        shipping_zip_code: invoiceData.shipping_zip_code,
-        customer_address: invoiceData.customer_address,
-        customer_city: invoiceData.customer_city,
-        customer_state: invoiceData.customer_state,
-        customer_zip_code: invoiceData.customer_zip_code,
+        shipping_zip: invoiceData.shipping_zip,
       }, null, 2));
 
       console.log('Line items count:', lineItems?.length || 0);
