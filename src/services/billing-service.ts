@@ -631,9 +631,9 @@ export const billingService = {
 
         const { data: stripePayments } = await supabase
           .from('stripe_payments')
-          .select('payment_date, stripe_payment_intent_id, payment_method')
+          .select('created_at, stripe_payment_intent_id, payment_method')
           .eq('printavo_invoice_id', item.id)
-          .order('payment_date', { ascending: false })
+          .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
 
