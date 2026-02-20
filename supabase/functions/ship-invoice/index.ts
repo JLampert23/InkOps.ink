@@ -48,9 +48,9 @@ interface LineItem {
   description: string;
   quantity: number;
   unit_price: number;
-  line_type: string;
-  sku: string;
-  product_name: string;
+  item_type: string;
+  style_number?: string;
+  style_name?: string;
   weight_oz?: number;
 }
 

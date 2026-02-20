@@ -29,8 +29,9 @@ interface Invoice {
 
 interface LineItem {
   id: string;
-  sku?: string;
-  name?: string;
+  style_number?: string;
+  style_name?: string;
+  description?: string;
   quantity: number;
   unit_price: number;
   weight_oz?: number;
@@ -125,8 +126,8 @@ export function buildShipStationOrderPayload(
 
   const items = lineItems.map((item) => ({
     lineItemKey: item.id,
-    sku: item.sku || item.id,
-    name: item.name || 'Custom Item',
+    sku: item.style_number || item.id,
+    name: item.description || item.style_name || 'Custom Item',
     quantity: item.quantity || 1,
     unitPrice: item.unit_price || 0,
     weight: {
