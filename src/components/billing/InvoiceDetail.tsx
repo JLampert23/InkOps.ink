@@ -583,12 +583,20 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                 invoice.rawData?.shipping_status === 'sent_to_shipstation') &&
               !labelUrl && (
               <button
-                onClick={() => {
+                onClick={async () => {
+                  await loadInvoice();
+
                   const hasShippingAddress = invoice.rawData?.shipping_line1 ||
                     invoice.rawData?.shipping_address_line1 ||
                     invoice.rawData?.shipping_city;
 
-                  if (hasShippingAddress) {
+                  const hasRequiredFields =
+                    (invoice.rawData?.shipping_line1 || invoice.rawData?.shipping_address_line1) &&
+                    invoice.rawData?.shipping_city &&
+                    invoice.rawData?.shipping_state &&
+                    invoice.rawData?.shipping_zip;
+
+                  if (hasShippingAddress && hasRequiredFields) {
                     setShowShipConfirm(true);
                   } else {
                     setShippingAddressForm({
