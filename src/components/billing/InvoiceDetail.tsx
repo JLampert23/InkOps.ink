@@ -17,6 +17,7 @@ import {
   MapPin,
   MessageSquare,
   Phone,
+  Printer,
   RefreshCw,
   RotateCcw,
   Send,
@@ -130,7 +131,9 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
         setInvoice(data);
         setCustomerPhone(data.contact.phone);
 
-        if (data.rawData?.shipping_status === 'label_created') {
+        if (data.shippingLabelUrl) {
+          setLabelUrl(data.shippingLabelUrl);
+        } else if (data.rawData?.shipping_status === 'label_created') {
           const { data: labelData } = await supabase
             .from('shipping_labels')
             .select('label_url')
@@ -555,12 +558,12 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                 <span className="lg:hidden hidden sm:inline">Ship</span>
               </button>
             )}
-            {(invoice.rawData?.shipping_status === 'label_created' || labelUrl) && labelUrl && (
+            {(invoice.shippingLabelUrl || labelUrl) && (
               <button
-                onClick={() => window.open(labelUrl, '_blank')}
+                onClick={() => window.open(invoice.shippingLabelUrl || labelUrl || '', '_blank')}
                 className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors whitespace-nowrap"
               >
-                <Download className="w-4 h-4" />
+                <Printer className="w-4 h-4" />
                 <span className="hidden lg:inline">Print Label</span>
                 <span className="lg:hidden hidden sm:inline">Label</span>
               </button>

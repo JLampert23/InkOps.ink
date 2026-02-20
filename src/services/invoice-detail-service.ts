@@ -119,6 +119,8 @@ export interface InvoiceDetail {
   lockedAt: string | null;
   lockedBy: string | null;
 
+  shippingLabelUrl: string | null;
+
   rawData: any;
 }
 
@@ -411,6 +413,8 @@ export const invoiceDetailService = {
         isFinanciallyLocked: invoice.is_financially_locked || false,
         lockedAt: invoice.locked_at || null,
         lockedBy: invoice.locked_by || null,
+
+        shippingLabelUrl: invoice.shipping_label_url || null,
 
         rawData,
       };
