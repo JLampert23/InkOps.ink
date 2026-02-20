@@ -381,6 +381,7 @@ Deno.serve(async (req: Request) => {
 
     const shipStationOrderId = responseData.orderId?.toString();
     const shipStationOrderNumber = responseData.orderNumber;
+    const orderKey = responseData.orderKey;
 
     await logShipStationAction(
       supabaseClient,
