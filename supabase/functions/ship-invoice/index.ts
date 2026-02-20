@@ -357,10 +357,32 @@ Deno.serve(async (req: Request) => {
 
     // Step 1: Create or verify ShipStation order exists
     if (!shipStationOrderId) {
+      console.log('Invoice data for ShipStation:', JSON.stringify({
+        id: invoiceData.id,
+        customer_name: invoiceData.customer_name,
+        customer_email: invoiceData.customer_email,
+        ship_address_1: invoiceData.ship_address_1,
+        ship_city: invoiceData.ship_city,
+        ship_state: invoiceData.ship_state,
+        ship_zip: invoiceData.ship_zip,
+        shipping_address1: invoiceData.shipping_address1,
+        shipping_city: invoiceData.shipping_city,
+        shipping_state: invoiceData.shipping_state,
+        shipping_zip_code: invoiceData.shipping_zip_code,
+        customer_address: invoiceData.customer_address,
+        customer_city: invoiceData.customer_city,
+        customer_state: invoiceData.customer_state,
+        customer_zip_code: invoiceData.customer_zip_code,
+      }, null, 2));
+
+      console.log('Line items count:', lineItems?.length || 0);
+
       const shipStationPayload = buildShipStationOrderPayload(
         invoiceData,
         lineItems || []
       );
+
+      console.log('Built ShipStation payload:', JSON.stringify(shipStationPayload, null, 2));
 
       const validation = validateShipStationPayload(shipStationPayload);
       if (!validation.valid) {
