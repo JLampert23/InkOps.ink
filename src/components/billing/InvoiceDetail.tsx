@@ -583,9 +583,7 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                 invoice.rawData?.shipping_status === 'sent_to_shipstation') &&
               !labelUrl && (
               <button
-                onClick={async () => {
-                  await loadInvoice();
-
+                onClick={() => {
                   const hasShippingAddress = invoice.rawData?.shipping_line1 ||
                     invoice.rawData?.shipping_address_line1 ||
                     invoice.rawData?.shipping_city;
