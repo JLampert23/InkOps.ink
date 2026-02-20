@@ -109,12 +109,31 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  const authHeader = req.headers.get("Authorization");
+  console.log('Authorization header present:', !!authHeader);
+
+  if (!authHeader) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "Missing Authorization header",
+      }),
+      {
+        status: 401,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+
   const supabaseClient = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
     Deno.env.get("SUPABASE_ANON_KEY") ?? "",
     {
       global: {
-        headers: { Authorization: req.headers.get("Authorization")! },
+        headers: { Authorization: authHeader },
       },
     }
   );
@@ -138,12 +157,19 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: { user } } = await supabaseClient.auth.getUser();
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+
+    if (authError) {
+      console.error('Auth error:', authError);
+    }
+
     if (!user) {
+      console.error('No user found in session');
       return new Response(
         JSON.stringify({
           success: false,
-          error: "Unauthorized",
+          error: "Unauthorized - invalid or expired session",
+          details: authError?.message,
         }),
         {
           status: 401,
