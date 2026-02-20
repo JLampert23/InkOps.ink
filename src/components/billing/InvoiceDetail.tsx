@@ -67,6 +67,16 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
   const [reverting, setReverting] = useState(false);
   const [shippingWithShipStation, setShippingWithShipStation] = useState(false);
   const [showShipConfirm, setShowShipConfirm] = useState(false);
+  const [showShippingAddressModal, setShowShippingAddressModal] = useState(false);
+  const [shippingAddressForm, setShippingAddressForm] = useState({
+    shipping_line1: '',
+    shipping_line2: '',
+    shipping_city: '',
+    shipping_state: '',
+    shipping_zip: '',
+    shipping_country: 'US',
+  });
+  const [savingAddress, setSavingAddress] = useState(false);
   const [labelUrl, setLabelUrl] = useState<string | null>(null);
   const [companySettings, setCompanySettings] = useState<{
     company_name: string | null;
@@ -343,6 +353,29 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
     }
   };
 
+  const handleSaveShippingAddress = async () => {
+    if (!invoice) return;
+    setSavingAddress(true);
+
+    try {
+      const { error } = await supabase
+        .from('printavo_invoices')
+        .update(shippingAddressForm)
+        .eq('id', invoice.id);
+
+      if (error) throw error;
+
+      setShowShippingAddressModal(false);
+      await loadInvoice();
+      setShowShipConfirm(true);
+    } catch (err) {
+      console.error('Error saving shipping address:', err);
+      alert('Failed to save shipping address');
+    } finally {
+      setSavingAddress(false);
+    }
+  };
+
   const handleShipWithShipStation = async () => {
     if (!invoice) return;
     setShowShipConfirm(false);
@@ -550,7 +583,25 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                 invoice.rawData?.shipping_status === 'sent_to_shipstation') &&
               !labelUrl && (
               <button
-                onClick={() => setShowShipConfirm(true)}
+                onClick={() => {
+                  const hasShippingAddress = invoice.rawData?.shipping_line1 ||
+                    invoice.rawData?.shipping_address_line1 ||
+                    invoice.rawData?.shipping_city;
+
+                  if (hasShippingAddress) {
+                    setShowShipConfirm(true);
+                  } else {
+                    setShippingAddressForm({
+                      shipping_line1: invoice.rawData?.shipping_line1 || invoice.rawData?.billing_address_line1 || '',
+                      shipping_line2: invoice.rawData?.shipping_line2 || invoice.rawData?.billing_address_line2 || '',
+                      shipping_city: invoice.rawData?.shipping_city || invoice.rawData?.billing_city || '',
+                      shipping_state: invoice.rawData?.shipping_state || invoice.rawData?.billing_state || '',
+                      shipping_zip: invoice.rawData?.shipping_zip || invoice.rawData?.billing_zip || '',
+                      shipping_country: invoice.rawData?.shipping_country || 'US',
+                    });
+                    setShowShippingAddressModal(true);
+                  }
+                }}
                 disabled={shippingWithShipStation}
                 className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-white bg-blue-600 dark:bg-blue-700 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 whitespace-nowrap"
               >
@@ -1552,6 +1603,148 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
           onClose={() => setShowPaymentModal(false)}
           onSuccess={handlePaymentSuccess}
         />
+      )}
+
+      {/* Shipping Address Modal */}
+      {showShippingAddressModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Add Shipping Address</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Shipping address is required to create a shipping label
+              </p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Street Address Line 1 *
+                </label>
+                <input
+                  type="text"
+                  value={shippingAddressForm.shipping_line1}
+                  onChange={(e) =>
+                    setShippingAddressForm({ ...shippingAddressForm, shipping_line1: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                  placeholder="123 Main St"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Street Address Line 2
+                </label>
+                <input
+                  type="text"
+                  value={shippingAddressForm.shipping_line2}
+                  onChange={(e) =>
+                    setShippingAddressForm({ ...shippingAddressForm, shipping_line2: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                  placeholder="Apt, Suite, etc."
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    City *
+                  </label>
+                  <input
+                    type="text"
+                    value={shippingAddressForm.shipping_city}
+                    onChange={(e) =>
+                      setShippingAddressForm({ ...shippingAddressForm, shipping_city: e.target.value })
+                    }
+                    className="w-full px-4 py-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                    placeholder="City"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    State *
+                  </label>
+                  <input
+                    type="text"
+                    value={shippingAddressForm.shipping_state}
+                    onChange={(e) =>
+                      setShippingAddressForm({ ...shippingAddressForm, shipping_state: e.target.value })
+                    }
+                    className="w-full px-4 py-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                    placeholder="CA"
+                    maxLength={2}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    ZIP Code *
+                  </label>
+                  <input
+                    type="text"
+                    value={shippingAddressForm.shipping_zip}
+                    onChange={(e) =>
+                      setShippingAddressForm({ ...shippingAddressForm, shipping_zip: e.target.value })
+                    }
+                    className="w-full px-4 py-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                    placeholder="12345"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Country
+                  </label>
+                  <input
+                    type="text"
+                    value={shippingAddressForm.shipping_country}
+                    onChange={(e) =>
+                      setShippingAddressForm({ ...shippingAddressForm, shipping_country: e.target.value })
+                    }
+                    className="w-full px-4 py-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                    placeholder="US"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-slate-700 flex justify-end gap-3">
+              <button
+                onClick={() => setShowShippingAddressModal(false)}
+                disabled={savingAddress}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveShippingAddress}
+                disabled={
+                  savingAddress ||
+                  !shippingAddressForm.shipping_line1 ||
+                  !shippingAddressForm.shipping_city ||
+                  !shippingAddressForm.shipping_state ||
+                  !shippingAddressForm.shipping_zip
+                }
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {savingAddress ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    Save & Continue
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Ship with ShipStation Confirmation Modal */}
