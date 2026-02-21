@@ -16,6 +16,7 @@ import {
   Mail,
   MapPin,
   MessageSquare,
+  Package,
   Phone,
   Printer,
   RefreshCw,
@@ -85,6 +86,14 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
     company_website: string | null;
     invoice_terms: string | null;
   } | null>(null);
+  const [packagesExpanded, setPackagesExpanded] = useState(false);
+  const [numPackages, setNumPackages] = useState(1);
+  const [packages, setPackages] = useState<Array<{
+    weight_oz: number;
+    length: number;
+    width: number;
+    height: number;
+  }>>([{ weight_oz: 16, length: 12, width: 9, height: 3 }]);
 
   useEffect(() => {
     loadInvoice();
@@ -362,6 +371,26 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
     }
   };
 
+  const handleNumPackagesChange = (num: number) => {
+    const clampedNum = Math.max(1, Math.min(20, num));
+    setNumPackages(clampedNum);
+
+    const newPackages = [...packages];
+    while (newPackages.length < clampedNum) {
+      newPackages.push({ weight_oz: 16, length: 12, width: 9, height: 3 });
+    }
+    while (newPackages.length > clampedNum) {
+      newPackages.pop();
+    }
+    setPackages(newPackages);
+  };
+
+  const handlePackageChange = (index: number, field: keyof typeof packages[0], value: number) => {
+    const newPackages = [...packages];
+    newPackages[index] = { ...newPackages[index], [field]: value };
+    setPackages(newPackages);
+  };
+
   const handleShipWithShipStation = async () => {
     if (!invoice) return;
     setShowShipConfirm(false);
@@ -370,6 +399,14 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
+
+      const requestBody: { invoice_id: string; packages?: typeof packages } = {
+        invoice_id: invoice.id,
+      };
+
+      if (numPackages > 1) {
+        requestBody.packages = packages;
+      }
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ship-invoice`,
@@ -380,9 +417,7 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
             'Content-Type': 'application/json',
             'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
           },
-          body: JSON.stringify({
-            invoice_id: invoice.id,
-          }),
+          body: JSON.stringify(requestBody),
         }
       );
 
@@ -395,8 +430,14 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
         throw new Error(result.error || 'Failed to create shipping label');
       }
 
-      setLabelUrl(result.label_url);
-      alert(`Shipping label created! Tracking #: ${result.tracking_number}`);
+      if (result.labels) {
+        setLabelUrl(result.labels[0]?.label_data || null);
+        const trackingNumbers = result.tracking_numbers?.join(', ') || '';
+        alert(`${result.package_count} shipping label(s) created! Tracking #: ${trackingNumbers}`);
+      } else {
+        setLabelUrl(result.label_url);
+        alert(`Shipping label created! Tracking #: ${result.tracking_number}`);
+      }
       await loadInvoice();
     } catch (err: any) {
       console.error('ShipStation error:', err);
@@ -1153,6 +1194,122 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Shipping Packages */}
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
+            <button
+              onClick={() => setPackagesExpanded(!packagesExpanded)}
+              className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+            >
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <Package className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+                Shipping Packages
+              </h2>
+              {packagesExpanded ? (
+                <ChevronUp className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+              ) : (
+                <ChevronDown className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+              )}
+            </button>
+            {packagesExpanded && (
+              <div className="px-6 pb-6 space-y-4 border-t border-gray-200 dark:border-slate-700 pt-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Number of Packages
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={numPackages}
+                    onChange={(e) => handleNumPackagesChange(parseInt(e.target.value) || 1)}
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                  />
+                </div>
+
+                <div className="space-y-4 max-h-80 overflow-y-auto">
+                  {packages.map((pkg, index) => (
+                    <div
+                      key={index}
+                      className="p-4 bg-gray-50 dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-700"
+                    >
+                      <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+                        Package {index + 1}
+                      </h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                            Weight (oz)
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.1}
+                            value={pkg.weight_oz}
+                            onChange={(e) =>
+                              handlePackageChange(index, 'weight_oz', parseFloat(e.target.value) || 0)
+                            }
+                            className="w-full px-2 py-1.5 text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                            Length (in)
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.1}
+                            value={pkg.length}
+                            onChange={(e) =>
+                              handlePackageChange(index, 'length', parseFloat(e.target.value) || 0)
+                            }
+                            className="w-full px-2 py-1.5 text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                            Width (in)
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.1}
+                            value={pkg.width}
+                            onChange={(e) =>
+                              handlePackageChange(index, 'width', parseFloat(e.target.value) || 0)
+                            }
+                            className="w-full px-2 py-1.5 text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                            Height (in)
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.1}
+                            value={pkg.height}
+                            onChange={(e) =>
+                              handlePackageChange(index, 'height', parseFloat(e.target.value) || 0)
+                            }
+                            className="w-full px-2 py-1.5 text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {numPackages > 1 && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Multi-package shipment: {numPackages} packages will be created with ShipStation
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Stripe Payment Link */}
