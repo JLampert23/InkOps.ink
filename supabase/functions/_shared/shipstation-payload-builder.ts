@@ -31,6 +31,15 @@ function normalizeCountryCode(country?: string): string {
   return countryMap[upperCountry] || 'US';
 }
 
+interface AddressJsonb {
+  line1?: string;
+  line2?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+}
+
 interface Invoice {
   id: string;
   uuid?: string;
@@ -39,13 +48,13 @@ interface Invoice {
   customer_company?: string;
   customer_email: string;
   customer_phone?: string;
-  billing_address?: string;
+  billing_address?: AddressJsonb | string;
   billing_address_line1?: string;
   billing_address_line2?: string;
   billing_city?: string;
   billing_state?: string;
   billing_zip?: string;
-  shipping_address?: string;
+  shipping_address?: AddressJsonb | string;
   shipping_line1?: string;
   shipping_line2?: string;
   shipping_address_line1?: string;
@@ -125,40 +134,53 @@ interface ShipStationOrderPayload {
   };
 }
 
+function extractAddressField(address: AddressJsonb | string | undefined, field: keyof AddressJsonb): string {
+  if (!address) return '';
+  if (typeof address === 'string') return field === 'line1' ? address : '';
+  return address[field] || '';
+}
+
 export function buildShipStationOrderPayload(
   invoice: Invoice,
   lineItems: LineItem[] = []
 ): ShipStationOrderPayload {
+  const billingStreet1 = invoice.billing_address_line1 || extractAddressField(invoice.billing_address, 'line1');
+  const billingStreet2 = invoice.billing_address_line2 || extractAddressField(invoice.billing_address, 'line2');
+  const billingCity = invoice.billing_city || extractAddressField(invoice.billing_address, 'city');
+  const billingState = invoice.billing_state || extractAddressField(invoice.billing_address, 'state');
+  const billingZip = invoice.billing_zip || extractAddressField(invoice.billing_address, 'zip');
+
   const billToAddress = {
     name: invoice.customer_name || 'Customer',
     company: invoice.customer_company || undefined,
-    street1: invoice.billing_address_line1 || invoice.billing_address || '',
-    street2: invoice.billing_address_line2 || undefined,
-    city: invoice.billing_city || '',
-    state: invoice.billing_state || '',
-    postalCode: invoice.billing_zip || '',
+    street1: billingStreet1,
+    street2: billingStreet2 || undefined,
+    city: billingCity,
+    state: billingState,
+    postalCode: billingZip,
     country: 'US',
     phone: invoice.customer_phone || undefined,
   };
 
-  const hasShippingAddress =
-    invoice.shipping_address_line1 ||
-    invoice.shipping_line1 ||
-    invoice.shipping_address ||
-    invoice.shipping_city ||
-    invoice.shipping_state ||
-    invoice.shipping_zip;
+  const shippingStreet1 = invoice.shipping_address_line1 || invoice.shipping_line1 || extractAddressField(invoice.shipping_address, 'line1');
+  const shippingStreet2 = invoice.shipping_address_line2 || invoice.shipping_line2 || extractAddressField(invoice.shipping_address, 'line2');
+  const shippingCity = invoice.shipping_city || extractAddressField(invoice.shipping_address, 'city');
+  const shippingState = invoice.shipping_state || extractAddressField(invoice.shipping_address, 'state');
+  const shippingZip = invoice.shipping_zip || extractAddressField(invoice.shipping_address, 'zip');
+  const shippingCountry = invoice.shipping_country || extractAddressField(invoice.shipping_address, 'country');
+
+  const hasShippingAddress = shippingStreet1 || shippingCity || shippingState || shippingZip;
 
   const shipToAddress = hasShippingAddress
     ? {
         name: invoice.customer_name || 'Customer',
         company: invoice.customer_company || undefined,
-        street1: invoice.shipping_address_line1 || invoice.shipping_line1 || invoice.shipping_address || '',
-        street2: invoice.shipping_address_line2 || invoice.shipping_line2 || undefined,
-        city: invoice.shipping_city || '',
-        state: invoice.shipping_state || '',
-        postalCode: invoice.shipping_zip || '',
-        country: normalizeCountryCode(invoice.shipping_country),
+        street1: shippingStreet1,
+        street2: shippingStreet2 || undefined,
+        city: shippingCity,
+        state: shippingState,
+        postalCode: shippingZip,
+        country: normalizeCountryCode(shippingCountry),
         phone: invoice.customer_phone || undefined,
       }
     : billToAddress;
