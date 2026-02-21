@@ -83,6 +83,15 @@ export interface ShippingLabel {
   createdAt: string;
 }
 
+export interface ShippingLabelJsonb {
+  label_url?: string;
+  tracking_number?: string;
+  carrier?: string;
+  service?: string;
+  shipment_id?: string;
+  cost?: number;
+}
+
 export interface InvoiceDetail {
   id: string;
   printavoInvoiceId: string;
@@ -136,6 +145,7 @@ export interface InvoiceDetail {
 
   shippingLabelUrl: string | null;
   shippingLabels: ShippingLabel[];
+  shipping_labels: ShippingLabelJsonb[];
 
   rawData: any;
 }
@@ -452,6 +462,7 @@ export const invoiceDetailService = {
           shipDate: label.ship_date,
           createdAt: label.created_at,
         })),
+        shipping_labels: Array.isArray(invoice.shipping_labels) ? invoice.shipping_labels : [],
 
         rawData,
       };

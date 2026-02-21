@@ -1018,6 +1018,51 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                   <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
                     {invoiceDetailService.formatAddress(invoice.shippingAddress)}
                   </p>
+                  {invoice.shipping_labels && Array.isArray(invoice.shipping_labels) && invoice.shipping_labels.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
+                      <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+                        Shipping Labels
+                      </h4>
+                      <div className="space-y-2">
+                        {invoice.shipping_labels.map((label, index) => {
+                          const trackingUrl = label.carrier && label.tracking_number
+                            ? getCarrierTrackingUrl(label.carrier, label.tracking_number)
+                            : null;
+                          return (
+                            <div key={index} className="text-sm">
+                              <span className="font-medium text-gray-700 dark:text-gray-300">
+                                Package {index + 1}:
+                              </span>{' '}
+                              {trackingUrl ? (
+                                <a
+                                  href={trackingUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 dark:text-blue-400 hover:underline font-mono"
+                                >
+                                  {label.tracking_number}
+                                </a>
+                              ) : (
+                                <span className="font-mono text-gray-600 dark:text-gray-400">
+                                  {label.tracking_number || 'N/A'}
+                                </span>
+                              )}
+                              {label.carrier && (
+                                <span className="text-gray-500 dark:text-gray-400 ml-2">
+                                  {label.carrier}
+                                </span>
+                              )}
+                              {label.service && (
+                                <span className="text-gray-500 dark:text-gray-400 ml-1">
+                                  - {label.service}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
