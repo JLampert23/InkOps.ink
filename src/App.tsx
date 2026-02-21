@@ -44,7 +44,6 @@ function AppContent() {
   const [accountingExpanded, setAccountingExpanded] = useState(false);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [settingsInitialTab, setSettingsInitialTab] = useState<string | undefined>(undefined);
-  const [syncing, setSyncing] = useState(false);
   const [customerSearchTerm, setCustomerSearchTerm] = useState<string>('');
   const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
   const [customersKey, setCustomersKey] = useState(0);
@@ -157,18 +156,6 @@ function AppContent() {
       description: 'Workflow & production tracking'
     },
   ];
-
-  const handleSync = async () => {
-    setSyncing(true);
-    try {
-      await billingService.syncBillingQueue([]);
-      showNotification('success', 'Sync completed successfully!', 'Data has been refreshed from Printavo');
-    } catch (error: any) {
-      showNotification('error', 'Sync failed', error.message || 'Failed to sync from Printavo');
-    } finally {
-      setSyncing(false);
-    }
-  };
 
   const handleNavigateToCustomer = (searchTerm: string, customerEmail: string) => {
     setCustomerSearchTerm(searchTerm);
@@ -392,22 +379,6 @@ function AppContent() {
               )}
             </div>
             <div className="flex items-center gap-3">
-              {/* Sync to Printavo button - Only show on accounting pages */}
-              {(activeTab === 'accounting-dashboard' ||
-                activeTab === 'accounts-receivable' ||
-                activeTab === 'paid-invoices' ||
-                activeTab === 'customers' ||
-                activeTab === 'payments') && (
-                <button
-                  onClick={handleSync}
-                  disabled={syncing}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors shadow-md hover:shadow-lg disabled:opacity-50"
-                  title="Sync from Printavo"
-                >
-                  <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-                  <span className="font-medium">{syncing ? 'Syncing...' : 'Sync to Printavo'}</span>
-                </button>
-              )}
               {activeTab === 'customers' && (
                 <button
                   onClick={() => setShowCreateCustomerModal(true)}

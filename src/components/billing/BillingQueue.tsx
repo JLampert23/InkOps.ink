@@ -323,7 +323,7 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
           <p className="text-gray-600 dark:text-gray-400">
             {statusFilter !== 'all'
               ? 'No invoices match the selected filter'
-              : 'Use the "Sync from Printavo" button in the sidebar to populate the billing queue'}
+              : 'No invoices are currently in the billing queue'}
           </p>
         </div>
       ) : (

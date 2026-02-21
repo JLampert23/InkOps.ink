@@ -51,7 +51,6 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
   const [generatingLink, setGeneratingLink] = useState(false);
   const [sendingInvoice, setSendingInvoice] = useState(false);
   const [markingPaid, setMarkingPaid] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   const [creatingStripeInvoice, setCreatingStripeInvoice] = useState(false);
   const [stripeInvoiceUrl, setStripeInvoiceUrl] = useState<string | null>(null);
   const [notesExpanded, setNotesExpanded] = useState(true);
@@ -305,19 +304,6 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
     setShowPaymentModal(false);
     await loadInvoice();
     alert('Payment recorded successfully!');
-  };
-
-  const handleSync = async () => {
-    if (!invoice) return;
-    setSyncing(true);
-    try {
-      await invoiceDetailService.syncInvoice(invoice.printavoInvoiceId);
-      await loadInvoice();
-    } catch (err: any) {
-      alert(err.message || 'Failed to sync invoice');
-    } finally {
-      setSyncing(false);
-    }
   };
 
   const handleCopyLink = async () => {
@@ -644,14 +630,6 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                 <span className="lg:hidden hidden sm:inline">Label</span>
               </button>
             )}
-            <button
-              onClick={handleSync}
-              disabled={syncing}
-              className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors disabled:opacity-50 whitespace-nowrap"
-            >
-              <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Sync</span>
-            </button>
             <button
               onClick={() => invoice && generateInvoicePDF(invoice, {
                 companyName: companySettings?.company_name || undefined,
