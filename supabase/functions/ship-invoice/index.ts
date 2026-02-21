@@ -143,7 +143,7 @@ Deno.serve(async (req: Request) => {
       }
     );
 
-    const { invoice_id, packages } = await req.json();
+    const { invoice_id, packages, selected_rate } = await req.json();
 
     if (!invoice_id) {
       return new Response(
@@ -303,7 +303,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (!settings.shipstation_default_carrier_code || !settings.shipstation_default_service_code) {
+    if (!selected_rate && (!settings.shipstation_default_carrier_code || !settings.shipstation_default_service_code)) {
       return new Response(
         JSON.stringify({
           success: false,
@@ -357,6 +357,112 @@ Deno.serve(async (req: Request) => {
 
     const credentials = btoa(`${apiKey}:${apiSecret}`);
     let shipStationOrderId = invoiceData.shipstation_order_id;
+
+    // If selected_rate is NOT provided, fetch rates and return them
+    if (!selected_rate) {
+      const shipToAddress = {
+        street1: invoiceData.shipping_line1 || invoiceData.shipping_address_line1 || invoiceData.billing_address_line1 || '',
+        street2: invoiceData.shipping_line2 || invoiceData.shipping_address_line2 || invoiceData.billing_address_line2 || '',
+        city: invoiceData.shipping_city || invoiceData.billing_city || '',
+        state: invoiceData.shipping_state || invoiceData.billing_state || '',
+        postalCode: invoiceData.shipping_zip || invoiceData.billing_zip || '',
+        country: invoiceData.shipping_country || 'US',
+      };
+
+      const fromAddress = {
+        postalCode: companySettings.company_zip || '60612',
+        country: 'US',
+      };
+
+      let ratePackages: Array<{ weight: { value: number; units: string }; dimensions: { units: string; length: number; width: number; height: number } }> = [];
+
+      if (packages && Array.isArray(packages) && packages.length > 0) {
+        ratePackages = packages.map((pkg: { weight_oz: number; length: number; width: number; height: number }) => ({
+          weight: { value: pkg.weight_oz, units: "ounces" },
+          dimensions: { units: "inches", length: pkg.length, width: pkg.width, height: pkg.height },
+        }));
+      } else {
+        ratePackages = [{
+          weight: { value: invoiceData.total_weight_oz || 16, units: "ounces" },
+          dimensions: {
+            units: "inches",
+            length: invoiceData.package_length || 12,
+            width: invoiceData.package_width || 9,
+            height: invoiceData.package_height || 3,
+          },
+        }];
+      }
+
+      const ratePayload = {
+        carrierCode: null,
+        fromPostalCode: fromAddress.postalCode,
+        toState: shipToAddress.state,
+        toCountry: shipToAddress.country,
+        toPostalCode: shipToAddress.postalCode,
+        toCity: shipToAddress.city,
+        weight: ratePackages[0].weight,
+        dimensions: ratePackages[0].dimensions,
+        confirmation: "none",
+        residential: true,
+      };
+
+      console.log('Fetching ShipStation rates:', JSON.stringify(ratePayload, null, 2));
+
+      const ratesResponse = await fetch("https://ssapi.shipstation.com/shipments/getrates", {
+        method: "POST",
+        headers: {
+          "Authorization": `Basic ${credentials}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(ratePayload),
+      });
+
+      const ratesResponseText = await ratesResponse.text();
+      let ratesResponseData: any;
+
+      try {
+        ratesResponseData = JSON.parse(ratesResponseText);
+      } catch {
+        ratesResponseData = { raw: ratesResponseText };
+      }
+
+      console.log('ShipStation rates response:', ratesResponseData);
+
+      if (!ratesResponse.ok) {
+        const errorMessage = ratesResponseData?.message || ratesResponseData?.ExceptionMessage || ratesResponseText || 'Rate lookup failed';
+
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: `Rate lookup failed: ${errorMessage}`,
+            status_code: ratesResponse.status,
+            details: ratesResponseData,
+          }),
+          {
+            status: 200,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          mode: "rates",
+          rates: ratesResponseData,
+        }),
+        {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
 
     // Step 1: Create or verify ShipStation order exists
     if (!shipStationOrderId) {
@@ -549,9 +655,9 @@ Deno.serve(async (req: Request) => {
 
         const labelPayload = {
           orderId: parseInt(shipStationOrderId!),
-          carrierCode: settings.shipstation_default_carrier_code,
-          serviceCode: settings.shipstation_default_service_code,
-          packageCode: "package",
+          carrierCode: selected_rate?.carrierCode || settings.shipstation_default_carrier_code,
+          serviceCode: selected_rate?.serviceCode || settings.shipstation_default_service_code,
+          packageCode: selected_rate?.packageCode || "package",
           confirmation: "none",
           shipDate: today,
           weight: {
@@ -754,9 +860,9 @@ Deno.serve(async (req: Request) => {
     // Single package label creation (existing logic)
     const labelPayload = {
       orderId: parseInt(shipStationOrderId!),
-      carrierCode: settings.shipstation_default_carrier_code,
-      serviceCode: settings.shipstation_default_service_code,
-      packageCode: "package",
+      carrierCode: selected_rate?.carrierCode || settings.shipstation_default_carrier_code,
+      serviceCode: selected_rate?.serviceCode || settings.shipstation_default_service_code,
+      packageCode: selected_rate?.packageCode || "package",
       confirmation: "none",
       shipDate: today,
       weight: {
