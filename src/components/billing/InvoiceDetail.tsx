@@ -941,54 +941,6 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                   <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
                     {invoiceDetailService.formatAddress(invoice.shippingAddress)}
                   </p>
-                  {invoice.shippingLabels && invoice.shippingLabels.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
-                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                        <Truck className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                        Tracking Information
-                      </h4>
-                      <div className="space-y-2">
-                        {invoice.shippingLabels.map((label, index) => {
-                          const trackingUrl = getCarrierTrackingUrl(label.carrier, label.trackingNumber);
-                          return (
-                            <div key={label.id} className="flex flex-col gap-1">
-                              {invoice.shippingLabels.length > 1 && (
-                                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                                  Package {index + 1}:
-                                </span>
-                              )}
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {trackingUrl ? (
-                                  <a
-                                    href={trackingUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-mono"
-                                  >
-                                    {label.trackingNumber}
-                                  </a>
-                                ) : (
-                                  <span className="text-sm text-gray-700 dark:text-gray-300 font-mono">
-                                    {label.trackingNumber || 'N/A'}
-                                  </span>
-                                )}
-                                {label.carrier && (
-                                  <span className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded">
-                                    {label.carrier}
-                                  </span>
-                                )}
-                                {label.service && (
-                                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                                    {label.service}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
@@ -1330,6 +1282,60 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
               )}
             </div>
           </div>
+
+          {/* Tracking Information */}
+          {invoice.shippingLabels && invoice.shippingLabels.length > 0 && (
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <Truck className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+                Tracking Information
+              </h2>
+              <div className="space-y-3">
+                {invoice.shippingLabels.map((label, index) => {
+                  const trackingUrl = getCarrierTrackingUrl(label.carrier, label.trackingNumber);
+                  return (
+                    <div key={label.id} className="p-3 bg-gray-50 dark:bg-slate-900 rounded-lg">
+                      {invoice.shippingLabels.length > 1 && (
+                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                          Package {index + 1}:
+                        </p>
+                      )}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Package className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                        {trackingUrl ? (
+                          <a
+                            href={trackingUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-mono flex items-center gap-1"
+                          >
+                            {label.trackingNumber}
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        ) : (
+                          <span className="text-sm text-gray-700 dark:text-gray-300 font-mono">
+                            {label.trackingNumber || 'N/A'}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        {label.carrier && (
+                          <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-0.5 rounded font-medium">
+                            {label.carrier}
+                          </span>
+                        )}
+                        {label.service && (
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {label.service}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Stripe Payment Link */}
           {invoice.stripePaymentLink && (
