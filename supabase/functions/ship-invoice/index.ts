@@ -166,15 +166,19 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const token = authHeader.replace('Bearer ', '');
+    console.log('Token length:', token?.length, 'Token prefix:', token?.substring(0, 20));
+
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
 
     if (authError) {
-      console.error('Auth error:', authError);
+      console.error('Auth error details:', JSON.stringify(authError));
       return new Response(
         JSON.stringify({
           success: false,
           error: "Authentication failed",
           details: authError?.message,
+          code: authError?.code,
         }),
         {
           status: 401,
