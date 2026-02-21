@@ -359,8 +359,16 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
 
       if (error) throw error;
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError || !refreshedSession) {
+          throw new Error('Session expired. Please refresh the page and try again.');
+        }
+      }
+
+      const currentSession = (await supabase.auth.getSession()).data.session;
+      if (!currentSession) throw new Error('Not authenticated');
 
       const requestBody: { invoice_id: string; packages?: typeof packages } = {
         invoice_id: invoice.id,
@@ -372,7 +380,7 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${session.access_token}`,
+            'Authorization': `Bearer ${currentSession.access_token}`,
             'Content-Type': 'application/json',
             'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
           },
@@ -380,7 +388,21 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
         }
       );
 
-      const result = await response.json();
+      if (response.status === 401) {
+        const { error: refreshErr } = await supabase.auth.refreshSession();
+        if (refreshErr) {
+          throw new Error('Your session has expired. Please refresh the page and log in again.');
+        }
+        throw new Error('Authentication failed. Please try again.');
+      }
+
+      const responseText = await response.text();
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch {
+        throw new Error(`Server error: ${responseText.substring(0, 200)}`);
+      }
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to create shipping label');
