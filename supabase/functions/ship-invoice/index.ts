@@ -635,7 +635,9 @@ Deno.serve(async (req: Request) => {
     }
 
     // Parse label response
-    const labelUrl = labelResponseData.labelData;
+    // labelData is base64-encoded PDF, we need to convert it to a data URL for viewing
+    const labelDataBase64 = labelResponseData.labelData;
+    const labelUrl = labelDataBase64 ? `data:application/pdf;base64,${labelDataBase64}` : null;
     const trackingNumber = labelResponseData.trackingNumber;
     const shipmentId = labelResponseData.shipmentId?.toString();
     const carrierCode = labelResponseData.carrierCode;
