@@ -124,17 +124,40 @@ export function buildShipStationOrderPayload(
       }
     : billToAddress;
 
-  const items = lineItems.map((item) => ({
-    lineItemKey: item.id,
-    sku: item.style_number || item.id,
-    name: item.description || item.style_name || 'Custom Item',
-    quantity: item.quantity || 1,
-    unitPrice: item.unit_price || 0,
-    weight: {
-      value: item.weight_oz || 8,
-      units: 'ounces',
-    },
-  }));
+  let items: Array<{
+    lineItemKey: string;
+    sku: string;
+    name: string;
+    quantity: number;
+    unitPrice: number;
+    weight: { value: number; units: string };
+  }>;
+
+  if (lineItems && lineItems.length > 0) {
+    items = lineItems.map((item) => ({
+      lineItemKey: item.id,
+      sku: item.style_number || item.id,
+      name: item.description || item.style_name || 'Custom Item',
+      quantity: item.quantity || 1,
+      unitPrice: item.unit_price || 0,
+      weight: {
+        value: item.weight_oz || 8,
+        units: 'ounces',
+      },
+    }));
+  } else {
+    items = [{
+      lineItemKey: `inv-${invoice.id}`,
+      sku: invoice.invoice_number || 'ORDER',
+      name: `Order #${invoice.invoice_number}`,
+      quantity: 1,
+      unitPrice: invoice.total || 0,
+      weight: {
+        value: 16,
+        units: 'ounces',
+      },
+    }];
+  }
 
   const payload: ShipStationOrderPayload = {
     orderNumber: invoice.invoice_number,
