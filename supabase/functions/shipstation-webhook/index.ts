@@ -161,8 +161,9 @@ Deno.serve(async (req: Request) => {
         const trackingNumber = shipNotify.data.trackingNumber;
         const carrierCode = shipNotify.data.carrierCode;
         const serviceCode = shipNotify.data.serviceCode;
+        const isVoided = shipNotify.data.voided || shipNotify.data.voidLabel;
 
-        console.log(`Processing SHIP_NOTIFY for order ${orderNumber}`);
+        console.log(`Processing SHIP_NOTIFY for order ${orderNumber}, voided: ${isVoided}`);
 
         const { data: invoice, error: invoiceError } = await supabaseClient
           .from("printavo_invoices")
@@ -188,40 +189,98 @@ Deno.serve(async (req: Request) => {
           });
         }
 
-        const { error: updateError } = await supabaseClient
-          .from("printavo_invoices")
-          .update({
-            tracking_number: trackingNumber,
-            carrier: carrierCode,
-            service: serviceCode,
-            shipping_status: "shipped",
-            shipped_at: new Date().toISOString(),
-          })
-          .eq("id", invoice.id);
+        if (isVoided) {
+          console.log(`Shipment voided for order ${orderNumber}, cleaning up labels`);
 
-        if (updateError) {
-          console.error("Failed to update invoice:", updateError);
-          await logWebhookEvent(
-            supabaseClient,
-            invoice.company_id,
-            "SHIP_NOTIFY",
-            orderNumber,
-            invoice.id,
-            payload,
-            false,
-            updateError.message
-          );
+          const { error: deleteLabelsError } = await supabaseClient
+            .from("shipping_labels")
+            .delete()
+            .eq("invoice_id", invoice.id)
+            .eq("tracking_number", trackingNumber);
+
+          if (deleteLabelsError) {
+            console.error("Failed to delete shipping labels:", deleteLabelsError);
+          } else {
+            console.log(`Deleted shipping labels for tracking ${trackingNumber}`);
+          }
+
+          const { data: remainingLabels } = await supabaseClient
+            .from("shipping_labels")
+            .select("id")
+            .eq("invoice_id", invoice.id)
+            .is("voided_at", null);
+
+          const hasActiveLabels = remainingLabels && remainingLabels.length > 0;
+
+          const { error: updateError } = await supabaseClient
+            .from("printavo_invoices")
+            .update({
+              tracking_number: hasActiveLabels ? undefined : null,
+              shipping_status: hasActiveLabels ? "shipped" : "pending",
+              shipping_labels: hasActiveLabels ? undefined : null,
+            })
+            .eq("id", invoice.id);
+
+          if (updateError) {
+            console.error("Failed to update invoice after void:", updateError);
+            await logWebhookEvent(
+              supabaseClient,
+              invoice.company_id,
+              "SHIP_NOTIFY_VOID",
+              orderNumber,
+              invoice.id,
+              payload,
+              false,
+              updateError.message
+            );
+          } else {
+            console.log(`Successfully processed void for invoice ${orderNumber}`);
+            await logWebhookEvent(
+              supabaseClient,
+              invoice.company_id,
+              "SHIP_NOTIFY_VOID",
+              orderNumber,
+              invoice.id,
+              payload,
+              true
+            );
+          }
         } else {
-          console.log(`Successfully updated invoice ${orderNumber} with tracking ${trackingNumber}`);
-          await logWebhookEvent(
-            supabaseClient,
-            invoice.company_id,
-            "SHIP_NOTIFY",
-            orderNumber,
-            invoice.id,
-            payload,
-            true
-          );
+          const { error: updateError } = await supabaseClient
+            .from("printavo_invoices")
+            .update({
+              tracking_number: trackingNumber,
+              carrier: carrierCode,
+              service: serviceCode,
+              shipping_status: "shipped",
+              shipped_at: new Date().toISOString(),
+            })
+            .eq("id", invoice.id);
+
+          if (updateError) {
+            console.error("Failed to update invoice:", updateError);
+            await logWebhookEvent(
+              supabaseClient,
+              invoice.company_id,
+              "SHIP_NOTIFY",
+              orderNumber,
+              invoice.id,
+              payload,
+              false,
+              updateError.message
+            );
+          } else {
+            console.log(`Successfully updated invoice ${orderNumber} with tracking ${trackingNumber}`);
+            await logWebhookEvent(
+              supabaseClient,
+              invoice.company_id,
+              "SHIP_NOTIFY",
+              orderNumber,
+              invoice.id,
+              payload,
+              true
+            );
+          }
         }
 
         break;
