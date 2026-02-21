@@ -530,6 +530,9 @@ Deno.serve(async (req: Request) => {
       packageCode: "package",
       confirmation: "none",
       shipDate: today,
+      insuranceOptions: {
+        insureShipment: false
+      },
       weight: {
         value: invoiceData.total_weight_oz || 16,
         units: "ounces"
