@@ -212,6 +212,7 @@ export const invoiceDetailService = {
         .from('shipping_labels')
         .select('*')
         .eq('invoice_id', printavoInvoiceId)
+        .is('voided_at', null)
         .order('created_at', { ascending: true });
 
       const rawData = invoice.raw_data || {};
