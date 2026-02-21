@@ -401,9 +401,10 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
       const currentSession = (await supabase.auth.getSession()).data.session;
       if (!currentSession) throw new Error('Not authenticated');
 
-      const requestBody: { invoice_id: string; packages?: typeof packages } = {
+      const requestBody: { invoice_id: string; packages?: typeof packages; fetch_rates: boolean } = {
         invoice_id: invoice.id,
         packages: packages,
+        fetch_rates: true,
       };
 
       const response = await fetch(

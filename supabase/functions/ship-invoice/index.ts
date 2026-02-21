@@ -61,8 +61,13 @@ interface CompanySettings {
   shipstation_default_service_code: string;
 }
 
-async function decryptToken(supabase: any, encryptedToken: string): Promise<string> {
-  const { data, error } = await supabase.functions.invoke('crypto-service', {
+async function decryptToken(encryptedToken: string): Promise<string> {
+  const serviceRoleClient = createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+  );
+
+  const { data, error } = await serviceRoleClient.functions.invoke('crypto-service', {
     body: {
       action: 'decrypt',
       token: encryptedToken,
@@ -307,8 +312,8 @@ Deno.serve(async (req: Request) => {
     let apiSecret: string;
 
     try {
-      apiKey = await decryptToken(supabaseClient, settings.shipstation_api_key);
-      apiSecret = await decryptToken(supabaseClient, settings.shipstation_api_secret);
+      apiKey = await decryptToken(settings.shipstation_api_key);
+      apiSecret = await decryptToken(settings.shipstation_api_secret);
     } catch (decryptError) {
       console.error('Decryption error:', decryptError);
       await logShipStationAction(
