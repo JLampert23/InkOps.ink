@@ -524,129 +524,10 @@ Deno.serve(async (req: Request) => {
     const today = new Date().toISOString().split('T')[0];
 
     // Check if multi-package shipment
-    const isMultiPackage = packages && Array.isArray(packages) && packages.length > 0;
+    const isMultiPackage = packages && Array.isArray(packages) && packages.length > 1;
 
     if (isMultiPackage) {
-      // Multi-package label creation using /shipments/createlabel endpoint
-      const multiPackageLabelPayload = {
-        orderId: parseInt(shipStationOrderId!),
-        carrierCode: settings.shipstation_default_carrier_code,
-        serviceCode: settings.shipstation_default_service_code,
-        confirmation: "none",
-        shipDate: today,
-        packages: packages.map((p: { weight_oz: number; length: number; width: number; height: number }) => ({
-          weight: { value: p.weight_oz, units: "ounces" },
-          dimensions: {
-            length: p.length,
-            width: p.width,
-            height: p.height,
-            units: "inches"
-          }
-        })),
-        insuranceOptions: { insureShipment: false }
-      };
-
-      console.log('Creating multi-package ShipStation label:', JSON.stringify(multiPackageLabelPayload, null, 2));
-
-      const labelResponse = await fetch("https://ssapi.shipstation.com/shipments/createlabel", {
-        method: "POST",
-        headers: {
-          "Authorization": `Basic ${credentials}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(multiPackageLabelPayload),
-      });
-
-      const labelResponseText = await labelResponse.text();
-      let labelResponseData: any;
-
-      try {
-        labelResponseData = JSON.parse(labelResponseText);
-      } catch {
-        labelResponseData = { raw: labelResponseText };
-      }
-
-      console.log('ShipStation multi-package label response:', labelResponseData);
-
-      if (!labelResponse.ok) {
-        const errorMessage = labelResponseData?.message || labelResponseData?.ExceptionMessage || labelResponseText || 'Label creation failed';
-
-        await logShipStationAction(
-          supabaseClient,
-          invoiceData.company_id,
-          invoice_id,
-          invoiceData.invoice_number,
-          'label_error',
-          multiPackageLabelPayload,
-          labelResponseData,
-          labelResponse.status,
-          errorMessage,
-          user.id
-        );
-
-        if (labelResponse.status === 401) {
-          return new Response(
-            JSON.stringify({
-              success: false,
-              error: "Invalid ShipStation API credentials. Please check your API Key and Secret in settings.",
-            }),
-            {
-              status: 200,
-              headers: {
-                ...corsHeaders,
-                "Content-Type": "application/json",
-              },
-            }
-          );
-        }
-
-        if (errorMessage.toLowerCase().includes('requested provider not configured') ||
-            errorMessage.toLowerCase().includes('carrier') ||
-            errorMessage.toLowerCase().includes('provider not configured')) {
-          return new Response(
-            JSON.stringify({
-              success: false,
-              error: `The carrier "${settings.shipstation_default_carrier_code}" is not connected to your ShipStation account. Please go to ShipStation Settings > Shipping > Carriers and connect this carrier, or select a different carrier in InkOps Settings.`,
-              error_type: 'carrier_not_configured',
-              carrier_code: settings.shipstation_default_carrier_code,
-              service_code: settings.shipstation_default_service_code,
-            }),
-            {
-              status: 200,
-              headers: {
-                ...corsHeaders,
-                "Content-Type": "application/json",
-              },
-            }
-          );
-        }
-
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: `Label creation failed: ${errorMessage}`,
-            status_code: labelResponse.status,
-            details: labelResponseData,
-          }),
-          {
-            status: 200,
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-      }
-
-      // Parse multi-package label response
-      const labelDataArray = labelResponseData.labelData;
-      const trackingNumberArray = labelResponseData.trackingNumber;
-      const shipmentId = labelResponseData.shipmentId?.toString();
-      const carrierCode = labelResponseData.carrierCode;
-      const serviceCode = labelResponseData.serviceCode;
-      const shipmentCost = labelResponseData.shipmentCost;
-
-      // Build shipping_labels array for invoice
+      // Create a separate label for each package
       const shippingLabels: Array<{
         label_data: string;
         tracking_number: string;
@@ -656,15 +537,135 @@ Deno.serve(async (req: Request) => {
         width: number;
         height: number;
       }> = [];
+      const trackingNumbers: string[] = [];
+      let totalCost = 0;
+      let lastCarrierCode = '';
+      let lastServiceCode = '';
 
-      // Handle both array and single value responses
-      const labelsArray = Array.isArray(labelDataArray) ? labelDataArray : [labelDataArray];
-      const trackingArray = Array.isArray(trackingNumberArray) ? trackingNumberArray : [trackingNumberArray];
+      console.log(`Creating ${packages.length} separate labels for multi-package shipment`);
 
-      for (let i = 0; i < labelsArray.length; i++) {
-        const labelBase64 = labelsArray[i];
-        const trackingNum = trackingArray[i] || trackingArray[0];
-        const pkg = packages[i] || packages[0];
+      for (let i = 0; i < packages.length; i++) {
+        const pkg = packages[i] as { weight_oz: number; length: number; width: number; height: number };
+
+        const labelPayload = {
+          orderId: parseInt(shipStationOrderId!),
+          carrierCode: settings.shipstation_default_carrier_code,
+          serviceCode: settings.shipstation_default_service_code,
+          packageCode: "package",
+          confirmation: "none",
+          shipDate: today,
+          weight: {
+            value: pkg.weight_oz,
+            units: "ounces"
+          },
+          dimensions: {
+            units: "inches",
+            length: pkg.length,
+            width: pkg.width,
+            height: pkg.height
+          }
+        };
+
+        console.log(`Creating label ${i + 1}/${packages.length}:`, JSON.stringify(labelPayload, null, 2));
+
+        const labelResponse = await fetch("https://ssapi.shipstation.com/orders/createlabelfororder", {
+          method: "POST",
+          headers: {
+            "Authorization": `Basic ${credentials}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(labelPayload),
+        });
+
+        const labelResponseText = await labelResponse.text();
+        let labelResponseData: any;
+
+        try {
+          labelResponseData = JSON.parse(labelResponseText);
+        } catch {
+          labelResponseData = { raw: labelResponseText };
+        }
+
+        console.log(`Label ${i + 1} response:`, labelResponseData);
+
+        if (!labelResponse.ok) {
+          const errorMessage = labelResponseData?.message || labelResponseData?.ExceptionMessage || labelResponseText || 'Label creation failed';
+
+          await logShipStationAction(
+            supabaseClient,
+            invoiceData.company_id,
+            invoice_id,
+            invoiceData.invoice_number,
+            'label_error',
+            labelPayload,
+            labelResponseData,
+            labelResponse.status,
+            `Package ${i + 1}: ${errorMessage}`,
+            user.id
+          );
+
+          if (labelResponse.status === 401) {
+            return new Response(
+              JSON.stringify({
+                success: false,
+                error: "Invalid ShipStation API credentials. Please check your API Key and Secret in settings.",
+              }),
+              {
+                status: 200,
+                headers: {
+                  ...corsHeaders,
+                  "Content-Type": "application/json",
+                },
+              }
+            );
+          }
+
+          if (errorMessage.toLowerCase().includes('requested provider not configured') ||
+              errorMessage.toLowerCase().includes('carrier') ||
+              errorMessage.toLowerCase().includes('provider not configured')) {
+            return new Response(
+              JSON.stringify({
+                success: false,
+                error: `The carrier "${settings.shipstation_default_carrier_code}" is not connected to your ShipStation account. Please go to ShipStation Settings > Shipping > Carriers and connect this carrier, or select a different carrier in InkOps Settings.`,
+                error_type: 'carrier_not_configured',
+                carrier_code: settings.shipstation_default_carrier_code,
+                service_code: settings.shipstation_default_service_code,
+              }),
+              {
+                status: 200,
+                headers: {
+                  ...corsHeaders,
+                  "Content-Type": "application/json",
+                },
+              }
+            );
+          }
+
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: `Label creation failed for package ${i + 1}: ${errorMessage}`,
+              status_code: labelResponse.status,
+              details: labelResponseData,
+              labels_created: shippingLabels.length,
+            }),
+            {
+              status: 200,
+              headers: {
+                ...corsHeaders,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+        }
+
+        const labelBase64 = labelResponseData.labelData;
+        const trackingNum = labelResponseData.trackingNumber;
+        const shipmentId = labelResponseData.shipmentId?.toString();
+        lastCarrierCode = labelResponseData.carrierCode || settings.shipstation_default_carrier_code;
+        lastServiceCode = labelResponseData.serviceCode || settings.shipstation_default_service_code;
+        const shipmentCost = labelResponseData.shipmentCost || 0;
+        totalCost += shipmentCost;
 
         shippingLabels.push({
           label_data: labelBase64 ? `data:application/pdf;base64,${labelBase64}` : '',
@@ -675,6 +676,7 @@ Deno.serve(async (req: Request) => {
           width: pkg.width,
           height: pkg.height,
         });
+        trackingNumbers.push(trackingNum);
 
         // Save each label to shipping_labels table
         const { error: labelInsertError } = await supabaseClient
@@ -685,9 +687,9 @@ Deno.serve(async (req: Request) => {
             shipstation_shipment_id: shipmentId,
             label_url: labelBase64 ? `data:application/pdf;base64,${labelBase64}` : null,
             tracking_number: trackingNum,
-            carrier: carrierCode,
-            service: serviceCode,
-            cost: shipmentCost ? (shipmentCost / labelsArray.length) : null,
+            carrier: lastCarrierCode,
+            service: lastServiceCode,
+            cost: shipmentCost,
             weight_oz: pkg.weight_oz,
             package_length: pkg.length,
             package_width: pkg.width,
@@ -697,12 +699,25 @@ Deno.serve(async (req: Request) => {
           });
 
         if (labelInsertError) {
-          console.error('Failed to save shipping label:', labelInsertError);
+          console.error(`Failed to save shipping label ${i + 1}:`, labelInsertError);
         }
+
+        await logShipStationAction(
+          supabaseClient,
+          invoiceData.company_id,
+          invoice_id,
+          invoiceData.invoice_number,
+          'label_created',
+          labelPayload,
+          labelResponseData,
+          labelResponse.status,
+          null,
+          user.id
+        );
       }
 
       // Update invoice with all labels and tracking numbers
-      const allTrackingNumbers = trackingArray.join(', ');
+      const allTrackingNumbers = trackingNumbers.join(', ');
       const { error: invoiceUpdateError } = await supabaseClient
         .from('printavo_invoices')
         .update({
@@ -716,29 +731,15 @@ Deno.serve(async (req: Request) => {
         console.error('Failed to update invoice with label data:', invoiceUpdateError);
       }
 
-      await logShipStationAction(
-        supabaseClient,
-        invoiceData.company_id,
-        invoice_id,
-        invoiceData.invoice_number,
-        'label_created',
-        multiPackageLabelPayload,
-        labelResponseData,
-        labelResponse.status,
-        null,
-        user.id
-      );
-
       return new Response(
         JSON.stringify({
           success: true,
           labels: shippingLabels,
-          tracking_numbers: trackingArray,
-          carrier: carrierCode,
-          service: serviceCode,
-          cost: shipmentCost,
-          shipment_id: shipmentId,
-          package_count: labelsArray.length,
+          tracking_numbers: trackingNumbers,
+          carrier: lastCarrierCode,
+          service: lastServiceCode,
+          cost: totalCost,
+          package_count: shippingLabels.length,
         }),
         {
           status: 200,
