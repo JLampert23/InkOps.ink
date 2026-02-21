@@ -359,12 +359,45 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
 
       if (error) throw error;
 
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const requestBody: { invoice_id: string; packages?: typeof packages } = {
+        invoice_id: invoice.id,
+        packages: packages,
+      };
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ship-invoice`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify(requestBody),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create shipping label');
+      }
+
+      if (result.labels && result.labels.length > 0) {
+        setLabelUrls(result.labels);
+      } else if (result.label_url) {
+        setLabelUrls([{ label_data: result.label_url, tracking_number: result.tracking_number, package_index: 0 }]);
+      }
+
       setShowShippingAddressModal(false);
       await loadInvoice();
-      setShowShipConfirm(true);
-    } catch (err) {
-      console.error('Error saving shipping address:', err);
-      alert('Failed to save shipping address');
+      alert('Shipping label(s) created successfully');
+    } catch (err: any) {
+      console.error('Error creating shipping label:', err);
+      alert(err.message || 'Failed to create shipping label');
     } finally {
       setSavingAddress(false);
     }
@@ -1889,12 +1922,12 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                 {savingAddress ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Saving...
+                    Creating Labels...
                   </>
                 ) : (
                   <>
                     <CheckCircle className="w-4 h-4" />
-                    Save & Continue
+                    Buy Labels
                   </>
                 )}
               </button>
