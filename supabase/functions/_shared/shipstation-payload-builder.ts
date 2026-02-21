@@ -1,3 +1,36 @@
+function normalizeCountryCode(country?: string): string {
+  if (!country) return 'US';
+
+  const upperCountry = country.toUpperCase().trim();
+
+  if (upperCountry.length === 2) return upperCountry;
+
+  const countryMap: Record<string, string> = {
+    'UNITED STATES': 'US',
+    'UNITED STATES OF AMERICA': 'US',
+    'USA': 'US',
+    'U.S.A.': 'US',
+    'U.S.': 'US',
+    'AMERICA': 'US',
+    'CANADA': 'CA',
+    'MEXICO': 'MX',
+    'UNITED KINGDOM': 'GB',
+    'UK': 'GB',
+    'GREAT BRITAIN': 'GB',
+    'AUSTRALIA': 'AU',
+    'GERMANY': 'DE',
+    'FRANCE': 'FR',
+    'SPAIN': 'ES',
+    'ITALY': 'IT',
+    'JAPAN': 'JP',
+    'CHINA': 'CN',
+    'INDIA': 'IN',
+    'BRAZIL': 'BR',
+  };
+
+  return countryMap[upperCountry] || 'US';
+}
+
 interface Invoice {
   id: string;
   uuid?: string;
@@ -119,7 +152,7 @@ export function buildShipStationOrderPayload(
         city: invoice.shipping_city || '',
         state: invoice.shipping_state || '',
         postalCode: invoice.shipping_zip || '',
-        country: invoice.shipping_country || 'US',
+        country: normalizeCountryCode(invoice.shipping_country),
         phone: invoice.customer_phone || undefined,
       }
     : billToAddress;
