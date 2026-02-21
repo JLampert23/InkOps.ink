@@ -114,8 +114,14 @@ interface ShipStationOrderPayload {
   taxAmount?: number;
   shippingAmount?: number;
   internalNotes?: string;
+  insuranceOptions?: {
+    provider: string;
+    insureShipment: boolean;
+    insuredValue: number;
+  };
   advancedOptions?: {
     source: string;
+    insuredValue?: number;
   };
 }
 
@@ -206,8 +212,14 @@ export function buildShipStationOrderPayload(
     taxAmount: invoice.tax || 0,
     shippingAmount: invoice.shipping || 0,
     internalNotes: `InkOps Invoice: ${invoice.invoice_number}`,
+    insuranceOptions: {
+      provider: 'none',
+      insureShipment: false,
+      insuredValue: 0,
+    },
     advancedOptions: {
       source: 'InkOps',
+      insuredValue: 0,
     },
   };
 
