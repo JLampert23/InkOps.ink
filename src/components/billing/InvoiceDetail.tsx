@@ -550,11 +550,12 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
-      const requestBody: { invoice_id: string; packages?: typeof packages } = {
+      const requestBody: { invoice_id: string; packages?: typeof packages; fetch_rates: boolean } = {
         invoice_id: invoice.id,
+        fetch_rates: true,
       };
 
-      if (numPackages > 1) {
+      if (numPackages >= 1) {
         requestBody.packages = packages;
       }
 
@@ -577,21 +578,23 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
 
       if (!result.success) {
         console.error('ShipStation error:', result);
-        throw new Error(result.error || 'Failed to create shipping label');
+        throw new Error(result.error || 'Failed to fetch shipping rates');
       }
 
-      if (result.labels && result.labels.length > 0) {
-        setLabelUrls(result.labels);
-        const trackingNumbers = result.tracking_numbers?.join(', ') || '';
-        alert(`${result.package_count} shipping label(s) created! Tracking #: ${trackingNumbers}`);
-      } else if (result.label_url) {
-        setLabelUrls([{ label_data: result.label_url, tracking_number: result.tracking_number, package_index: 0 }]);
-        alert(`Shipping label created! Tracking #: ${result.tracking_number}`);
+      if (result.mode === 'rates' && result.rates) {
+        const rates = Array.isArray(result.rates) ? result.rates : [];
+        if (rates.length === 0) {
+          throw new Error('No shipping rates available for this destination');
+        }
+        setAvailableRates(rates);
+        setSelectedRateIndex(null);
+        setShowRateSelectionModal(true);
+      } else {
+        throw new Error('Unexpected response from shipping service');
       }
-      await loadInvoice();
     } catch (err: any) {
       console.error('ShipStation error:', err);
-      alert(err.message || 'Failed to create shipping label');
+      alert(err.message || 'Failed to fetch shipping rates');
     } finally {
       setShippingWithShipStation(false);
     }
@@ -791,8 +794,8 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                 ) : (
                   <Truck className="w-4 h-4" />
                 )}
-                <span className="hidden lg:inline">Ship with ShipStation</span>
-                <span className="lg:hidden hidden sm:inline">Ship</span>
+                <span className="hidden lg:inline">Get Shipping Rates</span>
+                <span className="lg:hidden hidden sm:inline">Rates</span>
               </button>
             )}
             {(invoice.shippingLabels.length > 0 || labelUrls.length > 0) && (
@@ -2240,19 +2243,19 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
         </div>
       )}
 
-      {/* Ship with ShipStation Confirmation Modal */}
+      {/* Get Shipping Rates Confirmation Modal */}
       {showShipConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-md mx-4">
             <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Ship with ShipStation</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Get Shipping Rates</h3>
             </div>
             <div className="p-6">
               <p className="text-gray-700 dark:text-gray-300">
-                Create a shipping label for this invoice using ShipStation?
+                Fetch available shipping rates for this invoice?
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                This will create an order in ShipStation (if needed) and generate a shipping label with tracking number.
+                You'll be able to compare carrier options and select the best rate before purchasing a label.
               </p>
             </div>
             <div className="px-6 py-4 border-t border-gray-200 dark:border-slate-700 flex justify-end gap-3">
@@ -2267,7 +2270,7 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 <Truck className="w-4 h-4" />
-                Create Label
+                Get Rates
               </button>
             </div>
           </div>

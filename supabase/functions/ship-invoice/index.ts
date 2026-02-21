@@ -143,7 +143,7 @@ Deno.serve(async (req: Request) => {
       }
     );
 
-    const { invoice_id, packages, selected_rate } = await req.json();
+    const { invoice_id, packages, selected_rate, fetch_rates } = await req.json();
 
     if (!invoice_id) {
       return new Response(
@@ -303,22 +303,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (!selected_rate && (!settings.shipstation_default_carrier_code || !settings.shipstation_default_service_code)) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "ShipStation carrier and service codes not configured. Please configure in settings.",
-        }),
-        {
-          status: 400,
-          headers: {
-            ...corsHeaders,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-    }
-
     let apiKey: string;
     let apiSecret: string;
 
@@ -358,8 +342,8 @@ Deno.serve(async (req: Request) => {
     const credentials = btoa(`${apiKey}:${apiSecret}`);
     let shipStationOrderId = invoiceData.shipstation_order_id;
 
-    // If selected_rate is NOT provided, fetch rates and return them
-    if (!selected_rate) {
+    // If fetch_rates is true, fetch rates and return them for user selection
+    if (fetch_rates) {
       const shipToAddress = {
         street1: invoiceData.shipping_line1 || invoiceData.shipping_address_line1 || invoiceData.billing_address_line1 || '',
         street2: invoiceData.shipping_line2 || invoiceData.shipping_address_line2 || invoiceData.billing_address_line2 || '',
