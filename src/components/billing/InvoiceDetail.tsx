@@ -1307,26 +1307,13 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                             href={trackingUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-mono flex items-center gap-1"
+                            className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-mono"
                           >
                             {label.trackingNumber}
-                            <ExternalLink className="w-3 h-3" />
                           </a>
                         ) : (
                           <span className="text-sm text-gray-700 dark:text-gray-300 font-mono">
                             {label.trackingNumber || 'N/A'}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 mt-2 flex-wrap">
-                        {label.carrier && (
-                          <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-0.5 rounded font-medium">
-                            {label.carrier}
-                          </span>
-                        )}
-                        {label.service && (
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                            {label.service}
                           </span>
                         )}
                       </div>
