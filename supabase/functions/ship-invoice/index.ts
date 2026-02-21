@@ -113,36 +113,36 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  const authHeader = req.headers.get("Authorization");
-  console.log('Authorization header present:', !!authHeader);
+  try {
+    const authHeader = req.headers.get("Authorization");
+    console.log('Authorization header present:', !!authHeader);
 
-  if (!authHeader) {
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: "Missing Authorization header",
-      }),
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Missing Authorization header",
+        }),
+        {
+          status: 401,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
       {
-        status: 401,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
+        global: {
+          headers: { Authorization: authHeader },
         },
       }
     );
-  }
 
-  const supabaseClient = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-    {
-      global: {
-        headers: { Authorization: authHeader },
-      },
-    }
-  );
-
-  try {
     const { invoice_id } = await req.json();
 
     if (!invoice_id) {
@@ -165,6 +165,20 @@ Deno.serve(async (req: Request) => {
 
     if (authError) {
       console.error('Auth error:', authError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Authentication failed",
+          details: authError?.message,
+        }),
+        {
+          status: 401,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
     }
 
     if (!user) {
@@ -173,7 +187,6 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({
           success: false,
           error: "Unauthorized - invalid or expired session",
-          details: authError?.message,
         }),
         {
           status: 401,
