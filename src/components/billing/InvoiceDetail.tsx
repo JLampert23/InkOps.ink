@@ -584,26 +584,24 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
               !labelUrl && (
               <button
                 onClick={() => {
-                  const hasShippingAddress = invoice.rawData?.shipping_line1 ||
-                    invoice.rawData?.shipping_address_line1 ||
-                    invoice.rawData?.shipping_city;
+                  const hasShippingAddress = invoice.shippingAddress.line1 || invoice.shippingAddress.city;
 
                   const hasRequiredFields =
-                    (invoice.rawData?.shipping_line1 || invoice.rawData?.shipping_address_line1) &&
-                    invoice.rawData?.shipping_city &&
-                    invoice.rawData?.shipping_state &&
-                    invoice.rawData?.shipping_zip;
+                    invoice.shippingAddress.line1 &&
+                    invoice.shippingAddress.city &&
+                    invoice.shippingAddress.state &&
+                    invoice.shippingAddress.zip;
 
                   if (hasShippingAddress && hasRequiredFields) {
                     setShowShipConfirm(true);
                   } else {
                     setShippingAddressForm({
-                      shipping_line1: invoice.rawData?.shipping_line1 || invoice.rawData?.billing_address_line1 || '',
-                      shipping_line2: invoice.rawData?.shipping_line2 || invoice.rawData?.billing_address_line2 || '',
-                      shipping_city: invoice.rawData?.shipping_city || invoice.rawData?.billing_city || '',
-                      shipping_state: invoice.rawData?.shipping_state || invoice.rawData?.billing_state || '',
-                      shipping_zip: invoice.rawData?.shipping_zip || invoice.rawData?.billing_zip || '',
-                      shipping_country: invoice.rawData?.shipping_country || 'US',
+                      shipping_line1: invoice.shippingAddress.line1 || invoice.billingAddress.line1 || '',
+                      shipping_line2: invoice.shippingAddress.line2 || invoice.billingAddress.line2 || '',
+                      shipping_city: invoice.shippingAddress.city || invoice.billingAddress.city || '',
+                      shipping_state: invoice.shippingAddress.state || invoice.billingAddress.state || '',
+                      shipping_zip: invoice.shippingAddress.zip || invoice.billingAddress.zip || '',
+                      shipping_country: invoice.shippingAddress.country || 'US',
                     });
                     setShowShippingAddressModal(true);
                   }
