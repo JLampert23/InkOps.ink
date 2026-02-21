@@ -112,6 +112,18 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
     width: number;
     height: number;
   }>>([{ weight_oz: 16, length: 12, width: 9, height: 3 }]);
+  const [showRateSelectionModal, setShowRateSelectionModal] = useState(false);
+  const [availableRates, setAvailableRates] = useState<Array<{
+    serviceName: string;
+    serviceCode: string;
+    carrierCode: string;
+    packageCode?: string;
+    shipmentCost: number;
+    otherCost: number;
+    deliveryDays?: number | null;
+  }>>([]);
+  const [selectedRateIndex, setSelectedRateIndex] = useState<number | null>(null);
+  const [buyingLabelWithRate, setBuyingLabelWithRate] = useState(false);
 
   useEffect(() => {
     loadInvoice();
@@ -424,6 +436,69 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
       }
 
       if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch shipping rates');
+      }
+
+      if (result.mode === 'rates' && result.rates) {
+        setAvailableRates(result.rates);
+        setSelectedRateIndex(null);
+        setShowShippingAddressModal(false);
+        setShowRateSelectionModal(true);
+      } else if (result.labels && result.labels.length > 0) {
+        setLabelUrls(result.labels);
+        setShowShippingAddressModal(false);
+        await loadInvoice();
+        alert('Shipping label(s) created successfully');
+      } else if (result.label_url) {
+        setLabelUrls([{ label_data: result.label_url, tracking_number: result.tracking_number, package_index: 0 }]);
+        setShowShippingAddressModal(false);
+        await loadInvoice();
+        alert('Shipping label(s) created successfully');
+      }
+    } catch (err: any) {
+      console.error('Error fetching shipping rates:', err);
+      alert(err.message || 'Failed to fetch shipping rates');
+    } finally {
+      setSavingAddress(false);
+    }
+  };
+
+  const handleBuyLabelWithSelectedRate = async () => {
+    if (!invoice || selectedRateIndex === null) return;
+    setBuyingLabelWithRate(true);
+
+    try {
+      const selectedRate = availableRates[selectedRateIndex];
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const requestBody = {
+        invoice_id: invoice.id,
+        packages: packages,
+        selected_rate: {
+          carrierCode: selectedRate.carrierCode,
+          serviceCode: selectedRate.serviceCode,
+          packageCode: selectedRate.packageCode || 'package',
+        },
+      };
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ship-invoice`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify(requestBody),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!result.success) {
         throw new Error(result.error || 'Failed to create shipping label');
       }
 
@@ -433,14 +508,16 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
         setLabelUrls([{ label_data: result.label_url, tracking_number: result.tracking_number, package_index: 0 }]);
       }
 
-      setShowShippingAddressModal(false);
+      setShowRateSelectionModal(false);
+      setAvailableRates([]);
+      setSelectedRateIndex(null);
       await loadInvoice();
       alert('Shipping label(s) created successfully');
     } catch (err: any) {
       console.error('Error creating shipping label:', err);
       alert(err.message || 'Failed to create shipping label');
     } finally {
-      setSavingAddress(false);
+      setBuyingLabelWithRate(false);
     }
   };
 
@@ -2010,6 +2087,106 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                   <>
                     <CheckCircle className="w-4 h-4" />
                     Buy Labels
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rate Selection Modal */}
+      {showRateSelectionModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Select Shipping Rate</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Choose a shipping service for this order
+              </p>
+            </div>
+            <div className="p-6">
+              {availableRates.length === 0 ? (
+                <div className="text-center py-8">
+                  <Package className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                  <p className="text-gray-500 dark:text-gray-400">No shipping rates available</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {availableRates.map((rate, index) => (
+                    <button
+                      key={`${rate.carrierCode}-${rate.serviceCode}-${index}`}
+                      onClick={() => setSelectedRateIndex(index)}
+                      className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                        selectedRateIndex === index
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                          : 'border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-600'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-gray-900 dark:text-white">
+                              {rate.serviceName}
+                            </span>
+                            <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-400 rounded">
+                              {rate.carrierCode}
+                            </span>
+                          </div>
+                          {rate.deliveryDays !== null && rate.deliveryDays !== undefined && (
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                              Estimated delivery: {rate.deliveryDays} {rate.deliveryDays === 1 ? 'day' : 'days'}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <span className="text-lg font-semibold text-gray-900 dark:text-white">
+                            ${(rate.shipmentCost + rate.otherCost).toFixed(2)}
+                          </span>
+                          {rate.otherCost > 0 && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              (${rate.shipmentCost.toFixed(2)} + ${rate.otherCost.toFixed(2)} fees)
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {selectedRateIndex === index && (
+                        <div className="mt-2 flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                          <CheckCircle className="w-4 h-4" />
+                          <span className="text-sm font-medium">Selected</span>
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-slate-700 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowRateSelectionModal(false);
+                  setAvailableRates([]);
+                  setSelectedRateIndex(null);
+                }}
+                disabled={buyingLabelWithRate}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBuyLabelWithSelectedRate}
+                disabled={selectedRateIndex === null || buyingLabelWithRate}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {buyingLabelWithRate ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Creating Label...
+                  </>
+                ) : (
+                  <>
+                    <Truck className="w-4 h-4" />
+                    Buy Label with Selected Rate
                   </>
                 )}
               </button>
