@@ -68,6 +68,21 @@ export interface SMSLog {
   sentAt: string;
 }
 
+export interface ShippingLabel {
+  id: string;
+  labelUrl: string | null;
+  trackingNumber: string | null;
+  carrier: string | null;
+  service: string | null;
+  cost: number | null;
+  weightOz: number | null;
+  packageLength: number | null;
+  packageWidth: number | null;
+  packageHeight: number | null;
+  shipDate: string | null;
+  createdAt: string;
+}
+
 export interface InvoiceDetail {
   id: string;
   printavoInvoiceId: string;
@@ -120,6 +135,7 @@ export interface InvoiceDetail {
   lockedBy: string | null;
 
   shippingLabelUrl: string | null;
+  shippingLabels: ShippingLabel[];
 
   rawData: any;
 }
@@ -191,6 +207,12 @@ export const invoiceDetailService = {
         .select('*')
         .eq('invoice_id', printavoInvoiceId)
         .order('sent_at', { ascending: false });
+
+      const { data: shippingLabelsData } = await supabase
+        .from('shipping_labels')
+        .select('*')
+        .eq('invoice_id', printavoInvoiceId)
+        .order('created_at', { ascending: true });
 
       const rawData = invoice.raw_data || {};
       const contact = rawData.contact || {};
@@ -415,6 +437,20 @@ export const invoiceDetailService = {
         lockedBy: invoice.locked_by || null,
 
         shippingLabelUrl: invoice.shipping_label_url || null,
+        shippingLabels: (shippingLabelsData || []).map((label: any) => ({
+          id: label.id,
+          labelUrl: label.label_url,
+          trackingNumber: label.tracking_number,
+          carrier: label.carrier,
+          service: label.service,
+          cost: label.cost,
+          weightOz: label.weight_oz,
+          packageLength: label.package_length,
+          packageWidth: label.package_width,
+          packageHeight: label.package_height,
+          shipDate: label.ship_date,
+          createdAt: label.created_at,
+        })),
 
         rawData,
       };

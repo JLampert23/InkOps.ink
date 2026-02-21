@@ -77,7 +77,7 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
     shipping_country: 'US',
   });
   const [savingAddress, setSavingAddress] = useState(false);
-  const [labelUrl, setLabelUrl] = useState<string | null>(null);
+  const [labelUrls, setLabelUrls] = useState<Array<{ label_data: string; tracking_number: string; package_index: number }>>([]);
   const [companySettings, setCompanySettings] = useState<{
     company_name: string | null;
     company_address: string | null;
@@ -430,12 +430,12 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
         throw new Error(result.error || 'Failed to create shipping label');
       }
 
-      if (result.labels) {
-        setLabelUrl(result.labels[0]?.label_data || null);
+      if (result.labels && result.labels.length > 0) {
+        setLabelUrls(result.labels);
         const trackingNumbers = result.tracking_numbers?.join(', ') || '';
         alert(`${result.package_count} shipping label(s) created! Tracking #: ${trackingNumbers}`);
-      } else {
-        setLabelUrl(result.label_url);
+      } else if (result.label_url) {
+        setLabelUrls([{ label_data: result.label_url, tracking_number: result.tracking_number, package_index: 0 }]);
         alert(`Shipping label created! Tracking #: ${result.tracking_number}`);
       }
       await loadInvoice();
@@ -608,7 +608,7 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
               (!invoice.rawData?.shipping_status ||
                 invoice.rawData?.shipping_status === 'not_sent' ||
                 invoice.rawData?.shipping_status === 'sent_to_shipstation') &&
-              !labelUrl && (
+              labelUrls.length === 0 && invoice.shippingLabels.length === 0 && (
               <button
                 onClick={() => {
                   const hasShippingAddress = invoice.shippingAddress.line1 || invoice.shippingAddress.city;
@@ -645,31 +645,45 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                 <span className="lg:hidden hidden sm:inline">Ship</span>
               </button>
             )}
-            {(invoice.shippingLabelUrl || labelUrl) && (
-              <button
-                onClick={() => {
-                  const url = invoice.shippingLabelUrl || labelUrl || '';
-                  if (url.startsWith('data:application/pdf;base64,')) {
-                    const base64Data = url.replace('data:application/pdf;base64,', '');
-                    const byteCharacters = atob(base64Data);
-                    const byteNumbers = new Array(byteCharacters.length);
-                    for (let i = 0; i < byteCharacters.length; i++) {
-                      byteNumbers[i] = byteCharacters.charCodeAt(i);
-                    }
-                    const byteArray = new Uint8Array(byteNumbers);
-                    const blob = new Blob([byteArray], { type: 'application/pdf' });
-                    const blobUrl = URL.createObjectURL(blob);
-                    window.open(blobUrl, '_blank');
-                  } else {
-                    window.open(url, '_blank');
-                  }
-                }}
-                className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors whitespace-nowrap"
-              >
-                <Printer className="w-4 h-4" />
-                <span className="hidden lg:inline">Print Label</span>
-                <span className="lg:hidden hidden sm:inline">Label</span>
-              </button>
+            {(invoice.shippingLabels.length > 0 || labelUrls.length > 0) && (
+              <>
+                {(labelUrls.length > 0 ? labelUrls : invoice.shippingLabels.map(l => ({
+                  label_data: l.labelUrl || '',
+                  tracking_number: l.trackingNumber || '',
+                  package_index: 0
+                }))).map((label, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      const url = label.label_data;
+                      if (url.startsWith('data:application/pdf;base64,')) {
+                        const base64Data = url.replace('data:application/pdf;base64,', '');
+                        const byteCharacters = atob(base64Data);
+                        const byteNumbers = new Array(byteCharacters.length);
+                        for (let i = 0; i < byteCharacters.length; i++) {
+                          byteNumbers[i] = byteCharacters.charCodeAt(i);
+                        }
+                        const byteArray = new Uint8Array(byteNumbers);
+                        const blob = new Blob([byteArray], { type: 'application/pdf' });
+                        const blobUrl = URL.createObjectURL(blob);
+                        window.open(blobUrl, '_blank');
+                      } else if (url) {
+                        window.open(url, '_blank');
+                      }
+                    }}
+                    className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors whitespace-nowrap"
+                    title={label.tracking_number ? `Tracking: ${label.tracking_number}` : undefined}
+                  >
+                    <Printer className="w-4 h-4" />
+                    <span className="hidden lg:inline">
+                      {(labelUrls.length > 1 || invoice.shippingLabels.length > 1) ? `Label ${idx + 1}` : 'Print Label'}
+                    </span>
+                    <span className="lg:hidden hidden sm:inline">
+                      {(labelUrls.length > 1 || invoice.shippingLabels.length > 1) ? `#${idx + 1}` : 'Label'}
+                    </span>
+                  </button>
+                ))}
+              </>
             )}
             <button
               onClick={() => invoice && generateInvoicePDF(invoice, {
