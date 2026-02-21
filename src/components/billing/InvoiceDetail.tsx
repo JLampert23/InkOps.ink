@@ -620,7 +620,23 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
             )}
             {(invoice.shippingLabelUrl || labelUrl) && (
               <button
-                onClick={() => window.open(invoice.shippingLabelUrl || labelUrl || '', '_blank')}
+                onClick={() => {
+                  const url = invoice.shippingLabelUrl || labelUrl || '';
+                  if (url.startsWith('data:application/pdf;base64,')) {
+                    const base64Data = url.replace('data:application/pdf;base64,', '');
+                    const byteCharacters = atob(base64Data);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                      byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], { type: 'application/pdf' });
+                    const blobUrl = URL.createObjectURL(blob);
+                    window.open(blobUrl, '_blank');
+                  } else {
+                    window.open(url, '_blank');
+                  }
+                }}
                 className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors whitespace-nowrap"
               >
                 <Printer className="w-4 h-4" />
