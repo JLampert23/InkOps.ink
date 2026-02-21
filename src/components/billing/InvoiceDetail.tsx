@@ -2081,7 +2081,7 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                 {savingAddress ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Buying Labels...
+                    Loading Rates...
                   </>
                 ) : (
                   <>
