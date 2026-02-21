@@ -45,6 +45,25 @@ interface InvoiceDetailProps {
   onNavigateToCustomer?: (searchTerm: string, customerEmail: string) => void;
 }
 
+function getCarrierTrackingUrl(carrier: string | null, trackingNumber: string | null): string | null {
+  if (!trackingNumber) return null;
+  const carrierLower = (carrier || '').toLowerCase();
+
+  if (carrierLower.includes('ups')) {
+    return `https://www.ups.com/track?tracknum=${encodeURIComponent(trackingNumber)}`;
+  }
+  if (carrierLower.includes('fedex')) {
+    return `https://www.fedex.com/fedextrack/?trknbr=${encodeURIComponent(trackingNumber)}`;
+  }
+  if (carrierLower.includes('usps')) {
+    return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(trackingNumber)}`;
+  }
+  if (carrierLower.includes('dhl')) {
+    return `https://www.dhl.com/us-en/home/tracking/tracking-express.html?submit=1&tracking-id=${encodeURIComponent(trackingNumber)}`;
+  }
+  return null;
+}
+
 export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: InvoiceDetailProps) {
   const [invoice, setInvoice] = useState<InvoiceDetailType | null>(null);
   const [loading, setLoading] = useState(true);
@@ -922,6 +941,54 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                   <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
                     {invoiceDetailService.formatAddress(invoice.shippingAddress)}
                   </p>
+                  {invoice.shippingLabels && invoice.shippingLabels.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                        <Truck className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                        Tracking Information
+                      </h4>
+                      <div className="space-y-2">
+                        {invoice.shippingLabels.map((label, index) => {
+                          const trackingUrl = getCarrierTrackingUrl(label.carrier, label.trackingNumber);
+                          return (
+                            <div key={label.id} className="flex flex-col gap-1">
+                              {invoice.shippingLabels.length > 1 && (
+                                <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                                  Package {index + 1}:
+                                </span>
+                              )}
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {trackingUrl ? (
+                                  <a
+                                    href={trackingUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-mono"
+                                  >
+                                    {label.trackingNumber}
+                                  </a>
+                                ) : (
+                                  <span className="text-sm text-gray-700 dark:text-gray-300 font-mono">
+                                    {label.trackingNumber || 'N/A'}
+                                  </span>
+                                )}
+                                {label.carrier && (
+                                  <span className="text-xs bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded">
+                                    {label.carrier}
+                                  </span>
+                                )}
+                                {label.service && (
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    {label.service}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
