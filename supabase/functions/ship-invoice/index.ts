@@ -596,6 +596,27 @@ Deno.serve(async (req: Request) => {
         );
       }
 
+      if (errorMessage.toLowerCase().includes('requested provider not configured') ||
+          errorMessage.toLowerCase().includes('carrier') ||
+          errorMessage.toLowerCase().includes('provider not configured')) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: `The carrier "${settings.shipstation_default_carrier_code}" is not connected to your ShipStation account. Please go to ShipStation Settings > Shipping > Carriers and connect this carrier, or select a different carrier in InkOps Settings.`,
+            error_type: 'carrier_not_configured',
+            carrier_code: settings.shipstation_default_carrier_code,
+            service_code: settings.shipstation_default_service_code,
+          }),
+          {
+            status: 200,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
+
       return new Response(
         JSON.stringify({
           success: false,

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Package, Save, Loader2, AlertCircle, CheckCircle, Eye, EyeOff, TestTube } from 'lucide-react';
+import { Package, Save, Loader2, AlertCircle, CheckCircle, Eye, EyeOff, TestTube, RefreshCw } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useNotification } from '../../contexts/NotificationContext';
 import { encryptToken, decryptToken } from '../../services/crypto-service';
 
-interface ShipStationSettings {
+interface ShipStationSettingsData {
   api_key: string;
   api_secret: string;
   default_ship_from_name: string;
@@ -35,66 +35,34 @@ interface CompanySettings {
   shipstation_default_service_code: string | null;
 }
 
-const CARRIER_OPTIONS = [
-  { value: '', label: 'Select Carrier' },
-  { value: 'fedex', label: 'FedEx' },
-  { value: 'ups', label: 'UPS' },
-  { value: 'usps', label: 'USPS' },
-  { value: 'dhl_express', label: 'DHL Express' },
-  { value: 'stamps_com', label: 'Stamps.com' },
-  { value: 'other', label: 'Other' },
-];
+interface CarrierService {
+  code: string;
+  name: string;
+  domestic: boolean;
+  international: boolean;
+}
 
-const SERVICE_OPTIONS: Record<string, Array<{ value: string; label: string }>> = {
-  fedex: [
-    { value: '', label: 'Select Service' },
-    { value: 'fedex_ground', label: 'FedEx Ground' },
-    { value: 'fedex_2day', label: 'FedEx 2Day' },
-    { value: 'fedex_express_saver', label: 'FedEx Express Saver' },
-    { value: 'fedex_standard_overnight', label: 'FedEx Standard Overnight' },
-    { value: 'fedex_priority_overnight', label: 'FedEx Priority Overnight' },
-  ],
-  ups: [
-    { value: '', label: 'Select Service' },
-    { value: 'ups_ground', label: 'UPS Ground' },
-    { value: 'ups_3_day_select', label: 'UPS 3 Day Select' },
-    { value: 'ups_2nd_day_air', label: 'UPS 2nd Day Air' },
-    { value: 'ups_next_day_air', label: 'UPS Next Day Air' },
-    { value: 'ups_next_day_air_saver', label: 'UPS Next Day Air Saver' },
-  ],
-  usps: [
-    { value: '', label: 'Select Service' },
-    { value: 'usps_first_class_mail', label: 'USPS First Class Mail' },
-    { value: 'usps_priority_mail', label: 'USPS Priority Mail' },
-    { value: 'usps_priority_mail_express', label: 'USPS Priority Mail Express' },
-    { value: 'usps_parcel_select', label: 'USPS Parcel Select' },
-  ],
-  dhl_express: [
-    { value: '', label: 'Select Service' },
-    { value: 'dhl_express_worldwide', label: 'DHL Express Worldwide' },
-    { value: 'dhl_express_12:00', label: 'DHL Express 12:00' },
-  ],
-  stamps_com: [
-    { value: '', label: 'Select Service' },
-    { value: 'usps_first_class_mail', label: 'First Class Mail' },
-    { value: 'usps_priority_mail', label: 'Priority Mail' },
-  ],
-  other: [
-    { value: '', label: 'Select Service' },
-  ],
-};
+interface ConnectedCarrier {
+  name: string;
+  code: string;
+  accountNumber?: string;
+  nickname?: string;
+  services: CarrierService[];
+}
 
 export function ShipStationSettings() {
   const { showNotification } = useNotification();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [loadingCarriers, setLoadingCarriers] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [showApiSecret, setShowApiSecret] = useState(false);
   const [companySettingsId, setCompanySettingsId] = useState<string | null>(null);
   const [hasCredentials, setHasCredentials] = useState(false);
+  const [connectedCarriers, setConnectedCarriers] = useState<ConnectedCarrier[]>([]);
 
-  const [settings, setSettings] = useState<ShipStationSettings>({
+  const [settings, setSettings] = useState<ShipStationSettingsData>({
     api_key: '',
     api_secret: '',
     default_ship_from_name: '',
@@ -112,11 +80,68 @@ export function ShipStationSettings() {
   const [testResult, setTestResult] = useState<{
     success: boolean;
     message: string;
+    carriers?: Array<{ name: string; code: string }>;
   } | null>(null);
 
   useEffect(() => {
     loadSettings();
   }, []);
+
+  useEffect(() => {
+    if (hasCredentials && testResult?.success) {
+      loadCarriersFromAccount();
+    }
+  }, [hasCredentials, testResult?.success]);
+
+  const loadCarriersFromAccount = async () => {
+    if (!companySettingsId || !hasCredentials) return;
+
+    try {
+      setLoadingCarriers(true);
+
+      const { data: companySettings } = await supabase
+        .from('company_settings')
+        .select('shipstation_api_key, shipstation_api_secret')
+        .eq('id', companySettingsId)
+        .single();
+
+      if (!companySettings?.shipstation_api_key || !companySettings?.shipstation_api_secret) {
+        return;
+      }
+
+      const apiKey = await decryptToken(companySettings.shipstation_api_key);
+      const apiSecret = await decryptToken(companySettings.shipstation_api_secret);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/shipstation-test`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            apiKey,
+            apiSecret,
+            action: 'list_carriers',
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (result.success && result.carriers) {
+        setConnectedCarriers(result.carriers);
+      }
+    } catch (err) {
+      console.error('Error loading carriers:', err);
+    } finally {
+      setLoadingCarriers(false);
+    }
+  };
 
   const loadSettings = async () => {
     try {
@@ -235,10 +260,14 @@ export function ShipStationSettings() {
       setTestResult({
         success: result.success,
         message: result.success ? result.message : result.error,
+        carriers: result.carriers,
       });
 
       if (result.success) {
-        showNotification('success', 'Connection Successful', 'Successfully connected to ShipStation!');
+        showNotification('success', 'Connection Successful', `Connected to ShipStation! Found ${result.carriersCount || 0} carrier(s).`);
+        if (hasCredentials) {
+          loadCarriersFromAccount();
+        }
       } else {
         showNotification('error', 'Connection Failed', result.error);
       }
@@ -320,9 +349,12 @@ export function ShipStationSettings() {
     );
   }
 
-  const availableServiceOptions = settings.default_carrier_code
-    ? SERVICE_OPTIONS[settings.default_carrier_code] || [{ value: '', label: 'Select Service' }]
-    : [{ value: '', label: 'Select Carrier First' }];
+  const selectedCarrier = connectedCarriers.find(c => c.code === settings.default_carrier_code);
+  const availableServiceOptions = selectedCarrier?.services?.length
+    ? [{ value: '', label: 'Select Service' }, ...selectedCarrier.services.map(s => ({ value: s.code, label: s.name }))]
+    : settings.default_carrier_code
+      ? [{ value: '', label: 'No services available' }]
+      : [{ value: '', label: 'Select Carrier First' }];
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
@@ -563,10 +595,54 @@ export function ShipStationSettings() {
       </div>
 
       <div className="space-y-4">
-        <h3 className="text-base font-semibold text-gray-900 dark:text-white">Default Shipping Preferences</h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Set default carrier and service preferences for new shipments.
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">Default Shipping Preferences</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Select from carriers connected to your ShipStation account.
+            </p>
+          </div>
+          {hasCredentials && (
+            <button
+              onClick={loadCarriersFromAccount}
+              disabled={loadingCarriers}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-600 disabled:opacity-50 transition-colors"
+            >
+              <RefreshCw className={`w-4 h-4 ${loadingCarriers ? 'animate-spin' : ''}`} />
+              Refresh Carriers
+            </button>
+          )}
+        </div>
+
+        {connectedCarriers.length === 0 && hasCredentials && !loadingCarriers && (
+          <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-amber-800 dark:text-amber-200">No Carriers Found</p>
+                <p className="text-sm mt-1 text-amber-700 dark:text-amber-300">
+                  No carriers are connected to your ShipStation account. Please go to{' '}
+                  <a
+                    href="https://ship.shipstation.com/settings/shipping/carriers"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-amber-900 dark:hover:text-amber-100"
+                  >
+                    ShipStation Settings &rarr; Shipping &rarr; Carriers
+                  </a>{' '}
+                  to connect a carrier (UPS, FedEx, USPS, etc.), then click "Refresh Carriers" above.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {loadingCarriers && (
+          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Loading carriers from your ShipStation account...
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -582,12 +658,18 @@ export function ShipStationSettings() {
               }))}
               className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
             >
-              {CARRIER_OPTIONS.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
+              <option value="">Select Carrier</option>
+              {connectedCarriers.map(carrier => (
+                <option key={carrier.code} value={carrier.code}>
+                  {carrier.nickname || carrier.name} ({carrier.code})
                 </option>
               ))}
             </select>
+            {connectedCarriers.length === 0 && !loadingCarriers && hasCredentials && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Test connection and refresh carriers to see available options
+              </p>
+            )}
           </div>
 
           <div>
@@ -597,7 +679,7 @@ export function ShipStationSettings() {
             <select
               value={settings.default_service_code}
               onChange={(e) => setSettings(prev => ({ ...prev, default_service_code: e.target.value }))}
-              disabled={!settings.default_carrier_code}
+              disabled={!settings.default_carrier_code || availableServiceOptions.length <= 1}
               className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-900 text-gray-900 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {availableServiceOptions.map(option => (
