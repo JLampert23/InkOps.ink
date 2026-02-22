@@ -7,6 +7,14 @@ import { encryptToken, decryptToken } from '../../services/crypto-service';
 interface ShipStationSettingsData {
   api_key: string;
   api_secret: string;
+  ship_from_name: string;
+  ship_from_company: string;
+  ship_from_address1: string;
+  ship_from_address2: string;
+  ship_from_city: string;
+  ship_from_state: string;
+  ship_from_postal_code: string;
+  ship_from_country: string;
 }
 
 interface CompanySettings {
@@ -29,6 +37,14 @@ export function ShipStationSettings() {
   const [settings, setSettings] = useState<ShipStationSettingsData>({
     api_key: '',
     api_secret: '',
+    ship_from_name: '',
+    ship_from_company: '',
+    ship_from_address1: '',
+    ship_from_address2: '',
+    ship_from_city: '',
+    ship_from_state: '',
+    ship_from_postal_code: '',
+    ship_from_country: 'US',
   });
 
   const [testResult, setTestResult] = useState<{
@@ -72,6 +88,14 @@ export function ShipStationSettings() {
         setSettings({
           api_key: hasCreds ? '••••••••••••••••' : '',
           api_secret: hasCreds ? '••••••••••••••••' : '',
+          ship_from_name: companySettings.shipstation_default_ship_from_name || '',
+          ship_from_company: companySettings.shipstation_default_ship_from_company || '',
+          ship_from_address1: companySettings.shipstation_default_ship_from_address1 || '',
+          ship_from_address2: companySettings.shipstation_default_ship_from_address2 || '',
+          ship_from_city: companySettings.shipstation_default_ship_from_city || '',
+          ship_from_state: companySettings.shipstation_default_ship_from_state || '',
+          ship_from_postal_code: companySettings.shipstation_default_ship_from_postal_code || '',
+          ship_from_country: companySettings.shipstation_default_ship_from_country || 'US',
         });
       }
     } catch (err) {
@@ -176,7 +200,16 @@ export function ShipStationSettings() {
         throw new Error('Company settings ID not found');
       }
 
-      const updateData: Record<string, string> = {};
+      const updateData: Record<string, string | null> = {
+        shipstation_default_ship_from_name: settings.ship_from_name || null,
+        shipstation_default_ship_from_company: settings.ship_from_company || null,
+        shipstation_default_ship_from_address1: settings.ship_from_address1 || null,
+        shipstation_default_ship_from_address2: settings.ship_from_address2 || null,
+        shipstation_default_ship_from_city: settings.ship_from_city || null,
+        shipstation_default_ship_from_state: settings.ship_from_state || null,
+        shipstation_default_ship_from_postal_code: settings.ship_from_postal_code || null,
+        shipstation_default_ship_from_country: settings.ship_from_country || 'US',
+      };
 
       if (settings.api_key && settings.api_key !== '••••••••••••••••') {
         const encryptedKey = await encryptToken(settings.api_key);
@@ -338,6 +371,136 @@ export function ShipStationSettings() {
                   {testResult.message}
                 </p>
               </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="border-t border-gray-200 dark:border-slate-700 pt-6 space-y-4">
+        <div>
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Ship From Address</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            This is your company's shipping origin address. It's required for calculating shipping rates.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Contact Name
+            </label>
+            <input
+              type="text"
+              value={settings.ship_from_name}
+              onChange={(e) => setSettings(prev => ({ ...prev, ship_from_name: e.target.value }))}
+              placeholder="John Smith"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Company Name
+            </label>
+            <input
+              type="text"
+              value={settings.ship_from_company}
+              onChange={(e) => setSettings(prev => ({ ...prev, ship_from_company: e.target.value }))}
+              placeholder="Your Company Name"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Street Address <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={settings.ship_from_address1}
+            onChange={(e) => setSettings(prev => ({ ...prev, ship_from_address1: e.target.value }))}
+            placeholder="123 Main Street"
+            className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Address Line 2
+          </label>
+          <input
+            type="text"
+            value={settings.ship_from_address2}
+            onChange={(e) => setSettings(prev => ({ ...prev, ship_from_address2: e.target.value }))}
+            placeholder="Suite 100 (optional)"
+            className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="col-span-2 md:col-span-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              City <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={settings.ship_from_city}
+              onChange={(e) => setSettings(prev => ({ ...prev, ship_from_city: e.target.value }))}
+              placeholder="Chicago"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              State <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={settings.ship_from_state}
+              onChange={(e) => setSettings(prev => ({ ...prev, ship_from_state: e.target.value.toUpperCase().slice(0, 2) }))}
+              placeholder="IL"
+              maxLength={2}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-900 text-gray-900 dark:text-white uppercase"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              ZIP Code <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={settings.ship_from_postal_code}
+              onChange={(e) => setSettings(prev => ({ ...prev, ship_from_postal_code: e.target.value }))}
+              placeholder="60601"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Country
+            </label>
+            <select
+              value={settings.ship_from_country}
+              onChange={(e) => setSettings(prev => ({ ...prev, ship_from_country: e.target.value }))}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
+            >
+              <option value="US">United States</option>
+              <option value="CA">Canada</option>
+            </select>
+          </div>
+        </div>
+
+        {(!settings.ship_from_address1 || !settings.ship_from_city || !settings.ship_from_state || !settings.ship_from_postal_code) && (
+          <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <div className="flex items-start gap-2 text-amber-800 dark:text-amber-200">
+              <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              <p className="text-sm">
+                Ship From address is required to calculate shipping rates. Please fill in street address, city, state, and ZIP code.
+              </p>
             </div>
           </div>
         )}
