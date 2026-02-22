@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Copy, Check, Eye, EyeOff, Code, ChevronDown, ChevronUp } from 'lucide-react';
-import { AVAILABLE_SHORT_CODES, type ShortCodeKey } from '../../types/shortcode';
+import { Copy, Check, Eye, EyeOff, Code, ChevronDown, ChevronRight } from 'lucide-react';
+import { AVAILABLE_SHORT_CODES } from '../../types/shortcode';
 import { ShortCodeEngine } from '../../services/shortcode-service';
 
 interface ShortCodeReferenceProps {
@@ -11,16 +11,16 @@ interface ShortCodeReferenceProps {
 export default function ShortCodeReference({ showPreview = true, compact = false }: ShortCodeReferenceProps) {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['customer', 'quote']));
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['customer']));
 
   const categories = {
-    customer: { title: 'Customer Fields', icon: '👤' },
-    quote: { title: 'Quote Fields', icon: '📄' },
-    invoice: { title: 'Invoice Fields', icon: '🧾' },
-    company: { title: 'Company Fields', icon: '🏢' },
-    user: { title: 'User (Sender) Fields', icon: '👨‍💼' },
-    payment: { title: 'Payment Fields', icon: '💳' },
-    general: { title: 'General Fields', icon: '📅' },
+    customer: { title: 'Customer', color: 'text-blue-600 dark:text-blue-400' },
+    quote: { title: 'Quote', color: 'text-emerald-600 dark:text-emerald-400' },
+    invoice: { title: 'Invoice', color: 'text-amber-600 dark:text-amber-400' },
+    company: { title: 'Company', color: 'text-slate-600 dark:text-slate-400' },
+    user: { title: 'User', color: 'text-cyan-600 dark:text-cyan-400' },
+    payment: { title: 'Payment', color: 'text-green-600 dark:text-green-400' },
+    general: { title: 'General', color: 'text-gray-600 dark:text-gray-400' },
   };
 
   const categorizeShortCode = (key: string): keyof typeof categories => {
@@ -60,78 +60,46 @@ export default function ShortCodeReference({ showPreview = true, compact = false
   };
 
   const sampleTemplate = `<p>Hi {{customer_first_name}},</p>
-
-<p>Your quote {{quote_number}} for {{customer_company}} is ready for review!</p>
-
-<p><strong>Total Amount:</strong> {{quote_total}}<br/>
-<strong>Quote Date:</strong> {{quote_date}}<br/>
-<strong>Expires:</strong> {{quote_expiry_date}}</p>
-
-<p>Click below to review and approve your quote:</p>
+<p>Your quote {{quote_number}} for {{customer_company}} is ready!</p>
+<p><strong>Total:</strong> {{quote_total}}</p>
 <p><a href="{{quote_link}}">Review Quote</a></p>
-
-<p>If you have any questions, please contact us.</p>
-
-<p>Best regards,<br/>
-{{user_name}}<br/>
-{{company_name}}<br/>
-{{company_phone}}</p>`;
+<p>{{user_name}}<br/>{{company_name}}</p>`;
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-            <Code className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+    <div className="bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+      {/* Compact Header */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Code className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+          <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300">
             Available Short Codes
-          </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Use these placeholders in your email templates. They'll be replaced with actual data when emails are sent.
-          </p>
+          </h4>
         </div>
         {showPreview && (
           <button
             onClick={() => setPreviewVisible(!previewVisible)}
-            className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors"
+            className="flex items-center gap-1 px-2 py-1 text-xs bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 rounded transition-colors"
           >
-            {previewVisible ? (
-              <>
-                <EyeOff className="w-4 h-4" />
-                Hide Preview
-              </>
-            ) : (
-              <>
-                <Eye className="w-4 h-4" />
-                Show Preview
-              </>
-            )}
+            {previewVisible ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+            {previewVisible ? 'Hide' : 'Preview'}
           </button>
         )}
       </div>
 
-      {/* Preview Section */}
+      {/* Compact Preview */}
       {previewVisible && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-3">
-          <div className="flex items-start justify-between">
+        <div className="mb-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50 rounded p-2">
+          <div className="grid grid-cols-2 gap-2">
             <div>
-              <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-200">Live Preview</h4>
-              <p className="text-xs text-blue-700 dark:text-blue-300 mt-0.5">
-                See how short codes are replaced with sample data
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div>
-              <div className="text-xs font-medium text-blue-800 dark:text-blue-300 mb-2">Template with Short Codes:</div>
-              <div className="bg-white dark:bg-slate-800 rounded border border-blue-200 dark:border-blue-700 p-3 text-xs font-mono text-gray-700 dark:text-gray-300 max-h-64 overflow-auto">
+              <div className="text-[10px] font-medium text-blue-700 dark:text-blue-300 mb-1">Template:</div>
+              <div className="bg-white dark:bg-slate-800 rounded border border-blue-200 dark:border-blue-700/50 p-2 text-[10px] font-mono text-slate-600 dark:text-slate-300 max-h-32 overflow-auto leading-relaxed">
                 {sampleTemplate}
               </div>
             </div>
             <div>
-              <div className="text-xs font-medium text-blue-800 dark:text-blue-300 mb-2">Rendered with Sample Data:</div>
+              <div className="text-[10px] font-medium text-blue-700 dark:text-blue-300 mb-1">Rendered:</div>
               <div
-                className="bg-white dark:bg-slate-800 rounded border border-blue-200 dark:border-blue-700 p-3 text-xs max-h-64 overflow-auto"
+                className="bg-white dark:bg-slate-800 rounded border border-blue-200 dark:border-blue-700/50 p-2 text-[10px] max-h-32 overflow-auto text-slate-700 dark:text-slate-200 leading-relaxed [&_p]:mb-1 [&_a]:text-blue-600 [&_a]:dark:text-blue-400"
                 dangerouslySetInnerHTML={{ __html: ShortCodeEngine.generatePreview(sampleTemplate) }}
               />
             </div>
@@ -139,8 +107,8 @@ export default function ShortCodeReference({ showPreview = true, compact = false
         </div>
       )}
 
-      {/* Short Codes by Category */}
-      <div className="space-y-3">
+      {/* Compact Categories Grid */}
+      <div className="space-y-1">
         {Object.entries(categories).map(([categoryKey, categoryInfo]) => {
           const codes = groupedShortCodes[categoryKey] || [];
           if (codes.length === 0) return null;
@@ -150,68 +118,55 @@ export default function ShortCodeReference({ showPreview = true, compact = false
           return (
             <div
               key={categoryKey}
-              className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden"
+              className="bg-white dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 overflow-hidden"
             >
-              {/* Category Header */}
+              {/* Compact Category Header */}
               <button
                 onClick={() => toggleCategory(categoryKey)}
-                className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-slate-750 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
               >
-                <div className="flex items-center gap-3">
-                  <span className="text-xl">{categoryInfo.icon}</span>
-                  <div className="text-left">
-                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
-                      {categoryInfo.title}
-                    </h4>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {codes.length} short code{codes.length !== 1 ? 's' : ''}
-                    </p>
-                  </div>
-                </div>
                 {isExpanded ? (
-                  <ChevronUp className="w-4 h-4 text-gray-400" />
+                  <ChevronDown className="w-3 h-3 text-slate-400" />
                 ) : (
-                  <ChevronDown className="w-4 h-4 text-gray-400" />
+                  <ChevronRight className="w-3 h-3 text-slate-400" />
                 )}
+                <span className={`text-xs font-semibold ${categoryInfo.color}`}>
+                  {categoryInfo.title}
+                </span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                  ({codes.length})
+                </span>
               </button>
 
-              {/* Category Content */}
+              {/* Compact Codes List */}
               {isExpanded && (
-                <div className="divide-y divide-gray-100 dark:divide-slate-700">
+                <div className="border-t border-slate-100 dark:border-slate-700 px-2 py-1.5 grid grid-cols-1 sm:grid-cols-2 gap-1">
                   {codes.map(({ key, label }) => (
                     <div
                       key={key}
-                      className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-750 transition-colors group"
+                      className="flex items-center justify-between gap-1 px-1.5 py-1 rounded hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group"
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <code className="text-sm font-mono font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 rounded">
-                            {`{{${key}}}`}
-                          </code>
-                        </div>
-                        <div className="text-xs text-gray-600 dark:text-gray-400">
+                      <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                        <code className="text-[10px] font-mono font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-1 py-0.5 rounded shrink-0">
+                          {`{{${key}}}`}
+                        </code>
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
                           {label}
-                        </div>
+                        </span>
                       </div>
                       <button
                         onClick={() => handleCopy(key)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all ${
+                        className={`p-1 rounded transition-all shrink-0 ${
                           copiedCode === key
-                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                            : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'
+                            ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+                            : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600'
                         }`}
-                        title="Copy to clipboard"
+                        title="Copy"
                       >
                         {copiedCode === key ? (
-                          <>
-                            <Check className="w-3.5 h-3.5" />
-                            <span className="text-xs font-medium">Copied!</span>
-                          </>
+                          <Check className="w-3 h-3" />
                         ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5" />
-                            <span className="text-xs font-medium">Copy</span>
-                          </>
+                          <Copy className="w-3 h-3" />
                         )}
                       </button>
                     </div>
@@ -223,24 +178,9 @@ export default function ShortCodeReference({ showPreview = true, compact = false
         })}
       </div>
 
-      {/* Usage Tip */}
-      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-        <div className="flex gap-3">
-          <div className="text-amber-600 dark:text-amber-400 text-xl">💡</div>
-          <div className="flex-1 min-w-0">
-            <h5 className="text-sm font-semibold text-amber-900 dark:text-amber-200 mb-1">
-              How to Use Short Codes
-            </h5>
-            <ul className="text-xs text-amber-800 dark:text-amber-300 space-y-1 list-disc list-inside">
-              <li>Copy any short code and paste it into your email template (subject or body)</li>
-              <li>When the email is sent, the short code will be replaced with actual data</li>
-              <li>You can use the same short code multiple times in one template</li>
-              <li>Missing data will be replaced with an empty string</li>
-              <li>All currency values are automatically formatted (e.g., $1,250.00)</li>
-              <li>All dates are automatically formatted (e.g., January 15, 2024)</li>
-            </ul>
-          </div>
-        </div>
+      {/* Compact Tip */}
+      <div className="mt-2 text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed">
+        Copy short codes and paste into templates. They auto-replace with real data when sent.
       </div>
     </div>
   );
