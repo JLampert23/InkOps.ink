@@ -17,6 +17,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const authHeader = req.headers.get("Authorization");
 
@@ -32,9 +33,15 @@ Deno.serve(async (req: Request) => {
 
     const token = authHeader.replace("Bearer ", "");
 
-    const supabaseAuth = createClient(supabaseUrl, supabaseServiceRoleKey);
+    const supabaseUserClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    });
 
-    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser(token);
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+    const { data: { user }, error: userError } = await supabaseUserClient.auth.getUser();
 
     if (userError || !user) {
       console.error("Error getting user:", userError);
@@ -47,7 +54,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: profile } = await supabaseAuth
+    const { data: profile } = await supabaseAdmin
       .from("user_profiles")
       .select("role")
       .eq("id", user.id)
@@ -79,7 +86,7 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      const { data: newUser, error: createError } = await supabaseAuth.auth.admin.createUser({
+      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email,
         email_confirm: true,
         user_metadata: {
@@ -100,7 +107,7 @@ Deno.serve(async (req: Request) => {
 
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      const { error: profileError } = await supabaseAuth
+      const { error: profileError } = await supabaseAdmin
         .from("user_profiles")
         .update({
           full_name: full_name || null,
@@ -120,7 +127,7 @@ Deno.serve(async (req: Request) => {
       }
 
       // Generate password reset link for the new user
-      const { data: resetData, error: resetError } = await supabaseAuth.auth.admin.generateLink({
+      const { data: resetData, error: resetError } = await supabaseAdmin.auth.admin.generateLink({
         type: 'recovery',
         email: email,
       });
@@ -132,7 +139,7 @@ Deno.serve(async (req: Request) => {
       // Send welcome email with password setup link
       if (resetData?.properties?.action_link) {
         try {
-          const { data: settings } = await supabaseAuth
+          const { data: settings } = await supabaseAdmin
             .from('company_settings')
             .select('email_from_address')
             .maybeSingle();
@@ -229,7 +236,7 @@ Deno.serve(async (req: Request) => {
       if (password !== undefined) authUpdates.password = password;
 
       if (Object.keys(authUpdates).length > 0) {
-        const { error: authUpdateError } = await supabaseAuth.auth.admin.updateUserById(
+        const { error: authUpdateError } = await supabaseAdmin.auth.admin.updateUserById(
           userId,
           authUpdates
         );
@@ -246,7 +253,7 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      const { error: profileUpdateError } = await supabaseAuth
+      const { error: profileUpdateError } = await supabaseAdmin
         .from("user_profiles")
         .update(updates)
         .eq("id", userId);
