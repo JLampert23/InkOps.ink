@@ -765,27 +765,15 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
               labelUrls.length === 0 && invoice.shippingLabels.length === 0 && (
               <button
                 onClick={() => {
-                  const hasShippingAddress = invoice.shippingAddress.line1 || invoice.shippingAddress.city;
-
-                  const hasRequiredFields =
-                    invoice.shippingAddress.line1 &&
-                    invoice.shippingAddress.city &&
-                    invoice.shippingAddress.state &&
-                    invoice.shippingAddress.zip;
-
-                  if (hasShippingAddress && hasRequiredFields) {
-                    setShowShipConfirm(true);
-                  } else {
-                    setShippingAddressForm({
-                      shipping_line1: invoice.shippingAddress.line1 || invoice.billingAddress.line1 || '',
-                      shipping_line2: invoice.shippingAddress.line2 || invoice.billingAddress.line2 || '',
-                      shipping_city: invoice.shippingAddress.city || invoice.billingAddress.city || '',
-                      shipping_state: invoice.shippingAddress.state || invoice.billingAddress.state || '',
-                      shipping_zip: invoice.shippingAddress.zip || invoice.billingAddress.zip || '',
-                      shipping_country: invoice.shippingAddress.country || 'US',
-                    });
-                    setShowShippingAddressModal(true);
-                  }
+                  setShippingAddressForm({
+                    shipping_line1: invoice.shippingAddress.line1 || invoice.billingAddress.line1 || '',
+                    shipping_line2: invoice.shippingAddress.line2 || invoice.billingAddress.line2 || '',
+                    shipping_city: invoice.shippingAddress.city || invoice.billingAddress.city || '',
+                    shipping_state: invoice.shippingAddress.state || invoice.billingAddress.state || '',
+                    shipping_zip: invoice.shippingAddress.zip || invoice.billingAddress.zip || '',
+                    shipping_country: invoice.shippingAddress.country || 'US',
+                  });
+                  setShowShippingAddressModal(true);
                 }}
                 disabled={shippingWithShipStation}
                 className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-white bg-blue-600 dark:bg-blue-700 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 whitespace-nowrap"
@@ -795,8 +783,8 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                 ) : (
                   <Truck className="w-4 h-4" />
                 )}
-                <span className="hidden lg:inline">Get Shipping Rates</span>
-                <span className="lg:hidden hidden sm:inline">Rates</span>
+                <span className="hidden lg:inline">Ship with ShipStation</span>
+                <span className="lg:hidden hidden sm:inline">Ship</span>
               </button>
             )}
             {(invoice.shippingLabels.length > 0 || labelUrls.length > 0) && (
@@ -2134,8 +2122,8 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                   </>
                 ) : (
                   <>
-                    <CheckCircle className="w-4 h-4" />
-                    Buy Labels
+                    <Truck className="w-4 h-4" />
+                    Get Rates
                   </>
                 )}
               </button>
