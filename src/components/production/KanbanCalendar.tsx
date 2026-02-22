@@ -135,10 +135,8 @@ export default function KanbanCalendar({ typeOfWork, onClose, onNavigateToWorkOr
           work_order_line_items (
             id,
             quantity,
-            size_2xs, size_xs, size_s, size_m, size_l, size_xl,
-            size_2xl, size_3xl, size_4xl, size_5xl, size_6xl,
-            garment_color,
-            imprint_type
+            sizes,
+            color
           )
         `)
         .eq('company_id', companyId)
@@ -191,20 +189,17 @@ export default function KanbanCalendar({ typeOfWork, onClose, onNavigateToWorkOr
         workOrders.forEach(wo => {
           const lineItems = wo.work_order_line_items || [];
 
-          // Calculate total pieces
+          // Calculate total pieces from JSONB sizes column
           const totalPieces = lineItems.reduce((sum, item) => {
-            const sizes = [
-              item.size_2xs, item.size_xs, item.size_s, item.size_m,
-              item.size_l, item.size_xl, item.size_2xl, item.size_3xl,
-              item.size_4xl, item.size_5xl, item.size_6xl
-            ];
-            const lineTotal = sizes.reduce((s, size) => s + (parseInt(size?.toString() || '0') || 0), 0);
-            return sum + (lineTotal * (item.quantity || 1));
+            const sizesObj = item.sizes || {};
+            const lineTotal = Object.values(sizesObj).reduce((s: number, size: any) =>
+              s + (parseInt(size?.toString() || '0') || 0), 0);
+            return sum + (lineTotal || item.quantity || 0);
           }, 0);
 
-          // Get primary color and imprint type from first line item
-          const primaryColor = lineItems[0]?.garment_color || null;
-          const imprintType = lineItems[0]?.imprint_type || typeOfWork;
+          // Get primary color from first line item
+          const primaryColor = lineItems[0]?.color || null;
+          const imprintType = typeOfWork;
 
           kanbanJobs.push({
             id: `wo-${wo.id}`,
