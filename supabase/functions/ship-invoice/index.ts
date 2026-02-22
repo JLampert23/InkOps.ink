@@ -386,50 +386,126 @@ Deno.serve(async (req: Request) => {
         }];
       }
 
-      const ratePayload = {
-        carrierCode: null,
-        fromPostalCode: fromAddress.postalCode,
-        toState: shipToAddress.state,
-        toCountry: shipToAddress.country,
-        toPostalCode: shipToAddress.postalCode,
-        toCity: shipToAddress.city,
-        weight: ratePackages[0].weight,
-        dimensions: ratePackages[0].dimensions,
-        confirmation: "none",
-        residential: true,
-      };
-
-      console.log('Fetching ShipStation rates:', JSON.stringify(ratePayload, null, 2));
-
-      const ratesResponse = await fetch("https://ssapi.shipstation.com/shipments/getrates", {
-        method: "POST",
+      // First, fetch list of available carriers
+      console.log('Fetching available carriers...');
+      const carriersResponse = await fetch("https://ssapi.shipstation.com/carriers", {
+        method: "GET",
         headers: {
           "Authorization": `Basic ${credentials}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(ratePayload),
       });
 
-      const ratesResponseText = await ratesResponse.text();
-      let ratesResponseData: any;
-
-      try {
-        ratesResponseData = JSON.parse(ratesResponseText);
-      } catch {
-        ratesResponseData = { raw: ratesResponseText };
-      }
-
-      console.log('ShipStation rates response:', ratesResponseData);
-
-      if (!ratesResponse.ok) {
-        const errorMessage = ratesResponseData?.message || ratesResponseData?.ExceptionMessage || ratesResponseText || 'Rate lookup failed';
-
+      if (!carriersResponse.ok) {
+        const carriersError = await carriersResponse.text();
+        console.error('Failed to fetch carriers:', carriersError);
         return new Response(
           JSON.stringify({
             success: false,
-            error: `Rate lookup failed: ${errorMessage}`,
-            status_code: ratesResponse.status,
-            details: ratesResponseData,
+            error: "Failed to fetch available carriers from ShipStation",
+            details: carriersError,
+          }),
+          {
+            status: 200,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
+
+      const carriers = await carriersResponse.json();
+      console.log('Available carriers:', carriers);
+
+      if (!Array.isArray(carriers) || carriers.length === 0) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "No carriers are configured in your ShipStation account. Please add a carrier in ShipStation settings.",
+          }),
+          {
+            status: 200,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
+
+      // Fetch rates from all available carriers
+      const allRates: any[] = [];
+      const rateErrors: string[] = [];
+
+      for (const carrier of carriers) {
+        const carrierCode = carrier.code;
+        console.log(`Fetching rates for carrier: ${carrierCode}`);
+
+        const ratePayload = {
+          carrierCode: carrierCode,
+          fromPostalCode: fromAddress.postalCode,
+          toState: shipToAddress.state,
+          toCountry: shipToAddress.country,
+          toPostalCode: shipToAddress.postalCode,
+          toCity: shipToAddress.city,
+          weight: ratePackages[0].weight,
+          dimensions: ratePackages[0].dimensions,
+          confirmation: "none",
+          residential: true,
+        };
+
+        try {
+          const ratesResponse = await fetch("https://ssapi.shipstation.com/shipments/getrates", {
+            method: "POST",
+            headers: {
+              "Authorization": `Basic ${credentials}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(ratePayload),
+          });
+
+          const ratesResponseText = await ratesResponse.text();
+          let ratesResponseData: any;
+
+          try {
+            ratesResponseData = JSON.parse(ratesResponseText);
+          } catch {
+            ratesResponseData = [];
+          }
+
+          if (ratesResponse.ok && Array.isArray(ratesResponseData)) {
+            // Add carrier info to each rate
+            const ratesWithCarrier = ratesResponseData.map((rate: any) => ({
+              ...rate,
+              carrierCode: carrierCode,
+              carrierName: carrier.name,
+            }));
+            allRates.push(...ratesWithCarrier);
+            console.log(`Got ${ratesResponseData.length} rates from ${carrierCode}`);
+          } else {
+            const errorMsg = ratesResponseData?.Message || ratesResponseData?.ExceptionMessage || 'Unknown error';
+            rateErrors.push(`${carrier.name}: ${errorMsg}`);
+            console.log(`No rates from ${carrierCode}: ${errorMsg}`);
+          }
+        } catch (err) {
+          console.error(`Error fetching rates from ${carrierCode}:`, err);
+          rateErrors.push(`${carrier.name}: Request failed`);
+        }
+      }
+
+      // Sort rates by price
+      allRates.sort((a, b) => (a.shipmentCost || 0) - (b.shipmentCost || 0));
+
+      console.log(`Total rates found: ${allRates.length}`);
+
+      if (allRates.length === 0) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "No shipping rates available for this destination. " +
+              (rateErrors.length > 0 ? `Errors: ${rateErrors.join('; ')}` : ''),
+            carriers_checked: carriers.map((c: any) => c.name),
           }),
           {
             status: 200,
@@ -445,7 +521,8 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({
           success: true,
           mode: "rates",
-          rates: ratesResponseData,
+          rates: allRates,
+          carriers_checked: carriers.length,
         }),
         {
           status: 200,
