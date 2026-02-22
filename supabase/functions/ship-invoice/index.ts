@@ -353,15 +353,16 @@ Deno.serve(async (req: Request) => {
 
     // If fetch_rates is true, fetch rates and return them for user selection
     if (fetch_rates) {
-      // Build shipFrom address from company settings
+      // Build shipFrom address from company settings (using ShipStation-specific fields)
       const shipFromAddress = {
-        name: companySettings.company_name || '',
-        street1: companySettings.company_address1 || companySettings.address1 || '',
-        street2: companySettings.company_address2 || companySettings.address2 || '',
-        city: companySettings.company_city || companySettings.city || '',
-        state: companySettings.company_state || companySettings.state || '',
-        postalCode: companySettings.company_zip || companySettings.zip || '',
-        country: companySettings.company_country || companySettings.country || 'US',
+        name: companySettings.shipstation_default_ship_from_name || companySettings.company_name || '',
+        company: companySettings.shipstation_default_ship_from_company || companySettings.company_name || '',
+        street1: companySettings.shipstation_default_ship_from_address1 || '',
+        street2: companySettings.shipstation_default_ship_from_address2 || '',
+        city: companySettings.shipstation_default_ship_from_city || '',
+        state: companySettings.shipstation_default_ship_from_state || '',
+        postalCode: companySettings.shipstation_default_ship_from_postal_code || '',
+        country: companySettings.shipstation_default_ship_from_country || 'US',
       };
 
       // Build shipTo address from invoice data
@@ -416,7 +417,25 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      // Validation 2: Validate shipTo required fields
+      // Validation 2: Validate shipFrom required fields (company's ship from address)
+      if (!shipFromAddress.street1 || !shipFromAddress.city ||
+          !shipFromAddress.state || !shipFromAddress.postalCode) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Ship From address is not configured. Please go to Settings > ShipStation and enter your company's shipping origin address.",
+          }),
+          {
+            status: 200,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
+
+      // Validation 3: Validate shipTo required fields
       if (!shipToAddress.name || !shipToAddress.street1 || !shipToAddress.city ||
           !shipToAddress.state || !shipToAddress.postalCode || !shipToAddress.country) {
         return new Response(
