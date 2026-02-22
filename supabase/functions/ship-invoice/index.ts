@@ -353,7 +353,20 @@ Deno.serve(async (req: Request) => {
 
     // If fetch_rates is true, fetch rates and return them for user selection
     if (fetch_rates) {
+      // Build shipFrom address from company settings
+      const shipFromAddress = {
+        name: companySettings.company_name || '',
+        street1: companySettings.company_address1 || companySettings.address1 || '',
+        street2: companySettings.company_address2 || companySettings.address2 || '',
+        city: companySettings.company_city || companySettings.city || '',
+        state: companySettings.company_state || companySettings.state || '',
+        postalCode: companySettings.company_zip || companySettings.zip || '',
+        country: companySettings.company_country || companySettings.country || 'US',
+      };
+
+      // Build shipTo address from invoice data
       const shipToAddress = {
+        name: invoiceData.customer_name || '',
         street1: invoiceData.shipping_line1 || invoiceData.shipping_address_line1 || invoiceData.billing_address_line1 || '',
         street2: invoiceData.shipping_line2 || invoiceData.shipping_address_line2 || invoiceData.billing_address_line2 || '',
         city: invoiceData.shipping_city || invoiceData.billing_city || '',
@@ -362,29 +375,76 @@ Deno.serve(async (req: Request) => {
         country: invoiceData.shipping_country || 'US',
       };
 
-      const fromAddress = {
-        postalCode: companySettings.company_zip || '60612',
-        country: 'US',
-      };
-
-      let ratePackages: Array<{ weight: { value: number; units: string }; dimensions: { units: string; length: number; width: number; height: number } }> = [];
+      // Build package data
+      let ratePackages: Array<{ weight_oz: number; length: number; width: number; height: number }> = [];
 
       if (packages && Array.isArray(packages) && packages.length > 0) {
         ratePackages = packages.map((pkg: { weight_oz: number; length: number; width: number; height: number }) => ({
-          weight: { value: pkg.weight_oz, units: "ounces" },
-          dimensions: { units: "inches", length: pkg.length, width: pkg.width, height: pkg.height },
+          weight_oz: pkg.weight_oz,
+          length: pkg.length,
+          width: pkg.width,
+          height: pkg.height,
         }));
       } else {
         ratePackages = [{
-          weight: { value: invoiceData.total_weight_oz || 16, units: "ounces" },
-          dimensions: {
-            units: "inches",
-            length: invoiceData.package_length || 12,
-            width: invoiceData.package_width || 9,
-            height: invoiceData.package_height || 3,
-          },
+          weight_oz: invoiceData.total_weight_oz || 0,
+          length: invoiceData.package_length || 0,
+          width: invoiceData.package_width || 0,
+          height: invoiceData.package_height || 0,
         }];
       }
+
+      // Validation 1: Validate package dimensions and weight BEFORE calling ShipStation
+      for (const pkg of ratePackages) {
+        if (!pkg.weight_oz || pkg.weight_oz <= 0 ||
+            !pkg.length || pkg.length <= 0 ||
+            !pkg.width || pkg.width <= 0 ||
+            !pkg.height || pkg.height <= 0) {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: "Invalid package dimensions or weight.",
+            }),
+            {
+              status: 200,
+              headers: {
+                ...corsHeaders,
+                "Content-Type": "application/json",
+              },
+            }
+          );
+        }
+      }
+
+      // Validation 2: Validate shipTo required fields
+      if (!shipToAddress.name || !shipToAddress.street1 || !shipToAddress.city ||
+          !shipToAddress.state || !shipToAddress.postalCode || !shipToAddress.country) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Shipping address is incomplete. Name, street, city, state, postal code, and country are required.",
+          }),
+          {
+            status: 200,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
+
+      // Log the address info being used
+      console.log('Ship From Address:', JSON.stringify(shipFromAddress, null, 2));
+      console.log('Ship To Address:', JSON.stringify(shipToAddress, null, 2));
+      console.log('Package info:', JSON.stringify(ratePackages[0], null, 2));
+
+      // Get default carrier code from settings
+      const defaultCarrierCode = settings.shipstation_default_carrier_code || '';
+
+      // Fetch rates from all available carriers
+      const allRates: any[] = [];
+      const rateErrors: string[] = [];
 
       // First, fetch list of available carriers
       console.log('Fetching available carriers...');
@@ -402,8 +462,8 @@ Deno.serve(async (req: Request) => {
         return new Response(
           JSON.stringify({
             success: false,
-            error: "Failed to fetch available carriers from ShipStation",
-            details: carriersError,
+            mode: "rates",
+            error: "No shipping rates available for this destination.",
           }),
           {
             status: 200,
@@ -422,7 +482,8 @@ Deno.serve(async (req: Request) => {
         return new Response(
           JSON.stringify({
             success: false,
-            error: "No carriers are configured in your ShipStation account. Please add a carrier in ShipStation settings.",
+            mode: "rates",
+            error: "No shipping rates available for this destination.",
           }),
           {
             status: 200,
@@ -433,54 +494,25 @@ Deno.serve(async (req: Request) => {
           }
         );
       }
-
-      // Log the address info being used
-      console.log('Ship From Postal Code:', fromAddress.postalCode);
-      console.log('Ship To Address:', JSON.stringify(shipToAddress, null, 2));
-      console.log('Package info:', JSON.stringify(ratePackages[0], null, 2));
-
-      // Validate required fields
-      if (!shipToAddress.postalCode || shipToAddress.postalCode.trim() === '') {
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: "Shipping postal/zip code is required to get rates",
-          }),
-          {
-            status: 200,
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-      }
-
-      // Fetch rates from all available carriers
-      const allRates: any[] = [];
-      const rateErrors: string[] = [];
 
       for (const carrier of carriers) {
         const carrierCode = carrier.code;
         console.log(`Fetching rates for carrier: ${carrierCode}`);
 
-        // ShipStation requires specific format for rate requests
+        // Build rate payload with shipFrom and shipTo objects
         const ratePayload = {
-          carrierCode: carrierCode,
-          fromPostalCode: fromAddress.postalCode,
-          toState: shipToAddress.state || '',
-          toCountry: shipToAddress.country || 'US',
-          toPostalCode: shipToAddress.postalCode,
-          toCity: shipToAddress.city || '',
+          carrierCode: defaultCarrierCode || carrierCode,
+          shipFrom: shipFromAddress,
+          shipTo: shipToAddress,
           weight: {
-            value: ratePackages[0].weight.value || 16,
+            value: ratePackages[0].weight_oz,
             units: "ounces"
           },
           dimensions: {
             units: "inches",
-            length: ratePackages[0].dimensions.length || 12,
-            width: ratePackages[0].dimensions.width || 9,
-            height: ratePackages[0].dimensions.height || 3
+            length: ratePackages[0].length,
+            width: ratePackages[0].width,
+            height: ratePackages[0].height
           },
           confirmation: "none",
           residential: true,
@@ -511,7 +543,7 @@ Deno.serve(async (req: Request) => {
 
           console.log(`Parsed response from ${carrierCode}:`, JSON.stringify(ratesResponseData, null, 2));
 
-          if (ratesResponse.ok && Array.isArray(ratesResponseData)) {
+          if (ratesResponse.ok && Array.isArray(ratesResponseData) && ratesResponseData.length > 0) {
             // Add carrier info to each rate
             const ratesWithCarrier = ratesResponseData.map((rate: any) => ({
               ...rate,
@@ -521,7 +553,7 @@ Deno.serve(async (req: Request) => {
             allRates.push(...ratesWithCarrier);
             console.log(`Got ${ratesResponseData.length} rates from ${carrierCode}`);
           } else {
-            const errorMsg = ratesResponseData?.Message || ratesResponseData?.ExceptionMessage || 'Unknown error';
+            const errorMsg = ratesResponseData?.Message || ratesResponseData?.ExceptionMessage || 'No rates returned';
             rateErrors.push(`${carrier.name}: ${errorMsg}`);
             console.log(`No rates from ${carrierCode}: ${errorMsg}`);
           }
@@ -536,13 +568,13 @@ Deno.serve(async (req: Request) => {
 
       console.log(`Total rates found: ${allRates.length}`);
 
+      // Validation 5: If no rates or errors, return specific error format
       if (allRates.length === 0) {
         return new Response(
           JSON.stringify({
             success: false,
-            error: "No shipping rates available for this destination. " +
-              (rateErrors.length > 0 ? `Errors: ${rateErrors.join('; ')}` : ''),
-            carriers_checked: carriers.map((c: any) => c.name),
+            mode: "rates",
+            error: "No shipping rates available for this destination.",
           }),
           {
             status: 200,
