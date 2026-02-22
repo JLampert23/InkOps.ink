@@ -1270,8 +1270,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       }
 
       let encryptedToken = null;
+      const isPlaceholder = squareAccessToken === '••••••••••••••••';
 
-      if (squareAccessToken.trim()) {
+      if (squareAccessToken.trim() && !isPlaceholder) {
         const encryptResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crypto-service`, {
           method: 'POST',
           headers: {
