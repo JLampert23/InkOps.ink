@@ -53,10 +53,23 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: roleData, error: roleError } = await supabaseAdmin
-      .rpc('get_user_role', { user_id: user.id });
+    const { data: userProfile, error: profileError } = await supabaseAdmin
+      .from('user_profiles')
+      .select('company_id, role')
+      .eq('id', user.id)
+      .maybeSingle();
 
-    if (roleError || roleData !== 'super_admin') {
+    if (profileError || !userProfile) {
+      return new Response(
+        JSON.stringify({ error: 'User profile not found', details: profileError?.message }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    if (userProfile.role !== 'super_admin') {
       return new Response(
         JSON.stringify({ error: "Access denied. Super Admin role required." }),
         {
@@ -69,6 +82,7 @@ Deno.serve(async (req: Request) => {
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('company_settings')
       .select('square_access_token, square_environment, square_location_id')
+      .eq('company_id', userProfile.company_id)
       .maybeSingle();
 
     if (settingsError || !settings || !settings.square_access_token) {
