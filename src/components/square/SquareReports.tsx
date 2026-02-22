@@ -140,34 +140,34 @@ export default function SquareReports() {
   const getColorClasses = (color: string, variant: 'bg' | 'text' | 'border' | 'hover') => {
     const colorMap: Record<string, Record<string, string>> = {
       blue: {
-        bg: 'bg-blue-50',
-        text: 'text-blue-600',
-        border: 'border-blue-200',
-        hover: 'hover:bg-blue-100'
+        bg: 'bg-blue-50 dark:bg-blue-900/30',
+        text: 'text-blue-600 dark:text-blue-400',
+        border: 'border-blue-200 dark:border-blue-700',
+        hover: 'hover:bg-blue-100 dark:hover:bg-blue-900/50'
       },
       green: {
-        bg: 'bg-green-50',
-        text: 'text-green-600',
-        border: 'border-green-200',
-        hover: 'hover:bg-green-100'
+        bg: 'bg-green-50 dark:bg-green-900/30',
+        text: 'text-green-600 dark:text-green-400',
+        border: 'border-green-200 dark:border-green-700',
+        hover: 'hover:bg-green-100 dark:hover:bg-green-900/50'
       },
       orange: {
-        bg: 'bg-orange-50',
-        text: 'text-orange-600',
-        border: 'border-orange-200',
-        hover: 'hover:bg-orange-100'
+        bg: 'bg-orange-50 dark:bg-orange-900/30',
+        text: 'text-orange-600 dark:text-orange-400',
+        border: 'border-orange-200 dark:border-orange-700',
+        hover: 'hover:bg-orange-100 dark:hover:bg-orange-900/50'
       },
       teal: {
-        bg: 'bg-teal-50',
-        text: 'text-teal-600',
-        border: 'border-teal-200',
-        hover: 'hover:bg-teal-100'
+        bg: 'bg-teal-50 dark:bg-teal-900/30',
+        text: 'text-teal-600 dark:text-teal-400',
+        border: 'border-teal-200 dark:border-teal-700',
+        hover: 'hover:bg-teal-100 dark:hover:bg-teal-900/50'
       },
       slate: {
-        bg: 'bg-slate-50',
-        text: 'text-slate-600',
-        border: 'border-slate-200',
-        hover: 'hover:bg-slate-100'
+        bg: 'bg-slate-50 dark:bg-slate-700/30',
+        text: 'text-slate-600 dark:text-slate-400',
+        border: 'border-slate-200 dark:border-slate-600',
+        hover: 'hover:bg-slate-100 dark:hover:bg-slate-700/50'
       },
     };
     return colorMap[color]?.[variant] || colorMap.blue[variant];
@@ -666,9 +666,9 @@ export default function SquareReports() {
         showSort={false}
       />
 
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Square Reports</h2>
-        <p className="text-gray-600 mb-6">Generate comprehensive PDF reports from your Square data</p>
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow dark:shadow-slate-900/50 p-6">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Square Reports</h2>
+        <p className="text-gray-600 dark:text-gray-400 mb-6">Generate comprehensive PDF reports from your Square data</p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {reports.map((report) => {
@@ -681,17 +681,17 @@ export default function SquareReports() {
                 onClick={() => setSelectedReport(report.id)}
                 className={`text-left p-4 rounded-xl border-2 transition-all duration-200 ${
                   isSelected
-                    ? 'border-green-500 bg-green-50 shadow-lg'
+                    ? 'border-green-500 bg-green-50 dark:bg-green-900/30 shadow-lg dark:shadow-slate-900/50'
                     : `${getColorClasses(report.color, 'bg')} ${getColorClasses(report.color, 'border')} ${getColorClasses(report.color, 'hover')}`
                 }`}
               >
                 <div className={`inline-flex p-2 rounded-lg ${isSelected ? 'bg-green-500' : getColorClasses(report.color, 'bg')} mb-3`}>
                   <Icon className={`w-5 h-5 ${isSelected ? 'text-white' : getColorClasses(report.color, 'text')}`} />
                 </div>
-                <h3 className={`text-base font-semibold mb-1 ${isSelected ? 'text-green-700' : getColorClasses(report.color, 'text')}`}>
+                <h3 className={`text-base font-semibold mb-1 ${isSelected ? 'text-green-700 dark:text-green-400' : getColorClasses(report.color, 'text')}`}>
                   {report.name}
                 </h3>
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-gray-600 dark:text-gray-400">
                   {report.description}
                 </p>
               </button>
@@ -700,11 +700,11 @@ export default function SquareReports() {
         </div>
 
         {selectedReport && (
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <h3 className="font-semibold text-gray-900 mb-3">Report Configuration</h3>
+          <div className="mt-6 p-4 bg-gray-50 dark:bg-slate-700 rounded-lg border border-gray-200 dark:border-slate-600">
+            <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Report Configuration</h3>
 
             {needsDateRange && !dateRange.start && !dateRange.end && (
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                 Please select a date range using the filters above to generate this report.
               </p>
             )}
@@ -730,44 +730,44 @@ export default function SquareReports() {
             )}
 
             {previewData && (
-              <div className="mb-4 p-4 bg-white rounded-lg border border-gray-200">
-                <h4 className="font-semibold text-gray-900 mb-2">Data Preview</h4>
+              <div className="mb-4 p-4 bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-600">
+                <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Data Preview</h4>
                 {previewData.type === 'payments' && (
                   <div className="space-y-1 text-sm">
-                    <p className="text-gray-700">
+                    <p className="text-gray-700 dark:text-gray-300">
                       <span className="font-medium">Transactions:</span> {previewData.count}
                     </p>
-                    <p className="text-gray-700">
+                    <p className="text-gray-700 dark:text-gray-300">
                       <span className="font-medium">Total Revenue:</span> ${previewData.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
                 )}
                 {previewData.type === 'customers' && (
                   <div className="space-y-1 text-sm">
-                    <p className="text-gray-700">
+                    <p className="text-gray-700 dark:text-gray-300">
                       <span className="font-medium">Total Customers:</span> {previewData.count}
                     </p>
                   </div>
                 )}
                 {previewData.type === 'payouts' && (
                   <div className="space-y-1 text-sm">
-                    <p className="text-gray-700">
+                    <p className="text-gray-700 dark:text-gray-300">
                       <span className="font-medium">Deposits:</span> {previewData.count}
                     </p>
-                    <p className="text-gray-700">
+                    <p className="text-gray-700 dark:text-gray-300">
                       <span className="font-medium">Total Amount:</span> ${previewData.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </p>
                   </div>
                 )}
                 {previewData.type === 'combined' && (
                   <div className="space-y-1 text-sm">
-                    <p className="text-gray-700">
+                    <p className="text-gray-700 dark:text-gray-300">
                       <span className="font-medium">Transactions:</span> {previewData.payments}
                     </p>
-                    <p className="text-gray-700">
+                    <p className="text-gray-700 dark:text-gray-300">
                       <span className="font-medium">Deposits:</span> {previewData.payouts}
                     </p>
-                    <p className="text-gray-700">
+                    <p className="text-gray-700 dark:text-gray-300">
                       <span className="font-medium">Customers:</span> {previewData.customers}
                     </p>
                   </div>
@@ -776,7 +776,7 @@ export default function SquareReports() {
                   (previewData.type === 'customers' && previewData.count === 0) ||
                   (previewData.type === 'payouts' && previewData.count === 0) ||
                   (previewData.type === 'combined' && previewData.payments === 0 && previewData.payouts === 0)) && (
-                  <p className="text-sm text-amber-600 mt-2">
+                  <p className="text-sm text-amber-600 dark:text-amber-400 mt-2">
                     No data found for the selected criteria. Report will be empty.
                   </p>
                 )}
@@ -804,19 +804,19 @@ export default function SquareReports() {
         )}
 
         {error && (
-          <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div className="mt-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg p-4 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <h3 className="font-semibold text-red-900">Error</h3>
-              <p className="text-sm text-red-800">{error}</p>
+              <h3 className="font-semibold text-red-900 dark:text-red-300">Error</h3>
+              <p className="text-sm text-red-800 dark:text-red-400">{error}</p>
             </div>
           </div>
         )}
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h3 className="text-sm font-semibold text-blue-900 mb-2">Report Information</h3>
-        <ul className="text-sm text-blue-800 space-y-1">
+      <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
+        <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-300 mb-2">Report Information</h3>
+        <ul className="text-sm text-blue-800 dark:text-blue-400 space-y-1">
           <li>Reports are generated in real-time from your Square account</li>
           <li>All reports are exported as PDF files for easy sharing and printing</li>
           <li>Use the date range filter above to specify the reporting period</li>

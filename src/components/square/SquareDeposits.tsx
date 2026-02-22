@@ -86,8 +86,8 @@ export default function SquareDeposits() {
         showSort={true}
       />
 
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Deposits / Payouts</h2>
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow dark:shadow-slate-900/50 p-6">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Deposits / Payouts</h2>
 
         <div className="flex gap-3">
           <button
@@ -109,11 +109,11 @@ export default function SquareDeposits() {
               Export
             </button>
             {showExportMenu && (
-              <div className="absolute top-full mt-2 right-0 bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-10">
-                <button onClick={() => handleExport('csv')} className="w-full px-4 py-2 text-left hover:bg-gray-50">
+              <div className="absolute top-full mt-2 right-0 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg shadow-lg dark:shadow-slate-900/50 py-2 z-10">
+                <button onClick={() => handleExport('csv')} className="w-full px-4 py-2 text-left text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-slate-600">
                   Export as CSV
                 </button>
-                <button onClick={() => handleExport('pdf')} className="w-full px-4 py-2 text-left hover:bg-gray-50">
+                <button onClick={() => handleExport('pdf')} className="w-full px-4 py-2 text-left text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-slate-600">
                   Export as PDF
                 </button>
               </div>
@@ -123,40 +123,40 @@ export default function SquareDeposits() {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-red-800">{error}</p>
+        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-red-800 dark:text-red-400">{error}</p>
         </div>
       )}
 
       {deposits.length > 0 ? (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow dark:shadow-slate-900/50 overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+            <thead className="bg-gray-50 dark:bg-slate-900">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Deposit ID</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Deposit ID</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Amount</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Type</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
               {deposits.map((deposit, index) => (
-                <tr key={index} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm text-gray-900">{formatDate(deposit.date)}</td>
-                  <td className="px-6 py-4 text-sm font-mono text-gray-600 text-xs">{deposit.id}</td>
-                  <td className="px-6 py-4 text-sm text-right font-semibold text-gray-900">{formatCurrency(deposit.amount)}</td>
-                  <td className="px-6 py-4 text-sm text-gray-900">{deposit.status}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{deposit.type}</td>
+                <tr key={index} className="hover:bg-gray-50 dark:hover:bg-slate-700">
+                  <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">{formatDate(deposit.date)}</td>
+                  <td className="px-6 py-4 text-sm font-mono text-gray-600 dark:text-gray-400 text-xs">{deposit.id}</td>
+                  <td className="px-6 py-4 text-sm text-right font-semibold text-gray-900 dark:text-white">{formatCurrency(deposit.amount)}</td>
+                  <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">{deposit.status}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{deposit.type}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       ) : !loading && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
-          <p className="text-gray-600">No deposits to display. Click "Fetch Data" to load from Square.</p>
+        <div className="bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-8 text-center">
+          <p className="text-gray-600 dark:text-gray-400">No deposits to display. Click "Fetch Data" to load from Square.</p>
         </div>
       )}
     </div>
