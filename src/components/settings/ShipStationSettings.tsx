@@ -85,6 +85,14 @@ export function ShipStationSettings() {
         const hasCreds = !!(companySettings.shipstation_api_key && companySettings.shipstation_api_secret);
         setHasCredentials(hasCreds);
 
+        const normalizeCountry = (country: string | null): string => {
+          if (!country) return 'US';
+          const upper = country.trim().toUpperCase();
+          if (upper === 'US' || upper === 'USA' || upper === 'UNITED STATES' || upper === 'UNITED STATES OF AMERICA') return 'US';
+          if (upper === 'CA' || upper === 'CANADA') return 'CA';
+          return 'US';
+        };
+
         setSettings({
           api_key: hasCreds ? '••••••••••••••••' : '',
           api_secret: hasCreds ? '••••••••••••••••' : '',
@@ -93,9 +101,9 @@ export function ShipStationSettings() {
           ship_from_address1: companySettings.shipstation_default_ship_from_address1 || '',
           ship_from_address2: companySettings.shipstation_default_ship_from_address2 || '',
           ship_from_city: companySettings.shipstation_default_ship_from_city || '',
-          ship_from_state: companySettings.shipstation_default_ship_from_state || '',
+          ship_from_state: (companySettings.shipstation_default_ship_from_state || '').toUpperCase(),
           ship_from_postal_code: companySettings.shipstation_default_ship_from_postal_code || '',
-          ship_from_country: companySettings.shipstation_default_ship_from_country || 'US',
+          ship_from_country: normalizeCountry(companySettings.shipstation_default_ship_from_country),
         });
       }
     } catch (err) {
