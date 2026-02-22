@@ -110,6 +110,72 @@ async function logShipStationAction(
   }
 }
 
+async function upsertShippingLineItem(
+  supabase: any,
+  invoiceId: string,
+  companyId: string,
+  shippingCost: number
+) {
+  try {
+    const { data: existingItem } = await supabase
+      .from('invoice_line_items')
+      .select('id')
+      .eq('invoice_id', invoiceId)
+      .eq('item_type', 'shipping')
+      .maybeSingle();
+
+    if (existingItem) {
+      const { error } = await supabase
+        .from('invoice_line_items')
+        .update({
+          unit_price: shippingCost,
+          subtotal: shippingCost,
+          total: shippingCost,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingItem.id);
+
+      if (error) {
+        console.error('Failed to update shipping line item:', error);
+      } else {
+        console.log('Updated shipping line item with cost:', shippingCost);
+      }
+    } else {
+      const { data: maxLineNum } = await supabase
+        .from('invoice_line_items')
+        .select('line_number')
+        .eq('invoice_id', invoiceId)
+        .order('line_number', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const nextLineNumber = (maxLineNum?.line_number || 0) + 1;
+
+      const { error } = await supabase
+        .from('invoice_line_items')
+        .insert({
+          invoice_id: invoiceId,
+          company_id: companyId,
+          line_number: nextLineNumber,
+          item_type: 'shipping',
+          description: 'Shipping',
+          quantity: 1,
+          unit_price: shippingCost,
+          subtotal: shippingCost,
+          total: shippingCost,
+        });
+
+      if (error) {
+        console.error('Failed to create shipping line item:', error);
+      } else {
+        console.log('Created shipping line item with cost:', shippingCost);
+      }
+    }
+  } catch (err) {
+    console.error('Error upserting shipping line item:', err);
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -1032,6 +1098,9 @@ Deno.serve(async (req: Request) => {
         console.error('Failed to update invoice with label data:', invoiceUpdateError);
       }
 
+      // Upsert shipping line item with total cost
+      await upsertShippingLineItem(supabaseClient, invoice_id, invoiceData.company_id, totalCost);
+
       return new Response(
         JSON.stringify({
           success: true,
@@ -1040,6 +1109,7 @@ Deno.serve(async (req: Request) => {
           carrier: lastCarrierCode,
           service: lastServiceCode,
           cost: totalCost,
+          shippingCost: totalCost,
           package_count: shippingLabels.length,
         }),
         {
@@ -1211,6 +1281,10 @@ Deno.serve(async (req: Request) => {
       console.error('Failed to update invoice with label data:', invoiceUpdateError);
     }
 
+    // Upsert shipping line item with cost
+    const shippingCostValue = shipmentCost || 0;
+    await upsertShippingLineItem(supabaseClient, invoice_id, invoiceData.company_id, shippingCostValue);
+
     await logShipStationAction(
       supabaseClient,
       invoiceData.company_id,
@@ -1232,6 +1306,7 @@ Deno.serve(async (req: Request) => {
         carrier: carrierCode,
         service: serviceCode,
         cost: shipmentCost,
+        shippingCost: shippingCostValue,
         shipment_id: shipmentId,
       }),
       {

@@ -112,6 +112,7 @@ export interface InvoiceDetail {
   lineItems: InvoiceLineItem[];
   fees: InvoiceFee[];
   feesTotal: number;
+  shippingCost: number;
 
   subtotal: number;
   tax: number;
@@ -369,6 +370,11 @@ export const invoiceDetailService = {
               .filter((item: any) => item.item_type === 'fee')
               .reduce((sum: number, item: any) => sum + (parseFloat(item.total) || parseFloat(item.subtotal) || 0), 0)
           : this.calculateFeesTotal(rawData),
+        shippingCost: useInvoiceLineItems
+          ? (invoiceLineItems || [])
+              .filter((item: any) => item.item_type === 'shipping')
+              .reduce((sum: number, item: any) => sum + (parseFloat(item.total) || parseFloat(item.subtotal) || 0), 0)
+          : 0,
 
         subtotal: parseFloat(invoice.subtotal) || 0,
         tax: parseFloat(invoice.tax) || 0,

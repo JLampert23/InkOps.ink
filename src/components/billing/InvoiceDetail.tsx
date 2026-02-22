@@ -1222,6 +1222,14 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                       </td>
                     </tr>
                   )}
+                  <tr>
+                    <td colSpan={6} className="px-6 py-3 text-right text-sm font-medium text-gray-500 dark:text-gray-400">
+                      Shipping
+                    </td>
+                    <td className="px-6 py-3 text-right text-sm font-medium text-gray-900 dark:text-white">
+                      {invoice.shippingCost > 0 ? `$${invoice.shippingCost.toFixed(2)}` : '—'}
+                    </td>
+                  </tr>
                   {invoice.discounts > 0 && (
                     <tr>
                       <td colSpan={6} className="px-6 py-3 text-right text-sm font-medium text-gray-500 dark:text-gray-400">
