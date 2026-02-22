@@ -570,11 +570,27 @@ Deno.serve(async (req: Request) => {
 
       // Validation 5: If no rates or errors, return specific error format
       if (allRates.length === 0) {
+        console.log('No rates returned. Errors from carriers:', rateErrors);
+        console.log('Ship from:', JSON.stringify(shipFromAddress));
+        console.log('Ship to:', JSON.stringify(shipToAddress));
+
+        let errorDetail = "No shipping rates available for this destination.";
+        if (rateErrors.length > 0) {
+          errorDetail += " Carrier errors: " + rateErrors.slice(0, 3).join("; ");
+        }
+
         return new Response(
           JSON.stringify({
             success: false,
             mode: "rates",
-            error: "No shipping rates available for this destination.",
+            error: errorDetail,
+            carrier_errors: rateErrors,
+            debug: {
+              shipFrom: shipFromAddress,
+              shipTo: shipToAddress,
+              packages: ratePackages,
+              carriers_checked: carriers.length,
+            }
           }),
           {
             status: 200,

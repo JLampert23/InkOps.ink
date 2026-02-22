@@ -437,7 +437,14 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
       }
 
       if (!result.success) {
-        throw new Error(result.error || 'Failed to fetch shipping rates');
+        let errorMsg = result.error || 'Failed to fetch shipping rates';
+        if (result.carrier_errors && result.carrier_errors.length > 0) {
+          console.log('Carrier errors:', result.carrier_errors);
+        }
+        if (result.debug) {
+          console.log('Debug info:', result.debug);
+        }
+        throw new Error(errorMsg);
       }
 
       if (result.mode === 'rates' && result.rates) {
