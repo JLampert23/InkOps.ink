@@ -96,6 +96,9 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
       case 'work-orders':
         return <WorkOrdersManager initialWorkOrderId={navigateToWorkOrderId} />;
       case 'scheduling':
+        const schedulerType = selectedScheduleType === 'all' && typesOfWork.length > 0
+          ? typesOfWork[0].work_type_name
+          : selectedScheduleType;
         return (
           <div className="space-y-4">
             {typesOfWork.length === 0 ? (
@@ -112,7 +115,7 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
                     Type of Work
                   </label>
                   <select
-                    value={selectedScheduleType}
+                    value={schedulerType}
                     onChange={(e) => setSelectedScheduleType(e.target.value)}
                     className="w-full md:w-64 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-gray-900 dark:text-white"
                   >
@@ -125,8 +128,8 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
                 </div>
 
                 {/* Selected Schedule */}
-                {selectedScheduleType && (
-                  <ProductionScheduler typeOfWork={selectedScheduleType} onNavigateToWorkOrder={handleNavigateToWorkOrder} />
+                {schedulerType && (
+                  <ProductionScheduler typeOfWork={schedulerType} onNavigateToWorkOrder={handleNavigateToWorkOrder} />
                 )}
               </>
             )}

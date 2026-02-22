@@ -87,6 +87,7 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
   const [availableStations, setAvailableStations] = useState<Array<{ id: string; station_name: string }>>([]);
 
   const loadWorkflowSteps = async () => {
+    setLoading(true);
     try {
       const { data: typeData } = await supabase
         .from('type_of_work_settings')
@@ -114,6 +115,9 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
               is_default: status.is_default || false,
             })),
           })));
+        } else {
+          setWorkflowSteps([]);
+          setLoading(false);
         }
 
         // Load stations for this work type
@@ -127,9 +131,13 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
         if (stationsData) {
           setAvailableStations(stationsData);
         }
+      } else {
+        setWorkflowSteps([]);
+        setLoading(false);
       }
     } catch (error) {
       console.error('Error loading workflow steps:', error);
+      setLoading(false);
     }
   };
 
