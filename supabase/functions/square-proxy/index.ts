@@ -82,7 +82,7 @@ Deno.serve(async (req: Request) => {
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('company_settings')
       .select('square_access_token, square_environment, square_location_id')
-      .eq('company_id', userProfile.company_id)
+      .eq('id', userProfile.company_id)
       .maybeSingle();
 
     if (settingsError || !settings || !settings.square_access_token) {
