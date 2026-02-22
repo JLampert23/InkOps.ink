@@ -390,49 +390,25 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
 
       if (error) throw error;
 
-      const requestBody: { invoice_id: string; packages?: typeof packages; fetch_rates: boolean } = {
+      const payload = {
         invoice_id: invoice.id,
         packages: packages,
         fetch_rates: true,
       };
 
-      const makeRequest = async (retryCount = 0): Promise<Response> => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
-          if (refreshError || !refreshedSession) {
-            throw new Error('Session expired. Please refresh the page and try again.');
-          }
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const response = await fetch(
+        "https://cuaukcvccxvfpuxaciac.supabase.co/functions/v1/ship-invoice",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session?.access_token}`
+          },
+          body: JSON.stringify(payload)
         }
-
-        const currentSession = (await supabase.auth.getSession()).data.session;
-        if (!currentSession) throw new Error('Not authenticated');
-
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ship-invoice`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${currentSession.access_token}`,
-              'Content-Type': 'application/json',
-              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-            },
-            body: JSON.stringify(requestBody),
-          }
-        );
-
-        if (response.status === 401 && retryCount < 1) {
-          const { error: refreshErr } = await supabase.auth.refreshSession();
-          if (refreshErr) {
-            throw new Error('Your session has expired. Please refresh the page and log in again.');
-          }
-          return makeRequest(retryCount + 1);
-        }
-
-        return response;
-      };
-
-      const response = await makeRequest();
+      );
 
       const responseText = await response.text();
       let result;
