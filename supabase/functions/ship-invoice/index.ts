@@ -372,27 +372,15 @@ Deno.serve(async (req: Request) => {
       };
 
       // Build shipFrom address from company settings (using ShipStation-specific fields)
-      const shipFromAddress = {
-        name: companySettings.shipstation_default_ship_from_name || companySettings.company_name || '',
-        company: companySettings.shipstation_default_ship_from_company || companySettings.company_name || '',
-        street1: companySettings.shipstation_default_ship_from_address1 || '',
-        street2: companySettings.shipstation_default_ship_from_address2 || '',
-        city: companySettings.shipstation_default_ship_from_city || '',
-        state: normalizeState(companySettings.shipstation_default_ship_from_state),
-        postalCode: companySettings.shipstation_default_ship_from_postal_code || '',
-        country: normalizeCountry(companySettings.shipstation_default_ship_from_country),
-      };
+      const fromPostalCode = companySettings.shipstation_default_ship_from_postal_code || '';
+      const fromCity = companySettings.shipstation_default_ship_from_city || '';
+      const fromState = normalizeState(companySettings.shipstation_default_ship_from_state);
 
       // Build shipTo address from invoice data
-      const shipToAddress = {
-        name: invoiceData.customer_name || '',
-        street1: invoiceData.shipping_line1 || invoiceData.shipping_address_line1 || invoiceData.billing_address_line1 || '',
-        street2: invoiceData.shipping_line2 || invoiceData.shipping_address_line2 || invoiceData.billing_address_line2 || '',
-        city: invoiceData.shipping_city || invoiceData.billing_city || '',
-        state: normalizeState(invoiceData.shipping_state || invoiceData.billing_state),
-        postalCode: invoiceData.shipping_zip || invoiceData.billing_zip || '',
-        country: normalizeCountry(invoiceData.shipping_country),
-      };
+      const toPostalCode = invoiceData.shipping_zip || invoiceData.billing_zip || '';
+      const toCity = invoiceData.shipping_city || invoiceData.billing_city || '';
+      const toState = normalizeState(invoiceData.shipping_state || invoiceData.billing_state);
+      const toCountry = normalizeCountry(invoiceData.shipping_country);
 
       // Build package data
       let ratePackages: Array<{ weight_oz: number; length: number; width: number; height: number }> = [];
@@ -436,12 +424,11 @@ Deno.serve(async (req: Request) => {
       }
 
       // Validation 2: Validate shipFrom required fields (company's ship from address)
-      if (!shipFromAddress.street1 || !shipFromAddress.city ||
-          !shipFromAddress.state || !shipFromAddress.postalCode) {
+      if (!fromPostalCode) {
         return new Response(
           JSON.stringify({
             success: false,
-            error: "Ship From address is not configured. Please go to Settings > ShipStation and enter your company's shipping origin address.",
+            error: "Ship From postal code is not configured. Please go to Settings > ShipStation and enter your company's shipping origin address.",
           }),
           {
             status: 200,
@@ -454,12 +441,11 @@ Deno.serve(async (req: Request) => {
       }
 
       // Validation 3: Validate shipTo required fields
-      if (!shipToAddress.name || !shipToAddress.street1 || !shipToAddress.city ||
-          !shipToAddress.state || !shipToAddress.postalCode || !shipToAddress.country) {
+      if (!toPostalCode || !toCountry) {
         return new Response(
           JSON.stringify({
             success: false,
-            error: "Shipping address is incomplete. Name, street, city, state, postal code, and country are required.",
+            error: "Shipping address is incomplete. Postal code and country are required.",
           }),
           {
             status: 200,
@@ -472,12 +458,9 @@ Deno.serve(async (req: Request) => {
       }
 
       // Log the address info being used
-      console.log('Ship From Address:', JSON.stringify(shipFromAddress, null, 2));
-      console.log('Ship To Address:', JSON.stringify(shipToAddress, null, 2));
+      console.log('Ship From:', { fromPostalCode, fromCity, fromState });
+      console.log('Ship To:', { toPostalCode, toCity, toState, toCountry });
       console.log('Package info:', JSON.stringify(ratePackages[0], null, 2));
-
-      // Get default carrier code from settings
-      const defaultCarrierCode = settings.shipstation_default_carrier_code || '';
 
       // Fetch rates from all available carriers
       const allRates: any[] = [];
@@ -536,11 +519,12 @@ Deno.serve(async (req: Request) => {
         const carrierCode = carrier.code;
         console.log(`Fetching rates for carrier: ${carrierCode}`);
 
-        // Build rate payload with shipFrom and shipTo objects
-        const ratePayload = {
-          carrierCode: defaultCarrierCode || carrierCode,
-          shipFrom: shipFromAddress,
-          shipTo: shipToAddress,
+        // Build rate payload using flat fields per ShipStation API docs
+        const ratePayload: Record<string, unknown> = {
+          carrierCode: carrierCode,
+          fromPostalCode: fromPostalCode,
+          toPostalCode: toPostalCode,
+          toCountry: toCountry,
           weight: {
             value: ratePackages[0].weight_oz,
             units: "ounces"
@@ -554,6 +538,20 @@ Deno.serve(async (req: Request) => {
           confirmation: "none",
           residential: true,
         };
+
+        // Add optional fields if available (toState required for UPS)
+        if (toState) {
+          ratePayload.toState = toState;
+        }
+        if (toCity) {
+          ratePayload.toCity = toCity;
+        }
+        if (fromCity) {
+          ratePayload.fromCity = fromCity;
+        }
+        if (fromState) {
+          ratePayload.fromState = fromState;
+        }
 
         console.log(`Rate payload for ${carrierCode}:`, JSON.stringify(ratePayload, null, 2));
 
@@ -608,8 +606,8 @@ Deno.serve(async (req: Request) => {
       // Validation 5: If no rates or errors, return specific error format
       if (allRates.length === 0) {
         console.log('No rates returned. Errors from carriers:', rateErrors);
-        console.log('Ship from:', JSON.stringify(shipFromAddress));
-        console.log('Ship to:', JSON.stringify(shipToAddress));
+        console.log('Ship from postal:', fromPostalCode);
+        console.log('Ship to postal:', toPostalCode, 'country:', toCountry);
 
         let errorDetail = "No shipping rates available for this destination.";
         if (rateErrors.length > 0) {
@@ -623,8 +621,13 @@ Deno.serve(async (req: Request) => {
             error: errorDetail,
             carrier_errors: rateErrors,
             debug: {
-              shipFrom: shipFromAddress,
-              shipTo: shipToAddress,
+              fromPostalCode,
+              fromCity,
+              fromState,
+              toPostalCode,
+              toCity,
+              toState,
+              toCountry,
               packages: ratePackages,
               carriers_checked: carriers.length,
             }
