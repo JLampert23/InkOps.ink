@@ -34,16 +34,15 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const token = authHeader.replace('Bearer ', '');
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: { Authorization: authHeader },
-      },
-    });
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
     if (userError || !user) {
       return new Response(
         JSON.stringify({ error: 'Unauthorized', details: userError?.message }),
@@ -53,9 +52,6 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
-
-    const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
     const { data: roleData, error: roleError } = await supabaseAdmin
       .rpc('get_user_role', { user_id: user.id });
@@ -70,7 +66,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: settings, error: settingsError } = await supabase
+    const { data: settings, error: settingsError } = await supabaseAdmin
       .from('company_settings')
       .select('square_access_token, square_environment, square_location_id')
       .maybeSingle();
