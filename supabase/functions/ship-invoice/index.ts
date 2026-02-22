@@ -434,6 +434,28 @@ Deno.serve(async (req: Request) => {
         );
       }
 
+      // Log the address info being used
+      console.log('Ship From Postal Code:', fromAddress.postalCode);
+      console.log('Ship To Address:', JSON.stringify(shipToAddress, null, 2));
+      console.log('Package info:', JSON.stringify(ratePackages[0], null, 2));
+
+      // Validate required fields
+      if (!shipToAddress.postalCode || shipToAddress.postalCode.trim() === '') {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "Shipping postal/zip code is required to get rates",
+          }),
+          {
+            status: 200,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
+
       // Fetch rates from all available carriers
       const allRates: any[] = [];
       const rateErrors: string[] = [];
@@ -442,18 +464,29 @@ Deno.serve(async (req: Request) => {
         const carrierCode = carrier.code;
         console.log(`Fetching rates for carrier: ${carrierCode}`);
 
+        // ShipStation requires specific format for rate requests
         const ratePayload = {
           carrierCode: carrierCode,
           fromPostalCode: fromAddress.postalCode,
-          toState: shipToAddress.state,
-          toCountry: shipToAddress.country,
+          toState: shipToAddress.state || '',
+          toCountry: shipToAddress.country || 'US',
           toPostalCode: shipToAddress.postalCode,
-          toCity: shipToAddress.city,
-          weight: ratePackages[0].weight,
-          dimensions: ratePackages[0].dimensions,
+          toCity: shipToAddress.city || '',
+          weight: {
+            value: ratePackages[0].weight.value || 16,
+            units: "ounces"
+          },
+          dimensions: {
+            units: "inches",
+            length: ratePackages[0].dimensions.length || 12,
+            width: ratePackages[0].dimensions.width || 9,
+            height: ratePackages[0].dimensions.height || 3
+          },
           confirmation: "none",
           residential: true,
         };
+
+        console.log(`Rate payload for ${carrierCode}:`, JSON.stringify(ratePayload, null, 2));
 
         try {
           const ratesResponse = await fetch("https://ssapi.shipstation.com/shipments/getrates", {
@@ -466,13 +499,17 @@ Deno.serve(async (req: Request) => {
           });
 
           const ratesResponseText = await ratesResponse.text();
+          console.log(`Raw response from ${carrierCode}:`, ratesResponseText);
+
           let ratesResponseData: any;
 
           try {
             ratesResponseData = JSON.parse(ratesResponseText);
           } catch {
-            ratesResponseData = [];
+            ratesResponseData = { parseError: true, raw: ratesResponseText };
           }
+
+          console.log(`Parsed response from ${carrierCode}:`, JSON.stringify(ratesResponseData, null, 2));
 
           if (ratesResponse.ok && Array.isArray(ratesResponseData)) {
             // Add carrier info to each rate
