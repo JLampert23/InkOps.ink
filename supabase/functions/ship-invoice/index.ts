@@ -353,6 +353,24 @@ Deno.serve(async (req: Request) => {
 
     // If fetch_rates is true, fetch rates and return them for user selection
     if (fetch_rates) {
+      // Helper to normalize country to 2-letter ISO code
+      const normalizeCountry = (country: string | null | undefined): string => {
+        if (!country) return 'US';
+        const upper = country.trim().toUpperCase();
+        if (upper === 'US' || upper === 'USA' || upper === 'UNITED STATES' || upper === 'UNITED STATES OF AMERICA') return 'US';
+        if (upper === 'CA' || upper === 'CANADA') return 'CA';
+        if (upper === 'MX' || upper === 'MEXICO') return 'MX';
+        if (upper === 'GB' || upper === 'UK' || upper === 'UNITED KINGDOM' || upper === 'GREAT BRITAIN') return 'GB';
+        if (upper.length === 2) return upper;
+        return 'US';
+      };
+
+      // Helper to normalize state to uppercase 2-letter code
+      const normalizeState = (state: string | null | undefined): string => {
+        if (!state) return '';
+        return state.trim().toUpperCase();
+      };
+
       // Build shipFrom address from company settings (using ShipStation-specific fields)
       const shipFromAddress = {
         name: companySettings.shipstation_default_ship_from_name || companySettings.company_name || '',
@@ -360,9 +378,9 @@ Deno.serve(async (req: Request) => {
         street1: companySettings.shipstation_default_ship_from_address1 || '',
         street2: companySettings.shipstation_default_ship_from_address2 || '',
         city: companySettings.shipstation_default_ship_from_city || '',
-        state: companySettings.shipstation_default_ship_from_state || '',
+        state: normalizeState(companySettings.shipstation_default_ship_from_state),
         postalCode: companySettings.shipstation_default_ship_from_postal_code || '',
-        country: companySettings.shipstation_default_ship_from_country || 'US',
+        country: normalizeCountry(companySettings.shipstation_default_ship_from_country),
       };
 
       // Build shipTo address from invoice data
@@ -371,9 +389,9 @@ Deno.serve(async (req: Request) => {
         street1: invoiceData.shipping_line1 || invoiceData.shipping_address_line1 || invoiceData.billing_address_line1 || '',
         street2: invoiceData.shipping_line2 || invoiceData.shipping_address_line2 || invoiceData.billing_address_line2 || '',
         city: invoiceData.shipping_city || invoiceData.billing_city || '',
-        state: invoiceData.shipping_state || invoiceData.billing_state || '',
+        state: normalizeState(invoiceData.shipping_state || invoiceData.billing_state),
         postalCode: invoiceData.shipping_zip || invoiceData.billing_zip || '',
-        country: invoiceData.shipping_country || 'US',
+        country: normalizeCountry(invoiceData.shipping_country),
       };
 
       // Build package data
