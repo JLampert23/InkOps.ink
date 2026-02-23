@@ -8,6 +8,45 @@ const corsHeaders = {
 
 interface VerifyDomainRequest {
   company_id: string;
+  domain?: string;
+}
+
+function normalizeDomain(input: string): string | null {
+  if (!input || typeof input !== 'string') {
+    return null;
+  }
+
+  let domain = input.trim().toLowerCase();
+
+  try {
+    const urlObj = new URL(domain.startsWith('http') ? domain : `https://${domain}`);
+    domain = urlObj.hostname;
+  } catch {
+    domain = domain.replace(/^https?:\/\//, '').split('/')[0];
+  }
+
+  domain = domain.replace(/^www\./, '');
+  domain = domain.replace(/\.+$/, '');
+
+  if (!domain.includes('.') || domain.length < 4) {
+    return null;
+  }
+
+  return domain;
+}
+
+async function resolveTxtRecords(domain: string): Promise<string[]> {
+  console.log("Performing DNS TXT lookup for domain:", domain);
+
+  try {
+    const records = await Deno.resolveDns(domain, "TXT");
+    const flatRecords = records.flat();
+    console.log("TXT records found:", flatRecords);
+    return flatRecords;
+  } catch (error) {
+    console.error("DNS lookup failed for domain:", domain, "Error:", error);
+    throw error;
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -54,7 +93,8 @@ Deno.serve(async (req: Request) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { company_id } = await req.json() as VerifyDomainRequest;
+    const body = await req.json() as VerifyDomainRequest;
+    const { company_id, domain: requestDomain } = body;
 
     if (!company_id) {
       return new Response(
@@ -84,7 +124,7 @@ Deno.serve(async (req: Request) => {
 
     const { customer_url, customer_url_verification_token, customer_url_verification_expires_at } = companySettings;
 
-    if (!customer_url || !customer_url_verification_token) {
+    if (!customer_url_verification_token) {
       return new Response(
         JSON.stringify({ error: "No domain verification in progress" }),
         {
@@ -111,19 +151,62 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const domain = extractDomain(customer_url);
+    const domainToVerify = requestDomain || customer_url;
+
+    if (!domainToVerify) {
+      return new Response(
+        JSON.stringify({ error: "No domain provided for verification" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const normalizedDomain = normalizeDomain(domainToVerify);
+
+    if (!normalizedDomain) {
+      return new Response(
+        JSON.stringify({
+          error: "Invalid domain format. Please provide a valid domain (e.g., example.com)",
+          provided_value: domainToVerify
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    console.log("Verifying domain:", normalizedDomain);
+    console.log("Looking for verification token:", customer_url_verification_token);
 
     let txtRecords: string[] = [];
     try {
-      txtRecords = await resolveTxtRecords(domain);
-      console.log(`Found ${txtRecords.length} TXT records for ${domain}:`, txtRecords);
+      txtRecords = await resolveTxtRecords(normalizedDomain);
     } catch (error) {
-      console.error("DNS lookup error:", error);
+      console.error("DNS lookup error for domain:", normalizedDomain, "Error:", error);
       return new Response(
         JSON.stringify({
           success: false,
-          error: `Unable to look up DNS records for ${domain}. Please ensure your domain is correctly configured and try again in a few minutes.`,
-          details: "DNS lookup failed - this may be a temporary issue"
+          error: `Unable to look up DNS records for ${normalizedDomain}. Please ensure your domain is correctly configured and try again in a few minutes.`,
+          details: "DNS lookup failed - this may be a temporary issue",
+          domain_checked: normalizedDomain
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    if (txtRecords.length === 0) {
+      console.log("No TXT records found for domain:", normalizedDomain);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `No TXT records found for ${normalizedDomain}. Please add a TXT record with the verification token.`,
+          domain_checked: normalizedDomain
         }),
         {
           status: 400,
@@ -136,15 +219,15 @@ Deno.serve(async (req: Request) => {
       record.includes(customer_url_verification_token)
     );
 
-    console.log(`Verification result for ${domain}: ${verified ? 'SUCCESS' : 'NOT FOUND'}`);
-    console.log(`Looking for token: ${customer_url_verification_token}`);
+    console.log(`Verification result for ${normalizedDomain}: ${verified ? 'SUCCESS' : 'TOKEN NOT FOUND'}`);
 
     if (verified) {
       await supabase.rpc("mark_domain_verified", { p_company_id: company_id });
       return new Response(
         JSON.stringify({
           success: true,
-          message: "Domain verified successfully!"
+          message: "Domain verified successfully!",
+          domain: normalizedDomain
         }),
         {
           status: 200,
@@ -155,9 +238,9 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({
           success: false,
-          error: `TXT record not found for ${domain}. Please add a TXT record with host "@" and the verification token as the value. DNS changes can take up to 48 hours to propagate.`,
+          error: `TXT record not found for ${normalizedDomain}. Please add a TXT record with host "@" and the verification token as the value. DNS changes can take up to 48 hours to propagate.`,
           found_records: txtRecords.length,
-          domain_checked: domain
+          domain_checked: normalizedDomain
         }),
         {
           status: 400,
@@ -180,22 +263,3 @@ Deno.serve(async (req: Request) => {
     );
   }
 });
-
-function extractDomain(url: string): string {
-  try {
-    const urlObj = new URL(url.startsWith('http') ? url : `https://${url}`);
-    return urlObj.hostname;
-  } catch {
-    return url.replace(/^https?:\/\//, '').split('/')[0];
-  }
-}
-
-async function resolveTxtRecords(domain: string): Promise<string[]> {
-  try {
-    const records = await Deno.resolveDns(domain, "TXT");
-    return records.flat();
-  } catch (error) {
-    console.error("DNS resolution error:", error);
-    throw error;
-  }
-}
