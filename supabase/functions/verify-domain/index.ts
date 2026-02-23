@@ -116,13 +116,14 @@ Deno.serve(async (req: Request) => {
     let txtRecords: string[] = [];
     try {
       txtRecords = await resolveTxtRecords(domain);
+      console.log(`Found ${txtRecords.length} TXT records for ${domain}:`, txtRecords);
     } catch (error) {
       console.error("DNS lookup error:", error);
-      await supabase.rpc("mark_domain_verification_failed", { p_company_id: company_id });
       return new Response(
         JSON.stringify({
           success: false,
-          error: "Unable to verify DNS records. Please ensure the TXT record is properly configured."
+          error: `Unable to look up DNS records for ${domain}. Please ensure your domain is correctly configured and try again in a few minutes.`,
+          details: "DNS lookup failed - this may be a temporary issue"
         }),
         {
           status: 400,
@@ -134,6 +135,9 @@ Deno.serve(async (req: Request) => {
     const verified = txtRecords.some(record =>
       record.includes(customer_url_verification_token)
     );
+
+    console.log(`Verification result for ${domain}: ${verified ? 'SUCCESS' : 'NOT FOUND'}`);
+    console.log(`Looking for token: ${customer_url_verification_token}`);
 
     if (verified) {
       await supabase.rpc("mark_domain_verified", { p_company_id: company_id });
@@ -148,11 +152,12 @@ Deno.serve(async (req: Request) => {
         }
       );
     } else {
-      await supabase.rpc("mark_domain_verification_failed", { p_company_id: company_id });
       return new Response(
         JSON.stringify({
           success: false,
-          error: "Verification token not found in DNS TXT records. Please ensure you have added the correct TXT record and allow time for DNS propagation (up to 48 hours)."
+          error: `TXT record not found for ${domain}. Please add a TXT record with host "@" and the verification token as the value. DNS changes can take up to 48 hours to propagate.`,
+          found_records: txtRecords.length,
+          domain_checked: domain
         }),
         {
           status: 400,
