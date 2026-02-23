@@ -6327,41 +6327,30 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       </button>
                     )}
 
-                    {verificationToken && verificationStatus === 'unverified' && (
+                    {verificationToken && (verificationStatus === 'unverified' || verificationStatus === 'failed') && (
                       <button
                         onClick={verifyDomain}
                         disabled={verifyingDomain}
-                        className="px-6 py-2 bg-green-600 dark:bg-green-500 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                        className={`px-6 py-2 text-white rounded-lg disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors flex items-center gap-2 ${
+                          verificationStatus === 'failed'
+                            ? 'bg-orange-600 dark:bg-orange-500 hover:bg-orange-700 dark:hover:bg-orange-600'
+                            : 'bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600'
+                        }`}
                       >
                         {verifyingDomain ? (
                           <>
                             <Loader2 className="w-4 h-4 animate-spin" />
                             Verifying...
                           </>
+                        ) : verificationStatus === 'failed' ? (
+                          <>
+                            <RefreshCw className="w-4 h-4" />
+                            Retry Verification
+                          </>
                         ) : (
                           <>
                             <CheckCircle className="w-4 h-4" />
                             Verify Domain
-                          </>
-                        )}
-                      </button>
-                    )}
-
-                    {verificationStatus === 'failed' && (
-                      <button
-                        onClick={saveCustomerUrl}
-                        disabled={savingCustomerUrl}
-                        className="px-6 py-2 bg-orange-600 dark:bg-orange-500 text-white rounded-lg hover:bg-orange-700 dark:hover:bg-orange-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                      >
-                        {savingCustomerUrl ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Retrying...
-                          </>
-                        ) : (
-                          <>
-                            <RefreshCw className="w-4 h-4" />
-                            Retry Verification
                           </>
                         )}
                       </button>

@@ -21,12 +21,11 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
 
-    if (!supabaseUrl || !supabaseServiceKey) {
+    if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
       throw new Error("Missing Supabase environment variables");
     }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
@@ -38,6 +37,22 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
+
+    const token = authHeader.replace("Bearer ", "");
+    const authClient = createClient(supabaseUrl, supabaseAnonKey);
+    const { data: { user }, error: authError } = await authClient.auth.getUser(token);
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Invalid or expired token" }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { company_id } = await req.json() as VerifyDomainRequest;
 
