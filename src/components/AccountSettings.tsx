@@ -1491,8 +1491,13 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setVerificationStatus('verified');
         await loadSettings();
       } else {
-        showNotification('error', 'Verification Failed', result.error || 'Failed to verify domain');
-        setVerificationStatus('failed');
+        const errorMsg = result.error || 'Failed to verify domain';
+        const isDnsPropagation = errorMsg.includes('TXT record not found') || errorMsg.includes('DNS');
+        showNotification(
+          isDnsPropagation ? 'info' : 'error',
+          isDnsPropagation ? 'DNS Not Ready Yet' : 'Verification Failed',
+          errorMsg
+        );
       }
     } catch (err) {
       console.error('Error verifying domain:', err);
