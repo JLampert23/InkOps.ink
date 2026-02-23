@@ -172,6 +172,15 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [communicationsExpanded, setCommunicationsExpanded] = useState(false);
   const [manageGoodsExpanded, setManageGoodsExpanded] = useState(false);
 
+  const collapseAllExcept = (section: 'integrations' | 'production' | 'accounting' | 'company' | 'communications' | 'manageGoods') => {
+    if (section !== 'integrations') setIntegrationsExpanded(false);
+    if (section !== 'production') setProductionExpanded(false);
+    if (section !== 'accounting') setAccountingExpanded(false);
+    if (section !== 'company') setCompanySettingsExpanded(false);
+    if (section !== 'communications') setCommunicationsExpanded(false);
+    if (section !== 'manageGoods') setManageGoodsExpanded(false);
+  };
+
   const [companyName, setCompanyName] = useState('');
   const [companyAddress, setCompanyAddress] = useState('');
   const [companyPhone, setCompanyPhone] = useState('');
@@ -3913,7 +3922,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           {/* Company Settings Section - Collapsible */}
           <div className="mb-2">
             <button
-              onClick={() => setCompanySettingsExpanded(!companySettingsExpanded)}
+              onClick={() => { collapseAllExcept('company'); setCompanySettingsExpanded(!companySettingsExpanded); }}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-slate-700/50"
             >
               <Building2 className="w-4 h-4 flex-shrink-0 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
@@ -4011,7 +4020,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           {canAccessIntegrations && (
             <div className="mb-2">
               <button
-                onClick={() => setIntegrationsExpanded(!integrationsExpanded)}
+                onClick={() => { collapseAllExcept('integrations'); setIntegrationsExpanded(!integrationsExpanded); }}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-slate-700/50"
               >
                 <LinkIcon className="w-4 h-4 flex-shrink-0 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
@@ -4208,7 +4217,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           {/* Accounting Settings Section - Collapsible */}
           <div className="mb-2">
             <button
-              onClick={() => setAccountingExpanded(!accountingExpanded)}
+              onClick={() => { collapseAllExcept('accounting'); setAccountingExpanded(!accountingExpanded); }}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-slate-700/50"
             >
               <CreditCard className="w-4 h-4 flex-shrink-0 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
@@ -4267,7 +4276,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           {/* Manage Goods Section - Collapsible */}
           <div className="mb-2">
             <button
-              onClick={() => setManageGoodsExpanded(!manageGoodsExpanded)}
+              onClick={() => { collapseAllExcept('manageGoods'); setManageGoodsExpanded(!manageGoodsExpanded); }}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-slate-700/50"
             >
               <Package className="w-4 h-4 flex-shrink-0 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
@@ -4324,7 +4333,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           {/* Production Settings Section - Collapsible */}
           <div className="mb-2">
             <button
-              onClick={() => setProductionExpanded(!productionExpanded)}
+              onClick={() => { collapseAllExcept('production'); setProductionExpanded(!productionExpanded); }}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-slate-700/50"
             >
               <SettingsIcon className="w-4 h-4 flex-shrink-0 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
@@ -4419,7 +4428,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           {/* Communications Section - Collapsible */}
           <div className="mb-2">
             <button
-              onClick={() => setCommunicationsExpanded(!communicationsExpanded)}
+              onClick={() => { collapseAllExcept('communications'); setCommunicationsExpanded(!communicationsExpanded); }}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-slate-700/50"
             >
               <Mail className="w-4 h-4 flex-shrink-0 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
