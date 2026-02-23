@@ -18,6 +18,7 @@ const POSettings = lazy(() => import('./settings/POSettings').then(m => ({ defau
 const ShipStationSettings = lazy(() => import('./settings/ShipStationSettings').then(m => ({ default: m.default })));
 const ChipplyIntegrationSettings = lazy(() => import('./chipply/ChipplyIntegrationSettings').then(m => ({ default: m.ChipplyIntegrationSettings })));
 const CustomInvoiceStatusManager = lazy(() => import('./settings/CustomInvoiceStatusManager').then(m => ({ default: m.CustomInvoiceStatusManager })));
+const BoxLabelSettings = lazy(() => import('./settings/BoxLabelSettings'));
 
 interface CompanySettings {
   id: string;
@@ -142,7 +143,7 @@ interface ProductionStation {
 }
 
 type SettingsTab =
-  | 'company-info' | 'quote-invoice-settings'
+  | 'company-info' | 'quote-invoice-settings' | 'box-label'
   | 'printavo-integration' | 'square-integration' | 'resend-integration' | 'twilio-integration' | 'stripe-payments' | 'supplier-integrations' | 'shipstation-integration' | 'chipply-integration'
   | 'user-management' | 'user-security'
   | 'billing-status-filters'
@@ -4012,6 +4013,24 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   </div>
                   {activeTab === 'user-security' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
                 </button>
+
+                <button
+                  onClick={() => setActiveTab('box-label')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'box-label'
+                      ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                  style={{ animationDelay: '60ms' }}
+                >
+                  <Package className={`w-4 h-4 flex-shrink-0 ${activeTab === 'box-label' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'box-label' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      Box Label
+                    </div>
+                  </div>
+                  {activeTab === 'box-label' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                </button>
               </div>
             )}
           </div>
@@ -5965,6 +5984,22 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 </ul>
               </div>
             </div>
+          )}
+
+          {activeTab === 'box-label' && companySettings && (
+            <Suspense
+              fallback={
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                </div>
+              }
+            >
+              <BoxLabelSettings
+                companyId={companySettings.id}
+                primaryLogoUrl={companySettings.company_logo_primary_url}
+                secondaryLogoUrl={companySettings.company_logo_secondary_url}
+              />
+            </Suspense>
           )}
 
           {activeTab === 'billing-status-filters' && (

@@ -1,96 +1,108 @@
 import React, { useRef } from 'react';
 import { X, Printer, Download } from 'lucide-react';
 import { jsPDF } from 'jspdf';
-import { BoxLabel } from './BoxLabel';
+import { BoxLabel, BoxLabelConfig } from './BoxLabel';
 
 export interface LabelData {
-  invoiceNumber: string;
+  workOrderNumber: string;
   customerName: string;
   jobNickname: string;
-  typeOfWork: string;
+  dueDate?: string;
+  typeOfWork?: string;
+  imprintTypes?: string[];
 }
 
 interface LabelPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
   labels: LabelData[];
+  config?: BoxLabelConfig;
 }
 
 export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
   isOpen,
   onClose,
-  labels
+  labels,
+  config,
 }) => {
   const labelsContainerRef = useRef<HTMLDivElement>(null);
 
   if (!isOpen || labels.length === 0) return null;
 
   const handlePrint = () => {
-    const labelsHTML = labels.map((label, index) => `
-      <div class="box-label" style="
-        width: 4in;
-        height: 6in;
-        border: 2px solid black;
-        font-family: Arial, sans-serif;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        padding: 0.5in;
-        background-color: white;
-        color: black;
-        box-sizing: border-box;
-        ${index < labels.length - 1 ? 'page-break-after: always;' : ''}
-      ">
-        <div style="
-          text-align: center;
-          width: 100%;
+    const labelsHTML = labels.map((label, index) => {
+      const logoHtml = config?.logoUrl
+        ? `<div style="margin-bottom: 0.15in;"><img src="${config.logoUrl}" alt="Logo" style="max-height: 0.75in; max-width: 2.5in; object-fit: contain;" /></div>`
+        : '';
+
+      const workOrderHtml = (config?.showWorkOrderNumber ?? true)
+        ? `<div style="font-size: 22pt; font-weight: bold; letter-spacing: 1px;">WO #${label.workOrderNumber}</div>`
+        : '';
+
+      const customerHtml = (config?.showCustomerName ?? true)
+        ? `<div style="font-size: 26pt; font-weight: bold; word-wrap: break-word; line-height: 1.2;">${label.customerName}</div>`
+        : '';
+
+      const nicknameHtml = (config?.showJobNickname ?? true) && label.jobNickname
+        ? `<div style="font-size: 18pt; font-weight: 600; word-wrap: break-word; line-height: 1.2;">${label.jobNickname}</div>`
+        : '';
+
+      const dueDateHtml = (config?.showDueDate ?? true) && label.dueDate
+        ? `<div style="font-size: 14pt; font-weight: 500; color: #374151;">Due: ${label.dueDate}</div>`
+        : '';
+
+      const typeOfWorkHtml = (config?.showTypeOfWork ?? true) && label.typeOfWork
+        ? `<div style="font-size: 20pt; font-weight: bold; word-wrap: break-word; line-height: 1.2; text-transform: uppercase; margin-top: 0.1in;">${label.typeOfWork}</div>`
+        : '';
+
+      const uniqueImprints = Array.from(new Set((label.imprintTypes || []).filter(Boolean)));
+      const imprintTypesHtml = (config?.showImprintTypes ?? true) && uniqueImprints.length > 0
+        ? `<div style="margin-top: 0.15in; font-size: 12pt; line-height: 1.4;">
+            <div style="font-weight: bold; margin-bottom: 0.05in;">Imprints:</div>
+            ${uniqueImprints.map(imp => `<div style="font-size: 11pt;">${imp}</div>`).join('')}
+          </div>`
+        : '';
+
+      return `
+        <div class="box-label" style="
+          width: 4in;
+          height: 6in;
+          border: 2px solid black;
+          font-family: Arial, sans-serif;
           display: flex;
           flex-direction: column;
-          gap: 0.25in;
+          justify-content: center;
+          align-items: center;
+          padding: 0.5in;
+          background-color: white;
+          color: black;
+          box-sizing: border-box;
+          ${index < labels.length - 1 ? 'page-break-after: always;' : ''}
         ">
           <div style="
-            font-size: 22pt;
-            font-weight: bold;
-            letter-spacing: 1px;
+            text-align: center;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 0.2in;
           ">
-            INVOICE #${label.invoiceNumber}
-          </div>
-          <div style="
-            font-size: 26pt;
-            font-weight: bold;
-            word-wrap: break-word;
-            line-height: 1.2;
-          ">
-            ${label.customerName}
-          </div>
-          <div style="
-            font-size: 18pt;
-            font-weight: 600;
-            word-wrap: break-word;
-            line-height: 1.2;
-          ">
-            ${label.jobNickname}
-          </div>
-          <div style="
-            font-size: 20pt;
-            font-weight: bold;
-            word-wrap: break-word;
-            line-height: 1.2;
-            text-transform: uppercase;
-            margin-top: 0.1in;
-          ">
-            ${label.typeOfWork}
+            ${logoHtml}
+            ${workOrderHtml}
+            ${customerHtml}
+            ${nicknameHtml}
+            ${dueDateHtml}
+            ${typeOfWorkHtml}
+            ${imprintTypesHtml}
           </div>
         </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
 
     const htmlContent = `<!DOCTYPE html>
 <html>
   <head>
     <meta charset="UTF-8">
-    <title>Box Labels - ${labels[0].invoiceNumber}</title>
+    <title>Box Labels - ${labels[0].workOrderNumber}</title>
     <style>
       @page {
         size: 4in 6in;
@@ -171,7 +183,7 @@ export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
         pdf.addImage(imgData, 'PNG', 0, 0, 4, 6);
       }
 
-      pdf.save(`box-labels-${labels[0].invoiceNumber}.pdf`);
+      pdf.save(`box-labels-${labels[0].workOrderNumber}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('Failed to generate PDF. Please try again.');
@@ -183,7 +195,7 @@ export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-slate-700">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-            Label Preview {labels.length > 1 && `(${labels.length} Labels)`}
+            Box Label Preview {labels.length > 1 && `(${labels.length} Labels)`}
           </h2>
           <button
             onClick={onClose}
@@ -202,10 +214,13 @@ export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
               <div key={index} className="flex justify-center">
                 <div className="shadow-lg">
                   <BoxLabel
-                    invoiceNumber={label.invoiceNumber}
+                    workOrderNumber={label.workOrderNumber}
                     customerName={label.customerName}
                     jobNickname={label.jobNickname}
+                    dueDate={label.dueDate}
                     typeOfWork={label.typeOfWork}
+                    imprintTypes={label.imprintTypes}
+                    config={config}
                   />
                 </div>
               </div>

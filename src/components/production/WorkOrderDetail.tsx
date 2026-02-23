@@ -7,10 +7,12 @@ import {
   Circle,
   XCircle,
   Tag,
+  Printer,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { WorkOrderService, WorkOrderLineItem } from '../../services/work-order-service';
 import { LabelPreviewModal, LabelData } from './LabelPreviewModal';
+import { BoxLabelConfig } from './BoxLabel';
 
 interface WorkOrderDetailProps {
   workOrderId: string;
@@ -126,9 +128,11 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const [showProofModal, setShowProofModal] = useState(false);
   const [selectedProofImage, setSelectedProofImage] = useState('');
   const [showLabelModal, setShowLabelModal] = useState(false);
+  const [boxLabelConfig, setBoxLabelConfig] = useState<BoxLabelConfig | undefined>(undefined);
 
   useEffect(() => {
     loadData();
+    loadBoxLabelSettings();
   }, [workOrderId]);
 
   const loadData = async () => {
@@ -222,6 +226,55 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
     }
   };
 
+  const loadBoxLabelSettings = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!profile?.company_id) return;
+
+      const { data: settings } = await supabase
+        .from('company_settings')
+        .select(`
+          box_label_logo_choice,
+          box_label_show_work_order_number,
+          box_label_show_customer_name,
+          box_label_show_due_date,
+          box_label_show_type_of_work,
+          box_label_show_imprint_types,
+          box_label_show_job_nickname,
+          company_logo_primary_url,
+          company_logo_secondary_url
+        `)
+        .eq('id', profile.company_id)
+        .maybeSingle();
+
+      if (settings) {
+        const logoUrl = settings.box_label_logo_choice === 'secondary'
+          ? settings.company_logo_secondary_url
+          : settings.company_logo_primary_url;
+
+        setBoxLabelConfig({
+          logoUrl,
+          showWorkOrderNumber: settings.box_label_show_work_order_number ?? true,
+          showCustomerName: settings.box_label_show_customer_name ?? true,
+          showJobNickname: settings.box_label_show_job_nickname ?? true,
+          showDueDate: settings.box_label_show_due_date ?? true,
+          showTypeOfWork: settings.box_label_show_type_of_work ?? true,
+          showImprintTypes: settings.box_label_show_imprint_types ?? true,
+        });
+      }
+    } catch (error) {
+      console.error('Error loading box label settings:', error);
+    }
+  };
+
   const handleToggleComplete = async (woLineItem: WorkOrderLineItem) => {
     if (woLineItem.is_completed) {
       await WorkOrderService.uncompleteLineItem(woLineItem.id);
@@ -232,12 +285,21 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   };
 
   const generateLabels = (): LabelData[] => {
-    if (!workOrder || quoteImprints.length === 0) return [];
-    const uniqueTypes = Array.from(new Set(quoteImprints.map(imp => imp.type_of_work).filter(Boolean)));
-    if (uniqueTypes.length === 0) {
-      return [{ invoiceNumber: workOrder.work_order_number, customerName: workOrder.customer_name, jobNickname: quote?.nickname || '', typeOfWork: 'General' }];
-    }
-    return uniqueTypes.map(type => ({ invoiceNumber: workOrder.work_order_number, customerName: workOrder.customer_name, jobNickname: quote?.nickname || '', typeOfWork: type }));
+    if (!workOrder) return [];
+
+    const imprintTypes = Array.from(new Set(quoteImprints.map(imp => imp.type_of_work).filter(Boolean)));
+    const dueDate = workOrder.customer_due_date || workOrder.production_due_date
+      ? format(new Date((workOrder.customer_due_date || workOrder.production_due_date)!), 'MMM d, yyyy')
+      : undefined;
+
+    return [{
+      workOrderNumber: workOrder.work_order_number,
+      customerName: workOrder.customer_name,
+      jobNickname: quote?.nickname || '',
+      dueDate,
+      typeOfWork: imprintTypes[0] || 'General',
+      imprintTypes,
+    }];
   };
 
   const completionMap = new Map<string, WorkOrderLineItem>();
@@ -308,8 +370,8 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowLabelModal(true)} className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors shadow-sm">
-            <Tag className="w-4 h-4" />
-            + Label
+            <Printer className="w-4 h-4" />
+            Print Box Label
           </button>
         </div>
       </div>
@@ -470,7 +532,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         </div>
       )}
 
-      <LabelPreviewModal isOpen={showLabelModal} onClose={() => setShowLabelModal(false)} labels={generateLabels()} />
+      <LabelPreviewModal isOpen={showLabelModal} onClose={() => setShowLabelModal(false)} labels={generateLabels()} config={boxLabelConfig} />
     </div>
   );
 }
