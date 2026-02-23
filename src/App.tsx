@@ -39,9 +39,38 @@ interface CompanySettings {
   logo_url: string | null;
 }
 
+const TAB_HASH_MAP: Record<Tab, string> = {
+  'production': 'production',
+  'square': 'square',
+  'settings': 'settings',
+  'accounting-dashboard': 'billing',
+  'accounts-receivable': 'accounts-receivable',
+  'paid-invoices': 'paid-invoices',
+  'customers': 'customers',
+  'payments': 'payments',
+};
+
+const HASH_TAB_MAP: Record<string, Tab> = Object.entries(TAB_HASH_MAP).reduce(
+  (acc, [tab, hash]) => ({ ...acc, [hash]: tab as Tab }),
+  {} as Record<string, Tab>
+);
+
+const ACCOUNTING_TABS: Tab[] = ['accounting-dashboard', 'accounts-receivable', 'paid-invoices', 'customers', 'payments'];
+
+function getTabFromHash(): Tab | null {
+  const hash = window.location.hash.slice(1);
+  return HASH_TAB_MAP[hash] || null;
+}
+
 function AppContent() {
-  const [activeTab, setActiveTab] = useState<Tab>('production');
-  const [accountingExpanded, setAccountingExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    const hashTab = getTabFromHash();
+    return hashTab || 'production';
+  });
+  const [accountingExpanded, setAccountingExpanded] = useState(() => {
+    const hashTab = getTabFromHash();
+    return hashTab ? ACCOUNTING_TABS.includes(hashTab) : false;
+  });
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [settingsInitialTab, setSettingsInitialTab] = useState<string | undefined>(undefined);
   const [customerSearchTerm, setCustomerSearchTerm] = useState<string>('');
@@ -49,10 +78,41 @@ function AppContent() {
   const [customersKey, setCustomersKey] = useState(0);
   const [quoteCustomerId, setQuoteCustomerId] = useState<string | undefined>(undefined);
   const previousTabRef = useRef<Tab | null>(null);
+  const isNavigatingRef = useRef(false);
   const { signOut, user } = useAuth();
   const { userProfile, canAccessIntegrations, isAdmin, isSuperAdmin } = useRBAC();
   const { showNotification } = useNotification();
   const { darkMode, toggleDarkMode } = useTheme();
+
+  useEffect(() => {
+    const hash = TAB_HASH_MAP[activeTab];
+    if (hash && window.location.hash !== `#${hash}`) {
+      if (!isNavigatingRef.current) {
+        window.history.pushState(null, '', `#${hash}`);
+      }
+      isNavigatingRef.current = false;
+    }
+
+    if (ACCOUNTING_TABS.includes(activeTab)) {
+      setAccountingExpanded(true);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const hashTab = getTabFromHash();
+      if (hashTab && hashTab !== activeTab) {
+        isNavigatingRef.current = true;
+        setActiveTab(hashTab);
+        if (ACCOUNTING_TABS.includes(hashTab)) {
+          setAccountingExpanded(true);
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [activeTab]);
 
   useEffect(() => {
     const loadCompanySettings = async () => {
