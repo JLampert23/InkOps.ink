@@ -4193,8 +4193,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   >
                     <Package className={`w-4 h-4 flex-shrink-0 ${activeTab === 'chipply-integration' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                     <div className="flex-1 text-left">
-                      <div className={`font-medium text-sm ${activeTab === 'chipply-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      <div className={`font-medium text-sm flex items-center gap-2 ${activeTab === 'chipply-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                         Chipply
+                        <span className="w-2 h-2 bg-green-500 rounded-full" />
                       </div>
                     </div>
                     {activeTab === 'chipply-integration' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
