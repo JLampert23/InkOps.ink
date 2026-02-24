@@ -20,6 +20,7 @@ import {
 import { format } from 'date-fns';
 import { ManageImprintsModal } from './ManageImprintsModal';
 import { LabelPreviewModal, LabelData } from './LabelPreviewModal';
+import { BoxLabelConfig } from './BoxLabel';
 import { SendQuoteModal } from './SendQuoteModal';
 import { generateQuotePDF, QuotePDFData } from '../../utils/quote-pdf-export';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -148,12 +149,63 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
   const [showProofModal, setShowProofModal] = useState(false);
   const [selectedProofImage, setSelectedProofImage] = useState<string>('');
   const [showLabelModal, setShowLabelModal] = useState(false);
+  const [boxLabelConfig, setBoxLabelConfig] = useState<BoxLabelConfig | undefined>(undefined);
   const [reopening, setReopening] = useState(false);
   const [approving, setApproving] = useState(false);
 
   useEffect(() => {
     loadQuoteDetails();
+    loadBoxLabelSettings();
   }, [quoteId]);
+
+  const loadBoxLabelSettings = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!profile?.company_id) return;
+
+      const { data: settings } = await supabase
+        .from('company_settings')
+        .select(`
+          box_label_logo_choice,
+          box_label_show_work_order_number,
+          box_label_show_customer_name,
+          box_label_show_due_date,
+          box_label_show_imprint_types,
+          box_label_show_job_nickname,
+          box_label_show_qr_code,
+          company_logo_primary_url,
+          company_logo_secondary_url
+        `)
+        .eq('id', profile.company_id)
+        .maybeSingle();
+
+      if (settings) {
+        const logoUrl = settings.box_label_logo_choice === 'secondary'
+          ? settings.company_logo_secondary_url
+          : settings.company_logo_primary_url;
+
+        setBoxLabelConfig({
+          logoUrl,
+          showWorkOrderNumber: settings.box_label_show_work_order_number ?? true,
+          showCustomerName: settings.box_label_show_customer_name ?? true,
+          showJobNickname: settings.box_label_show_job_nickname ?? true,
+          showDueDate: settings.box_label_show_due_date ?? true,
+          showImprintTypes: settings.box_label_show_imprint_types ?? true,
+          showQrCode: settings.box_label_show_qr_code ?? true,
+        });
+      }
+    } catch (error) {
+      console.error('Error loading box label settings:', error);
+    }
+  };
 
   const loadQuoteDetails = async () => {
     try {
@@ -1104,6 +1156,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         isOpen={showLabelModal}
         onClose={() => setShowLabelModal(false)}
         labels={generateLabels()}
+        config={boxLabelConfig}
       />
     </div>
   );
