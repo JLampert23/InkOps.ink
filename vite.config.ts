@@ -7,6 +7,7 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  appType: 'spa',
   server: {
     watch: {
       // Ignore files that shouldn't trigger HMR
