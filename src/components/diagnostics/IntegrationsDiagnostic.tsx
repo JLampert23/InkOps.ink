@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Check, X, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Check, X, Loader2, AlertCircle, RefreshCw, Zap } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 
 interface DiagnosticResult {
@@ -12,6 +12,8 @@ interface DiagnosticResult {
 export function IntegrationsDiagnostic() {
   const [results, setResults] = useState<DiagnosticResult[]>([]);
   const [testing, setTesting] = useState(false);
+  const [portalTesting, setPortalTesting] = useState(false);
+  const [portalResult, setPortalResult] = useState<any>(null);
 
   useEffect(() => {
     runDiagnostics();
@@ -165,6 +167,42 @@ export function IntegrationsDiagnostic() {
     setTesting(false);
   };
 
+  const testPortalData = async () => {
+    setPortalTesting(true);
+    setPortalResult(null);
+
+    try {
+      const testEmail = 'jamie@kingclothing.com';
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/portal-data`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({ customerEmail: testEmail }),
+        }
+      );
+
+      const data = await response.json();
+      setPortalResult({
+        status: response.ok ? 'success' : 'error',
+        httpStatus: response.status,
+        data,
+      });
+    } catch (error: any) {
+      setPortalResult({
+        status: 'error',
+        message: error.message,
+        error: error.toString(),
+      });
+    }
+
+    setPortalTesting(false);
+  };
+
   const getStatusIcon = (status: DiagnosticResult['status']) => {
     switch (status) {
       case 'checking':
@@ -251,6 +289,43 @@ export function IntegrationsDiagnostic() {
             Click "Retest" to run diagnostics
           </div>
         )}
+
+        <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Portal Data Test
+          </h2>
+          <button
+            onClick={testPortalData}
+            disabled={portalTesting}
+            className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
+          >
+            <Zap className={`w-5 h-5 ${portalTesting ? 'animate-pulse' : ''}`} />
+            {portalTesting ? 'Testing...' : 'Test Portal Data (jamie@kingclothing.com)'}
+          </button>
+
+          {portalResult && (
+            <div className={`mt-4 p-4 rounded-lg border-2 ${
+              portalResult.status === 'success'
+                ? 'bg-green-50 border-green-200 dark:bg-green-900/10 dark:border-green-800'
+                : 'bg-red-50 border-red-200 dark:bg-red-900/10 dark:border-red-800'
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                {portalResult.status === 'success' ? (
+                  <Check className="w-5 h-5 text-green-600" />
+                ) : (
+                  <X className="w-5 h-5 text-red-600" />
+                )}
+                <span className="font-semibold text-gray-900 dark:text-white">
+                  {portalResult.status === 'success' ? 'Success' : 'Error'}
+                  {portalResult.httpStatus && ` (HTTP ${portalResult.httpStatus})`}
+                </span>
+              </div>
+              <pre className="mt-2 text-xs bg-gray-900 text-gray-100 p-3 rounded overflow-x-auto max-h-96">
+                {JSON.stringify(portalResult.data || portalResult, null, 2)}
+              </pre>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
