@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { supabase } from '../lib/supabase-client';
 
 interface CustomerPortalUser {
@@ -38,7 +38,7 @@ export function CustomerPortalProvider({ children }: { children: ReactNode }) {
     checkSession();
   }, []);
 
-  const checkSession = async () => {
+  const checkSession = useCallback(async () => {
     try {
       const storedUser = localStorage.getItem('customer_portal_user');
       const storedBranding = localStorage.getItem('customer_portal_branding');
@@ -52,9 +52,9 @@ export function CustomerPortalProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const loginWithToken = async (token: string): Promise<boolean> => {
+  const loginWithToken = useCallback(async (token: string): Promise<boolean> => {
     try {
       setLoading(true);
 
@@ -134,9 +134,9 @@ export function CustomerPortalProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const loginWithEmail = async (email: string): Promise<boolean> => {
+  const loginWithEmail = useCallback(async (email: string): Promise<boolean> => {
     try {
       setLoading(true);
 
@@ -165,18 +165,27 @@ export function CustomerPortalProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setUser(null);
     setBranding(null);
     localStorage.removeItem('customer_portal_user');
     localStorage.removeItem('customer_portal_branding');
     localStorage.removeItem('customer_portal_token');
-  };
+  }, []);
+
+  const value = useMemo(() => ({
+    user,
+    branding,
+    loading,
+    loginWithToken,
+    loginWithEmail,
+    logout
+  }), [user, branding, loading, loginWithToken, loginWithEmail, logout]);
 
   return (
-    <CustomerPortalContext.Provider value={{ user, branding, loading, loginWithToken, loginWithEmail, logout }}>
+    <CustomerPortalContext.Provider value={value}>
       {children}
     </CustomerPortalContext.Provider>
   );

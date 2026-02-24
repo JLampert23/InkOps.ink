@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useMemo, useCallback, ReactNode } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase-client';
 import { signUpCompany, CompanySignupData, getCompanySettings, CompanySettings } from '../services/auth-service';
@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timeout);
   }, []);
 
-  const refreshUserProfile = async (userId: string) => {
+  const refreshUserProfile = useCallback(async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('user_profiles')
@@ -60,12 +60,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Error fetching user profile:', error);
       setUserProfile(null);
     }
-  };
+  }, []);
 
-  const refreshCompanySettings = async () => {
+  const refreshCompanySettings = useCallback(async () => {
     const settings = await getCompanySettings();
     setCompanySettings(settings);
-  };
+  }, []);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -109,31 +109,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     return { error };
-  };
+  }, []);
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
     });
     return { error };
-  };
+  }, []);
 
-  const signUpWithCompany = async (data: CompanySignupData) => {
+  const signUpWithCompany = useCallback(async (data: CompanySignupData) => {
     const result = await signUpCompany(data);
     if (!result.error) {
       await refreshCompanySettings();
     }
     return result;
-  };
+  }, [refreshCompanySettings]);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     try {
       await supabase.auth.signOut();
     } catch (error) {
@@ -146,16 +146,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setCompanySettings(null);
 
     return { error: null };
-  };
+  }, []);
 
-  const resetPassword = async (email: string) => {
+  const resetPassword = useCallback(async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
     return { error };
-  };
+  }, []);
 
-  const value = {
+  const value = useMemo(() => ({
     user,
     session,
     userProfile,
@@ -167,7 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signUpWithCompany,
     signOut,
     resetPassword,
-  };
+  }), [user, session, userProfile, loading, companySettings, refreshCompanySettings, signIn, signUp, signUpWithCompany, signOut, resetPassword]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
