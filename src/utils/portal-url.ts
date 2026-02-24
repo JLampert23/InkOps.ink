@@ -1,7 +1,4 @@
-export function getPortalBaseUrl(subdomain: string | null): string {
-  if (subdomain) {
-    return `https://${subdomain}.inkops.ink`;
-  }
+export function getPortalBaseUrl(_subdomain: string | null): string {
   return window.location.origin;
 }
 
