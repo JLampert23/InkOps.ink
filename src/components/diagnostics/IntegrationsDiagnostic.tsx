@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Check, X, Loader2, AlertCircle, RefreshCw, Zap } from 'lucide-react';
+import { Check, X, Loader2, AlertCircle, RefreshCw, Zap, Mail, Send } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 
 interface DiagnosticResult {
@@ -14,6 +14,8 @@ export function IntegrationsDiagnostic() {
   const [testing, setTesting] = useState(false);
   const [portalTesting, setPortalTesting] = useState(false);
   const [portalResult, setPortalResult] = useState<any>(null);
+  const [sendingMagicLink, setSendingMagicLink] = useState(false);
+  const [magicLinkResult, setMagicLinkResult] = useState<any>(null);
 
   useEffect(() => {
     runDiagnostics();
@@ -264,6 +266,54 @@ export function IntegrationsDiagnostic() {
     setPortalTesting(false);
   };
 
+  const sendMagicLink = async () => {
+    setSendingMagicLink(true);
+    setMagicLinkResult(null);
+
+    try {
+      const testEmail = 'Jamie@toddssportinggoods.com';
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        setMagicLinkResult({
+          status: 'error',
+          message: 'Not authenticated'
+        });
+        setSendingMagicLink(false);
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-magic-link`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email: testEmail }),
+        }
+      );
+
+      const data = await response.json();
+
+      setMagicLinkResult({
+        status: response.ok ? 'success' : 'error',
+        httpStatus: response.status,
+        message: response.ok ? 'Magic link sent successfully!' : (data.error || 'Failed to send'),
+        data
+      });
+    } catch (error: any) {
+      setMagicLinkResult({
+        status: 'error',
+        message: error.message,
+        error: error.toString(),
+      });
+    }
+
+    setSendingMagicLink(false);
+  };
+
   const getStatusIcon = (status: DiagnosticResult['status']) => {
     switch (status) {
       case 'checking':
@@ -355,14 +405,53 @@ export function IntegrationsDiagnostic() {
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             Portal Data Test
           </h2>
-          <button
-            onClick={testPortalData}
-            disabled={portalTesting}
-            className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
-          >
-            <Zap className={`w-5 h-5 ${portalTesting ? 'animate-pulse' : ''}`} />
-            {portalTesting ? 'Testing...' : 'Test Portal Data (Jamie@toddssportinggoods.com)'}
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={sendMagicLink}
+              disabled={sendingMagicLink}
+              className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
+            >
+              <Mail className={`w-5 h-5 ${sendingMagicLink ? 'animate-pulse' : ''}`} />
+              {sendingMagicLink ? 'Sending...' : 'Send Magic Link'}
+            </button>
+            <button
+              onClick={testPortalData}
+              disabled={portalTesting}
+              className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
+            >
+              <Zap className={`w-5 h-5 ${portalTesting ? 'animate-pulse' : ''}`} />
+              {portalTesting ? 'Testing...' : 'Test Portal Data'}
+            </button>
+          </div>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+            Testing with: Jamie@toddssportinggoods.com
+          </p>
+
+          {magicLinkResult && (
+            <div className={`mt-4 p-4 rounded-lg border-2 ${
+              magicLinkResult.status === 'success'
+                ? 'bg-green-50 border-green-200 dark:bg-green-900/10 dark:border-green-800'
+                : 'bg-red-50 border-red-200 dark:bg-red-900/10 dark:border-red-800'
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                {magicLinkResult.status === 'success' ? (
+                  <Check className="w-5 h-5 text-green-600" />
+                ) : (
+                  <X className="w-5 h-5 text-red-600" />
+                )}
+                <span className="font-semibold text-gray-900 dark:text-white">
+                  {magicLinkResult.status === 'success' ? 'Magic Link Sent' : 'Error'}
+                  {magicLinkResult.httpStatus && ` (HTTP ${magicLinkResult.httpStatus})`}
+                </span>
+              </div>
+              {magicLinkResult.message && (
+                <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">{magicLinkResult.message}</p>
+              )}
+              <pre className="mt-2 text-xs bg-gray-900 text-gray-100 p-3 rounded overflow-x-auto max-h-96">
+                {JSON.stringify(magicLinkResult.data || magicLinkResult, null, 2)}
+              </pre>
+            </div>
+          )}
 
           {portalResult && (
             <div className={`mt-4 p-4 rounded-lg border-2 ${
