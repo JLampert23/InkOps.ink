@@ -244,11 +244,18 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
       ...quote,
       line_items: lineItems,
       imprints: quoteImprints.map(imprint => ({
+        id: imprint.id,
         type_of_work: imprint.type_of_work,
         location: imprint.location,
         num_colors: imprint.num_colors,
         description: imprint.description || '',
+        details: imprint.details,
         artwork_description: imprint.artwork_description,
+        thread_ink_color: imprint.thread_ink_color,
+        artwork_url: imprint.artwork_url,
+        artwork_images: imprint.artwork_images,
+        mockups: imprint.mockups,
+        group_label: imprint.group_label,
       })),
     };
 
