@@ -649,7 +649,7 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
           .map((m: any) => typeof m === 'string' ? m : m?.url)
           .filter(Boolean);
         if (artworkImages.length > 0 || mockupImages.length > 0) {
-          estimatedHeight += 14;
+          estimatedHeight += 22;
         }
 
         if (imprintY + estimatedHeight > pageHeight - marginBottom) {
@@ -708,7 +708,8 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
 
         if (allImages.length > 0) {
           textY += 1;
-          const imgSize = 10;
+          const imgSize = 18;
+          const imgGap = 3;
           let imgX = imprintX + 2;
 
           for (let j = 0; j < Math.min(allImages.length, 4); j++) {
@@ -717,13 +718,13 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
               const imgBase64 = await imageToBase64(imgUrl);
               if (imgBase64) {
                 doc.addImage(imgBase64, 'PNG', imgX, textY, imgSize, imgSize);
-                imgX += imgSize + 2;
+                imgX += imgSize + imgGap;
               }
             } catch {
               doc.setDrawColor(226, 232, 240);
               doc.setLineWidth(0.1);
               doc.rect(imgX, textY, imgSize, imgSize);
-              imgX += imgSize + 2;
+              imgX += imgSize + imgGap;
             }
           }
           textY += imgSize + 2;
