@@ -122,7 +122,25 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const resendApiKey = companySettings.resend_api_key;
+    const decryptResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({
+        action: 'decrypt',
+        token: companySettings.resend_api_key,
+      }),
+    });
+
+    if (!decryptResponse.ok) {
+      const errorData = await decryptResponse.json();
+      console.error("Failed to decrypt API key:", errorData);
+      throw new Error(`Failed to decrypt email API key: ${errorData.error || 'Unknown error'}`);
+    }
+
+    const { result: resendApiKey } = await decryptResponse.json();
     const fromEmail = companySettings.email_from_address || 'noreply@inkops.com';
 
     const emailResponse = await fetch("https://api.resend.com/emails", {
