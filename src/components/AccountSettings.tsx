@@ -6377,79 +6377,67 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 )}
 
                 {isAdmin && (
-                  <div className="flex flex-col gap-3">
-                    {verificationStatus === 'verified' && customerUrl !== companySettings?.customer_url && (
-                      <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-800 dark:text-amber-200 text-sm">
-                        Changing the URL will require re-verification of the new domain.
-                      </div>
-                    )}
-                    <div className="flex gap-3">
+                  <div className="flex gap-3">
+                    <button
+                      onClick={saveCustomerUrl}
+                      disabled={savingCustomerUrl}
+                      className="px-6 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                    >
+                      {savingCustomerUrl ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Requesting...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4" />
+                          Request Verification
+                        </>
+                      )}
+                    </button>
+
+                    {verificationToken && (verificationStatus === 'unverified' || verificationStatus === 'failed') && (
                       <button
-                        onClick={saveCustomerUrl}
-                        disabled={savingCustomerUrl || customerUrl === companySettings?.customer_url}
-                        className="px-6 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                        onClick={verifyDomain}
+                        disabled={verifyingDomain}
+                        className={`px-6 py-2 text-white rounded-lg disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors flex items-center gap-2 ${
+                          verificationStatus === 'failed'
+                            ? 'bg-orange-600 dark:bg-orange-500 hover:bg-orange-700 dark:hover:bg-orange-600'
+                            : 'bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600'
+                        }`}
                       >
-                        {savingCustomerUrl ? (
+                        {verifyingDomain ? (
                           <>
                             <Loader2 className="w-4 h-4 animate-spin" />
-                            Saving...
+                            Verifying...
                           </>
-                        ) : verificationStatus === 'verified' && customerUrl !== companySettings?.customer_url ? (
+                        ) : verificationStatus === 'failed' ? (
                           <>
-                            <Save className="w-4 h-4" />
-                            Save & Re-verify
+                            <RefreshCw className="w-4 h-4" />
+                            Retry Verification
                           </>
                         ) : (
                           <>
-                            <Save className="w-4 h-4" />
-                            {verificationStatus === 'verified' ? 'Saved' : 'Save & Request Verification'}
+                            <CheckCircle className="w-4 h-4" />
+                            Verify Domain
                           </>
                         )}
                       </button>
+                    )}
 
-                      {verificationToken && (verificationStatus === 'unverified' || verificationStatus === 'failed') && (
-                        <button
-                          onClick={verifyDomain}
-                          disabled={verifyingDomain}
-                          className={`px-6 py-2 text-white rounded-lg disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors flex items-center gap-2 ${
-                            verificationStatus === 'failed'
-                              ? 'bg-orange-600 dark:bg-orange-500 hover:bg-orange-700 dark:hover:bg-orange-600'
-                              : 'bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600'
-                          }`}
-                        >
-                          {verifyingDomain ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Verifying...
-                            </>
-                          ) : verificationStatus === 'failed' ? (
-                            <>
-                              <RefreshCw className="w-4 h-4" />
-                              Retry Verification
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle className="w-4 h-4" />
-                              Verify Domain
-                            </>
-                          )}
-                        </button>
-                      )}
-
-                      {customerUrl && (
-                        <button
-                          onClick={() => {
-                            setCustomerUrl('');
-                            setVerificationToken(null);
-                            setVerificationStatus('unverified');
-                          }}
-                          disabled={savingCustomerUrl}
-                          className="px-6 py-2 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
+                    {customerUrl && verificationStatus !== 'verified' && (
+                      <button
+                        onClick={() => {
+                          setCustomerUrl('');
+                          setVerificationToken(null);
+                          setVerificationStatus('unverified');
+                        }}
+                        disabled={savingCustomerUrl}
+                        className="px-6 py-2 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Clear
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
