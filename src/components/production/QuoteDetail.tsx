@@ -22,6 +22,13 @@ import { SendQuoteModal } from './SendQuoteModal';
 import { generateQuotePDF, QuotePDFData } from '../../utils/quote-pdf-export';
 import { useNotification } from '../../contexts/NotificationContext';
 
+function decodeHtmlEntities(text: string): string {
+  if (!text) return text;
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = text;
+  return textarea.value;
+}
+
 interface QuoteDetailProps {
   quoteId: string;
   onBack: () => void;
@@ -685,7 +692,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                         {item.color || '-'}
                       </td>
                       <td className="px-4 py-4 text-gray-900 dark:text-white text-base">
-                        {item.description}
+                        {decodeHtmlEntities(item.description)}
                         {item.notes && (
                           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 italic">{item.notes}</p>
                         )}

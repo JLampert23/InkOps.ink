@@ -16,6 +16,13 @@ import { LabelPreviewModal, LabelData } from './LabelPreviewModal';
 import { BoxLabelConfig } from './BoxLabel';
 import { generateWorkOrderPDF, WorkOrderPDFData } from '../../utils/work-order-pdf-export';
 
+function decodeHtmlEntities(text: string): string {
+  if (!text) return text;
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = text;
+  return textarea.value;
+}
+
 interface WorkOrderDetailProps {
   workOrderId: string;
   onBack: () => void;
@@ -370,7 +377,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           .filter(item => item.line_type === 'item' || !item.line_type)
           .map(item => ({
             item_number: item.item_number,
-            description: item.description,
+            description: decodeHtmlEntities(item.description),
             color: item.color,
             notes: item.notes,
             group_label: item.group_label,
@@ -585,7 +592,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
                           <td className={`px-4 py-4 font-mono text-base ${strikeClass || 'text-gray-700 dark:text-gray-300'}`}>{item.item_number || '-'}</td>
                           <td className={`px-4 py-4 text-base ${strikeClass || 'text-gray-700 dark:text-gray-300'}`}>{item.color || '-'}</td>
                           <td className={`px-4 py-4 text-base ${strikeClass || 'text-gray-900 dark:text-white'}`}>
-                            {item.description}
+                            {decodeHtmlEntities(item.description)}
                             {item.notes && <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 italic">{item.notes}</p>}
                           </td>
                           {getSizeValues(item).map((qty, idx) => (
