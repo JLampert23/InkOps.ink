@@ -8,11 +8,13 @@ import {
   XCircle,
   Tag,
   Printer,
+  Download,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { WorkOrderService, WorkOrderLineItem } from '../../services/work-order-service';
 import { LabelPreviewModal, LabelData } from './LabelPreviewModal';
 import { BoxLabelConfig } from './BoxLabel';
+import { generateWorkOrderPDF, WorkOrderPDFData } from '../../utils/work-order-pdf-export';
 
 interface WorkOrderDetailProps {
   workOrderId: string;
@@ -129,11 +131,50 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const [selectedProofImage, setSelectedProofImage] = useState('');
   const [showLabelModal, setShowLabelModal] = useState(false);
   const [boxLabelConfig, setBoxLabelConfig] = useState<BoxLabelConfig | undefined>(undefined);
+  const [downloading, setDownloading] = useState(false);
+  const [companySettings, setCompanySettings] = useState<any>(null);
 
   useEffect(() => {
     loadData();
     loadBoxLabelSettings();
+    loadCompanySettings();
   }, [workOrderId]);
+
+  const loadCompanySettings = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!profile?.company_id) return;
+
+      const { data: settings } = await supabase
+        .from('company_settings')
+        .select(`
+          company_name,
+          company_address,
+          company_city,
+          company_state,
+          company_zip,
+          company_phone,
+          company_email,
+          company_website,
+          company_logo_primary_url,
+          company_logo_secondary_url
+        `)
+        .eq('id', profile.company_id)
+        .maybeSingle();
+
+      setCompanySettings(settings);
+    } catch (error) {
+      console.error('Error loading company settings:', error);
+    }
+  };
 
   const loadData = async () => {
     try {
@@ -284,6 +325,99 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
     await loadData();
   };
 
+  const handleDownloadPDF = async () => {
+    if (!workOrder) return;
+
+    setDownloading(true);
+    try {
+      const pdfData: WorkOrderPDFData = {
+        work_order_number: workOrder.work_order_number,
+        quote_number: quote?.quote_number,
+        nickname: quote?.nickname,
+        customer_name: workOrder.customer_name,
+        status: workOrder.status,
+        total_quantity: workOrder.total_quantity,
+        production_due_date: workOrder.production_due_date,
+        customer_due_date: workOrder.customer_due_date,
+        notes: workOrder.notes,
+        created_at: workOrder.created_at,
+        quote: quote ? {
+          customer_email: quote.customer_email,
+          customer_phone: quote.customer_phone,
+          bill_company: quote.bill_company,
+          bill_name: quote.bill_name,
+          bill_address_1: quote.bill_address_1,
+          bill_address_2: quote.bill_address_2,
+          bill_city: quote.bill_city,
+          bill_state: quote.bill_state,
+          bill_zip: quote.bill_zip,
+          bill_email: quote.bill_email,
+          bill_phone: quote.bill_phone,
+          ship_company: quote.ship_company,
+          ship_name: quote.ship_name,
+          ship_address_1: quote.ship_address_1,
+          ship_address_2: quote.ship_address_2,
+          ship_city: quote.ship_city,
+          ship_state: quote.ship_state,
+          ship_zip: quote.ship_zip,
+          po_number: quote.po_number,
+          delivery_method: quote.delivery_method,
+          terms: quote.terms,
+          notes: quote.notes,
+          production_notes: quote.production_notes,
+        } : undefined,
+        line_items: quoteLineItems
+          .filter(item => item.line_type === 'item' || !item.line_type)
+          .map(item => ({
+            item_number: item.item_number,
+            description: item.description,
+            color: item.color,
+            notes: item.notes,
+            group_label: item.group_label,
+            qty_yxs: item.qty_yxs,
+            qty_ys: item.qty_ys,
+            qty_ym: item.qty_ym,
+            qty_yl: item.qty_yl,
+            qty_yxl: item.qty_yxl,
+            qty_xs: item.qty_xs,
+            qty_s: item.qty_s,
+            qty_m: item.qty_m,
+            qty_l: item.qty_l,
+            qty_xl: item.qty_xl,
+            qty_2xl: item.qty_2xl,
+            qty_3xl: item.qty_3xl,
+            qty_4xl: item.qty_4xl,
+          })),
+        imprints: quoteImprints.map(imp => ({
+          id: imp.id,
+          type_of_work: imp.type_of_work,
+          location: imp.location,
+          num_colors: imp.num_colors,
+          details: imp.details,
+          thread_ink_color: imp.thread_ink_color,
+          mockups: imp.mockups,
+          group_label: imp.group_label,
+          imprint_number: imp.imprint_number,
+        })),
+        company_name: companySettings?.company_name || null,
+        company_address: companySettings?.company_address || null,
+        company_city: companySettings?.company_city || null,
+        company_state: companySettings?.company_state || null,
+        company_zip: companySettings?.company_zip || null,
+        company_phone: companySettings?.company_phone || null,
+        company_email: companySettings?.company_email || null,
+        company_website: companySettings?.company_website || null,
+        company_logo_url: companySettings?.company_logo_primary_url || companySettings?.company_logo_secondary_url || null,
+      };
+
+      await generateWorkOrderPDF(pdfData);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const generateLabels = (): LabelData[] => {
     if (!workOrder) return [];
 
@@ -368,6 +502,14 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           {quote && <span className="text-sm text-gray-500 dark:text-gray-400 font-mono">{quote.quote_number}</span>}
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleDownloadPDF}
+            disabled={downloading}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
+          >
+            {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            Download Work Order
+          </button>
           <button onClick={() => setShowLabelModal(true)} className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors shadow-sm">
             <Printer className="w-4 h-4" />
             Print Box Label
