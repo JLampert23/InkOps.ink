@@ -173,16 +173,73 @@ export function IntegrationsDiagnostic() {
 
     try {
       const testEmail = 'jamie@kingclothing.com';
+
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('id, email, company_id')
+        .ilike('email', testEmail)
+        .maybeSingle();
+
+      if (!customer) {
+        setPortalResult({
+          status: 'error',
+          message: 'Customer not found in database',
+          data: { email: testEmail }
+        });
+        setPortalTesting(false);
+        return;
+      }
+
+      const { data: session } = await supabase
+        .from('customer_portal_sessions')
+        .select('*')
+        .eq('customer_id', customer.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!session) {
+        setPortalResult({
+          status: 'info',
+          message: 'Customer exists but no portal session found. Send a magic link to create a session.',
+          data: {
+            customer,
+            hint: 'Use send-magic-link function to create a portal session'
+          }
+        });
+        setPortalTesting(false);
+        return;
+      }
+
+      const isExpired = new Date(session.expires_at) < new Date();
+
+      if (isExpired) {
+        setPortalResult({
+          status: 'warning',
+          message: 'Portal session exists but is expired',
+          data: {
+            customer,
+            session: {
+              ...session,
+              magic_token: session.magic_token?.substring(0, 8) + '...'
+            },
+            expiresAt: session.expires_at
+          }
+        });
+        setPortalTesting(false);
+        return;
+      }
+
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/portal-data`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/portal-data?type=quotes`,
         {
-          method: 'POST',
+          method: 'GET',
           headers: {
             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
             'Content-Type': 'application/json',
             'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            'X-Customer-Token': session.magic_token,
           },
-          body: JSON.stringify({ customerEmail: testEmail }),
         }
       );
 
@@ -190,7 +247,11 @@ export function IntegrationsDiagnostic() {
       setPortalResult({
         status: response.ok ? 'success' : 'error',
         httpStatus: response.status,
-        data,
+        data: {
+          customer,
+          sessionValid: true,
+          portalResponse: data
+        },
       });
     } catch (error: any) {
       setPortalResult({
@@ -307,19 +368,30 @@ export function IntegrationsDiagnostic() {
             <div className={`mt-4 p-4 rounded-lg border-2 ${
               portalResult.status === 'success'
                 ? 'bg-green-50 border-green-200 dark:bg-green-900/10 dark:border-green-800'
+                : portalResult.status === 'info'
+                ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/10 dark:border-blue-800'
+                : portalResult.status === 'warning'
+                ? 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/10 dark:border-yellow-800'
                 : 'bg-red-50 border-red-200 dark:bg-red-900/10 dark:border-red-800'
             }`}>
               <div className="flex items-center gap-2 mb-2">
                 {portalResult.status === 'success' ? (
                   <Check className="w-5 h-5 text-green-600" />
+                ) : portalResult.status === 'info' ? (
+                  <AlertCircle className="w-5 h-5 text-blue-600" />
+                ) : portalResult.status === 'warning' ? (
+                  <AlertCircle className="w-5 h-5 text-yellow-600" />
                 ) : (
                   <X className="w-5 h-5 text-red-600" />
                 )}
                 <span className="font-semibold text-gray-900 dark:text-white">
-                  {portalResult.status === 'success' ? 'Success' : 'Error'}
+                  {portalResult.status === 'success' ? 'Success' : portalResult.status === 'info' ? 'Info' : portalResult.status === 'warning' ? 'Warning' : 'Error'}
                   {portalResult.httpStatus && ` (HTTP ${portalResult.httpStatus})`}
                 </span>
               </div>
+              {portalResult.message && (
+                <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">{portalResult.message}</p>
+              )}
               <pre className="mt-2 text-xs bg-gray-900 text-gray-100 p-3 rounded overflow-x-auto max-h-96">
                 {JSON.stringify(portalResult.data || portalResult, null, 2)}
               </pre>
