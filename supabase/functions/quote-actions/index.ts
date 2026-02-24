@@ -234,21 +234,21 @@ Deno.serve(async (req: Request) => {
         })
         .eq("id", quoteId);
 
-      // Get company settings to get inkops_subdomain
+      // Get company settings to get inkops_subdomain and company_name
       const { data: companySettings } = await supabase
         .from("company_settings")
-        .select("inkops_subdomain")
+        .select("inkops_subdomain, company_name")
         .eq("id", profile.company_id)
         .maybeSingle();
 
-      // Generate public approval URL using inkops.ink subdomain
-      let approvalUrl: string;
-      if (companySettings?.inkops_subdomain) {
-        approvalUrl = `https://${companySettings.inkops_subdomain}.inkops.ink/quote-approval/${approvalToken}`;
-      } else {
-        const fallbackUrl = req.headers.get("origin") || "https://inkops.ink";
-        approvalUrl = `${fallbackUrl}/quote-approval/${approvalToken}`;
+      // Generate public approval URL using inkops.ink subdomain (ALWAYS use inkops.ink subdomain)
+      let subdomain = companySettings?.inkops_subdomain;
+      if (!subdomain && companySettings?.company_name) {
+        subdomain = companySettings.company_name.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 30);
       }
+      const approvalUrl = subdomain
+        ? `https://${subdomain}.inkops.ink/quote-approval/${approvalToken}`
+        : `https://inkops.ink/quote-approval/${approvalToken}`;
 
       // Send email with template or default
       try {

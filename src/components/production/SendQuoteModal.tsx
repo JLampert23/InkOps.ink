@@ -45,6 +45,7 @@ export function SendQuoteModal({
   const [previewSubject, setPreviewSubject] = useState('');
   const [expiresInDays, setExpiresInDays] = useState(30);
   const [inkopsSubdomain, setInkopsSubdomain] = useState<string | null>(null);
+  const [companyName, setCompanyName] = useState<string | null>(null);
 
   useEffect(() => {
     loadTemplates();
@@ -54,10 +55,13 @@ export function SendQuoteModal({
   const loadCompanySettings = async () => {
     const { data } = await supabase
       .from('company_settings')
-      .select('inkops_subdomain')
+      .select('inkops_subdomain, company_name')
       .maybeSingle();
     if (data?.inkops_subdomain) {
       setInkopsSubdomain(data.inkops_subdomain);
+    }
+    if (data?.company_name) {
+      setCompanyName(data.company_name);
     }
   };
 
@@ -114,7 +118,7 @@ export function SendQuoteModal({
 
       if (!quote) return;
 
-      const approvalUrl = getQuoteApprovalUrl('PREVIEW_TOKEN', inkopsSubdomain);
+      const approvalUrl = getQuoteApprovalUrl('PREVIEW_TOKEN', inkopsSubdomain, companyName);
       const expiryDate = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
 
       const shortcodeData = {

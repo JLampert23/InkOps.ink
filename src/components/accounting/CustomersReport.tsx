@@ -148,10 +148,10 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
 
       if (settings?.company_name) {
         setCompanyName(settings.company_name);
+        setPortalEnabled(true);
       }
       if (settings?.inkops_subdomain) {
         setInkopsSubdomain(settings.inkops_subdomain);
-        setPortalEnabled(true);
       }
     } catch (error) {
       console.error('Error loading company settings:', error);
@@ -588,7 +588,7 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
                   </div>
                   <button
                     onClick={() => {
-                      const portalUrl = getCustomerPortalUrl(selectedCustomer.id, inkopsSubdomain);
+                      const portalUrl = getCustomerPortalUrl(selectedCustomer.id, inkopsSubdomain, companyName);
                       window.open(portalUrl, '_blank');
                     }}
                     disabled={!portalEnabled}

@@ -69,7 +69,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: companySettings } = await supabase
       .from("company_settings")
-      .select("company_name, customer_url, customer_url_verification_status, email_from_address, resend_api_key")
+      .select("company_name, inkops_subdomain, email_from_address, resend_api_key")
       .eq("id", companyId)
       .maybeSingle();
 
@@ -77,11 +77,13 @@ Deno.serve(async (req: Request) => {
       throw new Error("Company settings not found");
     }
 
-    const baseUrl = companySettings.customer_url && companySettings.customer_url_verification_status === 'verified'
-      ? companySettings.customer_url
-      : supabaseUrl.replace('https://', 'https://app.');
-
-    const magicLink = `${baseUrl}/portal/login?token=${magicToken}`;
+    // Always use inkops.ink subdomain for portal URLs
+    let subdomain = companySettings.inkops_subdomain;
+    if (!subdomain && companySettings.company_name) {
+      subdomain = companySettings.company_name.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 30);
+    }
+    const baseUrl = subdomain ? `https://${subdomain}.inkops.ink` : "https://inkops.ink";
+    const magicLink = `${baseUrl}/customer/${customerId}?token=${magicToken}`;
 
     const emailBody = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
