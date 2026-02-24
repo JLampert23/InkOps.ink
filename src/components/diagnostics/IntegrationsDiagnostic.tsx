@@ -172,7 +172,7 @@ export function IntegrationsDiagnostic() {
     setPortalResult(null);
 
     try {
-      const testEmail = 'jamie@kingclothing.com';
+      const testEmail = 'Jamie@toddssportinggoods.com';
 
       const { data: customer } = await supabase
         .from('customers')
@@ -361,7 +361,7 @@ export function IntegrationsDiagnostic() {
             className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
           >
             <Zap className={`w-5 h-5 ${portalTesting ? 'animate-pulse' : ''}`} />
-            {portalTesting ? 'Testing...' : 'Test Portal Data (jamie@kingclothing.com)'}
+            {portalTesting ? 'Testing...' : 'Test Portal Data (Jamie@toddssportinggoods.com)'}
           </button>
 
           {portalResult && (
