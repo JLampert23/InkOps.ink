@@ -246,9 +246,9 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           box_label_show_work_order_number,
           box_label_show_customer_name,
           box_label_show_due_date,
-          box_label_show_type_of_work,
           box_label_show_imprint_types,
           box_label_show_job_nickname,
+          box_label_show_qr_code,
           company_logo_primary_url,
           company_logo_secondary_url
         `)
@@ -267,6 +267,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           showJobNickname: settings.box_label_show_job_nickname ?? true,
           showDueDate: settings.box_label_show_due_date ?? true,
           showImprintTypes: settings.box_label_show_imprint_types ?? true,
+          showQrCode: settings.box_label_show_qr_code ?? true,
         });
       }
     } catch (error) {

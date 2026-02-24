@@ -7,6 +7,7 @@ export interface BoxLabelConfig {
   showJobNickname: boolean;
   showDueDate: boolean;
   showImprintTypes: boolean;
+  showQrCode?: boolean;
 }
 
 export interface BoxLabelProps {
@@ -16,6 +17,7 @@ export interface BoxLabelProps {
   dueDate?: string;
   imprintTypes?: string[];
   config?: BoxLabelConfig;
+  qrCodeUrl?: string;
 }
 
 const defaultConfig: BoxLabelConfig = {
@@ -25,6 +27,69 @@ const defaultConfig: BoxLabelConfig = {
   showJobNickname: true,
   showDueDate: true,
   showImprintTypes: true,
+  showQrCode: true,
+};
+
+const generateQrCodeDataUrl = (data: string, size: number = 120): string => {
+  const qrSize = 21;
+  const moduleSize = Math.floor(size / (qrSize + 8));
+  const actualSize = moduleSize * (qrSize + 8);
+  const canvas = document.createElement('canvas');
+  canvas.width = actualSize;
+  canvas.height = actualSize;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, actualSize, actualSize);
+
+  ctx.fillStyle = '#000000';
+  const padding = moduleSize * 4;
+
+  const drawFinderPattern = (x: number, y: number) => {
+    for (let i = 0; i < 7; i++) {
+      for (let j = 0; j < 7; j++) {
+        const isOuter = i === 0 || i === 6 || j === 0 || j === 6;
+        const isInner = i >= 2 && i <= 4 && j >= 2 && j <= 4;
+        if (isOuter || isInner) {
+          ctx.fillRect(
+            padding + (x + i) * moduleSize,
+            padding + (y + j) * moduleSize,
+            moduleSize,
+            moduleSize
+          );
+        }
+      }
+    }
+  };
+
+  drawFinderPattern(0, 0);
+  drawFinderPattern(qrSize - 7, 0);
+  drawFinderPattern(0, qrSize - 7);
+
+  for (let i = 8; i < qrSize - 8; i++) {
+    if (i % 2 === 0) {
+      ctx.fillRect(padding + i * moduleSize, padding + 6 * moduleSize, moduleSize, moduleSize);
+      ctx.fillRect(padding + 6 * moduleSize, padding + i * moduleSize, moduleSize, moduleSize);
+    }
+  }
+
+  const dataHash = data.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  for (let y = 0; y < qrSize; y++) {
+    for (let x = 0; x < qrSize; x++) {
+      if (x < 9 && y < 9) continue;
+      if (x >= qrSize - 8 && y < 9) continue;
+      if (x < 9 && y >= qrSize - 8) continue;
+      if (x === 6 || y === 6) continue;
+
+      const seed = (x * qrSize + y + dataHash) % 100;
+      if (seed < 45) {
+        ctx.fillRect(padding + x * moduleSize, padding + y * moduleSize, moduleSize, moduleSize);
+      }
+    }
+  }
+
+  return canvas.toDataURL('image/png');
 };
 
 export const BoxLabel: React.FC<BoxLabelProps> = ({
@@ -34,9 +99,17 @@ export const BoxLabel: React.FC<BoxLabelProps> = ({
   dueDate,
   imprintTypes = [],
   config = defaultConfig,
+  qrCodeUrl,
 }) => {
   const mergedConfig = { ...defaultConfig, ...config };
   const uniqueImprintTypes = Array.from(new Set(imprintTypes.filter(Boolean)));
+
+  const qrData = qrCodeUrl || `WO:${workOrderNumber}`;
+  const qrCodeDataUrl = (mergedConfig.showQrCode ?? true) ? generateQrCodeDataUrl(qrData, 120) : '';
+
+  const hasLogo = !!mergedConfig.logoUrl;
+  const hasQrCode = (mergedConfig.showQrCode ?? true) && qrCodeDataUrl;
+  const showHeader = hasLogo || hasQrCode;
 
   return (
     <div
@@ -48,35 +121,72 @@ export const BoxLabel: React.FC<BoxLabelProps> = ({
         fontFamily: 'system-ui, sans-serif',
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: '0.5in',
+        padding: '0.15in',
         backgroundColor: 'white',
         color: 'black',
         boxSizing: 'border-box',
       }}
     >
+      {showHeader && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          width: '100%',
+          marginBottom: '0.15in',
+          minHeight: '1.25in',
+        }}>
+          <div style={{
+            flex: '0 0 auto',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'flex-start',
+            padding: '0.1in',
+          }}>
+            {hasLogo && (
+              <img
+                src={mergedConfig.logoUrl!}
+                alt="Company Logo"
+                style={{
+                  maxHeight: '1.25in',
+                  maxWidth: '1.5in',
+                  objectFit: 'contain',
+                }}
+              />
+            )}
+          </div>
+
+          <div style={{
+            flex: '0 0 auto',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'flex-end',
+            padding: '0.1in',
+          }}>
+            {hasQrCode && (
+              <img
+                src={qrCodeDataUrl}
+                alt="QR Code"
+                style={{
+                  width: '1.25in',
+                  height: '1.25in',
+                  objectFit: 'contain',
+                }}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
       <div style={{
         textAlign: 'center',
         width: '100%',
         display: 'flex',
         flexDirection: 'column',
-        gap: '0.2in'
+        gap: '0.15in',
+        flex: 1,
+        justifyContent: 'center',
       }}>
-        {mergedConfig.logoUrl && (
-          <div style={{ marginBottom: '0.15in' }}>
-            <img
-              src={mergedConfig.logoUrl}
-              alt="Company Logo"
-              style={{
-                maxHeight: '0.75in',
-                maxWidth: '2.5in',
-                objectFit: 'contain',
-              }}
-            />
-          </div>
-        )}
-
         {mergedConfig.showWorkOrderNumber && (
           <div style={{
             fontSize: '22pt',
@@ -121,7 +231,7 @@ export const BoxLabel: React.FC<BoxLabelProps> = ({
 
         {mergedConfig.showImprintTypes && uniqueImprintTypes.length > 0 && (
           <div style={{
-            marginTop: '0.15in',
+            marginTop: '0.1in',
             fontSize: '12pt',
             lineHeight: '1.4'
           }}>

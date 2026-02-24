@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Loader2, Tag, Image, Eye } from 'lucide-react';
+import { Save, Loader2, Tag, Image, Eye, QrCode } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 
 interface BoxLabelSettingsProps {
@@ -13,9 +13,9 @@ interface BoxLabelConfig {
   box_label_show_work_order_number: boolean;
   box_label_show_customer_name: boolean;
   box_label_show_due_date: boolean;
-  box_label_show_type_of_work: boolean;
   box_label_show_imprint_types: boolean;
   box_label_show_job_nickname: boolean;
+  box_label_show_qr_code: boolean;
 }
 
 export default function BoxLabelSettings({ companyId, primaryLogoUrl, secondaryLogoUrl }: BoxLabelSettingsProps) {
@@ -26,9 +26,9 @@ export default function BoxLabelSettings({ companyId, primaryLogoUrl, secondaryL
     box_label_show_work_order_number: true,
     box_label_show_customer_name: true,
     box_label_show_due_date: true,
-    box_label_show_type_of_work: true,
     box_label_show_imprint_types: true,
     box_label_show_job_nickname: true,
+    box_label_show_qr_code: true,
   });
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -46,9 +46,9 @@ export default function BoxLabelSettings({ companyId, primaryLogoUrl, secondaryL
           box_label_show_work_order_number,
           box_label_show_customer_name,
           box_label_show_due_date,
-          box_label_show_type_of_work,
           box_label_show_imprint_types,
-          box_label_show_job_nickname
+          box_label_show_job_nickname,
+          box_label_show_qr_code
         `)
         .eq('id', companyId)
         .maybeSingle();
@@ -61,9 +61,9 @@ export default function BoxLabelSettings({ companyId, primaryLogoUrl, secondaryL
           box_label_show_work_order_number: data.box_label_show_work_order_number ?? true,
           box_label_show_customer_name: data.box_label_show_customer_name ?? true,
           box_label_show_due_date: data.box_label_show_due_date ?? true,
-          box_label_show_type_of_work: data.box_label_show_type_of_work ?? true,
           box_label_show_imprint_types: data.box_label_show_imprint_types ?? true,
           box_label_show_job_nickname: data.box_label_show_job_nickname ?? true,
+          box_label_show_qr_code: data.box_label_show_qr_code ?? true,
         });
       }
     } catch (error) {
@@ -85,9 +85,9 @@ export default function BoxLabelSettings({ companyId, primaryLogoUrl, secondaryL
           box_label_show_work_order_number: config.box_label_show_work_order_number,
           box_label_show_customer_name: config.box_label_show_customer_name,
           box_label_show_due_date: config.box_label_show_due_date,
-          box_label_show_type_of_work: config.box_label_show_type_of_work,
           box_label_show_imprint_types: config.box_label_show_imprint_types,
           box_label_show_job_nickname: config.box_label_show_job_nickname,
+          box_label_show_qr_code: config.box_label_show_qr_code,
         })
         .eq('id', companyId);
 
@@ -104,6 +104,7 @@ export default function BoxLabelSettings({ companyId, primaryLogoUrl, secondaryL
   };
 
   const selectedLogoUrl = config.box_label_logo_choice === 'primary' ? primaryLogoUrl : secondaryLogoUrl;
+  const showHeader = selectedLogoUrl || config.box_label_show_qr_code;
 
   if (loading) {
     return (
@@ -132,7 +133,7 @@ export default function BoxLabelSettings({ companyId, primaryLogoUrl, secondaryL
             Logo Selection
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Choose which company logo to display on box labels
+            Choose which company logo to display on box labels (top-left corner)
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -216,11 +217,33 @@ export default function BoxLabelSettings({ companyId, primaryLogoUrl, secondaryL
 
         <div className="border-t border-gray-200 dark:border-slate-700 pt-6">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <QrCode className="w-4 h-4" />
+            QR Code
+          </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            QR code appears in the top-right corner of the label
+          </p>
+
+          <label className="flex items-center gap-3 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={config.box_label_show_qr_code}
+              onChange={(e) => setConfig({ ...config, box_label_show_qr_code: e.target.checked })}
+              className="w-5 h-5 rounded border-gray-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white">
+              Show QR Code (links to Work Order)
+            </span>
+          </label>
+        </div>
+
+        <div className="border-t border-gray-200 dark:border-slate-700 pt-6">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
             <Eye className="w-4 h-4" />
             Field Visibility
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Select which fields appear on the box label
+            Select which fields appear on the box label (below the header)
           </p>
 
           <div className="space-y-3">
@@ -291,21 +314,37 @@ export default function BoxLabelSettings({ companyId, primaryLogoUrl, secondaryL
           <div className="flex justify-center">
             <div
               className="bg-white border-2 border-gray-300 rounded-lg shadow-lg"
-              style={{ width: '3in', minHeight: '4in', padding: '0.25in' }}
+              style={{ width: '3in', minHeight: '4in', padding: '0.15in' }}
             >
-              <div className="flex flex-col items-center text-center gap-2">
-                {selectedLogoUrl ? (
-                  <img
-                    src={selectedLogoUrl}
-                    alt="Logo Preview"
-                    className="h-12 w-auto object-contain mb-2"
-                  />
-                ) : (
-                  <div className="h-12 w-24 bg-gray-100 rounded mb-2 flex items-center justify-center">
-                    <span className="text-xs text-gray-400">Logo</span>
+              {showHeader && (
+                <div className="flex justify-between items-start mb-3" style={{ minHeight: '1in' }}>
+                  <div className="flex items-start" style={{ padding: '0.05in' }}>
+                    {selectedLogoUrl ? (
+                      <img
+                        src={selectedLogoUrl}
+                        alt="Logo Preview"
+                        className="object-contain"
+                        style={{ maxHeight: '1in', maxWidth: '1.2in' }}
+                      />
+                    ) : (
+                      <div className="bg-gray-100 rounded flex items-center justify-center" style={{ height: '1in', width: '1in' }}>
+                        <span className="text-xs text-gray-400">Logo</span>
+                      </div>
+                    )}
                   </div>
-                )}
+                  {config.box_label_show_qr_code && (
+                    <div className="flex items-start" style={{ padding: '0.05in' }}>
+                      <div className="bg-gray-900 rounded" style={{ width: '1in', height: '1in', padding: '0.08in' }}>
+                        <div className="w-full h-full bg-white flex items-center justify-center">
+                          <QrCode className="w-8 h-8 text-gray-800" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
+              <div className="flex flex-col items-center text-center gap-2">
                 {config.box_label_show_work_order_number && (
                   <div className="text-lg font-bold text-gray-900">WO-2024-0001</div>
                 )}

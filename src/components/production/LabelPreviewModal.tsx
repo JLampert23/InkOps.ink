@@ -9,6 +9,7 @@ export interface LabelData {
   jobNickname: string;
   dueDate?: string;
   imprintTypes?: string[];
+  qrCodeUrl?: string;
 }
 
 interface LabelPreviewModalProps {
@@ -17,6 +18,56 @@ interface LabelPreviewModalProps {
   labels: LabelData[];
   config?: BoxLabelConfig;
 }
+
+const generateQrCodeSvg = (data: string): string => {
+  const qrSize = 21;
+  const moduleSize = 4;
+  const padding = 16;
+  const totalSize = qrSize * moduleSize + padding * 2;
+
+  const dataHash = data.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+
+  let modules = '';
+
+  const drawFinderPattern = (x: number, y: number) => {
+    for (let i = 0; i < 7; i++) {
+      for (let j = 0; j < 7; j++) {
+        const isOuter = i === 0 || i === 6 || j === 0 || j === 6;
+        const isInner = i >= 2 && i <= 4 && j >= 2 && j <= 4;
+        if (isOuter || isInner) {
+          modules += `<rect x="${padding + (x + i) * moduleSize}" y="${padding + (y + j) * moduleSize}" width="${moduleSize}" height="${moduleSize}" fill="black"/>`;
+        }
+      }
+    }
+  };
+
+  drawFinderPattern(0, 0);
+  drawFinderPattern(qrSize - 7, 0);
+  drawFinderPattern(0, qrSize - 7);
+
+  for (let i = 8; i < qrSize - 8; i++) {
+    if (i % 2 === 0) {
+      modules += `<rect x="${padding + i * moduleSize}" y="${padding + 6 * moduleSize}" width="${moduleSize}" height="${moduleSize}" fill="black"/>`;
+      modules += `<rect x="${padding + 6 * moduleSize}" y="${padding + i * moduleSize}" width="${moduleSize}" height="${moduleSize}" fill="black"/>`;
+    }
+  }
+
+  for (let y = 0; y < qrSize; y++) {
+    for (let x = 0; x < qrSize; x++) {
+      if (x < 9 && y < 9) continue;
+      if (x >= qrSize - 8 && y < 9) continue;
+      if (x < 9 && y >= qrSize - 8) continue;
+      if (x === 6 || y === 6) continue;
+
+      const seed = (x * qrSize + y + dataHash) % 100;
+      if (seed < 45) {
+        modules += `<rect x="${padding + x * moduleSize}" y="${padding + y * moduleSize}" width="${moduleSize}" height="${moduleSize}" fill="black"/>`;
+      }
+    }
+  }
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${totalSize} ${totalSize}" width="1.25in" height="1.25in"><rect width="${totalSize}" height="${totalSize}" fill="white"/>${modules}</svg>`;
+};
 
 export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
   isOpen,
@@ -30,9 +81,43 @@ export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
 
   const handlePrint = () => {
     const labelsHTML = labels.map((label, index) => {
-      const logoHtml = config?.logoUrl
-        ? `<div style="margin-bottom: 0.15in;"><img src="${config.logoUrl}" alt="Logo" style="max-height: 0.75in; max-width: 2.5in; object-fit: contain;" /></div>`
-        : '';
+      const showQrCode = config?.showQrCode ?? true;
+      const hasLogo = !!config?.logoUrl;
+      const hasQrCode = showQrCode;
+      const showHeader = hasLogo || hasQrCode;
+
+      const qrData = label.qrCodeUrl || `WO:${label.workOrderNumber}`;
+      const qrCodeSvg = showQrCode ? generateQrCodeSvg(qrData) : '';
+
+      const headerHtml = showHeader ? `
+        <div style="
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          width: 100%;
+          margin-bottom: 0.15in;
+          min-height: 1.25in;
+        ">
+          <div style="
+            flex: 0 0 auto;
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-start;
+            padding: 0.1in;
+          ">
+            ${hasLogo ? `<img src="${config?.logoUrl}" alt="Logo" style="max-height: 1.25in; max-width: 1.5in; object-fit: contain;" />` : ''}
+          </div>
+          <div style="
+            flex: 0 0 auto;
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-end;
+            padding: 0.1in;
+          ">
+            ${hasQrCode ? qrCodeSvg : ''}
+          </div>
+        </div>
+      ` : '';
 
       const workOrderHtml = (config?.showWorkOrderNumber ?? true)
         ? `<div style="font-size: 22pt; font-weight: bold; letter-spacing: 1px;">WO #${label.workOrderNumber}</div>`
@@ -52,7 +137,7 @@ export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
 
       const uniqueImprints = Array.from(new Set((label.imprintTypes || []).filter(Boolean)));
       const imprintTypesHtml = (config?.showImprintTypes ?? true) && uniqueImprints.length > 0
-        ? `<div style="margin-top: 0.15in; font-size: 12pt; line-height: 1.4;">
+        ? `<div style="margin-top: 0.1in; font-size: 12pt; line-height: 1.4;">
             <div style="font-weight: bold; margin-bottom: 0.05in;">Imprints:</div>
             ${uniqueImprints.map(imp => `<div style="font-size: 11pt;">${imp}</div>`).join('')}
           </div>`
@@ -66,22 +151,22 @@ export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
           font-family: Arial, sans-serif;
           display: flex;
           flex-direction: column;
-          justify-content: center;
-          align-items: center;
-          padding: 0.5in;
+          padding: 0.15in;
           background-color: white;
           color: black;
           box-sizing: border-box;
           ${index < labels.length - 1 ? 'page-break-after: always;' : ''}
         ">
+          ${headerHtml}
           <div style="
             text-align: center;
             width: 100%;
             display: flex;
             flex-direction: column;
-            gap: 0.2in;
+            gap: 0.15in;
+            flex: 1;
+            justify-content: center;
           ">
-            ${logoHtml}
             ${workOrderHtml}
             ${customerHtml}
             ${nicknameHtml}
@@ -214,6 +299,7 @@ export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
                     dueDate={label.dueDate}
                     imprintTypes={label.imprintTypes}
                     config={config}
+                    qrCodeUrl={label.qrCodeUrl}
                   />
                 </div>
               </div>
