@@ -51,12 +51,12 @@ function DomainAwareCustomerPortal({ customerId }: { customerId: string }) {
       try {
         const { data: companyData, error: companyError } = await supabaseAnon
           .from('company_settings')
-          .select('id, customer_url')
-          .or(`customer_url.ilike.%${subdomain}%,customer_domain.eq.${subdomain}`)
+          .select('id, inkops_subdomain, customer_url')
+          .eq('inkops_subdomain', subdomain)
           .maybeSingle();
 
         if (companyError) {
-          console.error('Error looking up company by domain:', companyError);
+          console.error('Error looking up company by subdomain:', companyError);
           setError('Failed to verify domain');
           setLoading(false);
           return;
