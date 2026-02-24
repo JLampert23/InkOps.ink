@@ -1,6 +1,30 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+function extractSubdomainFromUrl(customerUrl: string | null): string | null {
+  if (!customerUrl) return null;
+
+  try {
+    const url = new URL(customerUrl.startsWith("http") ? customerUrl : `https://${customerUrl}`);
+    const hostname = url.hostname;
+    const parts = hostname.split(".");
+
+    if (parts.length >= 3 && parts[parts.length - 2] === "inkops" && parts[parts.length - 1] === "ink") {
+      return parts.slice(0, -2).join(".");
+    }
+
+    if (parts.length >= 2) {
+      return parts[0];
+    }
+
+    return parts[0] || null;
+  } catch {
+    const cleanUrl = customerUrl.replace(/^https?:\/\//, "").split("/")[0];
+    const parts = cleanUrl.split(".");
+    return parts[0] || null;
+  }
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -210,16 +234,27 @@ Deno.serve(async (req: Request) => {
         })
         .eq("id", quoteId);
 
-      // Get company settings to check for custom URL
+      // Get company settings to extract subdomain
       const { data: companySettings } = await supabase
         .from("company_settings")
         .select("customer_url")
         .eq("id", profile.company_id)
         .maybeSingle();
 
-      // Generate public approval URL - use custom URL if set, otherwise fallback to origin or supabase URL
-      const appUrl = companySettings?.customer_url || req.headers.get("origin") || supabaseUrl.replace('/rest/v1', '');
-      const approvalUrl = `${appUrl}/quote-approval/${approvalToken}`;
+      // Generate public approval URL using inkops.ink subdomain
+      let approvalUrl: string;
+      if (companySettings?.customer_url) {
+        const subdomain = extractSubdomainFromUrl(companySettings.customer_url);
+        if (subdomain) {
+          approvalUrl = `https://${subdomain}.inkops.ink/quote-approval/${approvalToken}`;
+        } else {
+          const fallbackUrl = req.headers.get("origin") || "https://inkops.ink";
+          approvalUrl = `${fallbackUrl}/quote-approval/${approvalToken}`;
+        }
+      } else {
+        const fallbackUrl = req.headers.get("origin") || "https://inkops.ink";
+        approvalUrl = `${fallbackUrl}/quote-approval/${approvalToken}`;
+      }
 
       // Send email with template or default
       try {

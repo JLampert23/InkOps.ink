@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
 import { ShortCodeEngine } from '../../services/shortcode-service';
 import DOMPurify from 'dompurify';
+import { getQuoteApprovalUrl, extractSubdomainFromCustomerUrl } from '../../utils/portal-url';
 
 interface SendQuoteModalProps {
   quoteId: string;
@@ -101,14 +102,14 @@ export function SendQuoteModal({
 
       if (!quote) return;
 
-      // Get company settings to check for custom URL
+      // Get company settings to extract subdomain
       const { data: companySettings } = await supabase
         .from('company_settings')
         .select('customer_url')
         .maybeSingle();
 
-      const baseUrl = companySettings?.customer_url || window.location.origin;
-      const approvalUrl = `${baseUrl}/quote-approval/PREVIEW_TOKEN`;
+      const subdomain = extractSubdomainFromCustomerUrl(companySettings?.customer_url || null);
+      const approvalUrl = getQuoteApprovalUrl('PREVIEW_TOKEN', subdomain);
       const expiryDate = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
 
       const shortcodeData = {
