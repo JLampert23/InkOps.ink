@@ -15,12 +15,9 @@ import {
   Plus,
   Pencil,
   X,
-  Tag,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ManageImprintsModal } from './ManageImprintsModal';
-import { LabelPreviewModal, LabelData } from './LabelPreviewModal';
-import { BoxLabelConfig } from './BoxLabel';
 import { SendQuoteModal } from './SendQuoteModal';
 import { generateQuotePDF, QuotePDFData } from '../../utils/quote-pdf-export';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -148,64 +145,12 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
   const [selectedGroupLabel, setSelectedGroupLabel] = useState<string>('');
   const [showProofModal, setShowProofModal] = useState(false);
   const [selectedProofImage, setSelectedProofImage] = useState<string>('');
-  const [showLabelModal, setShowLabelModal] = useState(false);
-  const [boxLabelConfig, setBoxLabelConfig] = useState<BoxLabelConfig | undefined>(undefined);
   const [reopening, setReopening] = useState(false);
   const [approving, setApproving] = useState(false);
 
   useEffect(() => {
     loadQuoteDetails();
-    loadBoxLabelSettings();
   }, [quoteId]);
-
-  const loadBoxLabelSettings = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (!profile?.company_id) return;
-
-      const { data: settings } = await supabase
-        .from('company_settings')
-        .select(`
-          box_label_logo_choice,
-          box_label_show_work_order_number,
-          box_label_show_customer_name,
-          box_label_show_due_date,
-          box_label_show_imprint_types,
-          box_label_show_job_nickname,
-          box_label_show_qr_code,
-          company_logo_primary_url,
-          company_logo_secondary_url
-        `)
-        .eq('id', profile.company_id)
-        .maybeSingle();
-
-      if (settings) {
-        const logoUrl = settings.box_label_logo_choice === 'secondary'
-          ? settings.company_logo_secondary_url
-          : settings.company_logo_primary_url;
-
-        setBoxLabelConfig({
-          logoUrl,
-          showWorkOrderNumber: settings.box_label_show_work_order_number ?? true,
-          showCustomerName: settings.box_label_show_customer_name ?? true,
-          showJobNickname: settings.box_label_show_job_nickname ?? true,
-          showDueDate: settings.box_label_show_due_date ?? true,
-          showImprintTypes: settings.box_label_show_imprint_types ?? true,
-          showQrCode: settings.box_label_show_qr_code ?? true,
-        });
-      }
-    } catch (error) {
-      console.error('Error loading box label settings:', error);
-    }
-  };
 
   const loadQuoteDetails = async () => {
     try {
@@ -290,33 +235,6 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
     } finally {
       setLoading(false);
     }
-  };
-
-
-  const generateLabels = (): LabelData[] => {
-    if (!quote || quoteImprints.length === 0) {
-      return [];
-    }
-
-    const uniqueTypesOfWork = Array.from(
-      new Set(quoteImprints.map(imprint => imprint.type_of_work).filter(Boolean))
-    );
-
-    if (uniqueTypesOfWork.length === 0) {
-      return [{
-        invoiceNumber: quote.quote_number,
-        customerName: quote.customer_name,
-        jobNickname: quote.nickname || '',
-        typeOfWork: 'General'
-      }];
-    }
-
-    return uniqueTypesOfWork.map(typeOfWork => ({
-      invoiceNumber: quote.quote_number,
-      customerName: quote.customer_name,
-      jobNickname: quote.nickname || '',
-      typeOfWork: typeOfWork
-    }));
   };
 
   const handleDownloadQuote = async () => {
@@ -538,13 +456,6 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
               Approve Quote
             </button>
           )}
-          <button
-            onClick={() => setShowLabelModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-cyan-500 text-white rounded-md hover:bg-cyan-600 transition-colors shadow-sm"
-          >
-            <Tag className="w-3.5 h-3.5" />
-            + Label
-          </button>
           <button
             onClick={handleDownloadQuote}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-slate-500 text-white rounded-md hover:bg-slate-600 transition-colors shadow-sm"
@@ -1151,13 +1062,6 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
           </div>
         </div>
       )}
-
-      <LabelPreviewModal
-        isOpen={showLabelModal}
-        onClose={() => setShowLabelModal(false)}
-        labels={generateLabels()}
-        config={boxLabelConfig}
-      />
     </div>
   );
 }
