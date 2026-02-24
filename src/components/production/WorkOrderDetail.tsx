@@ -508,17 +508,17 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           </div>
           {quote && <span className="text-sm text-gray-500 dark:text-gray-400 font-mono">{quote.quote_number}</span>}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={handleDownloadPDF}
             disabled={downloading}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
+            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
-            {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            {downloading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
             Download Work Order
           </button>
-          <button onClick={() => setShowLabelModal(true)} className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors shadow-sm">
-            <Printer className="w-4 h-4" />
+          <button onClick={() => setShowLabelModal(true)} className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-teal-600 text-white rounded hover:bg-teal-700 transition-colors">
+            <Printer className="w-3 h-3" />
             Print Box Label
           </button>
         </div>

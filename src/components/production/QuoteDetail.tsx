@@ -432,13 +432,13 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             {quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {(quote.status === 'draft' || quote.status === 'sent') && (
             <button
               onClick={onEdit}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors shadow-sm"
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
             >
-              <Edit className="w-3.5 h-3.5" />
+              <Edit className="w-3 h-3" />
               Edit Quote
             </button>
           )}
@@ -446,12 +446,12 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             <button
               onClick={handleReopenQuote}
               disabled={reopening}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-amber-500 text-white rounded-md hover:bg-amber-600 transition-colors shadow-sm disabled:opacity-50"
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-amber-600 text-white rounded hover:bg-amber-700 transition-colors disabled:opacity-50"
             >
               {reopening ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <Loader2 className="w-3 h-3 animate-spin" />
               ) : (
-                <Pencil className="w-3.5 h-3.5" />
+                <Pencil className="w-3 h-3" />
               )}
               Edit Quote
             </button>
@@ -460,29 +460,29 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             <button
               onClick={handleApproveQuote}
               disabled={approving}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-emerald-500 text-white rounded-md hover:bg-emerald-600 transition-colors shadow-sm disabled:opacity-50"
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-colors disabled:opacity-50"
             >
               {approving ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <Loader2 className="w-3 h-3 animate-spin" />
               ) : (
-                <CheckCircle className="w-3.5 h-3.5" />
+                <CheckCircle className="w-3 h-3" />
               )}
               Approve Quote
             </button>
           )}
           <button
             onClick={handleDownloadQuote}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-slate-500 text-white rounded-md hover:bg-slate-600 transition-colors shadow-sm"
+            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-slate-600 text-white rounded hover:bg-slate-700 transition-colors"
           >
-            <Download className="w-3.5 h-3.5" />
+            <Download className="w-3 h-3" />
             Download PDF
           </button>
           <button
             onClick={() => setShowSendModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors shadow-sm"
+            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
           >
-            <Send className="w-3.5 h-3.5" />
-            {quote.status === 'draft' ? 'Send to Customer' : 'Resend to Customer'}
+            <Send className="w-3 h-3" />
+            {quote.status === 'draft' ? 'Send to Customer' : 'Resend'}
           </button>
         </div>
       </div>
