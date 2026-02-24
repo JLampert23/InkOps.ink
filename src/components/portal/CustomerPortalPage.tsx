@@ -32,7 +32,6 @@ interface Quote {
 interface Invoice {
   id: string;
   invoice_number: string;
-  visual_id: string;
   invoice_date: string;
   status: string;
   total: number;
@@ -128,7 +127,7 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
 
       const { data: invoicesData, error: invoicesError } = await supabaseAnon
         .from('printavo_invoices')
-        .select('id, invoice_number, visual_id, invoice_date, status, total, amount_paid, balance_remaining')
+        .select('id, invoice_number, invoice_date, status, total, amount_paid, balance_remaining')
         .eq('customer_id', customerId)
         .eq('company_id', customerData.company_id)
         .order('invoice_date', { ascending: false });
@@ -432,7 +431,7 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
                       <tr key={invoice.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900">
-                            {invoice.visual_id || invoice.invoice_number}
+                            {invoice.invoice_number}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
