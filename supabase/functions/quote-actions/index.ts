@@ -234,25 +234,14 @@ Deno.serve(async (req: Request) => {
         })
         .eq("id", quoteId);
 
-      // Get company settings to extract subdomain
-      const { data: companySettings } = await supabase
-        .from("company_settings")
-        .select("customer_url")
-        .eq("id", profile.company_id)
-        .maybeSingle();
-
-      // Generate public approval URL using inkops.ink subdomain
+      // Generate public approval URL using inkops.ink subdomain from origin
+      const origin = req.headers.get("origin") || "";
+      const subdomain = extractSubdomainFromUrl(origin);
       let approvalUrl: string;
-      if (companySettings?.customer_url) {
-        const subdomain = extractSubdomainFromUrl(companySettings.customer_url);
-        if (subdomain) {
-          approvalUrl = `https://${subdomain}.inkops.ink/quote-approval/${approvalToken}`;
-        } else {
-          const fallbackUrl = req.headers.get("origin") || "https://inkops.ink";
-          approvalUrl = `${fallbackUrl}/quote-approval/${approvalToken}`;
-        }
+      if (subdomain) {
+        approvalUrl = `https://${subdomain}.inkops.ink/quote-approval/${approvalToken}`;
       } else {
-        const fallbackUrl = req.headers.get("origin") || "https://inkops.ink";
+        const fallbackUrl = origin || "https://inkops.ink";
         approvalUrl = `${fallbackUrl}/quote-approval/${approvalToken}`;
       }
 
