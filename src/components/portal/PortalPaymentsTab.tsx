@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase-client';
+import { supabaseAnon } from '../../lib/supabase-anon-client';
 import { CreditCard, Loader2, CheckCircle, XCircle, Clock, DollarSign, Receipt, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -38,7 +38,7 @@ export function PortalPaymentsTab({ customerId, companyId }: PortalPaymentsTabPr
     setError(null);
 
     try {
-      const { data, error: fetchError } = await supabase
+      const { data, error: fetchError } = await supabaseAnon
         .from('payments')
         .select(`
           id,
@@ -60,7 +60,7 @@ export function PortalPaymentsTab({ customerId, companyId }: PortalPaymentsTabPr
       const paymentsWithInvoices = await Promise.all(
         (data || []).map(async (payment) => {
           if (payment.invoice_id) {
-            const { data: invoiceData } = await supabase
+            const { data: invoiceData } = await supabaseAnon
               .from('printavo_invoices')
               .select('visual_id, invoice_number')
               .eq('id', payment.invoice_id)

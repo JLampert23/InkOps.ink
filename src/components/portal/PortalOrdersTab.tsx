@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase-client';
+import { supabaseAnon } from '../../lib/supabase-anon-client';
 import { Package, Loader2, XCircle, Clock, CheckCircle, Truck, PlayCircle, AlertCircle, ChevronRight, X, Shirt, Calendar, Hash } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -66,7 +66,7 @@ export function PortalOrdersTab({ customerId, companyId }: PortalOrdersTabProps)
     setError(null);
 
     try {
-      const { data, error: fetchError } = await supabase
+      const { data, error: fetchError } = await supabaseAnon
         .from('work_orders')
         .select(`
           id,
@@ -91,7 +91,7 @@ export function PortalOrdersTab({ customerId, companyId }: PortalOrdersTabProps)
       const ordersWithQuotes = await Promise.all(
         (data || []).map(async (order) => {
           if (order.quote_id) {
-            const { data: quoteData } = await supabase
+            const { data: quoteData } = await supabaseAnon
               .from('quotes')
               .select('quote_number, nickname')
               .eq('id', order.quote_id)
@@ -115,7 +115,7 @@ export function PortalOrdersTab({ customerId, companyId }: PortalOrdersTabProps)
     setLoadingDetail(true);
 
     try {
-      const { data: order, error: orderError } = await supabase
+      const { data: order, error: orderError } = await supabaseAnon
         .from('work_orders')
         .select(`
           id,
@@ -140,7 +140,7 @@ export function PortalOrdersTab({ customerId, companyId }: PortalOrdersTabProps)
 
       let quote = null;
       if (order.quote_id) {
-        const { data: quoteData } = await supabase
+        const { data: quoteData } = await supabaseAnon
           .from('quotes')
           .select('quote_number, nickname')
           .eq('id', order.quote_id)
@@ -148,7 +148,7 @@ export function PortalOrdersTab({ customerId, companyId }: PortalOrdersTabProps)
         quote = quoteData;
       }
 
-      const { data: lineItems, error: lineError } = await supabase
+      const { data: lineItems, error: lineError } = await supabaseAnon
         .from('work_order_line_items')
         .select(`
           id,
@@ -172,7 +172,7 @@ export function PortalOrdersTab({ customerId, companyId }: PortalOrdersTabProps)
 
       let imprints: Array<{ id: string; location_name: string; type_of_work: string; artwork_url: string | null }> = [];
       if (order.quote_id) {
-        const { data: imprintData } = await supabase
+        const { data: imprintData } = await supabaseAnon
           .from('quote_imprints')
           .select(`
             id,
@@ -188,7 +188,7 @@ export function PortalOrdersTab({ customerId, companyId }: PortalOrdersTabProps)
           let locationMap: Record<string, string> = {};
 
           if (locationIds.length > 0) {
-            const { data: locations } = await supabase
+            const { data: locations } = await supabaseAnon
               .from('decoration_locations')
               .select('id, name')
               .in('id', locationIds);

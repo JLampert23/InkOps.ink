@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase-client';
+import { supabaseAnon } from '../../lib/supabase-anon-client';
 import { FileText, Receipt, Loader2, AlertCircle, ChevronRight, Clock, CheckCircle, XCircle, DollarSign, CreditCard, Image, Package } from 'lucide-react';
 import { format } from 'date-fns';
 import { PortalPaymentsTab } from './PortalPaymentsTab';
@@ -85,7 +85,7 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
     setError(null);
 
     try {
-      const { data: customerData, error: customerError } = await supabase
+      const { data: customerData, error: customerError } = await supabaseAnon
         .from('customers')
         .select('id, company_name, contact_name, email, company_id')
         .eq('id', customerId)
@@ -101,7 +101,7 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
 
       setCustomer(customerData);
 
-      const { data: companyData, error: companyError } = await supabase
+      const { data: companyData, error: companyError } = await supabaseAnon
         .from('company_settings')
         .select('company_name, logo_url, company_logo_primary_url, company_address, company_phone, company_email, stripe_public_key, stripe_secret_key')
         .eq('id', customerData.company_id)
@@ -116,7 +116,7 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
         });
       }
 
-      const { data: quotesData, error: quotesError } = await supabase
+      const { data: quotesData, error: quotesError } = await supabaseAnon
         .from('quotes')
         .select('id, quote_number, created_at, status, subtotal, tax_amount, nickname')
         .eq('customer_id', customerId)
@@ -126,7 +126,7 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
       if (quotesError) throw quotesError;
       setQuotes(quotesData || []);
 
-      const { data: invoicesData, error: invoicesError } = await supabase
+      const { data: invoicesData, error: invoicesError } = await supabaseAnon
         .from('printavo_invoices')
         .select('id, invoice_number, visual_id, invoice_date, status, total, amount_paid, balance_remaining')
         .eq('customer_id', customerId)

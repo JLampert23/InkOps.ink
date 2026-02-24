@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase-client';
+import { supabaseAnon } from '../../lib/supabase-anon-client';
 import { Image, Loader2, CheckCircle, XCircle, Clock, Eye, ThumbsUp, ThumbsDown, MessageSquare, X, AlertCircle, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -48,7 +48,7 @@ export function PortalProofsTab({ customerId, companyId }: PortalProofsTabProps)
     setError(null);
 
     try {
-      const { data, error: fetchError } = await supabase
+      const { data, error: fetchError } = await supabaseAnon
         .from('proofs')
         .select(`
           id,
@@ -76,7 +76,7 @@ export function PortalProofsTab({ customerId, companyId }: PortalProofsTabProps)
       const proofsWithQuotes = await Promise.all(
         (data || []).map(async (proof) => {
           if (proof.quote_id) {
-            const { data: quoteData } = await supabase
+            const { data: quoteData } = await supabaseAnon
               .from('quotes')
               .select('quote_number, nickname')
               .eq('id', proof.quote_id)

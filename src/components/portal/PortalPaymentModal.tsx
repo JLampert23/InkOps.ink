@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase-client';
+import { supabaseAnon } from '../../lib/supabase-anon-client';
 import { X, CreditCard, Loader2, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
 
 interface Invoice {
@@ -41,7 +41,7 @@ export function PortalPaymentModal({
 
   const checkStripeEnabled = async () => {
     try {
-      const { data } = await supabase
+      const { data } = await supabaseAnon
         .from('company_settings')
         .select('stripe_public_key, stripe_secret_key')
         .eq('id', companyId)
