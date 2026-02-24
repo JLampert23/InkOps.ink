@@ -17,7 +17,7 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
           <div className="flex items-center justify-between h-20">
             <div className="flex items-center">
               <img
-                src="/inkops_logo-05.png"
+                src="/headerlogo.png"
                 alt="INKOPS"
                 className="h-10 w-auto"
               />

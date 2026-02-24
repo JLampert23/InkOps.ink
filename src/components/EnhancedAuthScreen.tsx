@@ -92,7 +92,7 @@ export function EnhancedAuthScreen({ onBackClick }: EnhancedAuthScreenProps) {
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center mb-6 transform hover:scale-105 transition-transform duration-200">
               <img
-                src="/inkops_logo-05.png"
+                src="/headerlogo.png"
                 alt="INKOPS"
                 className="h-16 w-auto"
               />
