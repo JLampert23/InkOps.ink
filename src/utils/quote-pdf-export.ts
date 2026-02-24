@@ -133,7 +133,13 @@ async function loadImage(url: string): Promise<HTMLImageElement | null> {
   });
 }
 
-async function imageToBase64(url: string): Promise<string | null> {
+interface ImageDimensions {
+  base64: string;
+  width: number;
+  height: number;
+}
+
+async function imageToBase64WithDimensions(url: string): Promise<ImageDimensions | null> {
   try {
     const img = await loadImage(url);
     if (!img) return null;
@@ -145,10 +151,19 @@ async function imageToBase64(url: string): Promise<string | null> {
     if (!ctx) return null;
 
     ctx.drawImage(img, 0, 0);
-    return canvas.toDataURL('image/png');
+    return {
+      base64: canvas.toDataURL('image/png'),
+      width: img.width,
+      height: img.height,
+    };
   } catch {
     return null;
   }
+}
+
+async function imageToBase64(url: string): Promise<string | null> {
+  const result = await imageToBase64WithDimensions(url);
+  return result ? result.base64 : null;
 }
 
 export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
@@ -160,78 +175,110 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 15;
-  let yPosition = margin;
+
+  const marginLeft = 16;
+  const marginRight = 16;
+  const marginTop = 14;
+  const marginBottom = 14;
+  const contentWidth = pageWidth - marginLeft - marginRight;
+
+  let yPosition = marginTop;
 
   const logoUrl = quote.company_logo_url || quote.company_logo_secondary_url;
-  let logoBase64: string | null = null;
+  let logoData: ImageDimensions | null = null;
   if (logoUrl) {
-    logoBase64 = await imageToBase64(logoUrl);
+    logoData = await imageToBase64WithDimensions(logoUrl);
   }
 
-  if (logoBase64) {
+  const maxLogoHeight = 20;
+  const maxLogoWidth = 45;
+  let actualLogoWidth = 0;
+  let actualLogoHeight = 0;
+
+  if (logoData) {
+    const aspectRatio = logoData.width / logoData.height;
+
+    if (logoData.height > logoData.width) {
+      actualLogoHeight = Math.min(maxLogoHeight, logoData.height * 0.264583);
+      actualLogoWidth = actualLogoHeight * aspectRatio;
+    } else {
+      actualLogoWidth = Math.min(maxLogoWidth, logoData.width * 0.264583);
+      actualLogoHeight = actualLogoWidth / aspectRatio;
+    }
+
+    if (actualLogoHeight > maxLogoHeight) {
+      actualLogoHeight = maxLogoHeight;
+      actualLogoWidth = actualLogoHeight * aspectRatio;
+    }
+    if (actualLogoWidth > maxLogoWidth) {
+      actualLogoWidth = maxLogoWidth;
+      actualLogoHeight = actualLogoWidth / aspectRatio;
+    }
+
     try {
-      const logoHeight = 18;
-      const logoWidth = 50;
-      doc.addImage(logoBase64, 'PNG', margin, yPosition, logoWidth, logoHeight);
+      doc.addImage(logoData.base64, 'PNG', marginLeft, yPosition, actualLogoWidth, actualLogoHeight);
     } catch (error) {
       console.warn('Failed to add logo to PDF');
+      actualLogoWidth = 0;
+      actualLogoHeight = 0;
     }
   }
 
-  const companyInfoX = logoBase64 ? margin + 55 : margin;
-  let companyY = yPosition;
+  const companyInfoX = logoData && actualLogoWidth > 0 ? marginLeft + actualLogoWidth + 4 : marginLeft;
+  let companyY = yPosition + 1;
 
-  doc.setFontSize(14);
+  doc.setFontSize(12);
   doc.setTextColor(17, 24, 39);
   doc.setFont('helvetica', 'bold');
   if (quote.company_name) {
     doc.text(quote.company_name, companyInfoX, companyY);
-    companyY += 5;
+    companyY += 4.5;
   }
 
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setTextColor(75, 85, 99);
   doc.setFont('helvetica', 'normal');
 
   if (quote.company_address) {
     doc.text(quote.company_address, companyInfoX, companyY);
-    companyY += 4;
+    companyY += 3.5;
   }
 
   if (quote.company_city && quote.company_state && quote.company_zip) {
     doc.text(`${quote.company_city}, ${quote.company_state} ${quote.company_zip}`, companyInfoX, companyY);
-    companyY += 4;
+    companyY += 3.5;
   }
 
   if (quote.company_phone) {
     doc.text(quote.company_phone, companyInfoX, companyY);
-    companyY += 4;
+    companyY += 3.5;
   }
 
   if (quote.company_email) {
     doc.text(quote.company_email, companyInfoX, companyY);
-    companyY += 4;
+    companyY += 3.5;
   }
 
   if (quote.company_website) {
     doc.text(quote.company_website, companyInfoX, companyY);
-    companyY += 4;
+    companyY += 3.5;
   }
 
-  const rightColX = pageWidth - margin - 50;
+  const rightEdge = marginLeft + contentWidth;
   let rightY = yPosition;
 
-  doc.setFontSize(22);
+  doc.setFontSize(20);
   doc.setTextColor(17, 24, 39);
   doc.setFont('helvetica', 'bold');
   const quoteTitleWidth = doc.getTextWidth('QUOTE');
-  doc.text('QUOTE', pageWidth - margin - quoteTitleWidth, rightY);
+  doc.text('QUOTE', rightEdge - quoteTitleWidth, rightY + 2);
   rightY += 8;
 
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setTextColor(75, 85, 99);
   doc.setFont('helvetica', 'normal');
+
+  const quoteMetaX = rightEdge - 55;
 
   const quoteDetails: [string, string][] = [
     ['Quote #:', quote.quote_number],
@@ -247,35 +294,37 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
   quoteDetails.forEach(([label, value]) => {
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(75, 85, 99);
-    doc.text(label, rightColX, rightY);
+    doc.text(label, quoteMetaX, rightY);
 
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(17, 24, 39);
     const valueWidth = doc.getTextWidth(value);
-    doc.text(value, pageWidth - margin - valueWidth, rightY);
-    rightY += 4.5;
+    doc.text(value, rightEdge - valueWidth, rightY);
+    rightY += 4;
   });
 
-  yPosition = Math.max(companyY, rightY) + 8;
+  const headerHeight = Math.max(companyY - yPosition, rightY - yPosition, actualLogoHeight);
+  yPosition += headerHeight + 6;
 
   doc.setDrawColor(209, 213, 219);
-  doc.line(margin, yPosition, pageWidth - margin, yPosition);
-  yPosition += 8;
+  doc.setLineWidth(0.3);
+  doc.line(marginLeft, yPosition, rightEdge, yPosition);
+  yPosition += 6;
 
-  const colWidth = (pageWidth - 2 * margin - 10) / 3;
-  const billToX = margin;
-  const shipToX = margin + colWidth + 5;
-  const detailsX = margin + 2 * colWidth + 10;
+  const colWidth = (contentWidth - 8) / 3;
+  const billToX = marginLeft;
+  const shipToX = marginLeft + colWidth + 4;
+  const detailsX = marginLeft + 2 * colWidth + 8;
 
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(17, 24, 39);
   doc.text('CUSTOMER BILLING', billToX, yPosition);
   doc.text('CUSTOMER SHIPPING', shipToX, yPosition);
   doc.text('QUOTE DETAILS', detailsX, yPosition);
-  yPosition += 5;
+  yPosition += 4;
 
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
 
   let billY = yPosition;
@@ -284,132 +333,141 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
 
   if (quote.bill_company) {
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(17, 24, 39);
     doc.text(quote.bill_company, billToX, billY);
-    billY += 3.5;
+    billY += 3.2;
     doc.setFont('helvetica', 'normal');
   }
   if (quote.bill_name) {
+    doc.setTextColor(55, 65, 81);
     doc.text(quote.bill_name, billToX, billY);
-    billY += 3.5;
+    billY += 3.2;
   }
   if (quote.bill_address_1) {
+    doc.setTextColor(55, 65, 81);
     doc.text(quote.bill_address_1, billToX, billY);
-    billY += 3.5;
+    billY += 3.2;
   }
   if (quote.bill_address_2) {
+    doc.setTextColor(55, 65, 81);
     doc.text(quote.bill_address_2, billToX, billY);
-    billY += 3.5;
+    billY += 3.2;
   }
   if (quote.bill_city && quote.bill_state && quote.bill_zip) {
+    doc.setTextColor(55, 65, 81);
     doc.text(`${quote.bill_city}, ${quote.bill_state} ${quote.bill_zip}`, billToX, billY);
-    billY += 3.5;
+    billY += 3.2;
   }
   if (quote.bill_email || quote.customer_email) {
     doc.setTextColor(37, 99, 235);
     doc.text(quote.bill_email || quote.customer_email, billToX, billY);
-    doc.setTextColor(17, 24, 39);
-    billY += 3.5;
+    billY += 3.2;
   }
   if (quote.bill_phone || quote.customer_phone) {
+    doc.setTextColor(55, 65, 81);
     doc.text(quote.bill_phone || quote.customer_phone, billToX, billY);
-    billY += 3.5;
+    billY += 3.2;
   }
   if (!quote.bill_company && !quote.bill_name && !quote.bill_address_1) {
     doc.setTextColor(156, 163, 175);
     doc.setFont('helvetica', 'italic');
     doc.text('No billing address provided', billToX, billY);
-    billY += 3.5;
+    billY += 3.2;
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(17, 24, 39);
   }
 
   if (quote.ship_company) {
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(17, 24, 39);
     doc.text(quote.ship_company, shipToX, shipY);
-    shipY += 3.5;
+    shipY += 3.2;
     doc.setFont('helvetica', 'normal');
   }
   if (quote.ship_name) {
+    doc.setTextColor(55, 65, 81);
     doc.text(quote.ship_name, shipToX, shipY);
-    shipY += 3.5;
+    shipY += 3.2;
   }
   if (quote.ship_address_1) {
+    doc.setTextColor(55, 65, 81);
     doc.text(quote.ship_address_1, shipToX, shipY);
-    shipY += 3.5;
+    shipY += 3.2;
   }
   if (quote.ship_address_2) {
+    doc.setTextColor(55, 65, 81);
     doc.text(quote.ship_address_2, shipToX, shipY);
-    shipY += 3.5;
+    shipY += 3.2;
   }
   if (quote.ship_city && quote.ship_state && quote.ship_zip) {
+    doc.setTextColor(55, 65, 81);
     doc.text(`${quote.ship_city}, ${quote.ship_state} ${quote.ship_zip}`, shipToX, shipY);
-    shipY += 3.5;
+    shipY += 3.2;
   }
   if (!quote.ship_company && !quote.ship_name && !quote.ship_address_1) {
     doc.setTextColor(156, 163, 175);
     doc.setFont('helvetica', 'italic');
     doc.text('No shipping address provided', shipToX, shipY);
-    shipY += 3.5;
+    shipY += 3.2;
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(17, 24, 39);
   }
 
+  doc.setTextColor(55, 65, 81);
   if (quote.po_number) {
-    doc.setTextColor(75, 85, 99);
+    doc.setTextColor(107, 114, 128);
     doc.text('PO #:', detailsX, detailY);
     doc.setTextColor(17, 24, 39);
     doc.setFont('helvetica', 'bold');
-    doc.text(quote.po_number, detailsX + 20, detailY);
+    doc.text(quote.po_number, detailsX + 18, detailY);
     doc.setFont('helvetica', 'normal');
-    detailY += 3.5;
+    detailY += 3.2;
   }
   if (quote.delivery_method) {
-    doc.setTextColor(75, 85, 99);
+    doc.setTextColor(107, 114, 128);
     doc.text('Delivery:', detailsX, detailY);
     doc.setTextColor(17, 24, 39);
     doc.setFont('helvetica', 'bold');
-    doc.text(quote.delivery_method, detailsX + 20, detailY);
+    doc.text(quote.delivery_method, detailsX + 18, detailY);
     doc.setFont('helvetica', 'normal');
-    detailY += 3.5;
+    detailY += 3.2;
   }
   if (quote.customer_due_date) {
-    doc.setTextColor(75, 85, 99);
-    doc.text('Customer Due:', detailsX, detailY);
+    doc.setTextColor(107, 114, 128);
+    doc.text('Due:', detailsX, detailY);
     doc.setTextColor(17, 24, 39);
     doc.setFont('helvetica', 'bold');
-    doc.text(formatDate(quote.customer_due_date), detailsX + 25, detailY);
+    doc.text(formatDate(quote.customer_due_date), detailsX + 18, detailY);
     doc.setFont('helvetica', 'normal');
-    detailY += 3.5;
+    detailY += 3.2;
   }
   if (quote.invoice_date) {
-    doc.setTextColor(75, 85, 99);
-    doc.text('Invoice Date:', detailsX, detailY);
+    doc.setTextColor(107, 114, 128);
+    doc.text('Invoice:', detailsX, detailY);
     doc.setTextColor(17, 24, 39);
     doc.setFont('helvetica', 'bold');
-    doc.text(formatDate(quote.invoice_date), detailsX + 25, detailY);
+    doc.text(formatDate(quote.invoice_date), detailsX + 18, detailY);
     doc.setFont('helvetica', 'normal');
-    detailY += 3.5;
+    detailY += 3.2;
   }
   if (quote.payment_due_date) {
-    doc.setTextColor(75, 85, 99);
-    doc.text('Payment Due:', detailsX, detailY);
+    doc.setTextColor(107, 114, 128);
+    doc.text('Pay Due:', detailsX, detailY);
     doc.setTextColor(17, 24, 39);
     doc.setFont('helvetica', 'bold');
-    doc.text(formatDate(quote.payment_due_date), detailsX + 25, detailY);
+    doc.text(formatDate(quote.payment_due_date), detailsX + 18, detailY);
     doc.setFont('helvetica', 'normal');
-    detailY += 3.5;
+    detailY += 3.2;
   }
   if (quote.terms) {
-    doc.setTextColor(75, 85, 99);
+    doc.setTextColor(107, 114, 128);
     doc.text('Terms:', detailsX, detailY);
     doc.setTextColor(17, 24, 39);
     doc.setFont('helvetica', 'bold');
-    doc.text(quote.terms, detailsX + 20, detailY);
+    doc.text(quote.terms, detailsX + 18, detailY);
     doc.setFont('helvetica', 'normal');
-    detailY += 3.5;
+    detailY += 3.2;
   }
 
-  yPosition = Math.max(billY, shipY, detailY) + 6;
+  yPosition = Math.max(billY, shipY, detailY) + 5;
 
   const items = quote.line_items.filter(item => item.line_type === 'item' || !item.line_type);
   const fees = quote.line_items.filter(item => item.line_type === 'fee');
@@ -427,24 +485,41 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
 
   const sizeColumns = ['YXS', 'YS', 'YM', 'YL', 'YXL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
 
+  const totalTableWidth = contentWidth;
+  const styleWidth = 12;
+  const colorWidth = 12;
+  const descWidth = 28;
+  const sizeWidth = 6;
+  const qtyWidth = 7;
+  const itemsWidth = 8;
+  const unitWidth = 12;
+  const totalWidth = 12;
+  const remainingWidth = totalTableWidth - styleWidth - colorWidth - descWidth - (sizeColumns.length * sizeWidth) - qtyWidth - itemsWidth - unitWidth - totalWidth;
+  const adjustedDescWidth = descWidth + remainingWidth;
+
   for (let groupIdx = 0; groupIdx < itemGroups.length; groupIdx++) {
     const [groupLabel, groupItems] = itemGroups[groupIdx];
 
     if (groupIdx > 0) {
-      yPosition += 3;
+      yPosition += 4;
     }
 
     if (groupLabel) {
-      doc.setFillColor(243, 244, 246);
-      doc.rect(margin, yPosition - 2, pageWidth - 2 * margin, 7, 'F');
-      doc.setFontSize(10);
+      if (yPosition + 12 > pageHeight - marginBottom) {
+        doc.addPage();
+        yPosition = marginTop;
+      }
+
+      doc.setFillColor(241, 245, 249);
+      doc.rect(marginLeft, yPosition - 1, contentWidth, 6, 'F');
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(17, 24, 39);
-      doc.text(groupLabel, margin + 2, yPosition + 3);
-      yPosition += 8;
+      doc.setTextColor(30, 41, 59);
+      doc.text(groupLabel, marginLeft + 2, yPosition + 3);
+      yPosition += 7;
     }
 
-    const tableHead = [['Style #', 'Color', 'Description', ...sizeColumns, 'Qty', 'Items', 'Unit', 'Total']];
+    const tableHead = [['Style', 'Color', 'Description', ...sizeColumns, 'Qty', 'Items', 'Unit', 'Total']];
     const tableBody: any[][] = [];
 
     for (const item of groupItems) {
@@ -487,52 +562,56 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
       body: tableBody,
       theme: 'plain',
       styles: {
-        fontSize: 6,
-        cellPadding: 1.5,
+        fontSize: 5.5,
+        cellPadding: { top: 1.5, bottom: 1.5, left: 1, right: 1 },
         textColor: [17, 24, 39],
         lineWidth: 0.1,
-        lineColor: [229, 231, 235],
+        lineColor: [226, 232, 240],
+        overflow: 'linebreak',
+        minCellHeight: 5,
       },
       headStyles: {
-        fillColor: [243, 244, 246],
-        textColor: [17, 24, 39],
+        fillColor: [241, 245, 249],
+        textColor: [30, 41, 59],
         fontStyle: 'bold',
         lineWidth: 0.2,
-        lineColor: [209, 213, 219],
+        lineColor: [203, 213, 225],
+        minCellHeight: 5,
       },
       columnStyles: {
-        0: { cellWidth: 14 },
-        1: { cellWidth: 14 },
-        2: { cellWidth: 35 },
-        3: { cellWidth: 7, halign: 'center' },
-        4: { cellWidth: 7, halign: 'center' },
-        5: { cellWidth: 7, halign: 'center' },
-        6: { cellWidth: 7, halign: 'center' },
-        7: { cellWidth: 7, halign: 'center' },
-        8: { cellWidth: 7, halign: 'center' },
-        9: { cellWidth: 7, halign: 'center' },
-        10: { cellWidth: 7, halign: 'center' },
-        11: { cellWidth: 7, halign: 'center' },
-        12: { cellWidth: 7, halign: 'center' },
-        13: { cellWidth: 7, halign: 'center' },
-        14: { cellWidth: 7, halign: 'center' },
-        15: { cellWidth: 7, halign: 'center' },
-        16: { cellWidth: 8, halign: 'center' },
-        17: { cellWidth: 10, halign: 'center', fontStyle: 'bold', textColor: [37, 99, 235] },
-        18: { cellWidth: 14, halign: 'right' },
-        19: { cellWidth: 14, halign: 'right', fontStyle: 'bold' },
+        0: { cellWidth: styleWidth, halign: 'left' },
+        1: { cellWidth: colorWidth, halign: 'left' },
+        2: { cellWidth: adjustedDescWidth, halign: 'left' },
+        3: { cellWidth: sizeWidth, halign: 'center' },
+        4: { cellWidth: sizeWidth, halign: 'center' },
+        5: { cellWidth: sizeWidth, halign: 'center' },
+        6: { cellWidth: sizeWidth, halign: 'center' },
+        7: { cellWidth: sizeWidth, halign: 'center' },
+        8: { cellWidth: sizeWidth, halign: 'center' },
+        9: { cellWidth: sizeWidth, halign: 'center' },
+        10: { cellWidth: sizeWidth, halign: 'center' },
+        11: { cellWidth: sizeWidth, halign: 'center' },
+        12: { cellWidth: sizeWidth, halign: 'center' },
+        13: { cellWidth: sizeWidth, halign: 'center' },
+        14: { cellWidth: sizeWidth, halign: 'center' },
+        15: { cellWidth: sizeWidth, halign: 'center' },
+        16: { cellWidth: qtyWidth, halign: 'center' },
+        17: { cellWidth: itemsWidth, halign: 'center', fontStyle: 'bold', textColor: [37, 99, 235] },
+        18: { cellWidth: unitWidth, halign: 'right' },
+        19: { cellWidth: totalWidth, halign: 'right', fontStyle: 'bold' },
       },
-      margin: { left: margin, right: margin },
+      margin: { left: marginLeft, right: marginRight },
+      tableWidth: contentWidth,
       didDrawPage: (data: any) => {
         if (data.pageNumber > 1) {
-          doc.setFontSize(8);
+          doc.setFontSize(7);
           doc.setTextColor(156, 163, 175);
-          doc.text(`Quote ${quote.quote_number} - Page ${data.pageNumber}`, margin, 10);
+          doc.text(`Quote ${quote.quote_number} - Page ${data.pageNumber}`, marginLeft, 10);
         }
       },
     });
 
-    yPosition = (doc as any).lastAutoTable.finalY + 2;
+    yPosition = (doc as any).lastAutoTable.finalY + 3;
 
     const normalizeLabel = (label: string | null | undefined) => label || '';
     const normalizedGroupLabel = normalizeLabel(groupLabel);
@@ -551,78 +630,86 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
 
     if (groupImprints && groupImprints.length > 0) {
       const imprintsPerRow = 2;
-      const imprintWidth = (pageWidth - 2 * margin - 5) / imprintsPerRow;
-      let imprintX = margin;
-      let imprintY = yPosition + 2;
+      const imprintGap = 4;
+      const imprintWidth = (contentWidth - imprintGap) / imprintsPerRow;
+      let imprintX = marginLeft;
+      let imprintY = yPosition;
       let maxImprintHeight = 0;
 
       for (let i = 0; i < groupImprints.length; i++) {
         const imprint = groupImprints[i];
 
-        if (imprintY + 30 > pageHeight - margin) {
-          doc.addPage();
-          imprintY = margin;
-          imprintX = margin;
-        }
-
-        doc.setFillColor(249, 250, 251);
-        doc.setDrawColor(209, 213, 219);
-        doc.roundedRect(imprintX, imprintY, imprintWidth - 3, 25, 1, 1, 'FD');
-
-        let textY = imprintY + 4;
-
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(17, 24, 39);
-        doc.text(`${quote.quote_number}-${String(i + 1).padStart(2, '0')}`, imprintX + 2, textY);
-
-        doc.setFillColor(219, 234, 254);
-        doc.setDrawColor(147, 197, 253);
-        const typeWidth = doc.getTextWidth(imprint.type_of_work) + 4;
-        doc.roundedRect(imprintX + 20, textY - 3, typeWidth, 5, 1, 1, 'FD');
-        doc.setFontSize(7);
-        doc.setTextColor(30, 64, 175);
-        doc.text(imprint.type_of_work, imprintX + 22, textY);
-
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(17, 24, 39);
-        doc.text(imprint.location, imprintX + 22 + typeWidth + 2, textY);
-
-        textY += 5;
-
-        if (imprint.details || imprint.description) {
-          doc.setFont('helvetica', 'normal');
-          doc.setFontSize(6);
-          doc.setTextColor(75, 85, 99);
-          const details = imprint.details || imprint.description || '';
-          const lines = doc.splitTextToSize(details, imprintWidth - 8);
-          doc.text(lines.slice(0, 2), imprintX + 2, textY);
-          textY += Math.min(lines.length, 2) * 3;
-        }
-
-        if (imprint.thread_ink_color) {
-          doc.setFontSize(6);
-          doc.setTextColor(75, 85, 99);
-          doc.text(`Colors: ${imprint.thread_ink_color}`, imprintX + 2, textY);
-          textY += 3;
-        }
-
+        let estimatedHeight = 28;
         const artworkImages = imprint.artwork_images && Array.isArray(imprint.artwork_images)
           ? imprint.artwork_images
           : imprint.artwork_url
             ? [imprint.artwork_url]
             : [];
-
         const mockupImages = (imprint.mockups || [])
           .map((m: any) => typeof m === 'string' ? m : m?.url)
           .filter(Boolean);
+        if (artworkImages.length > 0 || mockupImages.length > 0) {
+          estimatedHeight += 14;
+        }
+
+        if (imprintY + estimatedHeight > pageHeight - marginBottom) {
+          doc.addPage();
+          imprintY = marginTop;
+          imprintX = marginLeft;
+          maxImprintHeight = 0;
+        }
+
+        doc.setFillColor(248, 250, 252);
+        doc.setDrawColor(226, 232, 240);
+        doc.setLineWidth(0.2);
+        doc.roundedRect(imprintX, imprintY, imprintWidth - 2, estimatedHeight, 1.5, 1.5, 'FD');
+
+        let textY = imprintY + 4;
+
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(17, 24, 39);
+        doc.text(`${quote.quote_number}-${String(i + 1).padStart(2, '0')}`, imprintX + 2, textY);
+
+        doc.setFillColor(219, 234, 254);
+        doc.setDrawColor(191, 219, 254);
+        const typeText = imprint.type_of_work;
+        const typeWidth = doc.getTextWidth(typeText) + 3;
+        doc.roundedRect(imprintX + 18, textY - 2.5, typeWidth, 4, 0.8, 0.8, 'FD');
+        doc.setFontSize(6);
+        doc.setTextColor(30, 64, 175);
+        doc.text(typeText, imprintX + 19.5, textY);
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7);
+        doc.setTextColor(17, 24, 39);
+        doc.text(imprint.location, imprintX + 20 + typeWidth + 1, textY);
+
+        textY += 4.5;
+
+        if (imprint.details || imprint.description) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(6);
+          doc.setTextColor(100, 116, 139);
+          const details = imprint.details || imprint.description || '';
+          const lines = doc.splitTextToSize(details, imprintWidth - 8);
+          doc.text(lines.slice(0, 2), imprintX + 2, textY);
+          textY += Math.min(lines.length, 2) * 2.8;
+        }
+
+        if (imprint.thread_ink_color) {
+          doc.setFontSize(6);
+          doc.setTextColor(100, 116, 139);
+          doc.text(`Colors: ${imprint.thread_ink_color}`, imprintX + 2, textY);
+          textY += 3;
+        }
 
         const allImages = [...artworkImages, ...mockupImages];
 
         if (allImages.length > 0) {
-          const imgSize = 12;
-          const imgStartX = imprintX + 2;
-          let imgX = imgStartX;
+          textY += 1;
+          const imgSize = 10;
+          let imgX = imprintX + 2;
 
           for (let j = 0; j < Math.min(allImages.length, 4); j++) {
             const imgUrl = allImages[j];
@@ -633,7 +720,8 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
                 imgX += imgSize + 2;
               }
             } catch {
-              doc.setDrawColor(209, 213, 219);
+              doc.setDrawColor(226, 232, 240);
+              doc.setLineWidth(0.1);
               doc.rect(imgX, textY, imgSize, imgSize);
               imgX += imgSize + 2;
             }
@@ -642,10 +730,10 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
         }
 
         const currentHeight = textY - imprintY + 2;
-        maxImprintHeight = Math.max(maxImprintHeight, currentHeight);
+        maxImprintHeight = Math.max(maxImprintHeight, currentHeight, estimatedHeight);
 
         if ((i + 1) % imprintsPerRow === 0) {
-          imprintX = margin;
+          imprintX = marginLeft;
           imprintY += maxImprintHeight + 2;
           maxImprintHeight = 0;
         } else {
@@ -654,25 +742,25 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
       }
 
       if (groupImprints.length % imprintsPerRow !== 0) {
-        yPosition = imprintY + maxImprintHeight + 2;
+        yPosition = imprintY + maxImprintHeight + 3;
       } else {
-        yPosition = imprintY;
+        yPosition = imprintY + 2;
       }
     }
   }
 
   if (fees.length > 0) {
-    yPosition += 5;
+    yPosition += 4;
 
-    if (yPosition + 40 > pageHeight - margin) {
+    if (yPosition + 30 > pageHeight - marginBottom) {
       doc.addPage();
-      yPosition = margin;
+      yPosition = marginTop;
     }
 
-    doc.setFontSize(9);
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(17, 24, 39);
-    doc.text('Additional Fees', pageWidth / 2, yPosition);
+    doc.text('Additional Fees', marginLeft + contentWidth / 2, yPosition);
     yPosition += 4;
 
     const feeData = fees.map(fee => {
@@ -693,40 +781,41 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
       body: feeData,
       theme: 'plain',
       styles: {
-        fontSize: 8,
-        cellPadding: 2,
+        fontSize: 7,
+        cellPadding: { top: 1.5, bottom: 1.5, left: 1.5, right: 1.5 },
         textColor: [17, 24, 39],
         lineWidth: 0.1,
-        lineColor: [229, 231, 235],
+        lineColor: [226, 232, 240],
       },
       headStyles: {
-        fillColor: [243, 244, 246],
-        textColor: [17, 24, 39],
+        fillColor: [241, 245, 249],
+        textColor: [30, 41, 59],
         fontStyle: 'bold',
         lineWidth: 0.2,
-        lineColor: [209, 213, 219],
+        lineColor: [203, 213, 225],
       },
       columnStyles: {
-        0: { cellWidth: 30 },
+        0: { cellWidth: 28 },
         1: { cellWidth: 'auto' },
-        2: { cellWidth: 15, halign: 'center' },
-        3: { cellWidth: 25, halign: 'right' },
-        4: { cellWidth: 25, halign: 'right', fontStyle: 'bold' },
+        2: { cellWidth: 12, halign: 'center' },
+        3: { cellWidth: 20, halign: 'right' },
+        4: { cellWidth: 20, halign: 'right', fontStyle: 'bold' },
       },
-      margin: { left: pageWidth / 2, right: margin },
+      margin: { left: marginLeft + contentWidth / 2, right: marginRight },
     });
 
-    yPosition = (doc as any).lastAutoTable.finalY + 5;
+    yPosition = (doc as any).lastAutoTable.finalY + 4;
   }
 
-  if (yPosition + 60 > pageHeight - margin) {
+  if (yPosition + 50 > pageHeight - marginBottom) {
     doc.addPage();
-    yPosition = margin;
+    yPosition = marginTop;
   }
 
-  yPosition += 5;
-  const totalsX = pageWidth - margin - 70;
-  const totalsValueX = pageWidth - margin;
+  yPosition += 4;
+  const totalsWidth = 65;
+  const totalsX = marginLeft + contentWidth - totalsWidth;
+  const totalsValueX = marginLeft + contentWidth;
 
   const totalQty = items.reduce((sum, item) => {
     return sum + (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) + (item.qty_yl || 0) +
@@ -736,7 +825,7 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
 
   const feesTotal = fees.reduce((sum, fee) => sum + fee.total_price, 0);
 
-  doc.setFontSize(9);
+  doc.setFontSize(8);
 
   const totalsData: [string, string][] = [
     ['Total Quantity', totalQty.toString()],
@@ -753,68 +842,73 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
 
   totalsData.forEach(([label, value]) => {
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(17, 24, 39);
+    doc.setTextColor(55, 65, 81);
     doc.text(label, totalsX, yPosition);
 
     doc.setFont('helvetica', 'normal');
+    doc.setTextColor(17, 24, 39);
     const valueWidth = doc.getTextWidth(value);
     doc.text(value, totalsValueX - valueWidth, yPosition);
-    yPosition += 4.5;
+    yPosition += 4;
   });
 
   doc.setDrawColor(17, 24, 39);
-  doc.setLineWidth(0.5);
+  doc.setLineWidth(0.4);
   doc.line(totalsX, yPosition, totalsValueX, yPosition);
-  yPosition += 5;
+  yPosition += 4.5;
 
-  doc.setFontSize(11);
+  doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(17, 24, 39);
   doc.text('Total Due', totalsX, yPosition);
   const totalDueValue = formatCurrency(quote.total);
   const totalDueWidth = doc.getTextWidth(totalDueValue);
   doc.text(totalDueValue, totalsValueX - totalDueWidth, yPosition);
-  yPosition += 5;
+  yPosition += 4.5;
 
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
+  doc.setTextColor(55, 65, 81);
   doc.text('Paid', totalsX, yPosition);
   doc.setFont('helvetica', 'normal');
+  doc.setTextColor(17, 24, 39);
   const paidValue = formatCurrency(0);
   const paidWidth = doc.getTextWidth(paidValue);
   doc.text(paidValue, totalsValueX - paidWidth, yPosition);
-  yPosition += 5;
+  yPosition += 4.5;
 
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
+  doc.setTextColor(55, 65, 81);
   doc.text('Outstanding', totalsX, yPosition);
   doc.setTextColor(37, 99, 235);
   const outstandingValue = formatCurrency(quote.total);
   const outstandingWidth = doc.getTextWidth(outstandingValue);
   doc.text(outstandingValue, totalsValueX - outstandingWidth, yPosition);
-  yPosition += 8;
+  yPosition += 6;
 
-  doc.setTextColor(17, 24, 39);
-  doc.setFontSize(8);
+  doc.setTextColor(107, 114, 128);
+  doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Created: ${formatDate(quote.created_date || quote.created_at)}`, margin, yPosition);
+  doc.text(`Created: ${formatDate(quote.created_date || quote.created_at)}`, marginLeft, yPosition);
 
-  if (yPosition + 60 < pageHeight - margin) {
-    yPosition += 10;
+  if (yPosition + 45 < pageHeight - marginBottom) {
+    yPosition += 8;
 
-    doc.setDrawColor(209, 213, 219);
-    doc.line(margin, yPosition, pageWidth - margin, yPosition);
-    yPosition += 6;
-
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(17, 24, 39);
-    doc.text('TERMS & CONDITIONS', margin, yPosition);
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.2);
+    doc.line(marginLeft, yPosition, rightEdge, yPosition);
     yPosition += 5;
 
-    doc.setFontSize(7);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(17, 24, 39);
+    doc.text('TERMS & CONDITIONS', marginLeft, yPosition);
+    yPosition += 4;
+
+    doc.setFontSize(6.5);
     doc.setFont('helvetica', 'normal');
-    doc.setTextColor(75, 85, 99);
+    doc.setTextColor(100, 116, 139);
 
     const policies = [
       'Payment Terms: Payment is due upon receipt unless otherwise agreed in writing.',
@@ -827,9 +921,10 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
     ];
 
     policies.forEach(policy => {
-      const lines = doc.splitTextToSize(policy, pageWidth - 2 * margin);
-      doc.text(lines, margin, yPosition);
-      yPosition += lines.length * 3 + 1;
+      if (yPosition + 4 > pageHeight - marginBottom) return;
+      const lines = doc.splitTextToSize(policy, contentWidth);
+      doc.text(lines, marginLeft, yPosition);
+      yPosition += lines.length * 2.8 + 0.8;
     });
   }
 
