@@ -585,7 +585,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           items,
           taxed: items.length > 0 && items.every(item => item.taxed),
           customSizeOptions: [],
-          sizeMode: (items.length > 0 && items[0].size_mode) ? items[0].size_mode as SizeMode : 'regular'
+          sizeMode: 'regular'
         }));
 
         setItemGroups(groups);
@@ -1712,7 +1712,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       return false;
     }
 
-    if (!selectedCustomerId && !isAutoSave) {
+    const hasCustomerInfo = selectedCustomerId || billCompany || billName;
+    if (!hasCustomerInfo && !isAutoSave) {
       showNotification('error', 'Validation Error', 'Please select a customer before saving');
       return false;
     }
@@ -1896,7 +1897,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
   };
 
   const handleSendQuote = async () => {
-    if (!selectedCustomerId) {
+    const hasCustomerInfo = selectedCustomerId || billCompany || billName;
+    if (!hasCustomerInfo) {
       showNotification('error', 'Customer Required', 'Please select a customer before sending the quote');
       return;
     }
