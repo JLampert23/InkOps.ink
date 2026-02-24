@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase-client';
-import { FileText, Receipt, Loader2, AlertCircle, ChevronRight, Clock, CheckCircle, XCircle, DollarSign } from 'lucide-react';
+import { FileText, Receipt, Loader2, AlertCircle, ChevronRight, Clock, CheckCircle, XCircle, DollarSign, CreditCard } from 'lucide-react';
 import { format } from 'date-fns';
+import { PortalPaymentsTab } from './PortalPaymentsTab';
+import { PortalPaymentModal } from './PortalPaymentModal';
 
 interface CustomerPortalPageProps {
   customerId: string;
@@ -36,6 +38,10 @@ interface Invoice {
   balance_remaining: number;
 }
 
+interface StripeConfig {
+  enabled: boolean;
+}
+
 interface CompanyBranding {
   company_name: string;
   logo_url: string | null;
@@ -52,11 +58,25 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
   const [branding, setBranding] = useState<CompanyBranding | null>(null);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [activeTab, setActiveTab] = useState<'quotes' | 'invoices'>('quotes');
+  const [activeTab, setActiveTab] = useState<'quotes' | 'invoices' | 'payments'>('quotes');
+  const [stripeConfig, setStripeConfig] = useState<StripeConfig>({ enabled: false });
+  const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState<Invoice | null>(null);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
 
   useEffect(() => {
     loadCustomerData();
+    checkPaymentSuccess();
   }, [customerId]);
+
+  const checkPaymentSuccess = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('payment') === 'success') {
+      setPaymentSuccess(true);
+      setActiveTab('payments');
+      window.history.replaceState({}, '', window.location.pathname);
+      setTimeout(() => setPaymentSuccess(false), 5000);
+    }
+  };
 
   const loadCustomerData = async () => {
     setLoading(true);
@@ -81,7 +101,7 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
 
       const { data: companyData, error: companyError } = await supabase
         .from('company_settings')
-        .select('company_name, logo_url, company_logo_primary_url, company_address, company_phone, company_email')
+        .select('company_name, logo_url, company_logo_primary_url, company_address, company_phone, company_email, stripe_public_key, stripe_secret_key')
         .eq('id', customerData.company_id)
         .maybeSingle();
 
@@ -89,6 +109,9 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
 
       if (companyData) {
         setBranding(companyData);
+        setStripeConfig({
+          enabled: !!(companyData.stripe_public_key && companyData.stripe_secret_key),
+        });
       }
 
       const { data: quotesData, error: quotesError } = await supabase
@@ -268,11 +291,29 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
               <Receipt className="w-4 h-4" />
               Invoices ({invoices.length})
             </button>
+            <button
+              onClick={() => setActiveTab('payments')}
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+                activeTab === 'payments'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+              }`}
+            >
+              <CreditCard className="w-4 h-4" />
+              Payments
+            </button>
           </div>
         </div>
       </nav>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {paymentSuccess && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
+            <CheckCircle className="w-5 h-5 text-green-600" />
+            <p className="text-green-800 font-medium">Payment successful! Thank you for your payment.</p>
+          </div>
+        )}
+
         {activeTab === 'quotes' && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
@@ -359,6 +400,7 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Balance Due</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -383,6 +425,17 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
                             ${parseFloat(invoice.balance_remaining?.toString() || '0').toLocaleString('en-US', { minimumFractionDigits: 2 })}
                           </span>
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          {parseFloat(invoice.balance_remaining?.toString() || '0') > 0 && stripeConfig.enabled && (
+                            <button
+                              onClick={() => setSelectedInvoiceForPayment(invoice)}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                              <CreditCard className="w-4 h-4" />
+                              Pay Now
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -391,7 +444,30 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
             )}
           </div>
         )}
+
+        {activeTab === 'payments' && customer && (
+          <PortalPaymentsTab
+            customerId={customer.id}
+            companyId={customer.company_id}
+          />
+        )}
       </main>
+
+      {selectedInvoiceForPayment && customer && (
+        <PortalPaymentModal
+          invoice={selectedInvoiceForPayment}
+          companyId={customer.company_id}
+          customerId={customer.id}
+          customerEmail={customer.email}
+          customerName={customer.contact_name || customer.company_name}
+          onClose={() => setSelectedInvoiceForPayment(null)}
+          onPaymentSuccess={() => {
+            setSelectedInvoiceForPayment(null);
+            loadCustomerData();
+            setActiveTab('payments');
+          }}
+        />
+      )}
 
       <footer className="bg-white border-t border-gray-200 mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
