@@ -6,7 +6,6 @@ export interface BoxLabelConfig {
   showCustomerName: boolean;
   showJobNickname: boolean;
   showDueDate: boolean;
-  showTypeOfWork: boolean;
   showImprintTypes: boolean;
 }
 
@@ -15,7 +14,6 @@ export interface BoxLabelProps {
   customerName: string;
   jobNickname: string;
   dueDate?: string;
-  typeOfWork?: string;
   imprintTypes?: string[];
   config?: BoxLabelConfig;
 }
@@ -26,7 +24,6 @@ const defaultConfig: BoxLabelConfig = {
   showCustomerName: true,
   showJobNickname: true,
   showDueDate: true,
-  showTypeOfWork: true,
   showImprintTypes: true,
 };
 
@@ -35,7 +32,6 @@ export const BoxLabel: React.FC<BoxLabelProps> = ({
   customerName,
   jobNickname,
   dueDate,
-  typeOfWork,
   imprintTypes = [],
   config = defaultConfig,
 }) => {
@@ -120,19 +116,6 @@ export const BoxLabel: React.FC<BoxLabelProps> = ({
             color: '#374151'
           }}>
             Due: {dueDate}
-          </div>
-        )}
-
-        {mergedConfig.showTypeOfWork && typeOfWork && (
-          <div style={{
-            fontSize: '20pt',
-            fontWeight: 'bold',
-            wordWrap: 'break-word',
-            lineHeight: '1.2',
-            textTransform: 'uppercase',
-            marginTop: '0.1in'
-          }}>
-            {typeOfWork}
           </div>
         )}
 

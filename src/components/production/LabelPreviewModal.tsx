@@ -8,7 +8,6 @@ export interface LabelData {
   customerName: string;
   jobNickname: string;
   dueDate?: string;
-  typeOfWork?: string;
   imprintTypes?: string[];
 }
 
@@ -51,10 +50,6 @@ export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
         ? `<div style="font-size: 14pt; font-weight: 500; color: #374151;">Due: ${label.dueDate}</div>`
         : '';
 
-      const typeOfWorkHtml = (config?.showTypeOfWork ?? true) && label.typeOfWork
-        ? `<div style="font-size: 20pt; font-weight: bold; word-wrap: break-word; line-height: 1.2; text-transform: uppercase; margin-top: 0.1in;">${label.typeOfWork}</div>`
-        : '';
-
       const uniqueImprints = Array.from(new Set((label.imprintTypes || []).filter(Boolean)));
       const imprintTypesHtml = (config?.showImprintTypes ?? true) && uniqueImprints.length > 0
         ? `<div style="margin-top: 0.15in; font-size: 12pt; line-height: 1.4;">
@@ -91,7 +86,6 @@ export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
             ${customerHtml}
             ${nicknameHtml}
             ${dueDateHtml}
-            ${typeOfWorkHtml}
             ${imprintTypesHtml}
           </div>
         </div>
@@ -218,7 +212,6 @@ export const LabelPreviewModal: React.FC<LabelPreviewModalProps> = ({
                     customerName={label.customerName}
                     jobNickname={label.jobNickname}
                     dueDate={label.dueDate}
-                    typeOfWork={label.typeOfWork}
                     imprintTypes={label.imprintTypes}
                     config={config}
                   />

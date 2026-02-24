@@ -266,7 +266,6 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           showCustomerName: settings.box_label_show_customer_name ?? true,
           showJobNickname: settings.box_label_show_job_nickname ?? true,
           showDueDate: settings.box_label_show_due_date ?? true,
-          showTypeOfWork: settings.box_label_show_type_of_work ?? true,
           showImprintTypes: settings.box_label_show_imprint_types ?? true,
         });
       }
@@ -297,7 +296,6 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       customerName: workOrder.customer_name,
       jobNickname: quote?.nickname || '',
       dueDate,
-      typeOfWork: imprintTypes[0] || 'General',
       imprintTypes,
     }];
   };

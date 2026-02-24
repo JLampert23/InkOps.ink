@@ -275,18 +275,6 @@ export default function BoxLabelSettings({ companyId, primaryLogoUrl, secondaryL
             <label className="flex items-center gap-3 cursor-pointer group">
               <input
                 type="checkbox"
-                checked={config.box_label_show_type_of_work}
-                onChange={(e) => setConfig({ ...config, box_label_show_type_of_work: e.target.checked })}
-                className="w-5 h-5 rounded border-gray-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white">
-                Type of Work
-              </span>
-            </label>
-
-            <label className="flex items-center gap-3 cursor-pointer group">
-              <input
-                type="checkbox"
                 checked={config.box_label_show_imprint_types}
                 onChange={(e) => setConfig({ ...config, box_label_show_imprint_types: e.target.checked })}
                 className="w-5 h-5 rounded border-gray-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
@@ -332,10 +320,6 @@ export default function BoxLabelSettings({ companyId, primaryLogoUrl, secondaryL
 
                 {config.box_label_show_due_date && (
                   <div className="text-sm text-gray-600">Due: Mar 15, 2024</div>
-                )}
-
-                {config.box_label_show_type_of_work && (
-                  <div className="text-base font-bold text-gray-900 uppercase mt-2">Screen Printing</div>
                 )}
 
                 {config.box_label_show_imprint_types && (
