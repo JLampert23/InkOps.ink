@@ -19,8 +19,6 @@ const ShipStationSettings = lazy(() => import('./settings/ShipStationSettings').
 const ChipplyIntegrationSettings = lazy(() => import('./chipply/ChipplyIntegrationSettings').then(m => ({ default: m.ChipplyIntegrationSettings })));
 const CustomInvoiceStatusManager = lazy(() => import('./settings/CustomInvoiceStatusManager').then(m => ({ default: m.CustomInvoiceStatusManager })));
 const BoxLabelSettings = lazy(() => import('./settings/BoxLabelSettings'));
-const IntegrationsDiagnostic = lazy(() => import('./diagnostics/IntegrationsDiagnostic').then(m => ({ default: m.IntegrationsDiagnostic })));
-
 interface CompanySettings {
   id: string;
   company_name: string;
@@ -151,7 +149,7 @@ type SettingsTab =
   | 'automated-reports' | 'automations'
   | 'manage-goods' | 'receiving-settings' | 'po-settings'
   | 'production-general' | 'scheduler-settings' | 'invoice-fees' | 'price-matrices'
-  | 'email-templates' | 'urls' | 'diagnostics';
+  | 'email-templates' | 'urls';
 
 interface AccountSettingsProps {
   initialTab?: SettingsTab;
@@ -4503,25 +4501,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             )}
           </div>
 
-          {/* Diagnostics */}
-          <div className="pt-2">
-            <button
-              onClick={() => setActiveTab('diagnostics')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all relative group ${
-                activeTab === 'diagnostics'
-                  ? 'bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800'
-                  : 'hover:bg-gray-50 dark:hover:bg-slate-800'
-              }`}
-            >
-              <Bug className={`w-4 h-4 flex-shrink-0 ${activeTab === 'diagnostics' ? 'text-orange-600 dark:text-orange-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
-              <div className="flex-1 text-left">
-                <div className={`font-medium text-sm ${activeTab === 'diagnostics' ? 'text-orange-700 dark:text-orange-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                  Diagnostics
-                </div>
-              </div>
-              {activeTab === 'diagnostics' && <div className="w-1 h-6 bg-orange-600 dark:bg-orange-500 rounded-full absolute right-0" />}
-            </button>
-          </div>
         </nav>
       </div>
 
@@ -4730,80 +4709,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       )}
                     </div>
                   </div>
-                </div>
-
-                <div className="border-b border-gray-200 dark:border-slate-700 pb-6">
-                  <h3 className="text-md font-semibold text-gray-800 dark:text-gray-100 mb-4">Customer Portal Testing</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                    Test the customer portal experience by generating a magic link for any customer email
-                  </p>
-                  <div className="flex items-end gap-3">
-                    <div className="flex-1">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Customer Email
-                      </label>
-                      <input
-                        type="email"
-                        id="portal-test-email"
-                        defaultValue="mplampert@gmail.com"
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="customer@example.com"
-                      />
-                    </div>
-                    <button
-                      onClick={async () => {
-                        const emailInput = document.getElementById('portal-test-email') as HTMLInputElement;
-                        const email = emailInput?.value;
-                        if (!email) {
-                          showNotification('Please enter a customer email', 'error');
-                          return;
-                        }
-
-                        showNotification('Generating portal link...', 'info');
-
-                        try {
-                          console.log('Creating portal session for:', email);
-
-                          const { data, error } = await supabase.rpc('create_portal_session', {
-                            p_email: email
-                          });
-
-                          console.log('RPC Response:', { data, error });
-
-                          if (error) {
-                            console.error('RPC Error:', error);
-                            showNotification(`Error: ${error.message}`, 'error');
-                            return;
-                          }
-
-                          if (!data) {
-                            showNotification('No response from server', 'error');
-                            return;
-                          }
-
-                          if (!data.success) {
-                            showNotification(data.error || 'Customer not found', 'error');
-                            return;
-                          }
-
-                          const portalUrl = `${window.location.origin}/portal/login?token=${data.token}`;
-                          console.log('Opening portal URL:', portalUrl);
-                          window.open(portalUrl, '_blank');
-                          showNotification('Portal opened in new tab', 'success');
-                        } catch (err) {
-                          console.error('Error generating portal link:', err);
-                          showNotification(`Failed: ${err instanceof Error ? err.message : 'Unknown error'}`, 'error');
-                        }
-                      }}
-                      className="flex items-center gap-2 px-6 py-2 bg-green-600 dark:bg-green-700 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 transition-colors whitespace-nowrap"
-                    >
-                      <LinkIcon className="w-4 h-4" />
-                      Test Portal
-                    </button>
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
-                    This will create a magic link for the specified customer and open it in a new tab. The link expires in 15 minutes.
-                  </p>
                 </div>
 
                 {isAdmin && (
@@ -8622,16 +8527,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 <ShortCodeReference showPreview={true} />
               </div>
             </div>
-          )}
-
-          {activeTab === 'diagnostics' && (
-            <Suspense fallback={
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 text-orange-600 dark:text-orange-400 animate-spin" />
-              </div>
-            }>
-              <IntegrationsDiagnostic />
-            </Suspense>
           )}
 
         </div>
