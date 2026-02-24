@@ -16,6 +16,9 @@ import { PortalInvoices } from './components/portal/PortalInvoices';
 import { PortalQuotes } from './components/portal/PortalQuotes';
 import { PortalProofs } from './components/portal/PortalProofs';
 import { PortalOrderHistory } from './components/portal/PortalOrderHistory';
+import { PortalDashboard } from './components/portal/PortalDashboard';
+import { PortalPaymentMethods } from './components/portal/PortalPaymentMethods';
+import { CustomerPortalPage } from './components/portal/CustomerPortalPage';
 
 const SquareData = lazy(() => import('./components/SquareData'));
 const ProductionManagement = lazy(() => import('./components/ProductionManagement').then(m => ({ default: m.ProductionManagement })));
@@ -603,12 +606,18 @@ function App() {
 
   if (isPortalPage) {
     const path = window.location.pathname;
+    const customerMatch = path.match(/^\/portal\/customer\/([^/]+)/);
+
     return (
       <CustomerPortalProvider>
         <ThemeProvider>
           <NotificationProvider>
-            {path === '/portal' || path === '/portal/' || path === '/portal/login' ? (
+            {customerMatch ? (
+              <CustomerPortalPage customerId={customerMatch[1]} />
+            ) : path === '/portal' || path === '/portal/' || path === '/portal/login' ? (
               <PortalLogin />
+            ) : path.startsWith('/portal/dashboard') ? (
+              <PortalDashboard />
             ) : path.startsWith('/portal/invoices') ? (
               <PortalInvoices />
             ) : path.startsWith('/portal/quotes') ? (
@@ -617,6 +626,8 @@ function App() {
               <PortalProofs />
             ) : path.startsWith('/portal/orders') ? (
               <PortalOrderHistory />
+            ) : path.startsWith('/portal/payment-methods') ? (
+              <PortalPaymentMethods />
             ) : (
               <PortalLogin />
             )}

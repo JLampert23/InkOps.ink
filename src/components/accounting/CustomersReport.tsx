@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Search, ChevronRight, Mail, Phone, DollarSign, Loader2, FileText, CreditCard, FileSpreadsheet, Gift, Plus, Save, X, Edit2, Trash2, Upload, Image } from 'lucide-react';
+import { Users, Search, ChevronRight, Mail, Phone, DollarSign, Loader2, FileText, CreditCard, FileSpreadsheet, Gift, Plus, Save, X, Edit2, Trash2, Upload, Image, ExternalLink } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format } from 'date-fns';
 import { InvoiceDetail } from '../billing/InvoiceDetail';
@@ -79,6 +79,8 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
   const [showArtworkLibrary, setShowArtworkLibrary] = useState(false);
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [artworkCustomerId, setArtworkCustomerId] = useState<string | null>(null);
+  const [portalEnabled, setPortalEnabled] = useState(false);
+  const [customerPortalUrl, setCustomerPortalUrl] = useState<string | null>(null);
 
   useEffect(() => {
     loadCustomers();
@@ -140,11 +142,15 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
     try {
       const { data: settings } = await supabase
         .from('company_settings')
-        .select('company_name')
+        .select('company_name, customer_url')
         .single();
 
       if (settings?.company_name) {
         setCompanyName(settings.company_name);
+      }
+      if (settings?.customer_url) {
+        setCustomerPortalUrl(settings.customer_url);
+        setPortalEnabled(true);
       }
     } catch (error) {
       console.error('Error loading company settings:', error);
@@ -572,11 +578,30 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
           {selectedCustomer ? (
             <>
               <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
-                <div className="mb-2">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{selectedCustomer.company_name}</h3>
-                  {selectedCustomer.contact_name && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{selectedCustomer.contact_name}</p>
-                  )}
+                <div className="mb-2 flex items-start justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{selectedCustomer.company_name}</h3>
+                    {selectedCustomer.contact_name && (
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{selectedCustomer.contact_name}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => {
+                      const baseUrl = customerPortalUrl || window.location.origin;
+                      const portalUrl = `${baseUrl}/portal/customer/${selectedCustomer.id}`;
+                      window.open(portalUrl, '_blank');
+                    }}
+                    disabled={!portalEnabled}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                      portalEnabled
+                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 border border-blue-200 dark:border-blue-800'
+                        : 'bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                    }`}
+                    title={portalEnabled ? 'Open Customer Portal' : 'Customer Portal is not enabled for this company'}
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    Customer Portal
+                  </button>
                 </div>
 
                 <div className="mt-2 grid grid-cols-2 gap-4 text-sm">
