@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase-client';
-import { FileText, Receipt, Loader2, AlertCircle, ChevronRight, Clock, CheckCircle, XCircle, DollarSign, CreditCard } from 'lucide-react';
+import { FileText, Receipt, Loader2, AlertCircle, ChevronRight, Clock, CheckCircle, XCircle, DollarSign, CreditCard, Image } from 'lucide-react';
 import { format } from 'date-fns';
 import { PortalPaymentsTab } from './PortalPaymentsTab';
 import { PortalPaymentModal } from './PortalPaymentModal';
+import { PortalProofsTab } from './PortalProofsTab';
 
 interface CustomerPortalPageProps {
   customerId: string;
@@ -58,7 +59,7 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
   const [branding, setBranding] = useState<CompanyBranding | null>(null);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [activeTab, setActiveTab] = useState<'quotes' | 'invoices' | 'payments'>('quotes');
+  const [activeTab, setActiveTab] = useState<'quotes' | 'invoices' | 'payments' | 'proofs'>('quotes');
   const [stripeConfig, setStripeConfig] = useState<StripeConfig>({ enabled: false });
   const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState<Invoice | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
@@ -302,6 +303,17 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
               <CreditCard className="w-4 h-4" />
               Payments
             </button>
+            <button
+              onClick={() => setActiveTab('proofs')}
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+                activeTab === 'proofs'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+              }`}
+            >
+              <Image className="w-4 h-4" />
+              Proofs
+            </button>
           </div>
         </div>
       </nav>
@@ -447,6 +459,13 @@ export function CustomerPortalPage({ customerId }: CustomerPortalPageProps) {
 
         {activeTab === 'payments' && customer && (
           <PortalPaymentsTab
+            customerId={customer.id}
+            companyId={customer.company_id}
+          />
+        )}
+
+        {activeTab === 'proofs' && customer && (
+          <PortalProofsTab
             customerId={customer.id}
             companyId={customer.company_id}
           />
