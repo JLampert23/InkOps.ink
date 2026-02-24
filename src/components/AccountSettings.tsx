@@ -19,6 +19,7 @@ const ShipStationSettings = lazy(() => import('./settings/ShipStationSettings').
 const ChipplyIntegrationSettings = lazy(() => import('./chipply/ChipplyIntegrationSettings').then(m => ({ default: m.ChipplyIntegrationSettings })));
 const CustomInvoiceStatusManager = lazy(() => import('./settings/CustomInvoiceStatusManager').then(m => ({ default: m.CustomInvoiceStatusManager })));
 const BoxLabelSettings = lazy(() => import('./settings/BoxLabelSettings'));
+const IntegrationsDiagnostic = lazy(() => import('./diagnostics/IntegrationsDiagnostic').then(m => ({ default: m.IntegrationsDiagnostic })));
 
 interface CompanySettings {
   id: string;
@@ -150,7 +151,7 @@ type SettingsTab =
   | 'automated-reports' | 'automations'
   | 'manage-goods' | 'receiving-settings' | 'po-settings'
   | 'production-general' | 'scheduler-settings' | 'invoice-fees' | 'price-matrices'
-  | 'email-templates' | 'urls';
+  | 'email-templates' | 'urls' | 'diagnostics';
 
 interface AccountSettingsProps {
   initialTab?: SettingsTab;
@@ -4501,6 +4502,26 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               </div>
             )}
           </div>
+
+          {/* Diagnostics */}
+          <div className="pt-2">
+            <button
+              onClick={() => setActiveTab('diagnostics')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all relative group ${
+                activeTab === 'diagnostics'
+                  ? 'bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800'
+                  : 'hover:bg-gray-50 dark:hover:bg-slate-800'
+              }`}
+            >
+              <Bug className={`w-4 h-4 flex-shrink-0 ${activeTab === 'diagnostics' ? 'text-orange-600 dark:text-orange-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+              <div className="flex-1 text-left">
+                <div className={`font-medium text-sm ${activeTab === 'diagnostics' ? 'text-orange-700 dark:text-orange-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                  Diagnostics
+                </div>
+              </div>
+              {activeTab === 'diagnostics' && <div className="w-1 h-6 bg-orange-600 dark:bg-orange-500 rounded-full absolute right-0" />}
+            </button>
+          </div>
         </nav>
       </div>
 
@@ -8603,6 +8624,16 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 <ShortCodeReference showPreview={true} />
               </div>
             </div>
+          )}
+
+          {activeTab === 'diagnostics' && (
+            <Suspense fallback={
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 text-orange-600 dark:text-orange-400 animate-spin" />
+              </div>
+            }>
+              <IntegrationsDiagnostic />
+            </Suspense>
           )}
 
         </div>
