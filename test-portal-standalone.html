@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Portal Standalone Test</title>
+  <title>Portal Test</title>
   <style>
     body { font-family: system-ui, sans-serif; max-width: 900px; margin: 40px auto; padding: 20px; background: #f5f5f5; }
     .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
@@ -13,10 +13,8 @@
     .success { color: green; }
     .error { color: red; }
     .warning { color: orange; }
-    button { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; margin-right: 10px; }
+    button { background: #3b82f6; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; font-size: 16px; }
     button:hover { background: #2563eb; }
-    input { padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; width: 100%; margin-bottom: 10px; }
-    label { display: block; margin-bottom: 4px; font-weight: 500; }
     .result { margin-top: 15px; }
     table { width: 100%; border-collapse: collapse; margin-top: 10px; }
     th, td { padding: 8px; text-align: left; border-bottom: 1px solid #eee; }
@@ -24,385 +22,113 @@
   </style>
 </head>
 <body>
-  <h1>Customer Portal Standalone Test</h1>
-  <p>This test simulates a customer accessing the portal from outside the main app (no authentication).</p>
+  <h1>Customer Portal Test</h1>
+  <p>Testing portal access with customer ID: <strong>d05b000a-843c-47c0-b69d-796ba95df2d0</strong></p>
 
   <div class="card">
-    <h2>Configuration</h2>
-    <div>
-      <label>Supabase URL:</label>
-      <input type="text" id="supabaseUrl" placeholder="https://xxx.supabase.co">
-    </div>
-    <div>
-      <label>Supabase Anon Key:</label>
-      <input type="text" id="supabaseAnonKey" placeholder="eyJ...">
-    </div>
-    <div>
-      <label>Customer ID:</label>
-      <input type="text" id="customerId" value="d05b000a-843c-47c0-b69d-796ba95df2d0">
-    </div>
     <button onclick="runAllTests()">Run All Tests</button>
-    <button onclick="clearResults()">Clear Results</button>
   </div>
 
   <div class="card">
-    <h2>Test 1: Verify Anonymous Access (No Auth Header Check)</h2>
+    <h2>Test 1: Fetch Customer</h2>
     <div id="test1-result" class="result"></div>
   </div>
 
   <div class="card">
-    <h2>Test 2: Fetch Customer Data</h2>
+    <h2>Test 2: Fetch Company Settings</h2>
     <div id="test2-result" class="result"></div>
   </div>
 
   <div class="card">
-    <h2>Test 3: Fetch Company Settings</h2>
+    <h2>Test 3: Fetch Quotes</h2>
     <div id="test3-result" class="result"></div>
   </div>
 
   <div class="card">
-    <h2>Test 4: Fetch Quotes for Customer</h2>
+    <h2>Test 4: Fetch Invoices</h2>
     <div id="test4-result" class="result"></div>
   </div>
 
-  <div class="card">
-    <h2>Test 5: Fetch Invoices for Customer</h2>
-    <div id="test5-result" class="result"></div>
-  </div>
-
-  <div class="card">
-    <h2>Test 6: Check RLS Policies</h2>
-    <div id="test6-result" class="result"></div>
-  </div>
-
   <script>
-    // Try to load from localStorage
-    document.getElementById('supabaseUrl').value = localStorage.getItem('supabaseUrl') || '';
-    document.getElementById('supabaseAnonKey').value = localStorage.getItem('supabaseAnonKey') || '';
+    const SUPABASE_URL = 'https://cuaukcvccxvfpuxaciac.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1YXVrY3ZjY3h2ZnB1eGFjaWFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1NjA4NTQsImV4cCI6MjA4MjEzNjg1NH0.I-FDsR0oezVPxKcWgFmV-MMolV6E-lYcoA7Ew8ZgKYU';
+    const CUSTOMER_ID = 'd05b000a-843c-47c0-b69d-796ba95df2d0';
 
-    function getConfig() {
-      const url = document.getElementById('supabaseUrl').value.trim();
-      const key = document.getElementById('supabaseAnonKey').value.trim();
-      const customerId = document.getElementById('customerId').value.trim();
-
-      // Save to localStorage
-      localStorage.setItem('supabaseUrl', url);
-      localStorage.setItem('supabaseAnonKey', key);
-
-      return { url, key, customerId };
+    function setResult(testId, html) {
+      document.getElementById(`${testId}-result`).innerHTML = html;
     }
 
-    function setResult(testId, html, status = 'info') {
-      const el = document.getElementById(`${testId}-result`);
-      el.innerHTML = html;
-      if (status === 'success') el.classList.add('success');
-      else if (status === 'error') el.classList.add('error');
-    }
-
-    function clearResults() {
-      for (let i = 1; i <= 6; i++) {
-        document.getElementById(`test${i}-result`).innerHTML = '';
-        document.getElementById(`test${i}-result`).className = 'result';
-      }
-    }
-
-    async function makeAnonRequest(endpoint, config) {
-      const response = await fetch(`${config.url}/rest/v1/${endpoint}`, {
+    async function makeRequest(endpoint) {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
         headers: {
-          'apikey': config.key,
-          'Content-Type': 'application/json',
-          // Explicitly NOT sending Authorization header to simulate anonymous access
+          'apikey': SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json'
         }
       });
-
-      const data = await response.json();
-      return { status: response.status, data };
+      return { status: response.status, data: await response.json() };
     }
 
     async function test1() {
-      const config = getConfig();
-      setResult('test1', 'Testing anonymous access...');
-
+      setResult('test1', 'Loading...');
       try {
-        // Simple health check - just verify we can reach Supabase without auth
-        const response = await fetch(`${config.url}/rest/v1/`, {
-          headers: {
-            'apikey': config.key,
-          }
-        });
-
-        if (response.ok || response.status === 200) {
-          setResult('test1', `<span class="success">✓ Anonymous access working. Status: ${response.status}</span>`, 'success');
-          return true;
+        const result = await makeRequest(`customers?id=eq.${CUSTOMER_ID}&select=id,company_name,contact_name,email,company_id`);
+        if (result.data.length > 0) {
+          const c = result.data[0];
+          setResult('test1', `<span class="success">SUCCESS</span><pre>${JSON.stringify(c, null, 2)}</pre>`);
+          return c;
         } else {
-          setResult('test1', `<span class="warning">⚠ Response status: ${response.status}</span>`);
-          return true; // Still continue
+          setResult('test1', `<span class="error">FAILED - No customer found</span><pre>${JSON.stringify(result, null, 2)}</pre>`);
+          return null;
         }
       } catch (err) {
-        setResult('test1', `<span class="error">✗ Error: ${err.message}</span>`, 'error');
-        return false;
+        setResult('test1', `<span class="error">ERROR: ${err.message}</span>`);
+        return null;
       }
     }
 
-    async function test2() {
-      const config = getConfig();
-      setResult('test2', 'Fetching customer data...');
-
+    async function test2(companyId) {
+      if (!companyId) { setResult('test2', '<span class="warning">Skipped - no company_id</span>'); return; }
+      setResult('test2', 'Loading...');
       try {
-        const result = await makeAnonRequest(
-          `customers?id=eq.${config.customerId}&select=id,company_name,contact_name,email,company_id`,
-          config
-        );
-
-        if (result.status === 200 && result.data.length > 0) {
-          const customer = result.data[0];
-          setResult('test2', `
-            <span class="success">✓ Customer found!</span>
-            <table>
-              <tr><th>Field</th><th>Value</th></tr>
-              <tr><td>ID</td><td>${customer.id}</td></tr>
-              <tr><td>Company Name</td><td>${customer.company_name}</td></tr>
-              <tr><td>Contact</td><td>${customer.contact_name || 'N/A'}</td></tr>
-              <tr><td>Email</td><td>${customer.email}</td></tr>
-              <tr><td>Company ID</td><td>${customer.company_id}</td></tr>
-            </table>
-          `, 'success');
-          return customer;
-        } else if (result.data.length === 0) {
-          setResult('test2', `
-            <span class="error">✗ No customer found with ID: ${config.customerId}</span>
-            <p>This could mean:</p>
-            <ul>
-              <li>RLS policy is blocking anonymous access</li>
-              <li>Customer ID doesn't exist</li>
-              <li>Wrong company_id association</li>
-            </ul>
-            <pre>Response: ${JSON.stringify(result, null, 2)}</pre>
-          `, 'error');
-          return null;
+        const result = await makeRequest(`company_settings?id=eq.${companyId}&select=id,company_name,logo_url,stripe_public_key`);
+        if (result.data.length > 0) {
+          setResult('test2', `<span class="success">SUCCESS</span><pre>${JSON.stringify(result.data[0], null, 2)}</pre>`);
         } else {
-          setResult('test2', `<span class="error">✗ Error status: ${result.status}</span><pre>${JSON.stringify(result.data, null, 2)}</pre>`, 'error');
-          return null;
+          setResult('test2', `<span class="error">FAILED - No company found</span><pre>${JSON.stringify(result, null, 2)}</pre>`);
         }
       } catch (err) {
-        setResult('test2', `<span class="error">✗ Error: ${err.message}</span>`, 'error');
-        return null;
+        setResult('test2', `<span class="error">ERROR: ${err.message}</span>`);
       }
     }
 
     async function test3(companyId) {
-      const config = getConfig();
-      if (!companyId) {
-        setResult('test3', '<span class="warning">⚠ Skipped - no company_id from test 2</span>');
-        return null;
-      }
-
-      setResult('test3', 'Fetching company settings...');
-
+      if (!companyId) { setResult('test3', '<span class="warning">Skipped - no company_id</span>'); return; }
+      setResult('test3', 'Loading...');
       try {
-        const result = await makeAnonRequest(
-          `company_settings?id=eq.${companyId}&select=id,company_name,logo_url,company_address,company_phone,company_email,stripe_public_key`,
-          config
-        );
-
-        if (result.status === 200 && result.data.length > 0) {
-          const company = result.data[0];
-          setResult('test3', `
-            <span class="success">✓ Company settings found!</span>
-            <table>
-              <tr><th>Field</th><th>Value</th></tr>
-              <tr><td>ID</td><td>${company.id}</td></tr>
-              <tr><td>Company Name</td><td>${company.company_name}</td></tr>
-              <tr><td>Logo URL</td><td>${company.logo_url ? 'Set' : 'Not set'}</td></tr>
-              <tr><td>Address</td><td>${company.company_address || 'N/A'}</td></tr>
-              <tr><td>Phone</td><td>${company.company_phone || 'N/A'}</td></tr>
-              <tr><td>Email</td><td>${company.company_email || 'N/A'}</td></tr>
-              <tr><td>Stripe</td><td>${company.stripe_public_key ? 'Configured' : 'Not configured'}</td></tr>
-            </table>
-          `, 'success');
-          return company;
-        } else {
-          setResult('test3', `
-            <span class="error">✗ No company settings found for ID: ${companyId}</span>
-            <p>RLS policy may be blocking anonymous access to company_settings</p>
-            <pre>Response: ${JSON.stringify(result, null, 2)}</pre>
-          `, 'error');
-          return null;
-        }
+        const result = await makeRequest(`quotes?customer_id=eq.${CUSTOMER_ID}&company_id=eq.${companyId}&select=id,quote_number,status,subtotal&limit=5`);
+        setResult('test3', `<span class="success">Found ${result.data.length} quotes</span><pre>${JSON.stringify(result.data, null, 2)}</pre>`);
       } catch (err) {
-        setResult('test3', `<span class="error">✗ Error: ${err.message}</span>`, 'error');
-        return null;
+        setResult('test3', `<span class="error">ERROR: ${err.message}</span>`);
       }
     }
 
     async function test4(companyId) {
-      const config = getConfig();
-      if (!companyId) {
-        setResult('test4', '<span class="warning">⚠ Skipped - no company_id</span>');
-        return;
-      }
-
-      setResult('test4', 'Fetching quotes...');
-
+      if (!companyId) { setResult('test4', '<span class="warning">Skipped - no company_id</span>'); return; }
+      setResult('test4', 'Loading...');
       try {
-        const result = await makeAnonRequest(
-          `quotes?customer_id=eq.${config.customerId}&company_id=eq.${companyId}&select=id,quote_number,created_at,status,subtotal,nickname&order=created_at.desc&limit=10`,
-          config
-        );
-
-        if (result.status === 200) {
-          if (result.data.length > 0) {
-            let tableRows = result.data.map(q => `
-              <tr>
-                <td>${q.quote_number || 'N/A'}</td>
-                <td>${q.nickname || 'N/A'}</td>
-                <td>${q.status}</td>
-                <td>$${(q.subtotal || 0).toFixed(2)}</td>
-                <td>${new Date(q.created_at).toLocaleDateString()}</td>
-              </tr>
-            `).join('');
-
-            setResult('test4', `
-              <span class="success">✓ Found ${result.data.length} quotes</span>
-              <table>
-                <tr><th>Number</th><th>Name</th><th>Status</th><th>Subtotal</th><th>Date</th></tr>
-                ${tableRows}
-              </table>
-            `, 'success');
-          } else {
-            setResult('test4', `<span class="warning">⚠ No quotes found for this customer (this might be expected)</span>`);
-          }
-        } else {
-          setResult('test4', `<span class="error">✗ Error: ${result.status}</span><pre>${JSON.stringify(result.data, null, 2)}</pre>`, 'error');
-        }
+        const result = await makeRequest(`printavo_invoices?customer_id=eq.${CUSTOMER_ID}&company_id=eq.${companyId}&select=id,invoice_number,status,total,balance_remaining&limit=5`);
+        setResult('test4', `<span class="success">Found ${result.data.length} invoices</span><pre>${JSON.stringify(result.data, null, 2)}</pre>`);
       } catch (err) {
-        setResult('test4', `<span class="error">✗ Error: ${err.message}</span>`, 'error');
+        setResult('test4', `<span class="error">ERROR: ${err.message}</span>`);
       }
-    }
-
-    async function test5(companyId) {
-      const config = getConfig();
-      if (!companyId) {
-        setResult('test5', '<span class="warning">⚠ Skipped - no company_id</span>');
-        return;
-      }
-
-      setResult('test5', 'Fetching invoices...');
-
-      try {
-        const result = await makeAnonRequest(
-          `printavo_invoices?customer_id=eq.${config.customerId}&company_id=eq.${companyId}&select=id,invoice_number,visual_id,invoice_date,status,total,balance_remaining&order=invoice_date.desc&limit=10`,
-          config
-        );
-
-        if (result.status === 200) {
-          if (result.data.length > 0) {
-            let tableRows = result.data.map(inv => `
-              <tr>
-                <td>${inv.visual_id || inv.invoice_number || 'N/A'}</td>
-                <td>${inv.status}</td>
-                <td>$${(inv.total || 0).toFixed(2)}</td>
-                <td>$${(inv.balance_remaining || 0).toFixed(2)}</td>
-                <td>${inv.invoice_date ? new Date(inv.invoice_date).toLocaleDateString() : 'N/A'}</td>
-              </tr>
-            `).join('');
-
-            setResult('test5', `
-              <span class="success">✓ Found ${result.data.length} invoices</span>
-              <table>
-                <tr><th>Number</th><th>Status</th><th>Total</th><th>Balance</th><th>Date</th></tr>
-                ${tableRows}
-              </table>
-            `, 'success');
-          } else {
-            setResult('test5', `<span class="warning">⚠ No invoices found for this customer (this might be expected)</span>`);
-          }
-        } else {
-          setResult('test5', `<span class="error">✗ Error: ${result.status}</span><pre>${JSON.stringify(result.data, null, 2)}</pre>`, 'error');
-        }
-      } catch (err) {
-        setResult('test5', `<span class="error">✗ Error: ${err.message}</span>`, 'error');
-      }
-    }
-
-    async function test6() {
-      const config = getConfig();
-      setResult('test6', 'Checking RLS policy configuration...');
-
-      // This test just summarizes findings
-      let html = '<h3>RLS Policy Check Summary:</h3><ul>';
-
-      // Check if we can see any customers at all
-      try {
-        const result = await makeAnonRequest('customers?select=id&limit=1', config);
-        if (result.data.length > 0) {
-          html += '<li class="success">✓ Anonymous can read from customers table</li>';
-        } else {
-          html += '<li class="error">✗ Anonymous cannot read from customers table - check RLS policy</li>';
-        }
-      } catch (e) {
-        html += `<li class="error">✗ Error checking customers: ${e.message}</li>`;
-      }
-
-      // Check company_settings
-      try {
-        const result = await makeAnonRequest('company_settings?select=id&limit=1', config);
-        if (result.data.length > 0) {
-          html += '<li class="success">✓ Anonymous can read from company_settings table</li>';
-        } else {
-          html += '<li class="error">✗ Anonymous cannot read from company_settings table - check RLS policy</li>';
-        }
-      } catch (e) {
-        html += `<li class="error">✗ Error checking company_settings: ${e.message}</li>`;
-      }
-
-      // Check quotes
-      try {
-        const result = await makeAnonRequest('quotes?select=id&limit=1', config);
-        if (result.data.length > 0) {
-          html += '<li class="success">✓ Anonymous can read from quotes table</li>';
-        } else {
-          html += '<li class="warning">⚠ Anonymous returned 0 quotes - may need RLS policy for anon role</li>';
-        }
-      } catch (e) {
-        html += `<li class="error">✗ Error checking quotes: ${e.message}</li>`;
-      }
-
-      // Check invoices
-      try {
-        const result = await makeAnonRequest('printavo_invoices?select=id&limit=1', config);
-        if (result.data.length > 0) {
-          html += '<li class="success">✓ Anonymous can read from printavo_invoices table</li>';
-        } else {
-          html += '<li class="warning">⚠ Anonymous returned 0 invoices - may need RLS policy for anon role</li>';
-        }
-      } catch (e) {
-        html += `<li class="error">✗ Error checking printavo_invoices: ${e.message}</li>`;
-      }
-
-      html += '</ul>';
-      html += '<p><strong>Note:</strong> If tests are failing, you may need to add RLS policies that allow the "anon" role to SELECT from these tables.</p>';
-
-      setResult('test6', html);
     }
 
     async function runAllTests() {
-      const config = getConfig();
-
-      if (!config.url || !config.key) {
-        alert('Please enter Supabase URL and Anon Key');
-        return;
-      }
-
-      clearResults();
-
-      await test1();
-      const customer = await test2();
+      const customer = await test1();
       const companyId = customer?.company_id;
+      await test2(companyId);
       await test3(companyId);
       await test4(companyId);
-      await test5(companyId);
-      await test6();
     }
   </script>
 </body>
