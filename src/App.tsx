@@ -7,6 +7,7 @@ import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { EnhancedAuthScreen } from './components/EnhancedAuthScreen';
 import { LandingPage } from './components/LandingPage';
 import { supabase } from './lib/supabase-client';
+import { supabaseAnon } from './lib/supabase-anon-client';
 import { billingService } from './services/billing-service';
 import { useRBAC } from './hooks/useRBAC';
 import PublicQuoteApprovalPage from './components/production/PublicQuoteApprovalPage';
@@ -19,6 +20,130 @@ import { PortalOrderHistory } from './components/portal/PortalOrderHistory';
 import { PortalDashboard } from './components/portal/PortalDashboard';
 import { PortalPaymentMethods } from './components/portal/PortalPaymentMethods';
 import { CustomerPortalPage } from './components/portal/CustomerPortalPage';
+
+function getSubdomainFromHost(): string | null {
+  const hostname = window.location.hostname;
+  const parts = hostname.split('.');
+  if (parts.length >= 3 && parts[parts.length - 2] === 'inkops' && parts[parts.length - 1] === 'ink') {
+    return parts.slice(0, -2).join('.');
+  }
+  if (parts.length >= 2 && parts[parts.length - 1] === 'localhost') {
+    return parts.length > 1 ? parts[0] : null;
+  }
+  return null;
+}
+
+function DomainAwareCustomerPortal({ customerId }: { customerId: string }) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [validatedCustomerId, setValidatedCustomerId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const validateAccess = async () => {
+      const subdomain = getSubdomainFromHost();
+
+      if (!subdomain) {
+        setValidatedCustomerId(customerId);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const { data: companyData, error: companyError } = await supabaseAnon
+          .from('company_settings')
+          .select('id, customer_url')
+          .or(`customer_url.ilike.%${subdomain}%,customer_domain.eq.${subdomain}`)
+          .maybeSingle();
+
+        if (companyError) {
+          console.error('Error looking up company by domain:', companyError);
+          setError('Failed to verify domain');
+          setLoading(false);
+          return;
+        }
+
+        if (!companyData) {
+          setError('Invalid domain');
+          setLoading(false);
+          return;
+        }
+
+        const { data: customerData, error: customerError } = await supabaseAnon
+          .from('customers')
+          .select('id, company_id')
+          .eq('id', customerId)
+          .maybeSingle();
+
+        if (customerError) {
+          console.error('Error looking up customer:', customerError);
+          setError('Failed to verify customer');
+          setLoading(false);
+          return;
+        }
+
+        if (!customerData) {
+          setError('Customer not found');
+          setLoading(false);
+          return;
+        }
+
+        if (customerData.company_id !== companyData.id) {
+          setError('Access denied - customer does not belong to this company');
+          setLoading(false);
+          return;
+        }
+
+        setValidatedCustomerId(customerId);
+        setLoading(false);
+      } catch (err) {
+        console.error('Error validating domain access:', err);
+        setError('Failed to validate access');
+        setLoading(false);
+      }
+    };
+
+    validateAccess();
+  }, [customerId]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Verifying access...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-8 h-8 text-red-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            {error === 'Customer not found' ? 'Customer Not Found' : 'Access Denied'}
+          </h1>
+          <p className="text-gray-600">
+            {error === 'Customer not found'
+              ? 'The customer you are looking for does not exist or has been removed.'
+              : error === 'Invalid domain'
+              ? 'This domain is not configured for customer portal access.'
+              : 'You do not have permission to access this customer portal.'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (validatedCustomerId) {
+    return <CustomerPortalPage customerId={validatedCustomerId} />;
+  }
+
+  return null;
+}
 
 const SquareData = lazy(() => import('./components/SquareData'));
 const ProductionManagement = lazy(() => import('./components/ProductionManagement').then(m => ({ default: m.ProductionManagement })));
@@ -597,15 +722,31 @@ function AppContent() {
 }
 
 function App() {
-  const isQuoteApprovalPage = window.location.pathname.startsWith('/quote-approval/');
-  const isPortalPage = window.location.pathname.startsWith('/portal');
+  const path = window.location.pathname;
+
+  const isQuoteApprovalPage = path.startsWith('/quote-approval/');
+  const isPortalPage = path.startsWith('/portal');
+  const isDirectCustomerPage = path.match(/^\/customer\/([^/]+)/);
 
   if (isQuoteApprovalPage) {
     return <PublicQuoteApprovalPage />;
   }
 
+  if (isDirectCustomerPage) {
+    const customerId = isDirectCustomerPage[1];
+    console.log('[CustomerPortal] Loading customer portal for:', customerId);
+    return (
+      <CustomerPortalProvider>
+        <ThemeProvider>
+          <NotificationProvider>
+            <DomainAwareCustomerPortal customerId={customerId} />
+          </NotificationProvider>
+        </ThemeProvider>
+      </CustomerPortalProvider>
+    );
+  }
+
   if (isPortalPage) {
-    const path = window.location.pathname;
     const customerMatch = path.match(/^\/portal\/customer\/([^/]+)/);
 
     return (
@@ -613,7 +754,7 @@ function App() {
         <ThemeProvider>
           <NotificationProvider>
             {customerMatch ? (
-              <CustomerPortalPage customerId={customerMatch[1]} />
+              <DomainAwareCustomerPortal customerId={customerMatch[1]} />
             ) : path === '/portal' || path === '/portal/' || path === '/portal/login' ? (
               <PortalLogin />
             ) : path.startsWith('/portal/dashboard') ? (
