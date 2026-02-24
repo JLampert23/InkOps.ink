@@ -81,6 +81,7 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [artworkCustomerId, setArtworkCustomerId] = useState<string | null>(null);
   const [portalEnabled, setPortalEnabled] = useState(false);
+  const [inkopsSubdomain, setInkopsSubdomain] = useState<string | null>(null);
 
   useEffect(() => {
     loadCustomers();
@@ -142,13 +143,14 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
     try {
       const { data: settings } = await supabase
         .from('company_settings')
-        .select('company_name, customer_url')
+        .select('company_name, inkops_subdomain')
         .single();
 
       if (settings?.company_name) {
         setCompanyName(settings.company_name);
       }
-      if (settings?.customer_url) {
+      if (settings?.inkops_subdomain) {
+        setInkopsSubdomain(settings.inkops_subdomain);
         setPortalEnabled(true);
       }
     } catch (error) {
@@ -586,7 +588,7 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
                   </div>
                   <button
                     onClick={() => {
-                      const portalUrl = getCustomerPortalUrl(selectedCustomer.id);
+                      const portalUrl = getCustomerPortalUrl(selectedCustomer.id, inkopsSubdomain);
                       window.open(portalUrl, '_blank');
                     }}
                     disabled={!portalEnabled}

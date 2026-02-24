@@ -44,10 +44,22 @@ export function SendQuoteModal({
   const [previewHtml, setPreviewHtml] = useState('');
   const [previewSubject, setPreviewSubject] = useState('');
   const [expiresInDays, setExpiresInDays] = useState(30);
+  const [inkopsSubdomain, setInkopsSubdomain] = useState<string | null>(null);
 
   useEffect(() => {
     loadTemplates();
+    loadCompanySettings();
   }, []);
+
+  const loadCompanySettings = async () => {
+    const { data } = await supabase
+      .from('company_settings')
+      .select('inkops_subdomain')
+      .maybeSingle();
+    if (data?.inkops_subdomain) {
+      setInkopsSubdomain(data.inkops_subdomain);
+    }
+  };
 
   useEffect(() => {
     if (selectedTemplateId) {
@@ -102,7 +114,7 @@ export function SendQuoteModal({
 
       if (!quote) return;
 
-      const approvalUrl = getQuoteApprovalUrl('PREVIEW_TOKEN');
+      const approvalUrl = getQuoteApprovalUrl('PREVIEW_TOKEN', inkopsSubdomain);
       const expiryDate = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
 
       const shortcodeData = {
