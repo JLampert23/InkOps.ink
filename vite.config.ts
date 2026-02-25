@@ -36,6 +36,7 @@ export default defineConfig({
     },
     hmr: {
       overlay: true,
+      protocol: 'ws',
     },
   },
   build: {
