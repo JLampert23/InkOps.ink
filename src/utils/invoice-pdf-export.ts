@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { InvoiceDetail, InvoiceFee } from '../services/invoice-detail-service';
+import { renderHtmlToPdf, htmlToPlainText } from './html-to-pdf';
 
 export interface InvoicePDFOptions {
   companyName?: string;
@@ -546,7 +547,9 @@ export async function generateInvoicePDF(
     finalY += notesLines.length * 3.5 + 4;
   }
 
-  if (options.invoiceTerms) {
+  const hasInvoiceTerms = options.invoiceTerms && options.invoiceTerms.trim() && options.invoiceTerms !== '<p><br></p>';
+
+  if (hasInvoiceTerms) {
     finalY += 8;
 
     doc.setFontSize(9);
@@ -555,11 +558,29 @@ export async function generateInvoicePDF(
     doc.text('TERMS & CONDITIONS', marginLeft, finalY);
     finalY += 4;
 
-    doc.setFontSize(8);
-    doc.setTextColor(55, 65, 81);
-    doc.setFont('helvetica', 'normal');
-    const termsLines = doc.splitTextToSize(options.invoiceTerms, contentWidth);
-    doc.text(termsLines, marginLeft, finalY);
+    const isHtml = options.invoiceTerms!.includes('<') && options.invoiceTerms!.includes('>');
+
+    if (isHtml) {
+      const result = renderHtmlToPdf(doc, options.invoiceTerms!, {
+        fontSize: 8,
+        lineHeight: 3.5,
+        maxWidth: contentWidth,
+        startY: finalY,
+        marginLeft,
+        pageHeight,
+        marginBottom: 20,
+        textColor: [55, 65, 81],
+        boldColor: [31, 41, 55]
+      });
+      finalY = result.finalY;
+    } else {
+      doc.setFontSize(8);
+      doc.setTextColor(55, 65, 81);
+      doc.setFont('helvetica', 'normal');
+      const termsLines = doc.splitTextToSize(options.invoiceTerms!, contentWidth);
+      doc.text(termsLines, marginLeft, finalY);
+      finalY += termsLines.length * 3.5;
+    }
   }
 
   doc.setFontSize(8);

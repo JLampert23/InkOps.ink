@@ -19,6 +19,7 @@ const ShipStationSettings = lazy(() => import('./settings/ShipStationSettings').
 const ChipplyIntegrationSettings = lazy(() => import('./chipply/ChipplyIntegrationSettings').then(m => ({ default: m.ChipplyIntegrationSettings })));
 const CustomInvoiceStatusManager = lazy(() => import('./settings/CustomInvoiceStatusManager').then(m => ({ default: m.CustomInvoiceStatusManager })));
 const BoxLabelSettings = lazy(() => import('./settings/BoxLabelSettings'));
+const RichTextTermsEditor = lazy(() => import('./settings/RichTextTermsEditor'));
 interface CompanySettings {
   id: string;
   company_name: string;
@@ -364,6 +365,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   const [invoiceTerms, setInvoiceTerms] = useState('');
   const [savingInvoiceTerms, setSavingInvoiceTerms] = useState(false);
+  const [quoteTerms, setQuoteTerms] = useState('');
+  const [savingQuoteTerms, setSavingQuoteTerms] = useState(false);
 
   const [colorStitchOptions, setColorStitchOptions] = useState<ColorStitchOption[]>([]);
   const [loadingColorStitch, setLoadingColorStitch] = useState(false);
@@ -533,6 +536,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setNumberStartNumber(data.number_start_number || 1);
         setCustomLineItemOptions(data.custom_line_item_options || []);
         setInvoiceTerms(data.invoice_terms || '');
+        setQuoteTerms(data.quote_terms || '');
       }
     } catch (err) {
       console.error('Error loading settings:', err);
@@ -712,13 +716,41 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
       if (error) throw error;
 
-      showNotification('success', 'Settings Saved', 'Payment terms have been updated successfully!');
+      showNotification('success', 'Settings Saved', 'Invoice terms have been updated successfully!');
       await loadSettings();
     } catch (err) {
-      console.error('Error saving payment terms:', err);
-      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save payment terms');
+      console.error('Error saving invoice terms:', err);
+      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save invoice terms');
     } finally {
       setSavingInvoiceTerms(false);
+    }
+  };
+
+  const saveQuoteTerms = async () => {
+    if (!companySettings) {
+      showNotification('error', 'Error', 'Company settings not loaded');
+      return;
+    }
+
+    try {
+      setSavingQuoteTerms(true);
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update({
+          quote_terms: quoteTerms,
+        })
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
+
+      showNotification('success', 'Settings Saved', 'Quote terms have been updated successfully!');
+      await loadSettings();
+    } catch (err) {
+      console.error('Error saving quote terms:', err);
+      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save quote terms');
+    } finally {
+      setSavingQuoteTerms(false);
     }
   };
 
@@ -8457,8 +8489,44 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 </div>
               </div>
 
-              {/* Payment Terms */}
-              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-4">
+              {/* Quote & Invoice Terms */}
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Quote & Invoice Terms</h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Set default terms that will appear on quotes and invoices. Supports rich text formatting.</p>
+                </div>
+
+                <div className="space-y-6 border-t border-gray-200 dark:border-slate-700 pt-4">
+                  <Suspense fallback={<div className="flex items-center justify-center py-8"><Loader2 className="w-6 h-6 text-blue-600 animate-spin" /></div>}>
+                    <RichTextTermsEditor
+                      label="Quote Terms"
+                      description="These terms will appear at the bottom of all quote PDFs"
+                      value={quoteTerms}
+                      onChange={setQuoteTerms}
+                      onSave={saveQuoteTerms}
+                      placeholder="Enter your default quote terms, e.g., 'This quote is valid for 30 days. Prices subject to change...'"
+                      saving={savingQuoteTerms}
+                    />
+                  </Suspense>
+
+                  <div className="border-t border-gray-200 dark:border-slate-700 pt-6">
+                    <Suspense fallback={<div className="flex items-center justify-center py-8"><Loader2 className="w-6 h-6 text-blue-600 animate-spin" /></div>}>
+                      <RichTextTermsEditor
+                        label="Invoice Terms"
+                        description="These terms will appear at the bottom of all invoice PDFs"
+                        value={invoiceTerms}
+                        onChange={setInvoiceTerms}
+                        onSave={saveInvoiceTerms}
+                        placeholder="Enter your default payment terms, e.g., 'Payment due within 30 days of invoice date...'"
+                        saving={savingInvoiceTerms}
+                      />
+                    </Suspense>
+                  </div>
+                </div>
+              </div>
+
+              {/* REMOVED: Old Payment Terms section replaced by rich text editors above */}
+              {false && <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-4">
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Payment Terms</h2>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Set default payment terms that will appear on quotes and invoices</p>
@@ -8507,7 +8575,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     )}
                   </button>
                 </div>
-              </div>
+              </div>}
 
               {/* Custom Invoice Status */}
               <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">

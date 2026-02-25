@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { renderHtmlToPdf, htmlToPlainText } from './html-to-pdf';
 
 export interface QuotePDFData {
   quote_number: string;
@@ -104,6 +105,7 @@ export interface QuotePDFData {
     mockups?: any[];
     group_label?: string;
   }>;
+  quote_terms?: string | null;
 }
 
 function formatDate(dateString: string | null): string {
@@ -911,6 +913,8 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
   doc.setFont('helvetica', 'normal');
   doc.text(`Created: ${formatDate(quote.created_date || quote.created_at)}`, marginLeft, yPosition);
 
+  const hasQuoteTerms = quote.quote_terms && quote.quote_terms.trim() && quote.quote_terms !== '<p><br></p>';
+
   if (yPosition + 45 < pageHeight - marginBottom) {
     yPosition += 8;
 
@@ -925,26 +929,41 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
     doc.text('TERMS & CONDITIONS', marginLeft, yPosition);
     yPosition += 4;
 
-    doc.setFontSize(6.5);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100, 116, 139);
+    if (hasQuoteTerms) {
+      const result = renderHtmlToPdf(doc, quote.quote_terms!, {
+        fontSize: 6.5,
+        lineHeight: 2.8,
+        maxWidth: contentWidth,
+        startY: yPosition,
+        marginLeft,
+        pageHeight,
+        marginBottom,
+        textColor: [100, 116, 139],
+        boldColor: [55, 65, 81]
+      });
+      yPosition = result.finalY;
+    } else {
+      doc.setFontSize(6.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 116, 139);
 
-    const policies = [
-      'Payment Terms: Payment is due upon receipt unless otherwise agreed in writing.',
-      'Artwork Proofs: Customer approval of artwork proofs is required before production begins.',
-      'Ink/Thread Colors: Colors may vary slightly from screen displays and proofs.',
-      'Custom Colors: Custom PMS color matching may incur additional charges.',
-      'Customer-Supplied Goods: We are not responsible for defects in customer-supplied items.',
-      'Pricing Disclaimer: Prices are subject to change based on final artwork and quantity.',
-      `Quote Validity: This quote is valid until ${formatDate(quote.valid_until)}.`,
-    ];
+      const policies = [
+        'Payment Terms: Payment is due upon receipt unless otherwise agreed in writing.',
+        'Artwork Proofs: Customer approval of artwork proofs is required before production begins.',
+        'Ink/Thread Colors: Colors may vary slightly from screen displays and proofs.',
+        'Custom Colors: Custom PMS color matching may incur additional charges.',
+        'Customer-Supplied Goods: We are not responsible for defects in customer-supplied items.',
+        'Pricing Disclaimer: Prices are subject to change based on final artwork and quantity.',
+        `Quote Validity: This quote is valid until ${formatDate(quote.valid_until)}.`,
+      ];
 
-    policies.forEach(policy => {
-      if (yPosition + 4 > pageHeight - marginBottom) return;
-      const lines = doc.splitTextToSize(policy, contentWidth);
-      doc.text(lines, marginLeft, yPosition);
-      yPosition += lines.length * 2.8 + 0.8;
-    });
+      policies.forEach(policy => {
+        if (yPosition + 4 > pageHeight - marginBottom) return;
+        const lines = doc.splitTextToSize(policy, contentWidth);
+        doc.text(lines, marginLeft, yPosition);
+        yPosition += lines.length * 2.8 + 0.8;
+      });
+    }
   }
 
   const fileName = `Quote_${quote.quote_number.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;

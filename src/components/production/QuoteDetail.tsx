@@ -268,7 +268,8 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             company_email,
             company_website,
             company_logo_primary_url,
-            company_logo_secondary_url
+            company_logo_secondary_url,
+            quote_terms
           `)
           .eq('id', companyIdToUse)
           .maybeSingle();
@@ -304,6 +305,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
       company_website: quote.company_website || companySettings?.company_website || null,
       company_logo_url: quote.company_logo_url || companySettings?.company_logo_primary_url || companySettings?.company_logo_secondary_url || null,
       company_logo_secondary_url: companySettings?.company_logo_secondary_url || null,
+      quote_terms: (companySettings as any)?.quote_terms || null,
       line_items: lineItems,
       imprints: quoteImprints.map(imprint => ({
         id: imprint.id,
