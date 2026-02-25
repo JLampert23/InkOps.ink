@@ -186,8 +186,8 @@ export async function generateWorkOrderPDF(data: WorkOrderPDFData): Promise<void
     console.log('Logo data loaded:', logoData ? 'success' : 'failed');
   }
 
-  const maxLogoHeight = 20;
-  const maxLogoWidth = 45;
+  const maxLogoHeight = 28;
+  const maxLogoWidth = 60;
   let actualLogoWidth = 0;
   let actualLogoHeight = 0;
 
@@ -220,15 +220,14 @@ export async function generateWorkOrderPDF(data: WorkOrderPDFData): Promise<void
     }
   }
 
-  const companyInfoX = logoData && actualLogoWidth > 0 ? marginLeft + actualLogoWidth + 4 : marginLeft;
-  let companyY = yPosition + 1;
+  let companyY = yPosition + actualLogoHeight + 3;
 
-  doc.setFontSize(12);
+  doc.setFontSize(10);
   doc.setTextColor(17, 24, 39);
   doc.setFont('helvetica', 'bold');
   if (data.company_name) {
-    doc.text(data.company_name, companyInfoX, companyY);
-    companyY += 4.5;
+    doc.text(data.company_name, marginLeft, companyY);
+    companyY += 4;
   }
 
   doc.setFontSize(8);
@@ -236,27 +235,33 @@ export async function generateWorkOrderPDF(data: WorkOrderPDFData): Promise<void
   doc.setFont('helvetica', 'normal');
 
   if (data.company_address) {
-    doc.text(data.company_address, companyInfoX, companyY);
-    companyY += 3.5;
+    const addressLines = data.company_address.split('\n');
+    for (const line of addressLines) {
+      doc.text(line, marginLeft, companyY);
+      companyY += 3.5;
+    }
   }
 
-  if (data.company_city && data.company_state && data.company_zip) {
-    doc.text(`${data.company_city}, ${data.company_state} ${data.company_zip}`, companyInfoX, companyY);
-    companyY += 3.5;
+  if (data.company_city || data.company_state || data.company_zip) {
+    const cityStateZip = [data.company_city, data.company_state].filter(Boolean).join(', ') + (data.company_zip ? ' ' + data.company_zip : '');
+    if (cityStateZip.trim()) {
+      doc.text(cityStateZip, marginLeft, companyY);
+      companyY += 3.5;
+    }
   }
 
   if (data.company_phone) {
-    doc.text(data.company_phone, companyInfoX, companyY);
+    doc.text(data.company_phone, marginLeft, companyY);
     companyY += 3.5;
   }
 
   if (data.company_email) {
-    doc.text(data.company_email, companyInfoX, companyY);
+    doc.text(data.company_email, marginLeft, companyY);
     companyY += 3.5;
   }
 
   if (data.company_website) {
-    doc.text(data.company_website, companyInfoX, companyY);
+    doc.text(data.company_website, marginLeft, companyY);
     companyY += 3.5;
   }
 

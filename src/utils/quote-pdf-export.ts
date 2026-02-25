@@ -203,8 +203,8 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
     console.log('Logo data loaded:', logoData ? 'success' : 'failed');
   }
 
-  const maxLogoHeight = 20;
-  const maxLogoWidth = 45;
+  const maxLogoHeight = 28;
+  const maxLogoWidth = 60;
   let actualLogoWidth = 0;
   let actualLogoHeight = 0;
 
@@ -237,15 +237,14 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
     }
   }
 
-  const companyInfoX = logoData && actualLogoWidth > 0 ? marginLeft + actualLogoWidth + 4 : marginLeft;
-  let companyY = yPosition + 1;
+  let companyY = yPosition + actualLogoHeight + 3;
 
-  doc.setFontSize(12);
+  doc.setFontSize(10);
   doc.setTextColor(17, 24, 39);
   doc.setFont('helvetica', 'bold');
   if (quote.company_name) {
-    doc.text(quote.company_name, companyInfoX, companyY);
-    companyY += 4.5;
+    doc.text(quote.company_name, marginLeft, companyY);
+    companyY += 4;
   }
 
   doc.setFontSize(8);
@@ -253,27 +252,33 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
   doc.setFont('helvetica', 'normal');
 
   if (quote.company_address) {
-    doc.text(quote.company_address, companyInfoX, companyY);
-    companyY += 3.5;
+    const addressLines = quote.company_address.split('\n');
+    for (const line of addressLines) {
+      doc.text(line, marginLeft, companyY);
+      companyY += 3.5;
+    }
   }
 
-  if (quote.company_city && quote.company_state && quote.company_zip) {
-    doc.text(`${quote.company_city}, ${quote.company_state} ${quote.company_zip}`, companyInfoX, companyY);
-    companyY += 3.5;
+  if (quote.company_city || quote.company_state || quote.company_zip) {
+    const cityStateZip = [quote.company_city, quote.company_state].filter(Boolean).join(', ') + (quote.company_zip ? ' ' + quote.company_zip : '');
+    if (cityStateZip.trim()) {
+      doc.text(cityStateZip, marginLeft, companyY);
+      companyY += 3.5;
+    }
   }
 
   if (quote.company_phone) {
-    doc.text(quote.company_phone, companyInfoX, companyY);
+    doc.text(quote.company_phone, marginLeft, companyY);
     companyY += 3.5;
   }
 
   if (quote.company_email) {
-    doc.text(quote.company_email, companyInfoX, companyY);
+    doc.text(quote.company_email, marginLeft, companyY);
     companyY += 3.5;
   }
 
   if (quote.company_website) {
-    doc.text(quote.company_website, companyInfoX, companyY);
+    doc.text(quote.company_website, marginLeft, companyY);
     companyY += 3.5;
   }
 
