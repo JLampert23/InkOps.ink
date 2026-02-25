@@ -150,17 +150,26 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const loadCompanySettings = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      console.log('WorkOrderDetail: Loading company settings, user:', user?.id);
+      if (!user) {
+        console.log('WorkOrderDetail: No user found');
+        return;
+      }
 
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('user_profiles')
         .select('company_id')
         .eq('id', user.id)
         .maybeSingle();
 
-      if (!profile?.company_id) return;
+      console.log('WorkOrderDetail: User profile result:', { profile, profileError });
 
-      const { data: settings } = await supabase
+      if (!profile?.company_id) {
+        console.log('WorkOrderDetail: No company_id in profile');
+        return;
+      }
+
+      const { data: settings, error: settingsError } = await supabase
         .from('company_settings')
         .select(`
           company_name,
@@ -177,6 +186,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         .eq('id', profile.company_id)
         .maybeSingle();
 
+      console.log('WorkOrderDetail: Company settings result:', { settings, settingsError });
       setCompanySettings(settings);
     } catch (error) {
       console.error('Error loading company settings:', error);
