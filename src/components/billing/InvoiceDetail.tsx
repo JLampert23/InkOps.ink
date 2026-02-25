@@ -100,9 +100,13 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
   const [companySettings, setCompanySettings] = useState<{
     company_name: string | null;
     company_address: string | null;
+    company_city: string | null;
+    company_state: string | null;
+    company_zip: string | null;
     company_phone: string | null;
     company_email: string | null;
     company_website: string | null;
+    company_logo_primary_url: string | null;
     invoice_terms: string | null;
   } | null>(null);
   const [numPackages, setNumPackages] = useState(1);
@@ -134,16 +138,20 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
     try {
       const { data } = await supabase
         .from('company_settings')
-        .select('twilio_enabled, company_name, company_address, company_phone, company_email, company_website, invoice_terms')
+        .select('twilio_enabled, company_name, company_address, company_city, company_state, company_zip, company_phone, company_email, company_website, company_logo_primary_url, invoice_terms')
         .maybeSingle();
       if (data) {
         setTwilioEnabled(data.twilio_enabled || false);
         setCompanySettings({
           company_name: data.company_name,
           company_address: data.company_address,
+          company_city: data.company_city,
+          company_state: data.company_state,
+          company_zip: data.company_zip,
           company_phone: data.company_phone,
           company_email: data.company_email,
           company_website: data.company_website,
+          company_logo_primary_url: data.company_logo_primary_url,
           invoice_terms: data.invoice_terms,
         });
       }
@@ -865,12 +873,16 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
               </>
             )}
             <button
-              onClick={() => invoice && generateInvoicePDF(invoice, {
+              onClick={async () => invoice && await generateInvoicePDF(invoice, {
                 companyName: companySettings?.company_name || undefined,
                 companyAddress: companySettings?.company_address || undefined,
+                companyCity: companySettings?.company_city || undefined,
+                companyState: companySettings?.company_state || undefined,
+                companyZip: companySettings?.company_zip || undefined,
                 companyPhone: companySettings?.company_phone || undefined,
                 companyEmail: companySettings?.company_email || undefined,
                 companyWebsite: companySettings?.company_website || undefined,
+                companyLogoUrl: companySettings?.company_logo_primary_url || undefined,
                 invoiceTerms: companySettings?.invoice_terms || undefined,
               })}
               className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors whitespace-nowrap"
