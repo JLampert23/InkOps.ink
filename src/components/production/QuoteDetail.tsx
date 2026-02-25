@@ -278,6 +278,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             .eq('id', profile.company_id)
             .maybeSingle();
 
+          console.log('QuoteDetail: Company settings loaded:', settings);
           setCompanySettings(settings);
         }
       }
@@ -290,6 +291,10 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
   const handleDownloadQuote = async () => {
     if (!quote) return;
+
+    console.log('QuoteDetail: handleDownloadQuote called');
+    console.log('QuoteDetail: quote company_logo_url:', quote.company_logo_url);
+    console.log('QuoteDetail: companySettings:', companySettings);
 
     const quotePDFData: QuotePDFData = {
       ...quote,

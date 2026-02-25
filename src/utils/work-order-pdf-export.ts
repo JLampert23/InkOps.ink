@@ -94,10 +94,14 @@ function formatDate(dateString: string | null): string {
 async function loadImage(url: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const img = new Image();
-    img.crossOrigin = 'Anonymous';
+    img.crossOrigin = 'anonymous';
     img.onload = () => resolve(img);
-    img.onerror = () => resolve(null);
-    img.src = url;
+    img.onerror = (e) => {
+      console.warn('Failed to load image:', url, e);
+      resolve(null);
+    };
+    const timestamp = Date.now();
+    img.src = url.includes('?') ? `${url}&_t=${timestamp}` : `${url}?_t=${timestamp}`;
   });
 }
 
@@ -152,6 +156,12 @@ function getItemQty(item: WorkOrderPDFData['line_items'][0]): number {
 }
 
 export async function generateWorkOrderPDF(data: WorkOrderPDFData): Promise<void> {
+  console.log('generateWorkOrderPDF called with company data:', {
+    company_name: data.company_name,
+    company_logo_url: data.company_logo_url,
+    company_address: data.company_address,
+  });
+
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -171,7 +181,9 @@ export async function generateWorkOrderPDF(data: WorkOrderPDFData): Promise<void
 
   let logoData: ImageDimensions | null = null;
   if (data.company_logo_url) {
+    console.log('Attempting to load logo from:', data.company_logo_url);
     logoData = await imageToBase64WithDimensions(data.company_logo_url);
+    console.log('Logo data loaded:', logoData ? 'success' : 'failed');
   }
 
   const maxLogoHeight = 20;

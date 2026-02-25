@@ -126,10 +126,14 @@ function formatCurrency(amount: number): string {
 async function loadImage(url: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const img = new Image();
-    img.crossOrigin = 'Anonymous';
+    img.crossOrigin = 'anonymous';
     img.onload = () => resolve(img);
-    img.onerror = () => resolve(null);
-    img.src = url;
+    img.onerror = (e) => {
+      console.warn('Failed to load image:', url, e);
+      resolve(null);
+    };
+    const timestamp = Date.now();
+    img.src = url.includes('?') ? `${url}&_t=${timestamp}` : `${url}?_t=${timestamp}`;
   });
 }
 
@@ -167,6 +171,13 @@ async function imageToBase64(url: string): Promise<string | null> {
 }
 
 export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
+  console.log('generateQuotePDF called with company data:', {
+    company_name: quote.company_name,
+    company_logo_url: quote.company_logo_url,
+    company_logo_secondary_url: quote.company_logo_secondary_url,
+    company_address: quote.company_address,
+  });
+
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -185,9 +196,11 @@ export async function generateQuotePDF(quote: QuotePDFData): Promise<void> {
   let yPosition = marginTop;
 
   const logoUrl = quote.company_logo_url || quote.company_logo_secondary_url;
+  console.log('Logo URL to load:', logoUrl);
   let logoData: ImageDimensions | null = null;
   if (logoUrl) {
     logoData = await imageToBase64WithDimensions(logoUrl);
+    console.log('Logo data loaded:', logoData ? 'success' : 'failed');
   }
 
   const maxLogoHeight = 20;
