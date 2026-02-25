@@ -144,30 +144,11 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   useEffect(() => {
     loadData();
     loadBoxLabelSettings();
-    loadCompanySettings();
   }, [workOrderId]);
 
-  const loadCompanySettings = async () => {
+  const loadCompanySettings = async (companyId: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      console.log('WorkOrderDetail: Loading company settings, user:', user?.id);
-      if (!user) {
-        console.log('WorkOrderDetail: No user found');
-        return;
-      }
-
-      const { data: profile, error: profileError } = await supabase
-        .from('user_profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      console.log('WorkOrderDetail: User profile result:', { profile, profileError });
-
-      if (!profile?.company_id) {
-        console.log('WorkOrderDetail: No company_id in profile');
-        return;
-      }
+      console.log('WorkOrderDetail: Loading company settings for company_id:', companyId);
 
       const { data: settings, error: settingsError } = await supabase
         .from('company_settings')
@@ -183,7 +164,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           company_logo_primary_url,
           company_logo_secondary_url
         `)
-        .eq('id', profile.company_id)
+        .eq('id', companyId)
         .maybeSingle();
 
       console.log('WorkOrderDetail: Company settings result:', { settings, settingsError });
@@ -208,6 +189,10 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         return;
       }
       setWorkOrder(woData);
+
+      if (woData.company_id) {
+        loadCompanySettings(woData.company_id);
+      }
 
       const { data: woItems } = await supabase
         .from('work_order_line_items')

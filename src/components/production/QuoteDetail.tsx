@@ -252,42 +252,31 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         console.error('QuoteDetail: Error fetching imprints:', imprintsError);
       }
 
-      const { data: { user } } = await supabase.auth.getUser();
-      console.log('QuoteDetail: Fetching company settings, user:', user?.id);
-      if (user) {
-        const { data: profile, error: profileError } = await supabase
-          .from('user_profiles')
-          .select('company_id')
-          .eq('id', user.id)
+      const companyIdToUse = quoteData.company_id;
+      console.log('QuoteDetail: Fetching company settings for company_id:', companyIdToUse);
+
+      if (companyIdToUse) {
+        const { data: settings, error: settingsError } = await supabase
+          .from('company_settings')
+          .select(`
+            company_name,
+            company_address,
+            company_city,
+            company_state,
+            company_zip,
+            company_phone,
+            company_email,
+            company_website,
+            company_logo_primary_url,
+            company_logo_secondary_url
+          `)
+          .eq('id', companyIdToUse)
           .maybeSingle();
 
-        console.log('QuoteDetail: User profile result:', { profile, profileError });
-
-        if (profile?.company_id) {
-          const { data: settings, error: settingsError } = await supabase
-            .from('company_settings')
-            .select(`
-              company_name,
-              company_address,
-              company_city,
-              company_state,
-              company_zip,
-              company_phone,
-              company_email,
-              company_website,
-              company_logo_primary_url,
-              company_logo_secondary_url
-            `)
-            .eq('id', profile.company_id)
-            .maybeSingle();
-
-          console.log('QuoteDetail: Company settings result:', { settings, settingsError });
-          setCompanySettings(settings);
-        } else {
-          console.log('QuoteDetail: No company_id found in profile');
-        }
+        console.log('QuoteDetail: Company settings result:', { settings, settingsError });
+        setCompanySettings(settings);
       } else {
-        console.log('QuoteDetail: No user found');
+        console.log('QuoteDetail: No company_id found on quote');
       }
     } catch (error) {
       console.error('Error loading quote:', error);
