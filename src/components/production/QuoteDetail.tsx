@@ -140,11 +140,25 @@ interface QuoteImprint {
   artwork_images?: string[];
 }
 
+interface CompanySettings {
+  company_name: string | null;
+  company_address: string | null;
+  company_city: string | null;
+  company_state: string | null;
+  company_zip: string | null;
+  company_phone: string | null;
+  company_email: string | null;
+  company_website: string | null;
+  company_logo_primary_url: string | null;
+  company_logo_secondary_url: string | null;
+}
+
 export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProps) {
   const { showNotification } = useNotification();
   const [quote, setQuote] = useState<Quote | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [quoteImprints, setQuoteImprints] = useState<QuoteImprint[]>([]);
+  const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [showSendModal, setShowSendModal] = useState(false);
   const [converting, setConverting] = useState(false);
@@ -237,6 +251,36 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
       } else {
         console.error('QuoteDetail: Error fetching imprints:', imprintsError);
       }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('company_id')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (profile?.company_id) {
+          const { data: settings } = await supabase
+            .from('company_settings')
+            .select(`
+              company_name,
+              company_address,
+              company_city,
+              company_state,
+              company_zip,
+              company_phone,
+              company_email,
+              company_website,
+              company_logo_primary_url,
+              company_logo_secondary_url
+            `)
+            .eq('id', profile.company_id)
+            .maybeSingle();
+
+          setCompanySettings(settings);
+        }
+      }
     } catch (error) {
       console.error('Error loading quote:', error);
     } finally {
@@ -249,6 +293,16 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
     const quotePDFData: QuotePDFData = {
       ...quote,
+      company_name: quote.company_name || companySettings?.company_name || null,
+      company_address: quote.company_address || companySettings?.company_address || null,
+      company_city: quote.company_city || companySettings?.company_city || null,
+      company_state: quote.company_state || companySettings?.company_state || null,
+      company_zip: quote.company_zip || companySettings?.company_zip || null,
+      company_phone: quote.company_phone || companySettings?.company_phone || null,
+      company_email: quote.company_email || companySettings?.company_email || null,
+      company_website: quote.company_website || companySettings?.company_website || null,
+      company_logo_url: quote.company_logo_url || companySettings?.company_logo_primary_url || companySettings?.company_logo_secondary_url || null,
+      company_logo_secondary_url: companySettings?.company_logo_secondary_url || null,
       line_items: lineItems,
       imprints: quoteImprints.map(imprint => ({
         id: imprint.id,
