@@ -253,15 +253,18 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
       }
 
       const { data: { user } } = await supabase.auth.getUser();
+      console.log('QuoteDetail: Fetching company settings, user:', user?.id);
       if (user) {
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from('user_profiles')
           .select('company_id')
           .eq('id', user.id)
           .maybeSingle();
 
+        console.log('QuoteDetail: User profile result:', { profile, profileError });
+
         if (profile?.company_id) {
-          const { data: settings } = await supabase
+          const { data: settings, error: settingsError } = await supabase
             .from('company_settings')
             .select(`
               company_name,
@@ -278,9 +281,13 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             .eq('id', profile.company_id)
             .maybeSingle();
 
-          console.log('QuoteDetail: Company settings loaded:', settings);
+          console.log('QuoteDetail: Company settings result:', { settings, settingsError });
           setCompanySettings(settings);
+        } else {
+          console.log('QuoteDetail: No company_id found in profile');
         }
+      } else {
+        console.log('QuoteDetail: No user found');
       }
     } catch (error) {
       console.error('Error loading quote:', error);
