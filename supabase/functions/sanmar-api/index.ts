@@ -55,17 +55,24 @@ Deno.serve(async (req: Request) => {
       }
       companyId = qsCompanyId;
     } else {
+      // Create client with the user's auth header for proper JWT validation
       const userAuthClient = createClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+          headers: { Authorization: authHeader }
+        },
         auth: { autoRefreshToken: false, persistSession: false }
       });
-      const { data: { user }, error: authError } = await userAuthClient.auth.getUser(token);
+      const { data: { user }, error: authError } = await userAuthClient.auth.getUser();
 
       if (authError || !user) {
+        console.error('JWT validation failed:', authError?.message, 'Token prefix:', token.substring(0, 30));
         return new Response(
           JSON.stringify({ code: 401, message: `Invalid JWT: ${authError?.message || 'No user found'}` }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+
+      console.log('✅ User authenticated:', user.id);
 
       const { data: profile } = await supabaseAdmin
         .from("user_profiles")
