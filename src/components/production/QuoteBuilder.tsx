@@ -821,13 +821,25 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           return sum + (parseFloat(imp.price) || 0);
         }, 0);
 
+        // Get garment markup from company settings
+        const garmentMarkup = companySettings?.default_garment_markup || 0;
+
         // Apply pricing to ALL items in the group (both saved and unsaved)
         const newGroups = groups.map(g => {
           if (g.id === groupId) {
             const newItems = g.items.map((itm: any) => {
               // Try to get the price from the database first (for saved items)
               const updated = updatedLineItems?.find(li => li.id === itm.id);
-              const unitPrice = updated ? parseFloat(updated.unit_price) : totalImprintPrice;
+
+              let unitPrice: number;
+              if (updated) {
+                unitPrice = parseFloat(updated.unit_price);
+              } else {
+                // Fallback: calculate locally with wholesale + markup + imprints
+                const wholesalePrice = itm.wholesale_price || 0;
+                const garmentCostWithMarkup = wholesalePrice * (1 + garmentMarkup / 100);
+                unitPrice = totalImprintPrice + garmentCostWithMarkup;
+              }
 
               return {
                 ...itm,
