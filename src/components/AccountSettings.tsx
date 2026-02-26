@@ -146,7 +146,6 @@ type SettingsTab =
   | 'company-info' | 'quote-invoice-settings' | 'box-label'
   | 'printavo-integration' | 'square-integration' | 'resend-integration' | 'twilio-integration' | 'stripe-payments' | 'supplier-integrations' | 'shipstation-integration' | 'chipply-integration'
   | 'user-management' | 'user-security'
-  | 'billing-status-filters'
   | 'automated-reports' | 'automations'
   | 'manage-goods' | 'receiving-settings' | 'po-settings'
   | 'production-general' | 'scheduler-settings' | 'invoice-fees' | 'price-matrices'
@@ -296,9 +295,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [savingBillingStatuses, setSavingBillingStatuses] = useState(false);
 
   const [fullStatuses, setFullStatuses] = useState<PrintavoStatus[]>([]);
-  const [pendingBillingChanges, setPendingBillingChanges] = useState<Map<string, boolean>>(new Map());
-  const [savingBillingFilters, setSavingBillingFilters] = useState(false);
-  const [billingFiltersSaveMessage, setBillingFiltersSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const [unlockPin, setUnlockPin] = useState('');
   const [unlockPinConfirm, setUnlockPinConfirm] = useState('');
@@ -875,84 +871,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     }
   };
 
-  const toggleBillingEligibility = (statusId: string, currentValue: boolean) => {
-    const newPending = new Map(pendingBillingChanges);
-    const currentPendingValue = newPending.get(statusId);
-
-    if (currentPendingValue !== undefined) {
-      if (currentPendingValue === currentValue) {
-        newPending.delete(statusId);
-      } else {
-        newPending.set(statusId, !currentValue);
-      }
-    } else {
-      newPending.set(statusId, !currentValue);
-    }
-
-    setPendingBillingChanges(newPending);
-    setBillingFiltersSaveMessage(null);
-
-    setFullStatuses(prev =>
-      prev.map(s =>
-        s.id === statusId
-          ? { ...s, is_billing_eligible: !s.is_billing_eligible }
-          : s
-      )
-    );
-  };
-
-  const getEffectiveBillingEligibility = (status: PrintavoStatus): boolean => {
-    const pendingValue = pendingBillingChanges.get(status.id);
-    return pendingValue !== undefined ? pendingValue : status.is_billing_eligible;
-  };
-
-  const saveBillingFilters = async () => {
-    if (pendingBillingChanges.size === 0) {
-      setBillingFiltersSaveMessage({ type: 'success', text: 'No changes to save' });
-      setTimeout(() => setBillingFiltersSaveMessage(null), 3000);
-      return;
-    }
-
-    try {
-      setSavingBillingFilters(true);
-      setBillingFiltersSaveMessage(null);
-
-      for (const [statusId, isEligible] of pendingBillingChanges) {
-        const { error } = await supabase
-          .from('printavo_statuses')
-          .update({
-            is_billing_eligible: isEligible,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', statusId);
-
-        if (error) throw error;
-      }
-
-      const eligibleNames = fullStatuses
-        .filter(s => s.is_billing_eligible)
-        .map(s => s.name);
-      setBillingSelectedStatuses(eligibleNames);
-
-      setPendingBillingChanges(new Map());
-      setBillingFiltersSaveMessage({ type: 'success', text: 'Billing status filters saved successfully!' });
-
-      setTimeout(() => setBillingFiltersSaveMessage(null), 4000);
-    } catch (err) {
-      console.error('Error saving billing filters:', err);
-      setBillingFiltersSaveMessage({ type: 'error', text: 'Failed to save filters. Please try again.' });
-
-      await loadStatusesFromDatabase();
-    } finally {
-      setSavingBillingFilters(false);
-    }
-  };
-
-  const discardBillingChanges = async () => {
-    setPendingBillingChanges(new Map());
-    setBillingFiltersSaveMessage(null);
-    await loadStatusesFromDatabase();
-  };
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -4286,23 +4204,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             {accountingExpanded && (
               <div className="mt-1 ml-2 space-y-1 collapsible-section collapsible-section-enter">
                 <button
-                  onClick={() => setActiveTab('billing-status-filters')}
-                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
-                    activeTab === 'billing-status-filters'
-                      ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                >
-                  <Filter className={`w-4 h-4 flex-shrink-0 ${activeTab === 'billing-status-filters' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
-                  <div className="flex-1 text-left">
-                    <div className={`font-medium text-sm ${activeTab === 'billing-status-filters' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                      Billing Filters
-                    </div>
-                  </div>
-                  {activeTab === 'billing-status-filters' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
-                </button>
-
-                <button
                   onClick={() => setActiveTab('automated-reports')}
                   className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
                     activeTab === 'automated-reports'
@@ -5959,180 +5860,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               />
             </Suspense>
           )}
-
-          {activeTab === 'billing-status-filters' && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Billing & Payments Status Filters</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Select which statuses should appear in Billing Queue, then click Save to apply.</p>
-              </div>
-
-              {billingFiltersSaveMessage && (
-                <div className={`flex items-center gap-2 p-3 rounded-lg ${
-                  billingFiltersSaveMessage.type === 'success'
-                    ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200'
-                    : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200'
-                }`}>
-                  {billingFiltersSaveMessage.type === 'success' ? (
-                    <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  )}
-                  <span className="text-sm font-medium">{billingFiltersSaveMessage.text}</span>
-                </div>
-              )}
-
-              {loadingStatuses ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-spin" />
-                </div>
-              ) : fullStatuses.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-500 dark:text-gray-400 mb-4">No statuses found. Click "Sync from Printavo" to fetch all available statuses.</p>
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between mb-4">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {fullStatuses.filter(s => s.is_billing_eligible).length} of {fullStatuses.length} statuses enabled for billing
-                      {pendingBillingChanges.size > 0 && (
-                        <span className="ml-2 text-amber-600 dark:text-amber-400 font-medium">
-                          ({pendingBillingChanges.size} unsaved change{pendingBillingChanges.size !== 1 ? 's' : ''})
-                        </span>
-                      )}
-                    </p>
-                  </div>
-
-                  {['Invoice', 'Quote'].map(statusType => {
-                    const typeStatuses = fullStatuses.filter(s => s.type === statusType);
-                    if (typeStatuses.length === 0) return null;
-                    return (
-                      <div key={statusType} className="mb-6">
-                        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                          <Layers className="w-4 h-4" />
-                          {statusType} Statuses ({typeStatuses.length})
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                          {typeStatuses.map(status => (
-                            <button
-                              key={status.id}
-                              onClick={() => toggleBillingEligibility(status.id, status.is_billing_eligible)}
-                              className={`flex items-center gap-3 p-3 rounded-lg transition-all border ${
-                                status.is_billing_eligible
-                                  ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30'
-                                  : 'bg-white dark:bg-slate-700 border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-600'
-                              }`}
-                            >
-                              <div
-                                className="w-4 h-4 rounded-full flex-shrink-0 border border-gray-300 dark:border-gray-600"
-                                style={{ backgroundColor: status.color || '#9ca3af' }}
-                              />
-                              <span className={`text-sm flex-1 text-left ${status.is_billing_eligible ? 'text-blue-900 dark:text-blue-200 font-medium' : 'text-gray-700 dark:text-gray-300'}`}>
-                                {status.name}
-                              </span>
-                              <div className={`w-5 h-5 rounded flex items-center justify-center ${
-                                status.is_billing_eligible ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
-                              }`}>
-                                {status.is_billing_eligible && (
-                                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                  </svg>
-                                )}
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {fullStatuses.filter(s => !s.type || (s.type !== 'Invoice' && s.type !== 'Quote')).length > 0 && (
-                    <div className="mb-6">
-                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                        <Layers className="w-4 h-4" />
-                        Other Statuses
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {fullStatuses.filter(s => !s.type || (s.type !== 'Invoice' && s.type !== 'Quote')).map(status => (
-                          <button
-                            key={status.id}
-                            onClick={() => toggleBillingEligibility(status.id, status.is_billing_eligible)}
-                            className={`flex items-center gap-3 p-3 rounded-lg transition-all border ${
-                              status.is_billing_eligible
-                                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30'
-                                : 'bg-white dark:bg-slate-700 border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-600'
-                            }`}
-                          >
-                            <div
-                              className="w-4 h-4 rounded-full flex-shrink-0 border border-gray-300 dark:border-gray-600"
-                              style={{ backgroundColor: status.color || '#9ca3af' }}
-                            />
-                            <span className={`text-sm flex-1 text-left ${status.is_billing_eligible ? 'text-blue-900 dark:text-blue-200 font-medium' : 'text-gray-700 dark:text-gray-300'}`}>
-                              {status.name}
-                            </span>
-                            <div className={`w-5 h-5 rounded flex items-center justify-center ${
-                              status.is_billing_eligible ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
-                            }`}>
-                              {status.is_billing_eligible && (
-                                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                </svg>
-                              )}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="pt-6 border-t border-gray-200 dark:border-slate-600 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={saveBillingFilters}
-                        disabled={savingBillingFilters || pendingBillingChanges.size === 0}
-                        className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-all ${
-                          pendingBillingChanges.size > 0
-                            ? 'bg-green-600 text-white hover:bg-green-700 shadow-sm'
-                            : 'bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                        } disabled:opacity-50`}
-                      >
-                        {savingBillingFilters ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          <>
-                            <Save className="w-4 h-4" />
-                            Save Filters
-                          </>
-                        )}
-                      </button>
-                      {pendingBillingChanges.size > 0 && (
-                        <button
-                          onClick={discardBillingChanges}
-                          disabled={savingBillingFilters}
-                          className="px-4 py-2.5 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-                        >
-                          Discard Changes
-                        </button>
-                      )}
-                    </div>
-                    {pendingBillingChanges.size > 0 && (
-                      <p className="text-sm text-amber-600 dark:text-amber-400">
-                        You have unsaved changes
-                      </p>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
 
           {activeTab === 'automated-reports' && (
             <AutomatedReports />
