@@ -1,5 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { getLiveWholesalePricing, type VendorConfig } from "../_shared/live-wholesale-pricing.ts";
+
+const SSA_DEFAULT_FOB_ID = "IL";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -302,8 +305,18 @@ Deno.serve(async (req: Request) => {
   <shar:partId>${escapedPartId}</shar:partId>` : ''}
 </ns2:GetMediaContentRequest>`;
 
-    // Make all 4 requests in parallel
-    const [productResponse, inventoryResponse, pricingResponse, mediaResponse] = await Promise.allSettled([
+    // Build vendor config for live wholesale pricing
+    const ssaVendorConfig: VendorConfig = {
+      name: "ssactivewear",
+      pricingEndpoint: PROMOSTANDARDS_ENDPOINTS.pricing,
+      credentials: {
+        id: credentials.accountNumber,
+        password: decryptedApiKey,
+      },
+    };
+
+    // Make all 4 requests in parallel (using live wholesale pricing for pricing)
+    const [productResponse, inventoryResponse, livePricingResponse, mediaResponse] = await Promise.allSettled([
       // 1. Product Data
       makePromoStandardsRequest(
         PROMOSTANDARDS_ENDPOINTS.productData,
@@ -321,22 +334,8 @@ Deno.serve(async (req: Request) => {
   <shar:productId>${escapedPartId}</shar:productId>
 </ns2:GetInventoryLevelsRequest>`
       ) : Promise.resolve(null),
-      // 3. Pricing - ALWAYS call with styleNumber (S&S expects style, not partId)
-      makePromoStandardsRequest(
-        PROMOSTANDARDS_ENDPOINTS.pricing,
-        "getConfigurationAndPricing",
-        `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
-  <shar:wsVersion>1.0.0</shar:wsVersion>
-  <shar:id>${escapedAccountNumber}</shar:id>
-  <shar:password>${escapedApiKey}</shar:password>
-  <shar:productId>${escapedStyleNumber}</shar:productId>
-  <shar:currency>USD</shar:currency>
-  <shar:priceType>Customer</shar:priceType>
-  <shar:localizationCountry>US</shar:localizationCountry>
-  <shar:localizationLanguage>en</shar:localizationLanguage>
-  <shar:configurationType>Blank</shar:configurationType>
-</ns2:GetConfigurationAndPricingRequest>`
-      ),
+      // 3. Live Wholesale Pricing with FOB (S&S uses B-prefixed style IDs)
+      getLiveWholesalePricing(ssaVendorConfig, `B${styleNumber.replace(/^B/i, '')}`, SSA_DEFAULT_FOB_ID),
       // 4. Media Content - use styleNumber as productId and partId for color-specific images
       makePromoStandardsRequest(
         PROMOSTANDARDS_ENDPOINTS.media,
@@ -348,11 +347,11 @@ Deno.serve(async (req: Request) => {
     console.log('📊 PromoStandards API Results:', {
       product: productResponse.status,
       inventory: inventoryResponse.status,
-      pricing: pricingResponse.status,
+      livePricing: livePricingResponse.status,
       media: mediaResponse.status,
       productError: productResponse.status === 'rejected' ? productResponse.reason : null,
       inventoryError: inventoryResponse.status === 'rejected' ? inventoryResponse.reason : null,
-      pricingError: pricingResponse.status === 'rejected' ? pricingResponse.reason : null,
+      livePricingCount: livePricingResponse.status === 'fulfilled' ? livePricingResponse.value.length : 0,
       mediaError: mediaResponse.status === 'rejected' ? mediaResponse.reason : null,
     });
 
@@ -417,76 +416,48 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Parse Pricing - Try API first, fall back to cache on error
+    // Parse Pricing from live wholesale pricing response
     const pricingData: any = {};
     let pricingAuthError: { code: string; description: string } | null = null;
     let usedCache = false;
 
-    if (pricingResponse.status === 'fulfilled' && pricingResponse.value) {
-      const xmlDoc = pricingResponse.value;
-      console.log('💰 Pricing XML Response (first 2000 chars):', xmlDoc.substring(0, 2000));
+    if (livePricingResponse.status === 'fulfilled' && livePricingResponse.value.length > 0) {
+      const livePricing = livePricingResponse.value;
+      console.log('💰 Live wholesale pricing received:', livePricing.length, 'price entries');
 
-      // Check for error 105 (authentication failed)
-      const errorCodeMatch = xmlDoc.match(/<code>(\d+)<\/code>/);
-      const errorDescMatch = xmlDoc.match(/<description>(.*?)<\/description>/);
-
-      if (errorCodeMatch && errorDescMatch) {
-        pricingAuthError = {
-          code: errorCodeMatch[1],
-          description: errorDescMatch[1]
-        };
-        console.error('💰 Pricing API returned error:', pricingAuthError);
-      } else {
-        const partPattern = /<Part>([\s\S]*?)<\/Part>/gi;
-        const partMatches = getAllXmlMatches(xmlDoc, partPattern);
-        console.log('💰 Found', partMatches.length, 'parts in pricing response');
-
-        pricingData.parts = partMatches.map(match => {
-          const partXml = match[1];
-          // S&S uses PartPrice tags, not Price tags
-          const pricePattern = /<PartPrice>([\s\S]*?)<\/PartPrice>/gi;
-          const priceMatches = getAllXmlMatches(partXml, pricePattern);
-
-          const partId = getXmlValue(partXml, "partId");
-          const prices = priceMatches.map(priceMatch => {
-            const priceXml = priceMatch[1];
-            return {
-              minQuantity: parseInt(getXmlValue(priceXml, "minQuantity") || "0"),
-              price: parseFloat(getXmlValue(priceXml, "price") || "0"),
-              discountCode: getXmlValue(priceXml, "discountCode"),
-              priceUom: getXmlValue(priceXml, "priceUom"),
-            };
-          });
-
-          console.log(`💰 Part ${partId}:`, prices.length, 'prices', prices[0]);
-
-          return {
-            partId,
-            prices
-          };
-        });
-
-        console.log('💰 Total pricing data:', pricingData.parts?.length, 'parts');
-
-        // Create a pricing map for easy lookup by partId
-        pricingData.pricesByPartId = {};
-        if (pricingData.parts) {
-          pricingData.parts.forEach((part: any) => {
-            if (part.partId && part.prices && part.prices.length > 0) {
-              // Store the first price tier (usually min quantity 1)
-              pricingData.pricesByPartId[part.partId] = part.prices[0].price;
-            }
-          });
+      // Group by partId
+      const partPricingMap = new Map<string, any[]>();
+      livePricing.forEach(item => {
+        if (!partPricingMap.has(item.partId)) {
+          partPricingMap.set(item.partId, []);
         }
-        console.log('💰 Price map created with', Object.keys(pricingData.pricesByPartId || {}).length, 'entries');
-      }
-    } else if (pricingResponse.status === 'rejected') {
-      console.error('💰 Pricing API Error:', pricingResponse.reason);
-    }
+        partPricingMap.get(item.partId)!.push({
+          minQuantity: item.minQty,
+          price: item.price,
+          discountCode: item.discountCode,
+          effectiveDate: item.effectiveDate,
+          expiryDate: item.expiryDate,
+        });
+      });
 
-    // If pricing API failed or returned error, try cache as fallback
-    if (pricingAuthError || pricingResponse.status === 'rejected' || !pricingData.parts || pricingData.parts.length === 0) {
-      console.log('💰 Pricing API failed, checking cache as fallback...');
+      pricingData.parts = Array.from(partPricingMap.entries()).map(([partId, prices]) => ({
+        partId,
+        prices
+      }));
+
+      console.log('💰 Total pricing data:', pricingData.parts.length, 'parts');
+
+      // Create a pricing map for easy lookup by partId
+      pricingData.pricesByPartId = {};
+      pricingData.parts.forEach((part: any) => {
+        if (part.partId && part.prices && part.prices.length > 0) {
+          // Store the first price tier (usually min quantity 1)
+          pricingData.pricesByPartId[part.partId] = part.prices[0].price;
+        }
+      });
+      console.log('💰 Price map created with', Object.keys(pricingData.pricesByPartId).length, 'entries');
+    } else {
+      console.warn('💰 Live pricing returned empty, checking cache as fallback...');
 
       // Get part IDs from the product data to query cache
       const partIds = productData.parts?.map((p: any) => p.partId).filter(Boolean) || [];

@@ -17,6 +17,10 @@ import {
   type SanMarCredentials,
   type SanMarUnifiedResponse,
 } from './sanmar-promostandards-client.ts';
+import { getLiveWholesalePricing, type VendorConfig } from './live-wholesale-pricing.ts';
+
+const SANMAR_PRICING_ENDPOINT = "https://ws.sanmar.com:8080/promostandards/PricingAndConfigurationServiceBindingV1?WSDL";
+const SANMAR_DEFAULT_FOB_ID = "1";
 
 interface UnifiedGarment {
   vendor: string;
@@ -150,14 +154,36 @@ export async function getUnifiedGarment(
 
     const partId = matchingPart.partId;
 
-    // Fetch pricing, inventory, and media in parallel
-    const [pricingResult, inventoryResult, mediaResult] = await Promise.allSettled([
-      fetchSanMarPricing(credentials, partId),
+    // Build vendor config for live wholesale pricing
+    const vendorConfig: VendorConfig = {
+      name: "sanmar",
+      pricingEndpoint: SANMAR_PRICING_ENDPOINT,
+      credentials: {
+        id: credentials.id,
+        password: credentials.password,
+      },
+    };
+
+    // Fetch pricing (using live wholesale pricing), inventory, and media in parallel
+    const [livePricingResult, inventoryResult, mediaResult] = await Promise.allSettled([
+      getLiveWholesalePricing(vendorConfig, style, SANMAR_DEFAULT_FOB_ID),
       fetchSanMarInventory(credentials, partId),
       fetchSanMarMedia(credentials, style, partId),
     ]);
 
-    const pricing = pricingResult.status === 'fulfilled' ? pricingResult.value : null;
+    // Find pricing for this specific partId from live wholesale pricing
+    const livePricing = livePricingResult.status === 'fulfilled' ? livePricingResult.value : [];
+    const partPricing = livePricing.filter(p => p.partId === partId);
+    const pricing = partPricing.length > 0 ? {
+      parts: [{
+        partId,
+        prices: partPricing.map(p => ({
+          minQuantity: p.minQty,
+          price: p.price,
+          discountCode: p.discountCode || '',
+        }))
+      }]
+    } : null;
     const inventory = inventoryResult.status === 'fulfilled' ? inventoryResult.value : null;
     const media = mediaResult.status === 'fulfilled' ? mediaResult.value : null;
 
@@ -218,12 +244,49 @@ export async function getUnifiedStyle(
   try {
     const credentials = await getSanMarCredentials(companyId);
 
-    const unifiedData = await fetchUnifiedSanMarData(credentials, { styleNumber: style });
+    // Build vendor config for live wholesale pricing
+    const vendorConfig: VendorConfig = {
+      name: "sanmar",
+      pricingEndpoint: SANMAR_PRICING_ENDPOINT,
+      credentials: {
+        id: credentials.id,
+        password: credentials.password,
+      },
+    };
+
+    // Fetch product data and live wholesale pricing in parallel
+    const [unifiedDataResult, livePricingResult] = await Promise.allSettled([
+      fetchUnifiedSanMarData(credentials, { styleNumber: style }),
+      getLiveWholesalePricing(vendorConfig, style, SANMAR_DEFAULT_FOB_ID),
+    ]);
+
+    if (unifiedDataResult.status === 'rejected') {
+      throw unifiedDataResult.reason;
+    }
+
+    const unifiedData = unifiedDataResult.value;
+    const livePricing = livePricingResult.status === 'fulfilled' ? livePricingResult.value : [];
+
+    // Create a map of partId to pricing for quick lookup
+    const pricingByPartId = new Map<string, { piecePrice: number; priceBreaks: { quantity: number; price: number }[] }>();
+    for (const priceItem of livePricing) {
+      if (!pricingByPartId.has(priceItem.partId)) {
+        pricingByPartId.set(priceItem.partId, {
+          piecePrice: priceItem.price,
+          priceBreaks: [],
+        });
+      }
+      pricingByPartId.get(priceItem.partId)!.priceBreaks.push({
+        quantity: priceItem.minQty,
+        price: priceItem.price,
+      });
+    }
 
     const variants: UnifiedGarment[] = [];
 
     // Create variants for each part
     for (const part of unifiedData.style.parts) {
+      const partPricing = pricingByPartId.get(part.partId);
       variants.push({
         vendor: 'SanMar',
         style,
@@ -240,8 +303,8 @@ export async function getUnifiedStyle(
           colorName: part.colorName,
         },
         pricing: {
-          piecePrice: unifiedData.pricing.parts.find(p => p.partId === part.partId)?.prices[0]?.price,
-          priceBreaks: unifiedData.pricing.parts.find(p => p.partId === part.partId)?.prices.map(p => ({
+          piecePrice: partPricing?.piecePrice || unifiedData.pricing.parts.find(p => p.partId === part.partId)?.prices[0]?.price,
+          priceBreaks: partPricing?.priceBreaks || unifiedData.pricing.parts.find(p => p.partId === part.partId)?.prices.map(p => ({
             quantity: p.minQuantity,
             price: p.price
           })) || [],
@@ -318,6 +381,32 @@ export async function getGarmentPricing(
       return null;
     }
 
+    // Build vendor config for live wholesale pricing
+    const vendorConfig: VendorConfig = {
+      name: "sanmar",
+      pricingEndpoint: SANMAR_PRICING_ENDPOINT,
+      credentials: {
+        id: credentials.id,
+        password: credentials.password,
+      },
+    };
+
+    // Use live wholesale pricing with FOB
+    const livePricing = await getLiveWholesalePricing(vendorConfig, style, SANMAR_DEFAULT_FOB_ID);
+    const partPricing = livePricing.filter(p => p.partId === matchingPart.partId);
+
+    if (partPricing.length > 0) {
+      return {
+        piecePrice: partPricing[0].price,
+        priceBreaks: partPricing.map(p => ({
+          quantity: p.minQty,
+          price: p.price
+        })),
+        currency: 'USD',
+      };
+    }
+
+    // Fallback to old method if live pricing fails
     const pricingData = await fetchSanMarPricing(credentials, matchingPart.partId);
 
     return {
