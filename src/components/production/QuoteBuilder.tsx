@@ -1309,18 +1309,40 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         });
 
         // Extract fresh pricing for this specific partId
-        if (unifiedData.pricing?.pricesByPartId && color.code) {
+        if (unifiedData.pricing?.pricesByPartId && Object.keys(unifiedData.pricing.pricesByPartId).length > 0) {
           const priceForPart = unifiedData.pricing.pricesByPartId[color.code];
           if (priceForPart) {
             freshPrice = priceForPart;
             console.log('💰 Fresh pricing found for part:', { partId: color.code, price: freshPrice });
           } else {
-            console.warn('⚠️ No price found for part:', color.code, 'Available parts:', Object.keys(unifiedData.pricing.pricesByPartId));
-            // Fall back to cached pricing if available
-            if (color.pricing?.wholesale) {
+            console.warn('⚠️ No price found for exact part:', color.code, 'Available parts:', Object.keys(unifiedData.pricing.pricesByPartId));
+
+            // Try to find a matching partId from the available prices
+            // SSActivewear partIds often include style-color-size format
+            const availablePartIds = Object.keys(unifiedData.pricing.pricesByPartId);
+            const matchingPartId = availablePartIds.find(pid =>
+              pid.includes(color.code) || color.code.includes(pid)
+            );
+
+            if (matchingPartId) {
+              freshPrice = unifiedData.pricing.pricesByPartId[matchingPartId];
+              console.log('💰 Found matching partId:', { requested: color.code, matched: matchingPartId, price: freshPrice });
+            } else if (availablePartIds.length > 0) {
+              // Use the first available price as a fallback
+              const firstPartId = availablePartIds[0];
+              freshPrice = unifiedData.pricing.pricesByPartId[firstPartId];
+              console.log('💰 Using first available price as fallback:', { partId: firstPartId, price: freshPrice });
+            } else if (color.pricing?.wholesale) {
               freshPrice = color.pricing.wholesale;
               console.log('💰 Using cached pricing from search results (part not in map):', freshPrice);
             }
+          }
+        } else if (unifiedData.pricing?.parts && unifiedData.pricing.parts.length > 0) {
+          // Try to get pricing from the parts array directly
+          const firstPart = unifiedData.pricing.parts[0];
+          if (firstPart?.prices && firstPart.prices.length > 0) {
+            freshPrice = firstPart.prices[0].price;
+            console.log('💰 Using price from parts array:', { partId: firstPart.partId, price: freshPrice });
           }
         } else {
           console.warn('⚠️ No pricing data in unified response');
