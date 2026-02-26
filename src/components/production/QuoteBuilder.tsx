@@ -852,34 +852,36 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       let totalImprintPrice = 0;
 
       for (const imprint of groupImprints) {
-        // Use the price if it's already calculated
         if (imprint.price && imprint.price > 0) {
           totalImprintPrice += parseFloat(imprint.price);
         }
       }
 
-      if (totalImprintPrice === 0) {
-        if (!silent) {
-          showNotification('warning', 'No pricing available', 'Please save the quote first to calculate pricing from imprints');
-        }
-        return;
-      }
+      // Get garment markup from company settings
+      const garmentMarkup = companySettings?.default_garment_markup || 0;
 
       console.log('Draft mode pricing:', {
         groupLabel: group.label,
         imprintCount: groupImprints.length,
         totalImprintPrice,
+        garmentMarkup,
         itemCount: group.items.length
       });
 
       // Apply the calculated unit price to ALL items in the group
+      // unit_price = imprint_price + garment_cost_with_markup
       const newGroups = groups.map(g => {
         if (g.id === groupId) {
-          const newItems = g.items.map((itm: any) => ({
-            ...itm,
-            unit_price: totalImprintPrice,
-            total_price: itm.total_quantity * totalImprintPrice
-          }));
+          const newItems = g.items.map((itm: any) => {
+            const wholesalePrice = itm.wholesale_price || 0;
+            const garmentCostWithMarkup = wholesalePrice * (1 + garmentMarkup / 100);
+            const unitPrice = totalImprintPrice + garmentCostWithMarkup;
+            return {
+              ...itm,
+              unit_price: unitPrice,
+              total_price: itm.total_quantity * unitPrice
+            };
+          });
           return { ...g, items: newItems };
         }
         return g;
@@ -887,7 +889,11 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
 
       setItemGroups(newGroups);
       if (!silent) {
-        showNotification('success', 'Price updated', `Unit price set to $${totalImprintPrice.toFixed(2)} for all items in group`);
+        const sampleItem = group.items[0];
+        const sampleWholesale = sampleItem?.wholesale_price || 0;
+        const sampleGarmentCost = sampleWholesale * (1 + garmentMarkup / 100);
+        const sampleUnitPrice = totalImprintPrice + sampleGarmentCost;
+        showNotification('success', 'Price updated', `Unit price: $${sampleUnitPrice.toFixed(2)} (imprint: $${totalImprintPrice.toFixed(2)} + garment: $${sampleGarmentCost.toFixed(2)})`);
       }
 
     } catch (error) {
