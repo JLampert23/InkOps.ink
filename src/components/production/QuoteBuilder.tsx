@@ -1313,6 +1313,11 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
             console.log('💰 Fresh pricing found for part:', { partId: color.code, price: freshPrice });
           } else {
             console.warn('⚠️ No price found for part:', color.code, 'Available parts:', Object.keys(unifiedData.pricing.pricesByPartId));
+            // Fall back to cached pricing if available
+            if (color.pricing?.wholesale) {
+              freshPrice = color.pricing.wholesale;
+              console.log('💰 Using cached pricing from search results (part not in map):', freshPrice);
+            }
           }
         } else {
           console.warn('⚠️ No pricing data in unified response');
@@ -1321,7 +1326,6 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           if (color.pricing?.wholesale) {
             freshPrice = color.pricing.wholesale;
             console.log('💰 Using cached pricing from search results:', freshPrice);
-            showNotification('info', 'Using cached pricing (Pricing API unavailable)');
           }
         }
 
