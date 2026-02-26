@@ -650,27 +650,15 @@ export async function fetchUnifiedSanMarData(
   request: SanMarRequest
 ): Promise<SanMarUnifiedResponse> {
   const { partId } = request;
-  // SanMar style numbers are case-sensitive and must be uppercase
   const styleNumber = request.styleNumber.toUpperCase().trim();
 
   console.log('🔄 Fetching unified SanMar data:', { styleNumber, partId });
 
-  // Make all requests in parallel where possible
-  const [productResult, inventoryResult, pricingResult, mediaResult] = await Promise.allSettled([
+  const [productResult, mediaResult] = await Promise.allSettled([
     fetchSanMarProductData(credentials, styleNumber),
-    partId ? fetchSanMarInventory(credentials, partId) : Promise.resolve({ items: [] }),
-    partId ? fetchSanMarPricing(credentials, partId) : Promise.resolve({ parts: [] }),
     fetchSanMarMedia(credentials, styleNumber, partId),
   ]);
 
-  console.log('📊 SanMar API Results:', {
-    product: productResult.status,
-    inventory: inventoryResult.status,
-    pricing: pricingResult.status,
-    media: mediaResult.status,
-  });
-
-  // Check if product data fetch failed (this is critical)
   if (productResult.status === 'rejected') {
     console.error('❌ SanMar Product fetch failed:', productResult.reason);
     throw new Error(`SanMar: ${productResult.reason?.message || 'Product not found'}`);
@@ -678,19 +666,37 @@ export async function fetchUnifiedSanMarData(
 
   const style = productResult.value;
 
-  // Check if product has no parts/colors
   if (!style.parts || style.parts.length === 0) {
     console.warn(`⚠️ SanMar: Style ${styleNumber} returned no parts/colors`);
     throw new Error(`SanMar: Style ${styleNumber} not found or has no variants`);
   }
 
-  const inventory = inventoryResult.status === 'fulfilled'
-    ? inventoryResult.value
-    : { items: [] };
+  let inventory: SanMarInventoryData = { items: [] };
+  let pricing: SanMarPricingData = { parts: [] };
 
-  const pricing = pricingResult.status === 'fulfilled'
-    ? pricingResult.value
-    : { parts: [] };
+  if (partId) {
+    const [inventoryResult, pricingResult] = await Promise.allSettled([
+      fetchSanMarInventory(credentials, partId),
+      fetchSanMarPricing(credentials, partId),
+    ]);
+    inventory = inventoryResult.status === 'fulfilled' ? inventoryResult.value : { items: [] };
+    pricing = pricingResult.status === 'fulfilled' ? pricingResult.value : { parts: [] };
+  } else {
+    const uniquePartIds = [...new Set(style.parts.map(p => p.partId))].slice(0, 20);
+    console.log(`💰 Fetching pricing for ${uniquePartIds.length} parts`);
+
+    const pricingResults = await Promise.allSettled(
+      uniquePartIds.map(pid => fetchSanMarPricing(credentials, pid))
+    );
+
+    pricing = { parts: [] };
+    for (const result of pricingResults) {
+      if (result.status === 'fulfilled' && result.value.parts) {
+        pricing.parts.push(...result.value.parts);
+      }
+    }
+    console.log(`💰 Got pricing for ${pricing.parts.length} parts`);
+  }
 
   const media = mediaResult.status === 'fulfilled'
     ? mediaResult.value
