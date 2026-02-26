@@ -407,6 +407,43 @@ async function fetchAndCacheSSActivewear(
       }
     }
 
+    // Fetch and cache pricing via PromoStandards
+    try {
+      const pricingUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=pricing&productId=${encodeURIComponent(style)}&companyId=${encodeURIComponent(companyId)}`;
+      const pricingResponse = await fetch(pricingUrl, {
+        headers: { "Authorization": `Bearer ${supabaseServiceKey}` },
+      });
+
+      if (pricingResponse.ok) {
+        const pricingData = await pricingResponse.json();
+        console.log('SSA Pricing response:', JSON.stringify(pricingData).substring(0, 500));
+
+        if (pricingData.success && pricingData.data?.parts) {
+          for (const part of pricingData.data.parts) {
+            if (!part.partId || !part.prices || part.prices.length === 0) continue;
+
+            const firstPrice = part.prices[0];
+            await supabaseAdmin
+              .from("ss_catalog_pricing")
+              .upsert({
+                company_id: companyId,
+                part_number: part.partId,
+                unit_price: firstPrice.price,
+                quantity_min: firstPrice.minQuantity || 1,
+                quantity_max: part.prices[1]?.minQuantity ? part.prices[1].minQuantity - 1 : 99999,
+                discount_code: firstPrice.discountCode || null,
+                price_expiry_date: null,
+              }, {
+                onConflict: "company_id,part_number,quantity_min"
+              });
+          }
+          console.log(`Cached pricing for ${pricingData.data.parts.length} parts`);
+        }
+      }
+    } catch (pricingError: any) {
+      console.warn('Failed to fetch/cache SSA pricing:', pricingError.message);
+    }
+
     // Fetch and cache media (images)
     const mediaUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=media&productId=${encodeURIComponent(style)}&companyId=${encodeURIComponent(companyId)}`;
     const mediaResponse = await fetch(mediaUrl, {

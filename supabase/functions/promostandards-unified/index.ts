@@ -539,48 +539,6 @@ Deno.serve(async (req: Request) => {
       } else {
         console.warn('💰 No part IDs available to query cache');
       }
-
-      // If still no pricing, try SSA REST API as final fallback
-      if (!pricingData.pricesByPartId || Object.keys(pricingData.pricesByPartId).length === 0) {
-        console.log('💰 Trying SSA REST API for pricing...');
-        try {
-          const ssaRestUrl = `https://api.ssactivewear.com/v2/products/?style=${encodeURIComponent(styleNumber)}`;
-          const ssaRestResponse = await fetch(ssaRestUrl, {
-            method: 'GET',
-            headers: {
-              'Authorization': 'Basic ' + btoa(`${credentials.accountNumber}:${decryptedApiKey}`),
-              'Content-Type': 'application/json',
-            },
-          });
-
-          if (ssaRestResponse.ok) {
-            const ssaProducts = await ssaRestResponse.json();
-            console.log('💰 SSA REST API returned', ssaProducts.length, 'products');
-
-            if (ssaProducts && ssaProducts.length > 0) {
-              pricingData.pricesByPartId = {};
-              pricingData.parts = [];
-
-              for (const product of ssaProducts) {
-                if (product.sku && product.customerPrice) {
-                  const price = parseFloat(product.customerPrice);
-                  pricingData.pricesByPartId[product.sku] = price;
-                  pricingData.parts.push({
-                    partId: product.sku,
-                    prices: [{ minQuantity: 1, price }]
-                  });
-                }
-              }
-
-              console.log('💰 SSA REST API pricing loaded:', Object.keys(pricingData.pricesByPartId).length, 'SKUs');
-            }
-          } else {
-            console.warn('💰 SSA REST API failed:', ssaRestResponse.status);
-          }
-        } catch (ssaError: any) {
-          console.error('💰 SSA REST API error:', ssaError.message);
-        }
-      }
     }
 
     // Parse Media Content with fallback for error 105
