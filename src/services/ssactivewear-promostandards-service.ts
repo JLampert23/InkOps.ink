@@ -119,6 +119,50 @@ export async function getCachedPricing(partNumber: string, quantity: number = 1)
   }
 }
 
+export async function getSSActivewearWholesalePrice(
+  style: string,
+  color: string,
+  size: string
+): Promise<number | null> {
+  try {
+    const partNumber = `${style}-${color}-${size}`.toUpperCase();
+    console.log(`[SSActivewear] Looking up wholesale price for: ${partNumber}`);
+
+    const cachedPrice = await getCachedPricing(partNumber, 1);
+    if (cachedPrice !== null) {
+      console.log(`[SSActivewear] Found cached price for ${partNumber}: $${cachedPrice}`);
+      return cachedPrice;
+    }
+
+    const styleOnlyPrice = await getCachedPricing(style.toUpperCase(), 1);
+    if (styleOnlyPrice !== null) {
+      console.log(`[SSActivewear] Found cached price for style ${style}: $${styleOnlyPrice}`);
+      return styleOnlyPrice;
+    }
+
+    console.log(`[SSActivewear] No cached price found for ${partNumber}, fetching from API...`);
+    const pricingData = await getProductPricing(partNumber, false);
+
+    if (pricingData?.priceArray && pricingData.priceArray.length > 0) {
+      const lowestTier = pricingData.priceArray.reduce((lowest, current) => {
+        if (!lowest || current.minQuantity < lowest.minQuantity) {
+          return current;
+        }
+        return lowest;
+      }, pricingData.priceArray[0]);
+
+      console.log(`[SSActivewear] API returned price for ${partNumber}: $${lowestTier.price}`);
+      return lowestTier.price;
+    }
+
+    console.log(`[SSActivewear] No price found for ${partNumber}`);
+    return null;
+  } catch (error) {
+    console.error('[SSActivewear] Error getting wholesale price:', error);
+    return null;
+  }
+}
+
 export async function getProductPricing(partId: string, useCache: boolean = true): Promise<PromoStandardsPricing | null> {
   try {
     if (useCache) {
@@ -399,5 +443,65 @@ export async function getUnifiedProductData(
       error
     });
     throw error;
+  }
+}
+
+export async function getSanMarWholesalePrice(
+  style: string,
+  color: string,
+  _size?: string
+): Promise<number | null> {
+  try {
+    console.log(`[SanMar] Looking up wholesale price for: ${style}/${color}`);
+
+    const { data: cacheData } = await supabase
+      .from('sanmar_pricing_cache')
+      .select('data')
+      .eq('cache_key', style)
+      .eq('cache_type', 'pricing')
+      .maybeSingle();
+
+    if (cacheData?.data) {
+      const pricingData = cacheData.data as any;
+
+      if (pricingData.parts && Array.isArray(pricingData.parts)) {
+        for (const part of pricingData.parts) {
+          if (part.colorName?.toLowerCase() === color.toLowerCase() && part.prices?.length > 0) {
+            const lowestTier = part.prices.reduce((lowest: any, current: any) => {
+              if (!lowest || current.minQuantity < lowest.minQuantity) return current;
+              return lowest;
+            }, part.prices[0]);
+            console.log(`[SanMar] Found cached price for ${style}/${color}: $${lowestTier.price}`);
+            return lowestTier.price;
+          }
+        }
+      }
+
+      if (pricingData.price) {
+        console.log(`[SanMar] Found cached base price for ${style}: $${pricingData.price}`);
+        return pricingData.price;
+      }
+    }
+
+    const { data: productCache } = await supabase
+      .from('sanmar_product_cache')
+      .select('data')
+      .eq('cache_key', style)
+      .eq('cache_type', 'product')
+      .maybeSingle();
+
+    if (productCache?.data) {
+      const productData = productCache.data as any;
+      if (productData.pricing?.piecePrice) {
+        console.log(`[SanMar] Found price in product cache: $${productData.pricing.piecePrice}`);
+        return productData.pricing.piecePrice;
+      }
+    }
+
+    console.log(`[SanMar] No cached price found for ${style}/${color}`);
+    return null;
+  } catch (error) {
+    console.error('[SanMar] Error getting wholesale price:', error);
+    return null;
   }
 }

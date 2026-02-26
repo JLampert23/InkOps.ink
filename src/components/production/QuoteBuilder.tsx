@@ -1505,10 +1505,19 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           const firstVariant = unifiedData.variants[0];
 
           if (firstVariant) {
-            // Extract pricing
             if (firstVariant.pricing?.piecePrice) {
               freshPrice = firstVariant.pricing.piecePrice;
               console.log('💰 SanMar pricing from PromoStandards:', freshPrice);
+            } else if (firstVariant.pricing?.priceBreaks && firstVariant.pricing.priceBreaks.length > 0) {
+              const lowestTier = firstVariant.pricing.priceBreaks.reduce((lowest: any, current: any) => {
+                if (!lowest || current.quantity < lowest.quantity) return current;
+                return lowest;
+              }, firstVariant.pricing.priceBreaks[0]);
+              freshPrice = lowestTier.price;
+              console.log('💰 SanMar pricing from price breaks (lowest tier):', freshPrice);
+            } else if (color.pricing?.wholesale) {
+              freshPrice = color.pricing.wholesale;
+              console.log('💰 SanMar using cached pricing from search results:', freshPrice);
             }
 
             // Extract media
