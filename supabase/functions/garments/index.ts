@@ -46,12 +46,20 @@ Deno.serve(async (req: Request) => {
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/').filter(Boolean);
 
-    if (pathParts[0] !== 'garments') {
+    console.log('[GarmentController] Path:', url.pathname);
+    console.log('[GarmentController] Parts:', pathParts);
+
+    const garmentsIndex = pathParts.indexOf('garments');
+    if (garmentsIndex === -1) {
       return jsonResponse({ error: 'Invalid endpoint' }, 404);
     }
 
+    const relevantParts = ['garments', ...pathParts.slice(garmentsIndex + 1)];
+    console.log('[GarmentController] Relevant parts:', relevantParts);
+
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
+      console.log('[GarmentController] No auth header');
       return jsonResponse({ error: 'Authorization required' }, 401);
     }
 
@@ -62,14 +70,18 @@ Deno.serve(async (req: Request) => {
         global: {
           headers: { Authorization: authHeader },
         },
+        auth: { autoRefreshToken: false, persistSession: false }
       }
     );
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return jsonResponse({ error: 'Unauthorized' }, 401);
+      console.error('[GarmentController] Auth error:', authError?.message);
+      return jsonResponse({ error: 'Unauthorized', message: authError?.message }, 401);
     }
+
+    console.log('[GarmentController] User authenticated:', user.id);
 
     const { data: profile, error: profileError } = await supabase
       .from('user_profiles')
@@ -82,7 +94,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const companyId = profile.company_id;
-    const params = parseRoute(pathParts);
+    const params = parseRoute(relevantParts);
 
     if (!params.style) {
       return jsonResponse({ error: 'Style parameter required' }, 400);
