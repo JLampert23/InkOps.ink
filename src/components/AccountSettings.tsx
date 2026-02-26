@@ -340,6 +340,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [quoteTerms, setQuoteTerms] = useState('');
   const [savingQuoteTerms, setSavingQuoteTerms] = useState(false);
 
+  const [defaultGarmentMarkup, setDefaultGarmentMarkup] = useState(0);
+  const [savingGarmentMarkup, setSavingGarmentMarkup] = useState(false);
+
   const [colorStitchOptions, setColorStitchOptions] = useState<ColorStitchOption[]>([]);
   const [loadingColorStitch, setLoadingColorStitch] = useState(false);
   const [editingColorStitchId, setEditingColorStitchId] = useState<string | null>(null);
@@ -505,6 +508,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setCustomLineItemOptions(data.custom_line_item_options || []);
         setInvoiceTerms(data.invoice_terms || '');
         setQuoteTerms(data.quote_terms || '');
+        setDefaultGarmentMarkup(data.default_garment_markup || 0);
       }
     } catch (err) {
       console.error('Error loading settings:', err);
@@ -719,6 +723,34 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save quote terms');
     } finally {
       setSavingQuoteTerms(false);
+    }
+  };
+
+  const saveGarmentMarkup = async () => {
+    if (!companySettings) {
+      showNotification('error', 'Error', 'Company settings not loaded');
+      return;
+    }
+
+    try {
+      setSavingGarmentMarkup(true);
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update({
+          default_garment_markup: defaultGarmentMarkup,
+        })
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
+
+      showNotification('success', 'Settings Saved', 'Default garment markup has been updated successfully!');
+      await loadSettings();
+    } catch (err) {
+      console.error('Error saving garment markup:', err);
+      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save garment markup');
+    } finally {
+      setSavingGarmentMarkup(false);
     }
   };
 
@@ -7684,6 +7716,67 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       />
                     </Suspense>
                   </div>
+                </div>
+              </div>
+
+              {/* Garment Markup Settings */}
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Garment Markup</h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Set the default markup percentage applied to wholesale garment prices</p>
+                </div>
+
+                <div className="space-y-4 border-t border-gray-200 dark:border-slate-700 pt-4">
+                  <div>
+                    <label htmlFor="garment-markup" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Default Markup Percentage
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        id="garment-markup"
+                        value={defaultGarmentMarkup}
+                        onChange={(e) => setDefaultGarmentMarkup(Math.max(0, parseFloat(e.target.value) || 0))}
+                        min="0"
+                        step="1"
+                        className="w-32 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+                      />
+                      <span className="text-sm text-gray-600 dark:text-gray-400">%</span>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      This markup is applied to the wholesale price from vendors. 0% = sell at cost, 50% = 1.5x, 100% = 2x
+                    </p>
+                  </div>
+
+                  <div className="bg-gray-50 dark:bg-slate-700 rounded-lg p-3 border border-gray-200 dark:border-slate-600">
+                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Example:</p>
+                    <div className="space-y-1 text-sm">
+                      <p className="text-gray-600 dark:text-gray-400">
+                        Wholesale price: <span className="font-mono font-semibold text-gray-900 dark:text-white">$10.00</span>
+                      </p>
+                      <p className="text-gray-600 dark:text-gray-400">
+                        With {defaultGarmentMarkup}% markup: <span className="font-mono font-semibold text-green-600 dark:text-green-400">${(10 * (1 + defaultGarmentMarkup / 100)).toFixed(2)}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={saveGarmentMarkup}
+                    disabled={savingGarmentMarkup}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {savingGarmentMarkup ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Save Markup Settings
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
 

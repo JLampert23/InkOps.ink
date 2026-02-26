@@ -75,6 +75,7 @@ interface QuoteItem {
   garment_images_data?: any;
   supplier_partid?: string;
   supplier_name?: string;
+  wholesale_price?: number;
 }
 
 interface QuoteFee {
@@ -1605,6 +1606,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       hasImagesData: !!garmentImages.garment_images_data,
     });
 
+    const wholesalePrice = freshPrice !== null ? freshPrice : (color?.pricing?.wholesale || 0);
+
     const newGroups = itemGroups.map(group => {
       if (group.id === groupId) {
         const newItems = [...group.items];
@@ -1613,15 +1616,16 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           item_number: product.style.trim(),
           color: color?.name?.trim() || '',
           description: `${product.brand} ${product.description}`.trim(),
-          unit_price: freshPrice !== null ? freshPrice : (color?.pricing?.wholesale || 0),
+          wholesale_price: wholesalePrice,
+          unit_price: 0,
           supplier_name: product.supplier === 'sanmar' ? 'SANMAR' : product.supplier === 'ssactivewear' ? 'SSACTIVEWEAR' : null,
           ...garmentImages,
         };
 
-        console.log('💰 Final unit_price set:', {
+        console.log('💰 Wholesale price set:', {
           freshPrice,
           cachedPrice: color?.pricing?.wholesale,
-          finalPrice: freshPrice !== null ? freshPrice : (color?.pricing?.wholesale || 0),
+          wholesalePrice,
         });
         console.log('📝 Updated item:', newItems[itemIdx]);
         return { ...group, items: newItems };
@@ -1842,6 +1846,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
             garment_images_data: item.garment_images_data || null,
             supplier_partid: item.supplier_partid || null,
             supplier_name: item.supplier_name || null,
+            wholesale_price: item.wholesale_price || null,
           };
         })
         );
