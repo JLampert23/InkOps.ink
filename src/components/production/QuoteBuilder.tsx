@@ -782,13 +782,16 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         return;
       }
 
-      // Get imprints for this group
+      // Get imprints for this group (can be empty - garment-only pricing is allowed)
       const groupImprints = getGroupImprints(group.label);
 
-      if (groupImprints.length === 0) {
-        if (!silent) showNotification('warning', 'No imprints found', 'Please add an imprint to this group first');
-        return;
-      }
+      // Get garment markup from company settings
+      const garmentMarkup = companySettings?.default_garment_markup || 0;
+
+      // Calculate total imprint price (0 if no imprints)
+      const totalImprintPrice = groupImprints.reduce((sum, imp) => {
+        return sum + (parseFloat(imp.price) || 0);
+      }, 0);
 
       // If quote is saved in database, call database function to ensure DB is in sync
       if (quoteId && !quoteId.startsWith('temp-')) {
@@ -815,14 +818,6 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         if (lineItemError) {
           console.error('Error fetching updated prices:', lineItemError);
         }
-
-        // Calculate the unit price from imprints
-        const totalImprintPrice = groupImprints.reduce((sum, imp) => {
-          return sum + (parseFloat(imp.price) || 0);
-        }, 0);
-
-        // Get garment markup from company settings
-        const garmentMarkup = companySettings?.default_garment_markup || 0;
 
         // Apply pricing to ALL items in the group (both saved and unsaved)
         const newGroups = groups.map(g => {
@@ -854,24 +849,16 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
 
         setItemGroups(newGroups);
         if (!silent) {
-          showNotification('success', 'Pricing Updated', 'Prices have been recalculated for all items in the group');
+          const hasImprints = groupImprints.length > 0;
+          const msg = hasImprints
+            ? 'Prices recalculated with imprints and garment markup'
+            : 'Prices calculated with garment markup (no imprints)';
+          showNotification('success', 'Pricing Updated', msg);
         }
         return;
       }
 
       // For unsaved quotes (draft mode), calculate pricing locally
-      // Sum all imprint prices for this group
-      let totalImprintPrice = 0;
-
-      for (const imprint of groupImprints) {
-        if (imprint.price && imprint.price > 0) {
-          totalImprintPrice += parseFloat(imprint.price);
-        }
-      }
-
-      // Get garment markup from company settings
-      const garmentMarkup = companySettings?.default_garment_markup || 0;
-
       console.log('Draft mode pricing:', {
         groupLabel: group.label,
         imprintCount: groupImprints.length,
@@ -905,7 +892,11 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         const sampleWholesale = sampleItem?.wholesale_price || 0;
         const sampleGarmentCost = sampleWholesale * (1 + garmentMarkup / 100);
         const sampleUnitPrice = totalImprintPrice + sampleGarmentCost;
-        showNotification('success', 'Price updated', `Unit price: $${sampleUnitPrice.toFixed(2)} (imprint: $${totalImprintPrice.toFixed(2)} + garment: $${sampleGarmentCost.toFixed(2)})`);
+        const hasImprints = groupImprints.length > 0;
+        const breakdown = hasImprints
+          ? `Unit: $${sampleUnitPrice.toFixed(2)} (imprint: $${totalImprintPrice.toFixed(2)} + garment: $${sampleGarmentCost.toFixed(2)})`
+          : `Unit: $${sampleUnitPrice.toFixed(2)} (garment with ${garmentMarkup}% markup)`;
+        showNotification('success', 'Price updated', breakdown);
       }
 
     } catch (error) {
@@ -1639,16 +1630,31 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
 
     const wholesalePrice = freshPrice !== null ? freshPrice : (color?.pricing?.wholesale || 0);
 
-    const newGroups = itemGroups.map(group => {
-      if (group.id === groupId) {
-        const newItems = [...group.items];
+    // Calculate unit price immediately with garment markup
+    const garmentMarkup = companySettings?.default_garment_markup || 0;
+    const garmentCostWithMarkup = wholesalePrice * (1 + garmentMarkup / 100);
+
+    // Get any existing imprint prices for this group
+    const group = itemGroups.find(g => g.id === groupId);
+    const groupImprints = group ? getGroupImprints(group.label) : [];
+    const totalImprintPrice = groupImprints.reduce((sum, imp) => sum + (parseFloat(imp.price) || 0), 0);
+
+    // Unit price = garment with markup + imprints (if any)
+    const calculatedUnitPrice = garmentCostWithMarkup + totalImprintPrice;
+    const currentItem = group?.items[itemIdx];
+    const totalQuantity = currentItem?.total_quantity || 0;
+
+    const newGroups = itemGroups.map(grp => {
+      if (grp.id === groupId) {
+        const newItems = [...grp.items];
         newItems[itemIdx] = {
           ...newItems[itemIdx],
           item_number: product.style.trim(),
           color: color?.name?.trim() || '',
           description: `${product.brand} ${product.description}`.trim(),
           wholesale_price: wholesalePrice,
-          unit_price: 0,
+          unit_price: calculatedUnitPrice,
+          total_price: totalQuantity * calculatedUnitPrice,
           supplier_name: product.supplier === 'sanmar' ? 'SANMAR' : product.supplier === 'ssactivewear' ? 'SSACTIVEWEAR' : null,
           ...garmentImages,
         };
@@ -1657,11 +1663,15 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           freshPrice,
           cachedPrice: color?.pricing?.wholesale,
           wholesalePrice,
+          garmentMarkup,
+          garmentCostWithMarkup,
+          totalImprintPrice,
+          calculatedUnitPrice,
         });
         console.log('📝 Updated item:', newItems[itemIdx]);
-        return { ...group, items: newItems };
+        return { ...grp, items: newItems };
       }
-      return group;
+      return grp;
     });
 
     setItemGroups(newGroups);
