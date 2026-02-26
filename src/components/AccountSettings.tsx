@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, CreditCard as Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, RefreshCw, Bug, MessageSquare, Eye, EyeOff, Grid3x3, FileText, CheckCircle, GripVertical, Workflow, Mail, Package, AlertTriangle, Copy, Check } from 'lucide-react';
+import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, CreditCard as Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, RefreshCw, MessageSquare, Eye, EyeOff, Grid3x3, FileText, CheckCircle, GripVertical, Workflow, Mail, Package, AlertTriangle, Copy, Check } from 'lucide-react';
 import { supabase } from '../lib/supabase-client';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
@@ -32,8 +32,6 @@ interface CompanySettings {
   available_invoice_statuses: string[];
   selected_invoice_statuses: string[];
   billing_selected_invoice_statuses: string[];
-  printavo_username: string | null;
-  printavo_api_token_encrypted: string | null;
   resend_api_key: string | null;
   stripe_public_key: string | null;
   stripe_secret_key: string | null;
@@ -70,15 +68,6 @@ interface UserProfile {
   full_name: string | null;
   role: string;
   created_at: string;
-}
-
-interface PrintavoStatus {
-  id: string;
-  name: string;
-  color: string | null;
-  position: number;
-  type: string | null;
-  is_billing_eligible: boolean;
 }
 
 interface InvoiceFee {
@@ -144,7 +133,7 @@ interface ProductionStation {
 
 type SettingsTab =
   | 'company-info' | 'quote-invoice-settings' | 'box-label'
-  | 'printavo-integration' | 'square-integration' | 'resend-integration' | 'twilio-integration' | 'stripe-payments' | 'supplier-integrations' | 'shipstation-integration' | 'chipply-integration'
+  | 'square-integration' | 'resend-integration' | 'twilio-integration' | 'stripe-payments' | 'supplier-integrations' | 'shipstation-integration' | 'chipply-integration'
   | 'user-management' | 'user-security'
   | 'automated-reports' | 'automations'
   | 'manage-goods' | 'receiving-settings' | 'po-settings'
@@ -193,14 +182,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [secondaryLogoPreview, setSecondaryLogoPreview] = useState<string | null>(null);
   const [savingCompany, setSavingCompany] = useState(false);
 
-  const [printavoUsername, setPrintavoUsername] = useState('');
-  const [printavoToken, setPrintavoToken] = useState('');
-  const [showPrintavoToken, setShowPrintavoToken] = useState(false);
-  const [savingIntegration, setSavingIntegration] = useState(false);
-  const [testingConnection, setTestingConnection] = useState(false);
-  const [testResult, setTestResult] = useState<any>(null);
-  const [testLoading, setTestLoading] = useState(false);
-  const [testData, setTestData] = useState<any>(null);
 
   const [squareAccessToken, setSquareAccessToken] = useState('');
   const [showSquareToken, setShowSquareToken] = useState(false);
@@ -288,13 +269,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [loadingStatuses, setLoadingStatuses] = useState(false);
   const [savingStatuses, setSavingStatuses] = useState(false);
   const [syncingStatuses, setSyncingStatuses] = useState(false);
-  const [syncingPrintavoData, setSyncingPrintavoData] = useState(false);
-  const [syncResult, setSyncResult] = useState<{ success: boolean; message: string } | null>(null);
-
   const [billingSelectedStatuses, setBillingSelectedStatuses] = useState<string[]>([]);
   const [savingBillingStatuses, setSavingBillingStatuses] = useState(false);
-
-  const [fullStatuses, setFullStatuses] = useState<PrintavoStatus[]>([]);
 
   const [unlockPin, setUnlockPin] = useState('');
   const [unlockPinConfirm, setUnlockPinConfirm] = useState('');
@@ -435,7 +411,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   useEffect(() => {
     loadSettings();
     loadUsers();
-    loadAvailableStatuses();
     loadStatusesFromDatabase();
     loadInvoiceFees();
     loadDecorationLocations();
@@ -447,7 +422,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   useEffect(() => {
     const integrationTabs: SettingsTab[] = [
-      'printavo-integration',
       'square-integration',
       'resend-integration',
       'twilio-integration',
@@ -508,8 +482,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setAvailableStatuses(data.available_invoice_statuses || []);
         setSelectedStatuses(data.selected_invoice_statuses || []);
         setBillingSelectedStatuses(data.billing_selected_invoice_statuses || []);
-        setPrintavoUsername(data.printavo_username || '');
-        setPrintavoToken(data.printavo_api_token_encrypted ? '••••••••••••••••' : '');
         setSquareEnvironment(data.square_environment || 'production');
         setSquareAccessToken(data.square_access_token ? '••••••••••••••••' : '');
         setSquareApplicationId(data.square_application_id || '');
@@ -750,102 +722,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     }
   };
 
-  const loadAvailableStatuses = async (): Promise<string[]> => {
-    try {
-      setLoadingStatuses(true);
-
-      // Get fresh session token
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !session) {
-        console.warn('Unable to get session for status loading, falling back to local data');
-        const { data, error } = await supabase
-          .from('printavo_invoices_calculated')
-          .select('status')
-          .not('status', 'is', null);
-
-        if (error) throw error;
-
-        const uniqueStatuses = Array.from(
-          new Set(data?.map(item => item.status).filter(status => status && status.trim() !== '') || [])
-        ).sort();
-
-        setAvailableStatuses(uniqueStatuses);
-        return uniqueStatuses;
-      }
-
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/printavo-company`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        console.error('Printavo API error:', response.status);
-        console.error('Error details:', JSON.stringify(errorData, null, 2));
-        console.warn('Could not fetch statuses from Printavo API, falling back to local data');
-        const { data, error } = await supabase
-          .from('printavo_invoices_calculated')
-          .select('status')
-          .not('status', 'is', null);
-
-        if (error) throw error;
-
-        const uniqueStatuses = Array.from(
-          new Set(data?.map(item => item.status).filter(status => status && status.trim() !== '') || [])
-        ).sort();
-
-        setAvailableStatuses(uniqueStatuses);
-        return uniqueStatuses;
-      }
-
-      const result = await response.json();
-
-      if (result.success && result.statuses) {
-        setAvailableStatuses(result.statuses);
-        return result.statuses;
-      } else {
-        const { data, error } = await supabase
-          .from('printavo_invoices_calculated')
-          .select('status')
-          .not('status', 'is', null);
-
-        if (error) throw error;
-
-        const uniqueStatuses = Array.from(
-          new Set(data?.map(item => item.status).filter(status => status && status.trim() !== '') || [])
-        ).sort();
-
-        setAvailableStatuses(uniqueStatuses);
-        return uniqueStatuses;
-      }
-    } catch (err) {
-      console.error('Error loading statuses:', err);
-      try {
-        const { data, error } = await supabase
-          .from('printavo_invoices_calculated')
-          .select('status')
-          .not('status', 'is', null);
-
-        if (!error) {
-          const uniqueStatuses = Array.from(
-            new Set(data?.map(item => item.status).filter(status => status && status.trim() !== '') || [])
-          ).sort();
-          setAvailableStatuses(uniqueStatuses);
-          return uniqueStatuses;
-        }
-      } catch (fallbackErr) {
-        console.error('Fallback status loading also failed:', fallbackErr);
-      }
-      return [];
-    } finally {
-      setLoadingStatuses(false);
-    }
-  };
-
   const loadStatusesFromDatabase = async () => {
     try {
       const { data, error } = await supabase
@@ -856,12 +732,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       if (error) throw error;
 
       if (data && data.length > 0) {
-        setFullStatuses(data);
         const billingEligible = data
-          .filter(s => s.is_billing_eligible)
-          .map(s => s.name);
+          .filter((s: { is_billing_eligible: boolean; name: string }) => s.is_billing_eligible)
+          .map((s: { name: string }) => s.name);
         setBillingSelectedStatuses(billingEligible);
-        const allNames = data.map(s => s.name);
+        const allNames = data.map((s: { name: string }) => s.name);
         if (availableStatuses.length === 0) {
           setAvailableStatuses(allNames);
         }
@@ -1056,155 +931,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       showNotification('error', 'Save Failed', 'Failed to save company settings. Please try again.');
     } finally {
       setSavingCompany(false);
-    }
-  };
-
-  const testPrintavoConnection = async () => {
-    try {
-      setTestingConnection(true);
-      setTestResult(null);
-
-      // Get fresh session token
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-
-      if (!token) {
-        setTestResult({
-          success: false,
-          error: 'No authentication token available. Please sign in again.',
-        });
-        return;
-      }
-
-      // Call the edge function with manual fetch to get full error details
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-printavo`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({}),
-      });
-
-      const result = await response.json();
-
-      // Show full response including error details
-      setTestResult(result);
-    } catch (err) {
-      console.error('Error testing connection:', err);
-      setTestResult({
-        success: false,
-        error: err instanceof Error ? err.message : 'Failed to test connection',
-      });
-    } finally {
-      setTestingConnection(false);
-    }
-  };
-
-  const runPrintavoTest = async () => {
-    setTestLoading(true);
-    setTestData(null);
-    try {
-      // Get session for auth
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setTestData({
-          success: false,
-          error: 'You must be logged in to run this test'
-        });
-        return;
-      }
-
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-printavo`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({}),
-      });
-
-      const result = await response.json();
-      setTestData(result);
-    } catch (error) {
-      setTestData({ error: error instanceof Error ? error.message : 'Unknown error' });
-    } finally {
-      setTestLoading(false);
-    }
-  };
-
-  const saveIntegration = async () => {
-    if (!printavoUsername.trim()) {
-      showNotification('warning', 'Username Required', 'Printavo username/email is required');
-      return;
-    }
-
-    if (!printavoToken.trim()) {
-      showNotification('warning', 'API Token Required', 'Printavo API token is required');
-      return;
-    }
-
-    try {
-      setSavingIntegration(true);
-
-      if (!import.meta.env.VITE_SUPABASE_URL) {
-        showNotification('error', 'Configuration Error', 'VITE_SUPABASE_URL environment variable is not set. Please configure it in your Vercel project settings.');
-        return;
-      }
-
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        showNotification('error', 'Not Authenticated', 'You must be logged in to update integration settings');
-        return;
-      }
-
-      const encryptResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crypto-service`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          action: 'encrypt',
-          token: printavoToken,
-        }),
-      });
-
-      if (!encryptResponse.ok) {
-        const errorData = await encryptResponse.json();
-        throw new Error(errorData.error || 'Failed to encrypt API token');
-      }
-
-      const { result: encryptedToken } = await encryptResponse.json();
-
-      const settingsData = {
-        printavo_username: printavoUsername,
-        printavo_api_token_encrypted: encryptedToken,
-        encryption_key_version: 'v1',
-      };
-
-      if (!companySettings?.id) {
-        showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
-        return;
-      }
-
-      const { error } = await supabase
-        .from('company_settings')
-        .update(settingsData)
-        .eq('id', companySettings.id);
-
-      if (error) throw error;
-
-      showNotification('success', 'Printavo Connected', 'Integration settings have been saved successfully!');
-      setPrintavoToken('••••••••••••••••');
-      setTestResult(null);
-      await loadSettings();
-      await loadAvailableStatuses();
-    } catch (err) {
-      console.error('Error saving integration settings:', err);
-      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save integration settings. Please try again.');
-    } finally {
-      setSavingIntegration(false);
     }
   };
 
@@ -2818,57 +2544,13 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const syncStatuses = async () => {
     try {
       setSyncingStatuses(true);
-      await loadAvailableStatuses();
       await loadStatusesFromDatabase();
-      showNotification('success', 'Statuses Synced', 'Successfully synced statuses from Printavo!');
+      showNotification('success', 'Statuses Synced', 'Successfully synced statuses!');
     } catch (err) {
       console.error('Error syncing statuses:', err);
       showNotification('error', 'Sync Failed', 'Failed to sync statuses. Please try again.');
     } finally {
       setSyncingStatuses(false);
-    }
-  };
-
-  const syncPrintavoData = async () => {
-    try {
-      setSyncingPrintavoData(true);
-      setSyncResult(null);
-
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('You must be logged in to sync Printavo data');
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/printavo-sync`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ mode: 'quick' }),
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to start sync');
-      }
-
-      setSyncResult({
-        success: true,
-        message: 'Sync started successfully! This may take a few minutes. Your data will be updated in the background.',
-      });
-    } catch (err) {
-      console.error('Error syncing Printavo data:', err);
-      setSyncResult({
-        success: false,
-        message: err instanceof Error ? err.message : 'Failed to sync data',
-      });
-    } finally {
-      setSyncingPrintavoData(false);
     }
   };
 
@@ -4007,27 +3689,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               {integrationsExpanded && (
                 <div className="mt-1 ml-2 space-y-1 collapsible-section collapsible-section-enter">
                   <button
-                    onClick={() => setActiveTab('printavo-integration')}
-                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group relative ${
-                      activeTab === 'printavo-integration'
-                        ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
-                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
-                    }`}
-                  >
-                    <Key className={`w-4 h-4 flex-shrink-0 ${activeTab === 'printavo-integration' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
-                    <div className="flex-1 text-left">
-                      <div className={`font-medium text-sm flex items-center gap-2 ${activeTab === 'printavo-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                        Printavo
-                        <div
-                          className={`w-2 h-2 rounded-full ${companySettings?.printavo_api_token_encrypted ? 'bg-green-500' : 'bg-red-500'}`}
-                          title={companySettings?.printavo_api_token_encrypted ? "Credentials saved" : "Credentials missing"}
-                        />
-                      </div>
-                    </div>
-                    {activeTab === 'printavo-integration' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
-                  </button>
-
-                  <button
                     onClick={() => setActiveTab('square-integration')}
                     className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group relative ${
                       activeTab === 'square-integration'
@@ -4664,232 +4325,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       )}
                     </button>
                   </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'printavo-integration' && canAccessIntegrations && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Printavo Integration</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Connect your Printavo account to sync data</p>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Printavo Email / Username
-                  </label>
-                  <input
-                    type="email"
-                    value={printavoUsername}
-                    onChange={(e) => setPrintavoUsername(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="your@email.com"
-                  />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Your Printavo account email</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Printavo API Token
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showPrintavoToken ? 'text' : 'password'}
-                      value={printavoToken}
-                      onChange={(e) => setPrintavoToken(e.target.value)}
-                      className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder={companySettings?.printavo_api_token_encrypted ? '••••••••••••••••' : 'Enter your API token'}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPrintavoToken(!showPrintavoToken)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                      tabIndex={-1}
-                    >
-                      {showPrintavoToken ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {companySettings?.printavo_api_token_encrypted
-                      ? 'Token is saved and encrypted. Enter a new token to update it.'
-                      : 'Find your API token in Printavo Settings → Integrations'}
-                  </p>
-                </div>
-
-                <div className="pt-4">
-                  <button
-                    onClick={saveIntegration}
-                    disabled={savingIntegration}
-                    className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                  >
-                    {savingIntegration ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4" />
-                        Save Credentials
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {companySettings?.printavo_username && (
-                  <>
-                    <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
-                          <Key className="w-5 h-5" />
-                          <div>
-                            <p className="font-medium">Integration Active</p>
-                            <p className="text-sm mt-1">Connected as: {companySettings.printavo_username}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={syncPrintavoData}
-                            disabled={syncingPrintavoData}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                          >
-                            {syncingPrintavoData ? (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                Syncing...
-                              </>
-                            ) : (
-                              <>
-                                <RefreshCw className="w-4 h-4" />
-                                Sync Now
-                              </>
-                            )}
-                          </button>
-                          <button
-                            onClick={testPrintavoConnection}
-                            disabled={testingConnection}
-                            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/30 disabled:opacity-50 transition-colors"
-                          >
-                            {testingConnection ? (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                Testing...
-                              </>
-                            ) : (
-                              'Test Connection'
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {syncResult && (
-                      <div className={`mt-4 p-4 rounded-lg border ${syncResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
-                        <p className={`text-sm ${syncResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
-                          {syncResult.message}
-                        </p>
-                      </div>
-                    )}
-
-                    {testResult && (
-                      <div className={`p-4 rounded-lg border ${
-                        testResult.success
-                          ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
-                          : testResult.error === 'Rate limit exceeded'
-                            ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
-                            : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-                      }`}>
-                        <div className="space-y-3">
-                          <div className={`font-medium text-lg ${
-                            testResult.success
-                              ? 'text-green-800 dark:text-green-200'
-                              : testResult.error === 'Rate limit exceeded'
-                                ? 'text-yellow-800 dark:text-yellow-200'
-                                : 'text-red-800 dark:text-red-200'
-                          }`}>
-                            {testResult.success
-                              ? '✓ Connection Successful!'
-                              : testResult.error === 'Rate limit exceeded'
-                                ? '⚠ Rate Limit Exceeded'
-                                : '✗ Connection Failed'}
-                          </div>
-
-                          {testResult.success && testResult.company && (
-                            <div className="text-sm text-green-700 dark:text-green-300">
-                              Connected to: <strong>{testResult.company.name}</strong>
-                            </div>
-                          )}
-
-                          {testResult.error === 'Rate limit exceeded' && (
-                            <div className="text-sm text-yellow-800 dark:text-yellow-200 space-y-2">
-                              <p className="font-medium">
-                                {testResult.printavoError || 'Too many requests to Printavo API. Please wait a moment before testing again.'}
-                              </p>
-                              <p className="text-xs">
-                                Your credentials may be correct, but Printavo is temporarily limiting API requests.
-                                Wait 30-60 seconds and try again.
-                              </p>
-                            </div>
-                          )}
-
-                          {testResult.error && testResult.error !== 'Rate limit exceeded' && (
-                            <div className="text-sm text-red-700 dark:text-red-300 font-medium">
-                              Error: {testResult.error}
-                            </div>
-                          )}
-
-                          {testResult.printavoError && testResult.error !== 'Rate limit exceeded' && (
-                            <div className="text-sm text-red-700 dark:text-red-300 font-medium">
-                              Printavo Error: {testResult.printavoError}
-                            </div>
-                          )}
-
-                          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
-                            <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Diagnostics:</div>
-                            <pre className="text-xs p-3 bg-white dark:bg-slate-900 rounded border border-gray-300 dark:border-gray-600 overflow-x-auto max-h-96">
-                              {JSON.stringify(testResult, null, 2)}
-                            </pre>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="mt-6 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Bug className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
-                          <span className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">Debug: Test Printavo Data Structure</span>
-                        </div>
-                        <button
-                          onClick={runPrintavoTest}
-                          disabled={testLoading}
-                          className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50 transition-colors"
-                        >
-                          {testLoading ? 'Loading...' : 'Run Test'}
-                        </button>
-                      </div>
-                    </div>
-
-                    {testData && (
-                      <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 border border-gray-200 dark:border-slate-600">
-                        <div className="flex items-center justify-between mb-4">
-                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Printavo API Response</h3>
-                          <button
-                            onClick={() => setTestData(null)}
-                            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-                          >
-                            Close
-                          </button>
-                        </div>
-                        <pre className="bg-gray-50 dark:bg-slate-900 p-4 rounded overflow-auto max-h-96 text-xs">
-                          {JSON.stringify(testData, null, 2)}
-                        </pre>
-                      </div>
-                    )}
-                  </>
                 )}
               </div>
             </div>
