@@ -272,7 +272,7 @@ function transformSanMarData(apiData: any): ProductResult {
 
       colors.push({
         name: color.colorName,
-        code: color.hex || "",
+        code: partIds[0] || color.hex || "",
         partIds,
         sizes,
         image_url: imageUrl,

@@ -278,10 +278,12 @@ async function searchSSActivewearCache(
       }
     }
 
-    // Get images for first part of each color
+    // Get images and pricing for first part of each color
     for (const [_, color] of colorMap) {
       if (color.partIds && color.partIds.length > 0) {
-        const firstPart = partsData.find(p => p.part_id === color.partIds![0]);
+        const firstPartId = color.partIds[0];
+        const firstPart = partsData.find(p => p.part_id === firstPartId);
+
         if (firstPart) {
           const { data: imageData } = await supabaseAdmin
             .from("images")
@@ -293,6 +295,23 @@ async function searchSSActivewearCache(
           if (imageData?.url) {
             color.image_url = imageData.url;
           }
+        }
+
+        // Get pricing from cache
+        const { data: pricingData } = await supabaseAdmin
+          .from("ss_catalog_pricing")
+          .select("unit_price")
+          .eq("company_id", companyId)
+          .eq("part_number", firstPartId)
+          .order("quantity_min", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+        if (pricingData?.unit_price) {
+          color.pricing = {
+            wholesale: parseFloat(pricingData.unit_price),
+            retail: parseFloat(pricingData.unit_price),
+          };
         }
       }
     }
