@@ -1861,7 +1861,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
             garment_images_data: item.garment_images_data || null,
             supplier_partid: item.supplier_partid || null,
             supplier_name: item.supplier_name || null,
-            wholesale_price: item.wholesale_price || null,
+            wholesale_price: item.wholesale_price ?? null,
           };
         })
         );

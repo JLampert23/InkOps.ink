@@ -68,6 +68,8 @@ export async function searchSanMarCatalog(
     }
 
     let mediaData = null;
+    let pricingData = null;
+
     try {
       const mediaUrl = `${supabaseUrl}/functions/v1/sanmar-api?action=media&style=${encodeURIComponent(style)}&companyId=${encodeURIComponent(companyId)}`;
       const mediaResponse = await fetch(mediaUrl, {
@@ -81,13 +83,31 @@ export async function searchSanMarCatalog(
       console.warn(`Media fetch failed (non-critical): ${mediaError.message}`);
     }
 
+    // Fetch pricing for the first part to get wholesale price
+    const firstPartId = productData.data.parts?.[0]?.partId;
+    if (firstPartId) {
+      try {
+        const pricingUrl = `${supabaseUrl}/functions/v1/sanmar-api?action=pricing&partId=${encodeURIComponent(firstPartId)}&companyId=${encodeURIComponent(companyId)}`;
+        const pricingResponse = await fetch(pricingUrl, {
+          headers: { "Authorization": `Bearer ${supabaseServiceKey}` },
+        });
+        if (pricingResponse.ok) {
+          const pricingJson = await pricingResponse.json();
+          pricingData = pricingJson.data || null;
+          console.log(`Fetched pricing for part ${firstPartId}:`, pricingData?.parts?.[0]?.prices?.[0]?.price);
+        }
+      } catch (pricingError: any) {
+        console.warn(`Pricing fetch failed (non-critical): ${pricingError.message}`);
+      }
+    }
+
     const apiDataForTransform = {
       success: true,
       styleNumber: style,
       partId: null,
       style: productData.data,
       inventory: { items: [] },
-      pricing: { parts: [] },
+      pricing: pricingData || { parts: [] },
       media: mediaData || {
         images: [],
         views: {
