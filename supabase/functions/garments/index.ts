@@ -63,37 +63,45 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: 'Authorization required' }, 401);
     }
 
+    const token = authHeader.replace('Bearer ', '');
+    const jwtParts = token.split('.');
+
+    if (jwtParts.length !== 3) {
+      console.log('[GarmentController] Invalid JWT format');
+      return jsonResponse({ error: 'Invalid JWT format' }, 401);
+    }
+
+    let userId: string;
+    try {
+      const payload = JSON.parse(atob(jwtParts[1]));
+      userId = payload.sub;
+      console.log('[GarmentController] User ID from JWT:', userId);
+    } catch (e) {
+      console.error('[GarmentController] Failed to decode JWT:', e);
+      return jsonResponse({ error: 'Invalid JWT' }, 401);
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
       {
-        global: {
-          headers: { Authorization: authHeader },
-        },
         auth: { autoRefreshToken: false, persistSession: false }
       }
     );
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      console.error('[GarmentController] Auth error:', authError?.message);
-      return jsonResponse({ error: 'Unauthorized', message: authError?.message }, 401);
-    }
-
-    console.log('[GarmentController] User authenticated:', user.id);
-
     const { data: profile, error: profileError } = await supabase
       .from('user_profiles')
       .select('company_id')
-      .eq('id', user.id)
+      .eq('id', userId)
       .maybeSingle();
 
     if (profileError || !profile?.company_id) {
+      console.error('[GarmentController] Profile error:', profileError?.message);
       return jsonResponse({ error: 'Company not found' }, 404);
     }
 
     const companyId = profile.company_id;
+    console.log('[GarmentController] Company ID:', companyId);
     const params = parseRoute(relevantParts);
 
     if (!params.style) {
