@@ -101,6 +101,25 @@ function parseXmlResponse(xmlText: string): { success: boolean; xmlText?: string
     };
   }
 
+  // Check for authentication failures in product name or description
+  const productNameLower = (getXmlValue(xmlText, 'productName') || '').toLowerCase();
+  const descriptionLower = (getXmlValue(xmlText, 'description') || '').toLowerCase();
+
+  if (productNameLower.includes('authentication') ||
+      productNameLower.includes('credentials failed') ||
+      productNameLower.includes('unauthorized') ||
+      descriptionLower.includes('authentication') ||
+      descriptionLower.includes('credentials failed') ||
+      descriptionLower.includes('unauthorized')) {
+    return {
+      success: false,
+      error: {
+        code: 'AUTH_FAILED',
+        description: 'Authentication Credentials failed - check your SSActivewear username and API key'
+      }
+    };
+  }
+
   return {
     success: true,
     xmlText
