@@ -296,16 +296,24 @@ Deno.serve(async (req: Request) => {
   <shar:productId>${escapedStyleNumber}</shar:productId>
 </ns2:GetProductRequest>`;
 
-    // S&S Activewear MediaContent requires B-prefixed productId (e.g., B00760) per API docs page 16
-    const bPrefixedStyleNumber = `B${styleNumber.replace(/^B/i, '')}`;
-    const escapedBPrefixedStyleNumber = escapeXml(bPrefixedStyleNumber);
+    // S&S Activewear MediaContent uses raw style number (NOT B-prefixed like SanMar)
+    // Clean the style number: uppercase, remove non-alphanumeric, strip any erroneous B prefix
+    let cleanedStyleNumber = styleNumber.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (cleanedStyleNumber.startsWith('B') && cleanedStyleNumber.length > 1) {
+      const afterB = cleanedStyleNumber.substring(1);
+      // If it looks like an accidentally B-prefixed style, strip the B
+      if (/[A-Z]/.test(afterB) || /^\d+$/.test(afterB)) {
+        cleanedStyleNumber = afterB;
+      }
+    }
+    const escapedCleanedStyleNumber = escapeXml(cleanedStyleNumber);
 
     const mediaSoap = `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${escapedAccountNumber}</shar:id>
   <shar:password>${escapedApiKey}</shar:password>
   <shar:mediaType>Image</shar:mediaType>
-  <shar:productId>${escapedBPrefixedStyleNumber}</shar:productId>
+  <shar:productId>${escapedCleanedStyleNumber}</shar:productId>
 </ns2:GetMediaContentRequest>`;
 
     // Build vendor config for live wholesale pricing
@@ -337,8 +345,8 @@ Deno.serve(async (req: Request) => {
   <shar:productId>${escapedPartId}</shar:productId>
 </ns2:GetInventoryLevelsRequest>`
       ) : Promise.resolve(null),
-      // 3. Live Wholesale Pricing with FOB (S&S uses B-prefixed style IDs)
-      getLiveWholesalePricing(ssaVendorConfig, `B${styleNumber.replace(/^B/i, '')}`, SSA_DEFAULT_FOB_ID),
+      // 3. Live Wholesale Pricing with FOB (S&S uses raw style numbers, NOT B-prefixed)
+      getLiveWholesalePricing(ssaVendorConfig, cleanedStyleNumber, SSA_DEFAULT_FOB_ID),
       // 4. Media Content - use styleNumber as productId and partId for color-specific images
       makePromoStandardsRequest(
         PROMOSTANDARDS_ENDPOINTS.media,

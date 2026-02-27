@@ -23,23 +23,33 @@ interface SSActivewearCredentials {
 const VALID_SS_FOB_IDS = ['IL', 'KS', 'NJ', 'TX', 'GA', 'NV', 'DS'];
 
 /**
- * Converts a user-facing style number to S&S MediaContent productId format.
- * MediaContent requires "B" + uppercase alphanumeric style number.
- * Example: "TT11L" -> "BTT11L", "pc54" -> "BPC54"
+ * Normalizes a user-facing style number for S&S MediaContent API.
+ * S&S Activewear MediaContent uses the RAW style number (NOT B-prefixed like SanMar).
+ * Example: "pc54" -> "PC54", "5000" -> "5000", "G500" -> "G500"
+ *
+ * NOTE: The "B" prefix is for SanMar, NOT S&S Activewear.
  */
-function getSsProductIdFromStyle(styleNumber: string): string {
+function getSsMediaStyleNumber(styleNumber: string): string {
   if (!styleNumber) return '';
 
   // Remove non-alphanumeric characters and uppercase
   const cleaned = styleNumber.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
 
-  // If already starts with B, return as-is
-  if (cleaned.startsWith('B')) {
-    return cleaned;
+  // If incorrectly starts with B followed by letters (like BPC54), remove the B
+  // This handles cases where SanMar-style IDs were mistakenly passed
+  if (cleaned.startsWith('B') && cleaned.length > 1) {
+    const afterB = cleaned.substring(1);
+    // If the part after B has letters, it was likely a SanMar-style ID
+    if (/[A-Z]/.test(afterB) && !/^\d+$/.test(afterB)) {
+      return afterB;
+    }
+    // If it's like B5000 (B + pure numbers), also strip the B for S&S
+    if (/^\d+$/.test(afterB)) {
+      return afterB;
+    }
   }
 
-  // Prefix with B for MediaContent API
-  return 'B' + cleaned;
+  return cleaned;
 }
 
 function normalizeSsProductId(input: string): string {
@@ -864,8 +874,8 @@ Deno.serve(async (req: Request) => {
         const partId = url.searchParams.get("partId");
         const partIdTag = partId ? `<shar:partId>${partId}</shar:partId>` : '';
 
-        // MediaContent MUST use style-level productId (B + style number), NOT partId
-        const mediaProductId = getSsProductIdFromStyle(productId);
+        // MediaContent uses raw style number for S&S Activewear (NOT B-prefixed like SanMar)
+        const mediaProductId = getSsMediaStyleNumber(productId);
         console.log(`[SS Media] Raw input: "${productId}" -> MediaContent productId: "${mediaProductId}"`);
 
         const soapBody = `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
