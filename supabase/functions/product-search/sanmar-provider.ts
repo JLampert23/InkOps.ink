@@ -1,3 +1,10 @@
+import {
+  getSanMarImageCache,
+  setSanMarImageCache,
+  buildSanMarCdnFallbackUrl,
+  logImageOperation,
+} from "../_shared/image-cache.ts";
+
 export interface ColorOption {
   name: string;
   code: string;
@@ -113,18 +120,83 @@ export async function searchSanMarCatalog(
 
     let mediaData = null;
     let pricingData = null;
+    let imageCacheHit = false;
+    let usedCdnFallback = false;
 
-    try {
-      const mediaUrl = `${supabaseUrl}/functions/v1/sanmar-api?action=media&style=${encodeURIComponent(style)}&companyId=${encodeURIComponent(companyId)}`;
-      const mediaResponse = await fetch(mediaUrl, {
-        headers: { "Authorization": `Bearer ${supabaseServiceKey}` },
+    // Step 1: Check image cache first
+    const cachedImages = await getSanMarImageCache(supabaseAdmin, companyId, style);
+    if (cachedImages && cachedImages.urls) {
+      logImageOperation("sanmar", style, "cache_hit", {
+        imageCount: (cachedImages.urls.frontImages?.length || 0) +
+                   (cachedImages.urls.rearImages?.length || 0) +
+                   (cachedImages.urls.sideImages?.length || 0)
       });
-      if (mediaResponse.ok) {
-        const mediaJson = await mediaResponse.json();
-        mediaData = mediaJson.data || null;
+      imageCacheHit = true;
+      mediaData = {
+        images: [],
+        views: cachedImages.urls,
+      };
+    }
+
+    // Step 2: If no cache, fetch from vendor API
+    if (!imageCacheHit) {
+      logImageOperation("sanmar", style, "cache_miss", {});
+
+      try {
+        const mediaUrl = `${supabaseUrl}/functions/v1/sanmar-api?action=media&style=${encodeURIComponent(style)}&companyId=${encodeURIComponent(companyId)}`;
+        logImageOperation("sanmar", style, "api_fetch", { endpoint: "sanmar-api/media" });
+
+        const mediaResponse = await fetch(mediaUrl, {
+          headers: { "Authorization": `Bearer ${supabaseServiceKey}` },
+        });
+        if (mediaResponse.ok) {
+          const mediaJson = await mediaResponse.json();
+          mediaData = mediaJson.data || null;
+
+          if (mediaData?.images?.length > 0) {
+            logImageOperation("sanmar", style, "api_fetch", { imageCount: mediaData.images.length });
+          }
+        }
+      } catch (mediaError: any) {
+        console.warn(`Media fetch failed (non-critical): ${mediaError.message}`);
       }
-    } catch (mediaError: any) {
-      console.warn(`Media fetch failed (non-critical): ${mediaError.message}`);
+
+      // Step 3: If API returned no images, use CDN fallback
+      if (!mediaData?.images || mediaData.images.length === 0) {
+        logImageOperation("sanmar", style, "cdn_fallback", { fallbackUsed: true });
+        usedCdnFallback = true;
+
+        const fallbackUrls = buildSanMarCdnFallbackUrl(style);
+        if (fallbackUrls.length > 0) {
+          mediaData = {
+            images: fallbackUrls.map(url => ({
+              url,
+              productId: style,
+              partId: "",
+              classTypeName: url.includes("_fm") ? "Front" : url.includes("_bm") ? "Back" : "Other",
+              color: "",
+              singlePart: false,
+            })),
+            views: {
+              front: fallbackUrls[0] || null,
+              rear: fallbackUrls.find(u => u.includes("_bm")) || null,
+              side: null,
+              lifestyle: null,
+              frontImages: fallbackUrls.filter(u => u.includes("_fm")),
+              rearImages: fallbackUrls.filter(u => u.includes("_bm")),
+              sideImages: [],
+              lifestyleImages: [],
+              otherImages: [],
+            },
+          };
+        }
+      }
+
+      // Step 4: Write to cache only if we have valid images
+      if (mediaData?.images && mediaData.images.length > 0) {
+        await setSanMarImageCache(supabaseAdmin, companyId, style, mediaData);
+        logImageOperation("sanmar", style, "cache_write", { imageCount: mediaData.images.length });
+      }
     }
 
     // Fetch pricing for the first part to get wholesale price
@@ -202,16 +274,62 @@ async function getCachedProduct(
       return null;
     }
 
-    const { data: mediaCache } = await supabaseAdmin
-      .from("sanmar_media_cache")
-      .select("data, expires_at")
-      .eq("company_id", companyId)
-      .eq("cache_key", cacheKey)
-      .eq("cache_type", "style")
-      .maybeSingle();
+    // Check image cache using dedicated utility
+    const cachedImages = await getSanMarImageCache(supabaseAdmin, companyId, style);
+    let mediaData = null;
+
+    if (cachedImages && cachedImages.urls) {
+      logImageOperation("sanmar", style, "cache_hit", {
+        imageCount: (cachedImages.urls.frontImages?.length || 0) +
+                   (cachedImages.urls.rearImages?.length || 0)
+      });
+      mediaData = {
+        images: [],
+        views: cachedImages.urls,
+      };
+    } else {
+      // Fallback to legacy media cache table
+      const { data: legacyMediaCache } = await supabaseAdmin
+        .from("sanmar_media_cache")
+        .select("data, expires_at")
+        .eq("company_id", companyId)
+        .eq("cache_key", cacheKey)
+        .eq("cache_type", "style")
+        .maybeSingle();
+
+      mediaData = legacyMediaCache?.data || null;
+
+      // If still no images, try CDN fallback
+      if (!mediaData?.images || mediaData.images.length === 0) {
+        logImageOperation("sanmar", style, "cdn_fallback", { fallbackUsed: true });
+        const fallbackUrls = buildSanMarCdnFallbackUrl(style);
+        if (fallbackUrls.length > 0) {
+          mediaData = {
+            images: fallbackUrls.map(url => ({
+              url,
+              productId: style,
+              partId: "",
+              classTypeName: url.includes("_fm") ? "Front" : "Other",
+              color: "",
+              singlePart: false,
+            })),
+            views: {
+              front: fallbackUrls[0] || null,
+              rear: null,
+              side: null,
+              lifestyle: null,
+              frontImages: fallbackUrls,
+              rearImages: [],
+              sideImages: [],
+              lifestyleImages: [],
+              otherImages: [],
+            },
+          };
+        }
+      }
+    }
 
     const productData = productCache.data;
-    const mediaData = mediaCache?.data || null;
 
     const apiData = {
       success: true,
