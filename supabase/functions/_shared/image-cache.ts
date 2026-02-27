@@ -252,23 +252,49 @@ export async function setSSActivewearImageCache(
 
   console.log(`[Image Cache] Writing SSActivewear cache: style=${styleId}, part=${partInternalId}, images=${images.length}`);
 
+  let successCount = 0;
   try {
     for (const img of images) {
       if (!img.url) continue;
 
-      await supabaseAdmin
+      const { data: existing } = await supabaseAdmin
         .from("images")
-        .upsert({
-          company_id: companyId,
-          part_id: partInternalId,
-          class_type: img.classTypeName || null,
-          url: img.url,
-          color: img.color || null,
-        }, { onConflict: "company_id,part_id,class_type" });
+        .select("id")
+        .eq("company_id", companyId)
+        .eq("part_id", partInternalId)
+        .eq("url", img.url)
+        .maybeSingle();
+
+      if (existing) {
+        await supabaseAdmin
+          .from("images")
+          .update({
+            class_type: img.classTypeName || null,
+            color: img.color || null,
+          })
+          .eq("id", existing.id);
+        successCount++;
+      } else {
+        const { error } = await supabaseAdmin
+          .from("images")
+          .insert({
+            company_id: companyId,
+            part_id: partInternalId,
+            class_type: img.classTypeName || null,
+            url: img.url,
+            color: img.color || null,
+          });
+
+        if (!error) {
+          successCount++;
+        } else {
+          console.warn(`[Image Cache] Insert failed for ${img.url}: ${error.message}`);
+        }
+      }
     }
 
-    console.log(`[Image Cache] SSActivewear cache written successfully for ${styleId}`);
-    return true;
+    console.log(`[Image Cache] SSActivewear cache written: ${successCount}/${images.length} images for ${styleId}`);
+    return successCount > 0;
   } catch (error) {
     console.error(`[Image Cache] Error writing SSActivewear cache:`, error);
     return false;

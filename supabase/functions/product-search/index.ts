@@ -705,17 +705,41 @@ async function fetchAndCacheSSActivewear(
           .maybeSingle();
 
         if (partForImage) {
-          await supabaseAdmin
+          // Check if image already exists (unique constraint is on company_id, part_id, url)
+          const { data: existingImage } = await supabaseAdmin
             .from("images")
-            .upsert({
-              company_id: companyId,
-              part_id: partForImage.id,
-              class_type: media.classTypeName || null,
-              url: media.url,
-            }, {
-              onConflict: "company_id,part_id,class_type"
-            });
-          cachedCount++;
+            .select("id")
+            .eq("company_id", companyId)
+            .eq("part_id", partForImage.id)
+            .eq("url", media.url)
+            .maybeSingle();
+
+          if (existingImage) {
+            // Update existing image
+            await supabaseAdmin
+              .from("images")
+              .update({
+                class_type: media.classTypeName || null,
+              })
+              .eq("id", existingImage.id);
+            cachedCount++;
+          } else {
+            // Insert new image
+            const { error: insertError } = await supabaseAdmin
+              .from("images")
+              .insert({
+                company_id: companyId,
+                part_id: partForImage.id,
+                class_type: media.classTypeName || null,
+                url: media.url,
+              });
+
+            if (!insertError) {
+              cachedCount++;
+            } else {
+              console.warn(`Failed to cache image ${media.url}: ${insertError.message}`);
+            }
+          }
         }
       }
 
