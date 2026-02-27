@@ -411,19 +411,20 @@ export async function fetchSanMarProductData(
   }
   const uniqueXmlColors = [...new Set(allXmlColorNames)];
 
-  const sampleIndices = [0, 12, 24, 36, partMatches.length - 1].filter(i => i < partMatches.length);
+  const sampleIndices = [0, 12, 24, 36, partMatches.length - 1].filter(i => i >= 0 && i < partMatches.length);
   const matchSamples = sampleIndices.map(idx => {
     const m = partMatches[idx];
+    if (!m) return null;
     return {
       index: idx,
       matchPosition: m.index,
-      contentLength: m[1].length,
-      contentPreview: m[1].substring(0, 600),
-      extractedPartId: getXmlValue(m[1], "partId"),
-      extractedColorName: getXmlValue(m[1], "colorName"),
-      extractedLabelSize: getXmlValue(m[1], "labelSize"),
+      contentLength: m[1]?.length || 0,
+      contentPreview: m[1]?.substring(0, 600) || '',
+      extractedPartId: getXmlValue(m[1] || '', "partId"),
+      extractedColorName: getXmlValue(m[1] || '', "colorName"),
+      extractedLabelSize: getXmlValue(m[1] || '', "labelSize"),
     };
-  });
+  }).filter(Boolean);
 
   (styleData as any)._debug = {
     xmlLength: responseXml.length,
