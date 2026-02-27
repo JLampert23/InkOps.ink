@@ -22,6 +22,26 @@ interface SSActivewearCredentials {
 
 const VALID_SS_FOB_IDS = ['IL', 'KS', 'NJ', 'TX', 'GA', 'NV', 'DS'];
 
+/**
+ * Converts a user-facing style number to S&S MediaContent productId format.
+ * MediaContent requires "B" + uppercase alphanumeric style number.
+ * Example: "TT11L" -> "BTT11L", "pc54" -> "BPC54"
+ */
+function getSsProductIdFromStyle(styleNumber: string): string {
+  if (!styleNumber) return '';
+
+  // Remove non-alphanumeric characters and uppercase
+  const cleaned = styleNumber.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+  // If already starts with B, return as-is
+  if (cleaned.startsWith('B')) {
+    return cleaned;
+  }
+
+  // Prefix with B for MediaContent API
+  return 'B' + cleaned;
+}
+
 function normalizeSsProductId(input: string): string {
   if (!input) return '';
 
@@ -844,15 +864,16 @@ Deno.serve(async (req: Request) => {
         const partId = url.searchParams.get("partId");
         const partIdTag = partId ? `<shar:partId>${partId}</shar:partId>` : '';
 
-        const normalizedProductId = normalizeSsProductId(productId);
-        console.log(`[SS Media] Raw input: "${productId}" -> Normalized: "${normalizedProductId}"`);
+        // MediaContent MUST use style-level productId (B + style number), NOT partId
+        const mediaProductId = getSsProductIdFromStyle(productId);
+        console.log(`[SS Media] Raw input: "${productId}" -> MediaContent productId: "${mediaProductId}"`);
 
         const soapBody = `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${credentials.accountNumber}</shar:id>
   <shar:password>${decryptedApiKey}</shar:password>
   <shar:mediaType>Image</shar:mediaType>
-  <shar:productId>${normalizedProductId}</shar:productId>
+  <shar:productId>${mediaProductId}</shar:productId>
   ${partIdTag}
 </ns2:GetMediaContentRequest>`;
 
@@ -870,8 +891,15 @@ Deno.serve(async (req: Request) => {
 
         const parseResult = parseXmlResponse(xmlResponse);
 
+        // Check for 404/not found in response
         if (!parseResult.success) {
-          console.error(`[SS Media] PromoStandards error for ${normalizedProductId}:`, parseResult.error);
+          const is404 = parseResult.error?.code === '404' ||
+                        parseResult.error?.description?.toLowerCase().includes('not found') ||
+                        parseResult.error?.description?.toLowerCase().includes('no media');
+          console.error(`[SS Media] PromoStandards error for ${mediaProductId}:`, parseResult.error);
+          if (is404) {
+            console.error(`[SS Media] 404 NOT FOUND - productId "${mediaProductId}" returned no media content`);
+          }
           return new Response(
             JSON.stringify({
               success: false,
@@ -879,12 +907,12 @@ Deno.serve(async (req: Request) => {
               supplier: "ssactivewear",
               action,
               error: "ProductNotFound",
-              productId: normalizedProductId,
+              productId: mediaProductId,
               rawInput: productId,
               errorDetails: parseResult.error?.description,
               errorCode: parseResult.error?.code,
               data: {
-                productId: normalizedProductId,
+                productId: mediaProductId,
                 partId: partId || null,
                 mediaContent: []
               }
@@ -905,7 +933,12 @@ Deno.serve(async (req: Request) => {
         const partIds = getXmlValues(xmlDoc, "partId");
         const singleParts = getXmlValues(xmlDoc, "singlePart");
 
-        console.log(`Parsed media data: ${urls.length} URLs, ${classTypeNames.length} classTypeNames, ${colors.length} colors, ${partIds.length} partIds`);
+        console.log(`[SS Media] Parsed media data for ${mediaProductId}: ${urls.length} URLs, ${classTypeNames.length} classTypeNames, ${colors.length} colors, ${partIds.length} partIds`);
+
+        // Log if no media content was returned (effective 404)
+        if (urls.length === 0) {
+          console.error(`[SS Media] 404 - No media content returned for productId "${mediaProductId}"`);
+        }
 
         const mediaArray = urls.map((url, i) => {
           const classTypeName = classTypeNames[i] || "";
@@ -926,9 +959,9 @@ Deno.serve(async (req: Request) => {
           };
         }).filter(item => item.isImage);
 
-        console.log(`Filtered to ${mediaArray.length} actual images`);
+        console.log(`[SS Media] Filtered to ${mediaArray.length} actual images for ${mediaProductId}`);
         if (mediaArray.length > 0) {
-          console.log("First image:", mediaArray[0]);
+          console.log("[SS Media] First image:", mediaArray[0]);
         }
 
         return new Response(
@@ -937,7 +970,7 @@ Deno.serve(async (req: Request) => {
             supplier: "ssactivewear",
             action,
             data: {
-              productId: normalizedProductId,
+              productId: mediaProductId,
               rawInput: productId,
               partId: partId || null,
               mediaContent: mediaArray,
