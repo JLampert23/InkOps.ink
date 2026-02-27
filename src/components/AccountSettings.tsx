@@ -240,7 +240,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [showSsaAccountNumber, setShowSsaAccountNumber] = useState(false);
   const [showSsaApiKey, setShowSsaApiKey] = useState(false);
   const [ssaHasCredentials, setSsaHasCredentials] = useState(false);
-  const [savingSuppliers, setSavingSuppliers] = useState(false);
+  const [savingSanmar, setSavingSanmar] = useState(false);
+  const [savingSSA, setSavingSSA] = useState(false);
   const [testingSuppliers, setTestingSuppliers] = useState(false);
   const [supplierTestResult, setSupplierTestResult] = useState<any>(null);
   const [testingSanmar, setTestingSanmar] = useState(false);
@@ -1625,9 +1626,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     }
   };
 
-  const saveSupplierIntegrations = async () => {
+  const saveSanmarSettings = async () => {
     try {
-      setSavingSuppliers(true);
+      setSavingSanmar(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         showNotification('error', 'Not Authenticated', 'You must be logged in to update supplier settings');
@@ -1639,18 +1640,27 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
-      const settingsData: any = {
+      console.log('[SanMar Save] Starting save operation', {
+        vendorKey: 'sanmar',
+        enabled: sanmarEnabled,
+        hasExistingCredentials: sanmarHasCredentials,
+      });
+
+      const settingsData: Record<string, any> = {
         sanmar_enabled: sanmarEnabled,
-        ssactivewear_enabled: ssaEnabled,
       };
 
-      // Handle SanMar credentials
       if (sanmarEnabled) {
-        if (sanmarUsername.trim()) {
-          settingsData.sanmar_promo_username = sanmarUsername.trim();
+        const newUsername = sanmarUsername.trim();
+        if (newUsername && newUsername !== '••••••••••••••••') {
+          settingsData.sanmar_promo_username = newUsername;
+          console.log('[SanMar Save] Updating username');
+        } else {
+          console.log('[SanMar Save] Preserving existing username (field empty or masked)');
         }
 
-        if (sanmarPassword.trim() && sanmarPassword !== '••••••••••••••••') {
+        const newPassword = sanmarPassword.trim();
+        if (newPassword && newPassword !== '••••••••••••••••') {
           const encryptResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crypto-service`, {
             method: 'POST',
             headers: {
@@ -1659,7 +1669,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             },
             body: JSON.stringify({
               action: 'encrypt',
-              token: sanmarPassword,
+              token: newPassword,
             }),
           });
 
@@ -1669,15 +1679,81 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
           const { result: encryptedPassword } = await encryptResponse.json();
           settingsData.sanmar_promo_password_encrypted = encryptedPassword;
+          console.log('[SanMar Save] Updating password (encrypted)');
+        } else {
+          console.log('[SanMar Save] Preserving existing password (field empty or masked)');
+        }
+
+        if (!sanmarHasCredentials && (!settingsData.sanmar_promo_username || !settingsData.sanmar_promo_password_encrypted)) {
+          showNotification('warning', 'SanMar Credentials Required', 'Please enter Username and Password to enable SanMar integration');
+          return;
         }
       } else {
         settingsData.sanmar_promo_username = null;
         settingsData.sanmar_promo_password_encrypted = null;
+        console.log('[SanMar Save] Clearing credentials (disabled)');
       }
 
-      // Handle SSActivewear credentials
+      console.log('[SanMar Save] Saving to database', {
+        fieldsToUpdate: Object.keys(settingsData),
+        preservedFields: ['ssactivewear_*']
+      });
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update(settingsData)
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
+
+      showNotification('success', 'SanMar Settings Saved', 'SanMar integration settings have been saved successfully!');
+      setSanmarPassword(sanmarPassword.trim() && sanmarPassword !== '••••••••••••••••' ? '••••••••••••••••' : sanmarPassword);
+      setSanmarTestResult(null);
+      await loadSettings();
+      await loadSupplierIntegrationSettings();
+    } catch (err) {
+      console.error('[SanMar Save] Error:', err);
+      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save SanMar settings');
+    } finally {
+      setSavingSanmar(false);
+    }
+  };
+
+  const saveSSActivewearSettings = async () => {
+    try {
+      setSavingSSA(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        showNotification('error', 'Not Authenticated', 'You must be logged in to update supplier settings');
+        return;
+      }
+
+      if (!companySettings?.id) {
+        showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
+        return;
+      }
+
+      console.log('[SSActivewear Save] Starting save operation', {
+        vendorKey: 'ssactivewear',
+        enabled: ssaEnabled,
+        hasExistingCredentials: ssaHasCredentials,
+      });
+
+      const settingsData: Record<string, any> = {
+        ssactivewear_enabled: ssaEnabled,
+      };
+
       if (ssaEnabled) {
-        if (ssaApiKey.trim() && ssaApiKey !== '••••••••••••••••') {
+        const newAccountNumber = ssaAccountNumber.trim();
+        if (newAccountNumber && newAccountNumber !== '••••••••••••••••') {
+          settingsData.ssactivewear_username = newAccountNumber;
+          console.log('[SSActivewear Save] Updating account number');
+        } else {
+          console.log('[SSActivewear Save] Preserving existing account number (field empty or masked)');
+        }
+
+        const newApiKey = ssaApiKey.trim();
+        if (newApiKey && newApiKey !== '••••••••••••••••') {
           const encryptResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crypto-service`, {
             method: 'POST',
             headers: {
@@ -1686,7 +1762,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             },
             body: JSON.stringify({
               action: 'encrypt',
-              token: ssaApiKey,
+              token: newApiKey,
             }),
           });
 
@@ -1696,28 +1772,25 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
           const { result: encryptedApiKey } = await encryptResponse.json();
           settingsData.ssactivewear_api_key_encrypted = encryptedApiKey;
+          console.log('[SSActivewear Save] Updating API key (encrypted)');
+        } else {
+          console.log('[SSActivewear Save] Preserving existing API key (field empty or masked)');
         }
 
-        if (ssaAccountNumber.trim()) {
-          settingsData.ssactivewear_username = ssaAccountNumber.trim();
+        if (!ssaHasCredentials && (!settingsData.ssactivewear_username || !settingsData.ssactivewear_api_key_encrypted)) {
+          showNotification('warning', 'SSActivewear Credentials Required', 'Please enter your account number and API key to enable this integration');
+          return;
         }
       } else {
         settingsData.ssactivewear_api_key_encrypted = null;
         settingsData.ssactivewear_username = null;
+        console.log('[SSActivewear Save] Clearing credentials (disabled)');
       }
 
-      // Validate that if enabled, there are credentials (either existing or new)
-      if (sanmarEnabled && !sanmarHasCredentials && (!settingsData.sanmar_promo_username || !settingsData.sanmar_promo_password_encrypted)) {
-        showNotification('warning', 'SanMar Credentials Required', 'Please enter Username and Password to enable SanMar integration');
-        return;
-      }
-
-      if (ssaEnabled && !ssaHasCredentials && !settingsData.ssactivewear_api_key_encrypted) {
-        showNotification('warning', 'SSActivewear Credentials Required', 'Please enter your SSActivewear account number and API key to enable this integration');
-        return;
-      }
-
-      console.log('Saving supplier credentials to company_settings:', settingsData);
+      console.log('[SSActivewear Save] Saving to database', {
+        fieldsToUpdate: Object.keys(settingsData),
+        preservedFields: ['sanmar_*']
+      });
 
       const { error } = await supabase
         .from('company_settings')
@@ -1726,18 +1799,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
       if (error) throw error;
 
-      showNotification('success', 'Supplier Integrations Saved', 'Supplier integration settings have been saved successfully!');
-      setSanmarPassword(sanmarPassword.trim() ? '••••••••••••••••' : '');
-      setSsaAccountNumber(ssaAccountNumber.trim() && ssaAccountNumber !== '••••••••••••••••' ? '••••••••••••••••' : (ssaHasCredentials ? '••••••••••••••••' : ''));
-      setSsaApiKey(ssaApiKey.trim() ? '••••••••••••••••' : '');
-      setSupplierTestResult(null);
+      showNotification('success', 'SSActivewear Settings Saved', 'SSActivewear integration settings have been saved successfully!');
+      setSsaAccountNumber(ssaAccountNumber.trim() && ssaAccountNumber !== '••••••••••••••••' ? '••••••••••••••••' : ssaAccountNumber);
+      setSsaApiKey(ssaApiKey.trim() && ssaApiKey !== '••••••••••••••••' ? '••••••••••••••••' : ssaApiKey);
+      setSsaTestResult(null);
       await loadSettings();
       await loadSupplierIntegrationSettings();
     } catch (err) {
-      console.error('Error saving supplier integrations:', err);
-      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save supplier integrations');
+      console.error('[SSActivewear Save] Error:', err);
+      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save SSActivewear settings');
     } finally {
-      setSavingSuppliers(false);
+      setSavingSSA(false);
     }
   };
 
@@ -5853,44 +5925,61 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       </p>
                     </div>
 
-                    {sanmarHasCredentials && (
-                      <>
+                    <div className="flex gap-3 mt-4">
+                      <button
+                        onClick={saveSanmarSettings}
+                        disabled={savingSanmar}
+                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                      >
+                        {savingSanmar ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4" />
+                            Save SanMar Settings
+                          </>
+                        )}
+                      </button>
+                      {sanmarHasCredentials && (
                         <button
                           onClick={testSanmarConnection}
                           disabled={testingSanmar}
-                          className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                          className="px-4 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                         >
                           {testingSanmar ? (
                             <>
-                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              Testing API Connection...
+                              <div className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+                              Testing...
                             </>
                           ) : (
                             <>
                               <Zap className="w-4 h-4" />
-                              Test API Connection
+                              Test Connection
                             </>
                           )}
                         </button>
+                      )}
+                    </div>
 
-                        {sanmarTestResult && (
-                          <div className={`p-4 rounded-lg border ${sanmarTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
-                            <div className="flex items-start gap-3">
-                              <div className={`flex-shrink-0 w-6 h-6 rounded-full ${sanmarTestResult.success ? 'bg-green-500' : 'bg-red-500'} flex items-center justify-center text-white text-sm font-bold`}>
-                                {sanmarTestResult.success ? '✓' : '✕'}
-                              </div>
-                              <div className="flex-1">
-                                <h4 className={`font-medium ${sanmarTestResult.success ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'}`}>
-                                  {sanmarTestResult.success ? 'Connection Successful!' : 'Connection Failed'}
-                                </h4>
-                                <p className={`text-sm mt-1 ${sanmarTestResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
-                                  {sanmarTestResult.message || sanmarTestResult.error}
-                                </p>
-                              </div>
-                            </div>
+                    {sanmarTestResult && (
+                      <div className={`p-4 rounded-lg border ${sanmarTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
+                        <div className="flex items-start gap-3">
+                          <div className={`flex-shrink-0 w-6 h-6 rounded-full ${sanmarTestResult.success ? 'bg-green-500' : 'bg-red-500'} flex items-center justify-center text-white text-sm font-bold`}>
+                            {sanmarTestResult.success ? '✓' : '✕'}
                           </div>
-                        )}
-                      </>
+                          <div className="flex-1">
+                            <h4 className={`font-medium ${sanmarTestResult.success ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'}`}>
+                              {sanmarTestResult.success ? 'Connection Successful!' : 'Connection Failed'}
+                            </h4>
+                            <p className={`text-sm mt-1 ${sanmarTestResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
+                              {sanmarTestResult.message || sanmarTestResult.error}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     )}
                   </div>
                 )}
@@ -5977,42 +6066,62 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="flex gap-3 mt-4">
                       <button
-                        onClick={testSSAConnection}
-                        disabled={testingSSA || !ssaEnabled}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                        onClick={saveSSActivewearSettings}
+                        disabled={savingSSA}
+                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                       >
-                        {testingSSA ? (
+                        {savingSSA ? (
                           <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            Testing...
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Saving...
                           </>
                         ) : (
                           <>
-                            <Zap className="w-4 h-4" />
-                            Test Connection
+                            <Save className="w-4 h-4" />
+                            Save SSActivewear Settings
                           </>
                         )}
                       </button>
-
-                      <button
-                        onClick={syncSSACatalog}
-                        disabled={syncingCatalog || !ssaEnabled || !ssaHasCredentials}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                      >
-                        {syncingCatalog ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            Syncing...
-                          </>
-                        ) : (
-                          <>
-                            <RefreshCw className="w-4 h-4" />
-                            Sync Catalog
-                          </>
-                        )}
-                      </button>
+                      {ssaHasCredentials && (
+                        <button
+                          onClick={testSSAConnection}
+                          disabled={testingSSA}
+                          className="px-4 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                        >
+                          {testingSSA ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+                              Testing...
+                            </>
+                          ) : (
+                            <>
+                              <Zap className="w-4 h-4" />
+                              Test
+                            </>
+                          )}
+                        </button>
+                      )}
+                      {ssaHasCredentials && (
+                        <button
+                          onClick={syncSSACatalog}
+                          disabled={syncingCatalog}
+                          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                        >
+                          {syncingCatalog ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              Syncing...
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="w-4 h-4" />
+                              Sync
+                            </>
+                          )}
+                        </button>
+                      )}
                     </div>
 
                     {ssaTestResult && (
@@ -6065,90 +6174,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 )}
               </div>
 
-              {/* Save Button */}
-              <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
-                <div className="text-xs text-gray-500 dark:text-gray-400">
-                  <p>Enable integrations to auto-populate product information when creating quotes</p>
+              {/* Information Footer */}
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  <p>Each supplier's settings are saved independently. Saving one supplier will not affect the other.</p>
                 </div>
-                <button
-                  onClick={saveSupplierIntegrations}
-                  disabled={savingSuppliers}
-                  className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                >
-                  {savingSuppliers ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4" />
-                      Save Supplier Settings
-                    </>
-                  )}
-                </button>
               </div>
-
-              {/* Connection Status */}
-              {(sanmarEnabled || ssaEnabled) && (
-                <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-blue-800 dark:text-blue-200">
-                      <Grid3x3 className="w-5 h-5" />
-                      <div>
-                        <p className="font-medium">Supplier Integrations Active</p>
-                        <p className="text-sm mt-1">
-                          {sanmarEnabled && ssaEnabled ? 'SanMar and SSActivewear are configured' :
-                           sanmarEnabled ? 'SanMar is configured' : 'SSActivewear is configured'}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={testSupplierConnections}
-                      disabled={testingSuppliers}
-                      className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 disabled:opacity-50 transition-colors"
-                    >
-                      {testingSuppliers ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Testing...
-                        </>
-                      ) : (
-                        'Test Connections'
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Test Results */}
-              {supplierTestResult && (
-                <div className={`p-4 rounded-lg border ${supplierTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
-                  <div className="space-y-3">
-                    {supplierTestResult.success ? (
-                      <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-bold">
-                          ✓
-                        </div>
-                        <div className="flex-1">
-                          <h4 className="font-medium text-green-900 dark:text-green-100">Connections Successful!</h4>
-                          <p className="text-sm text-green-800 dark:text-green-200 mt-1">{supplierTestResult.message}</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-white text-sm font-bold">
-                          ✕
-                        </div>
-                        <div className="flex-1">
-                          <h4 className="font-medium text-red-900 dark:text-red-100">Connection Failed</h4>
-                          <p className="text-sm text-red-800 dark:text-red-200 mt-1">{supplierTestResult.error}</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
