@@ -562,42 +562,70 @@ Deno.serve(async (req: Request) => {
             const restApiData = await restApiResponse.json();
             console.log('📸 REST API returned', Array.isArray(restApiData) ? restApiData.length : 1, 'products');
 
+            // Log first product structure for debugging
+            if (Array.isArray(restApiData) && restApiData.length > 0) {
+              console.log('📸 Sample product keys:', Object.keys(restApiData[0]));
+              console.log('📸 Sample product images:', {
+                colorFrontImage: restApiData[0].colorFrontImage,
+                colorBackImage: restApiData[0].colorBackImage,
+                colorSideImage: restApiData[0].colorSideImage,
+                colorSwatchImage: restApiData[0].colorSwatchImage,
+                styleFrontImage: restApiData[0].styleFrontImage,
+                styleBackImage: restApiData[0].styleBackImage,
+              });
+            }
+
             if (Array.isArray(restApiData) && restApiData.length > 0) {
               usedRestApiFallback = true;
+
+              // Helper to check if URL is valid
+              const isValidImageUrl = (url: any): boolean => {
+                return url && typeof url === 'string' && url.trim().length > 0 && url.startsWith('http');
+              };
 
               // Extract unique images from all products (variants)
               const imageMap = new Map<string, { url: string; type: string; color: string }>();
 
               for (const product of restApiData) {
-                // Add front image
-                if (product.colorFrontImage) {
-                  const key = `front-${product.colorName}`;
+                const colorName = product.colorName || 'Unknown';
+
+                // Add front image (try color-specific first, then style-level)
+                const frontImg = isValidImageUrl(product.colorFrontImage) ? product.colorFrontImage : product.styleFrontImage;
+                if (isValidImageUrl(frontImg)) {
+                  const key = `front-${colorName}`;
                   if (!imageMap.has(key)) {
-                    imageMap.set(key, { url: product.colorFrontImage, type: 'Front', color: product.colorName });
+                    imageMap.set(key, { url: frontImg, type: 'Front', color: colorName });
                   }
                 }
+
                 // Add back image
-                if (product.colorBackImage) {
-                  const key = `back-${product.colorName}`;
+                const backImg = isValidImageUrl(product.colorBackImage) ? product.colorBackImage : product.styleBackImage;
+                if (isValidImageUrl(backImg)) {
+                  const key = `back-${colorName}`;
                   if (!imageMap.has(key)) {
-                    imageMap.set(key, { url: product.colorBackImage, type: 'Back', color: product.colorName });
+                    imageMap.set(key, { url: backImg, type: 'Back', color: colorName });
                   }
                 }
+
                 // Add side image
-                if (product.colorSideImage) {
-                  const key = `side-${product.colorName}`;
+                const sideImg = isValidImageUrl(product.colorSideImage) ? product.colorSideImage : product.styleSideImage;
+                if (isValidImageUrl(sideImg)) {
+                  const key = `side-${colorName}`;
                   if (!imageMap.has(key)) {
-                    imageMap.set(key, { url: product.colorSideImage, type: 'Side', color: product.colorName });
+                    imageMap.set(key, { url: sideImg, type: 'Side', color: colorName });
                   }
                 }
+
                 // Add swatch image (can use as lifestyle)
-                if (product.colorSwatchImage) {
-                  const key = `swatch-${product.colorName}`;
+                if (isValidImageUrl(product.colorSwatchImage)) {
+                  const key = `swatch-${colorName}`;
                   if (!imageMap.has(key)) {
-                    imageMap.set(key, { url: product.colorSwatchImage, type: 'Swatch', color: product.colorName });
+                    imageMap.set(key, { url: product.colorSwatchImage, type: 'Swatch', color: colorName });
                   }
                 }
               }
+
+              console.log('📸 Image map size:', imageMap.size);
 
               // Build media data from REST API response
               mediaData.images = Array.from(imageMap.values()).map(img => ({
@@ -617,7 +645,19 @@ Deno.serve(async (req: Request) => {
               const otherImages: string[] = [];
 
               // If partId (color code) is provided, try to find matching color images first
-              const targetColor = partId ? restApiData.find((p: any) => p.sku === partId || p.styleID === partId)?.colorName : null;
+              // partId format could be: "00760-ATHY-S" or just the SKU
+              let targetColor: string | null = null;
+              if (partId) {
+                // Try multiple matching strategies
+                const matchedProduct = restApiData.find((p: any) =>
+                  p.sku === partId ||
+                  p.styleID === partId ||
+                  p.gtin === partId ||
+                  (partId.includes('-') && p.sku?.includes(partId.split('-')[1])) // Match color code portion
+                );
+                targetColor = matchedProduct?.colorName || null;
+                console.log('📸 Target color matching:', { partId, targetColor, matchedSku: matchedProduct?.sku });
+              }
 
               for (const img of mediaData.images) {
                 const imgType = (img.classTypeName || '').toLowerCase();
@@ -661,7 +701,8 @@ Deno.serve(async (req: Request) => {
               });
             }
           } else {
-            console.warn('📸 REST API returned error:', restApiResponse.status, await restApiResponse.text().catch(() => ''));
+            const errorText = await restApiResponse.text().catch(() => '');
+            console.warn('📸 REST API returned error:', restApiResponse.status, errorText);
           }
         } catch (restApiError) {
           console.error('📸 REST API fallback failed:', restApiError);
