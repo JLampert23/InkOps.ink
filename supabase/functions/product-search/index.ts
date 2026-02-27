@@ -783,7 +783,7 @@ async function fetchAndCacheSSActivewear(
 
       console.log(`[SSA Cache] Grouped ${mediaContent.length} images into ${imagesByColor.size} color groups`);
 
-      // Get all parts for this style grouped by color
+      // Get all parts for this style
       const { data: allParts } = await supabaseAdmin
         .from("parts")
         .select("id, part_id, color_name")
@@ -791,9 +791,18 @@ async function fetchAndCacheSSActivewear(
         .eq("style_id", styleId);
 
       if (allParts && allParts.length > 0) {
-        // Group parts by color name (case-insensitive)
+        // Create lookup maps for matching
+        // Map: external part_id (S&S SKU) -> internal part record
+        const partByExternalId = new Map<string, any>();
+        // Map: color_name (lowercase) -> array of parts
         const partsByColor = new Map<string, typeof allParts>();
+
         for (const part of allParts) {
+          // Index by external part_id
+          if (part.part_id) {
+            partByExternalId.set(part.part_id.toUpperCase(), part);
+          }
+          // Index by color name
           const colorKey = (part.color_name || 'default').toLowerCase();
           if (!partsByColor.has(colorKey)) {
             partsByColor.set(colorKey, []);
@@ -801,82 +810,99 @@ async function fetchAndCacheSSActivewear(
           partsByColor.get(colorKey)!.push(part);
         }
 
-        console.log(`[SSA Cache] Parts grouped into ${partsByColor.size} colors: ${Array.from(partsByColor.keys()).join(', ')}`);
+        console.log(`[SSA Cache] Parts: ${allParts.length} total, ${partsByColor.size} color groups, ${partByExternalId.size} external IDs`);
 
-        // Cache images for each color's parts
-        for (const [colorName, colorImages] of imagesByColor) {
-          // Find matching parts - colorName is already lowercase from grouping above
-          let matchingParts = partsByColor.get(colorName);
+        // Cache each image - try to match by partId first, then by color
+        for (const media of mediaContent) {
+          if (!media.url) continue;
 
-          if (!matchingParts || matchingParts.length === 0) {
-            // Try partial/fuzzy match
-            for (const [partColor, parts] of partsByColor) {
-              if (partColor.includes(colorName) || colorName.includes(partColor)) {
-                matchingParts = parts;
-                console.log(`[SSA Cache] Fuzzy matched image color "${colorName}" to part color "${partColor}"`);
-                break;
-              }
+          let targetPart: any = null;
+
+          // PRIORITY 1: Match by external partId (most accurate)
+          if (media.partId) {
+            targetPart = partByExternalId.get(media.partId.toUpperCase());
+            if (targetPart) {
+              console.log(`[SSA Cache] Matched image by partId: ${media.partId} -> part ${targetPart.part_id}`);
             }
           }
 
-          // If still no match, use the first available parts (images without color info)
-          if (!matchingParts || matchingParts.length === 0) {
-            matchingParts = allParts.slice(0, 1);
-            console.log(`[SSA Cache] No color match for "${colorName}", using first part as fallback`);
+          // PRIORITY 2: Match by color name
+          if (!targetPart && media.color) {
+            const colorLower = media.color.toLowerCase();
+            let matchingParts = partsByColor.get(colorLower);
+
+            if (!matchingParts || matchingParts.length === 0) {
+              // Try fuzzy match
+              for (const [partColor, parts] of partsByColor) {
+                if (partColor.includes(colorLower) || colorLower.includes(partColor)) {
+                  matchingParts = parts;
+                  break;
+                }
+              }
+            }
+
+            if (matchingParts && matchingParts.length > 0) {
+              targetPart = matchingParts[0];
+              console.log(`[SSA Cache] Matched image by color: "${media.color}" -> part ${targetPart.part_id}`);
+            }
           }
 
-          // Cache each image for ONE representative part per color
-          // (The unique constraint is on company_id, part_id, url)
-          const representativePart = matchingParts[0];
-
-          // Log what we're caching for this color
-          const colorTypeBreakdown = { Front: 0, Rear: 0, Side: 0, Other: 0 };
-          for (const img of colorImages) {
-            const ct = (img.classTypeName || "").toLowerCase();
-            if (ct.includes("front")) colorTypeBreakdown.Front++;
-            else if (ct.includes("rear") || ct.includes("back")) colorTypeBreakdown.Rear++;
-            else if (ct.includes("side")) colorTypeBreakdown.Side++;
-            else colorTypeBreakdown.Other++;
+          // FALLBACK: Use first part if no match found
+          if (!targetPart) {
+            targetPart = allParts[0];
+            console.log(`[SSA Cache] No match for image, using fallback part: ${targetPart.part_id}`);
           }
-          console.log(`[SSA Cache] Caching for color "${colorName}": Front=${colorTypeBreakdown.Front}, Rear=${colorTypeBreakdown.Rear}, Side=${colorTypeBreakdown.Side}`);
 
-          for (const media of colorImages) {
-            const { data: existingImage } = await supabaseAdmin
+          // Determine the color to store - prefer part's color_name for consistency
+          const colorToStore = targetPart.color_name || media.color || null;
+
+          // Check if image already exists
+          const { data: existingImage } = await supabaseAdmin
+            .from("images")
+            .select("id")
+            .eq("company_id", companyId)
+            .eq("part_id", targetPart.id)
+            .eq("url", media.url)
+            .maybeSingle();
+
+          if (existingImage) {
+            await supabaseAdmin
               .from("images")
-              .select("id")
-              .eq("company_id", companyId)
-              .eq("part_id", representativePart.id)
-              .eq("url", media.url)
-              .maybeSingle();
+              .update({
+                class_type: media.classTypeName || null,
+                color: colorToStore,
+              })
+              .eq("id", existingImage.id);
+            cachedCount++;
+          } else {
+            const { error: insertError } = await supabaseAdmin
+              .from("images")
+              .insert({
+                company_id: companyId,
+                part_id: targetPart.id,
+                class_type: media.classTypeName || null,
+                url: media.url,
+                color: colorToStore,
+              });
 
-            if (existingImage) {
-              await supabaseAdmin
-                .from("images")
-                .update({
-                  class_type: media.classTypeName || null,
-                  color: media.color || null,
-                })
-                .eq("id", existingImage.id);
+            if (!insertError) {
               cachedCount++;
             } else {
-              const { error: insertError } = await supabaseAdmin
-                .from("images")
-                .insert({
-                  company_id: companyId,
-                  part_id: representativePart.id,
-                  class_type: media.classTypeName || null,
-                  url: media.url,
-                  color: media.color || null,
-                });
-
-              if (!insertError) {
-                cachedCount++;
-              } else {
-                console.warn(`Failed to cache image ${media.url}: ${insertError.message}`);
-              }
+              console.warn(`Failed to cache image ${media.url}: ${insertError.message}`);
             }
           }
         }
+
+        // Log final cache breakdown by image type
+        const finalBreakdown = { Front: 0, Rear: 0, Side: 0, Other: 0 };
+        for (const media of mediaContent) {
+          const ct = (media.classTypeName || "").toLowerCase();
+          if (ct.includes("front")) finalBreakdown.Front++;
+          else if (ct.includes("rear") || ct.includes("back")) finalBreakdown.Rear++;
+          else if (ct.includes("side")) finalBreakdown.Side++;
+          else finalBreakdown.Other++;
+        }
+        console.log(`[SSA Cache] Final cached: Front=${finalBreakdown.Front}, Rear=${finalBreakdown.Rear}, Side=${finalBreakdown.Side}, Other=${finalBreakdown.Other}`);
       }
 
       if (cachedCount > 0) {
