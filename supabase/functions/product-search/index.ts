@@ -691,53 +691,97 @@ async function fetchAndCacheSSActivewear(
     }
 
     // Cache all collected images - only if we have valid images and didn't use cache
+    // Images are per-color, so cache them for ALL parts of the same color
     if (!imageCacheHit && mediaContent.length > 0) {
       let cachedCount = 0;
+
+      // Group images by color
+      const imagesByColor = new Map<string, typeof mediaContent>();
       for (const media of mediaContent) {
         if (!media.url) continue;
+        const colorKey = media.color || 'default';
+        if (!imagesByColor.has(colorKey)) {
+          imagesByColor.set(colorKey, []);
+        }
+        imagesByColor.get(colorKey)!.push(media);
+      }
 
-        const { data: partForImage } = await supabaseAdmin
-          .from("parts")
-          .select("id")
-          .eq("company_id", companyId)
-          .eq("style_id", styleId)
-          .eq("part_id", media.partId || productData.parts?.[0]?.partId)
-          .maybeSingle();
+      // Get all parts for this style grouped by color
+      const { data: allParts } = await supabaseAdmin
+        .from("parts")
+        .select("id, part_id, color_name")
+        .eq("company_id", companyId)
+        .eq("style_id", styleId);
 
-        if (partForImage) {
-          // Check if image already exists (unique constraint is on company_id, part_id, url)
-          const { data: existingImage } = await supabaseAdmin
-            .from("images")
-            .select("id")
-            .eq("company_id", companyId)
-            .eq("part_id", partForImage.id)
-            .eq("url", media.url)
-            .maybeSingle();
+      if (allParts && allParts.length > 0) {
+        // Group parts by color name
+        const partsByColor = new Map<string, typeof allParts>();
+        for (const part of allParts) {
+          const colorKey = part.color_name || 'default';
+          if (!partsByColor.has(colorKey)) {
+            partsByColor.set(colorKey, []);
+          }
+          partsByColor.get(colorKey)!.push(part);
+        }
 
-          if (existingImage) {
-            // Update existing image
-            await supabaseAdmin
+        // Cache images for each color's parts
+        for (const [colorName, colorImages] of imagesByColor) {
+          // Find matching parts - try exact match first, then fuzzy match
+          let matchingParts = partsByColor.get(colorName);
+
+          if (!matchingParts || matchingParts.length === 0) {
+            // Try case-insensitive match
+            for (const [partColor, parts] of partsByColor) {
+              if (partColor.toLowerCase() === colorName.toLowerCase()) {
+                matchingParts = parts;
+                break;
+              }
+            }
+          }
+
+          // If still no match, use the first available parts (images without color info)
+          if (!matchingParts || matchingParts.length === 0) {
+            matchingParts = allParts.slice(0, 1);
+          }
+
+          // Cache each image for ONE representative part per color
+          // (The unique constraint is on company_id, part_id, url)
+          const representativePart = matchingParts[0];
+
+          for (const media of colorImages) {
+            const { data: existingImage } = await supabaseAdmin
               .from("images")
-              .update({
-                class_type: media.classTypeName || null,
-              })
-              .eq("id", existingImage.id);
-            cachedCount++;
-          } else {
-            // Insert new image
-            const { error: insertError } = await supabaseAdmin
-              .from("images")
-              .insert({
-                company_id: companyId,
-                part_id: partForImage.id,
-                class_type: media.classTypeName || null,
-                url: media.url,
-              });
+              .select("id")
+              .eq("company_id", companyId)
+              .eq("part_id", representativePart.id)
+              .eq("url", media.url)
+              .maybeSingle();
 
-            if (!insertError) {
+            if (existingImage) {
+              await supabaseAdmin
+                .from("images")
+                .update({
+                  class_type: media.classTypeName || null,
+                  color: media.color || null,
+                })
+                .eq("id", existingImage.id);
               cachedCount++;
             } else {
-              console.warn(`Failed to cache image ${media.url}: ${insertError.message}`);
+              const { error: insertError } = await supabaseAdmin
+                .from("images")
+                .insert({
+                  company_id: companyId,
+                  part_id: representativePart.id,
+                  class_type: media.classTypeName || null,
+                  url: media.url,
+                  color: media.color || null,
+                });
+
+              if (!insertError) {
+                cachedCount++;
+              } else {
+                console.warn(`Failed to cache image ${media.url}: ${insertError.message}`);
+              }
             }
           }
         }
