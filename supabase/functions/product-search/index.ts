@@ -194,11 +194,15 @@ Deno.serve(async (req: Request) => {
               const liveResult = await fetchAndCacheSSActivewear(
                 supabaseAdmin, supabaseUrl, supabaseServiceKey, companyId!, style
               );
-              if (liveResult) {
+              if (liveResult.product) {
                 console.log(`[SSA] Live API returned result for ${style}`);
-                results.push(liveResult);
+                results.push(liveResult.product);
+              } else if (liveResult.error) {
+                console.log(`[SSA] Live API error for ${style}: ${liveResult.error}`);
+                searchErrors.push(liveResult.error);
               } else {
                 console.log(`[SSA] Live API returned NO result for ${style}`);
+                searchErrors.push(`SSActivewear: No product found for ${style}`);
               }
             }
           } catch (error: any) {
@@ -402,17 +406,21 @@ async function searchSSActivewearCache(
   }
 }
 
+interface SSAFetchResult {
+  product: ProductResult | null;
+  error: string | null;
+}
+
 async function fetchAndCacheSSActivewear(
   supabaseAdmin: any,
   supabaseUrl: string,
   supabaseServiceKey: string,
   companyId: string,
   style: string
-): Promise<ProductResult | null> {
+): Promise<SSAFetchResult> {
   try {
     console.log(`🔍 SSA: Fetching product data for ${style}`);
 
-    // Try calling the ssactivewear-api which handles normalization internally
     const productUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=product&productId=${encodeURIComponent(style)}&companyId=${encodeURIComponent(companyId)}`;
     console.log(`[SSA] Calling: ${productUrl}`);
 
@@ -421,16 +429,18 @@ async function fetchAndCacheSSActivewear(
     });
 
     if (!productResponse.ok) {
-      console.log(`[SSA] API returned HTTP ${productResponse.status}`);
-      return null;
+      const errorText = await productResponse.text();
+      console.log(`[SSA] API returned HTTP ${productResponse.status}: ${errorText.substring(0, 500)}`);
+      return { product: null, error: `SSActivewear API returned HTTP ${productResponse.status}` };
     }
 
     const ssaData = await productResponse.json();
     console.log(`[SSA] API response:`, JSON.stringify(ssaData).substring(0, 800));
 
     if (ssaData.success === false || !ssaData.data?.[0]) {
+      const errorMsg = ssaData.errorDetails || ssaData.error || 'Product not found';
       console.log(`[SSA] Product not found - error: ${ssaData.error || 'no data'}, errorDetails: ${ssaData.errorDetails || 'none'}`);
-      return null;
+      return { product: null, error: `SSActivewear: ${errorMsg} (style: ${style})` };
     }
 
     const productData = ssaData.data[0];
@@ -457,7 +467,7 @@ async function fetchAndCacheSSActivewear(
 
     if (!newStyleData) {
       console.error("Failed to cache style");
-      return null;
+      return { product: null, error: "Failed to cache style in database" };
     }
 
     const styleId = newStyleData.id;
@@ -705,21 +715,24 @@ async function fetchAndCacheSSActivewear(
       }
 
       return {
-        supplier: "ssactivewear",
-        style: style,
-        brand: productData.productBrand || "",
-        description: productData.productName || productData.description || "",
-        category: "",
-        colors: Array.from(colorMap.values()),
-        cached: false,
-        last_synced: new Date().toISOString(),
+        product: {
+          supplier: "ssactivewear",
+          style: style,
+          brand: productData.productBrand || "",
+          description: productData.productName || productData.description || "",
+          category: "",
+          colors: Array.from(colorMap.values()),
+          cached: false,
+          last_synced: new Date().toISOString(),
+        },
+        error: null
       };
     }
 
-    return cachedResult;
+    return { product: cachedResult, error: null };
   } catch (error: any) {
     console.error("Error fetching/caching SSActivewear:", error.message);
-    return null;
+    return { product: null, error: `SSActivewear error: ${error.message}` };
   }
 }
 
