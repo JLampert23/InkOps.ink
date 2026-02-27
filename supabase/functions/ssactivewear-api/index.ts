@@ -20,6 +20,34 @@ interface SSActivewearCredentials {
   apiKey: string;
 }
 
+const VALID_SS_FOB_IDS = ['IL', 'KS', 'NJ', 'TX', 'GA', 'NV', 'DS'];
+
+function normalizeSsProductId(input: string): string {
+  if (!input) return '';
+
+  let cleaned = input.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+  if (cleaned.startsWith('B') && cleaned.length > 1) {
+    cleaned = cleaned.substring(1);
+  }
+
+  if (cleaned.startsWith('G') && /^G\d+$/.test(cleaned)) {
+    cleaned = cleaned.substring(1);
+  }
+
+  if (/^\d+$/.test(cleaned)) {
+    cleaned = cleaned.padStart(5, '0');
+  }
+
+  return 'B' + cleaned;
+}
+
+function validateFobId(fobId: string | null): string {
+  if (!fobId) return 'IL';
+  const upperFob = fobId.toUpperCase();
+  return VALID_SS_FOB_IDS.includes(upperFob) ? upperFob : 'IL';
+}
+
 async function makePromoStandardsRequest(
   endpoint: string,
   soapAction: string,
@@ -451,12 +479,17 @@ Deno.serve(async (req: Request) => {
           );
         }
 
+        const normalizedProductId = normalizeSsProductId(productId);
+        console.log(`[SS Product] Raw input: "${productId}" -> Normalized: "${normalizedProductId}"`);
+
         const soapBody = `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
   <shar:wsVersion>2.0.0</shar:wsVersion>
   <shar:id>${credentials.accountNumber}</shar:id>
   <shar:password>${decryptedApiKey}</shar:password>
-  <shar:productId>${productId}</shar:productId>
+  <shar:productId>${normalizedProductId}</shar:productId>
 </ns2:GetProductRequest>`;
+
+        console.log(`[SS Product] SOAP Request Body:\n${soapBody}`);
 
         const xmlResponse = await makePromoStandardsRequest(
           PROMOSTANDARDS_ENDPOINTS.productData,
@@ -466,16 +499,22 @@ Deno.serve(async (req: Request) => {
           decryptedApiKey
         );
 
+        console.log(`[SS Product] SOAP Response (first 1000 chars):\n${xmlResponse.substring(0, 1000)}`);
+
         const parseResult = parseXmlResponse(xmlResponse);
 
         if (!parseResult.success) {
-          console.error("PromoStandards error:", parseResult.error);
+          console.error(`[SS Product] PromoStandards error for ${normalizedProductId}:`, parseResult.error);
           return new Response(
             JSON.stringify({
               success: false,
+              vendor: "SSActivewear",
               supplier: "ssactivewear",
               action,
-              error: `Product not found or API error: ${parseResult.error?.description}`,
+              error: "ProductNotFound",
+              productId: normalizedProductId,
+              rawInput: productId,
+              errorDetails: parseResult.error?.description,
               errorCode: parseResult.error?.code,
               data: []
             }),
@@ -496,12 +535,33 @@ Deno.serve(async (req: Request) => {
         const partIds = getXmlValues(xmlDoc, "partId");
         const labelSizes = getXmlValues(xmlDoc, "labelSize");
 
-        console.log("Product data parsed:", {
+        console.log(`[SS Product] Parsed for ${normalizedProductId}:`, {
           productName,
           productBrand,
           colorCount: colorNames.length,
           partCount: partIds.length
         });
+
+        if (partIds.length === 0) {
+          console.warn(`[SS Product] No parts returned for ${normalizedProductId}`);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              vendor: "SSActivewear",
+              supplier: "ssactivewear",
+              action,
+              error: "ProductNotFound",
+              productId: normalizedProductId,
+              rawInput: productId,
+              errorDetails: "No parts returned from S&S API",
+              data: []
+            }),
+            {
+              status: 200,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            }
+          );
+        }
 
         const colorArray = colorNames.map(name => ({ colorName: name }));
         const partsArray = partIds.map((id, i) => ({
@@ -511,7 +571,8 @@ Deno.serve(async (req: Request) => {
         }));
 
         const transformedData = [{
-          productId,
+          productId: normalizedProductId,
+          rawInput: productId,
           productName,
           description,
           productBrand,
@@ -541,12 +602,18 @@ Deno.serve(async (req: Request) => {
           );
         }
 
+        const normalizedProductId = normalizeSsProductId(productId);
+        const fobId = validateFobId(url.searchParams.get("fobId"));
+        console.log(`[SS Inventory] Raw input: "${productId}" -> Normalized: "${normalizedProductId}", FOB: ${fobId}`);
+
         const soapBody = `<ns2:GetInventoryLevelsRequest xmlns:ns2="http://www.promostandards.org/WSDL/InventoryService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/Inventory/2.0.0/SharedObjects/">
   <shar:wsVersion>2.0.0</shar:wsVersion>
   <shar:id>${credentials.accountNumber}</shar:id>
   <shar:password>${decryptedApiKey}</shar:password>
-  <shar:productId>${productId}</shar:productId>
+  <shar:productId>${normalizedProductId}</shar:productId>
 </ns2:GetInventoryLevelsRequest>`;
+
+        console.log(`[SS Inventory] SOAP Request Body:\n${soapBody}`);
 
         const xmlResponse = await makePromoStandardsRequest(
           PROMOSTANDARDS_ENDPOINTS.inventory,
@@ -556,16 +623,22 @@ Deno.serve(async (req: Request) => {
           decryptedApiKey
         );
 
+        console.log(`[SS Inventory] SOAP Response (first 1000 chars):\n${xmlResponse.substring(0, 1000)}`);
+
         const parseResult = parseXmlResponse(xmlResponse);
 
         if (!parseResult.success) {
-          console.error("PromoStandards error:", parseResult.error);
+          console.error(`[SS Inventory] PromoStandards error for ${normalizedProductId}:`, parseResult.error);
           return new Response(
             JSON.stringify({
               success: false,
+              vendor: "SSActivewear",
               supplier: "ssactivewear",
               action,
-              error: `Inventory not found or API error: ${parseResult.error?.description}`,
+              error: "ProductNotFound",
+              productId: normalizedProductId,
+              rawInput: productId,
+              errorDetails: parseResult.error?.description,
               errorCode: parseResult.error?.code,
               data: []
             }),
@@ -581,6 +654,28 @@ Deno.serve(async (req: Request) => {
         const partIds = getXmlValues(xmlDoc, "partId");
         const quantities = getXmlValues(xmlDoc, "quantityAvailable");
 
+        console.log(`[SS Inventory] Found ${partIds.length} parts for ${normalizedProductId}`);
+
+        if (partIds.length === 0) {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              vendor: "SSActivewear",
+              supplier: "ssactivewear",
+              action,
+              error: "ProductNotFound",
+              productId: normalizedProductId,
+              rawInput: productId,
+              errorDetails: "No inventory data returned",
+              data: []
+            }),
+            {
+              status: 200,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            }
+          );
+        }
+
         const inventoryArray = partIds.map((id, i) => ({
           partId: id,
           quantityAvailable: parseInt(quantities[i] || "0"),
@@ -591,6 +686,7 @@ Deno.serve(async (req: Request) => {
             success: true,
             supplier: "ssactivewear",
             action,
+            productId: normalizedProductId,
             data: inventoryArray,
           }),
           {
@@ -608,12 +704,19 @@ Deno.serve(async (req: Request) => {
           );
         }
 
+        const normalizedProductId = normalizeSsProductId(productId);
+        const fobId = validateFobId(url.searchParams.get("fobId"));
+        console.log(`[SS Pricing] Raw input: "${productId}" -> Normalized: "${normalizedProductId}", FOB: ${fobId}`);
+
         const soapBody = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${credentials.accountNumber}</shar:id>
   <shar:password>${decryptedApiKey}</shar:password>
-  <shar:productId>${productId}</shar:productId>
+  <shar:productId>${normalizedProductId}</shar:productId>
+  <shar:fobId>${fobId}</shar:fobId>
 </ns2:GetConfigurationAndPricingRequest>`;
+
+        console.log(`[SS Pricing] SOAP Request Body:\n${soapBody}`);
 
         const xmlResponse = await makePromoStandardsRequest(
           PROMOSTANDARDS_ENDPOINTS.pricing,
@@ -623,16 +726,22 @@ Deno.serve(async (req: Request) => {
           decryptedApiKey
         );
 
+        console.log(`[SS Pricing] SOAP Response (first 1000 chars):\n${xmlResponse.substring(0, 1000)}`);
+
         const parseResult = parseXmlResponse(xmlResponse);
 
         if (!parseResult.success) {
-          console.error("PromoStandards error:", parseResult.error);
+          console.error(`[SS Pricing] PromoStandards error for ${normalizedProductId}:`, parseResult.error);
           return new Response(
             JSON.stringify({
               success: false,
+              vendor: "SSActivewear",
               supplier: "ssactivewear",
               action,
-              error: `Pricing not found or API error: ${parseResult.error?.description}`,
+              error: "ProductNotFound",
+              productId: normalizedProductId,
+              rawInput: productId,
+              errorDetails: parseResult.error?.description,
               errorCode: parseResult.error?.code,
               data: []
             }),
@@ -645,7 +754,6 @@ Deno.serve(async (req: Request) => {
 
         const xmlDoc = parseResult.xmlText!;
 
-        // SSActivewear returns pricing in nested Part/PartPrice structure
         const partPattern = /<Part>([\s\S]*?)<\/Part>/gi;
         const parts: any[] = [];
         let partMatch;
@@ -654,7 +762,6 @@ Deno.serve(async (req: Request) => {
           const partXml = partMatch[1];
           const partId = getXmlValue(partXml, "partId");
 
-          // Extract PartPrice elements within this Part
           const pricePattern = /<PartPrice>([\s\S]*?)<\/PartPrice>/gi;
           const prices: any[] = [];
           let priceMatch;
@@ -673,14 +780,35 @@ Deno.serve(async (req: Request) => {
           });
         }
 
-        const partArray = parts;
+        console.log(`[SS Pricing] Found ${parts.length} parts with pricing for ${normalizedProductId}`);
+
+        if (parts.length === 0) {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              vendor: "SSActivewear",
+              supplier: "ssactivewear",
+              action,
+              error: "ProductNotFound",
+              productId: normalizedProductId,
+              rawInput: productId,
+              errorDetails: "No pricing data returned",
+              data: []
+            }),
+            {
+              status: 200,
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            }
+          );
+        }
 
         return new Response(
           JSON.stringify({
             success: true,
             supplier: "ssactivewear",
             action,
-            data: partArray,
+            productId: normalizedProductId,
+            data: parts,
           }),
           {
             status: 200,
@@ -698,21 +826,21 @@ Deno.serve(async (req: Request) => {
         }
 
         const partId = url.searchParams.get("partId");
-
         const partIdTag = partId ? `<shar:partId>${partId}</shar:partId>` : '';
 
-        // S&S Activewear MediaContent requires B-prefixed productId (e.g., B18600)
-        const bPrefixedProductId = `B${productId.replace(/^B/i, '')}`;
-        console.log(`Media request using B-prefixed productId: ${bPrefixedProductId}`);
+        const normalizedProductId = normalizeSsProductId(productId);
+        console.log(`[SS Media] Raw input: "${productId}" -> Normalized: "${normalizedProductId}"`);
 
         const soapBody = `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${credentials.accountNumber}</shar:id>
   <shar:password>${decryptedApiKey}</shar:password>
   <shar:mediaType>Image</shar:mediaType>
-  <shar:productId>${bPrefixedProductId}</shar:productId>
+  <shar:productId>${normalizedProductId}</shar:productId>
   ${partIdTag}
 </ns2:GetMediaContentRequest>`;
+
+        console.log(`[SS Media] SOAP Request Body:\n${soapBody}`);
 
         const xmlResponse = await makePromoStandardsRequest(
           PROMOSTANDARDS_ENDPOINTS.media,
@@ -722,19 +850,25 @@ Deno.serve(async (req: Request) => {
           decryptedApiKey
         );
 
+        console.log(`[SS Media] SOAP Response (first 1000 chars):\n${xmlResponse.substring(0, 1000)}`);
+
         const parseResult = parseXmlResponse(xmlResponse);
 
         if (!parseResult.success) {
-          console.error("PromoStandards error:", parseResult.error);
+          console.error(`[SS Media] PromoStandards error for ${normalizedProductId}:`, parseResult.error);
           return new Response(
             JSON.stringify({
               success: false,
+              vendor: "SSActivewear",
               supplier: "ssactivewear",
               action,
-              error: `Media not found or API error: ${parseResult.error?.description}`,
+              error: "ProductNotFound",
+              productId: normalizedProductId,
+              rawInput: productId,
+              errorDetails: parseResult.error?.description,
               errorCode: parseResult.error?.code,
               data: {
-                productId,
+                productId: normalizedProductId,
                 partId: partId || null,
                 mediaContent: []
               }
@@ -747,8 +881,6 @@ Deno.serve(async (req: Request) => {
         }
 
         const xmlDoc = parseResult.xmlText!;
-
-        console.log("Media XML Response Preview:", xmlDoc.substring(0, 2000));
 
         const urls = getXmlValues(xmlDoc, "url");
         const classTypeNames = getXmlValues(xmlDoc, "classTypeName");
@@ -789,7 +921,8 @@ Deno.serve(async (req: Request) => {
             supplier: "ssactivewear",
             action,
             data: {
-              productId,
+              productId: normalizedProductId,
+              rawInput: productId,
               partId: partId || null,
               mediaContent: mediaArray,
             },
