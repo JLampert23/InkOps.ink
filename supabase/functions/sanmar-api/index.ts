@@ -204,13 +204,27 @@ Deno.serve(async (req: Request) => {
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-        const productData = await fetchSanMarProductData(credentials, style);
-        responseData = {
-          success: true,
-          supplier: "sanmar",
-          action: "product",
-          data: productData
-        };
+        try {
+          const productData = await fetchSanMarProductData(credentials, style);
+          responseData = {
+            success: true,
+            supplier: "sanmar",
+            action: "product",
+            data: productData
+          };
+        } catch (productError: any) {
+          console.error(`Product fetch failed for ${style}:`, productError.message);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              supplier: "sanmar",
+              action: "product",
+              error: productError.message || "Product not found",
+              style: style
+            }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
         break;
 
       case "inventory":

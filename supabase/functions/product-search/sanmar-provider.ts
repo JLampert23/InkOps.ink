@@ -51,26 +51,47 @@ export async function searchSanMarCatalog(
     console.log(`Cache miss, calling sanmar-api edge function for ${style}`);
 
     const apiUrl = `${supabaseUrl}/functions/v1/sanmar-api?action=product&style=${encodeURIComponent(style)}&companyId=${encodeURIComponent(companyId)}`;
-    const productResponse = await fetch(apiUrl, {
-      headers: { "Authorization": `Bearer ${supabaseServiceKey}` },
-    });
 
-    if (!productResponse.ok) {
-      const errText = await productResponse.text();
-      console.log(`SanMar returned ${productResponse.status} for ${style} - product may not exist in SanMar catalog`);
-      // Don't add this as an error - style simply doesn't exist at SanMar
-      // Only log errors for actual API failures (auth errors, server errors, etc.)
-      if (productResponse.status === 401 || productResponse.status === 403) {
-        errors.push(`SanMar authentication error`);
+    let productResponse;
+    let productData;
+
+    try {
+      productResponse = await fetch(apiUrl, {
+        headers: { "Authorization": `Bearer ${supabaseServiceKey}` },
+      });
+
+      const responseText = await productResponse.text();
+      console.log(`SanMar API response status: ${productResponse.status}, body length: ${responseText.length}`);
+
+      if (!productResponse.ok) {
+        console.log(`SanMar returned ${productResponse.status} for ${style}: ${responseText.substring(0, 500)}`);
+        if (productResponse.status === 401 || productResponse.status === 403) {
+          errors.push(`SanMar authentication error`);
+        } else if (productResponse.status === 500) {
+          errors.push(`SanMar API error: ${productResponse.status}`);
+        }
+        return { results, errors };
       }
+
+      try {
+        productData = JSON.parse(responseText);
+      } catch (parseErr) {
+        console.error(`Failed to parse SanMar response as JSON:`, responseText.substring(0, 500));
+        errors.push(`SanMar API returned invalid JSON`);
+        return { results, errors };
+      }
+    } catch (fetchErr: any) {
+      console.error(`SanMar API fetch failed:`, fetchErr.message);
+      errors.push(`SanMar API fetch failed: ${fetchErr.message}`);
       return { results, errors };
     }
 
-    const productData = await productResponse.json();
-
     // Check for error response from API
     if (productData.success === false || productData.error) {
-      console.log(`SanMar API returned error for ${style}: ${productData.error || 'unknown'}`);
+      console.log(`SanMar API returned error for ${style}: ${productData.error || productData.message || 'unknown'}`);
+      if (productData.error) {
+        errors.push(`SanMar: ${productData.error}`);
+      }
       return { results, errors };
     }
 
