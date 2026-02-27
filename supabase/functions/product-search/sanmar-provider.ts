@@ -57,15 +57,25 @@ export async function searchSanMarCatalog(
 
     if (!productResponse.ok) {
       const errText = await productResponse.text();
-      console.error(`sanmar-api returned ${productResponse.status}: ${errText}`);
-      errors.push(`SanMar API error: ${productResponse.status}`);
+      console.log(`SanMar returned ${productResponse.status} for ${style} - product may not exist in SanMar catalog`);
+      // Don't add this as an error - style simply doesn't exist at SanMar
+      // Only log errors for actual API failures (auth errors, server errors, etc.)
+      if (productResponse.status === 401 || productResponse.status === 403) {
+        errors.push(`SanMar authentication error`);
+      }
       return { results, errors };
     }
 
     const productData = await productResponse.json();
 
+    // Check for error response from API
+    if (productData.success === false || productData.error) {
+      console.log(`SanMar API returned error for ${style}: ${productData.error || 'unknown'}`);
+      return { results, errors };
+    }
+
     if (!productData?.data?.parts || productData.data.parts.length === 0) {
-      console.log(`No parts found for ${style}`);
+      console.log(`No parts found for ${style} at SanMar`);
       return { results, errors };
     }
 
@@ -243,6 +253,10 @@ function transformSanMarData(apiData: any): ProductResult {
   const colors: ColorOption[] = [];
 
   const mediaImages = apiData.media?.images || [];
+  console.log(`🖼️ SanMar transform: ${mediaImages.length} media images available`);
+  if (mediaImages.length > 0) {
+    console.log(`🖼️ Sample media image:`, JSON.stringify(mediaImages[0]));
+  }
 
   if (style.colors && Array.isArray(style.colors)) {
     for (const color of style.colors) {
@@ -273,9 +287,17 @@ function transformSanMarData(apiData: any): ProductResult {
       let sideImageUrl = "";
 
       const colorName = color.colorName?.toLowerCase() || "";
+
+      // Try to match images by color name (fuzzy match)
       const colorImages = mediaImages.filter((img: any) => {
-        const imgColor = (img.color || "").toLowerCase();
-        return imgColor === colorName || imgColor.includes(colorName) || colorName.includes(imgColor);
+        const imgColor = (img.color || "").toLowerCase().trim();
+        const productColor = colorName.trim();
+        // Exact match or partial match
+        return imgColor === productColor ||
+               imgColor.includes(productColor) ||
+               productColor.includes(imgColor) ||
+               // Also try matching by partId
+               (img.partId && partIds.includes(img.partId));
       });
 
       if (colorImages.length > 0) {
@@ -296,6 +318,15 @@ function transformSanMarData(apiData: any): ProductResult {
         sideImageUrl = sideImg?.url || "";
       }
 
+      // Fallback: use first available front image if no color match
+      if (!imageUrl && mediaImages.length > 0) {
+        const anyFrontImg = mediaImages.find((img: any) =>
+          (img.classTypeName || "").toLowerCase().includes("front")
+        );
+        imageUrl = anyFrontImg?.url || mediaImages[0]?.url || "";
+      }
+
+      // Final fallback to views
       if (!imageUrl) {
         imageUrl =
           apiData.media?.views?.front ||
@@ -317,6 +348,8 @@ function transformSanMarData(apiData: any): ProductResult {
       });
     }
   }
+
+  console.log(`🖼️ SanMar transform complete: ${colors.length} colors, first has image: ${!!colors[0]?.image_url}`);
 
   return {
     supplier: "sanmar",

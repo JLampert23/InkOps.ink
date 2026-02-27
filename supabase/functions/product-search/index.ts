@@ -351,6 +351,8 @@ async function fetchAndCacheSSActivewear(
   style: string
 ): Promise<ProductResult | null> {
   try {
+    console.log(`🔍 SSA: Fetching product data for ${style}`);
+
     // Fetch product data
     const productUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=product&productId=${encodeURIComponent(style)}&companyId=${encodeURIComponent(companyId)}`;
     const productResponse = await fetch(productUrl, {
@@ -363,13 +365,15 @@ async function fetchAndCacheSSActivewear(
     }
 
     const ssaData = await productResponse.json();
+    console.log(`🔍 SSA API response:`, JSON.stringify(ssaData).substring(0, 500));
 
     if (ssaData.success === false || !ssaData.data?.[0]) {
-      console.log("SSActivewear: Product not found");
+      console.log("SSActivewear: Product not found or error:", ssaData.error || "no data");
       return null;
     }
 
     const productData = ssaData.data[0];
+    console.log(`🔍 SSA: Found product: ${productData.productName}, ${productData.parts?.length || 0} parts`);
 
     // Cache the style
     const { data: newStyleData } = await supabaseAdmin
@@ -584,10 +588,75 @@ async function fetchAndCacheSSActivewear(
 
     console.log(`Cached ${mediaContent.length} images for style ${style}`);
 
+    console.log(`✅ SSA: Cached ${mediaContent.length} images for style ${style}, now fetching from cache`);
+
     // Now return the cached data
-    return await searchSSActivewearCache(supabaseAdmin, companyId, style);
+    const cachedResult = await searchSSActivewearCache(supabaseAdmin, companyId, style);
+
+    // If cache doesn't return (timing issue), build result directly from productData
+    if (!cachedResult && productData) {
+      console.log(`⚠️ SSA: Cache miss after insert, building result from productData`);
+
+      const colorMap = new Map<string, ColorOption>();
+
+      for (const part of (productData.parts || [])) {
+        const colorName = part.colorName || "Default";
+
+        if (!colorMap.has(colorName)) {
+          colorMap.set(colorName, {
+            name: colorName,
+            code: part.partId || "",
+            partIds: [],
+            sizes: [],
+            image_url: "",
+            pricing: { wholesale: 0, retail: 0 },
+            stock: {},
+          });
+        }
+
+        const color = colorMap.get(colorName)!;
+        if (part.partId && !color.partIds?.includes(part.partId)) {
+          color.partIds?.push(part.partId);
+        }
+        if (part.labelSize && !color.sizes?.includes(part.labelSize)) {
+          color.sizes?.push(part.labelSize);
+        }
+      }
+
+      // Apply images from mediaContent
+      for (const media of mediaContent) {
+        const mediaColor = (media.color || "").toLowerCase();
+        for (const [colorName, color] of colorMap) {
+          if (colorName.toLowerCase() === mediaColor || mediaColor.includes(colorName.toLowerCase())) {
+            const classType = (media.classTypeName || "").toLowerCase();
+            if (classType.includes("front") || !color.image_url) {
+              color.image_url = media.url;
+            }
+            if (classType.includes("rear") || classType.includes("back")) {
+              color.rear_image_url = media.url;
+            }
+            if (classType.includes("side")) {
+              color.side_image_url = media.url;
+            }
+          }
+        }
+      }
+
+      return {
+        supplier: "ssactivewear",
+        style: style,
+        brand: productData.productBrand || "",
+        description: productData.productName || productData.description || "",
+        category: "",
+        colors: Array.from(colorMap.values()),
+        cached: false,
+        last_synced: new Date().toISOString(),
+      };
+    }
+
+    return cachedResult;
   } catch (error: any) {
-    console.error("Error fetching/caching SSActivewear:", error);
+    console.error("Error fetching/caching SSActivewear:", error.message);
     return null;
   }
 }
