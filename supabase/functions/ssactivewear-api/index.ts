@@ -682,12 +682,16 @@ Deno.serve(async (req: Request) => {
 
         const partIdTag = partId ? `<shar:partId>${partId}</shar:partId>` : '';
 
+        // S&S Activewear MediaContent requires B-prefixed productId (e.g., B18600)
+        const bPrefixedProductId = `B${productId.replace(/^B/i, '')}`;
+        console.log(`Media request using B-prefixed productId: ${bPrefixedProductId}`);
+
         const soapBody = `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${credentials.accountNumber}</shar:id>
   <shar:password>${decryptedApiKey}</shar:password>
   <shar:mediaType>Image</shar:mediaType>
-  <shar:productId>${productId}</shar:productId>
+  <shar:productId>${bPrefixedProductId}</shar:productId>
   ${partIdTag}
 </ns2:GetMediaContentRequest>`;
 

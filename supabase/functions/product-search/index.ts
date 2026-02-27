@@ -23,6 +23,8 @@ interface ColorOption {
   code: string;
   partIds?: string[];
   image_url?: string;
+  rear_image_url?: string;
+  side_image_url?: string;
   pricing?: {
     wholesale?: number;
     retail?: number;
@@ -285,15 +287,24 @@ async function searchSSActivewearCache(
         const firstPart = partsData.find(p => p.part_id === firstPartId);
 
         if (firstPart) {
-          const { data: imageData } = await supabaseAdmin
+          const { data: imagesData } = await supabaseAdmin
             .from("images")
-            .select("url")
-            .eq("part_id", firstPart.id)
-            .limit(1)
-            .maybeSingle();
+            .select("url, class_type")
+            .eq("part_id", firstPart.id);
 
-          if (imageData?.url) {
-            color.image_url = imageData.url;
+          if (imagesData && imagesData.length > 0) {
+            for (const img of imagesData) {
+              const classType = (img.class_type || "").toLowerCase();
+              if (classType.includes("front") || !color.image_url) {
+                color.image_url = img.url;
+              }
+              if (classType.includes("rear") || classType.includes("back")) {
+                color.rear_image_url = img.url;
+              }
+              if (classType.includes("side") || classType.includes("sleeve")) {
+                color.side_image_url = img.url;
+              }
+            }
           }
         }
 

@@ -3,6 +3,8 @@ export interface ColorOption {
   code: string;
   partIds?: string[];
   image_url?: string;
+  rear_image_url?: string;
+  side_image_url?: string;
   pricing?: {
     wholesale?: number;
     retail?: number;
@@ -240,6 +242,8 @@ function transformSanMarData(apiData: any): ProductResult {
   const style = apiData.style;
   const colors: ColorOption[] = [];
 
+  const mediaImages = apiData.media?.images || [];
+
   if (style.colors && Array.isArray(style.colors)) {
     for (const color of style.colors) {
       const partIds = (color.partIds || []).map((p: any) => p.partId);
@@ -264,11 +268,41 @@ function transformSanMarData(apiData: any): ProductResult {
         }
       }
 
-      const imageUrl =
-        apiData.media?.views?.front ||
-        apiData.media?.views?.lifestyle ||
-        (apiData.media?.views?.frontImages?.[0]) ||
-        "";
+      let imageUrl = "";
+      let rearImageUrl = "";
+      let sideImageUrl = "";
+
+      const colorName = color.colorName?.toLowerCase() || "";
+      const colorImages = mediaImages.filter((img: any) => {
+        const imgColor = (img.color || "").toLowerCase();
+        return imgColor === colorName || imgColor.includes(colorName) || colorName.includes(imgColor);
+      });
+
+      if (colorImages.length > 0) {
+        const frontImg = colorImages.find((img: any) =>
+          (img.classTypeName || "").toLowerCase().includes("front")
+        );
+        const rearImg = colorImages.find((img: any) => {
+          const cls = (img.classTypeName || "").toLowerCase();
+          return cls.includes("rear") || cls.includes("back");
+        });
+        const sideImg = colorImages.find((img: any) => {
+          const cls = (img.classTypeName || "").toLowerCase();
+          return cls.includes("side") || cls.includes("sleeve");
+        });
+
+        imageUrl = frontImg?.url || colorImages[0]?.url || "";
+        rearImageUrl = rearImg?.url || "";
+        sideImageUrl = sideImg?.url || "";
+      }
+
+      if (!imageUrl) {
+        imageUrl =
+          apiData.media?.views?.front ||
+          apiData.media?.views?.lifestyle ||
+          (apiData.media?.views?.frontImages?.[0]) ||
+          "";
+      }
 
       colors.push({
         name: color.colorName,
@@ -276,6 +310,8 @@ function transformSanMarData(apiData: any): ProductResult {
         partIds,
         sizes,
         image_url: imageUrl,
+        rear_image_url: rearImageUrl,
+        side_image_url: sideImageUrl,
         pricing,
         stock,
       });
