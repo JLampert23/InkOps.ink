@@ -39,36 +39,43 @@ export async function searchSanMarCatalog(
   const errors: string[] = [];
 
   try {
-    console.log(`SanMar search for: ${style}`);
+    console.log(`[SanMar] ========== SEARCH START ==========`);
+    console.log(`[SanMar] Style: ${style}, Company: ${companyId}`);
 
     const cachedData = await getCachedProduct(supabaseAdmin, companyId, style);
     if (cachedData) {
-      console.log(`Cache hit for ${style}`);
+      console.log(`[SanMar] CACHE HIT for ${style}`);
       results.push(cachedData);
       return { results, errors };
     }
 
-    console.log(`Cache miss, calling sanmar-api edge function for ${style}`);
+    console.log(`[SanMar] CACHE MISS - calling sanmar-api edge function for ${style}`);
 
     const apiUrl = `${supabaseUrl}/functions/v1/sanmar-api?action=product&style=${encodeURIComponent(style)}&companyId=${encodeURIComponent(companyId)}`;
+    console.log(`[SanMar] API URL: ${apiUrl}`);
 
     let productResponse;
     let productData;
 
     try {
+      console.log(`[SanMar] Calling sanmar-api...`);
       productResponse = await fetch(apiUrl, {
         headers: { "Authorization": `Bearer ${supabaseServiceKey}` },
       });
 
       const responseText = await productResponse.text();
-      console.log(`SanMar API response status: ${productResponse.status}, body length: ${responseText.length}`);
+      console.log(`[SanMar] API response status: ${productResponse.status}, body length: ${responseText.length}`);
+      console.log(`[SanMar] API response preview: ${responseText.substring(0, 500)}`);
 
       if (!productResponse.ok) {
-        console.log(`SanMar returned ${productResponse.status} for ${style}: ${responseText.substring(0, 500)}`);
+        console.log(`[SanMar] ERROR: returned ${productResponse.status} for ${style}`);
+        console.log(`[SanMar] ERROR body: ${responseText.substring(0, 1000)}`);
         if (productResponse.status === 401 || productResponse.status === 403) {
           errors.push(`SanMar authentication error`);
         } else if (productResponse.status === 500) {
           errors.push(`SanMar API error: ${productResponse.status}`);
+        } else {
+          errors.push(`SanMar HTTP ${productResponse.status}`);
         }
         return { results, errors };
       }
@@ -88,7 +95,8 @@ export async function searchSanMarCatalog(
 
     // Check for error response from API
     if (productData.success === false || productData.error) {
-      console.log(`SanMar API returned error for ${style}: ${productData.error || productData.message || 'unknown'}`);
+      console.log(`[SanMar] API returned error for ${style}: ${productData.error || productData.message || 'unknown'}`);
+      console.log(`[SanMar] Full error response: ${JSON.stringify(productData)}`);
       if (productData.error) {
         errors.push(`SanMar: ${productData.error}`);
       }
@@ -96,9 +104,12 @@ export async function searchSanMarCatalog(
     }
 
     if (!productData?.data?.parts || productData.data.parts.length === 0) {
-      console.log(`No parts found for ${style} at SanMar`);
+      console.log(`[SanMar] No parts found for ${style} - productData.data: ${JSON.stringify(productData.data || {}).substring(0, 500)}`);
+      errors.push(`SanMar: No product data for ${style}`);
       return { results, errors };
     }
+
+    console.log(`[SanMar] SUCCESS: Found ${productData.data.parts.length} parts for ${style}`);
 
     let mediaData = null;
     let pricingData = null;
