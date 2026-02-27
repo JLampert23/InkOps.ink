@@ -296,17 +296,16 @@ Deno.serve(async (req: Request) => {
   <shar:productId>${escapedStyleNumber}</shar:productId>
 </ns2:GetProductRequest>`;
 
-    // S&S Activewear MediaContent requires the numeric style ID (e.g., 2000), not the B-prefixed part number
-    // Extract numeric portion from styleNumber (e.g., "5000" from "5000" or "B5000")
-    const numericStyleId = styleNumber.replace(/^B/i, '');
-    const escapedNumericStyleId = escapeXml(numericStyleId);
+    // S&S Activewear MediaContent requires B-prefixed productId (e.g., B00760) per API docs page 16
+    const bPrefixedStyleNumber = `B${styleNumber.replace(/^B/i, '')}`;
+    const escapedBPrefixedStyleNumber = escapeXml(bPrefixedStyleNumber);
 
     const mediaSoap = `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${escapedAccountNumber}</shar:id>
   <shar:password>${escapedApiKey}</shar:password>
   <shar:mediaType>Image</shar:mediaType>
-  <shar:productId>${escapedNumericStyleId}</shar:productId>
+  <shar:productId>${escapedBPrefixedStyleNumber}</shar:productId>
 </ns2:GetMediaContentRequest>`;
 
     // Build vendor config for live wholesale pricing
