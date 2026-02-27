@@ -36,8 +36,16 @@ export default defineConfig({
     },
     hmr: {
       overlay: true,
-      protocol: 'ws',
     },
+  },
+  preview: {
+    host: true,
+  },
+  define: {
+    __HMR_TIMEOUT__: 60000,
+  },
+  experimental: {
+    hmrPartialAccept: true,
   },
   build: {
     chunkSizeWarningLimit: 1000,
