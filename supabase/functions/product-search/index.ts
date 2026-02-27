@@ -444,7 +444,9 @@ async function fetchAndCacheSSActivewear(
       console.warn('Failed to fetch/cache SSA pricing:', pricingError.message);
     }
 
-    // Fetch and cache media (images)
+    // Fetch and cache media (images) - try PromoStandards first, then REST API fallback
+    let mediaContent: any[] = [];
+
     const mediaUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=media&productId=${encodeURIComponent(style)}&companyId=${encodeURIComponent(companyId)}`;
     const mediaResponse = await fetch(mediaUrl, {
       headers: { "Authorization": `Bearer ${supabaseServiceKey}` },
@@ -452,33 +454,124 @@ async function fetchAndCacheSSActivewear(
 
     if (mediaResponse.ok) {
       const mediaData = await mediaResponse.json();
-      const mediaContent = mediaData.data?.mediaContent || [];
+      mediaContent = mediaData.data?.mediaContent || [];
+      console.log(`PromoStandards media returned ${mediaContent.length} images`);
+    }
 
-      for (const media of mediaContent) {
-        if (!media.url) continue;
-
-        const { data: partForImage } = await supabaseAdmin
-          .from("parts")
-          .select("id")
-          .eq("company_id", companyId)
-          .eq("style_id", styleId)
-          .eq("part_id", media.partId || productData.parts?.[0]?.partId)
+    // If PromoStandards returned no images, try REST API fallback
+    if (mediaContent.length === 0) {
+      console.log('PromoStandards media empty, trying REST API fallback...');
+      try {
+        const { data: settings } = await supabaseAdmin
+          .from("company_settings")
+          .select("ssactivewear_username, ssactivewear_api_key_encrypted")
+          .eq("id", companyId)
           .maybeSingle();
 
-        if (partForImage) {
-          await supabaseAdmin
-            .from("images")
-            .upsert({
-              company_id: companyId,
-              part_id: partForImage.id,
-              class_type: media.classTypeName || null,
-              url: media.url,
-            }, {
-              onConflict: "company_id,part_id,class_type"
+        if (settings?.ssactivewear_username && settings?.ssactivewear_api_key_encrypted) {
+          // Decrypt the API key
+          const decryptResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${supabaseServiceKey}`,
+            },
+            body: JSON.stringify({
+              action: "decrypt",
+              token: settings.ssactivewear_api_key_encrypted,
+            }),
+          });
+
+          if (decryptResponse.ok) {
+            const decryptResult = await decryptResponse.json();
+            const decryptedApiKey = decryptResult.result;
+
+            const ssaRestApiUrl = `https://api.ssactivewear.com/v2/products/?style=${encodeURIComponent(style)}`;
+            const restApiResponse = await fetch(ssaRestApiUrl, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Basic ${btoa(`${settings.ssactivewear_username}:${decryptedApiKey}`)}`,
+                'Content-Type': 'application/json',
+              },
             });
+
+            if (restApiResponse.ok) {
+              const restApiData = await restApiResponse.json();
+              console.log(`REST API returned ${Array.isArray(restApiData) ? restApiData.length : 0} products`);
+
+              if (Array.isArray(restApiData) && restApiData.length > 0) {
+                // Extract images from REST API response
+                for (const product of restApiData) {
+                  if (product.colorFrontImage) {
+                    mediaContent.push({
+                      url: product.colorFrontImage,
+                      partId: product.sku || product.partID,
+                      classTypeName: 'Front',
+                      color: product.colorName,
+                    });
+                  }
+                  if (product.colorBackImage) {
+                    mediaContent.push({
+                      url: product.colorBackImage,
+                      partId: product.sku || product.partID,
+                      classTypeName: 'Rear',
+                      color: product.colorName,
+                    });
+                  }
+                  if (product.colorSideImage) {
+                    mediaContent.push({
+                      url: product.colorSideImage,
+                      partId: product.sku || product.partID,
+                      classTypeName: 'Side',
+                      color: product.colorName,
+                    });
+                  }
+                  if (product.colorSwatchImage) {
+                    mediaContent.push({
+                      url: product.colorSwatchImage,
+                      partId: product.sku || product.partID,
+                      classTypeName: 'Swatch',
+                      color: product.colorName,
+                    });
+                  }
+                }
+                console.log(`REST API fallback extracted ${mediaContent.length} images`);
+              }
+            }
+          }
         }
+      } catch (restApiError: any) {
+        console.warn('REST API fallback failed:', restApiError.message);
       }
     }
+
+    // Cache all collected images
+    for (const media of mediaContent) {
+      if (!media.url) continue;
+
+      const { data: partForImage } = await supabaseAdmin
+        .from("parts")
+        .select("id")
+        .eq("company_id", companyId)
+        .eq("style_id", styleId)
+        .eq("part_id", media.partId || productData.parts?.[0]?.partId)
+        .maybeSingle();
+
+      if (partForImage) {
+        await supabaseAdmin
+          .from("images")
+          .upsert({
+            company_id: companyId,
+            part_id: partForImage.id,
+            class_type: media.classTypeName || null,
+            url: media.url,
+          }, {
+            onConflict: "company_id,part_id,class_type"
+          });
+      }
+    }
+
+    console.log(`Cached ${mediaContent.length} images for style ${style}`);
 
     // Now return the cached data
     return await searchSSActivewearCache(supabaseAdmin, companyId, style);

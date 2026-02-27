@@ -528,12 +528,22 @@ Deno.serve(async (req: Request) => {
       const errorCodeMatch = mediaResponse.value.match(/<code>(\d+)<\/code>/);
       const errorDescMatch = mediaResponse.value.match(/<description>(.*?)<\/description>/);
 
-      if (errorCodeMatch && errorDescMatch && errorCodeMatch[1] === '105') {
+      const hasMediaError = errorCodeMatch && errorDescMatch;
+      const hasEmptyMediaContent = !hasMediaError && !mediaResponse.value.includes('<MediaContent>');
+
+      if (hasMediaError && errorCodeMatch[1] === '105') {
         mediaAuthError = {
           code: errorCodeMatch[1],
           description: errorDescMatch[1]
         };
         console.warn('📸 Media API error 105 (auth failed), trying SSActivewear REST API fallback...');
+      }
+
+      // Fall back to REST API if we got an auth error OR if PromoStandards returned empty results
+      if ((hasMediaError && errorCodeMatch[1] === '105') || hasEmptyMediaContent) {
+        if (hasEmptyMediaContent) {
+          console.warn('📸 PromoStandards returned empty MediaContentArray, trying SSActivewear REST API fallback...');
+        }
 
         // Use SSActivewear REST API as fallback for images
         try {

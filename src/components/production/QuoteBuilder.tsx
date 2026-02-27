@@ -1369,11 +1369,14 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           console.log('📄 Media XML (first 2000 chars):', unifiedData.debug.mediaXmlFull.substring(0, 2000));
         }
 
-        // If Media API failed (error 105), try to use cached images from database
-        const hasLiveMediaData = unifiedData.success && unifiedData.media?.views;
+        // Check if we have live media data from the API
+        const hasLiveMediaData = unifiedData.success && unifiedData.media?.views &&
+          (unifiedData.media.views.front || unifiedData.media.views.rear || unifiedData.media.views.side);
 
-        if (!hasLiveMediaData && unifiedData.debug?.mediaAuthError) {
-          console.log('⚠️ Media API unavailable, attempting to load cached images from database...');
+        // If no live media data, try to use cached images from database
+        // This handles: auth errors (105), empty results, or any other media API issues
+        if (!hasLiveMediaData) {
+          console.log('⚠️ No live media data, attempting to load cached images from database...');
 
           // Try to get cached images for this partId
           try {
@@ -1436,10 +1439,10 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                 allImages: cachedPart.images.map((img: any) => img.url),
               };
 
-              showNotification('warning', 'Using cached images (Media API unavailable)');
+              console.log('✅ Successfully loaded images from database cache');
             } else {
               console.warn('⚠️ No cached images found for this color');
-              showNotification('warning', 'No product images available (Media API access required)');
+              showNotification('info', 'Product images not yet cached');
             }
           } catch (cacheError) {
             console.error('Failed to load cached images:', cacheError);
