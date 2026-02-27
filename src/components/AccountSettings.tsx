@@ -1813,11 +1813,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       // Test SSActivewear if enabled
       if (ssaHasCreds) {
         try {
-          const authHeader = `Bearer ${session.access_token}`;
+          const authHeader = `Bearer ${token}`;
           console.log('Testing SSActivewear with auth token:', {
             tokenPrefix: authHeader.substring(0, 30) + '...',
-            tokenLength: session.access_token.length,
-            hasToken: !!session.access_token
+            tokenLength: token.length,
+            hasToken: !!token
           });
 
           const response = await fetch(
