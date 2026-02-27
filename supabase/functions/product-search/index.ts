@@ -349,21 +349,45 @@ async function searchSSActivewearCache(
       }
     }
 
-    // Get images and pricing for first part of each color
-    for (const [_, color] of colorMap) {
+    // Get images and pricing for each color - FILTER by color name to avoid mixed-color images
+    for (const [colorName, color] of colorMap) {
       if (color.partIds && color.partIds.length > 0) {
         const firstPartId = color.partIds[0];
         const firstPart = partsData.find(p => p.part_id === firstPartId);
 
         if (firstPart) {
-          const { data: imagesData } = await supabaseAdmin
+          // Query images filtering by BOTH part_id AND color name
+          // This ensures we only get images for the specific color, not all colors
+          let imagesQuery = supabaseAdmin
             .from("images")
-            .select("url, class_type")
+            .select("url, class_type, color")
             .eq("part_id", firstPart.id);
 
-          if (imagesData && imagesData.length > 0) {
-            logImageOperation("ssactivewear", style, "cache_hit", { imageCount: imagesData.length });
-            for (const img of imagesData) {
+          const { data: imagesData } = await imagesQuery;
+
+          // Filter images by color name (case-insensitive match)
+          // This is critical to avoid showing wrong-color images in mockup builder
+          let filteredImages = imagesData || [];
+          if (filteredImages.length > 0) {
+            const colorLower = colorName.toLowerCase();
+            const colorFiltered = filteredImages.filter((img: any) => {
+              if (!img.color) return true; // Include images without color info
+              const imgColor = (img.color || "").toLowerCase();
+              return imgColor === colorLower ||
+                     imgColor.includes(colorLower) ||
+                     colorLower.includes(imgColor);
+            });
+
+            // If color filtering returns results, use them; otherwise fall back to all images
+            if (colorFiltered.length > 0) {
+              filteredImages = colorFiltered;
+              console.log(`[SSA Cache] Filtered ${imagesData?.length || 0} images to ${filteredImages.length} for color "${colorName}"`);
+            }
+          }
+
+          if (filteredImages.length > 0) {
+            logImageOperation("ssactivewear", style, "cache_hit", { imageCount: filteredImages.length });
+            for (const img of filteredImages) {
               const classType = (img.class_type || "").toLowerCase();
               if (classType.includes("front") || !color.image_url) {
                 color.image_url = img.url;
@@ -829,22 +853,54 @@ async function fetchAndCacheSSActivewear(
         }
       }
 
-      // Apply images from mediaContent
+      // Apply images from mediaContent - FILTER by color to avoid mixed-color images
+      // Group mediaContent by color first
+      const mediaByColor = new Map<string, typeof mediaContent>();
       for (const media of mediaContent) {
-        const mediaColor = (media.color || "").toLowerCase();
-        for (const [colorName, color] of colorMap) {
-          if (colorName.toLowerCase() === mediaColor || mediaColor.includes(colorName.toLowerCase())) {
-            const classType = (media.classTypeName || "").toLowerCase();
-            if (classType.includes("front") || !color.image_url) {
-              color.image_url = media.url;
-            }
-            if (classType.includes("rear") || classType.includes("back")) {
-              color.rear_image_url = media.url;
-            }
-            if (classType.includes("side")) {
-              color.side_image_url = media.url;
+        const mediaColorKey = (media.color || "default").toLowerCase();
+        if (!mediaByColor.has(mediaColorKey)) {
+          mediaByColor.set(mediaColorKey, []);
+        }
+        mediaByColor.get(mediaColorKey)!.push(media);
+      }
+
+      // Apply images to each color, only using images that match that color
+      for (const [colorName, color] of colorMap) {
+        const colorLower = colorName.toLowerCase();
+
+        // Find matching media for this specific color
+        let matchingMedia: typeof mediaContent = [];
+
+        // Try exact match first
+        if (mediaByColor.has(colorLower)) {
+          matchingMedia = mediaByColor.get(colorLower)!;
+        } else {
+          // Try partial match
+          for (const [mediaColor, mediaList] of mediaByColor) {
+            if (mediaColor.includes(colorLower) || colorLower.includes(mediaColor)) {
+              matchingMedia = mediaList;
+              break;
             }
           }
+        }
+
+        // Apply only the matching images for this color
+        for (const media of matchingMedia) {
+          const classType = (media.classTypeName || "").toLowerCase();
+          if (classType.includes("front") || !color.image_url) {
+            color.image_url = media.url;
+          }
+          if (classType.includes("rear") || classType.includes("back")) {
+            color.rear_image_url = media.url;
+          }
+          if (classType.includes("side")) {
+            color.side_image_url = media.url;
+          }
+        }
+
+        // Log if no images found for this color
+        if (!color.image_url && matchingMedia.length === 0) {
+          console.log(`[SSA] No matching images found for color "${colorName}"`);
         }
       }
 
