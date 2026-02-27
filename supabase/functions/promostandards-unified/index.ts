@@ -14,7 +14,7 @@ const PROMOSTANDARDS_ENDPOINTS = {
   productData: "https://promostandards.ssactivewear.com/productdata/v2/productdataservicev2.svc",
   inventory: "https://promostandards.ssactivewear.com/inventory/v2/inventoryservice.svc",
   pricing: "https://promostandards.ssactivewear.com/pricingandconfiguration/v1/pricingandconfigurationservice.svc",
-  media: "https://promostandards.ssactivewear.com/MediaService/1.0.0/?wsdl",
+  media: "https://promostandards.ssactivewear.com/mediacontent/v1/mediacontentservice.svc",
 };
 
 async function makePromoStandardsRequest(
@@ -300,8 +300,8 @@ Deno.serve(async (req: Request) => {
     const ssaStyleNumber = `B${styleNumber.replace(/^B/i, '')}`;
     const escapedSsaStyleNumber = escapeXml(ssaStyleNumber);
 
-    const mediaSoap = `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
-  <shar:wsVersion>1.0.0</shar:wsVersion>
+    const mediaSoap = `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.1.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.1.0/SharedObjects/">
+  <shar:wsVersion>1.1.0</shar:wsVersion>
   <shar:id>${escapedAccountNumber}</shar:id>
   <shar:password>${escapedApiKey}</shar:password>
   <shar:mediaType>Image</shar:mediaType>
