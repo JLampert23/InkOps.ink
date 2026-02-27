@@ -163,20 +163,25 @@ Deno.serve(async (req: Request) => {
       searchPromises.push(
         (async () => {
           try {
+            console.log(`[SSA] Starting search for style: ${style}`);
             const cached = await searchSSActivewearCache(supabaseAdmin, companyId!, style);
             if (cached) {
+              console.log(`[SSA] Cache HIT for ${style}`);
               results.push(cached);
             } else {
-              console.log(`SSA cache miss for ${style}, calling live API...`);
+              console.log(`[SSA] Cache MISS for ${style}, calling live API...`);
               const liveResult = await fetchAndCacheSSActivewear(
                 supabaseAdmin, supabaseUrl, supabaseServiceKey, companyId!, style
               );
               if (liveResult) {
+                console.log(`[SSA] Live API returned result for ${style}`);
                 results.push(liveResult);
+              } else {
+                console.log(`[SSA] Live API returned NO result for ${style}`);
               }
             }
           } catch (error: any) {
-            console.error("SSA search error:", error.message);
+            console.error("[SSA] Search error:", error.message);
             searchErrors.push(`SSA: ${error.message}`);
           }
         })()
@@ -386,22 +391,24 @@ async function fetchAndCacheSSActivewear(
   try {
     console.log(`🔍 SSA: Fetching product data for ${style}`);
 
-    // Fetch product data
+    // Try calling the ssactivewear-api which handles normalization internally
     const productUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=product&productId=${encodeURIComponent(style)}&companyId=${encodeURIComponent(companyId)}`;
+    console.log(`[SSA] Calling: ${productUrl}`);
+
     const productResponse = await fetch(productUrl, {
       headers: { "Authorization": `Bearer ${supabaseServiceKey}` },
     });
 
     if (!productResponse.ok) {
-      console.log(`SSActivewear API returned ${productResponse.status}`);
+      console.log(`[SSA] API returned HTTP ${productResponse.status}`);
       return null;
     }
 
     const ssaData = await productResponse.json();
-    console.log(`🔍 SSA API response:`, JSON.stringify(ssaData).substring(0, 500));
+    console.log(`[SSA] API response:`, JSON.stringify(ssaData).substring(0, 800));
 
     if (ssaData.success === false || !ssaData.data?.[0]) {
-      console.log("SSActivewear: Product not found or error:", ssaData.error || "no data");
+      console.log(`[SSA] Product not found - error: ${ssaData.error || 'no data'}, errorDetails: ${ssaData.errorDetails || 'none'}`);
       return null;
     }
 
