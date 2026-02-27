@@ -18,6 +18,21 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: st
   ]);
 }
 
+function normalizeSsProductId(input: string): string {
+  if (!input) return '';
+  let cleaned = input.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (cleaned.startsWith('B') && cleaned.length > 1) {
+    cleaned = cleaned.substring(1);
+  }
+  if (cleaned.startsWith('G') && /^G\d+$/.test(cleaned)) {
+    cleaned = cleaned.substring(1);
+  }
+  if (/^\d+$/.test(cleaned)) {
+    cleaned = cleaned.padStart(5, '0');
+  }
+  return 'B' + cleaned;
+}
+
 interface ColorOption {
   name: string;
   code: string;
@@ -237,12 +252,30 @@ async function searchSSActivewearCache(
   style: string
 ): Promise<ProductResult | null> {
   try {
-    const { data: styleData } = await supabaseAdmin
+    const normalizedStyle = normalizeSsProductId(style);
+    console.log(`[SSA Cache] Searching for raw="${style}" or normalized="${normalizedStyle}"`);
+
+    let styleData = null;
+
+    const { data: exactMatch } = await supabaseAdmin
       .from("styles")
       .select("id, style_number, brand, name, description, category, last_synced")
       .eq("company_id", companyId)
       .ilike("style_number", style)
       .maybeSingle();
+
+    if (exactMatch) {
+      styleData = exactMatch;
+    } else {
+      const { data: normalizedMatch } = await supabaseAdmin
+        .from("styles")
+        .select("id, style_number, brand, name, description, category, last_synced")
+        .eq("company_id", companyId)
+        .ilike("style_number", normalizedStyle)
+        .maybeSingle();
+
+      styleData = normalizedMatch;
+    }
 
     if (!styleData) return null;
 
@@ -373,14 +406,15 @@ async function fetchAndCacheSSActivewear(
     }
 
     const productData = ssaData.data[0];
-    console.log(`🔍 SSA: Found product: ${productData.productName}, ${productData.parts?.length || 0} parts`);
+    const normalizedStyle = productData.productId || style;
+    console.log(`🔍 SSA: Found product: ${productData.productName}, ${productData.parts?.length || 0} parts, normalized style: ${normalizedStyle}`);
 
-    // Cache the style
+    // Cache the style using both raw input and normalized form for lookup
     const { data: newStyleData } = await supabaseAdmin
       .from("styles")
       .upsert({
         company_id: companyId,
-        style_number: style,
+        style_number: normalizedStyle,
         brand: productData.productBrand || null,
         name: productData.productName || null,
         description: productData.description || null,
