@@ -349,67 +349,106 @@ async function searchSSActivewearCache(
       }
     }
 
-    // Get images and pricing for each color - FILTER by color name to avoid mixed-color images
+    // Fetch ALL images for ALL parts of this style at once
+    const allPartInternalIds = partsData.map((p: any) => p.id);
+    const { data: allImagesData } = await supabaseAdmin
+      .from("images")
+      .select("url, class_type, color, part_id")
+      .in("part_id", allPartInternalIds);
+
+    // Create a lookup: part internal ID -> color name
+    const partIdToColorName = new Map<string, string>();
+    for (const part of partsData) {
+      partIdToColorName.set(part.id, part.color_name || "Default");
+    }
+
+    // Group images by color (using the part's color_name as the primary key)
+    const imagesByColor = new Map<string, Array<{ url: string; class_type: string; color: string }>>();
+    for (const img of (allImagesData || [])) {
+      if (!img.url) continue;
+
+      // Determine color: first try the image's color field, then fall back to part's color
+      let imgColorKey = img.color;
+      if (!imgColorKey && img.part_id) {
+        imgColorKey = partIdToColorName.get(img.part_id) || "Default";
+      }
+      imgColorKey = (imgColorKey || "Default").toLowerCase();
+
+      if (!imagesByColor.has(imgColorKey)) {
+        imagesByColor.set(imgColorKey, []);
+      }
+      imagesByColor.get(imgColorKey)!.push(img);
+    }
+
+    console.log(`[SSA Cache] Found ${allImagesData?.length || 0} total images grouped into ${imagesByColor.size} colors`);
+
+    // Assign images to each color - STRICTLY filter by matching color
     for (const [colorName, color] of colorMap) {
-      if (color.partIds && color.partIds.length > 0) {
-        const firstPartId = color.partIds[0];
-        const firstPart = partsData.find(p => p.part_id === firstPartId);
+      const colorLower = colorName.toLowerCase();
 
-        if (firstPart) {
-          // Query images filtering by BOTH part_id AND color name
-          // This ensures we only get images for the specific color, not all colors
-          let imagesQuery = supabaseAdmin
-            .from("images")
-            .select("url, class_type, color")
-            .eq("part_id", firstPart.id);
+      // Find images that match this color
+      let matchingImages: Array<{ url: string; class_type: string; color: string }> = [];
 
-          const { data: imagesData } = await imagesQuery;
-
-          // Filter images by color name (case-insensitive match)
-          // This is critical to avoid showing wrong-color images in mockup builder
-          let filteredImages = imagesData || [];
-          if (filteredImages.length > 0) {
-            const colorLower = colorName.toLowerCase();
-            const colorFiltered = filteredImages.filter((img: any) => {
-              if (!img.color) return true; // Include images without color info
-              const imgColor = (img.color || "").toLowerCase();
-              return imgColor === colorLower ||
-                     imgColor.includes(colorLower) ||
-                     colorLower.includes(imgColor);
-            });
-
-            // If color filtering returns results, use them; otherwise fall back to all images
-            if (colorFiltered.length > 0) {
-              filteredImages = colorFiltered;
-              console.log(`[SSA Cache] Filtered ${imagesData?.length || 0} images to ${filteredImages.length} for color "${colorName}"`);
-            }
+      // Try exact match first
+      if (imagesByColor.has(colorLower)) {
+        matchingImages = imagesByColor.get(colorLower)!;
+      } else {
+        // Try partial/fuzzy match
+        for (const [imgColor, imgs] of imagesByColor) {
+          if (imgColor.includes(colorLower) || colorLower.includes(imgColor)) {
+            matchingImages = imgs;
+            break;
           }
+        }
+      }
 
-          if (filteredImages.length > 0) {
-            logImageOperation("ssactivewear", style, "cache_hit", { imageCount: filteredImages.length });
-            for (const img of filteredImages) {
-              const classType = (img.class_type || "").toLowerCase();
-              if (classType.includes("front") || !color.image_url) {
-                color.image_url = img.url;
-              }
-              if (classType.includes("rear") || classType.includes("back")) {
-                color.rear_image_url = img.url;
-              }
-              if (classType.includes("side") || classType.includes("sleeve")) {
-                color.side_image_url = img.url;
-              }
-            }
-          } else {
-            // No cached images - use CDN fallback
-            logImageOperation("ssactivewear", style, "cdn_fallback", { fallbackUsed: true });
-            const fallbackUrls = buildSSActivewearCdnFallbackUrl(styleData.style_number, firstPartId);
-            if (fallbackUrls.length > 0) {
-              color.image_url = fallbackUrls[0];
-            }
+      console.log(`[SSA Cache] Color "${colorName}": found ${matchingImages.length} matching images`);
+
+      if (matchingImages.length > 0) {
+        logImageOperation("ssactivewear", style, "cache_hit", { imageCount: matchingImages.length });
+
+        // Assign images by type - prioritize exact class type matches
+        let frontImg: string | null = null;
+        let rearImg: string | null = null;
+        let sideImg: string | null = null;
+
+        for (const img of matchingImages) {
+          const classType = (img.class_type || "").toLowerCase();
+
+          if (classType.includes("front") && !frontImg) {
+            frontImg = img.url;
+          } else if ((classType.includes("rear") || classType.includes("back")) && !rearImg) {
+            rearImg = img.url;
+          } else if ((classType.includes("side") || classType.includes("sleeve")) && !sideImg) {
+            sideImg = img.url;
           }
         }
 
-        // Get pricing from cache
+        // If no front image found, use first available image
+        if (!frontImg && matchingImages.length > 0) {
+          frontImg = matchingImages[0].url;
+        }
+
+        color.image_url = frontImg || "";
+        color.rear_image_url = rearImg || undefined;
+        color.side_image_url = sideImg || undefined;
+
+        console.log(`[SSA Cache] Color "${colorName}" assigned: front=${!!frontImg}, rear=${!!rearImg}, side=${!!sideImg}`);
+      } else {
+        // No cached images for this color - use CDN fallback
+        logImageOperation("ssactivewear", style, "cdn_fallback", { fallbackUsed: true });
+        const firstPartId = color.partIds?.[0];
+        if (firstPartId) {
+          const fallbackUrls = buildSSActivewearCdnFallbackUrl(styleData.style_number, firstPartId);
+          if (fallbackUrls.length > 0) {
+            color.image_url = fallbackUrls[0];
+          }
+        }
+      }
+
+      // Get pricing from cache
+      const firstPartId = color.partIds?.[0];
+      if (firstPartId) {
         const { data: pricingData } = await supabaseAdmin
           .from("ss_catalog_pricing")
           .select("unit_price")
@@ -719,16 +758,30 @@ async function fetchAndCacheSSActivewear(
     if (!imageCacheHit && mediaContent.length > 0) {
       let cachedCount = 0;
 
+      // Log image type breakdown before caching
+      const typeBreakdown = { Front: 0, Rear: 0, Side: 0, Swatch: 0, Other: 0 };
+      for (const media of mediaContent) {
+        const classType = (media.classTypeName || "").toLowerCase();
+        if (classType.includes("front")) typeBreakdown.Front++;
+        else if (classType.includes("rear") || classType.includes("back")) typeBreakdown.Rear++;
+        else if (classType.includes("side")) typeBreakdown.Side++;
+        else if (classType.includes("swatch")) typeBreakdown.Swatch++;
+        else typeBreakdown.Other++;
+      }
+      console.log(`[SSA Cache] Image types to cache: Front=${typeBreakdown.Front}, Rear=${typeBreakdown.Rear}, Side=${typeBreakdown.Side}, Swatch=${typeBreakdown.Swatch}, Other=${typeBreakdown.Other}`);
+
       // Group images by color
       const imagesByColor = new Map<string, typeof mediaContent>();
       for (const media of mediaContent) {
         if (!media.url) continue;
-        const colorKey = media.color || 'default';
+        const colorKey = (media.color || 'default').toLowerCase();
         if (!imagesByColor.has(colorKey)) {
           imagesByColor.set(colorKey, []);
         }
         imagesByColor.get(colorKey)!.push(media);
       }
+
+      console.log(`[SSA Cache] Grouped ${mediaContent.length} images into ${imagesByColor.size} color groups`);
 
       // Get all parts for this style grouped by color
       const { data: allParts } = await supabaseAdmin
@@ -738,26 +791,29 @@ async function fetchAndCacheSSActivewear(
         .eq("style_id", styleId);
 
       if (allParts && allParts.length > 0) {
-        // Group parts by color name
+        // Group parts by color name (case-insensitive)
         const partsByColor = new Map<string, typeof allParts>();
         for (const part of allParts) {
-          const colorKey = part.color_name || 'default';
+          const colorKey = (part.color_name || 'default').toLowerCase();
           if (!partsByColor.has(colorKey)) {
             partsByColor.set(colorKey, []);
           }
           partsByColor.get(colorKey)!.push(part);
         }
 
+        console.log(`[SSA Cache] Parts grouped into ${partsByColor.size} colors: ${Array.from(partsByColor.keys()).join(', ')}`);
+
         // Cache images for each color's parts
         for (const [colorName, colorImages] of imagesByColor) {
-          // Find matching parts - try exact match first, then fuzzy match
+          // Find matching parts - colorName is already lowercase from grouping above
           let matchingParts = partsByColor.get(colorName);
 
           if (!matchingParts || matchingParts.length === 0) {
-            // Try case-insensitive match
+            // Try partial/fuzzy match
             for (const [partColor, parts] of partsByColor) {
-              if (partColor.toLowerCase() === colorName.toLowerCase()) {
+              if (partColor.includes(colorName) || colorName.includes(partColor)) {
                 matchingParts = parts;
+                console.log(`[SSA Cache] Fuzzy matched image color "${colorName}" to part color "${partColor}"`);
                 break;
               }
             }
@@ -766,11 +822,23 @@ async function fetchAndCacheSSActivewear(
           // If still no match, use the first available parts (images without color info)
           if (!matchingParts || matchingParts.length === 0) {
             matchingParts = allParts.slice(0, 1);
+            console.log(`[SSA Cache] No color match for "${colorName}", using first part as fallback`);
           }
 
           // Cache each image for ONE representative part per color
           // (The unique constraint is on company_id, part_id, url)
           const representativePart = matchingParts[0];
+
+          // Log what we're caching for this color
+          const colorTypeBreakdown = { Front: 0, Rear: 0, Side: 0, Other: 0 };
+          for (const img of colorImages) {
+            const ct = (img.classTypeName || "").toLowerCase();
+            if (ct.includes("front")) colorTypeBreakdown.Front++;
+            else if (ct.includes("rear") || ct.includes("back")) colorTypeBreakdown.Rear++;
+            else if (ct.includes("side")) colorTypeBreakdown.Side++;
+            else colorTypeBreakdown.Other++;
+          }
+          console.log(`[SSA Cache] Caching for color "${colorName}": Front=${colorTypeBreakdown.Front}, Rear=${colorTypeBreakdown.Rear}, Side=${colorTypeBreakdown.Side}`);
 
           for (const media of colorImages) {
             const { data: existingImage } = await supabaseAdmin
