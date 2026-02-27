@@ -1370,8 +1370,14 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         }
 
         // Check if we have live media data from the API
+        // Check both individual views AND the arrays (frontImages, etc.)
         const hasLiveMediaData = unifiedData.success && unifiedData.media?.views &&
-          (unifiedData.media.views.front || unifiedData.media.views.rear || unifiedData.media.views.side);
+          (unifiedData.media.views.front || unifiedData.media.views.rear || unifiedData.media.views.side ||
+           (unifiedData.media.views.frontImages && unifiedData.media.views.frontImages.length > 0) ||
+           (unifiedData.media.views.rearImages && unifiedData.media.views.rearImages.length > 0) ||
+           (unifiedData.media.views.sideImages && unifiedData.media.views.sideImages.length > 0) ||
+           (unifiedData.media.views.lifestyleImages && unifiedData.media.views.lifestyleImages.length > 0) ||
+           (unifiedData.media.images && unifiedData.media.images.length > 0));
 
         // If no live media data, try to use cached images from database
         // This handles: auth errors (105), empty results, or any other media API issues
@@ -1516,7 +1522,16 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           console.error('❌ No media data in unified response:', {
             success: unifiedData.success,
             hasMedia: !!unifiedData.media,
-            media: unifiedData.media,
+            hasViews: !!unifiedData.media?.views,
+            viewsKeys: unifiedData.media?.views ? Object.keys(unifiedData.media.views) : [],
+            front: unifiedData.media?.views?.front,
+            rear: unifiedData.media?.views?.rear,
+            side: unifiedData.media?.views?.side,
+            frontImagesCount: unifiedData.media?.views?.frontImages?.length || 0,
+            rearImagesCount: unifiedData.media?.views?.rearImages?.length || 0,
+            sideImagesCount: unifiedData.media?.views?.sideImages?.length || 0,
+            lifestyleImagesCount: unifiedData.media?.views?.lifestyleImages?.length || 0,
+            rawImagesCount: unifiedData.media?.images?.length || 0,
           });
         }
       } catch (error: any) {
