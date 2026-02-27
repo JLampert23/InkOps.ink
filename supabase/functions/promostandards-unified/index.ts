@@ -518,6 +518,7 @@ Deno.serve(async (req: Request) => {
 
     let mediaAuthError: { code: string; description: string } | null = null;
     let finalMediaResponse = mediaResponse;
+    let usedRestApiFallback = false;
 
     // Check if media request failed or returned error 105
     if (mediaResponse.status === 'fulfilled' && mediaResponse.value) {
@@ -529,32 +530,136 @@ Deno.serve(async (req: Request) => {
           code: errorCodeMatch[1],
           description: errorDescMatch[1]
         };
-        console.warn('📸 Media API error 105 (auth failed), retrying without partId as fallback...');
+        console.warn('📸 Media API error 105 (auth failed), trying SSActivewear REST API fallback...');
 
-        // Retry without partId to get style-level images
+        // Use SSActivewear REST API as fallback for images
         try {
-          const fallbackMediaXml = await makePromoStandardsRequest(
-            PROMOSTANDARDS_ENDPOINTS.media,
-            "getMediaContent",
-            `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
-  <shar:wsVersion>1.0.0</shar:wsVersion>
-  <shar:id>${escapedAccountNumber}</shar:id>
-  <shar:password>${escapedApiKey}</shar:password>
-  <shar:mediaType>Image</shar:mediaType>
-  <shar:productId>${escapedStyleNumber}</shar:productId>
-</ns2:GetMediaContentRequest>`
-          );
-          console.log('📸 Fallback media request succeeded');
-          finalMediaResponse = { status: 'fulfilled' as const, value: fallbackMediaXml };
-        } catch (fallbackError) {
-          console.error('📸 Fallback media request also failed:', fallbackError);
+          const ssaRestApiUrl = `https://api.ssactivewear.com/v2/products/?style=${encodeURIComponent(styleNumber)}`;
+          console.log('📸 Calling SSActivewear REST API:', ssaRestApiUrl);
+
+          const restApiResponse = await fetch(ssaRestApiUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Basic ${btoa(`${credentials.accountNumber}:${decryptedApiKey}`)}`,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (restApiResponse.ok) {
+            const restApiData = await restApiResponse.json();
+            console.log('📸 REST API returned', Array.isArray(restApiData) ? restApiData.length : 1, 'products');
+
+            if (Array.isArray(restApiData) && restApiData.length > 0) {
+              usedRestApiFallback = true;
+
+              // Extract unique images from all products (variants)
+              const imageMap = new Map<string, { url: string; type: string; color: string }>();
+
+              for (const product of restApiData) {
+                // Add front image
+                if (product.colorFrontImage) {
+                  const key = `front-${product.colorName}`;
+                  if (!imageMap.has(key)) {
+                    imageMap.set(key, { url: product.colorFrontImage, type: 'Front', color: product.colorName });
+                  }
+                }
+                // Add back image
+                if (product.colorBackImage) {
+                  const key = `back-${product.colorName}`;
+                  if (!imageMap.has(key)) {
+                    imageMap.set(key, { url: product.colorBackImage, type: 'Back', color: product.colorName });
+                  }
+                }
+                // Add side image
+                if (product.colorSideImage) {
+                  const key = `side-${product.colorName}`;
+                  if (!imageMap.has(key)) {
+                    imageMap.set(key, { url: product.colorSideImage, type: 'Side', color: product.colorName });
+                  }
+                }
+                // Add swatch image (can use as lifestyle)
+                if (product.colorSwatchImage) {
+                  const key = `swatch-${product.colorName}`;
+                  if (!imageMap.has(key)) {
+                    imageMap.set(key, { url: product.colorSwatchImage, type: 'Swatch', color: product.colorName });
+                  }
+                }
+              }
+
+              // Build media data from REST API response
+              mediaData.images = Array.from(imageMap.values()).map(img => ({
+                url: img.url,
+                productId: styleNumber,
+                partId: '',
+                classTypeName: img.type,
+                color: img.color,
+                singlePart: false,
+              }));
+
+              // Organize by type
+              const frontImages: string[] = [];
+              const rearImages: string[] = [];
+              const sideImages: string[] = [];
+              const lifestyleImages: string[] = [];
+              const otherImages: string[] = [];
+
+              // If partId (color code) is provided, try to find matching color images first
+              const targetColor = partId ? restApiData.find((p: any) => p.sku === partId || p.styleID === partId)?.colorName : null;
+
+              for (const img of mediaData.images) {
+                const imgType = (img.classTypeName || '').toLowerCase();
+                const isTargetColor = !targetColor || img.color === targetColor;
+
+                if (imgType.includes('front')) {
+                  if (isTargetColor) frontImages.unshift(img.url);
+                  else frontImages.push(img.url);
+                } else if (imgType.includes('back')) {
+                  if (isTargetColor) rearImages.unshift(img.url);
+                  else rearImages.push(img.url);
+                } else if (imgType.includes('side')) {
+                  if (isTargetColor) sideImages.unshift(img.url);
+                  else sideImages.push(img.url);
+                } else if (imgType.includes('swatch')) {
+                  if (isTargetColor) lifestyleImages.unshift(img.url);
+                  else lifestyleImages.push(img.url);
+                } else {
+                  otherImages.push(img.url);
+                }
+              }
+
+              mediaData.views = {
+                front: frontImages.length > 0 ? frontImages[0] : null,
+                rear: rearImages.length > 0 ? rearImages[0] : null,
+                side: sideImages.length > 0 ? sideImages[0] : null,
+                lifestyle: lifestyleImages.length > 0 ? lifestyleImages[0] : (frontImages.length > 0 ? frontImages[0] : null),
+                frontImages,
+                rearImages,
+                sideImages,
+                lifestyleImages,
+                otherImages,
+              };
+
+              console.log('📸 REST API images loaded:', {
+                totalImages: mediaData.images.length,
+                frontCount: frontImages.length,
+                rearCount: rearImages.length,
+                sideCount: sideImages.length,
+                lifestyleCount: lifestyleImages.length,
+              });
+            }
+          } else {
+            console.warn('📸 REST API returned error:', restApiResponse.status, await restApiResponse.text().catch(() => ''));
+          }
+        } catch (restApiError) {
+          console.error('📸 REST API fallback failed:', restApiError);
         }
       }
     } else if (mediaResponse.status === 'rejected') {
       console.error('📸 Media Request Failed:', mediaResponse.reason);
     }
 
-    if (finalMediaResponse.status === 'fulfilled' && finalMediaResponse.value) {
+    // Only process PromoStandards media if we didn't already get images from REST API fallback
+    if (!usedRestApiFallback && finalMediaResponse.status === 'fulfilled' && finalMediaResponse.value) {
       const xmlDoc = finalMediaResponse.value;
       console.log('📸 Media XML Response (first 1000 chars):', xmlDoc.substring(0, 1000));
 
