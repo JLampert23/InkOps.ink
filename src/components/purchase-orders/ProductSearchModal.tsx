@@ -46,39 +46,57 @@ export function ProductSearchModal({ vendorId, vendorType, onSelect, onClose }: 
   const [selectedSizes, setSelectedSizes] = useState<{ [size: string]: number }>({});
 
   useEffect(() => {
+    console.log('🔄 useEffect triggered, searchTerm:', searchTerm, 'length:', searchTerm.length);
     if (searchTerm.length >= 3) {
+      console.log('✅ searchTerm >= 3, setting up timer...');
       const timer = setTimeout(() => {
+        console.log('⏰ Timer fired, calling searchProducts()');
         searchProducts();
       }, 500);
-      return () => clearTimeout(timer);
+      return () => {
+        console.log('🧹 Cleaning up timer');
+        clearTimeout(timer);
+      };
+    } else {
+      console.log('⚠️ searchTerm too short, not searching');
     }
   }, [searchTerm]);
 
   const searchProducts = async () => {
-    if (!searchTerm.trim()) return;
+    console.log('🔍 searchProducts() called with searchTerm:', searchTerm);
+    if (!searchTerm.trim()) {
+      console.log('❌ searchTerm is empty, returning');
+      return;
+    }
 
     try {
       setSearching(true);
+      console.log('⏳ Set searching to true');
 
-      // Call the product search edge function with proper auth
       const { data: { session } } = await supabase.auth.getSession();
+      console.log('🔐 Session check:', session ? 'Found' : 'NOT FOUND');
+
       if (!session) {
         console.error('❌ Not authenticated - no session found');
         throw new Error('Not authenticated');
       }
 
-      console.log('🔐 Using session token for product search');
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      console.log('🌐 Supabase URL:', supabaseUrl);
+      console.log('🔑 Access token (first 20 chars):', session.access_token?.substring(0, 20));
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/product-search?style=${encodeURIComponent(searchTerm)}`,
-        {
+      const fullUrl = `${supabaseUrl}/functions/v1/product-search?style=${encodeURIComponent(searchTerm)}`;
+      console.log('📡 Calling:', fullUrl);
+
+      const response = await fetch(fullUrl, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
-        }
-      );
+        });
+
+      console.log('📥 Response status:', response.status, response.statusText);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -240,7 +258,16 @@ export function ProductSearchModal({ vendorId, vendorType, onSelect, onClose }: 
             <input
               type="text"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                console.log('📝 Input changed:', e.target.value);
+                setSearchTerm(e.target.value);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && searchTerm.length >= 3) {
+                  console.log('⏎ Enter pressed, triggering search');
+                  searchProducts();
+                }
+              }}
               placeholder="Search by style number, product name, or keyword..."
               className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
               autoFocus
