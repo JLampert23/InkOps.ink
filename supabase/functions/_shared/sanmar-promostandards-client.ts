@@ -553,13 +553,13 @@ export async function fetchSanMarMedia(
   const normalizedStyle = styleNumber.toUpperCase().trim();
   console.log('🖼️ Fetching SanMar media:', normalizedStyle, partId || '(all)');
 
+  // SanMar Media Content Service requires wsVersion 1.1.0 and only styleNumber (not partId)
   const payload = `<shar:mediaType>Image</shar:mediaType>
-      <shar:productId>${normalizedStyle}</shar:productId>${partId ? `
-      <shar:partId>${partId}</shar:partId>` : ''}`;
+      <shar:productId>${normalizedStyle}</shar:productId>`;
 
   const soapEnvelope = buildSOAPEnvelope(
     'MediaService',
-    '1.0.0',
+    '1.1.0',
     'GetMediaContent',
     credentials,
     payload
