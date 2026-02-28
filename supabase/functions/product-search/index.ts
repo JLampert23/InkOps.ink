@@ -384,21 +384,36 @@ async function searchSSActivewearCache(
 
     // Assign images to each color - STRICTLY filter by matching color
     for (const [colorName, color] of colorMap) {
-      const colorLower = colorName.toLowerCase();
+      const colorLower = colorName.toLowerCase().trim();
 
-      // Find images that match this color
       let matchingImages: Array<{ url: string; class_type: string; color: string }> = [];
 
-      // Try exact match first
       if (imagesByColor.has(colorLower)) {
         matchingImages = imagesByColor.get(colorLower)!;
       } else {
-        // Try partial/fuzzy match
+        let bestMatch: { key: string; imgs: Array<{ url: string; class_type: string; color: string }>; score: number } | null = null;
+
         for (const [imgColor, imgs] of imagesByColor) {
-          if (imgColor.includes(colorLower) || colorLower.includes(imgColor)) {
-            matchingImages = imgs;
+          if (!imgColor || imgColor === 'default') continue;
+
+          if (imgColor === colorLower) {
+            bestMatch = { key: imgColor, imgs, score: 100 };
             break;
           }
+
+          const colorWords = colorLower.split(/[\s/]+/);
+          const imgWords = imgColor.split(/[\s/]+/);
+          const matchingWords = colorWords.filter(w => w.length > 2 && imgWords.includes(w));
+          const wordScore = (matchingWords.length * 2) / (colorWords.length + imgWords.length) * 80;
+
+          if (wordScore > 0 && (!bestMatch || wordScore > bestMatch.score)) {
+            bestMatch = { key: imgColor, imgs, score: wordScore };
+          }
+        }
+
+        if (bestMatch && bestMatch.score >= 30) {
+          matchingImages = bestMatch.imgs;
+          console.log(`[SSA Cache] Fuzzy matched color "${colorName}" -> "${bestMatch.key}" (score: ${bestMatch.score.toFixed(0)})`);
         }
       }
 
@@ -832,11 +847,16 @@ async function fetchAndCacheSSActivewear(
             let matchingParts = partsByColor.get(colorLower);
 
             if (!matchingParts || matchingParts.length === 0) {
-              // Try fuzzy match
+              let bestScore = 0;
+              const mediaWords = colorLower.split(/[\s/]+/);
               for (const [partColor, parts] of partsByColor) {
-                if (partColor.includes(colorLower) || colorLower.includes(partColor)) {
+                if (!partColor || partColor === 'default') continue;
+                const partWords = partColor.split(/[\s/]+/);
+                const matching = mediaWords.filter(w => w.length > 2 && partWords.includes(w));
+                const score = (matching.length * 2) / (mediaWords.length + partWords.length);
+                if (score > bestScore && score >= 0.3) {
+                  bestScore = score;
                   matchingParts = parts;
-                  break;
                 }
               }
             }
@@ -958,23 +978,29 @@ async function fetchAndCacheSSActivewear(
         mediaByColor.get(mediaColorKey)!.push(media);
       }
 
-      // Apply images to each color, only using images that match that color
       for (const [colorName, color] of colorMap) {
-        const colorLower = colorName.toLowerCase();
+        const colorLower = colorName.toLowerCase().trim();
 
-        // Find matching media for this specific color
         let matchingMedia: typeof mediaContent = [];
 
-        // Try exact match first
         if (mediaByColor.has(colorLower)) {
           matchingMedia = mediaByColor.get(colorLower)!;
         } else {
-          // Try partial match
+          let bestMatch: { key: string; media: typeof mediaContent; score: number } | null = null;
+          const colorWords = colorLower.split(/[\s/]+/);
+
           for (const [mediaColor, mediaList] of mediaByColor) {
-            if (mediaColor.includes(colorLower) || colorLower.includes(mediaColor)) {
-              matchingMedia = mediaList;
-              break;
+            if (!mediaColor || mediaColor === 'default') continue;
+            const mediaWords = mediaColor.split(/[\s/]+/);
+            const matching = colorWords.filter(w => w.length > 2 && mediaWords.includes(w));
+            const score = (matching.length * 2) / (colorWords.length + mediaWords.length);
+            if (score > 0 && (!bestMatch || score > bestMatch.score) && score >= 0.3) {
+              bestMatch = { key: mediaColor, media: mediaList, score };
             }
+          }
+
+          if (bestMatch) {
+            matchingMedia = bestMatch.media;
           }
         }
 

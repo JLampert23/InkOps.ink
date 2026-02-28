@@ -438,16 +438,20 @@ function transformSanMarData(apiData: any): ProductResult {
 
       const colorName = color.colorName?.toLowerCase() || "";
 
-      // Try to match images by color name (fuzzy match)
       const colorImages = mediaImages.filter((img: any) => {
+        if (img.partId && partIds.includes(img.partId)) return true;
+
         const imgColor = (img.color || "").toLowerCase().trim();
         const productColor = colorName.trim();
-        // Exact match or partial match
-        return imgColor === productColor ||
-               imgColor.includes(productColor) ||
-               productColor.includes(imgColor) ||
-               // Also try matching by partId
-               (img.partId && partIds.includes(img.partId));
+
+        if (!imgColor || !productColor) return false;
+        if (imgColor === productColor) return true;
+
+        const imgWords = imgColor.split(/[\s/]+/);
+        const colorWords = productColor.split(/[\s/]+/);
+        const matching = colorWords.filter(w => w.length > 2 && imgWords.includes(w));
+        const score = (matching.length * 2) / (colorWords.length + imgWords.length);
+        return score >= 0.5;
       });
 
       if (colorImages.length > 0) {
