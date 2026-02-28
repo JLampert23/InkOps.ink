@@ -408,6 +408,7 @@ export async function getUnifiedProductData(
     const response = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${token}`,
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         'Content-Type': 'application/json',
       },
     });
