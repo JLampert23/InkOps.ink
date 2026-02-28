@@ -57,34 +57,15 @@ function normalizeSsProductId(input: string): string {
 
   let cleaned = input.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
 
-  // If it already has letters (like DG536, PC54, G500, etc.), it's a manufacturer style number
-  // These should be passed through as-is (no B prefix needed)
-  if (/[A-Z]/.test(cleaned) && !/^B\d+$/.test(cleaned)) {
-    // It's a manufacturer style number like DG536, PC54, G500, etc.
-    // Remove any leading B if it was incorrectly added previously
-    if (cleaned.startsWith('B') && cleaned.length > 1 && /[A-Z]/.test(cleaned.substring(1))) {
-      // But only if what follows has letters too (like BDG536 -> DG536)
-      // Keep it if it's like B18500 (which is correct)
-      const afterB = cleaned.substring(1);
-      if (/[A-Z]/.test(afterB)) {
-        cleaned = afterB;
-      }
+  if (cleaned.startsWith('B') && cleaned.length > 1) {
+    const afterB = cleaned.substring(1);
+    if (/[A-Z]/.test(afterB)) {
+      cleaned = afterB;
+    } else if (/^\d+$/.test(afterB)) {
+      cleaned = afterB;
     }
-    return cleaned;
   }
 
-  // If it starts with B followed by numbers only (B18500), keep it
-  if (/^B\d+$/.test(cleaned)) {
-    return cleaned;
-  }
-
-  // Pure numeric input (like 18500) - these are S&S internal IDs and need B prefix
-  if (/^\d+$/.test(cleaned)) {
-    cleaned = cleaned.padStart(5, '0');
-    return 'B' + cleaned;
-  }
-
-  // For anything else, return as-is
   return cleaned;
 }
 
