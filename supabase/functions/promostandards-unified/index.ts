@@ -577,26 +577,43 @@ Deno.serve(async (req: Request) => {
                 return url && typeof url === 'string' && url.trim().length > 0 && url.startsWith('http');
               };
 
-              // FILTER BY COLOR: Find the matching product by partId
-              let targetProduct: any = null;
               let targetColor: string | null = null;
+              let productsForColor: any[] = [];
 
               if (partId) {
-                targetProduct = restApiData.find((p: any) =>
-                  p.sku === partId ||
-                  p.styleID === partId ||
-                  p.gtin === partId ||
-                  (partId.includes('-') && p.sku?.includes(partId.split('-')[1]))
-                );
-                targetColor = targetProduct?.colorName || null;
-                console.log('📸 Target color matching (REST API):', { partId, targetColor, matchedSku: targetProduct?.sku });
+                const selectedPart = productData.parts?.find((p: any) => p.partId === partId);
+                targetColor = selectedPart?.colorName || null;
+                console.log('📸 Looking up color for partId:', { partId, targetColor });
+
+                if (targetColor) {
+                  productsForColor = restApiData.filter((p: any) =>
+                    p.colorName?.toLowerCase() === targetColor!.toLowerCase()
+                  );
+                }
+
+                if (productsForColor.length === 0) {
+                  const strippedPartId = partId.replace(/^B0*/i, '');
+                  const matched = restApiData.find((p: any) =>
+                    p.sku === partId ||
+                    p.styleID === partId ||
+                    p.gtin === partId ||
+                    (strippedPartId && (p.sku?.includes(strippedPartId) || p.partID?.toString() === strippedPartId))
+                  );
+                  if (matched) {
+                    targetColor = matched.colorName || null;
+                    productsForColor = restApiData.filter((p: any) =>
+                      p.colorName === matched.colorName
+                    );
+                  }
+                }
+
+                console.log('📸 Color match result:', { partId, targetColor, matchCount: productsForColor.length });
               }
 
-              // If we found a matching product, use ONLY that product's images
-              // Otherwise fall back to the first product
-              const productsToUse = targetProduct ? [targetProduct] : [restApiData[0]];
-
-              console.log('📸 Using products for images:', productsToUse.map((p: any) => ({ sku: p.sku, colorName: p.colorName })));
+              const productsToUse = productsForColor.length > 0 ? productsForColor : [restApiData[0]];
+              if (productsForColor.length === 0) {
+                console.warn('📸 No color match found, falling back to first product');
+              }
 
               // Extract images ONLY from the selected color's product(s)
               let front: string | null = null;
@@ -701,31 +718,48 @@ Deno.serve(async (req: Request) => {
         let filteredImages = allImages;
 
         if (partId) {
-          // First try to filter by exact partId match
           filteredImages = allImages.filter(img => img.partId === partId);
-          console.log('📸 Filtered by partId:', { partId, matchCount: filteredImages.length });
+          console.log('📸 Filtered by exact partId:', { partId, matchCount: filteredImages.length });
 
-          // If no exact partId match, try to match by color name
           if (filteredImages.length === 0) {
-            // Find the color name for the selected partId from product data
-            const selectedPart = productData.parts?.find((p: any) => p.partId === partId);
-            const selectedColorName = selectedPart?.colorName?.toLowerCase();
-
-            if (selectedColorName) {
+            const strippedPartId = partId.replace(/^B0*/i, '');
+            if (strippedPartId) {
               filteredImages = allImages.filter(img =>
-                img.color?.toLowerCase() === selectedColorName
+                img.partId && (img.partId.replace(/^B0*/i, '') === strippedPartId)
               );
-              console.log('📸 Filtered by color name:', { selectedColorName, matchCount: filteredImages.length });
+              console.log('📸 Filtered by stripped partId:', { strippedPartId, matchCount: filteredImages.length });
             }
           }
 
-          // If still no matches, use singlePart=true images (style-level) as fallback
+          if (filteredImages.length === 0) {
+            const selectedPart = productData.parts?.find((p: any) => p.partId === partId);
+            const selectedColorName = selectedPart?.colorName?.toLowerCase()?.trim();
+
+            if (selectedColorName) {
+              filteredImages = allImages.filter(img =>
+                img.color?.toLowerCase()?.trim() === selectedColorName
+              );
+              console.log('📸 Filtered by exact color name:', { selectedColorName, matchCount: filteredImages.length });
+
+              if (filteredImages.length === 0) {
+                const colorWords = selectedColorName.split(/[\s/]+/);
+                filteredImages = allImages.filter(img => {
+                  const imgColor = img.color?.toLowerCase()?.trim();
+                  if (!imgColor) return false;
+                  const imgWords = imgColor.split(/[\s/]+/);
+                  const matching = colorWords.filter(w => w.length > 2 && imgWords.includes(w));
+                  return (matching.length * 2) / (colorWords.length + imgWords.length) >= 0.5;
+                });
+                console.log('📸 Filtered by fuzzy color name:', { selectedColorName, matchCount: filteredImages.length });
+              }
+            }
+          }
+
           if (filteredImages.length === 0) {
             filteredImages = allImages.filter(img => img.singlePart === true);
             console.log('📸 Falling back to singlePart images:', { matchCount: filteredImages.length });
           }
 
-          // Last resort: use all images but log a warning
           if (filteredImages.length === 0) {
             filteredImages = allImages;
             console.warn('📸 No color-specific images found, using all images');
