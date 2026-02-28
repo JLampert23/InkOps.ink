@@ -1503,7 +1503,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
             sideImages: filterValidImages(unifiedData.media.views.sideImages || []),
             lifestyleImages: filterValidImages(unifiedData.media.views.lifestyleImages || []),
             otherImages: filterValidImages(unifiedData.media.views.otherImages || []),
-            allImages: filterValidImages(unifiedData.media.images || []),
+            allImages: filterValidImages((unifiedData.media.images || []).map((img: any) => typeof img === 'string' ? img : img?.url).filter(Boolean)),
           };
 
           console.log('✅ Loaded SSActivewear images:', {

@@ -308,12 +308,13 @@ Deno.serve(async (req: Request) => {
     }
     const escapedCleanedStyleNumber = escapeXml(cleanedStyleNumber);
 
+    const partIdTag = partId ? `\n  <shar:partId>${escapedPartId}</shar:partId>` : '';
     const mediaSoap = `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${escapedAccountNumber}</shar:id>
   <shar:password>${escapedApiKey}</shar:password>
   <shar:mediaType>Image</shar:mediaType>
-  <shar:productId>${escapedCleanedStyleNumber}</shar:productId>
+  <shar:productId>${escapedCleanedStyleNumber}</shar:productId>${partIdTag}
 </ns2:GetMediaContentRequest>`;
 
     // Build vendor config for live wholesale pricing
@@ -591,13 +592,36 @@ Deno.serve(async (req: Request) => {
                   );
                 }
 
+                if (productsForColor.length === 0 && targetColor) {
+                  const targetWords = targetColor.toLowerCase().split(/[\s/]+/);
+                  productsForColor = restApiData.filter((p: any) => {
+                    const pColor = p.colorName?.toLowerCase();
+                    if (!pColor) return false;
+                    const pWords = pColor.split(/[\s/]+/);
+                    const matching = targetWords.filter(w => w.length > 2 && pWords.includes(w));
+                    return matching.length > 0 && (matching.length * 2) / (targetWords.length + pWords.length) >= 0.5;
+                  });
+                  if (productsForColor.length > 0) {
+                    console.log('📸 Fuzzy color match found:', productsForColor.length, 'products');
+                  }
+                }
+
                 if (productsForColor.length === 0) {
-                  const strippedPartId = partId.replace(/^B0*/i, '');
+                  const colorPortion = partId.replace(/^[A-Z0-9]+-/i, '').replace(/-[A-Z0-9]+$/i, '').toLowerCase();
+                  if (colorPortion && colorPortion !== partId.toLowerCase()) {
+                    productsForColor = restApiData.filter((p: any) =>
+                      p.colorName?.toLowerCase()?.includes(colorPortion) ||
+                      p.color1?.toLowerCase()?.includes(colorPortion)
+                    );
+                    console.log('📸 Filtered REST by extracted color portion:', { colorPortion, matchCount: productsForColor.length });
+                  }
+                }
+
+                if (productsForColor.length === 0) {
                   const matched = restApiData.find((p: any) =>
                     p.sku === partId ||
                     p.styleID === partId ||
-                    p.gtin === partId ||
-                    (strippedPartId && (p.sku?.includes(strippedPartId) || p.partID?.toString() === strippedPartId))
+                    p.gtin === partId
                   );
                   if (matched) {
                     targetColor = matched.colorName || null;
@@ -714,44 +738,45 @@ Deno.serve(async (req: Request) => {
 
         console.log('📸 Total images parsed:', allImages.length);
 
-        // FILTER BY COLOR (partId): Only keep images matching the selected partId
         let filteredImages = allImages;
 
         if (partId) {
-          filteredImages = allImages.filter(img => img.partId === partId);
-          console.log('📸 Filtered by exact partId:', { partId, matchCount: filteredImages.length });
+          const selectedPart = productData.parts?.find((p: any) => p.partId === partId);
+          const selectedColorName = selectedPart?.colorName?.toLowerCase()?.trim();
+          console.log('📸 Resolving color for partId:', { partId, selectedColorName });
 
-          if (filteredImages.length === 0) {
-            const strippedPartId = partId.replace(/^B0*/i, '');
-            if (strippedPartId) {
-              filteredImages = allImages.filter(img =>
-                img.partId && (img.partId.replace(/^B0*/i, '') === strippedPartId)
-              );
-              console.log('📸 Filtered by stripped partId:', { strippedPartId, matchCount: filteredImages.length });
+          if (selectedColorName) {
+            filteredImages = allImages.filter(img =>
+              img.color?.toLowerCase()?.trim() === selectedColorName
+            );
+            console.log('📸 Filtered by exact color name:', { selectedColorName, matchCount: filteredImages.length });
+
+            if (filteredImages.length === 0) {
+              const colorWords = selectedColorName.split(/[\s/]+/);
+              filteredImages = allImages.filter(img => {
+                const imgColor = img.color?.toLowerCase()?.trim();
+                if (!imgColor) return false;
+                const imgWords = imgColor.split(/[\s/]+/);
+                const matching = colorWords.filter(w => w.length > 2 && imgWords.includes(w));
+                return (matching.length * 2) / (colorWords.length + imgWords.length) >= 0.5;
+              });
+              console.log('📸 Filtered by fuzzy color name:', { selectedColorName, matchCount: filteredImages.length });
             }
           }
 
           if (filteredImages.length === 0) {
-            const selectedPart = productData.parts?.find((p: any) => p.partId === partId);
-            const selectedColorName = selectedPart?.colorName?.toLowerCase()?.trim();
+            filteredImages = allImages.filter(img => img.partId === partId);
+            console.log('📸 Filtered by exact partId:', { partId, matchCount: filteredImages.length });
+          }
 
-            if (selectedColorName) {
+          if (filteredImages.length === 0) {
+            const colorPortion = partId.replace(/^[A-Z0-9]+-/, '').replace(/-[A-Z0-9]+$/, '').toLowerCase();
+            if (colorPortion && colorPortion !== partId.toLowerCase()) {
               filteredImages = allImages.filter(img =>
-                img.color?.toLowerCase()?.trim() === selectedColorName
+                img.color?.toLowerCase()?.includes(colorPortion) ||
+                img.partId?.toLowerCase()?.includes(colorPortion)
               );
-              console.log('📸 Filtered by exact color name:', { selectedColorName, matchCount: filteredImages.length });
-
-              if (filteredImages.length === 0) {
-                const colorWords = selectedColorName.split(/[\s/]+/);
-                filteredImages = allImages.filter(img => {
-                  const imgColor = img.color?.toLowerCase()?.trim();
-                  if (!imgColor) return false;
-                  const imgWords = imgColor.split(/[\s/]+/);
-                  const matching = colorWords.filter(w => w.length > 2 && imgWords.includes(w));
-                  return (matching.length * 2) / (colorWords.length + imgWords.length) >= 0.5;
-                });
-                console.log('📸 Filtered by fuzzy color name:', { selectedColorName, matchCount: filteredImages.length });
-              }
+              console.log('📸 Filtered by extracted color portion:', { colorPortion, matchCount: filteredImages.length });
             }
           }
 
