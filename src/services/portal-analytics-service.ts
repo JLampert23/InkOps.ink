@@ -1,3 +1,5 @@
+import { supabase, supabaseUrl, supabaseAnonKey } from '../lib/supabase-client';
+
 export type PortalEventType =
   | 'invoice_viewed'
   | 'invoice_paid'
@@ -35,23 +37,17 @@ interface ResourceAnalytics {
 }
 
 class PortalAnalyticsService {
-  private readonly supabaseUrl: string;
-  private readonly supabaseAnonKey: string;
-
-  constructor() {
-    this.supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    this.supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  }
-
   async trackEvent(params: TrackEventParams): Promise<void> {
+    if (!supabaseUrl || !supabaseAnonKey) return;
+
     try {
       const response = await fetch(
-        `${this.supabaseUrl}/functions/v1/track-portal-event`,
+        `${supabaseUrl}/functions/v1/track-portal-event`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'apikey': this.supabaseAnonKey
+            'apikey': supabaseAnonKey
           },
           body: JSON.stringify({
             company_id: params.companyId,
@@ -78,10 +74,9 @@ class PortalAnalyticsService {
     resourceType: ResourceType,
     resourceId: string
   ): Promise<ResourceAnalytics | null> {
-    try {
-      const { createClient } = await import('../lib/supabase-client');
-      const supabase = (await import('../lib/supabase-client')).supabase;
+    if (!supabase) return null;
 
+    try {
       const { data, error } = await supabase.rpc('get_resource_analytics', {
         p_company_id: companyId,
         p_resource_type: resourceType,
@@ -102,9 +97,9 @@ class PortalAnalyticsService {
     startDate?: Date,
     endDate?: Date
   ): Promise<any> {
-    try {
-      const supabase = (await import('../lib/supabase-client')).supabase;
+    if (!supabase) return null;
 
+    try {
       const { data, error } = await supabase.rpc('get_portal_analytics_summary', {
         p_company_id: companyId,
         p_start_date: startDate?.toISOString() || null,
@@ -126,9 +121,9 @@ class PortalAnalyticsService {
     startDate?: Date,
     endDate?: Date
   ): Promise<any> {
-    try {
-      const supabase = (await import('../lib/supabase-client')).supabase;
+    if (!supabase) return null;
 
+    try {
       const { data, error } = await supabase.rpc('get_time_to_action_metrics', {
         p_company_id: companyId,
         p_resource_type: resourceType,

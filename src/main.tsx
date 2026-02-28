@@ -1,11 +1,23 @@
-import { StrictMode } from 'react';
+import { StrictMode, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import { hasValidConfig } from './lib/supabase-client.ts';
 import './index.css';
 
+function hideInitialLoader() {
+  const loader = document.getElementById('initial-loader');
+  if (loader) {
+    loader.classList.add('fade-out');
+    setTimeout(() => loader.remove(), 300);
+  }
+}
+
 function ConfigError() {
+  useEffect(() => {
+    hideInitialLoader();
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6 text-center">
@@ -18,14 +30,23 @@ function ConfigError() {
   );
 }
 
+function AppWrapper() {
+  useEffect(() => {
+    hideInitialLoader();
+  }, []);
+
+  return <App />;
+}
+
 const rootElement = document.getElementById('root');
 if (!rootElement) {
   console.error('Root element not found!');
+  hideInitialLoader();
 } else {
   createRoot(rootElement).render(
     <StrictMode>
       <ErrorBoundary>
-        {hasValidConfig ? <App /> : <ConfigError />}
+        {hasValidConfig ? <AppWrapper /> : <ConfigError />}
       </ErrorBoundary>
     </StrictMode>
   );
