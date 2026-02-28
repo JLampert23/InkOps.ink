@@ -872,11 +872,11 @@ Deno.serve(async (req: Request) => {
         }
 
         const partId = url.searchParams.get("partId");
+        const colorName = url.searchParams.get("colorName");
         const partIdTag = partId ? `<shar:partId>${partId}</shar:partId>` : '';
 
-        // MediaContent uses raw style number for S&S Activewear (NOT B-prefixed like SanMar)
         const mediaProductId = getSsMediaStyleNumber(productId);
-        console.log(`[SS Media] Raw input: "${productId}" -> MediaContent productId: "${mediaProductId}"`);
+        console.log(`[SS Media] Raw input: "${productId}" -> MediaContent productId: "${mediaProductId}", partId: "${partId || 'none'}", colorName: "${colorName || 'none'}"`);
 
         const soapBody = `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
@@ -901,7 +901,6 @@ Deno.serve(async (req: Request) => {
 
         const parseResult = parseXmlResponse(xmlResponse);
 
-        // Check for 404/not found in response
         if (!parseResult.success) {
           const is404 = parseResult.error?.code === '404' ||
                         parseResult.error?.description?.toLowerCase().includes('not found') ||
@@ -924,7 +923,8 @@ Deno.serve(async (req: Request) => {
               data: {
                 productId: mediaProductId,
                 partId: partId || null,
-                mediaContent: []
+                mediaContent: [],
+                views: { front: null, back: null, side: null }
               }
             }),
             {
@@ -943,17 +943,15 @@ Deno.serve(async (req: Request) => {
         const partIds = getXmlValues(xmlDoc, "partId");
         const singleParts = getXmlValues(xmlDoc, "singlePart");
 
-        console.log(`[SS Media] Parsed media data for ${mediaProductId}: ${urls.length} URLs, ${classTypeNames.length} classTypeNames, ${colors.length} colors, ${partIds.length} partIds`);
+        console.log(`[SS Media] Parsed media data for ${mediaProductId}: ${urls.length} URLs`);
 
-        // Log if no media content was returned (effective 404)
         if (urls.length === 0) {
           console.error(`[SS Media] 404 - No media content returned for productId "${mediaProductId}"`);
         }
 
-        const mediaArray = urls.map((url, i) => {
+        // Parse all images
+        const allImages = urls.map((url, i) => {
           const classTypeName = classTypeNames[i] || "";
-
-          // Check if this is an actual image URL
           const hasImageExtension = url.match(/\.(jpg|jpeg|png|gif|webp|bmp|tiff)(\?|$)/i);
           const isWebPage = url.match(/\.(aspx|html|htm|php|jsp|asp)(\?|$)/i);
           const isImageUrl = !isWebPage && hasImageExtension;
@@ -969,10 +967,56 @@ Deno.serve(async (req: Request) => {
           };
         }).filter(item => item.isImage);
 
-        console.log(`[SS Media] Filtered to ${mediaArray.length} actual images for ${mediaProductId}`);
-        if (mediaArray.length > 0) {
-          console.log("[SS Media] First image:", mediaArray[0]);
+        console.log(`[SS Media] Total valid images: ${allImages.length}`);
+
+        // FILTER BY COLOR (partId or colorName)
+        let filteredImages = allImages;
+
+        if (partId) {
+          filteredImages = allImages.filter(img => img.partId === partId);
+          console.log(`[SS Media] Filtered by partId "${partId}": ${filteredImages.length} images`);
         }
+
+        if (filteredImages.length === 0 && colorName) {
+          const lowerColorName = colorName.toLowerCase();
+          filteredImages = allImages.filter(img => img.color?.toLowerCase() === lowerColorName);
+          console.log(`[SS Media] Filtered by colorName "${colorName}": ${filteredImages.length} images`);
+        }
+
+        if (filteredImages.length === 0 && (partId || colorName)) {
+          filteredImages = allImages.filter(img => img.singlePart === true);
+          console.log(`[SS Media] Fallback to singlePart images: ${filteredImages.length} images`);
+        }
+
+        if (filteredImages.length === 0) {
+          filteredImages = allImages;
+          console.warn(`[SS Media] No color-specific images found, using all ${allImages.length} images`);
+        }
+
+        // EXTRACT ONLY Front/Rear/Side views
+        const frontImg = filteredImages.find(img => img.classTypeName?.toLowerCase() === 'front');
+        const rearImg = filteredImages.find(img =>
+          img.classTypeName?.toLowerCase() === 'rear' || img.classTypeName?.toLowerCase() === 'back'
+        );
+        const sideImg = filteredImages.find(img =>
+          img.classTypeName?.toLowerCase() === 'side' || img.classTypeName?.toLowerCase() === 'sleeve'
+        );
+
+        // Build the views object with ONLY front/back/side
+        const views = {
+          front: frontImg?.url || null,
+          back: rearImg?.url || null,
+          side: sideImg?.url || null,
+        };
+
+        console.log(`[SS Media] Color-filtered views for ${mediaProductId}:`, {
+          partId,
+          colorName,
+          filteredCount: filteredImages.length,
+          front: !!views.front,
+          back: !!views.back,
+          side: !!views.side,
+        });
 
         return new Response(
           JSON.stringify({
@@ -983,7 +1027,9 @@ Deno.serve(async (req: Request) => {
               productId: mediaProductId,
               rawInput: productId,
               partId: partId || null,
-              mediaContent: mediaArray,
+              colorName: colorName || null,
+              mediaContent: filteredImages,
+              views,
             },
           }),
           {

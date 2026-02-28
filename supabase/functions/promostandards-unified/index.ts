@@ -570,142 +570,79 @@ Deno.serve(async (req: Request) => {
             const restApiData = await restApiResponse.json();
             console.log('📸 REST API returned', Array.isArray(restApiData) ? restApiData.length : 1, 'products');
 
-            // Log first product structure for debugging
-            if (Array.isArray(restApiData) && restApiData.length > 0) {
-              console.log('📸 Sample product keys:', Object.keys(restApiData[0]));
-              console.log('📸 Sample product images:', {
-                colorFrontImage: restApiData[0].colorFrontImage,
-                colorBackImage: restApiData[0].colorBackImage,
-                colorSideImage: restApiData[0].colorSideImage,
-                colorSwatchImage: restApiData[0].colorSwatchImage,
-                styleFrontImage: restApiData[0].styleFrontImage,
-                styleBackImage: restApiData[0].styleBackImage,
-              });
-            }
-
             if (Array.isArray(restApiData) && restApiData.length > 0) {
               usedRestApiFallback = true;
 
-              // Helper to check if URL is valid
               const isValidImageUrl = (url: any): boolean => {
                 return url && typeof url === 'string' && url.trim().length > 0 && url.startsWith('http');
               };
 
-              // Extract unique images from all products (variants)
-              const imageMap = new Map<string, { url: string; type: string; color: string }>();
-
-              for (const product of restApiData) {
-                const colorName = product.colorName || 'Unknown';
-
-                // Add front image (try color-specific first, then style-level)
-                const frontImg = isValidImageUrl(product.colorFrontImage) ? product.colorFrontImage : product.styleFrontImage;
-                if (isValidImageUrl(frontImg)) {
-                  const key = `front-${colorName}`;
-                  if (!imageMap.has(key)) {
-                    imageMap.set(key, { url: frontImg, type: 'Front', color: colorName });
-                  }
-                }
-
-                // Add back image
-                const backImg = isValidImageUrl(product.colorBackImage) ? product.colorBackImage : product.styleBackImage;
-                if (isValidImageUrl(backImg)) {
-                  const key = `back-${colorName}`;
-                  if (!imageMap.has(key)) {
-                    imageMap.set(key, { url: backImg, type: 'Back', color: colorName });
-                  }
-                }
-
-                // Add side image
-                const sideImg = isValidImageUrl(product.colorSideImage) ? product.colorSideImage : product.styleSideImage;
-                if (isValidImageUrl(sideImg)) {
-                  const key = `side-${colorName}`;
-                  if (!imageMap.has(key)) {
-                    imageMap.set(key, { url: sideImg, type: 'Side', color: colorName });
-                  }
-                }
-
-                // Add swatch image (can use as lifestyle)
-                if (isValidImageUrl(product.colorSwatchImage)) {
-                  const key = `swatch-${colorName}`;
-                  if (!imageMap.has(key)) {
-                    imageMap.set(key, { url: product.colorSwatchImage, type: 'Swatch', color: colorName });
-                  }
-                }
-              }
-
-              console.log('📸 Image map size:', imageMap.size);
-
-              // Build media data from REST API response
-              mediaData.images = Array.from(imageMap.values()).map(img => ({
-                url: img.url,
-                productId: styleNumber,
-                partId: '',
-                classTypeName: img.type,
-                color: img.color,
-                singlePart: false,
-              }));
-
-              // Organize by type
-              const frontImages: string[] = [];
-              const rearImages: string[] = [];
-              const sideImages: string[] = [];
-              const lifestyleImages: string[] = [];
-              const otherImages: string[] = [];
-
-              // If partId (color code) is provided, try to find matching color images first
-              // partId format could be: "00760-ATHY-S" or just the SKU
+              // FILTER BY COLOR: Find the matching product by partId
+              let targetProduct: any = null;
               let targetColor: string | null = null;
+
               if (partId) {
-                // Try multiple matching strategies
-                const matchedProduct = restApiData.find((p: any) =>
+                targetProduct = restApiData.find((p: any) =>
                   p.sku === partId ||
                   p.styleID === partId ||
                   p.gtin === partId ||
-                  (partId.includes('-') && p.sku?.includes(partId.split('-')[1])) // Match color code portion
+                  (partId.includes('-') && p.sku?.includes(partId.split('-')[1]))
                 );
-                targetColor = matchedProduct?.colorName || null;
-                console.log('📸 Target color matching:', { partId, targetColor, matchedSku: matchedProduct?.sku });
+                targetColor = targetProduct?.colorName || null;
+                console.log('📸 Target color matching (REST API):', { partId, targetColor, matchedSku: targetProduct?.sku });
               }
 
-              for (const img of mediaData.images) {
-                const imgType = (img.classTypeName || '').toLowerCase();
-                const isTargetColor = !targetColor || img.color === targetColor;
+              // If we found a matching product, use ONLY that product's images
+              // Otherwise fall back to the first product
+              const productsToUse = targetProduct ? [targetProduct] : [restApiData[0]];
 
-                if (imgType.includes('front')) {
-                  if (isTargetColor) frontImages.unshift(img.url);
-                  else frontImages.push(img.url);
-                } else if (imgType.includes('back')) {
-                  if (isTargetColor) rearImages.unshift(img.url);
-                  else rearImages.push(img.url);
-                } else if (imgType.includes('side')) {
-                  if (isTargetColor) sideImages.unshift(img.url);
-                  else sideImages.push(img.url);
-                } else if (imgType.includes('swatch')) {
-                  if (isTargetColor) lifestyleImages.unshift(img.url);
-                  else lifestyleImages.push(img.url);
-                } else {
-                  otherImages.push(img.url);
+              console.log('📸 Using products for images:', productsToUse.map((p: any) => ({ sku: p.sku, colorName: p.colorName })));
+
+              // Extract images ONLY from the selected color's product(s)
+              let front: string | null = null;
+              let back: string | null = null;
+              let side: string | null = null;
+
+              for (const product of productsToUse) {
+                if (!front) {
+                  const frontImg = isValidImageUrl(product.colorFrontImage) ? product.colorFrontImage : product.styleFrontImage;
+                  if (isValidImageUrl(frontImg)) front = frontImg;
+                }
+                if (!back) {
+                  const backImg = isValidImageUrl(product.colorBackImage) ? product.colorBackImage : product.styleBackImage;
+                  if (isValidImageUrl(backImg)) back = backImg;
+                }
+                if (!side) {
+                  const sideImg = isValidImageUrl(product.colorSideImage) ? product.colorSideImage : product.styleSideImage;
+                  if (isValidImageUrl(sideImg)) side = sideImg;
                 }
               }
 
+              // Build minimal image set for the selected color
+              mediaData.images = [];
+              if (front) mediaData.images.push({ url: front, productId: styleNumber, partId: partId || '', classTypeName: 'Front', color: targetColor || '', singlePart: false });
+              if (back) mediaData.images.push({ url: back, productId: styleNumber, partId: partId || '', classTypeName: 'Rear', color: targetColor || '', singlePart: false });
+              if (side) mediaData.images.push({ url: side, productId: styleNumber, partId: partId || '', classTypeName: 'Side', color: targetColor || '', singlePart: false });
+
+              // Return ONLY front/back/side for the selected color
               mediaData.views = {
-                front: frontImages.length > 0 ? frontImages[0] : null,
-                rear: rearImages.length > 0 ? rearImages[0] : null,
-                side: sideImages.length > 0 ? sideImages[0] : null,
-                lifestyle: lifestyleImages.length > 0 ? lifestyleImages[0] : (frontImages.length > 0 ? frontImages[0] : null),
-                frontImages,
-                rearImages,
-                sideImages,
-                lifestyleImages,
-                otherImages,
+                front,
+                rear: back,
+                side,
+                lifestyle: null,
+                frontImages: front ? [front] : [],
+                rearImages: back ? [back] : [],
+                sideImages: side ? [side] : [],
+                lifestyleImages: [],
+                otherImages: [],
               };
 
-              console.log('📸 REST API images loaded:', {
-                totalImages: mediaData.images.length,
-                frontCount: frontImages.length,
-                rearCount: rearImages.length,
-                sideCount: sideImages.length,
-                lifestyleCount: lifestyleImages.length,
+              console.log('📸 REST API images loaded (color-filtered):', {
+                partId,
+                targetColor,
+                front: !!front,
+                back: !!back,
+                side: !!side,
               });
             }
           } else {
@@ -725,7 +662,6 @@ Deno.serve(async (req: Request) => {
       const xmlDoc = finalMediaResponse.value;
       console.log('📸 Media XML Response (first 1000 chars):', xmlDoc.substring(0, 1000));
 
-      // Check for error message
       const errorCodeMatch = xmlDoc.match(/<code>(\d+)<\/code>/);
       const errorDescMatch = xmlDoc.match(/<description>(.*?)<\/description>/);
 
@@ -742,69 +678,97 @@ Deno.serve(async (req: Request) => {
         const mediaMatches = getAllXmlMatches(xmlDoc, mediaPattern);
         console.log('📸 MediaContent matches found:', mediaMatches.length);
 
-        // Log full response if MediaContentArray is empty for debugging
         if (mediaMatches.length === 0) {
           console.warn('📸 MediaContentArray is empty. Full SOAP response:', xmlDoc);
         }
 
-      mediaData.images = mediaMatches.map(match => {
-        const mediaXml = match[1];
-        return {
-          url: getXmlValue(mediaXml, "url"),
-          productId: getXmlValue(mediaXml, "productId"),
-          partId: getXmlValue(mediaXml, "partId"),
-          classTypeName: getXmlValue(mediaXml, "classTypeName"),
-          color: getXmlValue(mediaXml, "color"),
-          singlePart: getXmlValue(mediaXml, "singlePart") === "true",
-        };
-      });
+        // Parse all images from the response
+        const allImages = mediaMatches.map(match => {
+          const mediaXml = match[1];
+          return {
+            url: getXmlValue(mediaXml, "url"),
+            productId: getXmlValue(mediaXml, "productId"),
+            partId: getXmlValue(mediaXml, "partId"),
+            classTypeName: getXmlValue(mediaXml, "classTypeName"),
+            color: getXmlValue(mediaXml, "color"),
+            singlePart: getXmlValue(mediaXml, "singlePart") === "true",
+          };
+        });
 
-      // Organize ALL images by view type (return arrays instead of single URLs)
-      const frontImages: string[] = [];
-      const rearImages: string[] = [];
-      const sideImages: string[] = [];
-      const lifestyleImages: string[] = [];
-      const otherImages: string[] = [];
+        console.log('📸 Total images parsed:', allImages.length);
 
-      mediaData.images.forEach((img: any) => {
-        const classTypeName = (img.classTypeName || '').toLowerCase();
+        // FILTER BY COLOR (partId): Only keep images matching the selected partId
+        let filteredImages = allImages;
 
-        if (classTypeName.includes('front')) {
-          frontImages.push(img.url);
-        } else if (classTypeName.includes('rear') || classTypeName.includes('back')) {
-          rearImages.push(img.url);
-        } else if (classTypeName.includes('side') || classTypeName.includes('sleeve')) {
-          sideImages.push(img.url);
-        } else if (classTypeName.includes('lifestyle') || classTypeName.includes('casual')) {
-          lifestyleImages.push(img.url);
-        } else if (img.url && !classTypeName.includes('swatch')) {
-          // Include other images except swatches (Detail, etc.)
-          otherImages.push(img.url);
+        if (partId) {
+          // First try to filter by exact partId match
+          filteredImages = allImages.filter(img => img.partId === partId);
+          console.log('📸 Filtered by partId:', { partId, matchCount: filteredImages.length });
+
+          // If no exact partId match, try to match by color name
+          if (filteredImages.length === 0) {
+            // Find the color name for the selected partId from product data
+            const selectedPart = productData.parts?.find((p: any) => p.partId === partId);
+            const selectedColorName = selectedPart?.colorName?.toLowerCase();
+
+            if (selectedColorName) {
+              filteredImages = allImages.filter(img =>
+                img.color?.toLowerCase() === selectedColorName
+              );
+              console.log('📸 Filtered by color name:', { selectedColorName, matchCount: filteredImages.length });
+            }
+          }
+
+          // If still no matches, use singlePart=true images (style-level) as fallback
+          if (filteredImages.length === 0) {
+            filteredImages = allImages.filter(img => img.singlePart === true);
+            console.log('📸 Falling back to singlePart images:', { matchCount: filteredImages.length });
+          }
+
+          // Last resort: use all images but log a warning
+          if (filteredImages.length === 0) {
+            filteredImages = allImages;
+            console.warn('📸 No color-specific images found, using all images');
+          }
         }
-      });
 
-      // Return both the full images array AND organized views with ALL matching URLs
-      mediaData.views = {
-        front: frontImages.length > 0 ? frontImages[0] : null, // Keep first for backward compatibility
-        rear: rearImages.length > 0 ? rearImages[0] : null,
-        side: sideImages.length > 0 ? sideImages[0] : null,
-        lifestyle: lifestyleImages.length > 0 ? lifestyleImages[0] : null,
-        frontImages,
-        rearImages,
-        sideImages,
-        lifestyleImages,
-        otherImages,
-      };
+        // EXTRACT ONLY Front/Rear/Side views from the filtered set
+        const frontImg = filteredImages.find(img =>
+          img.classTypeName?.toLowerCase() === 'front'
+        );
+        const rearImg = filteredImages.find(img =>
+          img.classTypeName?.toLowerCase() === 'rear' ||
+          img.classTypeName?.toLowerCase() === 'back'
+        );
+        const sideImg = filteredImages.find(img =>
+          img.classTypeName?.toLowerCase() === 'side' ||
+          img.classTypeName?.toLowerCase() === 'sleeve'
+        );
 
-      console.log('Media Content organized:', {
-        totalImages: mediaData.images.length,
-        frontCount: frontImages.length,
-        rearCount: rearImages.length,
-        sideCount: sideImages.length,
-        lifestyleCount: lifestyleImages.length,
-        otherCount: otherImages.length,
-      });
-    }
+        // Store only the filtered images (for the selected color)
+        mediaData.images = filteredImages;
+
+        // Return ONLY front/rear/side for the selected color
+        mediaData.views = {
+          front: frontImg?.url || null,
+          rear: rearImg?.url || null,
+          side: sideImg?.url || null,
+          lifestyle: null,
+          frontImages: frontImg?.url ? [frontImg.url] : [],
+          rearImages: rearImg?.url ? [rearImg.url] : [],
+          sideImages: sideImg?.url ? [sideImg.url] : [],
+          lifestyleImages: [],
+          otherImages: [],
+        };
+
+        console.log('📸 Media Content organized (color-filtered):', {
+          partId,
+          totalFiltered: filteredImages.length,
+          front: !!frontImg?.url,
+          rear: !!rearImg?.url,
+          side: !!sideImg?.url,
+        });
+      }
     }
 
     // Return unified response
