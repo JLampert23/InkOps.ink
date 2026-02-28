@@ -49,13 +49,13 @@ async function makePromoStandardsRequest(
 }
 
 function getXmlValue(xmlText: string, tagName: string): string | null {
-  const regex = new RegExp(`<${tagName}[^>]*>([^<]*)</${tagName}>`, 'i');
+  const regex = new RegExp(`<(?:[a-zA-Z0-9]+:)?${tagName}[^>]*>([^<]*)</(?:[a-zA-Z0-9]+:)?${tagName}>`, 'i');
   const match = xmlText.match(regex);
   return match ? match[1] : null;
 }
 
 function getXmlValues(xmlText: string, tagName: string): string[] {
-  const regex = new RegExp(`<${tagName}[^>]*>([^<]*)</${tagName}>`, 'gi');
+  const regex = new RegExp(`<(?:[a-zA-Z0-9]+:)?${tagName}[^>]*>([^<]*)</(?:[a-zA-Z0-9]+:)?${tagName}>`, 'gi');
   const matches = xmlText.matchAll(regex);
   return Array.from(matches, m => m[1]);
 }
@@ -376,7 +376,7 @@ Deno.serve(async (req: Request) => {
       productData.productBrand = getXmlValue(xmlDoc, "productBrand") || "";
 
       // Extract all parts with colors and sizes
-      const partPattern = /<Part>([\s\S]*?)<\/Part>/gi;
+      const partPattern = /<(?:[a-zA-Z0-9]+:)?Part>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Part>/gi;
       const partMatches = getAllXmlMatches(xmlDoc, partPattern);
 
       productData.parts = partMatches.map(match => {
@@ -414,7 +414,7 @@ Deno.serve(async (req: Request) => {
     const inventoryData: any = {};
     if (inventoryResponse.status === 'fulfilled' && inventoryResponse.value) {
       const xmlDoc = inventoryResponse.value;
-      const inventoryPattern = /<Inventory>([\s\S]*?)<\/Inventory>/gi;
+      const inventoryPattern = /<(?:[a-zA-Z0-9]+:)?Inventory>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Inventory>/gi;
       const inventoryMatches = getAllXmlMatches(xmlDoc, inventoryPattern);
 
       inventoryData.items = inventoryMatches.map(match => {
@@ -574,8 +574,16 @@ Deno.serve(async (req: Request) => {
             if (Array.isArray(restApiData) && restApiData.length > 0) {
               usedRestApiFallback = true;
 
+              const SSA_IMAGE_BASE = 'https://www.ssactivewear.com/';
+              const normalizeImageUrl = (url: any): string | null => {
+                if (!url || typeof url !== 'string' || url.trim().length === 0) return null;
+                const trimmed = url.trim();
+                if (trimmed.startsWith('http')) return trimmed;
+                if (trimmed.startsWith('Images/') || trimmed.startsWith('images/')) return SSA_IMAGE_BASE + trimmed;
+                return null;
+              };
               const isValidImageUrl = (url: any): boolean => {
-                return url && typeof url === 'string' && url.trim().length > 0 && url.startsWith('http');
+                return normalizeImageUrl(url) !== null;
               };
 
               let targetColor: string | null = null;
@@ -646,16 +654,13 @@ Deno.serve(async (req: Request) => {
 
               for (const product of productsToUse) {
                 if (!front) {
-                  const frontImg = isValidImageUrl(product.colorFrontImage) ? product.colorFrontImage : product.styleFrontImage;
-                  if (isValidImageUrl(frontImg)) front = frontImg;
+                  front = normalizeImageUrl(product.colorFrontImage) || normalizeImageUrl(product.colorOnModelFrontImage) || normalizeImageUrl(product.styleFrontImage);
                 }
                 if (!back) {
-                  const backImg = isValidImageUrl(product.colorBackImage) ? product.colorBackImage : product.styleBackImage;
-                  if (isValidImageUrl(backImg)) back = backImg;
+                  back = normalizeImageUrl(product.colorBackImage) || normalizeImageUrl(product.colorOnModelBackImage) || normalizeImageUrl(product.styleBackImage);
                 }
                 if (!side) {
-                  const sideImg = isValidImageUrl(product.colorSideImage) ? product.colorSideImage : product.styleSideImage;
-                  if (isValidImageUrl(sideImg)) side = sideImg;
+                  side = normalizeImageUrl(product.colorSideImage) || normalizeImageUrl(product.colorDirectSideImage) || normalizeImageUrl(product.colorOnModelSideImage) || normalizeImageUrl(product.styleSideImage);
                 }
               }
 
@@ -715,7 +720,7 @@ Deno.serve(async (req: Request) => {
         }
         console.error('📸 Media API returned error:', mediaAuthError);
       } else {
-        const mediaPattern = /<MediaContent>([\s\S]*?)<\/MediaContent>/gi;
+        const mediaPattern = /<(?:[a-zA-Z0-9]+:)?MediaContent>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?MediaContent>/gi;
         const mediaMatches = getAllXmlMatches(xmlDoc, mediaPattern);
         console.log('📸 MediaContent matches found:', mediaMatches.length);
 
@@ -736,7 +741,8 @@ Deno.serve(async (req: Request) => {
           };
         });
 
-        console.log('📸 Total images parsed:', allImages.length);
+        const uniqueClassTypes = [...new Set(allImages.map(img => img.classTypeName).filter(Boolean))];
+        console.log('📸 Total images parsed:', allImages.length, '| classTypeNames found:', uniqueClassTypes);
 
         let filteredImages = allImages;
 
@@ -828,12 +834,17 @@ Deno.serve(async (req: Request) => {
           otherImages: [],
         };
 
+        const filteredClassTypes = [...new Set(filteredImages.map(img => img.classTypeName?.toLowerCase()).filter(Boolean))];
         console.log('📸 Media Content organized (color-filtered):', {
           partId,
           totalFiltered: filteredImages.length,
-          front: !!frontImg?.url,
-          rear: !!rearImg?.url,
-          side: !!sideImg?.url,
+          filteredClassTypes,
+          front: frontImg?.classTypeName || null,
+          rear: rearImg?.classTypeName || null,
+          side: sideImg?.classTypeName || null,
+          frontUrl: !!frontImg?.url,
+          rearUrl: !!rearImg?.url,
+          sideUrl: !!sideImg?.url,
         });
       }
     }
