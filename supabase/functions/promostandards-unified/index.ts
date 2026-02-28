@@ -740,9 +740,17 @@ Deno.serve(async (req: Request) => {
           img.classTypeName?.toLowerCase() === 'rear' ||
           img.classTypeName?.toLowerCase() === 'back'
         );
+        // S&S uses inconsistent classTypeName values for side views
+        const sideViewLabels = [
+          'side', 'side view',
+          'left', 'left side', 'left profile',
+          'right', 'right side', 'right profile',
+          'profile',
+          'angle', 'angle view',
+          'sleeve'
+        ];
         const sideImg = filteredImages.find(img =>
-          img.classTypeName?.toLowerCase() === 'side' ||
-          img.classTypeName?.toLowerCase() === 'sleeve'
+          sideViewLabels.includes(img.classTypeName?.toLowerCase() || '')
         );
 
         // Store only the filtered images (for the selected color)
