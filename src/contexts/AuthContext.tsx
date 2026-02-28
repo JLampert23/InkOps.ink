@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useMemo, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useMemo, useCallback, ReactNode, useRef } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase-client';
 import { signUpCompany, CompanySignupData, getCompanySettings, CompanySettings } from '../services/auth-service';
@@ -32,14 +32,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
+  const initRef = useRef(false);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      console.warn('Auth initialization timeout - forcing ready state');
-      setLoading(false);
-    }, 10000);
-
-    return () => clearTimeout(timeout);
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
   }, []);
 
   const refreshUserProfile = useCallback(async (userId: string) => {
@@ -50,6 +48,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq('id', userId)
         .maybeSingle();
 
+      if (!mountedRef.current) return;
+
       if (error) {
         console.error('Error fetching user profile:', error);
         setUserProfile(null);
@@ -58,56 +58,85 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
-      setUserProfile(null);
+      if (mountedRef.current) setUserProfile(null);
     }
   }, []);
 
   const refreshCompanySettings = useCallback(async () => {
-    const settings = await getCompanySettings();
-    setCompanySettings(settings);
+    try {
+      const settings = await getCompanySettings();
+      if (mountedRef.current) setCompanySettings(settings);
+    } catch (error) {
+      console.error('Error fetching company settings:', error);
+    }
   }, []);
 
   useEffect(() => {
+    if (initRef.current) return;
+    initRef.current = true;
+
+    let timeoutId: ReturnType<typeof setTimeout>;
+
     const initAuth = async () => {
+      timeoutId = setTimeout(() => {
+        if (mountedRef.current && loading) {
+          console.warn('Auth initialization timeout - forcing ready state');
+          setLoading(false);
+        }
+      }, 5000);
+
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error } = await supabase.auth.getSession();
+
+        if (!mountedRef.current) return;
+
+        if (error) {
+          console.error('Error getting session:', error);
+          setLoading(false);
+          return;
+        }
+
         setSession(session);
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          await refreshUserProfile(session.user.id);
-          await refreshCompanySettings();
+          await Promise.all([
+            refreshUserProfile(session.user.id),
+            refreshCompanySettings()
+          ]).catch(err => console.error('Error loading user data:', err));
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
       } finally {
-        setLoading(false);
+        clearTimeout(timeoutId);
+        if (mountedRef.current) setLoading(false);
       }
     };
 
     initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      (async () => {
-        try {
-          setSession(session);
-          setUser(session?.user ?? null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mountedRef.current) return;
 
-          if (session?.user) {
-            await refreshUserProfile(session.user.id);
-            await refreshCompanySettings();
-          } else {
-            setUserProfile(null);
-            setCompanySettings(null);
-          }
-        } catch (error) {
-          console.error('Error in auth state change:', error);
-        }
-      })();
+      setSession(session);
+      setUser(session?.user ?? null);
+
+      if (session?.user) {
+        Promise.all([
+          refreshUserProfile(session.user.id),
+          refreshCompanySettings()
+        ]).catch(err => console.error('Error in auth state change:', err));
+      } else {
+        setUserProfile(null);
+        setCompanySettings(null);
+      }
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      clearTimeout(timeoutId);
+      subscription.unsubscribe();
+    };
+  }, [loading, refreshUserProfile, refreshCompanySettings]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({

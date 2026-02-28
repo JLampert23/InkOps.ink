@@ -1,29 +1,42 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { supabaseUrl, supabaseAnonKey, hasValidConfig } from './supabase-client';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+let supabaseAnonInstance: SupabaseClient | null = null;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    'Missing Supabase environment variables. Please check your .env file contains VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY'
-  );
+function createAnonClient(): SupabaseClient {
+  if (supabaseAnonInstance) return supabaseAnonInstance;
+
+  if (!hasValidConfig) {
+    throw new Error('Supabase configuration missing');
+  }
+
+  supabaseAnonInstance = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+    global: {
+      fetch: (url, options = {}) => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+        return fetch(url, {
+          ...options,
+          signal: controller.signal,
+        }).finally(() => {
+          clearTimeout(timeoutId);
+        }).catch(err => {
+          if (err.name === 'AbortError') {
+            console.warn('Supabase anon request timeout');
+          }
+          throw err;
+        });
+      },
+    },
+  });
+
+  return supabaseAnonInstance;
 }
 
-export const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-    detectSessionInUrl: false,
-  },
-  global: {
-    fetch: (url, options = {}) => {
-      return fetch(url, {
-        ...options,
-        signal: AbortSignal.timeout(30000),
-      }).catch(err => {
-        console.error('Supabase fetch error:', err);
-        throw err;
-      });
-    },
-  },
-});
+export const supabaseAnon = hasValidConfig ? createAnonClient() : (null as unknown as SupabaseClient);
