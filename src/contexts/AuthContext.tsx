@@ -32,7 +32,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
-  const initRef = useRef(false);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -72,14 +71,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (initRef.current) return;
-    initRef.current = true;
-
     let timeoutId: ReturnType<typeof setTimeout>;
 
     const initAuth = async () => {
       timeoutId = setTimeout(() => {
-        if (mountedRef.current && loading) {
+        if (mountedRef.current) {
           console.warn('Auth initialization timeout - forcing ready state');
           setLoading(false);
         }
@@ -122,10 +118,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
 
       if (session?.user) {
-        Promise.all([
-          refreshUserProfile(session.user.id),
-          refreshCompanySettings()
-        ]).catch(err => console.error('Error in auth state change:', err));
+        (async () => {
+          try {
+            await Promise.all([
+              refreshUserProfile(session.user.id),
+              refreshCompanySettings()
+            ]);
+          } catch (err) {
+            console.error('Error in auth state change:', err);
+          }
+        })();
       } else {
         setUserProfile(null);
         setCompanySettings(null);
@@ -136,7 +138,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
-  }, [loading, refreshUserProfile, refreshCompanySettings]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
