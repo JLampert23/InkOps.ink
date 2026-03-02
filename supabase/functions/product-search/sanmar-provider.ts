@@ -3,6 +3,7 @@ import {
   setSanMarImageCache,
   buildSanMarCdnFallbackUrl,
   logImageOperation,
+  proxySanMarUrl,
 } from "../_shared/image-cache.ts";
 
 export interface ColorOption {
@@ -49,7 +50,7 @@ export async function searchSanMarCatalog(
     console.log(`[SanMar] ========== SEARCH START ==========`);
     console.log(`[SanMar] Style: ${style}, Company: ${companyId}`);
 
-    const cachedData = await getCachedProduct(supabaseAdmin, companyId, style);
+    const cachedData = await getCachedProduct(supabaseAdmin, companyId, style, supabaseUrl);
     if (cachedData) {
       console.log(`[SanMar] CACHE HIT for ${style}`);
       results.push(cachedData);
@@ -268,7 +269,7 @@ export async function searchSanMarCatalog(
       },
     };
 
-    const product = transformSanMarData(apiDataForTransform);
+    const product = transformSanMarData(apiDataForTransform, supabaseUrl);
     if (productData.data?._debug) {
       product.raw_data = { _debug: productData.data._debug };
     }
@@ -288,7 +289,8 @@ export async function searchSanMarCatalog(
 async function getCachedProduct(
   supabaseAdmin: any,
   companyId: string,
-  style: string
+  style: string,
+  supabaseUrl: string
 ): Promise<ProductResult | null> {
   try {
     const cacheKey = `style:${style.toUpperCase()}`;
@@ -415,7 +417,7 @@ async function getCachedProduct(
       },
     };
 
-    const product = transformSanMarData(apiData);
+    const product = transformSanMarData(apiData, supabaseUrl);
     product.cached = true;
     product.last_synced = productCache.expires_at;
     return product;
@@ -465,7 +467,7 @@ async function cacheProduct(
   }
 }
 
-function transformSanMarData(apiData: any): ProductResult {
+function transformSanMarData(apiData: any, supabaseUrl: string): ProductResult {
   const style = apiData.style;
   const colors: ColorOption[] = [];
 
@@ -561,9 +563,9 @@ function transformSanMarData(apiData: any): ProductResult {
         code: partIds[0] || color.hex || "",
         partIds,
         sizes,
-        image_url: imageUrl,
-        rear_image_url: rearImageUrl,
-        side_image_url: sideImageUrl,
+        image_url: proxySanMarUrl(imageUrl, supabaseUrl),
+        rear_image_url: proxySanMarUrl(rearImageUrl, supabaseUrl),
+        side_image_url: proxySanMarUrl(sideImageUrl, supabaseUrl),
         pricing,
         stock,
       });

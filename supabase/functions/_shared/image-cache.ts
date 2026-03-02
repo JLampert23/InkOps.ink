@@ -48,6 +48,21 @@ const CACHE_TTL_HOURS = 24;
 const SS_CDN_BASE = "https://www.ssactivewear.com/images";
 const SANMAR_CDN_BASE = "https://cdnm.sanmar.com/imglib";
 
+const SANMAR_CDN_HOSTS = ["cdnm.sanmar.com", "www.sanmar.com", "sanmar.com"];
+
+export function proxySanMarUrl(url: string, supabaseUrl: string): string {
+  if (!url) return url;
+  try {
+    const parsed = new URL(url);
+    if (SANMAR_CDN_HOSTS.includes(parsed.hostname)) {
+      return `${supabaseUrl}/functions/v1/sanmar-image-proxy?url=${encodeURIComponent(url)}`;
+    }
+  } catch {
+    // not a valid URL, return as-is
+  }
+  return url;
+}
+
 export function buildSanMarCdnFallbackUrl(style: string, colorCode?: string): string[] {
   const urls: string[] = [];
   const normalizedStyle = style.toUpperCase().trim();

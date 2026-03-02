@@ -8,6 +8,7 @@ import { ManageImprintsModal } from './ManageImprintsModal';
 import MockupGenerator from './MockupGenerator';
 import { SendQuoteModal } from './SendQuoteModal';
 import { getUnifiedProductData } from '../../services/ssactivewear-promostandards-service';
+import { proxySanMarImageUrl } from '../../utils/sanmar-image-proxy';
 
 function decodeHtmlEntities(text: string): string {
   if (!text) return text;
@@ -1560,35 +1561,35 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         console.log('💰 SanMar pricing from search results:', freshPrice);
       }
 
-      // Use images from search results
-      if (color.image_url) {
-        garmentImages.garment_front_image_url = color.image_url;
-        garmentImages.garment_back_image_url = color.image_url;
-        console.log('✅ Set SanMar front image from search results:', color.image_url);
+      // Use images from search results (proxy SanMar CDN URLs for CORS compatibility)
+      const frontUrl = proxySanMarImageUrl(color.image_url || '');
+      const rearUrl = proxySanMarImageUrl(color.rear_image_url || '');
+      const sideUrl = proxySanMarImageUrl(color.side_image_url || '');
+
+      if (frontUrl) {
+        garmentImages.garment_front_image_url = frontUrl;
+        garmentImages.garment_back_image_url = frontUrl;
+        console.log('✅ Set SanMar front image from search results:', frontUrl);
       }
 
-      if (color.rear_image_url) {
-        garmentImages.garment_rear_image_url = color.rear_image_url;
+      if (rearUrl) {
+        garmentImages.garment_rear_image_url = rearUrl;
         console.log('✅ Set SanMar rear image from search results');
       }
 
-      if (color.side_image_url) {
-        garmentImages.garment_side_image_url = color.side_image_url;
+      if (sideUrl) {
+        garmentImages.garment_side_image_url = sideUrl;
         console.log('✅ Set SanMar side image from search results');
       }
 
       // Build images data structure
-      const allImages = [
-        color.image_url,
-        color.rear_image_url,
-        color.side_image_url,
-      ].filter(Boolean);
+      const allImages = [frontUrl, rearUrl, sideUrl].filter(Boolean);
 
       if (allImages.length > 0) {
         garmentImages.garment_images_data = {
-          frontImages: color.image_url ? [color.image_url] : [],
-          rearImages: color.rear_image_url ? [color.rear_image_url] : [],
-          sideImages: color.side_image_url ? [color.side_image_url] : [],
+          frontImages: frontUrl ? [frontUrl] : [],
+          rearImages: rearUrl ? [rearUrl] : [],
+          sideImages: sideUrl ? [sideUrl] : [],
           lifestyleImages: [],
           otherImages: [],
           allImages,

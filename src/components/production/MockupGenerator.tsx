@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase-client';
+import { proxySanMarImageUrl } from '../../utils/sanmar-image-proxy';
 import {
   X,
   Upload,
@@ -527,7 +528,7 @@ export default function MockupGenerator({
 
           // Set the initial garment image from the first item
           if (lineItems[0].garment_front_image_url) {
-            setGarmentImageUrl(lineItems[0].garment_front_image_url);
+            setGarmentImageUrl(proxySanMarImageUrl(lineItems[0].garment_front_image_url));
             setGarmentDescription(lineItems[0].description || '');
           }
         }
@@ -1748,7 +1749,9 @@ export default function MockupGenerator({
       return;
     }
 
-    if (garmentImageCache.current && garmentImageCache.current.src === garmentImageUrl) {
+    const proxiedUrl = proxySanMarImageUrl(garmentImageUrl);
+
+    if (garmentImageCache.current && garmentImageCache.current.src === proxiedUrl) {
       return;
     }
 
@@ -1762,7 +1765,7 @@ export default function MockupGenerator({
       garmentImageCache.current = null;
       drawCanvas();
     };
-    img.src = garmentImageUrl;
+    img.src = proxiedUrl;
   };
 
   const preloadArtworkImages = () => {
@@ -2325,7 +2328,7 @@ export default function MockupGenerator({
                           onClick={() => {
                             setActiveGarmentIndex(index);
                             if (garmentStyle.frontImage) {
-                              setGarmentImageUrl(garmentStyle.frontImage);
+                              setGarmentImageUrl(proxySanMarImageUrl(garmentStyle.frontImage));
                               setGarmentDescription(garmentStyle.description);
                             }
                           }}
@@ -2402,7 +2405,7 @@ export default function MockupGenerator({
                                 });
 
                                 // Remove duplicates
-                                const uniqueImages = [...new Set(validImages)];
+                                const uniqueImages = [...new Set(validImages)].map(proxySanMarImageUrl);
 
                                 if (uniqueImages.length === 0) return null;
 
