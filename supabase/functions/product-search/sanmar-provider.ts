@@ -133,7 +133,7 @@ export async function searchSanMarCatalog(
       });
       imageCacheHit = true;
       mediaData = {
-        images: [],
+        images: cachedImages.rawImages || [],
         views: cachedImages.urls,
       };
     }
@@ -161,29 +161,63 @@ export async function searchSanMarCatalog(
         console.warn(`Media fetch failed (non-critical): ${mediaError.message}`);
       }
 
-      // Step 3: If API returned no images, use CDN fallback
+      // Step 3: If API returned no images, use per-color CDN fallback
       if (!mediaData?.images || mediaData.images.length === 0) {
         logImageOperation("sanmar", style, "cdn_fallback", { fallbackUsed: true });
         usedCdnFallback = true;
 
-        const fallbackUrls = buildSanMarCdnFallbackUrl(style);
-        if (fallbackUrls.length > 0) {
-          mediaData = {
-            images: fallbackUrls.map(url => ({
+        const allImages: any[] = [];
+        const allFrontUrls: string[] = [];
+        const allRearUrls: string[] = [];
+        const colors = productData.data?.colors || [];
+
+        const genericFallback = buildSanMarCdnFallbackUrl(style);
+        for (const url of genericFallback) {
+          allImages.push({
+            url,
+            productId: style,
+            partId: "",
+            classTypeName: url.includes("_fm") ? "Front" : url.includes("_bm") ? "Back" : "Other",
+            color: "",
+            singlePart: false,
+          });
+          if (url.includes("_fm")) allFrontUrls.push(url);
+          if (url.includes("_bm")) allRearUrls.push(url);
+        }
+
+        for (const color of colors) {
+          const colorName = color.colorName || "";
+          const firstPartId = color.partIds?.[0]?.partId || "";
+          const colorCode = firstPartId.replace(new RegExp(`^${style.toUpperCase()}-?`), "").replace(/-.*$/, "");
+          if (!colorCode) continue;
+
+          const colorUrls = buildSanMarCdnFallbackUrl(style, colorCode);
+          for (const url of colorUrls) {
+            allImages.push({
               url,
               productId: style,
-              partId: "",
+              partId: firstPartId,
               classTypeName: url.includes("_fm") ? "Front" : url.includes("_bm") ? "Back" : "Other",
-              color: "",
+              color: colorName,
               singlePart: false,
-            })),
+            });
+            if (url.includes("_fm")) allFrontUrls.push(url);
+            if (url.includes("_bm")) allRearUrls.push(url);
+          }
+        }
+
+        console.log(`[SanMar] CDN fallback generated ${allImages.length} images for ${colors.length} colors`);
+
+        if (allImages.length > 0) {
+          mediaData = {
+            images: allImages,
             views: {
-              front: fallbackUrls[0] || null,
-              rear: fallbackUrls.find(u => u.includes("_bm")) || null,
+              front: allFrontUrls[0] || null,
+              rear: allRearUrls[0] || null,
               side: null,
               lifestyle: null,
-              frontImages: fallbackUrls.filter(u => u.includes("_fm")),
-              rearImages: fallbackUrls.filter(u => u.includes("_bm")),
+              frontImages: allFrontUrls,
+              rearImages: allRearUrls,
               sideImages: [],
               lifestyleImages: [],
               otherImages: [],
@@ -284,11 +318,10 @@ async function getCachedProduct(
                    (cachedImages.urls.rearImages?.length || 0)
       });
       mediaData = {
-        images: [],
+        images: cachedImages.rawImages || [],
         views: cachedImages.urls,
       };
     } else {
-      // Fallback to legacy media cache table
       const { data: legacyMediaCache } = await supabaseAdmin
         .from("sanmar_media_cache")
         .select("data, expires_at")
@@ -297,29 +330,63 @@ async function getCachedProduct(
         .eq("cache_type", "style")
         .maybeSingle();
 
-      mediaData = legacyMediaCache?.data || null;
+      if (legacyMediaCache && new Date(legacyMediaCache.expires_at) >= new Date()) {
+        mediaData = legacyMediaCache.data || null;
+      }
 
-      // If still no images, try CDN fallback
       if (!mediaData?.images || mediaData.images.length === 0) {
         logImageOperation("sanmar", style, "cdn_fallback", { fallbackUsed: true });
-        const fallbackUrls = buildSanMarCdnFallbackUrl(style);
-        if (fallbackUrls.length > 0) {
-          mediaData = {
-            images: fallbackUrls.map(url => ({
+
+        const allImages: any[] = [];
+        const allFrontUrls: string[] = [];
+        const allRearUrls: string[] = [];
+        const colors = productCache.data?.colors || [];
+
+        const genericFallback = buildSanMarCdnFallbackUrl(style);
+        for (const url of genericFallback) {
+          allImages.push({
+            url,
+            productId: style,
+            partId: "",
+            classTypeName: url.includes("_fm") ? "Front" : url.includes("_bm") ? "Back" : "Other",
+            color: "",
+            singlePart: false,
+          });
+          if (url.includes("_fm")) allFrontUrls.push(url);
+          if (url.includes("_bm")) allRearUrls.push(url);
+        }
+
+        for (const color of colors) {
+          const colorName = color.colorName || "";
+          const firstPartId = color.partIds?.[0]?.partId || "";
+          const colorCode = firstPartId.replace(new RegExp(`^${style.toUpperCase()}-?`), "").replace(/-.*$/, "");
+          if (!colorCode) continue;
+
+          const colorUrls = buildSanMarCdnFallbackUrl(style, colorCode);
+          for (const url of colorUrls) {
+            allImages.push({
               url,
               productId: style,
-              partId: "",
-              classTypeName: url.includes("_fm") ? "Front" : "Other",
-              color: "",
+              partId: firstPartId,
+              classTypeName: url.includes("_fm") ? "Front" : url.includes("_bm") ? "Back" : "Other",
+              color: colorName,
               singlePart: false,
-            })),
+            });
+            if (url.includes("_fm")) allFrontUrls.push(url);
+            if (url.includes("_bm")) allRearUrls.push(url);
+          }
+        }
+
+        if (allImages.length > 0) {
+          mediaData = {
+            images: allImages,
             views: {
-              front: fallbackUrls[0] || null,
-              rear: null,
+              front: allFrontUrls[0] || null,
+              rear: allRearUrls[0] || null,
               side: null,
               lifestyle: null,
-              frontImages: fallbackUrls,
-              rearImages: [],
+              frontImages: allFrontUrls,
+              rearImages: allRearUrls,
               sideImages: [],
               lifestyleImages: [],
               otherImages: [],

@@ -572,7 +572,20 @@ export async function fetchSanMarMedia(
     soapEnvelope
   );
 
-  // Parse media content
+  console.log(`[SanMar Media] Response XML length: ${responseXml.length}`);
+  console.log(`[SanMar Media] Response preview (2000 chars): ${responseXml.substring(0, 2000)}`);
+
+  const mediaErrorCode = getXmlValue(responseXml, "errorCode");
+  const mediaErrorMessage = getXmlValue(responseXml, "errorMessage");
+  if (mediaErrorCode) {
+    console.warn(`[SanMar Media] API returned error code ${mediaErrorCode}: ${mediaErrorMessage || 'unknown'}`);
+  }
+
+  const serviceExceptionMatch = responseXml.match(/<(?:[^:>]*:)?serviceException(?:\s[^>]*)?>[\s\S]*?<\/(?:[^:>]*:)?serviceException>/i);
+  if (serviceExceptionMatch) {
+    console.warn(`[SanMar Media] serviceException found: ${serviceExceptionMatch[0].substring(0, 500)}`);
+  }
+
   const mediaData: SanMarMediaData = {
     images: [],
     views: {
@@ -638,7 +651,20 @@ export async function fetchSanMarMedia(
     otherImages,
   };
 
-  console.log(`✅ Found ${mediaData.images.length} images`);
+  console.log(`[SanMar Media] MediaContent matches found: ${mediaMatches.length}`);
+  if (mediaMatches.length === 0) {
+    console.warn(`[SanMar Media] Zero MediaContent elements parsed from response for ${normalizedStyle}`);
+    const mediaContentArrayMatch = responseXml.match(/<(?:[^:>]*:)?MediaContentArray(?:\s[^>]*)?>[\s\S]*?<\/(?:[^:>]*:)?MediaContentArray>/i);
+    if (mediaContentArrayMatch) {
+      console.log(`[SanMar Media] MediaContentArray found but no MediaContent children. Sample: ${mediaContentArrayMatch[0].substring(0, 500)}`);
+    } else {
+      console.log(`[SanMar Media] No MediaContentArray element found in response at all`);
+    }
+  } else {
+    console.log(`[SanMar Media] First MediaContent sample: ${mediaMatches[0][1].substring(0, 300)}`);
+  }
+
+  console.log(`[SanMar Media] Found ${mediaData.images.length} images for ${normalizedStyle}`);
 
   return mediaData;
 }

@@ -31,6 +31,7 @@ export interface CachedImageData {
   styleId: string;
   colorId: string | null;
   urls: ImageUrls;
+  rawImages?: any[];
   timestamp: string;
   expiresAt: string;
 }
@@ -127,6 +128,7 @@ export async function getSanMarImageCache(
         lifestyleImages: [],
         otherImages: [],
       },
+      rawImages: mediaData.images || [],
       timestamp: mediaCache.created_at,
       expiresAt: mediaCache.expires_at,
     };

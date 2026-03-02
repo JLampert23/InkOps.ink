@@ -270,6 +270,13 @@ Deno.serve(async (req: Request) => {
           );
         }
         const mediaData = await fetchSanMarMedia(credentials, style, partId);
+        console.log(`[SanMar Media Action] Style: ${style}, images returned: ${mediaData.images?.length || 0}`);
+        if (mediaData.images?.length === 0) {
+          console.warn(`[SanMar Media Action] WARNING: Zero images returned from PromoStandards Media API for ${style}. The Media Content Service may not be included in this SanMar account.`);
+        } else {
+          const colorSample = [...new Set(mediaData.images.map((i: any) => i.color).filter(Boolean))].slice(0, 5);
+          console.log(`[SanMar Media Action] Colors in images: ${colorSample.join(', ')}`);
+        }
         responseData = {
           success: true,
           supplier: "sanmar",
