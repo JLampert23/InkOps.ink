@@ -47,7 +47,7 @@
       }
     </style>
   </head>
-  <body>
+  <body style="background-color:#0f172a;margin:0">
     <div id="initial-loader">
       <div class="spinner"></div>
       <div class="text">Loading...</div>
@@ -64,14 +64,19 @@
         }
       }, 20000);
 
+      var _errorTimeout = null;
       window.addEventListener('error', function(e) {
         console.error('Global error:', e.error);
-        var root = document.getElementById('root');
-        if (root && root.children.length === 0) {
-          root.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f8fafc;padding:20px"><div style="max-width:400px;background:white;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.1);padding:24px;text-align:center"><h1 style="font-size:20px;font-weight:bold;color:#111;margin-bottom:8px">Something went wrong</h1><p style="color:#666;margin-bottom:16px">The application encountered an error loading.</p><button onclick="window.location.reload()" style="padding:8px 20px;background:#2563eb;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600">Refresh Page</button></div></div>';
-          var loader = document.getElementById('initial-loader');
-          if (loader) loader.remove();
-        }
+        if (_errorTimeout) return;
+        _errorTimeout = setTimeout(function() {
+          var root = document.getElementById('root');
+          if (root && root.children.length === 0) {
+            root.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0f172a;padding:20px"><div style="max-width:400px;background:#1e293b;border:1px solid #334155;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.3);padding:24px;text-align:center"><h1 style="font-size:20px;font-weight:bold;color:#f1f5f9;margin-bottom:8px">Something went wrong</h1><p style="color:#94a3b8;margin-bottom:16px">The application encountered an error loading.</p><button onclick="window.location.reload()" style="padding:8px 20px;background:#f97316;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600">Refresh Page</button></div></div>';
+            var loader = document.getElementById('initial-loader');
+            if (loader) loader.remove();
+          }
+          _errorTimeout = null;
+        }, 3000);
       });
 
       window.addEventListener('unhandledrejection', function(e) {

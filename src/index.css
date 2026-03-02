@@ -31,9 +31,9 @@
     }
   }
 
-  /* Prevent horizontal scroll on mobile */
   body {
     overflow-x: hidden;
+    background-color: #0f172a;
   }
 
   /* Dark mode defaults */
