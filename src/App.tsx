@@ -805,12 +805,18 @@ function AuthenticatedApp() {
 
   useEffect(() => {
     if (!loading) {
-      hideInitialLoader();
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          hideInitialLoader();
+        });
+      });
     }
   }, [loading]);
 
   if (loading) {
-    return null;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" />
+    );
   }
 
   if (!user) {
