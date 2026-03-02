@@ -24,6 +24,7 @@ function createSupabaseClient(): SupabaseClient {
 
   supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
+      storageKey: 'inkops-auth-session',
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: true,

@@ -15,7 +15,7 @@ function createAnonClient(): SupabaseClient {
       autoRefreshToken: false,
       persistSession: false,
       detectSessionInUrl: false,
-      storageKey: 'sb-anon-auth-token',
+      storageKey: 'inkops-anon-session',
     },
     global: {
       fetch: (url, options = {}) => {
