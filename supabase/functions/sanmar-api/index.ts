@@ -27,7 +27,6 @@ Deno.serve(async (req: Request) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
@@ -55,29 +54,32 @@ Deno.serve(async (req: Request) => {
       }
       companyId = qsCompanyId;
     } else {
-      // Create client with the user's auth header for proper JWT validation
-      const userAuthClient = createClient(supabaseUrl, supabaseAnonKey, {
-        global: {
-          headers: { Authorization: authHeader }
-        },
-        auth: { autoRefreshToken: false, persistSession: false }
-      });
-      const { data: { user }, error: authError } = await userAuthClient.auth.getUser();
-
-      if (authError || !user) {
-        console.error('JWT validation failed:', authError?.message, 'Token prefix:', token.substring(0, 30));
+      const jwtParts = token.split('.');
+      if (jwtParts.length !== 3) {
         return new Response(
-          JSON.stringify({ code: 401, message: `Invalid JWT: ${authError?.message || 'No user found'}` }),
+          JSON.stringify({ code: 401, message: "Invalid JWT format" }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      console.log('✅ User authenticated:', user.id);
+      let userId: string;
+      try {
+        const payload = JSON.parse(atob(jwtParts[1]));
+        userId = payload.sub;
+        if (!userId) throw new Error("No sub claim in JWT");
+        console.log('✅ JWT decoded, user ID:', userId);
+      } catch (e) {
+        console.error('Failed to decode JWT:', e);
+        return new Response(
+          JSON.stringify({ code: 401, message: "Failed to decode JWT" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
       const { data: profile } = await supabaseAdmin
         .from("user_profiles")
         .select("company_id")
-        .eq("id", user.id)
+        .eq("id", userId)
         .maybeSingle();
 
       if (!profile?.company_id) {
