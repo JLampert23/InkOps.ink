@@ -12,6 +12,10 @@
  *
  * Cache Key Format: sanmar:{styleId}:{colorId} (per-color) or sanmar:{styleId} (all colors)
  * TTL: 24 hours (existing behavior preserved)
+ *
+ * IMPORTANT: SanMar CDN blocks browser CORS. All SanMar image URLs sent to the
+ * browser MUST go through our sanmar-image-proxy edge function. Never send
+ * cdnm.sanmar.com URLs directly to the client.
  */
 
 export interface ImageUrls {
@@ -31,6 +35,7 @@ export interface MockupImageResult {
   back: string[];
   side: string[];
   detail: string[];
+  swatch: string[];
 }
 
 export interface CachedImageData {
@@ -63,16 +68,53 @@ function buildSanMarCacheKey(styleId: string, colorId?: string): string {
   return `sanmar:${normalizedStyle}`;
 }
 
+export function sanmarCdnUrlToProxyUrl(cdnUrl: string, supabaseUrl: string): string {
+  if (!cdnUrl) return "";
+  if (cdnUrl.includes("/functions/v1/sanmar-image-proxy")) return cdnUrl;
+  if (!cdnUrl.includes("sanmar.com")) return cdnUrl;
+
+  return `${supabaseUrl}/functions/v1/sanmar-image-proxy?url=${encodeURIComponent(cdnUrl)}`;
+}
+
+export function buildSanMarProxyUrl(
+  supabaseUrl: string,
+  style: string,
+  view: "fm" | "bk" | "sd" | "sw",
+  colorCode?: string
+): string {
+  const normalizedStyle = style.toUpperCase().trim();
+  let url = `${supabaseUrl}/functions/v1/sanmar-image-proxy/${normalizedStyle}/${view}`;
+  if (colorCode) {
+    url += `?color=${encodeURIComponent(colorCode.toUpperCase().trim())}`;
+  }
+  return url;
+}
+
+export function convertAllSanMarUrlsToProxy(images: any[], supabaseUrl: string): any[] {
+  return images.map(img => {
+    if (!img.url) return img;
+    return {
+      ...img,
+      url: sanmarCdnUrlToProxyUrl(img.url, supabaseUrl),
+    };
+  });
+}
+
 export function buildSanMarCdnFallbackUrl(style: string, colorCode?: string): string[] {
   const urls: string[] = [];
   const normalizedStyle = style.toUpperCase().trim();
 
   urls.push(`${SANMAR_CDN_BASE}/${normalizedStyle}/${normalizedStyle}_fm.jpg`);
+  urls.push(`${SANMAR_CDN_BASE}/${normalizedStyle}/${normalizedStyle}_bk.jpg`);
+  urls.push(`${SANMAR_CDN_BASE}/${normalizedStyle}/${normalizedStyle}_sd.jpg`);
+  urls.push(`${SANMAR_CDN_BASE}/${normalizedStyle}/${normalizedStyle}_sw.jpg`);
 
   if (colorCode) {
     const normalizedColor = colorCode.toUpperCase().trim();
     urls.push(`${SANMAR_CDN_BASE}/${normalizedStyle}/${normalizedStyle}_${normalizedColor}_fm.jpg`);
-    urls.push(`${SANMAR_CDN_BASE}/${normalizedStyle}/${normalizedStyle}_${normalizedColor}_bm.jpg`);
+    urls.push(`${SANMAR_CDN_BASE}/${normalizedStyle}/${normalizedStyle}_${normalizedColor}_bk.jpg`);
+    urls.push(`${SANMAR_CDN_BASE}/${normalizedStyle}/${normalizedStyle}_${normalizedColor}_sd.jpg`);
+    urls.push(`${SANMAR_CDN_BASE}/${normalizedStyle}/${normalizedStyle}_${normalizedColor}_sw.jpg`);
   }
 
   return urls;
@@ -101,6 +143,7 @@ export function categorizeSanMarImages(
   const sideImages: string[] = [];
   const lifestyleImages: string[] = [];
   const otherImages: string[] = [];
+  const swatchImages: string[] = [];
 
   const filtered = colorFilter
     ? images.filter((img: any) => {
@@ -119,7 +162,9 @@ export function categorizeSanMarImages(
   for (const img of filtered) {
     if (!img.url) continue;
     const classType = (img.classTypeName || "").toLowerCase();
-    if (classType.includes("front")) {
+    if (classType.includes("swatch") || img.url.includes("_sw.")) {
+      swatchImages.push(img.url);
+    } else if (classType.includes("front")) {
       frontImages.push(img.url);
     } else if (classType.includes("rear") || classType.includes("back")) {
       rearImages.push(img.url);
@@ -127,7 +172,7 @@ export function categorizeSanMarImages(
       sideImages.push(img.url);
     } else if (classType.includes("lifestyle") || classType.includes("casual")) {
       lifestyleImages.push(img.url);
-    } else if (!classType.includes("swatch")) {
+    } else {
       otherImages.push(img.url);
     }
   }
@@ -149,6 +194,7 @@ export function categorizeSanMarImages(
       back: rearImages,
       side: sideImages,
       detail: [...lifestyleImages, ...otherImages],
+      swatch: swatchImages,
     },
   };
 }
@@ -302,7 +348,7 @@ export function getSanMarMockupImages(
   const { mockupImages } = categorizeSanMarImages(rawImages, colorId);
 
   logImageOperation("sanmar", "mockup", "cache_hit", {
-    imageCount: mockupImages.front.length + mockupImages.back.length + mockupImages.side.length + mockupImages.detail.length,
+    imageCount: mockupImages.front.length + mockupImages.back.length + mockupImages.side.length + mockupImages.detail.length + mockupImages.swatch.length,
     fallbackUsed: false,
   });
 

@@ -5,6 +5,9 @@
  * Provides fallback logic: EPDD images take priority over SDL images.
  * Returns images in the format expected by the mockup generator.
  *
+ * IMPORTANT: All SanMar CDN URLs are converted to proxy URLs before returning
+ * to the client, because SanMar CDN blocks browser CORS requests.
+ *
  * ISOLATED from SSActivewear image logic - do not modify global utilities.
  */
 
@@ -14,6 +17,8 @@ import {
   setSanMarImageCache,
   buildSanMarCdnFallbackUrl,
   categorizeSanMarImages,
+  convertAllSanMarUrlsToProxy,
+  sanmarCdnUrlToProxyUrl,
   logImageOperation,
   type MockupImageResult,
 } from './image-cache.ts';
@@ -36,13 +41,18 @@ export interface SanMarImageRecord {
   original_filename: string;
 }
 
+function getSupabaseUrl(): string {
+  return Deno.env.get('SUPABASE_URL') || '';
+}
+
 export async function resolveSanMarImagesForMockup(
   supabase: SupabaseClient,
   companyId: string,
   styleId: string,
   colorId?: string
 ): Promise<MockupImageResult> {
-  const empty: MockupImageResult = { front: [], back: [], side: [], detail: [] };
+  const empty: MockupImageResult = { front: [], back: [], side: [], detail: [], swatch: [] };
+  const supabaseUrl = getSupabaseUrl();
 
   console.log(`[SanMar Resolver] supplier=sanmar, styleId=${styleId}, colorId=${colorId || 'none'}`);
 
@@ -50,8 +60,9 @@ export async function resolveSanMarImagesForMockup(
     const cached = await getSanMarImageCache(supabase, companyId, styleId, colorId);
 
     if (cached && cached.rawImages && cached.rawImages.length > 0) {
-      const { mockupImages } = categorizeSanMarImages(cached.rawImages, colorId);
-      const total = mockupImages.front.length + mockupImages.back.length + mockupImages.side.length + mockupImages.detail.length;
+      const proxied = convertAllSanMarUrlsToProxy(cached.rawImages, supabaseUrl);
+      const { mockupImages } = categorizeSanMarImages(proxied, colorId);
+      const total = mockupImages.front.length + mockupImages.back.length + mockupImages.side.length + mockupImages.detail.length + mockupImages.swatch.length;
       console.log(`[SanMar Resolver] supplier=sanmar, styleId=${styleId}, colorId=${colorId || 'none'}, cache=hit, images=${total}, fallback=false`);
       return mockupImages;
     }
@@ -64,8 +75,9 @@ export async function resolveSanMarImagesForMockup(
       const mediaData = { images: mapImages };
       await setSanMarImageCache(supabase, companyId, styleId, mediaData, colorId);
 
-      const { mockupImages } = categorizeSanMarImages(mapImages, colorId);
-      const total = mockupImages.front.length + mockupImages.back.length + mockupImages.side.length + mockupImages.detail.length;
+      const proxied = convertAllSanMarUrlsToProxy(mapImages, supabaseUrl);
+      const { mockupImages } = categorizeSanMarImages(proxied, colorId);
+      const total = mockupImages.front.length + mockupImages.back.length + mockupImages.side.length + mockupImages.detail.length + mockupImages.swatch.length;
       console.log(`[SanMar Resolver] supplier=sanmar, styleId=${styleId}, colorId=${colorId || 'none'}, cache=miss, images=${total}, fallback=false`);
       return mockupImages;
     }
@@ -76,14 +88,15 @@ export async function resolveSanMarImagesForMockup(
         url,
         productId: styleId,
         partId: "",
-        classTypeName: url.includes("_fm") ? "Front" : url.includes("_bm") ? "Back" : "Other",
+        classTypeName: classTypeFromUrl(url),
         color: colorId || "",
         singlePart: false,
       }));
 
       await setSanMarImageCache(supabase, companyId, styleId, { images: fallbackImages }, colorId);
 
-      const { mockupImages } = categorizeSanMarImages(fallbackImages);
+      const proxied = convertAllSanMarUrlsToProxy(fallbackImages, supabaseUrl);
+      const { mockupImages } = categorizeSanMarImages(proxied);
       console.log(`[SanMar Resolver] supplier=sanmar, styleId=${styleId}, colorId=${colorId || 'none'}, cache=miss, images=${mockupImages.front.length + mockupImages.back.length}, fallback=true`);
       return mockupImages;
     }
@@ -94,6 +107,14 @@ export async function resolveSanMarImagesForMockup(
     console.error(`[SanMar Resolver] Exception:`, err);
     return empty;
   }
+}
+
+function classTypeFromUrl(url: string): string {
+  if (url.includes("_fm.")) return "Front";
+  if (url.includes("_bk.")) return "Back";
+  if (url.includes("_sd.")) return "Side";
+  if (url.includes("_sw.")) return "Swatch";
+  return "Other";
 }
 
 async function fetchFromImageMap(
@@ -148,6 +169,7 @@ export async function resolveSanMarImages(
   style: string,
   colorCode?: string
 ): Promise<SanMarImageUrls> {
+  const supabaseUrl = getSupabaseUrl();
   const result: SanMarImageUrls = {
     frontModel: null,
     backModel: null,
@@ -183,7 +205,7 @@ export async function resolveSanMarImages(
     const records = data as SanMarImageRecord[];
 
     for (const record of records) {
-      const url = record.cdn_url;
+      const url = sanmarCdnUrlToProxyUrl(record.cdn_url, supabaseUrl);
 
       switch (record.image_type) {
         case 'front_model':
@@ -224,6 +246,8 @@ export async function resolveSanMarImage(
   imageType: string,
   colorCode?: string
 ): Promise<string | null> {
+  const supabaseUrl = getSupabaseUrl();
+
   try {
     let query = supabase
       .from('sanmar_image_map')
@@ -243,7 +267,7 @@ export async function resolveSanMarImage(
       return null;
     }
 
-    return data.cdn_url;
+    return sanmarCdnUrlToProxyUrl(data.cdn_url, supabaseUrl);
   } catch (err) {
     console.error('Exception in resolveSanMarImage:', err);
     return null;

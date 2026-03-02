@@ -4,6 +4,8 @@ import {
   buildSanMarCdnFallbackUrl,
   logImageOperation,
   categorizeSanMarImages,
+  sanmarCdnUrlToProxyUrl,
+  convertAllSanMarUrlsToProxy,
 } from "../_shared/image-cache.ts";
 
 export interface ColorOption {
@@ -50,7 +52,7 @@ export async function searchSanMarCatalog(
     console.log(`[SanMar] ========== SEARCH START ==========`);
     console.log(`[SanMar] Style: ${style}, Company: ${companyId}`);
 
-    const cachedData = await getCachedProduct(supabaseAdmin, companyId, style);
+    const cachedData = await getCachedProduct(supabaseAdmin, companyId, style, supabaseUrl);
     if (cachedData) {
       console.log(`[SanMar] CACHE HIT for ${style}`);
       results.push(cachedData);
@@ -101,7 +103,6 @@ export async function searchSanMarCatalog(
       return { results, errors };
     }
 
-    // Check for error response from API
     if (productData.success === false || productData.error) {
       console.log(`[SanMar] API returned error for ${style}: ${productData.error || productData.message || 'unknown'}`);
       console.log(`[SanMar] Full error response: ${JSON.stringify(productData)}`);
@@ -172,7 +173,7 @@ export async function searchSanMarCatalog(
             url,
             productId: style,
             partId: "",
-            classTypeName: url.includes("_fm") ? "Front" : url.includes("_bm") ? "Back" : "Other",
+            classTypeName: classTypeFromUrl(url),
             color: "",
             singlePart: false,
           });
@@ -190,7 +191,7 @@ export async function searchSanMarCatalog(
               url,
               productId: style,
               partId: firstPartId,
-              classTypeName: url.includes("_fm") ? "Front" : url.includes("_bm") ? "Back" : "Other",
+              classTypeName: classTypeFromUrl(url),
               color: colorName,
               singlePart: false,
             });
@@ -213,7 +214,6 @@ export async function searchSanMarCatalog(
       }
     }
 
-    // Fetch pricing for the first part to get wholesale price
     const firstPartId = productData.data.parts?.[0]?.partId;
     if (firstPartId) {
       try {
@@ -248,7 +248,7 @@ export async function searchSanMarCatalog(
       },
     };
 
-    const product = transformSanMarData(apiDataForTransform);
+    const product = transformSanMarData(apiDataForTransform, supabaseUrl);
     if (productData.data?._debug) {
       product.raw_data = { _debug: productData.data._debug };
     }
@@ -268,7 +268,8 @@ export async function searchSanMarCatalog(
 async function getCachedProduct(
   supabaseAdmin: any,
   companyId: string,
-  style: string
+  style: string,
+  supabaseUrl: string
 ): Promise<ProductResult | null> {
   try {
     const cacheKey = `style:${style.toUpperCase()}`;
@@ -309,7 +310,7 @@ async function getCachedProduct(
           url,
           productId: style,
           partId: "",
-          classTypeName: url.includes("_fm") ? "Front" : url.includes("_bm") ? "Back" : "Other",
+          classTypeName: classTypeFromUrl(url),
           color: "",
           singlePart: false,
         });
@@ -327,7 +328,7 @@ async function getCachedProduct(
             url,
             productId: style,
             partId: firstPartId,
-            classTypeName: url.includes("_fm") ? "Front" : url.includes("_bm") ? "Back" : "Other",
+            classTypeName: classTypeFromUrl(url),
             color: colorName,
             singlePart: false,
           });
@@ -362,7 +363,7 @@ async function getCachedProduct(
       },
     };
 
-    const product = transformSanMarData(apiData);
+    const product = transformSanMarData(apiData, supabaseUrl);
     product.cached = true;
     product.last_synced = productCache.expires_at;
     return product;
@@ -412,7 +413,15 @@ async function cacheProduct(
   }
 }
 
-function transformSanMarData(apiData: any): ProductResult {
+function classTypeFromUrl(url: string): string {
+  if (url.includes("_fm.")) return "Front";
+  if (url.includes("_bk.")) return "Back";
+  if (url.includes("_sd.")) return "Side";
+  if (url.includes("_sw.")) return "Swatch";
+  return "Other";
+}
+
+function transformSanMarData(apiData: any, supabaseUrl: string): ProductResult {
   const style = apiData.style;
   const colors: ColorOption[] = [];
 
@@ -510,6 +519,10 @@ function transformSanMarData(apiData: any): ProductResult {
           (apiData.media?.views?.frontImages?.[0]) ||
           "";
       }
+
+      imageUrl = sanmarCdnUrlToProxyUrl(imageUrl, supabaseUrl);
+      rearImageUrl = sanmarCdnUrlToProxyUrl(rearImageUrl, supabaseUrl);
+      sideImageUrl = sanmarCdnUrlToProxyUrl(sideImageUrl, supabaseUrl);
 
       console.log(`[SanMar Transform] Color "${color.colorName}": matched=${colorImages.length} images, generic=${genericImages.length}, front=${!!imageUrl}, rear=${!!rearImageUrl}, side=${!!sideImageUrl}`);
 
