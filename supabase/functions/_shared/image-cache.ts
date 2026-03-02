@@ -7,15 +7,11 @@
  * DO NOT modify product lookup, prefix normalization, pricing, or any other system.
  *
  * Cache Tables:
- * - sanmar_media_cache: For SanMar images (cache_key = sanmar:{STYLE}:{COLOR} or sanmar:{STYLE}, cache_type = style)
+ * - sanmar_media_cache: For SanMar images (cache_key = style:{STYLE}, cache_type = style)
  * - images: For S&S Activewear images (linked to parts table)
  *
- * Cache Key Format: sanmar:{styleId}:{colorId} (per-color) or sanmar:{styleId} (all colors)
+ * Cache Key Format: {supplier}:{styleId}:{colorId}
  * TTL: 24 hours (existing behavior preserved)
- *
- * IMPORTANT: SanMar CDN blocks browser CORS. All SanMar image URLs sent to the
- * browser MUST go through our sanmar-image-proxy edge function. Never send
- * cdnm.sanmar.com URLs directly to the client.
  */
 
 export interface ImageUrls {
@@ -28,14 +24,6 @@ export interface ImageUrls {
   sideImages: string[];
   lifestyleImages: string[];
   otherImages: string[];
-}
-
-export interface MockupImageResult {
-  front: string[];
-  back: string[];
-  side: string[];
-  detail: string[];
-  swatch: string[];
 }
 
 export interface CachedImageData {
@@ -60,61 +48,16 @@ const CACHE_TTL_HOURS = 24;
 const SS_CDN_BASE = "https://www.ssactivewear.com/images";
 const SANMAR_CDN_BASE = "https://cdnm.sanmar.com/imglib";
 
-function buildSanMarCacheKey(styleId: string, colorId?: string): string {
-  const normalizedStyle = styleId.toUpperCase().trim();
-  if (colorId) {
-    return `sanmar:${normalizedStyle}:${colorId.toUpperCase().trim()}`;
-  }
-  return `sanmar:${normalizedStyle}`;
-}
-
-export function sanmarCdnUrlToProxyUrl(cdnUrl: string, supabaseUrl: string): string {
-  if (!cdnUrl) return "";
-  if (cdnUrl.includes("/functions/v1/sanmar-image-proxy")) return cdnUrl;
-  if (!cdnUrl.includes("sanmar.com")) return cdnUrl;
-
-  return `${supabaseUrl}/functions/v1/sanmar-image-proxy?url=${encodeURIComponent(cdnUrl)}`;
-}
-
-export function buildSanMarProxyUrl(
-  supabaseUrl: string,
-  style: string,
-  view: "fm" | "bk" | "sd" | "sw",
-  colorCode?: string
-): string {
-  const normalizedStyle = style.toUpperCase().trim();
-  let url = `${supabaseUrl}/functions/v1/sanmar-image-proxy/${normalizedStyle}/${view}`;
-  if (colorCode) {
-    url += `?color=${encodeURIComponent(colorCode.toUpperCase().trim())}`;
-  }
-  return url;
-}
-
-export function convertAllSanMarUrlsToProxy(images: any[], supabaseUrl: string): any[] {
-  return images.map(img => {
-    if (!img.url) return img;
-    return {
-      ...img,
-      url: sanmarCdnUrlToProxyUrl(img.url, supabaseUrl),
-    };
-  });
-}
-
 export function buildSanMarCdnFallbackUrl(style: string, colorCode?: string): string[] {
   const urls: string[] = [];
   const normalizedStyle = style.toUpperCase().trim();
 
   urls.push(`${SANMAR_CDN_BASE}/${normalizedStyle}/${normalizedStyle}_fm.jpg`);
-  urls.push(`${SANMAR_CDN_BASE}/${normalizedStyle}/${normalizedStyle}_bk.jpg`);
-  urls.push(`${SANMAR_CDN_BASE}/${normalizedStyle}/${normalizedStyle}_sd.jpg`);
-  urls.push(`${SANMAR_CDN_BASE}/${normalizedStyle}/${normalizedStyle}_sw.jpg`);
 
   if (colorCode) {
     const normalizedColor = colorCode.toUpperCase().trim();
     urls.push(`${SANMAR_CDN_BASE}/${normalizedStyle}/${normalizedStyle}_${normalizedColor}_fm.jpg`);
-    urls.push(`${SANMAR_CDN_BASE}/${normalizedStyle}/${normalizedStyle}_${normalizedColor}_bk.jpg`);
-    urls.push(`${SANMAR_CDN_BASE}/${normalizedStyle}/${normalizedStyle}_${normalizedColor}_sd.jpg`);
-    urls.push(`${SANMAR_CDN_BASE}/${normalizedStyle}/${normalizedStyle}_${normalizedColor}_sw.jpg`);
+    urls.push(`${SANMAR_CDN_BASE}/${normalizedStyle}/${normalizedStyle}_${normalizedColor}_bm.jpg`);
   }
 
   return urls;
@@ -134,86 +77,17 @@ export function buildSSActivewearCdnFallbackUrl(styleId: string, colorCode?: str
   return urls;
 }
 
-export function categorizeSanMarImages(
-  images: any[],
-  colorFilter?: string
-): { views: ImageUrls; mockupImages: MockupImageResult } {
-  const frontImages: string[] = [];
-  const rearImages: string[] = [];
-  const sideImages: string[] = [];
-  const lifestyleImages: string[] = [];
-  const otherImages: string[] = [];
-  const swatchImages: string[] = [];
-
-  const filtered = colorFilter
-    ? images.filter((img: any) => {
-        if (!img.url) return false;
-        const imgColor = (img.color || "").toLowerCase().trim();
-        const targetColor = colorFilter.toLowerCase().trim();
-        if (!imgColor) return true;
-        if (imgColor === targetColor) return true;
-        const imgWords = imgColor.split(/[\s/]+/);
-        const targetWords = targetColor.split(/[\s/]+/);
-        const matching = targetWords.filter(w => w.length > 2 && imgWords.includes(w));
-        return matching.length > 0;
-      })
-    : images;
-
-  for (const img of filtered) {
-    if (!img.url) continue;
-    const classType = (img.classTypeName || "").toLowerCase();
-    if (classType.includes("swatch") || img.url.includes("_sw.")) {
-      swatchImages.push(img.url);
-    } else if (classType.includes("front")) {
-      frontImages.push(img.url);
-    } else if (classType.includes("rear") || classType.includes("back")) {
-      rearImages.push(img.url);
-    } else if (classType.includes("side") || classType.includes("sleeve")) {
-      sideImages.push(img.url);
-    } else if (classType.includes("lifestyle") || classType.includes("casual")) {
-      lifestyleImages.push(img.url);
-    } else {
-      otherImages.push(img.url);
-    }
-  }
-
-  return {
-    views: {
-      front: frontImages[0] || null,
-      rear: rearImages[0] || null,
-      side: sideImages[0] || null,
-      lifestyle: lifestyleImages[0] || null,
-      frontImages,
-      rearImages,
-      sideImages,
-      lifestyleImages,
-      otherImages,
-    },
-    mockupImages: {
-      front: frontImages,
-      back: rearImages,
-      side: sideImages,
-      detail: [...lifestyleImages, ...otherImages],
-      swatch: swatchImages,
-    },
-  };
-}
-
 export async function getSanMarImageCache(
   supabaseAdmin: any,
   companyId: string,
-  styleId: string,
-  colorId?: string
+  styleId: string
 ): Promise<CachedImageData | null> {
-  const cacheKey = buildSanMarCacheKey(styleId, colorId);
-  const legacyCacheKey = `style:${styleId.toUpperCase()}`;
+  const cacheKey = `style:${styleId.toUpperCase()}`;
 
-  console.log(`[Image Cache] SanMar cache lookup: company=${companyId}, style=${styleId}, colorId=${colorId || 'all'}, key=${cacheKey}`);
+  console.log(`[Image Cache] SanMar cache lookup: company=${companyId}, style=${styleId}, key=${cacheKey}`);
 
   try {
-    let mediaCache = null;
-
-    const { data: primaryCache } = await supabaseAdmin
+    const { data: mediaCache } = await supabaseAdmin
       .from("sanmar_media_cache")
       .select("data, expires_at, created_at")
       .eq("company_id", companyId)
@@ -221,62 +95,40 @@ export async function getSanMarImageCache(
       .eq("cache_type", "style")
       .maybeSingle();
 
-    if (primaryCache) {
-      mediaCache = primaryCache;
-    } else {
-      const { data: legacyCache } = await supabaseAdmin
-        .from("sanmar_media_cache")
-        .select("data, expires_at, created_at")
-        .eq("company_id", companyId)
-        .eq("cache_key", legacyCacheKey)
-        .eq("cache_type", "style")
-        .maybeSingle();
-      if (legacyCache) {
-        mediaCache = legacyCache;
-      }
-    }
-
     if (!mediaCache) {
-      logImageOperation("sanmar", styleId, "cache_miss", {});
-      console.log(`[Image Cache] SanMar cache MISS for ${styleId}${colorId ? ':' + colorId : ''}`);
+      console.log(`[Image Cache] SanMar cache MISS for ${styleId}`);
       return null;
     }
 
     if (new Date(mediaCache.expires_at) < new Date()) {
-      logImageOperation("sanmar", styleId, "cache_miss", {});
       console.log(`[Image Cache] SanMar cache EXPIRED for ${styleId}`);
       return null;
     }
 
     const mediaData = mediaCache.data;
-    const rawImages = mediaData?.images || [];
-    if (!mediaData || rawImages.length === 0) {
-      logImageOperation("sanmar", styleId, "cache_miss", {});
-      console.log(`[Image Cache] SanMar cache HIT but no images stored for ${styleId} - treating as miss`);
+    if (!mediaData || !mediaData.images || mediaData.images.length === 0) {
+      console.log(`[Image Cache] SanMar cache HIT but no images stored for ${styleId}`);
       return null;
     }
 
-    const validImages = rawImages.filter((img: any) => img && img.url);
-    if (validImages.length === 0) {
-      logImageOperation("sanmar", styleId, "cache_miss", {});
-      console.log(`[Image Cache] SanMar cache HIT but all images have empty URLs for ${styleId}`);
-      return null;
-    }
-
-    logImageOperation("sanmar", styleId, "cache_hit", {
-      imageCount: validImages.length,
-      fallbackUsed: false,
-    });
-    console.log(`[Image Cache] SanMar cache HIT for ${styleId}${colorId ? ':' + colorId : ''}: ${validImages.length} images`);
-
-    const { views } = categorizeSanMarImages(validImages, colorId);
+    console.log(`[Image Cache] SanMar cache HIT for ${styleId}: ${mediaData.images.length} images`);
 
     return {
       supplier: "sanmar",
       styleId: styleId.toUpperCase(),
-      colorId: colorId || null,
-      urls: views,
-      rawImages: validImages,
+      colorId: null,
+      urls: mediaData.views || {
+        front: null,
+        rear: null,
+        side: null,
+        lifestyle: null,
+        frontImages: [],
+        rearImages: [],
+        sideImages: [],
+        lifestyleImages: [],
+        otherImages: [],
+      },
+      rawImages: mediaData.images || [],
       timestamp: mediaCache.created_at,
       expiresAt: mediaCache.expires_at,
     };
@@ -290,37 +142,18 @@ export async function setSanMarImageCache(
   supabaseAdmin: any,
   companyId: string,
   styleId: string,
-  mediaData: any,
-  colorId?: string
+  mediaData: any
 ): Promise<boolean> {
-  const rawImages = mediaData?.images || [];
-  const validImages = rawImages.filter((img: any) => img && img.url);
-
-  if (validImages.length === 0) {
-    console.log(`[Image Cache] Skipping SanMar cache write - no valid images for ${styleId}`);
+  if (!mediaData?.images || mediaData.images.length === 0) {
+    console.log(`[Image Cache] Skipping SanMar cache write - no images to cache for ${styleId}`);
     return false;
   }
 
-  const cacheKey = buildSanMarCacheKey(styleId, colorId);
+  const cacheKey = `style:${styleId.toUpperCase()}`;
   const expiresAt = new Date();
   expiresAt.setHours(expiresAt.getHours() + CACHE_TTL_HOURS);
 
-  const { views } = categorizeSanMarImages(validImages);
-
-  const cacheData = {
-    images: validImages,
-    views,
-    supplier: "sanmar",
-    styleId: styleId.toUpperCase(),
-    colorId: colorId || null,
-    timestamp: new Date().toISOString(),
-  };
-
-  logImageOperation("sanmar", styleId, "cache_write", {
-    imageCount: validImages.length,
-    fallbackUsed: false,
-  });
-  console.log(`[Image Cache] Writing SanMar cache: style=${styleId}, colorId=${colorId || 'all'}, images=${validImages.length}, key=${cacheKey}`);
+  console.log(`[Image Cache] Writing SanMar cache: style=${styleId}, images=${mediaData.images.length}`);
 
   try {
     await supabaseAdmin
@@ -329,7 +162,7 @@ export async function setSanMarImageCache(
         company_id: companyId,
         cache_key: cacheKey,
         cache_type: "style",
-        data: cacheData,
+        data: mediaData,
         expires_at: expiresAt.toISOString(),
       }, { onConflict: "company_id,cache_key" });
 
@@ -339,20 +172,6 @@ export async function setSanMarImageCache(
     console.error(`[Image Cache] Error writing SanMar cache:`, error);
     return false;
   }
-}
-
-export function getSanMarMockupImages(
-  rawImages: any[],
-  colorId?: string
-): MockupImageResult {
-  const { mockupImages } = categorizeSanMarImages(rawImages, colorId);
-
-  logImageOperation("sanmar", "mockup", "cache_hit", {
-    imageCount: mockupImages.front.length + mockupImages.back.length + mockupImages.side.length + mockupImages.detail.length + mockupImages.swatch.length,
-    fallbackUsed: false,
-  });
-
-  return mockupImages;
 }
 
 export async function getSSActivewearImageCache(

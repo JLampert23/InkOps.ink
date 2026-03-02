@@ -3,9 +3,6 @@ import {
   setSanMarImageCache,
   buildSanMarCdnFallbackUrl,
   logImageOperation,
-  categorizeSanMarImages,
-  sanmarCdnUrlToProxyUrl,
-  convertAllSanMarUrlsToProxy,
 } from "../_shared/image-cache.ts";
 
 export interface ColorOption {
@@ -52,7 +49,7 @@ export async function searchSanMarCatalog(
     console.log(`[SanMar] ========== SEARCH START ==========`);
     console.log(`[SanMar] Style: ${style}, Company: ${companyId}`);
 
-    const cachedData = await getCachedProduct(supabaseAdmin, companyId, style, supabaseUrl);
+    const cachedData = await getCachedProduct(supabaseAdmin, companyId, style);
     if (cachedData) {
       console.log(`[SanMar] CACHE HIT for ${style}`);
       results.push(cachedData);
@@ -103,6 +100,7 @@ export async function searchSanMarCatalog(
       return { results, errors };
     }
 
+    // Check for error response from API
     if (productData.success === false || productData.error) {
       console.log(`[SanMar] API returned error for ${style}: ${productData.error || productData.message || 'unknown'}`);
       console.log(`[SanMar] Full error response: ${JSON.stringify(productData)}`);
@@ -125,17 +123,25 @@ export async function searchSanMarCatalog(
     let imageCacheHit = false;
     let usedCdnFallback = false;
 
+    // Step 1: Check image cache first
     const cachedImages = await getSanMarImageCache(supabaseAdmin, companyId, style);
-    if (cachedImages && cachedImages.rawImages && cachedImages.rawImages.length > 0) {
+    if (cachedImages && cachedImages.urls) {
+      logImageOperation("sanmar", style, "cache_hit", {
+        imageCount: (cachedImages.urls.frontImages?.length || 0) +
+                   (cachedImages.urls.rearImages?.length || 0) +
+                   (cachedImages.urls.sideImages?.length || 0)
+      });
       imageCacheHit = true;
       mediaData = {
-        images: cachedImages.rawImages,
+        images: cachedImages.rawImages || [],
         views: cachedImages.urls,
       };
-      console.log(`[SanMar] Image cache HIT: ${cachedImages.rawImages.length} raw images with color data preserved`);
     }
 
+    // Step 2: If no cache, fetch from vendor API
     if (!imageCacheHit) {
+      logImageOperation("sanmar", style, "cache_miss", {});
+
       try {
         const mediaUrl = `${supabaseUrl}/functions/v1/sanmar-api?action=media&style=${encodeURIComponent(style)}&companyId=${encodeURIComponent(companyId)}`;
         logImageOperation("sanmar", style, "api_fetch", { endpoint: "sanmar-api/media" });
@@ -145,26 +151,24 @@ export async function searchSanMarCatalog(
         });
         if (mediaResponse.ok) {
           const mediaJson = await mediaResponse.json();
-          const apiMediaData = mediaJson.data || null;
+          mediaData = mediaJson.data || null;
 
-          if (apiMediaData?.images?.length > 0) {
-            logImageOperation("sanmar", style, "api_fetch", { imageCount: apiMediaData.images.length });
-            const { views } = categorizeSanMarImages(apiMediaData.images);
-            mediaData = {
-              images: apiMediaData.images,
-              views,
-            };
+          if (mediaData?.images?.length > 0) {
+            logImageOperation("sanmar", style, "api_fetch", { imageCount: mediaData.images.length });
           }
         }
       } catch (mediaError: any) {
         console.warn(`Media fetch failed (non-critical): ${mediaError.message}`);
       }
 
+      // Step 3: If API returned no images, use per-color CDN fallback
       if (!mediaData?.images || mediaData.images.length === 0) {
         logImageOperation("sanmar", style, "cdn_fallback", { fallbackUsed: true });
         usedCdnFallback = true;
 
         const allImages: any[] = [];
+        const allFrontUrls: string[] = [];
+        const allRearUrls: string[] = [];
         const colors = productData.data?.colors || [];
 
         const genericFallback = buildSanMarCdnFallbackUrl(style);
@@ -173,10 +177,12 @@ export async function searchSanMarCatalog(
             url,
             productId: style,
             partId: "",
-            classTypeName: classTypeFromUrl(url),
+            classTypeName: url.includes("_fm") ? "Front" : url.includes("_bm") ? "Back" : "Other",
             color: "",
             singlePart: false,
           });
+          if (url.includes("_fm")) allFrontUrls.push(url);
+          if (url.includes("_bm")) allRearUrls.push(url);
         }
 
         for (const color of colors) {
@@ -191,29 +197,43 @@ export async function searchSanMarCatalog(
               url,
               productId: style,
               partId: firstPartId,
-              classTypeName: classTypeFromUrl(url),
+              classTypeName: url.includes("_fm") ? "Front" : url.includes("_bm") ? "Back" : "Other",
               color: colorName,
               singlePart: false,
             });
+            if (url.includes("_fm")) allFrontUrls.push(url);
+            if (url.includes("_bm")) allRearUrls.push(url);
           }
         }
 
         console.log(`[SanMar] CDN fallback generated ${allImages.length} images for ${colors.length} colors`);
 
         if (allImages.length > 0) {
-          const { views } = categorizeSanMarImages(allImages);
           mediaData = {
             images: allImages,
-            views,
+            views: {
+              front: allFrontUrls[0] || null,
+              rear: allRearUrls[0] || null,
+              side: null,
+              lifestyle: null,
+              frontImages: allFrontUrls,
+              rearImages: allRearUrls,
+              sideImages: [],
+              lifestyleImages: [],
+              otherImages: [],
+            },
           };
         }
       }
 
+      // Step 4: Write to cache only if we have valid images
       if (mediaData?.images && mediaData.images.length > 0) {
         await setSanMarImageCache(supabaseAdmin, companyId, style, mediaData);
+        logImageOperation("sanmar", style, "cache_write", { imageCount: mediaData.images.length });
       }
     }
 
+    // Fetch pricing for the first part to get wholesale price
     const firstPartId = productData.data.parts?.[0]?.partId;
     if (firstPartId) {
       try {
@@ -248,7 +268,7 @@ export async function searchSanMarCatalog(
       },
     };
 
-    const product = transformSanMarData(apiDataForTransform, supabaseUrl);
+    const product = transformSanMarData(apiDataForTransform);
     if (productData.data?._debug) {
       product.raw_data = { _debug: productData.data._debug };
     }
@@ -268,8 +288,7 @@ export async function searchSanMarCatalog(
 async function getCachedProduct(
   supabaseAdmin: any,
   companyId: string,
-  style: string,
-  supabaseUrl: string
+  style: string
 ): Promise<ProductResult | null> {
   try {
     const cacheKey = `style:${style.toUpperCase()}`;
@@ -289,58 +308,91 @@ async function getCachedProduct(
       return null;
     }
 
+    // Check image cache using dedicated utility
     const cachedImages = await getSanMarImageCache(supabaseAdmin, companyId, style);
     let mediaData = null;
 
-    if (cachedImages && cachedImages.rawImages && cachedImages.rawImages.length > 0) {
+    if (cachedImages && cachedImages.urls) {
+      logImageOperation("sanmar", style, "cache_hit", {
+        imageCount: (cachedImages.urls.frontImages?.length || 0) +
+                   (cachedImages.urls.rearImages?.length || 0)
+      });
       mediaData = {
-        images: cachedImages.rawImages,
+        images: cachedImages.rawImages || [],
         views: cachedImages.urls,
       };
-      console.log(`[SanMar Cache] Image cache HIT for ${style}: ${cachedImages.rawImages.length} raw images`);
     } else {
-      logImageOperation("sanmar", style, "cdn_fallback", { fallbackUsed: true });
+      const { data: legacyMediaCache } = await supabaseAdmin
+        .from("sanmar_media_cache")
+        .select("data, expires_at")
+        .eq("company_id", companyId)
+        .eq("cache_key", cacheKey)
+        .eq("cache_type", "style")
+        .maybeSingle();
 
-      const allImages: any[] = [];
-      const colors = productCache.data?.colors || [];
-
-      const genericFallback = buildSanMarCdnFallbackUrl(style);
-      for (const url of genericFallback) {
-        allImages.push({
-          url,
-          productId: style,
-          partId: "",
-          classTypeName: classTypeFromUrl(url),
-          color: "",
-          singlePart: false,
-        });
+      if (legacyMediaCache && new Date(legacyMediaCache.expires_at) >= new Date()) {
+        mediaData = legacyMediaCache.data || null;
       }
 
-      for (const color of colors) {
-        const colorName = color.colorName || "";
-        const firstPartId = color.partIds?.[0]?.partId || "";
-        const colorCode = firstPartId.replace(new RegExp(`^${style.toUpperCase()}-?`), "").replace(/-.*$/, "");
-        if (!colorCode) continue;
+      if (!mediaData?.images || mediaData.images.length === 0) {
+        logImageOperation("sanmar", style, "cdn_fallback", { fallbackUsed: true });
 
-        const colorUrls = buildSanMarCdnFallbackUrl(style, colorCode);
-        for (const url of colorUrls) {
+        const allImages: any[] = [];
+        const allFrontUrls: string[] = [];
+        const allRearUrls: string[] = [];
+        const colors = productCache.data?.colors || [];
+
+        const genericFallback = buildSanMarCdnFallbackUrl(style);
+        for (const url of genericFallback) {
           allImages.push({
             url,
             productId: style,
-            partId: firstPartId,
-            classTypeName: classTypeFromUrl(url),
-            color: colorName,
+            partId: "",
+            classTypeName: url.includes("_fm") ? "Front" : url.includes("_bm") ? "Back" : "Other",
+            color: "",
             singlePart: false,
           });
+          if (url.includes("_fm")) allFrontUrls.push(url);
+          if (url.includes("_bm")) allRearUrls.push(url);
         }
-      }
 
-      if (allImages.length > 0) {
-        const { views } = categorizeSanMarImages(allImages);
-        mediaData = {
-          images: allImages,
-          views,
-        };
+        for (const color of colors) {
+          const colorName = color.colorName || "";
+          const firstPartId = color.partIds?.[0]?.partId || "";
+          const colorCode = firstPartId.replace(new RegExp(`^${style.toUpperCase()}-?`), "").replace(/-.*$/, "");
+          if (!colorCode) continue;
+
+          const colorUrls = buildSanMarCdnFallbackUrl(style, colorCode);
+          for (const url of colorUrls) {
+            allImages.push({
+              url,
+              productId: style,
+              partId: firstPartId,
+              classTypeName: url.includes("_fm") ? "Front" : url.includes("_bm") ? "Back" : "Other",
+              color: colorName,
+              singlePart: false,
+            });
+            if (url.includes("_fm")) allFrontUrls.push(url);
+            if (url.includes("_bm")) allRearUrls.push(url);
+          }
+        }
+
+        if (allImages.length > 0) {
+          mediaData = {
+            images: allImages,
+            views: {
+              front: allFrontUrls[0] || null,
+              rear: allRearUrls[0] || null,
+              side: null,
+              lifestyle: null,
+              frontImages: allFrontUrls,
+              rearImages: allRearUrls,
+              sideImages: [],
+              lifestyleImages: [],
+              otherImages: [],
+            },
+          };
+        }
       }
     }
 
@@ -363,7 +415,7 @@ async function getCachedProduct(
       },
     };
 
-    const product = transformSanMarData(apiData, supabaseUrl);
+    const product = transformSanMarData(apiData);
     product.cached = true;
     product.last_synced = productCache.expires_at;
     return product;
@@ -413,29 +465,15 @@ async function cacheProduct(
   }
 }
 
-function classTypeFromUrl(url: string): string {
-  if (url.includes("_fm.")) return "Front";
-  if (url.includes("_bk.")) return "Back";
-  if (url.includes("_sd.")) return "Side";
-  if (url.includes("_sw.")) return "Swatch";
-  return "Other";
-}
-
-function transformSanMarData(apiData: any, supabaseUrl: string): ProductResult {
+function transformSanMarData(apiData: any): ProductResult {
   const style = apiData.style;
   const colors: ColorOption[] = [];
 
   const mediaImages = apiData.media?.images || [];
-  console.log(`[SanMar Transform] ${mediaImages.length} media images available`);
+  console.log(`🖼️ SanMar transform: ${mediaImages.length} media images available`);
   if (mediaImages.length > 0) {
-    console.log(`[SanMar Transform] Sample image:`, JSON.stringify(mediaImages[0]));
+    console.log(`🖼️ Sample media image:`, JSON.stringify(mediaImages[0]));
   }
-
-  const genericImages = mediaImages.filter((img: any) => {
-    const imgColor = (img.color || "").trim();
-    const imgPartId = (img.partId || "").trim();
-    return !imgColor && !imgPartId;
-  });
 
   if (style.colors && Array.isArray(style.colors)) {
     for (const color of style.colors) {
@@ -468,13 +506,11 @@ function transformSanMarData(apiData: any, supabaseUrl: string): ProductResult {
       const colorName = color.colorName?.toLowerCase() || "";
 
       const colorImages = mediaImages.filter((img: any) => {
-        if (!img.url) return false;
         if (img.partId && partIds.includes(img.partId)) return true;
 
         const imgColor = (img.color || "").toLowerCase().trim();
         const productColor = colorName.trim();
 
-        if (!imgColor && !productColor) return false;
         if (!imgColor || !productColor) return false;
         if (imgColor === productColor) return true;
 
@@ -482,29 +518,28 @@ function transformSanMarData(apiData: any, supabaseUrl: string): ProductResult {
         const colorWords = productColor.split(/[\s/]+/);
         const matching = colorWords.filter(w => w.length > 2 && imgWords.includes(w));
         const score = (matching.length * 2) / (colorWords.length + imgWords.length);
-        return score >= 0.4;
+        return score >= 0.5;
       });
 
-      const imagesToUse = colorImages.length > 0 ? colorImages : genericImages;
-
-      if (imagesToUse.length > 0) {
-        const frontImg = imagesToUse.find((img: any) =>
+      if (colorImages.length > 0) {
+        const frontImg = colorImages.find((img: any) =>
           (img.classTypeName || "").toLowerCase().includes("front")
         );
-        const rearImg = imagesToUse.find((img: any) => {
+        const rearImg = colorImages.find((img: any) => {
           const cls = (img.classTypeName || "").toLowerCase();
           return cls.includes("rear") || cls.includes("back");
         });
-        const sideImg = imagesToUse.find((img: any) => {
+        const sideImg = colorImages.find((img: any) => {
           const cls = (img.classTypeName || "").toLowerCase();
           return cls.includes("side") || cls.includes("sleeve");
         });
 
-        imageUrl = frontImg?.url || imagesToUse[0]?.url || "";
+        imageUrl = frontImg?.url || colorImages[0]?.url || "";
         rearImageUrl = rearImg?.url || "";
         sideImageUrl = sideImg?.url || "";
       }
 
+      // Fallback: use first available front image if no color match
       if (!imageUrl && mediaImages.length > 0) {
         const anyFrontImg = mediaImages.find((img: any) =>
           (img.classTypeName || "").toLowerCase().includes("front")
@@ -512,6 +547,7 @@ function transformSanMarData(apiData: any, supabaseUrl: string): ProductResult {
         imageUrl = anyFrontImg?.url || mediaImages[0]?.url || "";
       }
 
+      // Final fallback to views
       if (!imageUrl) {
         imageUrl =
           apiData.media?.views?.front ||
@@ -519,12 +555,6 @@ function transformSanMarData(apiData: any, supabaseUrl: string): ProductResult {
           (apiData.media?.views?.frontImages?.[0]) ||
           "";
       }
-
-      imageUrl = sanmarCdnUrlToProxyUrl(imageUrl, supabaseUrl);
-      rearImageUrl = sanmarCdnUrlToProxyUrl(rearImageUrl, supabaseUrl);
-      sideImageUrl = sanmarCdnUrlToProxyUrl(sideImageUrl, supabaseUrl);
-
-      console.log(`[SanMar Transform] Color "${color.colorName}": matched=${colorImages.length} images, generic=${genericImages.length}, front=${!!imageUrl}, rear=${!!rearImageUrl}, side=${!!sideImageUrl}`);
 
       colors.push({
         name: color.colorName,
@@ -540,7 +570,7 @@ function transformSanMarData(apiData: any, supabaseUrl: string): ProductResult {
     }
   }
 
-  console.log(`[SanMar Transform] Complete: ${colors.length} colors, first has image: ${!!colors[0]?.image_url}`);
+  console.log(`🖼️ SanMar transform complete: ${colors.length} colors, first has image: ${!!colors[0]?.image_url}`);
 
   return {
     supplier: "sanmar",
