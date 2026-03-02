@@ -7,7 +7,6 @@ import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { EnhancedAuthScreen } from './components/EnhancedAuthScreen';
 import { LandingPage } from './components/LandingPage';
 import { supabase } from './lib/supabase-client';
-import { supabaseAnon } from './lib/supabase-anon-client';
 import { billingService } from './services/billing-service';
 import { useRBAC } from './hooks/useRBAC';
 import PublicQuoteApprovalPage from './components/production/PublicQuoteApprovalPage';
@@ -50,6 +49,8 @@ function DomainAwareCustomerPortal({ customerId }: { customerId: string }) {
       }
 
       try {
+        const { supabaseAnon } = await import('./lib/supabase-anon-client');
+
         const { data: companyData, error: companyError } = await supabaseAnon
           .from('company_settings')
           .select('id, inkops_subdomain, customer_url')
