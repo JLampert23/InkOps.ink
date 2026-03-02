@@ -133,61 +133,38 @@ Deno.serve(async (req: Request) => {
       companyId = companyIdParam;
       console.log('🔧 Service role call - using company_id:', companyId);
     } else {
-      // User JWT - validate using anon key client with user's JWT
-      console.log('👤 User JWT - validating token...');
-
-      const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
-        global: { headers: { Authorization: authHeader } },
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      });
-
-      const { data: { user }, error: authError } = await supabaseUser.auth.getUser();
-
-      if (authError) {
-        console.error('❌ JWT validation FAILED:', {
-          message: authError.message,
-          name: authError.name,
-          status: authError.status,
-          code: authError.code
-        });
+      const jwtParts = token.split('.');
+      if (jwtParts.length !== 3) {
         return new Response(
-          JSON.stringify({
-            error: "Unauthorized",
-            details: authError.message
-          }),
+          JSON.stringify({ error: "Invalid JWT format" }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      if (!user) {
-        console.error('❌ No user found in JWT');
+      let userId: string;
+      try {
+        const payload = JSON.parse(atob(jwtParts[1]));
+        userId = payload.sub;
+        console.log('✅ Decoded user ID from JWT:', userId);
+      } catch (_e) {
         return new Response(
-          JSON.stringify({ error: "Unauthorized - no user found" }),
+          JSON.stringify({ error: "Failed to decode JWT" }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      console.log('✅ JWT validated successfully for user:', user.id);
-
-      // Use service role key for database queries
       const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
+        auth: { autoRefreshToken: false, persistSession: false }
       });
 
       const { data: profile } = await supabase
         .from("user_profiles")
         .select("company_id")
-        .eq("id", user.id)
+        .eq("id", userId)
         .maybeSingle();
 
       if (!profile?.company_id) {
-        console.error('❌ No company_id found for user:', user.id);
+        console.error('❌ No company_id found for user:', userId);
         return new Response(
           JSON.stringify({ error: "Company not found" }),
           { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
