@@ -43,11 +43,17 @@ if (!rootElement) {
   console.error('Root element not found!');
   hideInitialLoader();
 } else {
-  createRoot(rootElement).render(
-    <StrictMode>
-      <ErrorBoundary>
-        {hasValidConfig ? <AppWrapper /> : <ConfigError />}
-      </ErrorBoundary>
-    </StrictMode>
-  );
+  try {
+    createRoot(rootElement).render(
+      <StrictMode>
+        <ErrorBoundary>
+          {hasValidConfig ? <AppWrapper /> : <ConfigError />}
+        </ErrorBoundary>
+      </StrictMode>
+    );
+  } catch (err) {
+    console.error('Failed to render app:', err);
+    hideInitialLoader();
+    rootElement.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f8fafc;padding:20px"><div style="max-width:400px;background:white;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.1);padding:24px;text-align:center"><h1 style="font-size:20px;font-weight:bold;color:#111;margin-bottom:8px">Failed to Load</h1><p style="color:#666;margin-bottom:16px">The application failed to initialize.</p><button onclick="window.location.reload()" style="padding:8px 20px;background:#2563eb;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600">Retry</button></div></div>';
+  }
 }

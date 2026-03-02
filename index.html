@@ -67,12 +67,26 @@
             }
             clearInterval(checkReact);
           }
-        }, 50);
+        }, 100);
         setTimeout(function() {
           clearInterval(checkReact);
           var loader = document.getElementById('initial-loader');
           if (loader) loader.remove();
-        }, 10000);
+        }, 15000);
+      });
+
+      window.addEventListener('error', function(e) {
+        console.error('Global error:', e.error);
+        var root = document.getElementById('root');
+        if (root && root.children.length === 0) {
+          root.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f8fafc;padding:20px"><div style="max-width:400px;background:white;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.1);padding:24px;text-align:center"><h1 style="font-size:20px;font-weight:bold;color:#111;margin-bottom:8px">Something went wrong</h1><p style="color:#666;margin-bottom:16px">The application encountered an error loading.</p><button onclick="window.location.reload()" style="padding:8px 20px;background:#2563eb;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600">Refresh Page</button></div></div>';
+          var loader = document.getElementById('initial-loader');
+          if (loader) loader.remove();
+        }
+      });
+
+      window.addEventListener('unhandledrejection', function(e) {
+        console.error('Unhandled promise rejection:', e.reason);
       });
     </script>
   </body>
