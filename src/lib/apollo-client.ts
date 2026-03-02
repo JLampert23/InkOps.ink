@@ -1,12 +1,8 @@
 import { ApolloClient, InMemoryCache, HttpLink, ApolloLink, from } from '@apollo/client';
 import { onError } from '@apollo/client/link/error';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  throw new Error('Missing Supabase credentials in .env file');
-}
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 const httpLink = new HttpLink({
   uri: `${SUPABASE_URL}/functions/v1/printavo-proxy`,
