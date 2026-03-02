@@ -28,7 +28,6 @@ function createSupabaseClient(): SupabaseClient {
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: true,
-      flowType: 'pkce',
     },
     global: {
       fetch: (url, options: RequestInit = {}) => {
