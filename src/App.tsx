@@ -20,6 +20,7 @@ import { PortalOrderHistory } from './components/portal/PortalOrderHistory';
 import { PortalDashboard } from './components/portal/PortalDashboard';
 import { PortalPaymentMethods } from './components/portal/PortalPaymentMethods';
 import { CustomerPortalPage } from './components/portal/CustomerPortalPage';
+import { hideInitialLoader } from './utils/loader';
 
 function getSubdomainFromHost(): string | null {
   const hostname = window.location.hostname;
@@ -729,12 +730,13 @@ function App() {
   const isDirectCustomerPage = path.match(/^\/customer\/([^/]+)/);
 
   if (isQuoteApprovalPage) {
+    hideInitialLoader();
     return <PublicQuoteApprovalPage />;
   }
 
   if (isDirectCustomerPage) {
+    hideInitialLoader();
     const customerId = isDirectCustomerPage[1];
-    console.log('[CustomerPortal] Loading customer portal for:', customerId);
     return (
       <CustomerPortalProvider>
         <ThemeProvider>
@@ -747,6 +749,7 @@ function App() {
   }
 
   if (isPortalPage) {
+    hideInitialLoader();
     const customerMatch = path.match(/^\/portal\/customer\/([^/]+)/);
 
     return (
@@ -800,15 +803,14 @@ function AuthenticatedApp() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!loading) {
+      hideInitialLoader();
+    }
+  }, [loading]);
+
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 text-blue-600 dark:text-blue-500 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   if (!user) {

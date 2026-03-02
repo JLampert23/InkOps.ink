@@ -3,15 +3,8 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 import { hasValidConfig } from './lib/supabase-client.ts';
+import { hideInitialLoader } from './utils/loader.ts';
 import './index.css';
-
-function hideInitialLoader() {
-  const loader = document.getElementById('initial-loader');
-  if (loader) {
-    loader.classList.add('fade-out');
-    setTimeout(() => loader.remove(), 300);
-  }
-}
 
 function ConfigError() {
   useEffect(() => {
@@ -31,10 +24,6 @@ function ConfigError() {
 }
 
 function AppWrapper() {
-  useEffect(() => {
-    hideInitialLoader();
-  }, []);
-
   return <App />;
 }
 

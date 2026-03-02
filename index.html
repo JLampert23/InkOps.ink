@@ -54,26 +54,14 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
-      window.addEventListener('DOMContentLoaded', function() {
-        var checkReact = setInterval(function() {
-          var root = document.getElementById('root');
-          if (root && root.children.length > 0) {
-            var loader = document.getElementById('initial-loader');
-            if (loader) {
-              loader.classList.add('fade-out');
-              setTimeout(function() {
-                loader.remove();
-              }, 300);
-            }
-            clearInterval(checkReact);
-          }
-        }, 100);
-        setTimeout(function() {
-          clearInterval(checkReact);
-          var loader = document.getElementById('initial-loader');
-          if (loader) loader.remove();
-        }, 15000);
-      });
+      // Safety fallback: remove loader after 20s if React never hides it
+      setTimeout(function() {
+        var loader = document.getElementById('initial-loader');
+        if (loader) {
+          loader.classList.add('fade-out');
+          setTimeout(function() { if (loader.parentNode) loader.remove(); }, 300);
+        }
+      }, 20000);
 
       window.addEventListener('error', function(e) {
         console.error('Global error:', e.error);
