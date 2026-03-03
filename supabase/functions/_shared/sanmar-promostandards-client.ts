@@ -22,7 +22,7 @@
 
 const SANMAR_PROMOSTANDARDS_ENDPOINTS = {
   productData: "https://ws.sanmar.com:8080/promostandards/ProductDataServiceBindingV2?WSDL",
-  media: "https://ws.sanmar.com:8080/promostandards/MediaContentServiceBindingV1?WSDL",
+  media: "https://ws.sanmar.com:8080/promostandards/MediaContentServiceBinding?wsdl",
   inventory: "https://ws.sanmar.com:8080/promostandards/InventoryServiceBindingV2?WSDL",
   pricing: "https://ws.sanmar.com:8080/promostandards/PricingAndConfigurationServiceBindingV1?WSDL",
   orderStatus: "https://ws.sanmar.com:8080/promostandards/OrderStatusServiceBindingV2?WSDL",
@@ -559,9 +559,9 @@ export async function fetchSanMarMedia(
       <shar:productId>${normalizedStyle}</shar:productId>`;
 
   const soapEnvelope = buildSOAPEnvelope(
-    'MediaService',
+    'MediaContentService',
     '1.1.0',
-    'GetMediaContent',
+    'getMediaContent',
     credentials,
     payload
   );
@@ -610,33 +610,37 @@ export async function fetchSanMarMedia(
       url: getXmlValue(mediaXml, "url") || "",
       productId: getXmlValue(mediaXml, "productId") || "",
       partId: getXmlValue(mediaXml, "partId") || "",
-      classTypeName: getXmlValue(mediaXml, "classTypeName") || "",
+      classTypeName: getXmlValue(mediaXml, "classTypeName") || getXmlValue(mediaXml, "view") || "",
       color: getXmlValue(mediaXml, "color") || "",
       singlePart: getXmlValue(mediaXml, "singlePart") === "true",
     };
   });
 
-  // Categorize images by view type
   const frontImages: string[] = [];
   const rearImages: string[] = [];
   const sideImages: string[] = [];
   const lifestyleImages: string[] = [];
   const otherImages: string[] = [];
 
-  mediaData.images.forEach((img) => {
-    const classTypeName = (img.classTypeName || '').toLowerCase();
+  function classifyView(classTypeName: string, url: string): string {
+    const label = classTypeName.toLowerCase();
+    const urlLower = url.toLowerCase();
+    if (/front|fm/.test(label) || /_fm[._]/.test(urlLower)) return 'front';
+    if (/rear|back|bk/.test(label) || /_bk[._]/.test(urlLower)) return 'back';
+    if (/side|profile|sleeve/.test(label) || /_sd[._]/.test(urlLower)) return 'side';
+    if (/lifestyle|casual/.test(label)) return 'lifestyle';
+    if (/swatch/.test(label)) return 'swatch';
+    return 'other';
+  }
 
-    if (classTypeName.includes('front')) {
-      frontImages.push(img.url);
-    } else if (classTypeName.includes('rear') || classTypeName.includes('back')) {
-      rearImages.push(img.url);
-    } else if (classTypeName.includes('side') || classTypeName.includes('sleeve')) {
-      sideImages.push(img.url);
-    } else if (classTypeName.includes('lifestyle') || classTypeName.includes('casual')) {
-      lifestyleImages.push(img.url);
-    } else if (img.url && !classTypeName.includes('swatch')) {
-      otherImages.push(img.url);
-    }
+  mediaData.images.forEach((img) => {
+    if (!img.url) return;
+    const category = classifyView(img.classTypeName, img.url);
+    if (category === 'front') frontImages.push(img.url);
+    else if (category === 'back') rearImages.push(img.url);
+    else if (category === 'side') sideImages.push(img.url);
+    else if (category === 'lifestyle') lifestyleImages.push(img.url);
+    else if (category !== 'swatch') otherImages.push(img.url);
   });
 
   mediaData.views = {

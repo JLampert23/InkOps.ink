@@ -524,16 +524,20 @@ function transformSanMarData(apiData: any, supabaseUrl: string): ProductResult {
       });
 
       if (colorImages.length > 0) {
-        const frontImg = colorImages.find((img: any) =>
-          (img.classTypeName || "").toLowerCase().includes("front")
-        );
+        const frontImg = colorImages.find((img: any) => {
+          const cls = (img.classTypeName || "").toLowerCase();
+          const url = (img.url || "").toLowerCase();
+          return /front|fm/.test(cls) || /_fm[._]/.test(url);
+        });
         const rearImg = colorImages.find((img: any) => {
           const cls = (img.classTypeName || "").toLowerCase();
-          return cls.includes("rear") || cls.includes("back");
+          const url = (img.url || "").toLowerCase();
+          return /rear|back|bk/.test(cls) || /_bk[._]/.test(url);
         });
         const sideImg = colorImages.find((img: any) => {
           const cls = (img.classTypeName || "").toLowerCase();
-          return cls.includes("side") || cls.includes("sleeve");
+          const url = (img.url || "").toLowerCase();
+          return /side|sleeve|profile/.test(cls) || /_sd[._]/.test(url);
         });
 
         imageUrl = frontImg?.url || colorImages[0]?.url || "";
@@ -541,11 +545,12 @@ function transformSanMarData(apiData: any, supabaseUrl: string): ProductResult {
         sideImageUrl = sideImg?.url || "";
       }
 
-      // Fallback: use first available front image if no color match
       if (!imageUrl && mediaImages.length > 0) {
-        const anyFrontImg = mediaImages.find((img: any) =>
-          (img.classTypeName || "").toLowerCase().includes("front")
-        );
+        const anyFrontImg = mediaImages.find((img: any) => {
+          const cls = (img.classTypeName || "").toLowerCase();
+          const url = (img.url || "").toLowerCase();
+          return /front|fm/.test(cls) || /_fm[._]/.test(url);
+        });
         imageUrl = anyFrontImg?.url || mediaImages[0]?.url || "";
       }
 

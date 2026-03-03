@@ -48,7 +48,7 @@ const CACHE_TTL_HOURS = 24;
 const SS_CDN_BASE = "https://www.ssactivewear.com/images";
 const SANMAR_CDN_BASE = "https://cdnm.sanmar.com/imglib";
 
-const SANMAR_CDN_HOSTS = ["cdnm.sanmar.com", "www.sanmar.com", "sanmar.com"];
+const SANMAR_CDN_HOSTS = ["cdn.sanmar.com", "cdnm.sanmar.com", "www.sanmar.com", "sanmar.com"];
 
 export function proxySanMarUrl(url: string, supabaseUrl: string): string {
   if (!url) return url;
