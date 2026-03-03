@@ -554,17 +554,23 @@ export async function fetchSanMarMedia(
   const normalizedStyle = styleNumber.toUpperCase().trim();
   console.log('🖼️ Fetching SanMar media:', normalizedStyle, partId || '(all)');
 
-  // SanMar Media Content Service requires wsVersion 1.1.0 and only styleNumber (not partId)
-  const payload = `<shar:mediaType>Image</shar:mediaType>
-      <shar:productId>${normalizedStyle}</shar:productId>`;
+  validateCredentials(credentials);
 
-  const soapEnvelope = buildSOAPEnvelope(
-    'MediaContentService',
-    '1.1.0',
-    'getMediaContent',
-    credentials,
-    payload
-  );
+  const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
+<soapenv:Envelope
+  xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+  xmlns:ns="http://www.promostandards.org/WSDL/MediaContentService/1.1.0/"
+  xmlns:shar="http://www.promostandards.org/WSDL/MediaContentService/1.1.0/SharedObjects/">
+  <soapenv:Header/>
+  <soapenv:Body>
+    <ns:getMediaContentRequest>
+      <shar:wsVersion>1.1.0</shar:wsVersion>
+      <shar:id>${escapeXml(credentials.id)}</shar:id>
+      <shar:password>${escapeXml(credentials.password)}</shar:password>
+      <shar:productId>${escapeXml(normalizedStyle)}</shar:productId>
+    </ns:getMediaContentRequest>
+  </soapenv:Body>
+</soapenv:Envelope>`;
 
   const responseXml = await callPromoStandardsService(
     SANMAR_PROMOSTANDARDS_ENDPOINTS.media,

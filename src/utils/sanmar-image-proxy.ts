@@ -1,4 +1,4 @@
-const SANMAR_CDN_HOSTS = ["cdnm.sanmar.com", "www.sanmar.com", "sanmar.com"];
+const SANMAR_CDN_HOSTS = ["cdn.sanmar.com", "cdnm.sanmar.com", "www.sanmar.com", "sanmar.com"];
 
 export function proxySanMarImageUrl(url: string): string {
   if (!url) return url;
