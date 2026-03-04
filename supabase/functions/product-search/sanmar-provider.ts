@@ -456,10 +456,16 @@ function triggerImageIngest(
   const ingestUrl = `${supabaseUrl}/functions/v1/sanmar-image-ingest?style=${encodeURIComponent(style)}&companyId=${encodeURIComponent(companyId)}`;
   fetch(ingestUrl, {
     headers: { Authorization: `Bearer ${supabaseServiceKey}` },
-  }).then((resp) => {
-    console.log(`[SanMar] Background image ingest for ${style}: ${resp.status}`);
+  }).then(async (resp) => {
+    if (resp.ok) {
+      const body = await resp.json().catch(() => null);
+      console.log(`[SanMar] Background image ingest for ${style}: ${resp.status}, uploaded=${body?.uploaded || 0}, failed=${body?.failed || 0}`);
+    } else {
+      const text = await resp.text().catch(() => "");
+      console.error(`[SanMar] Background image ingest FAILED for ${style}: ${resp.status} - ${text.substring(0, 300)}`);
+    }
   }).catch((err) => {
-    console.warn(`[SanMar] Background image ingest failed for ${style}: ${err.message}`);
+    console.error(`[SanMar] Background image ingest fetch error for ${style}: ${err.message}`);
   });
 }
 
@@ -472,6 +478,40 @@ function normalizeColorKey(color: string): string {
     .replace(/^-|-$/g, "");
 }
 
+function colorWordsMatch(productColor: string, imageColor: string): boolean {
+  const pWords = productColor.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(w => w.length > 0);
+  const iWords = imageColor.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(w => w.length > 0);
+  if (pWords.length === 0 || iWords.length === 0) return false;
+
+  const matching = pWords.filter(w => iWords.some(iw => iw.includes(w) || w.includes(iw)));
+  const score = (matching.length * 2) / (pWords.length + iWords.length);
+  return score >= 0.4;
+}
+
+function findFrontImage(images: any[]): any {
+  return images.find((img: any) => {
+    const cls = (img.classTypeName || "").toLowerCase();
+    const url = (img.url || "").toLowerCase();
+    return /front|fm/.test(cls) || /_fm[._]/.test(url);
+  });
+}
+
+function findRearImage(images: any[]): any {
+  return images.find((img: any) => {
+    const cls = (img.classTypeName || "").toLowerCase();
+    const url = (img.url || "").toLowerCase();
+    return /rear|back|bk/.test(cls) || /_bk[._]/.test(url);
+  });
+}
+
+function findSideImage(images: any[]): any {
+  return images.find((img: any) => {
+    const cls = (img.classTypeName || "").toLowerCase();
+    const url = (img.url || "").toLowerCase();
+    return /side|sleeve|profile/.test(cls) || /_sd[._]/.test(url);
+  });
+}
+
 function transformSanMarData(
   apiData: any,
   supabaseUrl: string,
@@ -481,8 +521,17 @@ function transformSanMarData(
   const colors: ColorOption[] = [];
 
   const mediaImages = apiData.media?.images || [];
+  const mediaViews = apiData.media?.views || {};
   const hasCdn = cdnImages && Object.keys(cdnImages).length > 0;
   console.log(`[SanMar] Transform: ${mediaImages.length} media images, CDN colors: ${hasCdn ? Object.keys(cdnImages!).length : 0}`);
+
+  const imagesByPartId = new Map<string, any[]>();
+  for (const img of mediaImages) {
+    if (img.partId) {
+      if (!imagesByPartId.has(img.partId)) imagesByPartId.set(img.partId, []);
+      imagesByPartId.get(img.partId)!.push(img);
+    }
+  }
 
   if (style.colors && Array.isArray(style.colors)) {
     for (const color of style.colors) {
@@ -516,7 +565,7 @@ function transformSanMarData(
       const colorKey = normalizeColorKey(color.colorName);
 
       if (hasCdn) {
-        const cdnEntry = cdnImages![colorKey] || cdnImages![colorName];
+        const cdnEntry = cdnImages![colorKey];
         if (cdnEntry) {
           imageUrl = cdnEntry.front || cdnEntry.all?.[0] || "";
           rearImageUrl = cdnEntry.back || "";
@@ -525,12 +574,35 @@ function transformSanMarData(
       }
 
       if (!imageUrl) {
-        const colorImages = mediaImages.filter((img: any) => {
+        let colorImages = mediaImages.filter((img: any) => {
           if (img.partId && partIds.includes(img.partId)) return true;
           const imgColor = (img.color || "").toLowerCase().trim();
           if (!imgColor || !colorName) return false;
-          return imgColor === colorName;
+          if (imgColor === colorName) return true;
+          if (normalizeColorKey(img.color) === colorKey) return true;
+          return false;
         });
+
+        if (colorImages.length === 0 && colorName) {
+          colorImages = mediaImages.filter((img: any) => {
+            const imgColor = (img.color || "").trim();
+            if (!imgColor) return false;
+            return colorWordsMatch(color.colorName, imgColor);
+          });
+          if (colorImages.length > 0) {
+            console.log(`[SanMar] Fuzzy matched "${color.colorName}" -> "${colorImages[0].color}" (${colorImages.length} images)`);
+          }
+        }
+
+        if (colorImages.length === 0 && partIds.length > 0) {
+          for (const pid of partIds) {
+            const partImgs = imagesByPartId.get(pid);
+            if (partImgs && partImgs.length > 0) {
+              colorImages = partImgs;
+              break;
+            }
+          }
+        }
 
         const colorSpecificImages = colorImages.filter((img: any) => {
           const url = (img.url || "");
@@ -540,25 +612,27 @@ function transformSanMarData(
         const imagesToUse = colorSpecificImages.length > 0 ? colorSpecificImages : colorImages;
 
         if (imagesToUse.length > 0) {
-          const frontImg = imagesToUse.find((img: any) => {
-            const cls = (img.classTypeName || "").toLowerCase();
-            const url = (img.url || "").toLowerCase();
-            return /front|fm/.test(cls) || /_fm[._]/.test(url);
-          });
-          const rearImg = imagesToUse.find((img: any) => {
-            const cls = (img.classTypeName || "").toLowerCase();
-            const url = (img.url || "").toLowerCase();
-            return /rear|back|bk/.test(cls) || /_bk[._]/.test(url);
-          });
-          const sideImg = imagesToUse.find((img: any) => {
-            const cls = (img.classTypeName || "").toLowerCase();
-            const url = (img.url || "").toLowerCase();
-            return /side|sleeve|profile/.test(cls) || /_sd[._]/.test(url);
-          });
+          const frontImg = findFrontImage(imagesToUse);
+          const rearImg = findRearImage(imagesToUse);
+          const sideImg = findSideImage(imagesToUse);
 
           imageUrl = frontImg?.url || imagesToUse[0]?.url || "";
           rearImageUrl = rearImg?.url || "";
           sideImageUrl = sideImg?.url || "";
+        }
+
+        if (!rearImageUrl && mediaViews.rearImages?.length > 0) {
+          const colorPartUrl = mediaViews.rearImages.find((u: string) =>
+            partIds.some((pid: string) => u.includes(pid))
+          );
+          rearImageUrl = colorPartUrl || "";
+        }
+
+        if (!sideImageUrl && mediaViews.sideImages?.length > 0) {
+          const colorPartUrl = mediaViews.sideImages.find((u: string) =>
+            partIds.some((pid: string) => u.includes(pid))
+          );
+          sideImageUrl = colorPartUrl || "";
         }
 
         if (!imageUrl && style.styleNumber) {
@@ -587,7 +661,10 @@ function transformSanMarData(
     }
   }
 
-  console.log(`[SanMar] Transform complete: ${colors.length} colors, first has image: ${!!colors[0]?.image_url}`);
+  const withImages = colors.filter(c => !!c.image_url).length;
+  const withRear = colors.filter(c => !!c.rear_image_url).length;
+  const withSide = colors.filter(c => !!c.side_image_url).length;
+  console.log(`[SanMar] Transform complete: ${colors.length} colors, front=${withImages}, rear=${withRear}, side=${withSide}`);
 
   return {
     supplier: "sanmar",

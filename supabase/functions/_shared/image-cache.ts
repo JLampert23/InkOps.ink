@@ -158,10 +158,10 @@ export async function setSanMarImageCache(
   const expiresAt = new Date();
   expiresAt.setHours(expiresAt.getHours() + CACHE_TTL_HOURS);
 
-  console.log(`[Image Cache] Writing SanMar cache: style=${styleId}, images=${mediaData.images.length}`);
+  console.log(`[Image Cache] Writing SanMar cache: style=${styleId}, images=${mediaData.images.length}, company=${companyId}`);
 
   try {
-    await supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from("sanmar_media_cache")
       .upsert({
         company_id: companyId,
@@ -169,12 +169,19 @@ export async function setSanMarImageCache(
         cache_type: "style",
         data: mediaData,
         expires_at: expiresAt.toISOString(),
-      }, { onConflict: "company_id,cache_key" });
+      }, { onConflict: "company_id,cache_key" })
+      .select("id")
+      .maybeSingle();
 
-    console.log(`[Image Cache] SanMar cache written successfully for ${styleId}`);
+    if (error) {
+      console.error(`[Image Cache] SanMar cache WRITE FAILED for ${styleId}: ${error.message} (code: ${error.code}, details: ${error.details})`);
+      return false;
+    }
+
+    console.log(`[Image Cache] SanMar cache written successfully for ${styleId}, row id: ${data?.id || 'unknown'}`);
     return true;
-  } catch (error) {
-    console.error(`[Image Cache] Error writing SanMar cache:`, error);
+  } catch (error: any) {
+    console.error(`[Image Cache] Error writing SanMar cache:`, error?.message || error);
     return false;
   }
 }
