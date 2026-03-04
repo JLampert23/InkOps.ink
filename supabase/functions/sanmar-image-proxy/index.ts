@@ -9,6 +9,18 @@ const corsHeaders = {
 
 const ALLOWED_HOSTS = ["cdn.sanmar.com", "cdnm.sanmar.com", "www.sanmar.com", "sanmar.com"];
 
+const PLACEHOLDER_INDICATORS = [
+  "imagenotavailable",
+  "image404errorhandler",
+  "image_not_available",
+  "notavailable",
+];
+
+function isPlaceholderUrl(url: string): boolean {
+  const lower = url.toLowerCase();
+  return PLACEHOLDER_INDICATORS.some(indicator => lower.includes(indicator));
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -50,6 +62,7 @@ Deno.serve(async (req: Request) => {
         "User-Agent": "Mozilla/5.0 (compatible; InkOps/1.0)",
         Accept: "image/*",
       },
+      redirect: "follow",
     });
 
     if (!imageResponse.ok) {
@@ -59,6 +72,17 @@ Deno.serve(async (req: Request) => {
         }),
         {
           status: imageResponse.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const finalUrl = imageResponse.url || "";
+    if (isPlaceholderUrl(finalUrl)) {
+      return new Response(
+        JSON.stringify({ error: "No image available for this product" }),
+        {
+          status: 404,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
