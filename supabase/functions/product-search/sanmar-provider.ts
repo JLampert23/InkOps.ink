@@ -127,7 +127,14 @@ export async function searchSanMarCatalog(
         console.log(`[SanMar] ERROR: returned ${productResponse.status} for ${style}`);
         console.log(`[SanMar] ERROR body: ${responseText.substring(0, 1000)}`);
         if (productResponse.status === 401 || productResponse.status === 403) {
-          errors.push(`SanMar authentication error`);
+          const bodyPreview = responseText.substring(0, 300);
+          console.error(`[SanMar] Auth failure (${productResponse.status}): ${bodyPreview}`);
+          try {
+            const errJson = JSON.parse(responseText);
+            errors.push(`SanMar: ${errJson.error || errJson.message || 'Authentication failed'}`);
+          } catch {
+            errors.push(`SanMar authentication error (${productResponse.status})`);
+          }
         } else if (productResponse.status === 500) {
           errors.push(`SanMar API error: ${productResponse.status}`);
         } else {
