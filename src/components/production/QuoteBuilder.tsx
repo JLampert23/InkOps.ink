@@ -1561,25 +1561,21 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         console.log('💰 SanMar pricing from search results:', freshPrice);
       }
 
-      // Use images from search results (proxy SanMar CDN URLs for CORS compatibility)
       const frontUrl = proxySanMarImageUrl(color.image_url || '');
       const rearUrl = proxySanMarImageUrl(color.rear_image_url || '');
       const sideUrl = proxySanMarImageUrl(color.side_image_url || '');
 
       if (frontUrl) {
         garmentImages.garment_front_image_url = frontUrl;
-        garmentImages.garment_back_image_url = frontUrl;
-        console.log('✅ Set SanMar front image from search results:', frontUrl);
       }
 
       if (rearUrl) {
+        garmentImages.garment_back_image_url = rearUrl;
         garmentImages.garment_rear_image_url = rearUrl;
-        console.log('✅ Set SanMar rear image from search results');
       }
 
       if (sideUrl) {
         garmentImages.garment_side_image_url = sideUrl;
-        console.log('✅ Set SanMar side image from search results');
       }
 
       // Build images data structure
