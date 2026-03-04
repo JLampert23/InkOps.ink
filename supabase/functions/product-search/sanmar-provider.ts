@@ -50,58 +50,30 @@ function extractColorCode(partId: string, style: string): string {
 
 function buildCdnFallbackMediaData(
   style: string,
-  colors: Array<{ colorName?: string; partIds?: Array<{ partId?: string }> }>
+  _colors: Array<{ colorName?: string; partIds?: Array<{ partId?: string }> }>
 ): { images: any[]; views: any } | null {
-  const allImages: any[] = [];
-  const allFrontUrls: string[] = [];
-  const allRearUrls: string[] = [];
+  const fallbackUrls = buildSanMarCdnFallbackUrl(style);
+  if (fallbackUrls.length === 0) return null;
 
-  const genericFallback = buildSanMarCdnFallbackUrl(style);
-  for (const url of genericFallback) {
-    allImages.push({
-      url,
-      productId: style,
-      partId: "",
-      classTypeName: url.includes("_fm") ? "Front" : url.includes("_bm") ? "Back" : "Other",
-      color: "",
-      singlePart: false,
-    });
-    if (url.includes("_fm")) allFrontUrls.push(url);
-    if (url.includes("_bm")) allRearUrls.push(url);
-  }
-
-  for (const color of colors) {
-    const colorName = color.colorName || "";
-    const firstPartId = color.partIds?.[0]?.partId || "";
-    const colorCode = extractColorCode(firstPartId, style);
-    if (!colorCode) continue;
-
-    const colorUrls = buildSanMarCdnFallbackUrl(style, colorCode);
-    for (const url of colorUrls) {
-      allImages.push({
-        url,
-        productId: style,
-        partId: firstPartId,
-        classTypeName: url.includes("_fm") ? "Front" : url.includes("_bm") ? "Back" : "Other",
-        color: colorName,
-        singlePart: false,
-      });
-      if (url.includes("_fm")) allFrontUrls.push(url);
-      if (url.includes("_bm")) allRearUrls.push(url);
-    }
-  }
-
-  if (allImages.length === 0) return null;
+  const url = fallbackUrls[0];
+  const images = [{
+    url,
+    productId: style,
+    partId: "",
+    classTypeName: "Front",
+    color: "",
+    singlePart: false,
+  }];
 
   return {
-    images: allImages,
+    images,
     views: {
-      front: allFrontUrls[0] || null,
-      rear: allRearUrls[0] || null,
+      front: url,
+      rear: null,
       side: null,
       lifestyle: null,
-      frontImages: allFrontUrls,
-      rearImages: allRearUrls,
+      frontImages: [url],
+      rearImages: [],
       sideImages: [],
       lifestyleImages: [],
       otherImages: [],

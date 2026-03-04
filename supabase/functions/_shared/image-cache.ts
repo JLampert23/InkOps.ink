@@ -46,7 +46,7 @@ export interface ImageFetchResult {
 const CACHE_TTL_HOURS = 24;
 
 const SS_CDN_BASE = "https://www.ssactivewear.com/images";
-const SANMAR_CDN_BASE = "https://cdnm.sanmar.com/imglib";
+const SANMAR_CDN_BASE = "https://cdnm.sanmar.com/catalog/images";
 
 const SANMAR_CDN_HOSTS = ["cdn.sanmar.com", "cdnm.sanmar.com", "www.sanmar.com", "sanmar.com"];
 
@@ -63,19 +63,9 @@ export function proxySanMarUrl(url: string, supabaseUrl: string): string {
   return url;
 }
 
-export function buildSanMarCdnFallbackUrl(style: string, colorCode?: string): string[] {
-  const urls: string[] = [];
+export function buildSanMarCdnFallbackUrl(style: string, _colorCode?: string): string[] {
   const normalizedStyle = style.toUpperCase().trim();
-
-  urls.push(`${SANMAR_CDN_BASE}/${normalizedStyle}/${normalizedStyle}_fm.jpg`);
-
-  if (colorCode) {
-    const normalizedColor = colorCode.toUpperCase().trim();
-    urls.push(`${SANMAR_CDN_BASE}/${normalizedStyle}/${normalizedStyle}_${normalizedColor}_fm.jpg`);
-    urls.push(`${SANMAR_CDN_BASE}/${normalizedStyle}/${normalizedStyle}_${normalizedColor}_bm.jpg`);
-  }
-
-  return urls;
+  return [`${SANMAR_CDN_BASE}/${normalizedStyle}.jpg`];
 }
 
 export function buildSSActivewearCdnFallbackUrl(styleId: string, colorCode?: string): string[] {

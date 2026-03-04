@@ -202,7 +202,8 @@ async function callPromoStandardsService(
   wsdlUrl: string,
   soapAction: string,
   soapEnvelope: string,
-  maxRetries = 1
+  maxRetries = 1,
+  skipErrorCheck = false
 ): Promise<string> {
   const startTime = Date.now();
   const REQUEST_TIMEOUT_MS = 15000;
@@ -234,8 +235,7 @@ async function callPromoStandardsService(
 
       console.log(`⏱️  Duration: ${duration}ms | Status: ${response.status}`);
 
-      // Check for SOAP faults or PromoStandards errors
-      if (responseText.includes('<faultcode>') || responseText.includes('<errorCode>')) {
+      if (!skipErrorCheck && (responseText.includes('<faultcode>') || responseText.includes('<errorCode>'))) {
         console.log(`🚨 SOAP Fault detected in response`);
         handlePromoStandardsError(responseText);
       }
@@ -559,14 +559,16 @@ export async function fetchSanMarMedia(
   const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
 <soapenv:Envelope
   xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-  xmlns:ns="http://www.promostandards.org/WSDL/MediaContentService/1.1.0/"
-  xmlns:shar="http://www.promostandards.org/WSDL/MediaContentService/1.1.0/SharedObjects/">
+  xmlns:ns="http://www.promostandards.org/WSDL/MediaService/1.0.0/"
+  xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
   <soapenv:Header/>
   <soapenv:Body>
     <ns:getMediaContentRequest>
       <shar:wsVersion>1.1.0</shar:wsVersion>
       <shar:id>${escapeXml(credentials.id)}</shar:id>
       <shar:password>${escapeXml(credentials.password)}</shar:password>
+      <shar:cultureName>en-US</shar:cultureName>
+      <shar:mediaType>Image</shar:mediaType>
       <shar:productId>${escapeXml(normalizedStyle)}</shar:productId>
     </ns:getMediaContentRequest>
   </soapenv:Body>
@@ -575,7 +577,9 @@ export async function fetchSanMarMedia(
   const responseXml = await callPromoStandardsService(
     SANMAR_PROMOSTANDARDS_ENDPOINTS.media,
     'getMediaContent',
-    soapEnvelope
+    soapEnvelope,
+    1,
+    true
   );
 
   console.log(`[SanMar Media] Response XML length: ${responseXml.length}`);
