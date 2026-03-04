@@ -33,6 +33,82 @@ export interface ProductResult {
   raw_data?: any;
 }
 
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function extractColorCode(partId: string, style: string): string {
+  if (!partId) return "";
+  const escaped = escapeRegExp(style.toUpperCase());
+  const stripped = partId.toUpperCase().replace(new RegExp(`^${escaped}-?`), "");
+  const dashIdx = stripped.lastIndexOf("-");
+  if (dashIdx > 0) {
+    return stripped.substring(0, dashIdx);
+  }
+  return stripped;
+}
+
+function buildCdnFallbackMediaData(
+  style: string,
+  colors: Array<{ colorName?: string; partIds?: Array<{ partId?: string }> }>
+): { images: any[]; views: any } | null {
+  const allImages: any[] = [];
+  const allFrontUrls: string[] = [];
+  const allRearUrls: string[] = [];
+
+  const genericFallback = buildSanMarCdnFallbackUrl(style);
+  for (const url of genericFallback) {
+    allImages.push({
+      url,
+      productId: style,
+      partId: "",
+      classTypeName: url.includes("_fm") ? "Front" : url.includes("_bm") ? "Back" : "Other",
+      color: "",
+      singlePart: false,
+    });
+    if (url.includes("_fm")) allFrontUrls.push(url);
+    if (url.includes("_bm")) allRearUrls.push(url);
+  }
+
+  for (const color of colors) {
+    const colorName = color.colorName || "";
+    const firstPartId = color.partIds?.[0]?.partId || "";
+    const colorCode = extractColorCode(firstPartId, style);
+    if (!colorCode) continue;
+
+    const colorUrls = buildSanMarCdnFallbackUrl(style, colorCode);
+    for (const url of colorUrls) {
+      allImages.push({
+        url,
+        productId: style,
+        partId: firstPartId,
+        classTypeName: url.includes("_fm") ? "Front" : url.includes("_bm") ? "Back" : "Other",
+        color: colorName,
+        singlePart: false,
+      });
+      if (url.includes("_fm")) allFrontUrls.push(url);
+      if (url.includes("_bm")) allRearUrls.push(url);
+    }
+  }
+
+  if (allImages.length === 0) return null;
+
+  return {
+    images: allImages,
+    views: {
+      front: allFrontUrls[0] || null,
+      rear: allRearUrls[0] || null,
+      side: null,
+      lifestyle: null,
+      frontImages: allFrontUrls,
+      rearImages: allRearUrls,
+      sideImages: [],
+      lifestyleImages: [],
+      otherImages: [],
+    },
+  };
+}
+
 export async function searchSanMarCatalog(
   supabaseAdmin: any,
   supabaseUrl: string,
@@ -167,64 +243,13 @@ export async function searchSanMarCatalog(
         logImageOperation("sanmar", style, "cdn_fallback", { fallbackUsed: true });
         usedCdnFallback = true;
 
-        const allImages: any[] = [];
-        const allFrontUrls: string[] = [];
-        const allRearUrls: string[] = [];
         const colors = productData.data?.colors || [];
-
-        const genericFallback = buildSanMarCdnFallbackUrl(style);
-        for (const url of genericFallback) {
-          allImages.push({
-            url,
-            productId: style,
-            partId: "",
-            classTypeName: url.includes("_fm") ? "Front" : url.includes("_bm") ? "Back" : "Other",
-            color: "",
-            singlePart: false,
-          });
-          if (url.includes("_fm")) allFrontUrls.push(url);
-          if (url.includes("_bm")) allRearUrls.push(url);
+        const fallback = buildCdnFallbackMediaData(style, colors);
+        if (fallback) {
+          mediaData = fallback;
         }
 
-        for (const color of colors) {
-          const colorName = color.colorName || "";
-          const firstPartId = color.partIds?.[0]?.partId || "";
-          const colorCode = firstPartId.replace(new RegExp(`^${style.toUpperCase()}-?`), "").replace(/-.*$/, "");
-          if (!colorCode) continue;
-
-          const colorUrls = buildSanMarCdnFallbackUrl(style, colorCode);
-          for (const url of colorUrls) {
-            allImages.push({
-              url,
-              productId: style,
-              partId: firstPartId,
-              classTypeName: url.includes("_fm") ? "Front" : url.includes("_bm") ? "Back" : "Other",
-              color: colorName,
-              singlePart: false,
-            });
-            if (url.includes("_fm")) allFrontUrls.push(url);
-            if (url.includes("_bm")) allRearUrls.push(url);
-          }
-        }
-
-        console.log(`[SanMar] CDN fallback generated ${allImages.length} images for ${colors.length} colors`);
-
-        if (allImages.length > 0) {
-          mediaData = {
-            images: allImages,
-            views: {
-              front: allFrontUrls[0] || null,
-              rear: allRearUrls[0] || null,
-              side: null,
-              lifestyle: null,
-              frontImages: allFrontUrls,
-              rearImages: allRearUrls,
-              sideImages: [],
-              lifestyleImages: [],
-              otherImages: [],
-            },
-          };
-        }
+        console.log(`[SanMar] CDN fallback generated ${mediaData?.images?.length || 0} images for ${colors.length} colors`);
       }
 
       // Step 4: Write to cache only if we have valid images
@@ -339,61 +364,10 @@ async function getCachedProduct(
       if (!mediaData?.images || mediaData.images.length === 0) {
         logImageOperation("sanmar", style, "cdn_fallback", { fallbackUsed: true });
 
-        const allImages: any[] = [];
-        const allFrontUrls: string[] = [];
-        const allRearUrls: string[] = [];
         const colors = productCache.data?.colors || [];
-
-        const genericFallback = buildSanMarCdnFallbackUrl(style);
-        for (const url of genericFallback) {
-          allImages.push({
-            url,
-            productId: style,
-            partId: "",
-            classTypeName: url.includes("_fm") ? "Front" : url.includes("_bm") ? "Back" : "Other",
-            color: "",
-            singlePart: false,
-          });
-          if (url.includes("_fm")) allFrontUrls.push(url);
-          if (url.includes("_bm")) allRearUrls.push(url);
-        }
-
-        for (const color of colors) {
-          const colorName = color.colorName || "";
-          const firstPartId = color.partIds?.[0]?.partId || "";
-          const colorCode = firstPartId.replace(new RegExp(`^${style.toUpperCase()}-?`), "").replace(/-.*$/, "");
-          if (!colorCode) continue;
-
-          const colorUrls = buildSanMarCdnFallbackUrl(style, colorCode);
-          for (const url of colorUrls) {
-            allImages.push({
-              url,
-              productId: style,
-              partId: firstPartId,
-              classTypeName: url.includes("_fm") ? "Front" : url.includes("_bm") ? "Back" : "Other",
-              color: colorName,
-              singlePart: false,
-            });
-            if (url.includes("_fm")) allFrontUrls.push(url);
-            if (url.includes("_bm")) allRearUrls.push(url);
-          }
-        }
-
-        if (allImages.length > 0) {
-          mediaData = {
-            images: allImages,
-            views: {
-              front: allFrontUrls[0] || null,
-              rear: allRearUrls[0] || null,
-              side: null,
-              lifestyle: null,
-              frontImages: allFrontUrls,
-              rearImages: allRearUrls,
-              sideImages: [],
-              lifestyleImages: [],
-              otherImages: [],
-            },
-          };
+        const fallback = buildCdnFallbackMediaData(style, colors);
+        if (fallback) {
+          mediaData = fallback;
         }
       }
     }
