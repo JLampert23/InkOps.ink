@@ -1762,6 +1762,24 @@ export default function MockupGenerator({
       drawCanvas();
     };
     img.onerror = () => {
+      const activeStyle = garmentStyles[activeGarmentIndex];
+      const itemNumber = activeStyle?.description?.match(/\b([A-Z0-9]{2,10})\s*$/)?.[1] || '';
+      if (itemNumber && !proxiedUrl.includes('/catalog/images/' + itemNumber)) {
+        const fallbackCdnUrl = `https://cdnm.sanmar.com/catalog/images/${itemNumber.toUpperCase()}.jpg`;
+        const fallbackProxied = proxySanMarImageUrl(fallbackCdnUrl);
+        const fallbackImg = new Image();
+        fallbackImg.crossOrigin = 'anonymous';
+        fallbackImg.onload = () => {
+          garmentImageCache.current = fallbackImg;
+          drawCanvas();
+        };
+        fallbackImg.onerror = () => {
+          garmentImageCache.current = null;
+          drawCanvas();
+        };
+        fallbackImg.src = fallbackProxied;
+        return;
+      }
       garmentImageCache.current = null;
       drawCanvas();
     };
@@ -2429,6 +2447,16 @@ export default function MockupGenerator({
                                           src={imageUrl}
                                           alt={`View ${idx + 1}`}
                                           className="w-full h-full object-contain bg-white"
+                                          onError={(e) => {
+                                            const target = e.currentTarget;
+                                            target.style.display = 'none';
+                                            if (target.parentElement) {
+                                              const placeholder = document.createElement('div');
+                                              placeholder.className = 'w-full h-full flex items-center justify-center bg-gray-100 text-gray-400 text-[8px]';
+                                              placeholder.textContent = 'No img';
+                                              target.parentElement.insertBefore(placeholder, target);
+                                            }
+                                          }}
                                         />
                                         <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[8px] text-center py-0.5">
                                           {idx + 1}

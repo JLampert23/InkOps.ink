@@ -116,6 +116,24 @@ export interface SanMarUnifiedResponse {
   media: SanMarMediaData;
 }
 
+const SANMAR_CATALOG_CDN = "https://cdnm.sanmar.com/catalog/images";
+
+function rewriteSanMarImageUrl(url: string): string {
+  if (!url) return url;
+  try {
+    const parsed = new URL(url);
+    if (parsed.pathname.startsWith("/imglib/")) {
+      const filename = parsed.pathname.split("/").pop() || "";
+      if (filename) {
+        return `${SANMAR_CATALOG_CDN}/${filename}`;
+      }
+    }
+  } catch {
+    // not a valid URL
+  }
+  return url;
+}
+
 export class PromoStandardsError extends Error {
   constructor(public code: number, message: string) {
     super(message);
@@ -616,8 +634,9 @@ export async function fetchSanMarMedia(
 
   mediaData.images = mediaMatches.map(match => {
     const mediaXml = match[1];
+    const rawUrl = getXmlValue(mediaXml, "url") || "";
     return {
-      url: getXmlValue(mediaXml, "url") || "",
+      url: rewriteSanMarImageUrl(rawUrl),
       productId: getXmlValue(mediaXml, "productId") || "",
       partId: getXmlValue(mediaXml, "partId") || "",
       classTypeName: getXmlValue(mediaXml, "classTypeName") || getXmlValue(mediaXml, "view") || "",

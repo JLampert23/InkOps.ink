@@ -3,6 +3,7 @@ import {
   setSanMarImageCache,
   logImageOperation,
   proxySanMarUrl,
+  buildSanMarCdnFallbackUrl,
 } from "../_shared/image-cache.ts";
 
 export interface ColorOption {
@@ -77,13 +78,32 @@ async function filterValidImages(
 ): Promise<any[]> {
   if (!images || images.length === 0) return [];
 
-  const sampleUrl = images.find((img: any) => img.url && img.partId)?.url || images[0]?.url;
-  if (!sampleUrl) return [];
+  const uniqueUrls = [...new Set(images.map((img: any) => img.url).filter(Boolean))];
+  if (uniqueUrls.length === 0) return [];
 
-  const isValid = await validateSanMarImageUrl(sampleUrl);
-  if (!isValid) {
-    console.log(`[SanMar] Image validation FAILED for sample URL: ${sampleUrl} - all images likely placeholders`);
+  const samplesToCheck = uniqueUrls.slice(0, 3);
+  const results = await Promise.allSettled(
+    samplesToCheck.map(url => validateSanMarImageUrl(url))
+  );
+
+  const validUrls = new Set<string>();
+  const invalidUrls = new Set<string>();
+  results.forEach((result, i) => {
+    if (result.status === "fulfilled" && result.value) {
+      validUrls.add(samplesToCheck[i]);
+    } else {
+      invalidUrls.add(samplesToCheck[i]);
+    }
+  });
+
+  if (validUrls.size === 0) {
+    console.log(`[SanMar] All ${samplesToCheck.length} sample URLs failed validation - discarding all images`);
     return [];
+  }
+
+  if (invalidUrls.size > 0) {
+    console.log(`[SanMar] ${invalidUrls.size}/${samplesToCheck.length} sample URLs invalid, filtering out bad URLs`);
+    return images.filter((img: any) => !invalidUrls.has(img.url));
   }
 
   return images;
@@ -401,18 +421,6 @@ async function cacheProduct(
         expires_at: expiresAt.toISOString(),
       }, { onConflict: "company_id,cache_key" });
 
-    if (mediaData) {
-      await supabaseAdmin
-        .from("sanmar_media_cache")
-        .upsert({
-          company_id: companyId,
-          cache_key: cacheKey,
-          cache_type: "style",
-          data: mediaData,
-          expires_at: expiresAt.toISOString(),
-        }, { onConflict: "company_id,cache_key" });
-    }
-
     console.log(`Cached product data for ${style}`);
   } catch (error) {
     console.error("Error caching product:", error);
@@ -494,6 +502,14 @@ function transformSanMarData(apiData: any, supabaseUrl: string): ProductResult {
         imageUrl = frontImg?.url || imagesToUse[0]?.url || "";
         rearImageUrl = rearImg?.url || "";
         sideImageUrl = sideImg?.url || "";
+      }
+
+      if (!imageUrl && style.styleNumber) {
+        const fallbacks = buildSanMarCdnFallbackUrl(style.styleNumber);
+        if (fallbacks.length > 0) {
+          imageUrl = fallbacks[0];
+          console.log(`[SanMar] Using CDN fallback for ${color.colorName}: ${imageUrl}`);
+        }
       }
 
       colors.push({
