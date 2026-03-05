@@ -57,7 +57,7 @@ export default function KanbanBoard({ onNavigateToWorkOrder }: KanbanBoardProps)
         WorkOrderService.getWorkOrdersByStatus(),
       ]);
 
-      if (columnsRes.data) setColumns(columnsRes.data);
+      if (columnsRes.data) setColumns(columnsRes.data.filter(c => c.is_visible !== false));
       if (workOrdersRes.data) setWorkOrdersByStatus(workOrdersRes.data);
 
       if (companyId) {
@@ -345,8 +345,12 @@ export default function KanbanBoard({ onNavigateToWorkOrder }: KanbanBoardProps)
                       <h3 className="font-semibold text-gray-900 dark:text-white text-sm">
                         {column.column_name}
                       </h3>
-                      <span className="text-xs text-gray-500 dark:text-gray-400 bg-white dark:bg-slate-700 px-2 py-0.5 rounded-full font-medium">
-                        {items.length}
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        column.wip_limit !== null && items.length > column.wip_limit
+                          ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                          : 'bg-white dark:bg-slate-700 text-gray-500 dark:text-gray-400'
+                      }`}>
+                        {items.length}{column.wip_limit !== null ? ` / ${column.wip_limit}` : ''}
                       </span>
                     </div>
                   </div>

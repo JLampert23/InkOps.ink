@@ -50,6 +50,9 @@ export interface WorkflowColumn {
   column_order: number;
   color: string;
   is_default: boolean;
+  wip_limit: number | null;
+  is_visible: boolean;
+  is_default_column: boolean;
   created_at: string;
 }
 
