@@ -365,14 +365,27 @@ Deno.serve(async (req: Request) => {
       const body = await req.json();
       const approverName = body.approver_name || profile.full_name || profile.email;
 
-      // Get line items
       const { data: lineItems } = await supabaseAdmin
         .from("quote_line_items")
         .select("*")
         .eq("quote_id", quoteId)
         .order("line_number");
 
-      // Generate work order number
+      const sumQty = (item: any) =>
+        (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) +
+        (item.qty_yl || 0) + (item.qty_yxl || 0) + (item.qty_xs || 0) +
+        (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) +
+        (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
+        (item.qty_4xl || 0);
+
+      const buildSizesJson = (item: any) => ({
+        yxs: item.qty_yxs || 0, ys: item.qty_ys || 0, ym: item.qty_ym || 0,
+        yl: item.qty_yl || 0, yxl: item.qty_yxl || 0,
+        xs: item.qty_xs || 0, s: item.qty_s || 0, m: item.qty_m || 0,
+        l: item.qty_l || 0, xl: item.qty_xl || 0,
+        "2xl": item.qty_2xl || 0, "3xl": item.qty_3xl || 0, "4xl": item.qty_4xl || 0,
+      });
+
       const { data: existingWOs } = await supabaseAdmin
         .from("work_orders")
         .select("work_order_number")
@@ -382,33 +395,28 @@ Deno.serve(async (req: Request) => {
 
       let workOrderNumber: string;
       if (existingWOs && existingWOs.length > 0) {
-        const lastNumber = existingWOs[0].work_order_number;
-        const match = lastNumber.match(/WO-(\d+)/);
-        const nextNum = match ? parseInt(match[1]) + 1 : 1;
-        workOrderNumber = `WO-${String(nextNum).padStart(6, '0')}`;
+        const match = existingWOs[0].work_order_number.match(/WO-(\d+)/);
+        workOrderNumber = `WO-${String((match ? parseInt(match[1]) : 0) + 1).padStart(6, '0')}`;
       } else {
         workOrderNumber = "WO-000001";
       }
 
-      // Generate invoice number
       const { data: existingInvoices } = await supabaseAdmin
-        .from("invoices")
+        .from("printavo_invoices")
         .select("invoice_number")
         .eq("company_id", profile.company_id)
+        .not("invoice_number", "is", null)
         .order("created_at", { ascending: false })
         .limit(1);
 
       let invoiceNumber: string;
-      if (existingInvoices && existingInvoices.length > 0) {
-        const lastNumber = existingInvoices[0].invoice_number;
-        const match = lastNumber.match(/INV-(\d+)/);
-        const nextNum = match ? parseInt(match[1]) + 1 : 1;
-        invoiceNumber = `INV-${String(nextNum).padStart(6, '0')}`;
+      if (existingInvoices && existingInvoices.length > 0 && existingInvoices[0].invoice_number) {
+        const match = existingInvoices[0].invoice_number.match(/INV-(\d+)/);
+        invoiceNumber = `INV-${String((match ? parseInt(match[1]) : 0) + 1).padStart(6, '0')}`;
       } else {
         invoiceNumber = "INV-000001";
       }
 
-      // Create work order
       const { data: workOrder, error: woError } = await supabaseAdmin
         .from("work_orders")
         .insert([{
@@ -416,21 +424,17 @@ Deno.serve(async (req: Request) => {
           company_id: profile.company_id,
           quote_id: quoteId,
           customer_name: quote.customer_name,
-          customer_email: quote.customer_email,
-          customer_company: quote.customer_company,
-          customer_phone: quote.customer_phone,
           status: "Pending Scheduling",
+          priority: "medium",
           production_due_date: quote.production_due_date,
           customer_due_date: quote.customer_due_date,
           notes: quote.production_notes || quote.notes,
-          created_by: user.id,
         }])
         .select()
         .single();
 
       if (woError) throw new Error("Failed to create work order: " + woError.message);
 
-      // Create work order line items
       if (lineItems && lineItems.length > 0) {
         const woLineItems = lineItems
           .filter((item: any) => item.line_type === "item" || !item.line_type)
@@ -438,140 +442,120 @@ Deno.serve(async (req: Request) => {
             work_order_id: workOrder.id,
             company_id: profile.company_id,
             line_number: item.line_number,
-            line_type: "garment",
-            item_number: item.item_number,
-            description: item.description,
+            item_type: "garment",
+            description: item.description || item.item_number || "",
+            style_number: item.item_number,
             color: item.color,
-            qty_yxs: item.qty_yxs || 0,
-            qty_ys: item.qty_ys || 0,
-            qty_ym: item.qty_ym || 0,
-            qty_yl: item.qty_yl || 0,
-            qty_yxl: item.qty_yxl || 0,
-            qty_xs: item.qty_xs || 0,
-            qty_s: item.qty_s || 0,
-            qty_m: item.qty_m || 0,
-            qty_l: item.qty_l || 0,
-            qty_xl: item.qty_xl || 0,
-            qty_2xl: item.qty_2xl || 0,
-            qty_3xl: item.qty_3xl || 0,
-            qty_4xl: item.qty_4xl || 0,
+            quantity: sumQty(item) || item.quantity || 0,
+            sizes: buildSizesJson(item),
             notes: item.notes,
           }));
 
-        await supabaseAdmin.from("work_order_line_items").insert(woLineItems);
+        const { error: woliError } = await supabaseAdmin.from("work_order_line_items").insert(woLineItems);
+        if (woliError) console.error("WO line items error:", woliError.message);
       }
 
-      // Create invoice
+      const invoiceId = invoiceNumber;
       const { data: invoice, error: invError } = await supabaseAdmin
-        .from("invoices")
+        .from("printavo_invoices")
         .insert([{
+          id: invoiceId,
           invoice_number: invoiceNumber,
           company_id: profile.company_id,
-          quote_id: quoteId,
-          work_order_id: workOrder.id,
           customer_name: quote.customer_name,
           customer_email: quote.customer_email,
           customer_company: quote.customer_company,
           customer_phone: quote.customer_phone,
-          bill_company: quote.bill_company,
-          bill_name: quote.bill_name,
-          bill_address_1: quote.bill_address_1,
-          bill_address_2: quote.bill_address_2,
-          bill_city: quote.bill_city,
-          bill_state: quote.bill_state,
-          bill_zip: quote.bill_zip,
-          bill_phone: quote.bill_phone,
-          bill_email: quote.bill_email,
-          ship_company: quote.ship_company,
-          ship_name: quote.ship_name,
-          ship_address_1: quote.ship_address_1,
-          ship_address_2: quote.ship_address_2,
-          ship_city: quote.ship_city,
-          ship_state: quote.ship_state,
-          ship_zip: quote.ship_zip,
-          subtotal: quote.subtotal,
-          tax_rate: quote.tax_rate,
-          tax_amount: quote.tax_amount,
-          discount_amount: quote.discount_amount,
-          total: quote.total,
-          balance_due: quote.total,
+          subtotal: quote.subtotal || 0,
+          tax: quote.tax_amount || 0,
+          total: quote.total || 0,
+          amount_paid: 0,
+          amount_outstanding: quote.total || 0,
+          balance_remaining: quote.total || 0,
           status: "open",
           status_stage: "unpaid",
           invoice_date: new Date().toISOString(),
-          payment_due_date: quote.payment_due_date,
-          terms: quote.terms,
-          notes: quote.customer_notes,
-          created_by: user.id,
+          due_date: quote.payment_due_date || null,
+          billing_line1: quote.bill_address_1,
+          billing_line2: quote.bill_address_2,
+          billing_city: quote.bill_city,
+          billing_state: quote.bill_state,
+          billing_zip: quote.bill_zip,
+          shipping_line1: quote.ship_address_1,
+          shipping_line2: quote.ship_address_2,
+          shipping_city: quote.ship_city,
+          shipping_state: quote.ship_state,
+          shipping_zip: quote.ship_zip,
+          raw_data: {
+            source: "quote_approval",
+            quote_id: quoteId,
+            quote_number: quote.quote_number,
+            work_order_id: workOrder.id,
+            work_order_number: workOrderNumber,
+            approved_by: approverName,
+            terms: quote.terms,
+            customer_notes: quote.customer_notes,
+          },
         }])
         .select()
         .single();
 
       if (invError) throw new Error("Failed to create invoice: " + invError.message);
 
-      // Create invoice line items
       if (lineItems && lineItems.length > 0) {
         const invLineItems = lineItems.map((item: any) => ({
-          invoice_id: invoice.id,
+          invoice_id: invoiceId,
           company_id: profile.company_id,
           line_number: item.line_number,
-          line_type: item.line_type || "item",
-          item_number: item.item_number,
-          description: item.description,
-          quantity: (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) +
-                    (item.qty_yl || 0) + (item.qty_yxl || 0) + (item.qty_xs || 0) +
-                    (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) +
-                    (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
-                    (item.qty_4xl || 0),
-          unit_price: item.unit_price,
-          total_price: item.total_price,
+          item_type: item.line_type === "fee" ? "fee" : "garment",
+          description: item.description || item.item_number || "",
+          style_number: item.item_number,
+          color: item.color,
+          sizes: buildSizesJson(item),
+          quantity: sumQty(item) || item.quantity || 1,
+          unit_price: item.unit_price || 0,
+          subtotal: item.total_price || 0,
+          total: item.total_price || 0,
+          notes: item.notes,
         }));
 
-        await supabaseAdmin.from("invoice_line_items").insert(invLineItems);
+        const { error: iliError } = await supabaseAdmin.from("invoice_line_items").insert(invLineItems);
+        if (iliError) console.error("Invoice line items error:", iliError.message);
       }
 
-      // Stage garment requirements
       const garmentLineItems = lineItems?.filter((item: any) =>
         item.line_type === "item" || !item.line_type
       ) || [];
 
       for (const garment of garmentLineItems) {
+        const totalQty = sumQty(garment) || garment.quantity || 0;
         await supabaseAdmin.from("garment_requirements_staging").insert([{
           company_id: profile.company_id,
           quote_id: quoteId,
           work_order_id: workOrder.id,
-          item_number: garment.item_number,
-          description: garment.description,
+          style_number: garment.item_number,
+          style_name: garment.description,
           color: garment.color,
-          qty_yxs: garment.qty_yxs || 0,
-          qty_ys: garment.qty_ys || 0,
-          qty_ym: garment.qty_ym || 0,
-          qty_yl: garment.qty_yl || 0,
-          qty_yxl: garment.qty_yxl || 0,
-          qty_xs: garment.qty_xs || 0,
-          qty_s: garment.qty_s || 0,
-          qty_m: garment.qty_m || 0,
-          qty_l: garment.qty_l || 0,
-          qty_xl: garment.qty_xl || 0,
-          qty_2xl: garment.qty_2xl || 0,
-          qty_3xl: garment.qty_3xl || 0,
-          qty_4xl: garment.qty_4xl || 0,
-          supplier_id: garment.supplier_id,
+          sizes: buildSizesJson(garment),
+          total_quantity: totalQty,
+          unit_cost: garment.wholesale_price || garment.garment_unit_price || 0,
           supplier_name: garment.supplier_name,
-          status: "pending",
+          supplier_type: garment.supplier_name ? "distributor" : null,
         }]);
       }
 
-      // Add to billing queue
       await supabaseAdmin.from("billing_queue").insert([{
         company_id: profile.company_id,
-        invoice_id: invoice.id,
+        printavo_invoice_id: invoiceId,
+        printavo_visual_id: invoiceNumber,
         customer_name: quote.customer_name,
         customer_email: quote.customer_email,
-        amount: quote.total,
-        status: "pending",
+        customer_company: quote.customer_company,
+        invoice_total: quote.total || 0,
+        invoice_date: new Date().toISOString(),
+        payment_status: "pending",
       }]);
 
-      // Update quote status
       await supabaseAdmin
         .from("quotes")
         .update({
@@ -582,7 +566,6 @@ Deno.serve(async (req: Request) => {
         })
         .eq("id", quoteId);
 
-      // Log activity
       await supabaseAdmin
         .from("quote_activity_log")
         .insert([{
