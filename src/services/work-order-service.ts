@@ -174,7 +174,7 @@ export class WorkOrderService {
   }
 
   static async getWorkOrdersByStatus(): Promise<{
-    data: Record<string, WorkOrder[]> | null;
+    data: Record<string, WorkOrderWithImprints[]> | null;
     error: any;
   }> {
     const { data: columns, error: columnsError } = await supabase
@@ -195,20 +195,51 @@ export class WorkOrderService {
       return { data: null, error: workOrdersError };
     }
 
-    const grouped: Record<string, WorkOrder[]> = {};
+    const quoteIds = (workOrders || [])
+      .map((wo) => wo.quote_id)
+      .filter((id): id is string => !!id);
+
+    let imprintsByQuote: Record<string, string[]> = {};
+
+    if (quoteIds.length > 0) {
+      const { data: imprints } = await supabase
+        .from('quote_imprints')
+        .select('quote_id, type_of_work')
+        .in('quote_id', quoteIds);
+
+      if (imprints) {
+        for (const imp of imprints) {
+          if (imp.type_of_work) {
+            if (!imprintsByQuote[imp.quote_id]) {
+              imprintsByQuote[imp.quote_id] = [];
+            }
+            if (!imprintsByQuote[imp.quote_id].includes(imp.type_of_work)) {
+              imprintsByQuote[imp.quote_id].push(imp.type_of_work);
+            }
+          }
+        }
+      }
+    }
+
+    const grouped: Record<string, WorkOrderWithImprints[]> = {};
 
     columns.forEach((col) => {
       grouped[col.column_name] = [];
     });
 
     workOrders?.forEach((wo) => {
+      const enriched: WorkOrderWithImprints = {
+        ...wo,
+        types_of_work: wo.quote_id ? imprintsByQuote[wo.quote_id] || [] : [],
+      };
+
       if (grouped[wo.status]) {
-        grouped[wo.status].push(wo);
+        grouped[wo.status].push(enriched);
       } else {
         if (!grouped['Pending Scheduling']) {
           grouped['Pending Scheduling'] = [];
         }
-        grouped['Pending Scheduling'].push(wo);
+        grouped['Pending Scheduling'].push(enriched);
       }
     });
 
