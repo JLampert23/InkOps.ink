@@ -840,7 +840,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
               return {
                 ...itm,
                 unit_price: unitPrice,
-                total_price: itm.total_quantity * unitPrice
+                total_price: calculateItemsTotal(itm) * unitPrice
               };
             });
             return { ...g, items: newItems };
@@ -879,7 +879,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
             return {
               ...itm,
               unit_price: unitPrice,
-              total_price: itm.total_quantity * unitPrice
+              total_price: calculateItemsTotal(itm) * unitPrice
             };
           });
           return { ...g, items: newItems };
