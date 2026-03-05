@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Save, Plus, Trash2, GripVertical, X, Loader2, DollarSign, Settings, Search, Image as ImageIcon, Check } from 'lucide-react';
+import { Save, Plus, Trash2, GripVertical, X, Loader2, DollarSign, Settings, Search, Image as ImageIcon, Check, Info } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -103,6 +103,74 @@ interface QuoteBuilderProps {
   initialCustomerId?: string;
   onSave?: () => void;
   onCancel?: () => void;
+}
+
+function UnitPriceTooltip({ item, groupImprints, garmentMarkup }: {
+  item: QuoteItem;
+  groupImprints: any[];
+  garmentMarkup: number;
+}) {
+  const wholesalePrice = item.wholesale_price || 0;
+  const garmentCostWithMarkup = wholesalePrice * (1 + garmentMarkup / 100);
+  const totalImprintPrice = groupImprints.reduce((sum, imp) => sum + (parseFloat(imp.price) || 0), 0);
+  const calculatedTotal = garmentCostWithMarkup + totalImprintPrice;
+
+  return (
+    <div className="hidden group-hover/tip:block absolute bottom-full right-0 mb-1 w-64 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-xl z-50 text-xs pointer-events-none">
+      <div className="p-3 space-y-2">
+        <div className="font-semibold text-gray-900 dark:text-white border-b border-gray-100 dark:border-slate-700 pb-1.5">
+          Unit Price Breakdown
+        </div>
+
+        {wholesalePrice > 0 && (
+          <div className="space-y-1">
+            <div className="font-medium text-gray-700 dark:text-gray-300">Garment</div>
+            <div className="flex justify-between text-gray-500 dark:text-gray-400 pl-2">
+              <span>Wholesale</span>
+              <span>${wholesalePrice.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-gray-500 dark:text-gray-400 pl-2">
+              <span>Markup ({garmentMarkup}%)</span>
+              <span>+${(garmentCostWithMarkup - wholesalePrice).toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between font-medium text-gray-700 dark:text-gray-300 pl-2 border-t border-gray-100 dark:border-slate-700 pt-0.5">
+              <span>Garment Cost</span>
+              <span>${garmentCostWithMarkup.toFixed(2)}</span>
+            </div>
+          </div>
+        )}
+
+        {groupImprints.length > 0 && (
+          <div className="space-y-1">
+            <div className="font-medium text-gray-700 dark:text-gray-300">Print / Decoration</div>
+            {groupImprints.map((imp, i) => (
+              <div key={imp.id || i} className="flex justify-between text-gray-500 dark:text-gray-400 pl-2">
+                <span className="truncate mr-2">{imp.location || 'Imprint ' + (i + 1)}</span>
+                <span className="shrink-0">${(parseFloat(imp.price) || 0).toFixed(2)}</span>
+              </div>
+            ))}
+            {groupImprints.length > 1 && (
+              <div className="flex justify-between font-medium text-gray-700 dark:text-gray-300 pl-2 border-t border-gray-100 dark:border-slate-700 pt-0.5">
+                <span>Print Total</span>
+                <span>${totalImprintPrice.toFixed(2)}</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="flex justify-between font-semibold text-gray-900 dark:text-white border-t border-gray-200 dark:border-slate-600 pt-1.5">
+          <span>Calculated Total</span>
+          <span>${calculatedTotal.toFixed(2)}</span>
+        </div>
+
+        {Math.abs(calculatedTotal - item.unit_price) > 0.01 && item.unit_price > 0 && calculatedTotal > 0 && (
+          <div className="text-amber-600 dark:text-amber-400 text-[10px] italic">
+            Actual unit price (${item.unit_price.toFixed(2)}) differs from calculated
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSave, onCancel }: QuoteBuilderProps) {
@@ -2526,7 +2594,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                       <td className="p-1 border border-gray-300 dark:border-slate-800 text-center text-base text-blue-600 dark:text-blue-400 font-bold">
                         {calculateItemsTotal(item)}
                       </td>
-                      <td className="p-0 border border-gray-300 dark:border-slate-800">
+                      <td className="p-0 border border-gray-300 dark:border-slate-800 relative group/price">
                         <input
                           type="number"
                           step="0.01"
@@ -2535,6 +2603,18 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                           onChange={(e) => updateItem(group.id, itemIdx, 'unit_price', parseFloat(e.target.value) || 0)}
                           className="w-full px-2 py-2 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-base text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
+                        {(item.wholesale_price || getGroupImprints(group.label).length > 0) && (
+                          <div className="absolute top-0 right-0 p-0.5 opacity-0 group-hover/price:opacity-100 transition-opacity z-10">
+                            <div className="relative group/tip">
+                              <Info className="w-3 h-3 text-gray-400 dark:text-slate-500 cursor-help" />
+                              <UnitPriceTooltip
+                                item={item}
+                                groupImprints={getGroupImprints(group.label)}
+                                garmentMarkup={companySettings?.default_garment_markup || 0}
+                              />
+                            </div>
+                          </div>
+                        )}
                       </td>
                       <td className="p-1 border border-gray-300 dark:border-slate-800 text-right text-base font-semibold text-gray-900 dark:text-white">
                         ${item.total_price.toFixed(2)}
