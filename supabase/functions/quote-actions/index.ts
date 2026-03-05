@@ -371,6 +371,12 @@ Deno.serve(async (req: Request) => {
         .eq("quote_id", quoteId)
         .order("line_number");
 
+      const { data: imprints } = await supabaseAdmin
+        .from("quote_imprints")
+        .select("*")
+        .eq("quote_id", quoteId)
+        .order("sort_order");
+
       const sumQty = (item: any) =>
         (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) +
         (item.qty_yl || 0) + (item.qty_yxl || 0) + (item.qty_xs || 0) +
@@ -542,6 +548,30 @@ Deno.serve(async (req: Request) => {
           supplier_name: garment.supplier_name,
           supplier_type: garment.supplier_name ? "distributor" : null,
         }]);
+      }
+
+      if (imprints && imprints.length > 0) {
+        const dueDate = quote.production_due_date || quote.customer_due_date || new Date().toISOString().split('T')[0];
+        const totalQtyAll = lineItems?.reduce((sum: number, li: any) => sum + (sumQty(li) || li.quantity || 0), 0) || 0;
+        const scheduleEntries = imprints.map((imp: any, idx: number) => ({
+          company_id: profile.company_id,
+          quote_id: quoteId,
+          work_order_id: workOrder.id,
+          imprint_id: imp.id,
+          type_of_work: imp.type_of_work || "Screen Print",
+          imprint_number: imp.imprint_number || `IMP-${idx + 1}`,
+          production_due_date: dueDate,
+          quantity: totalQtyAll,
+          customer_name: quote.customer_name,
+          quote_number: quote.quote_number,
+          scheduler_column: "Unscheduled",
+          colors: imp.thread_ink_color || null,
+          step_statuses: {},
+          priority_order: idx,
+        }));
+
+        const { error: schedError } = await supabaseAdmin.from("production_schedule_entries").insert(scheduleEntries);
+        if (schedError) console.error("Schedule entries error:", schedError.message);
       }
 
       await supabaseAdmin.from("billing_queue").insert([{
