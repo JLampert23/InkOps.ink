@@ -392,36 +392,8 @@ Deno.serve(async (req: Request) => {
         "2xl": item.qty_2xl || 0, "3xl": item.qty_3xl || 0, "4xl": item.qty_4xl || 0,
       });
 
-      const { data: existingWOs } = await supabaseAdmin
-        .from("work_orders")
-        .select("work_order_number")
-        .eq("company_id", profile.company_id)
-        .order("created_at", { ascending: false })
-        .limit(1);
-
-      let workOrderNumber: string;
-      if (existingWOs && existingWOs.length > 0) {
-        const match = existingWOs[0].work_order_number.match(/WO-(\d+)/);
-        workOrderNumber = `WO-${String((match ? parseInt(match[1]) : 0) + 1).padStart(6, '0')}`;
-      } else {
-        workOrderNumber = "WO-000001";
-      }
-
-      const { data: existingInvoices } = await supabaseAdmin
-        .from("printavo_invoices")
-        .select("invoice_number")
-        .eq("company_id", profile.company_id)
-        .not("invoice_number", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(1);
-
-      let invoiceNumber: string;
-      if (existingInvoices && existingInvoices.length > 0 && existingInvoices[0].invoice_number) {
-        const match = existingInvoices[0].invoice_number.match(/INV-(\d+)/);
-        invoiceNumber = `INV-${String((match ? parseInt(match[1]) : 0) + 1).padStart(6, '0')}`;
-      } else {
-        invoiceNumber = "INV-000001";
-      }
+      const workOrderNumber = quote.quote_number;
+      const invoiceNumber = quote.quote_number;
 
       const { data: workOrder, error: woError } = await supabaseAdmin
         .from("work_orders")
