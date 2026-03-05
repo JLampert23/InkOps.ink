@@ -1874,7 +1874,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
             garment_images_data: item.garment_images_data || null,
             supplier_partid: item.supplier_partid || null,
             supplier_name: item.supplier_name || null,
-            wholesale_price: item.wholesale_price ?? null,
+            wholesale_price: item.wholesale_price ?? 0,
           };
         })
         );
@@ -2938,18 +2938,22 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       {/* Manage Imprints Modal */}
       <ManageImprintsModal
         isOpen={showImprintsModal !== null}
-        onClose={() => {
+        onClose={async () => {
+          const closedGroupLabel = showImprintsModal;
           setShowImprintsModal(null);
           if (quoteId) {
-            // Reload imprints after modal closes
-            supabase
+            const { data } = await supabase
               .from('quote_imprints')
               .select('*')
               .eq('quote_id', quoteId)
-              .order('sort_order')
-              .then(({ data }) => {
-                if (data) setQuoteImprints(data);
-              });
+              .order('sort_order');
+            if (data) {
+              setQuoteImprints(data);
+              const affectedGroup = itemGroups.find(g => g.label === (closedGroupLabel || ''));
+              if (affectedGroup) {
+                await updatePriceFromMatrixWithGroups(itemGroups, affectedGroup.id, 0, true);
+              }
+            }
           }
         }}
         quoteId={quoteId}

@@ -70,11 +70,12 @@ interface ManageImprintsModalProps {
   lineItems?: any[];
 }
 
-// Helper function to extract number of colors from pricing_matrix_column
 const extractNumColors = (columnName: string): number => {
   if (!columnName) return 1;
-  const match = columnName.match(/(\d+)\s*color/i);
-  return match ? parseInt(match[1]) : 1;
+  const match = columnName.match(/(\d+)\s*color|color\s*(\d+)/i);
+  if (match) return parseInt(match[1] || match[2]);
+  const digitMatch = columnName.match(/(\d+)/);
+  return digitMatch ? parseInt(digitMatch[1]) : 1;
 };
 
 export function ManageImprintsModal({ isOpen, onClose, quoteId, initialGroupLabel, quote, lineItems }: ManageImprintsModalProps) {
