@@ -1,22 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase-client';
 import { useNotification } from '../../contexts/NotificationContext';
-import {
-  FileText,
-  Search,
-  Plus,
-  Clock,
-  Send,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  Loader2,
-  Edit,
-  Eye,
-  Copy,
-  RefreshCw,
-  Trash2,
-} from 'lucide-react';
+import { FileText, Search, Plus, Clock, Send, CheckCircle, XCircle, AlertCircle, Loader2, CreditCard as Edit, Eye, Copy, RefreshCw, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface QuotesListProps {
@@ -44,7 +29,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('active');
   const [duplicating, setDuplicating] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -152,18 +137,22 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
       (quote.customer_company || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (quote.customer_email || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesStatus =
-      statusFilter === 'all'
-        ? true
-        : statusFilter === 'approved'
-        ? ['approved', 'converted'].includes(quote.status)
-        : quote.status === statusFilter;
+    let matchesStatus = true;
+    if (statusFilter === 'all') {
+      matchesStatus = true;
+    } else if (statusFilter === 'active') {
+      matchesStatus = ['draft', 'sent'].includes(quote.status);
+    } else if (statusFilter === 'approved') {
+      matchesStatus = ['approved', 'converted'].includes(quote.status);
+    } else {
+      matchesStatus = quote.status === statusFilter;
+    }
 
     return matchesSearch && matchesStatus;
   });
 
   const stats = {
-    total: quotes.length,
+    active: quotes.filter(q => ['draft', 'sent'].includes(q.status)).length,
     draft: quotes.filter(q => q.status === 'draft').length,
     sent: quotes.filter(q => q.status === 'sent').length,
     approved: quotes.filter(q => ['approved', 'converted'].includes(q.status)).length,
@@ -198,15 +187,15 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
 
       <div className="grid grid-cols-5 gap-2">
         <button
-          onClick={() => setStatusFilter('all')}
+          onClick={() => setStatusFilter('active')}
           className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all ${
-            statusFilter === 'all'
+            statusFilter === 'active'
               ? 'border-gray-900 dark:border-white ring-2 ring-gray-900 dark:ring-white'
               : 'border-gray-200 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
           } p-3 text-left cursor-pointer`}
         >
-          <div className="text-xl font-bold text-gray-900 dark:text-white">{stats.total}</div>
-          <div className="text-xs text-gray-600 dark:text-gray-400">Total</div>
+          <div className="text-xl font-bold text-gray-900 dark:text-white">{stats.active}</div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">Active</div>
         </button>
         <button
           onClick={() => setStatusFilter('draft')}
@@ -272,6 +261,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
               onChange={(e) => setStatusFilter(e.target.value)}
               className="px-4 py-2.5 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
             >
+              <option value="active">Active (Unsent + Sent)</option>
               <option value="all">All Quotes</option>
               <option value="draft">Unsent</option>
               <option value="sent">Sent</option>

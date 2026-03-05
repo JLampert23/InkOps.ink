@@ -551,7 +551,9 @@ Deno.serve(async (req: Request) => {
       }
 
       if (imprints && imprints.length > 0) {
-        const dueDate = quote.production_due_date || quote.customer_due_date || new Date().toISOString().split('T')[0];
+        const today = new Date().toISOString().split('T')[0];
+        const quoteDueDate = quote.production_due_date || quote.customer_due_date || today;
+        const dueDate = quoteDueDate >= today ? quoteDueDate : today;
         const totalQtyAll = lineItems?.reduce((sum: number, li: any) => sum + (sumQty(li) || li.quantity || 0), 0) || 0;
         const scheduleEntries = imprints.map((imp: any, idx: number) => ({
           company_id: profile.company_id,
