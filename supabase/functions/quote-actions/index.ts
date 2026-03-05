@@ -395,6 +395,9 @@ Deno.serve(async (req: Request) => {
       const workOrderNumber = quote.quote_number;
       const invoiceNumber = quote.quote_number;
 
+      const garmentItems = lineItems?.filter((item: any) => item.line_type === "item" || !item.line_type) || [];
+      const totalQuantity = garmentItems.reduce((sum: number, item: any) => sum + (sumQty(item) || item.quantity || 0), 0);
+
       const { data: workOrder, error: woError } = await supabaseAdmin
         .from("work_orders")
         .insert([{
@@ -406,6 +409,7 @@ Deno.serve(async (req: Request) => {
           priority: "medium",
           production_due_date: quote.production_due_date,
           customer_due_date: quote.customer_due_date,
+          total_quantity: totalQuantity,
           notes: quote.production_notes || quote.notes,
         }])
         .select()
