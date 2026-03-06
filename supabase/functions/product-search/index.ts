@@ -586,6 +586,7 @@ async function fetchAndCacheSSActivewear(
     }
 
     // Fetch and cache pricing via PromoStandards
+    let cachedPricingMap: Map<string, number> | null = null;
     try {
       const pricingUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=pricing&productId=${encodeURIComponent(style)}&companyId=${encodeURIComponent(companyId)}`;
       const pricingResponse = await fetch(pricingUrl, {
@@ -596,26 +597,37 @@ async function fetchAndCacheSSActivewear(
         const pricingData = await pricingResponse.json();
         console.log('SSA Pricing response:', JSON.stringify(pricingData).substring(0, 500));
 
-        if (pricingData.success && pricingData.data?.parts) {
-          for (const part of pricingData.data.parts) {
-            if (!part.partId || !part.prices || part.prices.length === 0) continue;
+        const parts = pricingData.success
+          ? (Array.isArray(pricingData.data) ? pricingData.data : pricingData.data?.parts || [])
+          : [];
 
-            const firstPrice = part.prices[0];
-            await supabaseAdmin
-              .from("ss_catalog_pricing")
-              .upsert({
-                company_id: companyId,
-                part_number: part.partId,
-                unit_price: firstPrice.price,
-                quantity_min: firstPrice.minQuantity || 1,
-                quantity_max: part.prices[1]?.minQuantity ? part.prices[1].minQuantity - 1 : 99999,
-                discount_code: firstPrice.discountCode || null,
-                price_expiry_date: null,
-              }, {
-                onConflict: "company_id,part_number,quantity_min"
-              });
-          }
-          console.log(`Cached pricing for ${pricingData.data.parts.length} parts`);
+        for (const part of parts) {
+          if (!part.partId || !part.prices || part.prices.length === 0) continue;
+
+          const firstPrice = part.prices[0];
+          const minQty = firstPrice.minQuantity ?? firstPrice.quantity ?? 1;
+          const secondPrice = part.prices[1];
+          const nextMinQty = secondPrice?.minQuantity ?? secondPrice?.quantity ?? null;
+
+          await supabaseAdmin
+            .from("ss_catalog_pricing")
+            .upsert({
+              company_id: companyId,
+              part_number: part.partId,
+              unit_price: firstPrice.price,
+              quantity_min: minQty,
+              quantity_max: nextMinQty ? nextMinQty - 1 : 99999,
+              discount_code: firstPrice.discountCode || null,
+              price_expiry_date: null,
+            }, {
+              onConflict: "company_id,part_number,quantity_min"
+            });
+
+          if (!cachedPricingMap) cachedPricingMap = new Map();
+          cachedPricingMap.set(part.partId, firstPrice.price);
+        }
+        if (parts.length > 0) {
+          console.log(`Cached pricing for ${parts.length} parts`);
         }
       }
     } catch (pricingError: any) {
@@ -946,13 +958,14 @@ async function fetchAndCacheSSActivewear(
         const colorName = part.colorName || "Default";
 
         if (!colorMap.has(colorName)) {
+          const wholesalePrice = cachedPricingMap?.get(part.partId) ?? 0;
           colorMap.set(colorName, {
             name: colorName,
             code: part.partId || "",
             partIds: [],
             sizes: [],
             image_url: "",
-            pricing: { wholesale: 0, retail: 0 },
+            pricing: { wholesale: wholesalePrice, retail: wholesalePrice },
             stock: {},
           });
         }

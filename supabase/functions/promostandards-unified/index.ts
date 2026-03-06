@@ -445,6 +445,27 @@ Deno.serve(async (req: Request) => {
         }
       });
       console.log('💰 Price map created with', Object.keys(pricingData.pricesByPartId).length, 'entries');
+
+      try {
+        for (const item of livePricing) {
+          await supabase
+            .from('ss_catalog_pricing')
+            .upsert({
+              company_id: companyId,
+              part_number: item.partId,
+              unit_price: item.price,
+              quantity_min: item.minQty || 1,
+              quantity_max: 99999,
+              discount_code: item.discountCode || null,
+              price_expiry_date: item.expiryDate || null,
+            }, {
+              onConflict: "company_id,part_number,quantity_min"
+            });
+        }
+        console.log('💰 Cached', livePricing.length, 'pricing entries to ss_catalog_pricing');
+      } catch (cacheErr: any) {
+        console.warn('💰 Failed to cache pricing:', cacheErr.message);
+      }
     } else {
       console.warn('💰 Live pricing returned empty, checking cache as fallback...');
 
