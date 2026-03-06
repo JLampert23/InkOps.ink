@@ -731,153 +731,297 @@ Deno.serve(async (req: Request) => {
           );
         }
 
-        const normalizedProductId = normalizeSsProductId(productId);
+        // ============================================================
+        // DEBUG VERSION: S&S PromoStandards Pricing API
+        // Following EXACT format from S&S PDF specification
+        // ============================================================
+
+        // Step 1: Prepare productId with B-prefix (per S&S PDF spec)
+        const styleNumberUppercase = productId.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+        const bPrefixedProductId = styleNumberUppercase.startsWith('B')
+          ? styleNumberUppercase
+          : `B${styleNumberUppercase}`;
+
         const fobId = validateFobId(url.searchParams.get("fobId"));
+        const priceType = "Customer";
+        const configurationType = "Blank";
+        const currency = "USD";
+        const localizationCountry = "US";
+        const localizationLanguage = "en";
+
         const maskedApiKey = decryptedApiKey.length > 4
           ? '*'.repeat(decryptedApiKey.length - 4) + decryptedApiKey.slice(-4)
           : '****';
 
         console.log('');
-        console.log('===========================================================');
-        console.log('[SS Pricing] STARTING PRICING REQUEST');
-        console.log('===========================================================');
-        console.log('[SS Pricing] Input Parameters:');
-        console.log(`  - Raw productId input: "${productId}"`);
-        console.log(`  - Normalized productId: "${normalizedProductId}"`);
-        console.log(`  - fobId: "${fobId}"`);
-        console.log('===========================================================');
+        console.log('╔═══════════════════════════════════════════════════════════════╗');
+        console.log('║  S&S ACTIVEWEAR PROMOSTANDARDS PRICING - DEBUG VERSION        ║');
+        console.log('╠═══════════════════════════════════════════════════════════════╣');
+        console.log('║  Following EXACT S&S PDF specification format                 ║');
+        console.log('╚═══════════════════════════════════════════════════════════════╝');
+        console.log('');
+        console.log('[DEBUG] INPUT PARAMETERS:');
+        console.log(`  Raw productId input:    "${productId}"`);
+        console.log(`  Style (uppercase):      "${styleNumberUppercase}"`);
+        console.log(`  B-Prefixed productId:   "${bPrefixedProductId}"`);
+        console.log(`  fobId:                  "${fobId}"`);
+        console.log(`  priceType:              "${priceType}"`);
+        console.log(`  configurationType:      "${configurationType}"`);
+        console.log(`  currency:               "${currency}"`);
+        console.log(`  Account Number:         "${credentials.accountNumber}"`);
+        console.log(`  API Key (masked):       "${maskedApiKey}"`);
+        console.log('');
 
-        // S&S Activewear's PromoStandards Pricing API does NOT accept style numbers (like "2000")
-        // It only works with partIds (SKU-level). So we use the REST API for pricing instead.
-        // The REST API returns pricing data directly with customerPrice field.
+        // Step 2: Build EXACT SOAP request per S&S PDF spec
+        const soapBody = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
+  <shar:wsVersion>1.0.0</shar:wsVersion>
+  <shar:id>${credentials.accountNumber}</shar:id>
+  <shar:password>${decryptedApiKey}</shar:password>
+  <shar:productId>${bPrefixedProductId}</shar:productId>
+  <shar:currency>${currency}</shar:currency>
+  <shar:fobId>${fobId}</shar:fobId>
+  <shar:priceType>${priceType}</shar:priceType>
+  <shar:localizationCountry>${localizationCountry}</shar:localizationCountry>
+  <shar:localizationLanguage>${localizationLanguage}</shar:localizationLanguage>
+  <shar:configurationType>${configurationType}</shar:configurationType>
+</ns2:GetConfigurationAndPricingRequest>`;
 
-        console.log('[SS Pricing] Using S&S REST API for pricing (PromoStandards requires partId, not style)');
+        const maskedSoapBody = soapBody.replace(
+          /<shar:password>[^<]*<\/shar:password>/,
+          `<shar:password>${maskedApiKey}</shar:password>`
+        );
 
-        const parts: any[] = [];
-        let restApiUsed = false;
-        let restApiError: string | null = null;
+        console.log('[DEBUG] SOAP REQUEST (password masked):');
+        console.log('─────────────────────────────────────────');
+        console.log(maskedSoapBody);
+        console.log('─────────────────────────────────────────');
+        console.log('');
+
+        // Step 3: Send the request
+        let xmlResponse = '';
+        let soapFault: string | null = null;
+        let httpStatus = 0;
+        let httpStatusText = '';
 
         try {
-          const ssaRestApiUrl = `https://api.ssactivewear.com/v2/products/?style=${encodeURIComponent(normalizedProductId)}`;
-          console.log('[SS Pricing] Calling S&S REST API:', ssaRestApiUrl);
+          console.log('[DEBUG] Sending SOAP request to:', PROMOSTANDARDS_ENDPOINTS.pricing);
 
-          const restApiResponse = await fetch(ssaRestApiUrl, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Basic ${btoa(`${credentials.accountNumber}:${decryptedApiKey}`)}`,
-              'Content-Type': 'application/json',
-            },
-          });
+          xmlResponse = await makePromoStandardsRequest(
+            PROMOSTANDARDS_ENDPOINTS.pricing,
+            "getConfigurationAndPricing",
+            soapBody,
+            credentials.accountNumber,
+            decryptedApiKey
+          );
+          httpStatus = 200;
+          httpStatusText = 'OK';
+        } catch (reqError: any) {
+          console.error('[DEBUG] REQUEST FAILED:', reqError.message);
+          soapFault = reqError.message;
 
-          if (restApiResponse.ok) {
-            const restApiData = await restApiResponse.json();
-            restApiUsed = true;
-
-            console.log('[SS Pricing] REST API returned', Array.isArray(restApiData) ? restApiData.length : 0, 'products');
-
-            if (Array.isArray(restApiData) && restApiData.length > 0) {
-              // Group pricing by SKU (partId)
-              const partPricingMap = new Map<string, any>();
-
-              for (const variant of restApiData) {
-                const sku = variant.sku;
-                const customerPrice = parseFloat(variant.customerPrice || variant.piecePrice || variant.salePrice || '0');
-                const casePrice = parseFloat(variant.casePrice || '0');
-                const casePieces = parseInt(variant.caseQty || variant.casePieces || '1') || 1;
-
-                if (!sku || customerPrice <= 0) continue;
-
-                if (!partPricingMap.has(sku)) {
-                  partPricingMap.set(sku, {
-                    partId: sku,
-                    colorName: variant.colorName || '',
-                    sizeName: variant.sizeName || '',
-                    priceBreaks: []
-                  });
-                }
-
-                // Add piece price
-                partPricingMap.get(sku).priceBreaks.push({
-                  minQuantity: 1,
-                  price: customerPrice,
-                  priceUom: 'PC',
-                  discountCode: null,
-                });
-
-                // Add case price if available and different
-                if (casePrice > 0 && casePieces > 1) {
-                  const perPieceCasePrice = casePrice / casePieces;
-                  if (perPieceCasePrice < customerPrice) {
-                    partPricingMap.get(sku).priceBreaks.push({
-                      minQuantity: casePieces,
-                      price: perPieceCasePrice,
-                      priceUom: 'CS',
-                      discountCode: 'CASE',
-                    });
-                  }
+          return new Response(
+            JSON.stringify({
+              success: false,
+              supplier: "ssactivewear",
+              action,
+              error: "SOAP_REQUEST_FAILED",
+              debug: {
+                requestXml: maskedSoapBody,
+                responseXml: null,
+                soapFault: reqError.message,
+                httpStatus: 0,
+                parsed: null,
+                diagnostics: {
+                  rawInput: productId,
+                  styleNumberUppercase,
+                  bPrefixedProductId,
+                  fobId,
+                  priceType,
+                  configurationType,
+                  currency,
+                  accountNumber: credentials.accountNumber,
+                  apiKeyMasked: maskedApiKey,
+                  endpoint: PROMOSTANDARDS_ENDPOINTS.pricing,
                 }
               }
-
-              for (const [, partData] of partPricingMap) {
-                parts.push(partData);
-              }
-
-              console.log('[SS Pricing] Parsed', parts.length, 'unique SKUs with pricing');
-            }
-          } else {
-            const errorText = await restApiResponse.text().catch(() => '');
-            restApiError = `HTTP ${restApiResponse.status}: ${errorText.substring(0, 200)}`;
-            console.error('[SS Pricing] REST API error:', restApiError);
-          }
-        } catch (restErr: any) {
-          restApiError = restErr.message;
-          console.error('[SS Pricing] REST API exception:', restErr.message);
+            }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
         }
 
-        console.log('===========================================================');
-        console.log(`[SS Pricing] COMPLETE`);
-        console.log(`  - Total Parts found: ${parts.length}`);
-        console.log(`  - REST API used: ${restApiUsed}`);
-        console.log(`  - REST API error: ${restApiError || 'none'}`);
-        console.log('===========================================================');
+        // Step 4: Log RAW response
+        console.log('');
+        console.log('[DEBUG] RAW SOAP RESPONSE:');
+        console.log('═══════════════════════════════════════════════════════════════');
+        console.log(xmlResponse);
+        console.log('═══════════════════════════════════════════════════════════════');
+        console.log('');
 
-        const response = {
-          success: parts.length > 0,
+        // Step 5: Analyze response structure
+        const hasSoapFault = xmlResponse.includes('soap:Fault') || xmlResponse.includes('faultstring');
+        const hasPartArray = xmlResponse.includes('PartArray') || xmlResponse.includes(':PartArray');
+        const hasPartPriceArray = xmlResponse.includes('PartPriceArray') || xmlResponse.includes(':PartPriceArray');
+        const hasPartPrice = xmlResponse.includes('<PartPrice') || xmlResponse.includes(':PartPrice');
+        const hasPart = xmlResponse.includes('<Part>') || xmlResponse.includes(':Part>');
+        const hasErrorCode = xmlResponse.includes('<code>') || xmlResponse.includes('errorCode');
+        const hasErrorMessage = xmlResponse.includes('<description>') || xmlResponse.includes('errorMessage');
+
+        if (hasSoapFault) {
+          soapFault = getXmlValue(xmlResponse, 'faultstring') || 'Unknown SOAP fault';
+          console.error('[DEBUG] SOAP FAULT DETECTED:', soapFault);
+        }
+
+        // Extract error codes if present
+        const errorCode = getXmlValue(xmlResponse, 'code') || getXmlValue(xmlResponse, 'errorCode');
+        const errorDescription = getXmlValue(xmlResponse, 'description') || getXmlValue(xmlResponse, 'errorMessage');
+
+        console.log('[DEBUG] RESPONSE STRUCTURE ANALYSIS:');
+        console.log(`  Contains SOAP Fault:     ${hasSoapFault}`);
+        console.log(`  Contains PartArray:      ${hasPartArray}`);
+        console.log(`  Contains Part nodes:     ${hasPart}`);
+        console.log(`  Contains PartPriceArray: ${hasPartPriceArray}`);
+        console.log(`  Contains PartPrice:      ${hasPartPrice}`);
+        console.log(`  Contains Error Code:     ${hasErrorCode} (value: ${errorCode || 'none'})`);
+        console.log(`  Contains Error Message:  ${hasErrorMessage} (value: ${errorDescription || 'none'})`);
+        console.log('');
+
+        // Step 6: Parse Part and PartPrice nodes
+        const partPattern = /<(?:[a-zA-Z0-9]+:)?Part[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Part>/gi;
+        const parsedParts: any[] = [];
+        let partMatch;
+        let partIndex = 0;
+
+        while ((partMatch = partPattern.exec(xmlResponse)) !== null) {
+          partIndex++;
+          const partXml = partMatch[1];
+          const partId = getXmlValue(partXml, "partId");
+
+          console.log(`[DEBUG] Parsing Part #${partIndex}: partId="${partId}"`);
+
+          const pricePattern = /<(?:[a-zA-Z0-9]+:)?PartPrice[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?PartPrice>/gi;
+          const priceBreaks: any[] = [];
+          let priceMatch;
+          let priceIndex = 0;
+
+          while ((priceMatch = pricePattern.exec(partXml)) !== null) {
+            priceIndex++;
+            const priceXml = priceMatch[1];
+            const minQuantity = getXmlValue(priceXml, "minQuantity");
+            const price = getXmlValue(priceXml, "price");
+            const priceUom = getXmlValue(priceXml, "priceUom");
+            const discountCode = getXmlValue(priceXml, "discountCode");
+
+            console.log(`    PartPrice #${priceIndex}: minQuantity=${minQuantity}, price=${price}, priceUom=${priceUom}, discountCode=${discountCode}`);
+
+            priceBreaks.push({
+              minQuantity: minQuantity ? parseInt(minQuantity) : null,
+              price: price ? parseFloat(price) : null,
+              priceUom: priceUom || null,
+              discountCode: discountCode || null,
+            });
+          }
+
+          if (priceBreaks.length === 0) {
+            console.warn(`    WARNING: No PartPrice nodes found for partId="${partId}"`);
+          }
+
+          parsedParts.push({
+            partId,
+            priceBreaksCount: priceBreaks.length,
+            priceBreaks
+          });
+        }
+
+        // Step 7: Additional field extraction for debugging
+        const allMinQuantities = getXmlValues(xmlResponse, "minQuantity");
+        const allPrices = getXmlValues(xmlResponse, "price");
+        const allPartIds = getXmlValues(xmlResponse, "partId");
+
+        console.log('');
+        console.log('[DEBUG] EXTRACTED RAW VALUES:');
+        console.log(`  All partId values (${allPartIds.length}):`, allPartIds.slice(0, 10));
+        console.log(`  All minQuantity values (${allMinQuantities.length}):`, allMinQuantities.slice(0, 10));
+        console.log(`  All price values (${allPrices.length}):`, allPrices.slice(0, 10));
+        console.log('');
+
+        console.log('[DEBUG] PARSING SUMMARY:');
+        console.log(`  Total Parts found:       ${parsedParts.length}`);
+        console.log(`  Total PriceBreaks:       ${parsedParts.reduce((sum, p) => sum + p.priceBreaks.length, 0)}`);
+        console.log(`  Empty Parts (no prices): ${parsedParts.filter(p => p.priceBreaks.length === 0).length}`);
+        console.log('');
+
+        // Step 8: Build comprehensive debug response
+        const debugResponse = {
+          success: parsedParts.length > 0 && parsedParts.some(p => p.priceBreaks.length > 0),
           supplier: "ssactivewear",
           action,
-          productId: normalizedProductId,
-          data: parts.map(p => ({
+          method: "PROMOSTANDARDS_SOAP",
+          productId: bPrefixedProductId,
+          data: parsedParts.map(p => ({
             partId: p.partId,
-            colorName: p.colorName,
-            sizeName: p.sizeName,
             prices: p.priceBreaks.map((pb: any) => ({
-              quantity: pb.minQuantity,
+              minQuantity: pb.minQuantity,
               price: pb.price,
               priceUom: pb.priceUom,
+              discountCode: pb.discountCode,
             }))
           })),
           debug: {
-            method: 'REST_API',
-            note: 'S&S PromoStandards Pricing API requires partId (SKU), not style number. Using REST API instead.',
-            restApiUsed,
-            restApiError,
-            diagnostics: {
-              rawInput: productId,
-              normalizedProductId,
-              fobId,
-              accountNumber: credentials.accountNumber,
-              apiKeyMasked: maskedApiKey,
+            requestXml: maskedSoapBody,
+            responseXml: xmlResponse,
+            responseLength: xmlResponse.length,
+            httpStatus,
+            soapFault,
+            errorCode,
+            errorDescription,
+            responseAnalysis: {
+              hasSoapFault,
+              hasPartArray,
+              hasPart,
+              hasPartPriceArray,
+              hasPartPrice,
+              hasErrorCode,
+              hasErrorMessage,
+            },
+            rawExtractedValues: {
+              partIdCount: allPartIds.length,
+              partIdSample: allPartIds.slice(0, 5),
+              minQuantityCount: allMinQuantities.length,
+              minQuantitySample: allMinQuantities.slice(0, 5),
+              priceCount: allPrices.length,
+              priceSample: allPrices.slice(0, 5),
             },
             parsed: {
-              totalParts: parts.length,
-              totalPriceBreaks: parts.reduce((sum, p) => sum + p.priceBreaks.length, 0),
-              sampleParts: parts.slice(0, 5),
+              totalParts: parsedParts.length,
+              totalPriceBreaks: parsedParts.reduce((sum, p) => sum + p.priceBreaks.length, 0),
+              emptyParts: parsedParts.filter(p => p.priceBreaks.length === 0).length,
+              parts: parsedParts.slice(0, 10),
             },
+            diagnostics: {
+              rawInput: productId,
+              styleNumberUppercase,
+              bPrefixedProductId,
+              fobId,
+              priceType,
+              configurationType,
+              currency,
+              localizationCountry,
+              localizationLanguage,
+              accountNumber: credentials.accountNumber,
+              apiKeyMasked: maskedApiKey,
+              endpoint: PROMOSTANDARDS_ENDPOINTS.pricing,
+            }
           }
         };
 
+        console.log('');
+        console.log('╔═══════════════════════════════════════════════════════════════╗');
+        console.log('║  DEBUG COMPLETE - Returning full diagnostic response          ║');
+        console.log('╚═══════════════════════════════════════════════════════════════╝');
+        console.log('');
+
         return new Response(
-          JSON.stringify(response),
+          JSON.stringify(debugResponse),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
