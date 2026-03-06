@@ -21,6 +21,7 @@ const CustomInvoiceStatusManager = lazy(() => import('./settings/CustomInvoiceSt
 const BoxLabelSettings = lazy(() => import('./settings/BoxLabelSettings'));
 const RichTextTermsEditor = lazy(() => import('./settings/RichTextTermsEditor'));
 const KanbanSettings = lazy(() => import('./settings/KanbanSettings'));
+const IntegrationsDiagnostic = lazy(() => import('./diagnostics/IntegrationsDiagnostic').then(m => ({ default: m.IntegrationsDiagnostic })));
 interface CompanySettings {
   id: string;
   company_name: string;
@@ -134,7 +135,7 @@ interface ProductionStation {
 
 type SettingsTab =
   | 'company-info' | 'quote-invoice-settings' | 'box-label'
-  | 'square-integration' | 'resend-integration' | 'twilio-integration' | 'stripe-payments' | 'supplier-integrations' | 'shipstation-integration' | 'chipply-integration'
+  | 'square-integration' | 'resend-integration' | 'twilio-integration' | 'stripe-payments' | 'supplier-integrations' | 'shipstation-integration' | 'chipply-integration' | 'integrations-diagnostic'
   | 'user-management' | 'user-security'
   | 'automated-reports' | 'automations'
   | 'manage-goods' | 'receiving-settings' | 'po-settings'
@@ -432,7 +433,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       'twilio-integration',
       'stripe-payments',
       'supplier-integrations',
-      'chipply-integration'
+      'chipply-integration',
+      'integrations-diagnostic'
     ];
 
     if (!canAccessIntegrations && integrationTabs.includes(activeTab)) {
@@ -3949,6 +3951,24 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     </div>
                     {activeTab === 'chipply-integration' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
                   </button>
+
+                  <button
+                    onClick={() => setActiveTab('integrations-diagnostic')}
+                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group relative ${
+                      activeTab === 'integrations-diagnostic'
+                        ? 'bg-orange-50 dark:bg-orange-600/20 text-orange-700 dark:text-orange-400 shadow-sm'
+                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                    style={{ animationDelay: '100ms' }}
+                  >
+                    <AlertTriangle className={`w-4 h-4 flex-shrink-0 ${activeTab === 'integrations-diagnostic' ? 'text-orange-600 dark:text-orange-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                    <div className="flex-1 text-left">
+                      <div className={`font-medium text-sm ${activeTab === 'integrations-diagnostic' ? 'text-orange-700 dark:text-orange-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                        Diagnostics
+                      </div>
+                    </div>
+                    {activeTab === 'integrations-diagnostic' && <div className="w-1 h-6 bg-orange-600 dark:bg-orange-500 rounded-full absolute right-0" />}
+                  </button>
                 </div>
               )}
             </div>
@@ -6241,6 +6261,19 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               }
             >
               <ChipplyIntegrationSettings onBack={() => setActiveTab('company-info')} />
+            </Suspense>
+          )}
+
+          {/* Integrations Diagnostic Section */}
+          {activeTab === 'integrations-diagnostic' && canAccessIntegrations && (
+            <Suspense
+              fallback={
+                <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 flex items-center justify-center">
+                  <Loader2 className="w-6 h-6 text-orange-600 dark:text-orange-400 animate-spin" />
+                </div>
+              }
+            >
+              <IntegrationsDiagnostic />
             </Suspense>
           )}
 
