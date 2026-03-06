@@ -120,14 +120,16 @@ export function IntegrationsDiagnostic() {
       }
       setResults([...diagnostics]);
 
-      // 5. Test product search endpoint
+      // 5. Test product search endpoint with vendor-specific styles
       if (settings?.sanmar_enabled || settings?.ssactivewear_enabled) {
-        diagnostics.push({ name: 'Product Search API', status: 'checking', message: 'Testing with PC54...' });
+        const testStyle = settings?.sanmar_enabled ? 'PC54' : '64000';
+        const vendorName = settings?.sanmar_enabled ? 'SanMar' : 'S&S';
+        diagnostics.push({ name: 'Product Search API', status: 'checking', message: `Testing with ${testStyle} (${vendorName})...` });
         setResults([...diagnostics]);
 
         try {
           const response = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/product-search?style=PC54`,
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/product-search?style=${testStyle}`,
             {
               method: 'GET',
               headers: {
@@ -144,7 +146,7 @@ export function IntegrationsDiagnostic() {
             diagnostics[4] = {
               name: 'Product Search API',
               status: 'success',
-              message: `Found ${data.count} result(s)`,
+              message: `Found ${data.count} result(s) for ${testStyle}`,
               details: data
             };
           } else {
