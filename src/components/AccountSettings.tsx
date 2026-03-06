@@ -6017,6 +6017,13 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           )}
                         </button>
                       )}
+                      <button
+                        onClick={() => setActiveTab('integrations-diagnostic')}
+                        className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <AlertTriangle className="w-4 h-4" />
+                        Diagnostic
+                      </button>
                     </div>
 
                     {sanmarTestResult && (
@@ -6177,6 +6184,13 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           )}
                         </button>
                       )}
+                      <button
+                        onClick={() => setActiveTab('integrations-diagnostic')}
+                        className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <AlertTriangle className="w-4 h-4" />
+                        Diagnostic
+                      </button>
                     </div>
 
                     {ssaTestResult && (
