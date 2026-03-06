@@ -740,9 +740,12 @@ Deno.serve(async (req: Request) => {
   <shar:id>${credentials.accountNumber}</shar:id>
   <shar:password>${decryptedApiKey}</shar:password>
   <shar:productId>${normalizedProductId}</shar:productId>
+  <shar:currency>USD</shar:currency>
+  <shar:fobId>${fobId}</shar:fobId>
+  <shar:priceType>Customer</shar:priceType>
   <shar:localizationCountry>US</shar:localizationCountry>
   <shar:localizationLanguage>en</shar:localizationLanguage>
-  <shar:fobId>${fobId}</shar:fobId>
+  <shar:configurationType>Blank</shar:configurationType>
 </ns2:GetConfigurationAndPricingRequest>`;
 
         console.log(`[SS Pricing] SOAP Request Body:\n${soapBody}`);
