@@ -28,13 +28,13 @@ function escapeXml(str: string): string {
 }
 
 function getXmlValue(xmlText: string, tagName: string): string | null {
-  const regex = new RegExp(`<[^:]*:?${tagName}[^>]*>([^<]*)</[^:]*:?${tagName}>`, "i");
+  const regex = new RegExp(`<(?:[a-zA-Z0-9]+:)?${tagName}(?:\\s[^>]*)?>([^<]*)</(?:[a-zA-Z0-9]+:)?${tagName}>`, "i");
   const match = xmlText.match(regex);
   return match ? match[1].trim() : null;
 }
 
 function getAllXmlBlocks(xmlText: string, tagName: string): string[] {
-  const regex = new RegExp(`<[^:]*:?${tagName}[^>]*>([\\s\\S]*?)</[^:]*:?${tagName}>`, "gi");
+  const regex = new RegExp(`<(?:[a-zA-Z0-9]+:)?${tagName}(?:\\s[^>]*)?>([\\s\\S]*?)</(?:[a-zA-Z0-9]+:)?${tagName}>`, "gi");
   const blocks: string[] = [];
   let match;
   while ((match = regex.exec(xmlText)) !== null) {
@@ -149,7 +149,23 @@ export async function getLiveWholesalePricing(
     }
 
     if (results.length === 0) {
-      console.warn("[LivePricing] Zero price results parsed. Response preview:", xmlText.substring(0, 1000));
+      console.warn("[LivePricing] Zero price results parsed for", productId);
+      console.warn("[LivePricing] FULL RESPONSE:", xmlText);
+
+      const bodyMatch = xmlText.match(/<(?:[a-zA-Z0-9]+:)?Body[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Body>/i);
+      if (bodyMatch) {
+        console.warn("[LivePricing] SOAP Body content:", bodyMatch[1]);
+      }
+
+      const configMatch = xmlText.match(/<(?:[a-zA-Z0-9]+:)?Configuration[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Configuration>/i);
+      if (configMatch) {
+        console.log("[LivePricing] Found Configuration block, checking for pricing data inside...");
+      }
+
+      const priceMatch = xmlText.match(/<(?:[a-zA-Z0-9]+:)?PartPrice[^>]*>/i);
+      if (priceMatch) {
+        console.log("[LivePricing] Found PartPrice tags but Part blocks not parsed correctly");
+      }
     } else {
       console.log(`[LivePricing] Parsed ${results.length} price entries. Sample:`, results[0]);
     }
