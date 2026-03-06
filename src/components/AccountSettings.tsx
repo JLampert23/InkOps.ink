@@ -1861,7 +1861,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             {
               method: 'GET',
               headers: {
-                'Authorization': `Bearer ${token}`,
+                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                'X-User-Token': token,
                 'Content-Type': 'application/json',
               },
             }
@@ -1897,8 +1898,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ssactivewear-api?action=brands`,
             {
               headers: {
-                'Authorization': authHeader,
+                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
                 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                'X-User-Token': token,
               },
             }
           );
@@ -2018,8 +2020,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       const response = await fetch(testUrl, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'X-User-Token': token,
           'Content-Type': 'application/json',
         },
       });
@@ -2150,8 +2153,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       const response = await fetch(testUrl, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'X-User-Token': token,
           'Content-Type': 'application/json',
         },
       });
@@ -2247,7 +2251,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${token}`,
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'X-User-Token': token,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({}),
@@ -2361,7 +2366,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'X-User-Token': token,
         },
         body: JSON.stringify({
           to: user.email,

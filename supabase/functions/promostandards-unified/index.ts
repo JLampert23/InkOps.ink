@@ -7,7 +7,7 @@ const SSA_DEFAULT_FOB_ID = "NJ";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey, X-User-Token",
 };
 
 const PROMOSTANDARDS_ENDPOINTS = {
@@ -99,18 +99,19 @@ Deno.serve(async (req: Request) => {
       hasAnonKey: !!supabaseAnonKey
     });
 
+    const userToken = req.headers.get("X-User-Token") || "";
     const authHeader = req.headers.get("Authorization");
+    const bearerToken = authHeader?.replace("Bearer ", "") || "";
+    const isServiceRoleKey = bearerToken === supabaseServiceRoleKey;
+    const token = isServiceRoleKey ? bearerToken : (userToken || bearerToken);
 
-    if (!authHeader) {
-      console.error('❌ No Authorization header provided');
+    if (!token) {
+      console.error('❌ No authorization provided');
       return new Response(
-        JSON.stringify({ error: "Missing authorization header" }),
+        JSON.stringify({ error: "Missing authorization" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    const token = authHeader.replace("Bearer ", "");
-    const isServiceRoleKey = token === supabaseServiceRoleKey;
 
     console.log('🔑 Auth token check:', {
       tokenLength: token.length,

@@ -880,7 +880,8 @@ export default function MockupGenerator({
       const response = await fetch(searchUrl, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'X-User-Token': accessToken,
           'Content-Type': 'application/json',
         },
       });

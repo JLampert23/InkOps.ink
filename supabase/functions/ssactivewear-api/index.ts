@@ -4,7 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey, X-User-Token",
   "Access-Control-Max-Age": "86400",
 };
 
@@ -203,18 +203,18 @@ Deno.serve(async (req: Request) => {
       hasServiceRole: !!supabaseServiceRoleKey
     });
 
+    const userToken = req.headers.get("X-User-Token") || "";
     const authHeader = req.headers.get("Authorization");
+    const bearerToken = authHeader?.replace("Bearer ", "") || "";
+    const isServiceRoleKey = bearerToken === supabaseServiceRoleKey;
+    const token = isServiceRoleKey ? bearerToken : (userToken || bearerToken);
 
-    if (!authHeader) {
+    if (!token) {
       return new Response(
-        JSON.stringify({ error: "Missing authorization header" }),
+        JSON.stringify({ error: "Missing authorization" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    // Check if it's a service role key (internal call) or user JWT
-    const token = authHeader.replace("Bearer ", "");
-    const isServiceRoleKey = token === supabaseServiceRoleKey;
 
     console.log("🔑 Auth check:", {
       tokenLength: token.length,

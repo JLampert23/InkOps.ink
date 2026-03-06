@@ -128,7 +128,8 @@ export function IntegrationsDiagnostic() {
             {
               method: 'GET',
               headers: {
-                'Authorization': `Bearer ${session.access_token}`,
+                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                'X-User-Token': session.access_token,
                 'Content-Type': 'application/json',
               },
             }

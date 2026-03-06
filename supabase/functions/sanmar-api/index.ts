@@ -14,7 +14,7 @@ import {
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey, X-User-Token",
 };
 
 Deno.serve(async (req: Request) => {
@@ -31,20 +31,24 @@ Deno.serve(async (req: Request) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
+    const userToken = req.headers.get("X-User-Token") || "";
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
+    const bearerToken = authHeader?.replace('Bearer ', '') || "";
+    const isServiceRoleKey = bearerToken === supabaseServiceRoleKey;
+    const token = isServiceRoleKey ? bearerToken : (userToken || bearerToken);
+
+    if (!token) {
       return new Response(
-        JSON.stringify({ code: 401, message: "Missing Authorization header" }),
+        JSON.stringify({ code: 401, message: "Missing authorization" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const token = authHeader.replace('Bearer ', '');
     const url = new URL(req.url);
 
     let companyId: string;
 
-    if (token === supabaseServiceRoleKey) {
+    if (isServiceRoleKey) {
       const qsCompanyId = url.searchParams.get("companyId");
       if (!qsCompanyId) {
         return new Response(

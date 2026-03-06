@@ -67,8 +67,9 @@ export async function lookupProductByStyle(styleNumber: string): Promise<PromoSt
       `${EDGE_FUNCTION_URL}?action=product&productId=${encodeURIComponent(styleNumber)}`,
       {
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'X-User-Token': token,
         },
       }
     );
@@ -184,8 +185,9 @@ export async function getProductPricing(partId: string, useCache: boolean = true
       `${EDGE_FUNCTION_URL}?action=pricing&partId=${encodeURIComponent(partId)}`,
       {
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'X-User-Token': token,
         },
       }
     );
@@ -215,8 +217,9 @@ export async function getProductInventory(partId: string): Promise<PromoStandard
       `${EDGE_FUNCTION_URL}?action=inventory&partId=${encodeURIComponent(partId)}`,
       {
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'X-User-Token': token,
         },
       }
     );
@@ -246,8 +249,9 @@ export async function getProductMedia(partId: string): Promise<PromoStandardsMed
       `${EDGE_FUNCTION_URL}?action=media&partId=${encodeURIComponent(partId)}`,
       {
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'X-User-Token': token,
         },
       }
     );
@@ -407,8 +411,9 @@ export async function getUnifiedProductData(
 
     const response = await fetch(url, {
       headers: {
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
         'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        'X-User-Token': token,
         'Content-Type': 'application/json',
       },
     });
