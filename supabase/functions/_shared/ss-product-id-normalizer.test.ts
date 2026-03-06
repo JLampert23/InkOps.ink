@@ -21,9 +21,9 @@ function normalizeSsProductId(input: string): string {
 }
 
 function validateFobId(fobId: string | null): string {
-  if (!fobId) return 'IL';
+  if (!fobId) return 'NJ';
   const upperFob = fobId.toUpperCase();
-  return VALID_SS_FOB_IDS.includes(upperFob) ? upperFob : 'IL';
+  return VALID_SS_FOB_IDS.includes(upperFob) ? upperFob : 'NJ';
 }
 
 const testCases = [
@@ -52,9 +52,9 @@ const fobTestCases = [
   { input: "NV", expected: "NV", description: "Valid NV stays NV" },
   { input: "DS", expected: "DS", description: "Valid DS stays DS" },
   { input: "il", expected: "IL", description: "Lowercase normalizes to uppercase" },
-  { input: "XX", expected: "IL", description: "Invalid FOB defaults to IL" },
-  { input: null, expected: "IL", description: "Null defaults to IL" },
-  { input: "", expected: "IL", description: "Empty string defaults to IL" },
+  { input: "XX", expected: "NJ", description: "Invalid FOB defaults to NJ" },
+  { input: null, expected: "NJ", description: "Null defaults to NJ" },
+  { input: "", expected: "NJ", description: "Empty string defaults to NJ" },
 ];
 
 console.log("=== S&S ProductId Normalization Tests ===\n");

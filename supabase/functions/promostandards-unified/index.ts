@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { getLiveWholesalePricing, type VendorConfig } from "../_shared/live-wholesale-pricing.ts";
 
-const SSA_DEFAULT_FOB_ID = "IL";
+const SSA_DEFAULT_FOB_ID = "NJ";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

@@ -70,9 +70,9 @@ function normalizeSsProductId(input: string): string {
 }
 
 function validateFobId(fobId: string | null): string {
-  if (!fobId) return 'IL';
+  if (!fobId) return 'NJ';
   const upperFob = fobId.toUpperCase();
-  return VALID_SS_FOB_IDS.includes(upperFob) ? upperFob : 'IL';
+  return VALID_SS_FOB_IDS.includes(upperFob) ? upperFob : 'NJ';
 }
 
 async function makePromoStandardsRequest(
