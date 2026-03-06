@@ -733,12 +733,14 @@ Deno.serve(async (req: Request) => {
 
         // ============================================================
         // S&S PromoStandards Pricing API
-        // NOTE: S&S does NOT use the "B" prefix - that's SanMar only!
-        // S&S uses the raw style number: PC54, 5000, G500, etc.
+        // S&S Activewear requires the "B" prefix for pricing API
+        // Example: PC54 -> BPC54
         // ============================================================
 
-        // Normalize the product ID - remove B prefix if mistakenly passed
-        const normalizedPricingProductId = normalizeSsProductId(productId);
+        const styleUppercase = productId.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+        const normalizedPricingProductId = styleUppercase.startsWith('B')
+          ? styleUppercase
+          : `B${styleUppercase}`;
 
         const fobId = validateFobId(url.searchParams.get("fobId"));
         const priceType = "Customer";
