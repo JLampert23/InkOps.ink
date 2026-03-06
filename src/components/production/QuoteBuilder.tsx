@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Save, Plus, Trash2, GripVertical, X, Loader2, DollarSign, Settings, Search, Image as ImageIcon, Check, Info } from 'lucide-react';
+import { Save, Plus, Trash2, GripVertical, X, Loader2, DollarSign, Settings, Search, Image as ImageIcon, Check, Info, RefreshCw } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -2621,13 +2621,6 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                       </td>
                       <td className="p-0.5 border border-gray-300 dark:border-slate-800">
                         <div className="flex items-center justify-center gap-0.5">
-                          <button
-                            onClick={() => updatePriceFromMatrix(group.id, itemIdx)}
-                            className="p-0.5 text-green-600 dark:text-green-500 hover:text-green-700 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-slate-800 rounded"
-                            title="Refresh Pricing from Matrix"
-                          >
-                            <DollarSign className="w-3 h-3" />
-                          </button>
                               <button
                                 onClick={() => removeItem(group.id, itemIdx)}
                                 className="p-0.5 text-red-600 dark:text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-slate-800 rounded"
@@ -2667,6 +2660,13 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                                 >
                                   <Plus className="w-4 h-4" />
                                   Mockup
+                                </button>
+                                <button
+                                  onClick={() => updatePriceFromMatrix(group.id, 0)}
+                                  className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm flex items-center gap-2 shadow-sm"
+                                >
+                                  <RefreshCw className="w-4 h-4" />
+                                  Update Price
                                 </button>
                               </div>
                               <div className="flex items-center">
