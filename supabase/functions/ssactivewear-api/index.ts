@@ -732,15 +732,13 @@ Deno.serve(async (req: Request) => {
         }
 
         // ============================================================
-        // DEBUG VERSION: S&S PromoStandards Pricing API
-        // Following EXACT format from S&S PDF specification
+        // S&S PromoStandards Pricing API
+        // NOTE: S&S does NOT use the "B" prefix - that's SanMar only!
+        // S&S uses the raw style number: PC54, 5000, G500, etc.
         // ============================================================
 
-        // Step 1: Prepare productId with B-prefix (per S&S PDF spec)
-        const styleNumberUppercase = productId.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-        const bPrefixedProductId = styleNumberUppercase.startsWith('B')
-          ? styleNumberUppercase
-          : `B${styleNumberUppercase}`;
+        // Normalize the product ID - remove B prefix if mistakenly passed
+        const normalizedPricingProductId = normalizeSsProductId(productId);
 
         const fobId = validateFobId(url.searchParams.get("fobId"));
         const priceType = "Customer";
@@ -762,8 +760,8 @@ Deno.serve(async (req: Request) => {
         console.log('');
         console.log('[DEBUG] INPUT PARAMETERS:');
         console.log(`  Raw productId input:    "${productId}"`);
-        console.log(`  Style (uppercase):      "${styleNumberUppercase}"`);
-        console.log(`  B-Prefixed productId:   "${bPrefixedProductId}"`);
+        console.log(`  Style (uppercase):      "${normalizedPricingProductId}"`);
+        console.log(`  B-Prefixed productId:   "${normalizedPricingProductId}"`);
         console.log(`  fobId:                  "${fobId}"`);
         console.log(`  priceType:              "${priceType}"`);
         console.log(`  configurationType:      "${configurationType}"`);
@@ -777,7 +775,7 @@ Deno.serve(async (req: Request) => {
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${credentials.accountNumber}</shar:id>
   <shar:password>${decryptedApiKey}</shar:password>
-  <shar:productId>${bPrefixedProductId}</shar:productId>
+  <shar:productId>${normalizedPricingProductId}</shar:productId>
   <shar:currency>${currency}</shar:currency>
   <shar:fobId>${fobId}</shar:fobId>
   <shar:priceType>${priceType}</shar:priceType>
@@ -833,8 +831,8 @@ Deno.serve(async (req: Request) => {
                 parsed: null,
                 diagnostics: {
                   rawInput: productId,
-                  styleNumberUppercase,
-                  bPrefixedProductId,
+                  normalizedPricingProductId,
+                  normalizedPricingProductId,
                   fobId,
                   priceType,
                   configurationType,
@@ -956,7 +954,7 @@ Deno.serve(async (req: Request) => {
           supplier: "ssactivewear",
           action,
           method: "PROMOSTANDARDS_SOAP",
-          productId: bPrefixedProductId,
+          productId: normalizedPricingProductId,
           data: parsedParts.map(p => ({
             partId: p.partId,
             prices: p.priceBreaks.map((pb: any) => ({
@@ -999,8 +997,8 @@ Deno.serve(async (req: Request) => {
             },
             diagnostics: {
               rawInput: productId,
-              styleNumberUppercase,
-              bPrefixedProductId,
+              normalizedPricingProductId,
+              normalizedPricingProductId,
               fobId,
               priceType,
               configurationType,
