@@ -739,221 +739,145 @@ Deno.serve(async (req: Request) => {
 
         console.log('');
         console.log('===========================================================');
-        console.log('[SS Pricing DEBUG] STARTING PRICING REQUEST');
+        console.log('[SS Pricing] STARTING PRICING REQUEST');
         console.log('===========================================================');
-        console.log('[SS Pricing DEBUG] Input Parameters:');
+        console.log('[SS Pricing] Input Parameters:');
         console.log(`  - Raw productId input: "${productId}"`);
         console.log(`  - Normalized productId: "${normalizedProductId}"`);
         console.log(`  - fobId: "${fobId}"`);
-        console.log(`  - priceType: "Customer"`);
-        console.log(`  - configurationType: "Blank"`);
-        console.log(`  - currency: "USD"`);
-        console.log(`  - Account Number: "${credentials.accountNumber}"`);
-        console.log(`  - API Key (masked): "${maskedApiKey}"`);
         console.log('===========================================================');
 
-        const soapBody = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
-  <shar:wsVersion>1.0.0</shar:wsVersion>
-  <shar:id>${credentials.accountNumber}</shar:id>
-  <shar:password>${decryptedApiKey}</shar:password>
-  <shar:productId>${normalizedProductId}</shar:productId>
-  <shar:currency>USD</shar:currency>
-  <shar:fobId>${fobId}</shar:fobId>
-  <shar:priceType>Customer</shar:priceType>
-  <shar:localizationCountry>US</shar:localizationCountry>
-  <shar:localizationLanguage>en</shar:localizationLanguage>
-  <shar:configurationType>Blank</shar:configurationType>
-</ns2:GetConfigurationAndPricingRequest>`;
+        // S&S Activewear's PromoStandards Pricing API does NOT accept style numbers (like "2000")
+        // It only works with partIds (SKU-level). So we use the REST API for pricing instead.
+        // The REST API returns pricing data directly with customerPrice field.
 
-        const maskedSoapBody = soapBody.replace(
-          /<shar:password>[^<]*<\/shar:password>/,
-          `<shar:password>${maskedApiKey}</shar:password>`
-        );
+        console.log('[SS Pricing] Using S&S REST API for pricing (PromoStandards requires partId, not style)');
 
-        console.log('[SS Pricing DEBUG] SOAP Request Body (password masked):');
-        console.log(maskedSoapBody);
-        console.log('===========================================================');
-
-        let xmlResponse = '';
-        let soapFault: string | null = null;
+        const parts: any[] = [];
+        let restApiUsed = false;
+        let restApiError: string | null = null;
 
         try {
-          xmlResponse = await makePromoStandardsRequest(
-            PROMOSTANDARDS_ENDPOINTS.pricing,
-            "getConfigurationAndPricing",
-            soapBody,
-            credentials.accountNumber,
-            decryptedApiKey
-          );
-        } catch (reqError: any) {
-          console.error('[SS Pricing DEBUG] REQUEST FAILED:', reqError.message);
-          return new Response(
-            JSON.stringify({
-              success: false,
-              supplier: "ssactivewear",
-              action,
-              error: "RequestFailed",
-              debug: {
-                requestXml: maskedSoapBody,
-                responseXml: null,
-                soapFault: reqError.message,
-                parsed: null,
-                diagnostics: {
-                  rawInput: productId,
-                  normalizedProductId,
-                  fobId,
-                  priceType: "Customer",
-                  configurationType: "Blank",
-                  accountNumber: credentials.accountNumber,
-                  apiKeyMasked: maskedApiKey,
+          const ssaRestApiUrl = `https://api.ssactivewear.com/v2/products/?style=${encodeURIComponent(normalizedProductId)}`;
+          console.log('[SS Pricing] Calling S&S REST API:', ssaRestApiUrl);
+
+          const restApiResponse = await fetch(ssaRestApiUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Basic ${btoa(`${credentials.accountNumber}:${decryptedApiKey}`)}`,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (restApiResponse.ok) {
+            const restApiData = await restApiResponse.json();
+            restApiUsed = true;
+
+            console.log('[SS Pricing] REST API returned', Array.isArray(restApiData) ? restApiData.length : 0, 'products');
+
+            if (Array.isArray(restApiData) && restApiData.length > 0) {
+              // Group pricing by SKU (partId)
+              const partPricingMap = new Map<string, any>();
+
+              for (const variant of restApiData) {
+                const sku = variant.sku;
+                const customerPrice = parseFloat(variant.customerPrice || variant.piecePrice || variant.salePrice || '0');
+                const casePrice = parseFloat(variant.casePrice || '0');
+                const casePieces = parseInt(variant.caseQty || variant.casePieces || '1') || 1;
+
+                if (!sku || customerPrice <= 0) continue;
+
+                if (!partPricingMap.has(sku)) {
+                  partPricingMap.set(sku, {
+                    partId: sku,
+                    colorName: variant.colorName || '',
+                    sizeName: variant.sizeName || '',
+                    priceBreaks: []
+                  });
+                }
+
+                // Add piece price
+                partPricingMap.get(sku).priceBreaks.push({
+                  minQuantity: 1,
+                  price: customerPrice,
+                  priceUom: 'PC',
+                  discountCode: null,
+                });
+
+                // Add case price if available and different
+                if (casePrice > 0 && casePieces > 1) {
+                  const perPieceCasePrice = casePrice / casePieces;
+                  if (perPieceCasePrice < customerPrice) {
+                    partPricingMap.get(sku).priceBreaks.push({
+                      minQuantity: casePieces,
+                      price: perPieceCasePrice,
+                      priceUom: 'CS',
+                      discountCode: 'CASE',
+                    });
+                  }
                 }
               }
-            }),
-            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
 
-        console.log('[SS Pricing DEBUG] RAW RESPONSE (full):');
-        console.log(xmlResponse);
-        console.log('===========================================================');
+              for (const [, partData] of partPricingMap) {
+                parts.push(partData);
+              }
 
-        if (xmlResponse.includes('soap:Fault') || xmlResponse.includes('faultstring')) {
-          soapFault = getXmlValue(xmlResponse, 'faultstring') || 'Unknown SOAP fault';
-          console.error('[SS Pricing DEBUG] SOAP FAULT DETECTED:', soapFault);
-        }
-
-        const hasPartArray = xmlResponse.includes('PartArray') || xmlResponse.includes(':PartArray');
-        const hasPartPriceArray = xmlResponse.includes('PartPriceArray') || xmlResponse.includes(':PartPriceArray');
-        const hasPartPrice = xmlResponse.includes('<PartPrice') || xmlResponse.includes(':PartPrice');
-        const hasPart = xmlResponse.includes('<Part>') || xmlResponse.includes(':Part>');
-
-        console.log('[SS Pricing DEBUG] Response Analysis:');
-        console.log(`  - Contains PartArray: ${hasPartArray}`);
-        console.log(`  - Contains Part nodes: ${hasPart}`);
-        console.log(`  - Contains PartPriceArray: ${hasPartPriceArray}`);
-        console.log(`  - Contains PartPrice nodes: ${hasPartPrice}`);
-        console.log(`  - Contains SOAP Fault: ${!!soapFault}`);
-
-        const errorCode = getXmlValue(xmlResponse, 'errorCode');
-        const errorMessage = getXmlValue(xmlResponse, 'errorMessage');
-        if (errorCode || errorMessage) {
-          console.log(`  - Error Code: ${errorCode || 'none'}`);
-          console.log(`  - Error Message: ${errorMessage || 'none'}`);
-        }
-
-        const partPattern = /<(?:[a-zA-Z0-9]+:)?Part[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Part>/gi;
-        const parts: any[] = [];
-        let partMatch;
-        let partIndex = 0;
-
-        while ((partMatch = partPattern.exec(xmlResponse)) !== null) {
-          partIndex++;
-          const partXml = partMatch[1];
-          const partId = getXmlValue(partXml, "partId");
-
-          console.log(`[SS Pricing DEBUG] Parsing Part #${partIndex}: partId="${partId}"`);
-
-          const pricePattern = /<(?:[a-zA-Z0-9]+:)?PartPrice[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?PartPrice>/gi;
-          const priceBreaks: any[] = [];
-          let priceMatch;
-          let priceIndex = 0;
-
-          while ((priceMatch = pricePattern.exec(partXml)) !== null) {
-            priceIndex++;
-            const priceXml = priceMatch[1];
-            const minQuantity = getXmlValue(priceXml, "minQuantity");
-            const price = getXmlValue(priceXml, "price");
-            const priceUom = getXmlValue(priceXml, "priceUom");
-            const discountCode = getXmlValue(priceXml, "discountCode");
-
-            console.log(`    - PartPrice #${priceIndex}: minQuantity=${minQuantity}, price=${price}, priceUom=${priceUom}, discountCode=${discountCode}`);
-
-            priceBreaks.push({
-              minQuantity: parseInt(minQuantity || "1"),
-              price: parseFloat(price || "0"),
-              priceUom: priceUom || null,
-              discountCode: discountCode || null,
-            });
+              console.log('[SS Pricing] Parsed', parts.length, 'unique SKUs with pricing');
+            }
+          } else {
+            const errorText = await restApiResponse.text().catch(() => '');
+            restApiError = `HTTP ${restApiResponse.status}: ${errorText.substring(0, 200)}`;
+            console.error('[SS Pricing] REST API error:', restApiError);
           }
-
-          if (priceBreaks.length === 0) {
-            console.warn(`    - WARNING: No PartPrice nodes found for partId="${partId}"`);
-          }
-
-          parts.push({
-            partId,
-            priceBreaks
-          });
+        } catch (restErr: any) {
+          restApiError = restErr.message;
+          console.error('[SS Pricing] REST API exception:', restErr.message);
         }
 
         console.log('===========================================================');
-        console.log(`[SS Pricing DEBUG] PARSING COMPLETE`);
+        console.log(`[SS Pricing] COMPLETE`);
         console.log(`  - Total Parts found: ${parts.length}`);
-        console.log(`  - Total PriceBreaks: ${parts.reduce((sum, p) => sum + p.priceBreaks.length, 0)}`);
+        console.log(`  - REST API used: ${restApiUsed}`);
+        console.log(`  - REST API error: ${restApiError || 'none'}`);
         console.log('===========================================================');
 
-        if (parts.length === 0) {
-          console.warn('[SS Pricing DEBUG] NO PARTS FOUND - checking for alternative data structures...');
-
-          const configPartPattern = /<(?:[a-zA-Z0-9]+:)?ConfigurationAndPricing[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?ConfigurationAndPricing>/gi;
-          const configMatch = configPartPattern.exec(xmlResponse);
-          if (configMatch) {
-            console.log('[SS Pricing DEBUG] Found ConfigurationAndPricing wrapper');
-          }
-
-          const anyPartId = getXmlValue(xmlResponse, 'partId');
-          const anyPrice = getXmlValue(xmlResponse, 'price');
-          const anyMinQty = getXmlValue(xmlResponse, 'minQuantity');
-          console.log(`[SS Pricing DEBUG] Loose field search: partId=${anyPartId}, price=${anyPrice}, minQuantity=${anyMinQty}`);
-        }
-
-        const debugResponse = {
+        const response = {
           success: parts.length > 0,
           supplier: "ssactivewear",
           action,
           productId: normalizedProductId,
           data: parts.map(p => ({
             partId: p.partId,
+            colorName: p.colorName,
+            sizeName: p.sizeName,
             prices: p.priceBreaks.map((pb: any) => ({
               quantity: pb.minQuantity,
               price: pb.price,
+              priceUom: pb.priceUom,
             }))
           })),
           debug: {
-            requestXml: maskedSoapBody,
-            responseXml: xmlResponse.substring(0, 5000) + (xmlResponse.length > 5000 ? '...[truncated]' : ''),
-            responseLength: xmlResponse.length,
-            soapFault,
-            errorCode,
-            errorMessage,
-            responseAnalysis: {
-              hasPartArray,
-              hasPart,
-              hasPartPriceArray,
-              hasPartPrice,
-              hasSoapFault: !!soapFault,
-            },
-            parsed: {
-              totalParts: parts.length,
-              totalPriceBreaks: parts.reduce((sum, p) => sum + p.priceBreaks.length, 0),
-              parts: parts.slice(0, 5),
-            },
+            method: 'REST_API',
+            note: 'S&S PromoStandards Pricing API requires partId (SKU), not style number. Using REST API instead.',
+            restApiUsed,
+            restApiError,
             diagnostics: {
               rawInput: productId,
               normalizedProductId,
               fobId,
-              priceType: "Customer",
-              configurationType: "Blank",
-              currency: "USD",
               accountNumber: credentials.accountNumber,
               apiKeyMasked: maskedApiKey,
-              endpoint: PROMOSTANDARDS_ENDPOINTS.pricing,
-            }
+            },
+            parsed: {
+              totalParts: parts.length,
+              totalPriceBreaks: parts.reduce((sum, p) => sum + p.priceBreaks.length, 0),
+              sampleParts: parts.slice(0, 5),
+            },
           }
         };
 
         return new Response(
-          JSON.stringify(debugResponse),
+          JSON.stringify(response),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
