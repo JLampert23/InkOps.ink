@@ -252,6 +252,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [ssaTestResult, setSsaTestResult] = useState<any>(null);
   const [syncingCatalog, setSyncingCatalog] = useState(false);
   const [catalogSyncResult, setCatalogSyncResult] = useState<any>(null);
+  const [runningDiagnostic, setRunningDiagnostic] = useState(false);
+  const [diagnosticResult, setDiagnosticResult] = useState<any>(null);
 
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -2294,6 +2296,140 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     } finally {
       setSyncingCatalog(false);
     }
+  };
+
+  const runSupplierDiagnostic = async () => {
+    setRunningDiagnostic(true);
+    setDiagnosticResult(null);
+
+    const results: any = {
+      timestamp: new Date().toISOString(),
+      checks: [],
+    };
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        results.checks.push({ name: 'Authentication', status: 'error', message: 'Not authenticated' });
+        setDiagnosticResult(results);
+        setRunningDiagnostic(false);
+        return;
+      }
+      results.checks.push({ name: 'Authentication', status: 'success', message: 'Authenticated', userId: session.user.id });
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
+      if (!profile?.company_id) {
+        results.checks.push({ name: 'Company', status: 'error', message: 'No company found' });
+        setDiagnosticResult(results);
+        setRunningDiagnostic(false);
+        return;
+      }
+      results.checks.push({ name: 'Company', status: 'success', message: 'Found', companyId: profile.company_id });
+
+      const { data: settings } = await supabase
+        .from('company_settings')
+        .select('sanmar_enabled, ssactivewear_enabled, sanmar_promo_username, sanmar_promo_password_encrypted, ssactivewear_username, ssactivewear_api_key_encrypted')
+        .eq('id', profile.company_id)
+        .maybeSingle();
+
+      results.checks.push({
+        name: 'SanMar Config',
+        status: settings?.sanmar_enabled ? (settings?.sanmar_promo_username && settings?.sanmar_promo_password_encrypted ? 'success' : 'warning') : 'disabled',
+        message: !settings?.sanmar_enabled ? 'Disabled' : (settings?.sanmar_promo_username ? 'Credentials configured' : 'Missing credentials'),
+        enabled: settings?.sanmar_enabled,
+        hasUsername: !!settings?.sanmar_promo_username,
+        hasPassword: !!settings?.sanmar_promo_password_encrypted,
+      });
+
+      results.checks.push({
+        name: 'S&S Config',
+        status: settings?.ssactivewear_enabled ? (settings?.ssactivewear_username && settings?.ssactivewear_api_key_encrypted ? 'success' : 'warning') : 'disabled',
+        message: !settings?.ssactivewear_enabled ? 'Disabled' : (settings?.ssactivewear_api_key_encrypted ? 'Credentials configured' : 'Missing credentials'),
+        enabled: settings?.ssactivewear_enabled,
+        hasAccountNumber: !!settings?.ssactivewear_username,
+        hasApiKey: !!settings?.ssactivewear_api_key_encrypted,
+      });
+
+      if (settings?.sanmar_enabled || settings?.ssactivewear_enabled) {
+        try {
+          const response = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/product-search?style=PC54`,
+            {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                'X-User-Token': session.access_token,
+                'Content-Type': 'application/json',
+              },
+            }
+          );
+          const data = await response.json();
+          results.checks.push({
+            name: 'Product Search API',
+            status: response.ok && data.success ? 'success' : 'error',
+            message: response.ok && data.success ? `Found ${data.count} result(s) for PC54` : (data.error || 'Search failed'),
+            httpStatus: response.status,
+            resultCount: data.count,
+          });
+        } catch (err: any) {
+          results.checks.push({
+            name: 'Product Search API',
+            status: 'error',
+            message: err.message || 'Network error',
+          });
+        }
+      }
+
+      if (settings?.ssactivewear_enabled && settings?.ssactivewear_api_key_encrypted) {
+        try {
+          const pricingUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ssactivewear-api?action=pricing&productId=PC54`;
+          const pricingResponse = await fetch(pricingUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+              'X-User-Token': session.access_token,
+              'Content-Type': 'application/json',
+            },
+          });
+          const pricingData = await pricingResponse.json();
+          results.checks.push({
+            name: 'S&S Pricing API',
+            status: pricingResponse.ok && pricingData.success ? 'success' : 'error',
+            message: pricingData.success
+              ? `Got ${pricingData.priceBreaks?.length || 0} price breaks`
+              : (pricingData.error || 'No pricing data'),
+            httpStatus: pricingResponse.status,
+            priceBreakCount: pricingData.priceBreaks?.length,
+            debug: pricingData.debug,
+          });
+        } catch (err: any) {
+          results.checks.push({
+            name: 'S&S Pricing API',
+            status: 'error',
+            message: err.message || 'Network error',
+          });
+        }
+      }
+
+      results.summary = {
+        total: results.checks.length,
+        success: results.checks.filter((c: any) => c.status === 'success').length,
+        errors: results.checks.filter((c: any) => c.status === 'error').length,
+        warnings: results.checks.filter((c: any) => c.status === 'warning').length,
+        disabled: results.checks.filter((c: any) => c.status === 'disabled').length,
+      };
+
+    } catch (error: any) {
+      results.checks.push({ name: 'Diagnostic', status: 'error', message: error.message });
+    }
+
+    setDiagnosticResult(results);
+    setRunningDiagnostic(false);
   };
 
   const testSquareConnection = async () => {
@@ -6018,13 +6154,74 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         </button>
                       )}
                       <button
-                        onClick={() => setActiveTab('integrations-diagnostic')}
-                        className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center justify-center gap-2"
+                        onClick={runSupplierDiagnostic}
+                        disabled={runningDiagnostic}
+                        className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-orange-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                       >
-                        <AlertTriangle className="w-4 h-4" />
-                        Diagnostic
+                        {runningDiagnostic ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Running...
+                          </>
+                        ) : (
+                          <>
+                            <AlertTriangle className="w-4 h-4" />
+                            Diagnostic
+                          </>
+                        )}
                       </button>
                     </div>
+
+                    {diagnosticResult && (
+                      <div className="p-4 rounded-lg border-2 border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                            <AlertTriangle className="w-5 h-5 text-orange-600" />
+                            Diagnostic Results
+                          </h4>
+                          {diagnosticResult.summary && (
+                            <div className="flex gap-2 text-xs">
+                              <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">{diagnosticResult.summary.success} OK</span>
+                              {diagnosticResult.summary.errors > 0 && (
+                                <span className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded">{diagnosticResult.summary.errors} Errors</span>
+                              )}
+                              {diagnosticResult.summary.warnings > 0 && (
+                                <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded">{diagnosticResult.summary.warnings} Warnings</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          {diagnosticResult.checks?.map((check: any, idx: number) => (
+                            <div key={idx} className={`flex items-start gap-3 p-2 rounded ${
+                              check.status === 'success' ? 'bg-green-100 dark:bg-green-900/20' :
+                              check.status === 'error' ? 'bg-red-100 dark:bg-red-900/20' :
+                              check.status === 'warning' ? 'bg-yellow-100 dark:bg-yellow-900/20' :
+                              'bg-gray-100 dark:bg-gray-800'
+                            }`}>
+                              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${
+                                check.status === 'success' ? 'bg-green-500' :
+                                check.status === 'error' ? 'bg-red-500' :
+                                check.status === 'warning' ? 'bg-yellow-500' :
+                                'bg-gray-400'
+                              }`}>
+                                {check.status === 'success' ? '✓' : check.status === 'error' ? '✕' : check.status === 'warning' ? '!' : '-'}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm text-gray-900 dark:text-white">{check.name}</p>
+                                <p className="text-xs text-gray-600 dark:text-gray-400">{check.message}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <details className="mt-3">
+                          <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">View raw JSON</summary>
+                          <pre className="mt-2 text-xs bg-gray-900 text-gray-100 p-3 rounded overflow-x-auto max-h-48">
+                            {JSON.stringify(diagnosticResult, null, 2)}
+                          </pre>
+                        </details>
+                      </div>
+                    )}
 
                     {sanmarTestResult && (
                       <div className={`p-4 rounded-lg border ${sanmarTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
@@ -6185,13 +6382,74 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         </button>
                       )}
                       <button
-                        onClick={() => setActiveTab('integrations-diagnostic')}
-                        className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors flex items-center justify-center gap-2"
+                        onClick={runSupplierDiagnostic}
+                        disabled={runningDiagnostic}
+                        className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:bg-orange-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                       >
-                        <AlertTriangle className="w-4 h-4" />
-                        Diagnostic
+                        {runningDiagnostic ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Running...
+                          </>
+                        ) : (
+                          <>
+                            <AlertTriangle className="w-4 h-4" />
+                            Diagnostic
+                          </>
+                        )}
                       </button>
                     </div>
+
+                    {diagnosticResult && (
+                      <div className="p-4 rounded-lg border-2 border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                            <AlertTriangle className="w-5 h-5 text-orange-600" />
+                            Diagnostic Results
+                          </h4>
+                          {diagnosticResult.summary && (
+                            <div className="flex gap-2 text-xs">
+                              <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">{diagnosticResult.summary.success} OK</span>
+                              {diagnosticResult.summary.errors > 0 && (
+                                <span className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded">{diagnosticResult.summary.errors} Errors</span>
+                              )}
+                              {diagnosticResult.summary.warnings > 0 && (
+                                <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded">{diagnosticResult.summary.warnings} Warnings</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          {diagnosticResult.checks?.map((check: any, idx: number) => (
+                            <div key={idx} className={`flex items-start gap-3 p-2 rounded ${
+                              check.status === 'success' ? 'bg-green-100 dark:bg-green-900/20' :
+                              check.status === 'error' ? 'bg-red-100 dark:bg-red-900/20' :
+                              check.status === 'warning' ? 'bg-yellow-100 dark:bg-yellow-900/20' :
+                              'bg-gray-100 dark:bg-gray-800'
+                            }`}>
+                              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${
+                                check.status === 'success' ? 'bg-green-500' :
+                                check.status === 'error' ? 'bg-red-500' :
+                                check.status === 'warning' ? 'bg-yellow-500' :
+                                'bg-gray-400'
+                              }`}>
+                                {check.status === 'success' ? '✓' : check.status === 'error' ? '✕' : check.status === 'warning' ? '!' : '-'}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm text-gray-900 dark:text-white">{check.name}</p>
+                                <p className="text-xs text-gray-600 dark:text-gray-400">{check.message}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <details className="mt-3">
+                          <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">View raw JSON</summary>
+                          <pre className="mt-2 text-xs bg-gray-900 text-gray-100 p-3 rounded overflow-x-auto max-h-48">
+                            {JSON.stringify(diagnosticResult, null, 2)}
+                          </pre>
+                        </details>
+                      </div>
+                    )}
 
                     {ssaTestResult && (
                       <div className={`p-4 rounded-lg border ${ssaTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
