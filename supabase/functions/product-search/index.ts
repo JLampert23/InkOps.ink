@@ -11,7 +11,7 @@ import {
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey, X-User-Token",
 };
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
@@ -120,15 +120,15 @@ Deno.serve(async (req: Request) => {
     if (companyIdParam) {
       companyId = companyIdParam;
     } else {
-      const authHeader = req.headers.get("Authorization");
-      if (!authHeader) {
+      const userToken = req.headers.get("X-User-Token") || req.headers.get("Authorization")?.replace("Bearer ", "") || "";
+      if (!userToken) {
         return new Response(
-          JSON.stringify({ error: "Missing authorization header" }),
+          JSON.stringify({ error: "Missing authorization" }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      const token = authHeader.replace("Bearer ", "");
+      const token = userToken;
       const jwtParts = token.split('.');
 
       if (jwtParts.length !== 3) {

@@ -1091,8 +1091,9 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       console.log('⏳ Fetching...');
       const response = await fetch(apiUrl, {
         headers: {
-          'Authorization': `Bearer ${freshSession.access_token}`,
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'X-User-Token': freshSession.access_token,
           'Content-Type': 'application/json',
         },
       });
