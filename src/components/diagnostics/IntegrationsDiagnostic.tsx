@@ -18,7 +18,7 @@ export function IntegrationsDiagnostic() {
   const [magicLinkResult, setMagicLinkResult] = useState<any>(null);
   const [ssPricingTesting, setSSPricingTesting] = useState(false);
   const [ssPricingResult, setSSPricingResult] = useState<any>(null);
-  const [ssPricingProductId, setSSPricingProductId] = useState('PC54');
+  const [ssPricingProductId, setSSPricingProductId] = useState('64000');
 
   useEffect(() => {
     runDiagnostics();
@@ -556,7 +556,7 @@ export function IntegrationsDiagnostic() {
                 type="text"
                 value={ssPricingProductId}
                 onChange={(e) => setSSPricingProductId(e.target.value)}
-                placeholder="e.g., PC54, 5000, G500"
+                placeholder="e.g., 64000, 5000, 2000"
                 className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white w-48"
               />
             </div>
