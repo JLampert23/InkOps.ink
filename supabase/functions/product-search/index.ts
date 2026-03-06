@@ -585,7 +585,6 @@ async function fetchAndCacheSSActivewear(
       }
     }
 
-    // Fetch and cache pricing via PromoStandards
     let cachedPricingMap: Map<string, number> | null = null;
     try {
       const pricingUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=pricing&productId=${encodeURIComponent(style)}&companyId=${encodeURIComponent(companyId)}`;
@@ -632,6 +631,68 @@ async function fetchAndCacheSSActivewear(
       }
     } catch (pricingError: any) {
       console.warn('Failed to fetch/cache SSA pricing:', pricingError.message);
+    }
+
+    if (!cachedPricingMap || cachedPricingMap.size === 0) {
+      console.log('[SSA Pricing] PromoStandards returned no pricing, trying REST API fallback...');
+      try {
+        const { data: ssSettings } = await supabaseAdmin
+          .from("company_settings")
+          .select("ssactivewear_username, ssactivewear_api_key_encrypted")
+          .eq("id", companyId)
+          .maybeSingle();
+
+        if (ssSettings?.ssactivewear_username && ssSettings?.ssactivewear_api_key_encrypted) {
+          const decryptResp = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${supabaseServiceKey}`,
+            },
+            body: JSON.stringify({ action: "decrypt", token: ssSettings.ssactivewear_api_key_encrypted }),
+          });
+
+          if (decryptResp.ok) {
+            const { result: decKey } = await decryptResp.json();
+            const restUrl = `https://api.ssactivewear.com/v2/products/?style=${encodeURIComponent(style)}`;
+            const restResp = await fetch(restUrl, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Basic ${btoa(`${ssSettings.ssactivewear_username}:${decKey}`)}`,
+                'Content-Type': 'application/json',
+              },
+            });
+
+            if (restResp.ok) {
+              const restData = await restResp.json();
+              if (Array.isArray(restData) && restData.length > 0) {
+                cachedPricingMap = new Map();
+                for (const variant of restData) {
+                  const pid = variant.sku || variant.partID;
+                  const price = parseFloat(variant.customerPrice || variant.salePrice || variant.price || '0');
+                  if (pid && price > 0) {
+                    cachedPricingMap.set(pid, price);
+                    await supabaseAdmin
+                      .from("ss_catalog_pricing")
+                      .upsert({
+                        company_id: companyId,
+                        part_number: pid,
+                        unit_price: price,
+                        quantity_min: 1,
+                        quantity_max: 99999,
+                        discount_code: null,
+                        price_expiry_date: null,
+                      }, { onConflict: "company_id,part_number,quantity_min" });
+                  }
+                }
+                console.log(`[SSA Pricing] REST API fallback cached pricing for ${cachedPricingMap.size} parts`);
+              }
+            }
+          }
+        }
+      } catch (restPricingErr: any) {
+        console.warn('[SSA Pricing] REST API pricing fallback failed:', restPricingErr.message);
+      }
     }
 
     // Fetch and cache media (images) - check cache first, then PromoStandards, then REST API fallback

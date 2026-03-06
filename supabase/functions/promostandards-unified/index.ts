@@ -467,58 +467,134 @@ Deno.serve(async (req: Request) => {
         console.warn('💰 Failed to cache pricing:', cacheErr.message);
       }
     } else {
-      console.warn('💰 Live pricing returned empty, checking cache as fallback...');
+      console.warn('💰 Live pricing returned empty, trying REST API fallback...');
 
-      // Get part IDs from the product data to query cache
-      const partIds = productData.parts?.map((p: any) => p.partId).filter(Boolean) || [];
+      try {
+        const ssaRestApiUrl = `https://api.ssactivewear.com/v2/products/?style=${encodeURIComponent(styleNumber)}`;
+        console.log('💰 Calling SSActivewear REST API for pricing:', ssaRestApiUrl);
 
-      if (partIds.length > 0) {
-        console.log('💰 Querying cache for', partIds.length, 'part IDs');
-        const { data: cachedPricing } = await supabase
-          .from('ss_catalog_pricing')
-          .select('part_number, unit_price, quantity_min, quantity_max, discount_code')
-          .eq('company_id', companyId)
-          .in('part_number', partIds)
-          .or(`price_expiry_date.gte.${new Date().toISOString().split('T')[0]},price_expiry_date.is.null`)
-          .order('part_number')
-          .order('quantity_min');
+        const restPricingResponse = await fetch(ssaRestApiUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Basic ${btoa(`${credentials.accountNumber}:${decryptedApiKey}`)}`,
+            'Content-Type': 'application/json',
+          },
+        });
 
-        if (cachedPricing && cachedPricing.length > 0) {
-          console.log('💰 Found cached pricing for', cachedPricing.length, 'records');
-          usedCache = true;
+        if (restPricingResponse.ok) {
+          const restData = await restPricingResponse.json();
+          console.log('💰 REST API returned', Array.isArray(restData) ? restData.length : 0, 'products for pricing');
 
-          // Group by part_number
-          const partPricingMap = new Map();
-          cachedPricing.forEach(row => {
-            if (!partPricingMap.has(row.part_number)) {
-              partPricingMap.set(row.part_number, []);
+          if (Array.isArray(restData) && restData.length > 0) {
+            const partPricingMap = new Map<string, any[]>();
+
+            for (const variant of restData) {
+              const variantPartId = variant.sku || variant.partID;
+              const customerPrice = parseFloat(variant.customerPrice || variant.salePrice || variant.price || '0');
+
+              if (!variantPartId || customerPrice <= 0) continue;
+
+              if (!partPricingMap.has(variantPartId)) {
+                partPricingMap.set(variantPartId, []);
+              }
+              partPricingMap.get(variantPartId)!.push({
+                minQuantity: 1,
+                price: customerPrice,
+                discountCode: null,
+              });
             }
-            partPricingMap.get(row.part_number).push({
-              minQuantity: row.quantity_min,
-              price: parseFloat(row.unit_price),
-              discountCode: row.discount_code,
-            });
-          });
 
-          pricingData.parts = Array.from(partPricingMap.entries()).map(([partId, prices]) => ({
-            partId,
-            prices
-          }));
+            if (partPricingMap.size > 0) {
+              pricingData.parts = Array.from(partPricingMap.entries()).map(([partId, prices]) => ({
+                partId,
+                prices
+              }));
 
-          // Create pricing map
-          pricingData.pricesByPartId = {};
-          pricingData.parts.forEach((part: any) => {
-            if (part.partId && part.prices && part.prices.length > 0) {
-              pricingData.pricesByPartId[part.partId] = part.prices[0].price;
+              pricingData.pricesByPartId = {};
+              pricingData.parts.forEach((part: any) => {
+                if (part.partId && part.prices && part.prices.length > 0) {
+                  pricingData.pricesByPartId[part.partId] = part.prices[0].price;
+                }
+              });
+
+              console.log('💰 REST API pricing: ', pricingData.parts.length, 'parts,', Object.keys(pricingData.pricesByPartId).length, 'in price map');
+              usedCache = false;
+
+              try {
+                for (const [partId, prices] of partPricingMap) {
+                  await supabase
+                    .from('ss_catalog_pricing')
+                    .upsert({
+                      company_id: companyId,
+                      part_number: partId,
+                      unit_price: prices[0].price,
+                      quantity_min: 1,
+                      quantity_max: 99999,
+                      discount_code: null,
+                      price_expiry_date: null,
+                    }, {
+                      onConflict: "company_id,part_number,quantity_min"
+                    });
+                }
+                console.log('💰 Cached REST API pricing for', partPricingMap.size, 'parts');
+              } catch (cacheErr: any) {
+                console.warn('💰 Failed to cache REST API pricing:', cacheErr.message);
+              }
             }
-          });
-
-          console.log('💰 Using cached pricing:', pricingData.parts.length, 'parts with', Object.keys(pricingData.pricesByPartId).length, 'in price map');
+          }
         } else {
-          console.warn('💰 No cached pricing found for these part IDs');
+          console.warn('💰 REST API pricing request failed:', restPricingResponse.status);
         }
-      } else {
-        console.warn('💰 No part IDs available to query cache');
+      } catch (restErr: any) {
+        console.warn('💰 REST API pricing fallback failed:', restErr.message);
+      }
+
+      if (!pricingData.parts || pricingData.parts.length === 0) {
+        console.warn('💰 REST API fallback empty, checking DB cache...');
+        const partIds = productData.parts?.map((p: any) => p.partId).filter(Boolean) || [];
+
+        if (partIds.length > 0) {
+          const { data: cachedPricing } = await supabase
+            .from('ss_catalog_pricing')
+            .select('part_number, unit_price, quantity_min, quantity_max, discount_code')
+            .eq('company_id', companyId)
+            .in('part_number', partIds)
+            .or(`price_expiry_date.gte.${new Date().toISOString().split('T')[0]},price_expiry_date.is.null`)
+            .order('part_number')
+            .order('quantity_min');
+
+          if (cachedPricing && cachedPricing.length > 0) {
+            usedCache = true;
+
+            const partPricingMap = new Map();
+            cachedPricing.forEach(row => {
+              if (!partPricingMap.has(row.part_number)) {
+                partPricingMap.set(row.part_number, []);
+              }
+              partPricingMap.get(row.part_number).push({
+                minQuantity: row.quantity_min,
+                price: parseFloat(row.unit_price),
+                discountCode: row.discount_code,
+              });
+            });
+
+            pricingData.parts = Array.from(partPricingMap.entries()).map(([partId, prices]) => ({
+              partId,
+              prices
+            }));
+
+            pricingData.pricesByPartId = {};
+            pricingData.parts.forEach((part: any) => {
+              if (part.partId && part.prices && part.prices.length > 0) {
+                pricingData.pricesByPartId[part.partId] = part.prices[0].price;
+              }
+            });
+
+            console.log('💰 Using cached pricing:', pricingData.parts.length, 'parts');
+          } else {
+            console.warn('💰 No cached pricing found either');
+          }
+        }
       }
     }
 
@@ -865,6 +941,13 @@ Deno.serve(async (req: Request) => {
           mediaError: mediaResponse.status === 'rejected' ? mediaResponse.reason?.toString() : null,
           mediaAuthError,
           pricingAuthError,
+          pricingSource: pricingData.parts?.length > 0
+            ? (usedCache ? 'cache' : 'live')
+            : 'none',
+          pricingPartsCount: pricingData.parts?.length || 0,
+          pricingMapCount: pricingData.pricesByPartId ? Object.keys(pricingData.pricesByPartId).length : 0,
+          livePricingStatus: livePricingResponse.status,
+          livePricingCount: livePricingResponse.status === 'fulfilled' ? livePricingResponse.value.length : 0,
           soapRequests: {
             productDataRequest: productSoap,
             mediaRequest: mediaSoap,

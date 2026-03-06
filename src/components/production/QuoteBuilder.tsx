@@ -1729,6 +1729,10 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       return grp;
     });
 
+    if (wholesalePrice === 0) {
+      showNotification('warning', 'Garment pricing unavailable', 'Please enter the wholesale cost manually for this item.');
+    }
+
     setItemGroups(newGroups);
     setShowProductDropdown(false);
     setProductSearchResults([]);
