@@ -123,7 +123,7 @@ async function makePromoStandardsRequest(
 }
 
 function getXmlValue(xmlText: string, tagName: string): string | null {
-  const regex = new RegExp(`<${tagName}[^>]*>([^<]*)</${tagName}>`, 'i');
+  const regex = new RegExp(`<(?:[a-zA-Z0-9]+:)?${tagName}[^>]*>([^<]*)</(?:[a-zA-Z0-9]+:)?${tagName}>`, 'i');
   const match = xmlText.match(regex);
   return match ? match[1] : null;
 }
@@ -781,7 +781,7 @@ Deno.serve(async (req: Request) => {
 
         const xmlDoc = parseResult.xmlText!;
 
-        const partPattern = /<Part>([\s\S]*?)<\/Part>/gi;
+        const partPattern = /<(?:[a-zA-Z0-9]+:)?Part[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Part>/gi;
         const parts: any[] = [];
         let partMatch;
 
@@ -789,7 +789,7 @@ Deno.serve(async (req: Request) => {
           const partXml = partMatch[1];
           const partId = getXmlValue(partXml, "partId");
 
-          const pricePattern = /<PartPrice>([\s\S]*?)<\/PartPrice>/gi;
+          const pricePattern = /<(?:[a-zA-Z0-9]+:)?PartPrice[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?PartPrice>/gi;
           const prices: any[] = [];
           let priceMatch;
 

@@ -669,7 +669,7 @@ async function fetchAndCacheSSActivewear(
                 cachedPricingMap = new Map();
                 for (const variant of restData) {
                   const pid = variant.sku || variant.partID;
-                  const price = parseFloat(variant.customerPrice || variant.salePrice || variant.price || '0');
+                  const price = parseFloat(variant.customerPrice || variant.piecePrice || variant.salePrice || variant.casePrice || '0');
                   if (pid && price > 0) {
                     cachedPricingMap.set(pid, price);
                     await supabaseAdmin

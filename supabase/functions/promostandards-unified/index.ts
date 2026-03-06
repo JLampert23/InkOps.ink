@@ -490,7 +490,7 @@ Deno.serve(async (req: Request) => {
 
             for (const variant of restData) {
               const variantPartId = variant.sku || variant.partID;
-              const customerPrice = parseFloat(variant.customerPrice || variant.salePrice || variant.price || '0');
+              const customerPrice = parseFloat(variant.customerPrice || variant.piecePrice || variant.salePrice || variant.casePrice || '0');
 
               if (!variantPartId || customerPrice <= 0) continue;
 
