@@ -733,7 +733,24 @@ Deno.serve(async (req: Request) => {
 
         const normalizedProductId = normalizeSsProductId(productId);
         const fobId = validateFobId(url.searchParams.get("fobId"));
-        console.log(`[SS Pricing] Raw input: "${productId}" -> Normalized: "${normalizedProductId}", FOB: ${fobId}`);
+        const maskedApiKey = decryptedApiKey.length > 4
+          ? '*'.repeat(decryptedApiKey.length - 4) + decryptedApiKey.slice(-4)
+          : '****';
+
+        console.log('');
+        console.log('===========================================================');
+        console.log('[SS Pricing DEBUG] STARTING PRICING REQUEST');
+        console.log('===========================================================');
+        console.log('[SS Pricing DEBUG] Input Parameters:');
+        console.log(`  - Raw productId input: "${productId}"`);
+        console.log(`  - Normalized productId: "${normalizedProductId}"`);
+        console.log(`  - fobId: "${fobId}"`);
+        console.log(`  - priceType: "Customer"`);
+        console.log(`  - configurationType: "Blank"`);
+        console.log(`  - currency: "USD"`);
+        console.log(`  - Account Number: "${credentials.accountNumber}"`);
+        console.log(`  - API Key (masked): "${maskedApiKey}"`);
+        console.log('===========================================================');
 
         const soapBody = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
@@ -748,104 +765,196 @@ Deno.serve(async (req: Request) => {
   <shar:configurationType>Blank</shar:configurationType>
 </ns2:GetConfigurationAndPricingRequest>`;
 
-        console.log(`[SS Pricing] SOAP Request Body:\n${soapBody}`);
-
-        const xmlResponse = await makePromoStandardsRequest(
-          PROMOSTANDARDS_ENDPOINTS.pricing,
-          "getConfigurationAndPricing",
-          soapBody,
-          credentials.accountNumber,
-          decryptedApiKey
+        const maskedSoapBody = soapBody.replace(
+          /<shar:password>[^<]*<\/shar:password>/,
+          `<shar:password>${maskedApiKey}</shar:password>`
         );
 
-        console.log(`[SS Pricing] SOAP Response (first 1000 chars):\n${xmlResponse.substring(0, 1000)}`);
+        console.log('[SS Pricing DEBUG] SOAP Request Body (password masked):');
+        console.log(maskedSoapBody);
+        console.log('===========================================================');
 
-        const parseResult = parseXmlResponse(xmlResponse);
+        let xmlResponse = '';
+        let soapFault: string | null = null;
 
-        if (!parseResult.success) {
-          console.error(`[SS Pricing] PromoStandards error for ${normalizedProductId}:`, parseResult.error);
+        try {
+          xmlResponse = await makePromoStandardsRequest(
+            PROMOSTANDARDS_ENDPOINTS.pricing,
+            "getConfigurationAndPricing",
+            soapBody,
+            credentials.accountNumber,
+            decryptedApiKey
+          );
+        } catch (reqError: any) {
+          console.error('[SS Pricing DEBUG] REQUEST FAILED:', reqError.message);
           return new Response(
             JSON.stringify({
               success: false,
-              vendor: "SSActivewear",
               supplier: "ssactivewear",
               action,
-              error: "ProductNotFound",
-              productId: normalizedProductId,
-              rawInput: productId,
-              errorDetails: parseResult.error?.description,
-              errorCode: parseResult.error?.code,
-              data: []
+              error: "RequestFailed",
+              debug: {
+                requestXml: maskedSoapBody,
+                responseXml: null,
+                soapFault: reqError.message,
+                parsed: null,
+                diagnostics: {
+                  rawInput: productId,
+                  normalizedProductId,
+                  fobId,
+                  priceType: "Customer",
+                  configurationType: "Blank",
+                  accountNumber: credentials.accountNumber,
+                  apiKeyMasked: maskedApiKey,
+                }
+              }
             }),
-            {
-              status: 200,
-              headers: { ...corsHeaders, "Content-Type": "application/json" }
-            }
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
 
-        const xmlDoc = parseResult.xmlText!;
+        console.log('[SS Pricing DEBUG] RAW RESPONSE (full):');
+        console.log(xmlResponse);
+        console.log('===========================================================');
+
+        if (xmlResponse.includes('soap:Fault') || xmlResponse.includes('faultstring')) {
+          soapFault = getXmlValue(xmlResponse, 'faultstring') || 'Unknown SOAP fault';
+          console.error('[SS Pricing DEBUG] SOAP FAULT DETECTED:', soapFault);
+        }
+
+        const hasPartArray = xmlResponse.includes('PartArray') || xmlResponse.includes(':PartArray');
+        const hasPartPriceArray = xmlResponse.includes('PartPriceArray') || xmlResponse.includes(':PartPriceArray');
+        const hasPartPrice = xmlResponse.includes('<PartPrice') || xmlResponse.includes(':PartPrice');
+        const hasPart = xmlResponse.includes('<Part>') || xmlResponse.includes(':Part>');
+
+        console.log('[SS Pricing DEBUG] Response Analysis:');
+        console.log(`  - Contains PartArray: ${hasPartArray}`);
+        console.log(`  - Contains Part nodes: ${hasPart}`);
+        console.log(`  - Contains PartPriceArray: ${hasPartPriceArray}`);
+        console.log(`  - Contains PartPrice nodes: ${hasPartPrice}`);
+        console.log(`  - Contains SOAP Fault: ${!!soapFault}`);
+
+        const errorCode = getXmlValue(xmlResponse, 'errorCode');
+        const errorMessage = getXmlValue(xmlResponse, 'errorMessage');
+        if (errorCode || errorMessage) {
+          console.log(`  - Error Code: ${errorCode || 'none'}`);
+          console.log(`  - Error Message: ${errorMessage || 'none'}`);
+        }
 
         const partPattern = /<(?:[a-zA-Z0-9]+:)?Part[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Part>/gi;
         const parts: any[] = [];
         let partMatch;
+        let partIndex = 0;
 
-        while ((partMatch = partPattern.exec(xmlDoc)) !== null) {
+        while ((partMatch = partPattern.exec(xmlResponse)) !== null) {
+          partIndex++;
           const partXml = partMatch[1];
           const partId = getXmlValue(partXml, "partId");
 
+          console.log(`[SS Pricing DEBUG] Parsing Part #${partIndex}: partId="${partId}"`);
+
           const pricePattern = /<(?:[a-zA-Z0-9]+:)?PartPrice[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?PartPrice>/gi;
-          const prices: any[] = [];
+          const priceBreaks: any[] = [];
           let priceMatch;
+          let priceIndex = 0;
 
           while ((priceMatch = pricePattern.exec(partXml)) !== null) {
+            priceIndex++;
             const priceXml = priceMatch[1];
-            prices.push({
-              quantity: parseInt(getXmlValue(priceXml, "minQuantity") || "1"),
-              price: parseFloat(getXmlValue(priceXml, "price") || "0"),
+            const minQuantity = getXmlValue(priceXml, "minQuantity");
+            const price = getXmlValue(priceXml, "price");
+            const priceUom = getXmlValue(priceXml, "priceUom");
+            const discountCode = getXmlValue(priceXml, "discountCode");
+
+            console.log(`    - PartPrice #${priceIndex}: minQuantity=${minQuantity}, price=${price}, priceUom=${priceUom}, discountCode=${discountCode}`);
+
+            priceBreaks.push({
+              minQuantity: parseInt(minQuantity || "1"),
+              price: parseFloat(price || "0"),
+              priceUom: priceUom || null,
+              discountCode: discountCode || null,
             });
+          }
+
+          if (priceBreaks.length === 0) {
+            console.warn(`    - WARNING: No PartPrice nodes found for partId="${partId}"`);
           }
 
           parts.push({
             partId,
-            prices
+            priceBreaks
           });
         }
 
-        console.log(`[SS Pricing] Found ${parts.length} parts with pricing for ${normalizedProductId}`);
+        console.log('===========================================================');
+        console.log(`[SS Pricing DEBUG] PARSING COMPLETE`);
+        console.log(`  - Total Parts found: ${parts.length}`);
+        console.log(`  - Total PriceBreaks: ${parts.reduce((sum, p) => sum + p.priceBreaks.length, 0)}`);
+        console.log('===========================================================');
 
         if (parts.length === 0) {
-          return new Response(
-            JSON.stringify({
-              success: false,
-              vendor: "SSActivewear",
-              supplier: "ssactivewear",
-              action,
-              error: "ProductNotFound",
-              productId: normalizedProductId,
-              rawInput: productId,
-              errorDetails: "No pricing data returned",
-              data: []
-            }),
-            {
-              status: 200,
-              headers: { ...corsHeaders, "Content-Type": "application/json" }
-            }
-          );
+          console.warn('[SS Pricing DEBUG] NO PARTS FOUND - checking for alternative data structures...');
+
+          const configPartPattern = /<(?:[a-zA-Z0-9]+:)?ConfigurationAndPricing[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?ConfigurationAndPricing>/gi;
+          const configMatch = configPartPattern.exec(xmlResponse);
+          if (configMatch) {
+            console.log('[SS Pricing DEBUG] Found ConfigurationAndPricing wrapper');
+          }
+
+          const anyPartId = getXmlValue(xmlResponse, 'partId');
+          const anyPrice = getXmlValue(xmlResponse, 'price');
+          const anyMinQty = getXmlValue(xmlResponse, 'minQuantity');
+          console.log(`[SS Pricing DEBUG] Loose field search: partId=${anyPartId}, price=${anyPrice}, minQuantity=${anyMinQty}`);
         }
 
-        return new Response(
-          JSON.stringify({
-            success: true,
-            supplier: "ssactivewear",
-            action,
-            productId: normalizedProductId,
-            data: parts,
-          }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" }
+        const debugResponse = {
+          success: parts.length > 0,
+          supplier: "ssactivewear",
+          action,
+          productId: normalizedProductId,
+          data: parts.map(p => ({
+            partId: p.partId,
+            prices: p.priceBreaks.map((pb: any) => ({
+              quantity: pb.minQuantity,
+              price: pb.price,
+            }))
+          })),
+          debug: {
+            requestXml: maskedSoapBody,
+            responseXml: xmlResponse.substring(0, 5000) + (xmlResponse.length > 5000 ? '...[truncated]' : ''),
+            responseLength: xmlResponse.length,
+            soapFault,
+            errorCode,
+            errorMessage,
+            responseAnalysis: {
+              hasPartArray,
+              hasPart,
+              hasPartPriceArray,
+              hasPartPrice,
+              hasSoapFault: !!soapFault,
+            },
+            parsed: {
+              totalParts: parts.length,
+              totalPriceBreaks: parts.reduce((sum, p) => sum + p.priceBreaks.length, 0),
+              parts: parts.slice(0, 5),
+            },
+            diagnostics: {
+              rawInput: productId,
+              normalizedProductId,
+              fobId,
+              priceType: "Customer",
+              configurationType: "Blank",
+              currency: "USD",
+              accountNumber: credentials.accountNumber,
+              apiKeyMasked: maskedApiKey,
+              endpoint: PROMOSTANDARDS_ENDPOINTS.pricing,
+            }
           }
+        };
+
+        return new Response(
+          JSON.stringify(debugResponse),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
