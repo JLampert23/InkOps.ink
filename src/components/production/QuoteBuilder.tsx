@@ -2659,17 +2659,17 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                                   <Plus className="w-4 h-4" />
                                   Imprint(s)
                                 </button>
-                              </div>
-                              <div className="flex flex-col gap-2 items-end">
                                 <button
                                   onClick={() => {
                                     setShowMockupForGroup(group.label);
                                   }}
-                                  className="w-32 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center justify-center gap-2 shadow-sm"
+                                  className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm flex items-center gap-2 shadow-sm"
                                 >
                                   <Plus className="w-4 h-4" />
                                   Mockup
                                 </button>
+                              </div>
+                              <div className="flex items-center">
                                 <button
                                   onClick={() => setEditingGroupIdForOptions(group.id)}
                                   className="px-3 py-2 bg-gray-600 hover:bg-gray-700 dark:bg-slate-700 dark:hover:bg-slate-600 text-white rounded text-sm flex items-center gap-2 shadow-sm whitespace-nowrap"
