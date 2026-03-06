@@ -75,6 +75,8 @@ export async function getLiveWholesalePricing(
   <shar:id>${escapedId}</shar:id>
   <shar:password>${escapedPassword}</shar:password>
   <shar:productId>${escapedProductId}</shar:productId>
+  <shar:localizationCountry>US</shar:localizationCountry>
+  <shar:localizationLanguage>en</shar:localizationLanguage>
   <shar:fobId>${escapedFobId}</shar:fobId>
   <shar:priceType>Net</shar:priceType>
   <shar:configurationType>Blank</shar:configurationType>

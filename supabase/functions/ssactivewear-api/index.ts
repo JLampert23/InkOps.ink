@@ -740,6 +740,8 @@ Deno.serve(async (req: Request) => {
   <shar:id>${credentials.accountNumber}</shar:id>
   <shar:password>${decryptedApiKey}</shar:password>
   <shar:productId>${normalizedProductId}</shar:productId>
+  <shar:localizationCountry>US</shar:localizationCountry>
+  <shar:localizationLanguage>en</shar:localizationLanguage>
   <shar:fobId>${fobId}</shar:fobId>
 </ns2:GetConfigurationAndPricingRequest>`;
 
