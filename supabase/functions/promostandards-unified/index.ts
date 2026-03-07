@@ -316,14 +316,43 @@ Deno.serve(async (req: Request) => {
      .catch(reason => ({ status: 'rejected' as const, reason }));
 
     // Extract internal productId from Product Data response (B-prefixed)
+    // S&S Activewear uses B-prefixed internal IDs (e.g., "B00760") for the Pricing API
+    // The XML structure has productId at the Product level AND inside each Part element
+    // We need the PRODUCT-level one (B-prefixed), not part-level ones (SKU format)
     let internalProductId: string | null = null;
     if (productResponse.status === 'fulfilled' && productResponse.value) {
-      // The Product Data response contains the internal productId at the product level
-      // Look for <productId>B00393</productId> pattern in GetProductResponse
-      const productIdMatch = productResponse.value.match(/<(?:[a-zA-Z0-9]+:)?productId[^>]*>([^<]+)<\/(?:[a-zA-Z0-9]+:)?productId>/i);
-      if (productIdMatch && productIdMatch[1]) {
-        internalProductId = productIdMatch[1].trim();
-        console.log('📦 Extracted internal productId:', internalProductId);
+      const xmlDoc = productResponse.value;
+
+      // Strategy: Find all productId values, then pick the B-prefixed one
+      // The B-prefixed productId is always at the Product level, not Part level
+      const allProductIdMatches = xmlDoc.matchAll(/<(?:[a-zA-Z0-9]+:)?productId[^>]*>([^<]+)<\/(?:[a-zA-Z0-9]+:)?productId>/gi);
+      const allProductIds = Array.from(allProductIdMatches, m => m[1].trim());
+
+      console.log('📦 All productId values found in XML:', allProductIds.slice(0, 10), allProductIds.length > 10 ? `... (${allProductIds.length} total)` : '');
+
+      // Find the B-prefixed productId (internal S&S format)
+      const bPrefixedId = allProductIds.find(id => /^B\d+$/i.test(id));
+
+      if (bPrefixedId) {
+        internalProductId = bPrefixedId;
+        console.log('📦 Found B-prefixed internal productId:', internalProductId);
+      } else {
+        // Fallback: take the first productId that appears before any Part blocks
+        // This extracts content between <Product> and first <Part>
+        const productHeaderMatch = xmlDoc.match(/<(?:[a-zA-Z0-9]+:)?Product[^>]*>([\s\S]*?)<(?:[a-zA-Z0-9]+:)?Part/i);
+        if (productHeaderMatch) {
+          const productHeader = productHeaderMatch[1];
+          const headerProductIdMatch = productHeader.match(/<(?:[a-zA-Z0-9]+:)?productId[^>]*>([^<]+)<\/(?:[a-zA-Z0-9]+:)?productId>/i);
+          if (headerProductIdMatch && headerProductIdMatch[1]) {
+            internalProductId = headerProductIdMatch[1].trim();
+            console.log('📦 Extracted productId from Product header (pre-Part):', internalProductId);
+          }
+        }
+
+        if (!internalProductId) {
+          console.warn('📦 WARNING: Could not find B-prefixed productId. Available IDs:', allProductIds.slice(0, 5));
+          console.warn('📦 XML snippet (first 2000 chars):', xmlDoc.substring(0, 2000));
+        }
       }
     }
 
