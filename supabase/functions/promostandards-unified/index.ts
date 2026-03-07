@@ -305,15 +305,34 @@ Deno.serve(async (req: Request) => {
       },
     };
 
-    // Make all 4 requests in parallel (using live wholesale pricing for pricing)
-    const [productResponse, inventoryResponse, livePricingResponse, mediaResponse] = await Promise.allSettled([
-      // 1. Product Data
-      makePromoStandardsRequest(
-        PROMOSTANDARDS_ENDPOINTS.productData,
-        "getProduct",
-        productSoap
-      ),
-      // 2. Inventory (if partId provided, otherwise skip)
+    // STEP 1: First call Product Data API to get the internal B-prefixed productId
+    // S&S Pricing API requires the internal product ID (e.g., "B00393"), NOT the style number (e.g., "996MR")
+    console.log('📦 Step 1: Fetching Product Data to extract internal productId...');
+    const productResponse = await makePromoStandardsRequest(
+      PROMOSTANDARDS_ENDPOINTS.productData,
+      "getProduct",
+      productSoap
+    ).then(value => ({ status: 'fulfilled' as const, value }))
+     .catch(reason => ({ status: 'rejected' as const, reason }));
+
+    // Extract internal productId from Product Data response (B-prefixed)
+    let internalProductId: string | null = null;
+    if (productResponse.status === 'fulfilled' && productResponse.value) {
+      // The Product Data response contains the internal productId at the product level
+      // Look for <productId>B00393</productId> pattern in GetProductResponse
+      const productIdMatch = productResponse.value.match(/<(?:[a-zA-Z0-9]+:)?productId[^>]*>([^<]+)<\/(?:[a-zA-Z0-9]+:)?productId>/i);
+      if (productIdMatch && productIdMatch[1]) {
+        internalProductId = productIdMatch[1].trim();
+        console.log('📦 Extracted internal productId:', internalProductId);
+      }
+    }
+
+    // STEP 2: Now make the remaining requests in parallel, using the internal productId for pricing
+    console.log('📦 Step 2: Fetching Inventory, Pricing, and Media in parallel...');
+    console.log('💰 Using productId for Pricing API:', internalProductId || cleanedStyleNumber);
+
+    const [inventoryResponse, livePricingResponse, mediaResponse] = await Promise.allSettled([
+      // 1. Inventory (if partId provided, otherwise skip)
       partId ? makePromoStandardsRequest(
         PROMOSTANDARDS_ENDPOINTS.inventory,
         "getInventoryLevels",
@@ -324,9 +343,9 @@ Deno.serve(async (req: Request) => {
   <shar:productId>${escapedPartId}</shar:productId>
 </ns2:GetInventoryLevelsRequest>`
       ) : Promise.resolve(null),
-      // 3. Live Wholesale Pricing with FOB (S&S uses raw style numbers, NOT B-prefixed)
-      getLiveWholesalePricing(ssaVendorConfig, cleanedStyleNumber, SSA_DEFAULT_FOB_ID),
-      // 4. Media Content - use styleNumber as productId and partId for color-specific images
+      // 2. Live Wholesale Pricing with FOB - use internal B-prefixed productId if available
+      getLiveWholesalePricing(ssaVendorConfig, internalProductId || cleanedStyleNumber, SSA_DEFAULT_FOB_ID),
+      // 3. Media Content - use styleNumber as productId and partId for color-specific images
       makePromoStandardsRequest(
         PROMOSTANDARDS_ENDPOINTS.media,
         "getMediaContent",
