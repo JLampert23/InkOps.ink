@@ -732,28 +732,31 @@ Deno.serve(async (req: Request) => {
         }
 
         // ============================================================
-        // S&S PromoStandards Pricing API
-        // S&S Activewear PromoStandards expects the RAW style number
-        // WITHOUT any B-prefix. The B-prefix format is internal to
-        // S&S systems and NOT used in PromoStandards API calls.
+        // S&S PromoStandards Pricing API - REQUIRES B-PREFIX
+        // S&S Activewear PromoStandards Pricing API requires the
+        // B-prefixed product ID format for ALL styles.
         //
-        // Examples:
-        // - "64000" stays "64000" (Gildan numeric)
-        // - "G5000" becomes "5000" (strip G prefix)
-        // - "B5000" becomes "5000" (strip B prefix)
-        // - "PC54" stays "PC54" (alphanumeric)
+        // Normalization rules:
+        // - Numeric styles: "64000" -> "B64000"
+        // - G-prefix styles: "G5000" -> "B5000"
+        // - Already B-prefix: "B5000" -> "B5000"
+        // - Alphanumeric: "PC54" -> "BPC54"
         // ============================================================
 
         let styleUppercase = productId.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
 
-        // Strip any G or B prefix - S&S PromoStandards wants raw style numbers
+        // Strip G prefix if present (Gildan convention)
         if (styleUppercase.startsWith('G') && /^G\d+$/.test(styleUppercase)) {
-          styleUppercase = styleUppercase.substring(1);
-        } else if (styleUppercase.startsWith('B') && /^B\d+$/.test(styleUppercase)) {
           styleUppercase = styleUppercase.substring(1);
         }
 
-        const normalizedPricingProductId = styleUppercase;
+        // Ensure B-prefix for S&S PromoStandards Pricing API
+        let normalizedPricingProductId: string;
+        if (styleUppercase.startsWith('B')) {
+          normalizedPricingProductId = styleUppercase;
+        } else {
+          normalizedPricingProductId = 'B' + styleUppercase;
+        }
 
         const fobId = validateFobId(url.searchParams.get("fobId"));
         const priceType = "Customer";
