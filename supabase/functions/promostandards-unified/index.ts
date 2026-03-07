@@ -468,90 +468,9 @@ Deno.serve(async (req: Request) => {
         console.warn('💰 Failed to cache pricing:', cacheErr.message);
       }
     } else {
-      console.warn('💰 Live pricing returned empty, trying REST API fallback...');
-
-      try {
-        const ssaRestApiUrl = `https://api.ssactivewear.com/v2/products/?style=${encodeURIComponent(styleNumber)}`;
-        console.log('💰 Calling SSActivewear REST API for pricing:', ssaRestApiUrl);
-
-        const restPricingResponse = await fetch(ssaRestApiUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Basic ${btoa(`${credentials.accountNumber}:${decryptedApiKey}`)}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (restPricingResponse.ok) {
-          const restData = await restPricingResponse.json();
-          console.log('💰 REST API returned', Array.isArray(restData) ? restData.length : 0, 'products for pricing');
-
-          if (Array.isArray(restData) && restData.length > 0) {
-            const partPricingMap = new Map<string, any[]>();
-
-            for (const variant of restData) {
-              const variantPartId = variant.sku || variant.partID;
-              const customerPrice = parseFloat(variant.customerPrice || variant.piecePrice || variant.salePrice || variant.casePrice || '0');
-
-              if (!variantPartId || customerPrice <= 0) continue;
-
-              if (!partPricingMap.has(variantPartId)) {
-                partPricingMap.set(variantPartId, []);
-              }
-              partPricingMap.get(variantPartId)!.push({
-                minQuantity: 1,
-                price: customerPrice,
-                discountCode: null,
-              });
-            }
-
-            if (partPricingMap.size > 0) {
-              pricingData.parts = Array.from(partPricingMap.entries()).map(([partId, prices]) => ({
-                partId,
-                prices
-              }));
-
-              pricingData.pricesByPartId = {};
-              pricingData.parts.forEach((part: any) => {
-                if (part.partId && part.prices && part.prices.length > 0) {
-                  pricingData.pricesByPartId[part.partId] = part.prices[0].price;
-                }
-              });
-
-              console.log('💰 REST API pricing: ', pricingData.parts.length, 'parts,', Object.keys(pricingData.pricesByPartId).length, 'in price map');
-              usedCache = false;
-
-              try {
-                for (const [partId, prices] of partPricingMap) {
-                  await supabase
-                    .from('ss_catalog_pricing')
-                    .upsert({
-                      company_id: companyId,
-                      part_number: partId,
-                      unit_price: prices[0].price,
-                      quantity_min: 1,
-                      quantity_max: 99999,
-                      discount_code: null,
-                      price_expiry_date: null,
-                    }, {
-                      onConflict: "company_id,part_number,quantity_min"
-                    });
-                }
-                console.log('💰 Cached REST API pricing for', partPricingMap.size, 'parts');
-              } catch (cacheErr: any) {
-                console.warn('💰 Failed to cache REST API pricing:', cacheErr.message);
-              }
-            }
-          }
-        } else {
-          console.warn('💰 REST API pricing request failed:', restPricingResponse.status);
-        }
-      } catch (restErr: any) {
-        console.warn('💰 REST API pricing fallback failed:', restErr.message);
-      }
+      console.warn('💰 Live pricing returned empty, checking DB cache...');
 
       if (!pricingData.parts || pricingData.parts.length === 0) {
-        console.warn('💰 REST API fallback empty, checking DB cache...');
         const partIds = productData.parts?.map((p: any) => p.partId).filter(Boolean) || [];
 
         if (partIds.length > 0) {
