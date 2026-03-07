@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, CreditCard as Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, RefreshCw, MessageSquare, Eye, EyeOff, Grid3x3, FileText, CheckCircle, GripVertical, Workflow, Mail, Package, AlertTriangle, Copy, Check, Columns3 } from 'lucide-react';
+import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, CreditCard as Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, RefreshCw, MessageSquare, Eye, EyeOff, Grid3x3, FileText, CheckCircle, GripVertical, Workflow, Mail, Package, AlertTriangle, Copy, Check, Columns3, Wrench } from 'lucide-react';
 import { supabase } from '../lib/supabase-client';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
@@ -251,6 +251,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [ssaTestResult, setSsaTestResult] = useState<any>(null);
   const [syncingCatalog, setSyncingCatalog] = useState(false);
   const [catalogSyncResult, setCatalogSyncResult] = useState<any>(null);
+
+  const [diagnosticsExpanded, setDiagnosticsExpanded] = useState(false);
+  const [testStyleNumber, setTestStyleNumber] = useState('18000');
+  const [testingPricing, setTestingPricing] = useState(false);
+  const [pricingTestResult, setPricingTestResult] = useState<any>(null);
 
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -2208,6 +2213,99 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       });
     } finally {
       setTestingSSA(false);
+    }
+  };
+
+  const testSSAPricing = async () => {
+    if (!testStyleNumber.trim()) {
+      setPricingTestResult({
+        success: false,
+        error: 'Please enter a style number to test',
+      });
+      return;
+    }
+
+    try {
+      setTestingPricing(true);
+      setPricingTestResult(null);
+
+      if (!companySettings?.id) {
+        setPricingTestResult({
+          success: false,
+          error: 'Company settings not loaded. Please refresh the page.',
+        });
+        return;
+      }
+
+      const ssaHasCreds = !!(companySettings.ssactivewear_api_key_encrypted);
+      if (!ssaHasCreds) {
+        setPricingTestResult({
+          success: false,
+          error: 'SSActivewear credentials not saved. Please save your credentials first.',
+        });
+        return;
+      }
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
+      if (!token) {
+        setPricingTestResult({
+          success: false,
+          error: 'No authentication token available. Please sign in again.',
+        });
+        return;
+      }
+
+      const testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/promostandards-unified?styleNumber=${encodeURIComponent(testStyleNumber.trim())}&verbose=true`;
+      console.log('[Pricing Test] Calling:', testUrl);
+
+      const response = await fetch(testUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'X-User-Token': token,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      console.log('[Pricing Test] Response:', data);
+
+      if (response.ok && data.success) {
+        const pricingCount = data.pricing?.parts?.length || 0;
+        const productName = data.product?.productName || 'Unknown';
+        const debug = data.debug || {};
+
+        setPricingTestResult({
+          success: pricingCount > 0,
+          productName,
+          pricingCount,
+          usedPricingId: debug.usedPricingId,
+          usedPricingSource: debug.usedPricingSource,
+          pricingAttempts: debug.pricingAttempts,
+          pricingSource: debug.pricingSource,
+          message: pricingCount > 0
+            ? `Found ${pricingCount} price entries for "${productName}" using ID: ${debug.usedPricingId} (${debug.usedPricingSource})`
+            : `Product found ("${productName}") but no pricing data returned. Attempted IDs: ${debug.pricingAttempts?.map((a: any) => `${a.id}(${a.resultCount})`).join(', ') || 'none'}`,
+          rawDebug: debug,
+        });
+      } else {
+        setPricingTestResult({
+          success: false,
+          error: data.error || `Request failed (${response.status})`,
+          details: data.details,
+        });
+      }
+    } catch (err) {
+      console.error('[Pricing Test] Exception:', err);
+      setPricingTestResult({
+        success: false,
+        error: err instanceof Error ? err.message : 'Test failed',
+      });
+    } finally {
+      setTestingPricing(false);
     }
   };
 
@@ -6205,6 +6303,110 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         </div>
                       </div>
                     )}
+
+                    {/* Collapsible Pricing Diagnostics */}
+                    <div className="mt-4 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                      <button
+                        onClick={() => setDiagnosticsExpanded(!diagnosticsExpanded)}
+                        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Wrench className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Pricing API Diagnostics</span>
+                        </div>
+                        {diagnosticsExpanded ? (
+                          <ChevronUp className="w-4 h-4 text-gray-500" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-gray-500" />
+                        )}
+                      </button>
+
+                      {diagnosticsExpanded && (
+                        <div className="p-4 space-y-4 border-t border-gray-200 dark:border-gray-700">
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Test the S&S Activewear PromoStandards Pricing API with a specific style number to verify pricing data is being retrieved correctly.
+                          </p>
+
+                          <div className="flex gap-3 items-end">
+                            <div className="flex-1">
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                Style Number
+                              </label>
+                              <input
+                                type="text"
+                                value={testStyleNumber}
+                                onChange={(e) => setTestStyleNumber(e.target.value)}
+                                placeholder="e.g., 18000, 5000, 64000"
+                                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              />
+                            </div>
+                            <button
+                              onClick={testSSAPricing}
+                              disabled={testingPricing || !testStyleNumber.trim()}
+                              className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                            >
+                              {testingPricing ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  Testing...
+                                </>
+                              ) : (
+                                <>
+                                  <Zap className="w-4 h-4" />
+                                  Test Pricing
+                                </>
+                              )}
+                            </button>
+                          </div>
+
+                          {pricingTestResult && (
+                            <div className={`p-4 rounded-lg border ${pricingTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'}`}>
+                              <div className="flex items-start gap-3">
+                                <div className={`flex-shrink-0 w-6 h-6 rounded-full ${pricingTestResult.success ? 'bg-green-500' : 'bg-amber-500'} flex items-center justify-center text-white text-sm font-bold`}>
+                                  {pricingTestResult.success ? '✓' : '!'}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className={`font-medium ${pricingTestResult.success ? 'text-green-900 dark:text-green-100' : 'text-amber-900 dark:text-amber-100'}`}>
+                                    {pricingTestResult.success ? 'Pricing Retrieved Successfully' : pricingTestResult.error ? 'Test Failed' : 'No Pricing Data Found'}
+                                  </h4>
+                                  <p className={`text-sm mt-1 ${pricingTestResult.success ? 'text-green-800 dark:text-green-200' : 'text-amber-800 dark:text-amber-200'}`}>
+                                    {pricingTestResult.message || pricingTestResult.error}
+                                  </p>
+
+                                  {pricingTestResult.pricingAttempts && pricingTestResult.pricingAttempts.length > 0 && (
+                                    <div className="mt-3 p-3 bg-white/50 dark:bg-slate-800/50 rounded border border-gray-200 dark:border-gray-700">
+                                      <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">ProductId Attempts:</p>
+                                      <div className="space-y-1">
+                                        {pricingTestResult.pricingAttempts.map((attempt: any, idx: number) => (
+                                          <div key={idx} className="flex items-center gap-2 text-xs">
+                                            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-white ${attempt.resultCount > 0 ? 'bg-green-500' : 'bg-gray-400'}`}>
+                                              {attempt.resultCount > 0 ? '✓' : idx + 1}
+                                            </span>
+                                            <code className="px-1.5 py-0.5 bg-gray-100 dark:bg-slate-700 rounded font-mono">
+                                              {attempt.id}
+                                            </code>
+                                            <span className="text-gray-500 dark:text-gray-400">
+                                              ({attempt.source}) - {attempt.resultCount} results
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {pricingTestResult.success && (
+                                    <div className="mt-2 text-xs text-green-700 dark:text-green-300">
+                                      <p>Pricing Source: {pricingTestResult.pricingSource}</p>
+                                      <p>Total Price Entries: {pricingTestResult.pricingCount}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

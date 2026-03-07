@@ -250,6 +250,7 @@ Deno.serve(async (req: Request) => {
     const url = new URL(req.url);
     const styleNumber = url.searchParams.get("styleNumber")?.trim();
     const partId = url.searchParams.get("partId")?.trim();
+    const verbose = url.searchParams.get("verbose") === "true";
 
     if (!styleNumber) {
       return new Response(
@@ -258,7 +259,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    console.log('Unified PromoStandards Request:', { styleNumber, partId });
+    console.log('Unified PromoStandards Request:', { styleNumber, partId, verbose });
 
     // XML-escape credentials to prevent authentication issues
     const escapedAccountNumber = escapeXml(credentials.accountNumber);
@@ -392,9 +393,28 @@ Deno.serve(async (req: Request) => {
       console.warn('📦 WARNING: Could not find internal productId from any source');
     }
 
-    // STEP 2: Now make the remaining requests, using the internal productId for pricing
+    // STEP 2: Now make the remaining requests
+    // SIMPLIFIED PRICING APPROACH: Try plain style number FIRST, then fallback to extracted ID
     console.log('📦 Step 2: Fetching Inventory and Pricing...');
-    console.log('💰 Using productId for Pricing API:', internalProductId || cleanedStyleNumber, `(source: ${internalIdSource})`);
+
+    // Build list of productId formats to try for pricing (in order of preference)
+    const pricingIdCandidates: { id: string; source: string }[] = [
+      // 1. Try the plain style number first (most common format)
+      { id: cleanedStyleNumber, source: 'style-number' },
+    ];
+
+    // 2. Add the extracted internal ID if we found one and it's different
+    if (internalProductId && internalProductId !== cleanedStyleNumber) {
+      pricingIdCandidates.push({ id: internalProductId, source: internalIdSource });
+    }
+
+    // 3. Add B-prefixed version if not already tried
+    const bPrefixedStyle = `B${cleanedStyleNumber.replace(/^B/i, '').padStart(5, '0')}`;
+    if (!pricingIdCandidates.some(c => c.id === bPrefixedStyle)) {
+      pricingIdCandidates.push({ id: bPrefixedStyle, source: 'b-prefixed-style' });
+    }
+
+    console.log('💰 Pricing API candidates to try:', pricingIdCandidates);
 
     const [inventoryResponse, livePricingResponse] = await Promise.allSettled([
       // 1. Inventory (if partId provided, otherwise skip)
@@ -408,9 +428,46 @@ Deno.serve(async (req: Request) => {
   <shar:productId>${escapedPartId}</shar:productId>
 </ns2:GetInventoryLevelsRequest>`
       ) : Promise.resolve(null),
-      // 2. Live Wholesale Pricing with FOB - use internal B-prefixed productId if available
-      getLiveWholesalePricing(ssaVendorConfig, internalProductId || cleanedStyleNumber, SSA_DEFAULT_FOB_ID),
+      // 2. Live Wholesale Pricing - try first candidate (plain style number)
+      getLiveWholesalePricing(ssaVendorConfig, pricingIdCandidates[0].id, SSA_DEFAULT_FOB_ID),
     ]);
+
+    // Track which pricing ID we actually used
+    let usedPricingId = pricingIdCandidates[0].id;
+    let usedPricingSource = pricingIdCandidates[0].source;
+    let pricingAttempts: { id: string; source: string; resultCount: number }[] = [{
+      id: pricingIdCandidates[0].id,
+      source: pricingIdCandidates[0].source,
+      resultCount: livePricingResponse.status === 'fulfilled' ? livePricingResponse.value.length : 0
+    }];
+
+    // If first attempt returned no results, try remaining candidates
+    let finalPricingResponse = livePricingResponse;
+    if (livePricingResponse.status === 'fulfilled' && livePricingResponse.value.length === 0 && pricingIdCandidates.length > 1) {
+      console.log('💰 First pricing attempt returned 0 results, trying alternative IDs...');
+
+      for (let i = 1; i < pricingIdCandidates.length; i++) {
+        const candidate = pricingIdCandidates[i];
+        console.log(`💰 Trying pricing candidate ${i + 1}/${pricingIdCandidates.length}: ${candidate.id} (${candidate.source})`);
+
+        const retryResult = await getLiveWholesalePricing(ssaVendorConfig, candidate.id, SSA_DEFAULT_FOB_ID);
+        pricingAttempts.push({
+          id: candidate.id,
+          source: candidate.source,
+          resultCount: retryResult.length
+        });
+
+        if (retryResult.length > 0) {
+          console.log(`💰 SUCCESS with ${candidate.id}: ${retryResult.length} price entries`);
+          finalPricingResponse = { status: 'fulfilled', value: retryResult } as PromiseFulfilledResult<typeof retryResult>;
+          usedPricingId = candidate.id;
+          usedPricingSource = candidate.source;
+          break;
+        } else {
+          console.log(`💰 No results with ${candidate.id}, continuing...`);
+        }
+      }
+    }
 
     // Use the media response from Step 1
     const mediaResponse = initialMediaResponse;
@@ -418,13 +475,16 @@ Deno.serve(async (req: Request) => {
     console.log('📊 PromoStandards API Results:', {
       product: productResponse.status,
       inventory: inventoryResponse.status,
-      livePricing: livePricingResponse.status,
+      livePricing: finalPricingResponse.status,
       media: mediaResponse.status,
+      usedPricingId,
+      usedPricingSource,
       internalProductId,
       internalIdSource,
+      pricingAttempts,
       productError: productResponse.status === 'rejected' ? productResponse.reason : null,
       inventoryError: inventoryResponse.status === 'rejected' ? inventoryResponse.reason : null,
-      livePricingCount: livePricingResponse.status === 'fulfilled' ? livePricingResponse.value.length : 0,
+      livePricingCount: finalPricingResponse.status === 'fulfilled' ? finalPricingResponse.value.length : 0,
       mediaError: mediaResponse.status === 'rejected' ? mediaResponse.reason : null,
     });
 
@@ -494,8 +554,8 @@ Deno.serve(async (req: Request) => {
     let pricingAuthError: { code: string; description: string } | null = null;
     let usedCache = false;
 
-    if (livePricingResponse.status === 'fulfilled' && livePricingResponse.value.length > 0) {
-      const livePricing = livePricingResponse.value;
+    if (finalPricingResponse.status === 'fulfilled' && finalPricingResponse.value.length > 0) {
+      const livePricing = finalPricingResponse.value;
       console.log('💰 Live wholesale pricing received:', livePricing.length, 'price entries');
 
       // Group by partId
@@ -937,10 +997,13 @@ Deno.serve(async (req: Request) => {
         pricing: pricingData,
         media: mediaData,
         debug: {
+          usedPricingId,
+          usedPricingSource,
+          pricingAttempts,
           internalProductId,
           internalIdSource,
           mediaResponseStatus: mediaResponse.status,
-          mediaXmlFull: mediaResponse.status === 'fulfilled' && mediaResponse.value
+          mediaXmlFull: verbose && mediaResponse.status === 'fulfilled' && mediaResponse.value
             ? mediaResponse.value
             : null,
           mediaError: mediaResponse.status === 'rejected' ? mediaResponse.reason?.toString() : null,
@@ -951,16 +1014,16 @@ Deno.serve(async (req: Request) => {
             : 'none',
           pricingPartsCount: pricingData.parts?.length || 0,
           pricingMapCount: pricingData.pricesByPartId ? Object.keys(pricingData.pricesByPartId).length : 0,
-          livePricingStatus: livePricingResponse.status,
-          livePricingCount: livePricingResponse.status === 'fulfilled' ? livePricingResponse.value.length : 0,
-          soapRequests: {
+          livePricingStatus: finalPricingResponse.status,
+          livePricingCount: finalPricingResponse.status === 'fulfilled' ? finalPricingResponse.value.length : 0,
+          soapRequests: verbose ? {
             productDataRequest: productSoap,
             mediaRequest: mediaSoap,
-          },
-          credentials: {
+          } : undefined,
+          credentials: verbose ? {
             accountNumber: credentials.accountNumber,
             apiKeyLength: decryptedApiKey?.length,
-          }
+          } : undefined
         }
       }),
       {
