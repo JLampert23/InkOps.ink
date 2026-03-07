@@ -733,32 +733,27 @@ Deno.serve(async (req: Request) => {
 
         // ============================================================
         // S&S PromoStandards Pricing API
-        // S&S Activewear uses DIFFERENT product ID formats:
-        // - Numeric styles (Gildan): 5000 -> B05000 (B-prefix + padded)
-        // - Alphanumeric styles: PC54 stays PC54 (NO B-prefix)
+        // S&S Activewear PromoStandards expects the RAW style number
+        // WITHOUT any B-prefix. The B-prefix format is internal to
+        // S&S systems and NOT used in PromoStandards API calls.
+        //
+        // Examples:
+        // - "64000" stays "64000" (Gildan numeric)
+        // - "G5000" becomes "5000" (strip G prefix)
+        // - "B5000" becomes "5000" (strip B prefix)
+        // - "PC54" stays "PC54" (alphanumeric)
         // ============================================================
 
-        const styleUppercase = productId.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+        let styleUppercase = productId.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
 
-        // Determine if this is a numeric-only style (needs B-prefix and padding)
-        // or an alphanumeric style (use as-is)
-        let normalizedPricingProductId: string;
-
-        if (/^\d+$/.test(styleUppercase)) {
-          // Pure numeric style (e.g., "5000") - add B prefix and pad to 5 digits
-          normalizedPricingProductId = 'B' + styleUppercase.padStart(5, '0');
-        } else if (styleUppercase.startsWith('G') && /^G\d+$/.test(styleUppercase)) {
-          // Gildan G-prefix (e.g., "G5000") - convert to B-prefix format
-          const numericPart = styleUppercase.substring(1);
-          normalizedPricingProductId = 'B' + numericPart.padStart(5, '0');
+        // Strip any G or B prefix - S&S PromoStandards wants raw style numbers
+        if (styleUppercase.startsWith('G') && /^G\d+$/.test(styleUppercase)) {
+          styleUppercase = styleUppercase.substring(1);
         } else if (styleUppercase.startsWith('B') && /^B\d+$/.test(styleUppercase)) {
-          // Already B-prefixed numeric (e.g., "B5000") - just ensure padding
-          const numericPart = styleUppercase.substring(1);
-          normalizedPricingProductId = 'B' + numericPart.padStart(5, '0');
-        } else {
-          // Alphanumeric style (e.g., "PC54", "DG536") - use as-is, NO B-prefix
-          normalizedPricingProductId = styleUppercase;
+          styleUppercase = styleUppercase.substring(1);
         }
+
+        const normalizedPricingProductId = styleUppercase;
 
         const fobId = validateFobId(url.searchParams.get("fobId"));
         const priceType = "Customer";
