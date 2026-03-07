@@ -2356,9 +2356,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       });
 
       if (settings?.sanmar_enabled || settings?.ssactivewear_enabled) {
+        const testStyle = settings?.sanmar_enabled ? 'PC54' : '64000';
+        const vendorName = settings?.sanmar_enabled ? 'SanMar' : 'S&S';
         try {
           const response = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/product-search?style=PC54`,
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/product-search?style=${testStyle}`,
             {
               method: 'GET',
               headers: {
@@ -2372,7 +2374,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           results.checks.push({
             name: 'Product Search API',
             status: response.ok && data.success ? 'success' : 'error',
-            message: response.ok && data.success ? `Found ${data.count} result(s) for PC54` : (data.error || 'Search failed'),
+            message: response.ok && data.success ? `Found ${data.count} result(s) for ${testStyle} (${vendorName})` : (data.error || 'Search failed'),
             httpStatus: response.status,
             resultCount: data.count,
           });
@@ -2386,8 +2388,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       }
 
       if (settings?.ssactivewear_enabled && settings?.ssactivewear_api_key_encrypted) {
+        const ssTestStyle = '64000';
         try {
-          const pricingUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ssactivewear-api?action=pricing&productId=PC54`;
+          const pricingUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ssactivewear-api?action=pricing&productId=${ssTestStyle}`;
           const pricingResponse = await fetch(pricingUrl, {
             method: 'GET',
             headers: {
@@ -2401,10 +2404,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             name: 'S&S Pricing API',
             status: pricingResponse.ok && pricingData.success ? 'success' : 'error',
             message: pricingData.success
-              ? `Got ${pricingData.priceBreaks?.length || 0} price breaks`
+              ? `Got ${pricingData.data?.length || 0} parts with pricing for ${ssTestStyle}`
               : (pricingData.error || 'No pricing data'),
             httpStatus: pricingResponse.status,
-            priceBreakCount: pricingData.priceBreaks?.length,
+            partCount: pricingData.data?.length,
             debug: pricingData.debug,
           });
         } catch (err: any) {
