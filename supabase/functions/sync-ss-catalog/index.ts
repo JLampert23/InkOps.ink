@@ -147,12 +147,22 @@ Deno.serve(async (req: Request) => {
             throw new Error('No product data returned from SSActivewear API');
           }
 
-          // Upsert style data
+          // Extract the internal styleID from the REST API response
+          // This is required for the S&S Pricing API (format: B + 5-digit padded number)
+          const ssInternalId = productData.styleID ? String(productData.styleID) : null;
+          if (ssInternalId) {
+            console.log(`🔑 Found internal styleID: ${ssInternalId} -> Pricing ID: B${ssInternalId.padStart(5, '0')}`);
+          } else {
+            console.warn(`⚠️ No styleID found in REST API response for ${styleNumber}`);
+          }
+
+          // Upsert style data including the internal styleID
           const { data: styleData, error: styleError } = await supabase
             .from("styles")
             .upsert({
               company_id: company.id,
               style_number: styleNumber,
+              ss_internal_id: ssInternalId,
               brand: productData.productBrand || null,
               name: productData.productName || null,
               description: productData.description || null,

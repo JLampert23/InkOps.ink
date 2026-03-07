@@ -306,10 +306,89 @@ Deno.serve(async (req: Request) => {
       },
     };
 
-    // STEP 1: Fetch Product Data AND Media in parallel first
-    // We need Media first because URLs like https://cdn.ssactivewear.com/images/style/393_fl.jpg
-    // contain the REAL internal product ID (393) that the Pricing API requires
-    console.log('📦 Step 1: Fetching Product Data and Media to extract internal productId...');
+    // STEP 1: Fetch internal styleID from S&S REST API first
+    // The S&S Pricing API requires the internal styleID (not the customer-facing style number)
+    // Example: Gildan 2000 has styleID 760, which needs to be formatted as "B00760" for pricing
+    console.log('📦 Step 1: Fetching internal styleID from S&S REST API...');
+
+    let internalProductId: string | null = null;
+    let internalIdSource = 'none';
+    let rawStyleId: string | null = null;
+
+    // STRATEGY 1 (PRIMARY): Call S&S REST API to get the internal styleID
+    // This is the ONLY reliable way to get the correct ID for pricing
+    try {
+      const ssaRestApiUrl = `https://api.ssactivewear.com/v2/products/?style=${encodeURIComponent(styleNumber)}`;
+      console.log('🔍 Calling S&S REST API for internal styleID:', ssaRestApiUrl);
+
+      const restApiResponse = await fetch(ssaRestApiUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Basic ${btoa(`${credentials.accountNumber}:${decryptedApiKey}`)}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (restApiResponse.ok) {
+        const restApiData = await restApiResponse.json();
+        if (Array.isArray(restApiData) && restApiData.length > 0) {
+          // The styleID is consistent across all SKUs of the same style
+          rawStyleId = String(restApiData[0].styleID);
+          // Format as B-prefixed 6-character ID: 760 -> B00760
+          internalProductId = `B${rawStyleId.padStart(5, '0')}`;
+          internalIdSource = 'rest-api-styleID';
+          console.log('✅ Got internal styleID from REST API:', rawStyleId, '-> Pricing ID:', internalProductId);
+
+          // Cache the internal ID to the styles table for future lookups
+          try {
+            await supabase
+              .from('styles')
+              .upsert({
+                company_id: companyId,
+                style_number: styleNumber,
+                ss_internal_id: rawStyleId,
+                last_synced: new Date().toISOString(),
+              }, {
+                onConflict: 'company_id,style_number'
+              });
+            console.log('💾 Cached styleID to styles table');
+          } catch (cacheErr: any) {
+            console.warn('⚠️ Failed to cache styleID:', cacheErr.message);
+          }
+        } else {
+          console.warn('⚠️ S&S REST API returned empty array for style:', styleNumber);
+        }
+      } else {
+        const errorText = await restApiResponse.text().catch(() => '');
+        console.warn('⚠️ S&S REST API error:', restApiResponse.status, errorText.substring(0, 200));
+      }
+    } catch (restErr: any) {
+      console.warn('⚠️ S&S REST API call failed:', restErr.message);
+    }
+
+    // STRATEGY 2 (FALLBACK): Check cached styleID in database
+    if (!internalProductId) {
+      try {
+        const { data: cachedStyle } = await supabase
+          .from('styles')
+          .select('ss_internal_id')
+          .eq('company_id', companyId)
+          .eq('style_number', styleNumber)
+          .maybeSingle();
+
+        if (cachedStyle?.ss_internal_id) {
+          rawStyleId = cachedStyle.ss_internal_id;
+          internalProductId = `B${rawStyleId.padStart(5, '0')}`;
+          internalIdSource = 'database-cache';
+          console.log('💾 Using cached styleID from database:', rawStyleId, '-> Pricing ID:', internalProductId);
+        }
+      } catch (dbErr: any) {
+        console.warn('⚠️ Database lookup failed:', dbErr.message);
+      }
+    }
+
+    // STEP 2: Fetch Product Data AND Media in parallel
+    console.log('📦 Step 2: Fetching Product Data and Media...');
 
     const [productResponse, initialMediaResponse] = await Promise.allSettled([
       makePromoStandardsRequest(
@@ -324,9 +403,8 @@ Deno.serve(async (req: Request) => {
       ),
     ]);
 
-    // Helper function to extract internal numeric ID from S&S CDN URLs
+    // Helper function to extract internal numeric ID from S&S CDN URLs (backup strategy)
     // URLs look like: https://cdn.ssactivewear.com/images/style/393_fl.jpg
-    // The number before the underscore is the internal product ID
     function extractInternalIdFromMediaUrls(xmlDoc: string): string | null {
       const urlPattern = /https?:\/\/cdn\.ssactivewear\.com\/images\/[^"'<>\s]*?\/(\d+)_[a-z]+\.jpg/gi;
       const matches = xmlDoc.matchAll(urlPattern);
@@ -345,23 +423,19 @@ Deno.serve(async (req: Request) => {
       return null;
     }
 
-    // Extract internal productId - try multiple strategies
-    let internalProductId: string | null = null;
-    let internalIdSource = 'none';
-
-    // Strategy 1: Extract from Media API URLs (most reliable for S&S)
-    if (initialMediaResponse.status === 'fulfilled' && initialMediaResponse.value) {
+    // STRATEGY 3 (BACKUP): Extract from Media API URLs if REST API failed
+    if (!internalProductId && initialMediaResponse.status === 'fulfilled' && initialMediaResponse.value) {
       const mediaXml = initialMediaResponse.value;
       const idFromMedia = extractInternalIdFromMediaUrls(mediaXml);
       if (idFromMedia) {
-        // Convert to B-prefixed format: 393 -> B00393
+        rawStyleId = idFromMedia;
         internalProductId = `B${idFromMedia.padStart(5, '0')}`;
         internalIdSource = 'media-url';
         console.log('📸 Extracted internal ID from Media URLs:', idFromMedia, '-> Pricing ID:', internalProductId);
       }
     }
 
-    // Strategy 2: Find B-prefixed productId in Product Data response
+    // STRATEGY 4 (LAST RESORT): Find B-prefixed productId in Product Data response
     if (!internalProductId && productResponse.status === 'fulfilled' && productResponse.value) {
       const xmlDoc = productResponse.value;
       const allProductIdMatches = xmlDoc.matchAll(/<(?:[a-zA-Z0-9]+:)?productId[^>]*>([^<]+)<\/(?:[a-zA-Z0-9]+:)?productId>/gi);
@@ -393,22 +467,24 @@ Deno.serve(async (req: Request) => {
       console.warn('📦 WARNING: Could not find internal productId from any source');
     }
 
-    // STEP 2: Now make the remaining requests
-    // SIMPLIFIED PRICING APPROACH: Try plain style number FIRST, then fallback to extracted ID
-    console.log('📦 Step 2: Fetching Inventory and Pricing...');
+    // STEP 3: Now make the remaining requests
+    // PRICING APPROACH: Use internal styleID (B-prefixed) FIRST - this is the correct format for S&S
+    console.log('📦 Step 3: Fetching Inventory and Pricing...');
 
     // Build list of productId formats to try for pricing (in order of preference)
-    const pricingIdCandidates: { id: string; source: string }[] = [
-      // 1. Try the plain style number first (most common format)
-      { id: cleanedStyleNumber, source: 'style-number' },
-    ];
+    const pricingIdCandidates: { id: string; source: string }[] = [];
 
-    // 2. Add the extracted internal ID if we found one and it's different
-    if (internalProductId && internalProductId !== cleanedStyleNumber) {
+    // 1. FIRST: Try the internal styleID from REST API (most reliable - e.g., B00760 for Gildan 2000)
+    if (internalProductId) {
       pricingIdCandidates.push({ id: internalProductId, source: internalIdSource });
     }
 
-    // 3. Add B-prefixed version if not already tried
+    // 2. FALLBACK: Try the plain style number (rarely works but worth trying)
+    if (!pricingIdCandidates.some(c => c.id === cleanedStyleNumber)) {
+      pricingIdCandidates.push({ id: cleanedStyleNumber, source: 'style-number' });
+    }
+
+    // 3. LAST RESORT: Try B-prefixed version of the style number itself
     const bPrefixedStyle = `B${cleanedStyleNumber.replace(/^B/i, '').padStart(5, '0')}`;
     if (!pricingIdCandidates.some(c => c.id === bPrefixedStyle)) {
       pricingIdCandidates.push({ id: bPrefixedStyle, source: 'b-prefixed-style' });
