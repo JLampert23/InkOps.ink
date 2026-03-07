@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { normalizeSsPromoStandardsProductId, validateSsFobId } from "../_shared/ss-promostandards-normalizer.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,61 +19,6 @@ const PROMOSTANDARDS_ENDPOINTS = {
 interface SSActivewearCredentials {
   accountNumber: string;
   apiKey: string;
-}
-
-const VALID_SS_FOB_IDS = ['IL', 'KS', 'NJ', 'TX', 'GA', 'NV', 'DS'];
-
-/**
- * Normalizes a user-facing style number for S&S MediaContent API.
- * S&S Activewear MediaContent uses the RAW style number (NOT B-prefixed like SanMar).
- * Example: "pc54" -> "PC54", "5000" -> "5000", "G500" -> "G500"
- *
- * NOTE: The "B" prefix is for SanMar, NOT S&S Activewear.
- */
-function getSsMediaStyleNumber(styleNumber: string): string {
-  if (!styleNumber) return '';
-
-  // Remove non-alphanumeric characters and uppercase
-  const cleaned = styleNumber.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-
-  // If incorrectly starts with B followed by letters (like BPC54), remove the B
-  // This handles cases where SanMar-style IDs were mistakenly passed
-  if (cleaned.startsWith('B') && cleaned.length > 1) {
-    const afterB = cleaned.substring(1);
-    // If the part after B has letters, it was likely a SanMar-style ID
-    if (/[A-Z]/.test(afterB) && !/^\d+$/.test(afterB)) {
-      return afterB;
-    }
-    // If it's like B5000 (B + pure numbers), also strip the B for S&S
-    if (/^\d+$/.test(afterB)) {
-      return afterB;
-    }
-  }
-
-  return cleaned;
-}
-
-function normalizeSsProductId(input: string): string {
-  if (!input) return '';
-
-  let cleaned = input.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
-
-  if (cleaned.startsWith('B') && cleaned.length > 1) {
-    const afterB = cleaned.substring(1);
-    if (/[A-Z]/.test(afterB)) {
-      cleaned = afterB;
-    } else if (/^\d+$/.test(afterB)) {
-      cleaned = afterB;
-    }
-  }
-
-  return cleaned;
-}
-
-function validateFobId(fobId: string | null): string {
-  if (!fobId) return 'NJ';
-  const upperFob = fobId.toUpperCase();
-  return VALID_SS_FOB_IDS.includes(upperFob) ? upperFob : 'NJ';
 }
 
 async function makePromoStandardsRequest(
@@ -506,7 +452,7 @@ Deno.serve(async (req: Request) => {
           );
         }
 
-        const normalizedProductId = normalizeSsProductId(productId);
+        const normalizedProductId = normalizeSsPromoStandardsProductId(productId);
         console.log(`[SS Product] Raw input: "${productId}" -> Normalized: "${normalizedProductId}"`);
 
         const soapBody = `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
@@ -629,8 +575,8 @@ Deno.serve(async (req: Request) => {
           );
         }
 
-        const normalizedProductId = normalizeSsProductId(productId);
-        const fobId = validateFobId(url.searchParams.get("fobId"));
+        const normalizedProductId = normalizeSsPromoStandardsProductId(productId);
+        const fobId = validateSsFobId(url.searchParams.get("fobId"));
         console.log(`[SS Inventory] Raw input: "${productId}" -> Normalized: "${normalizedProductId}", FOB: ${fobId}`);
 
         const soapBody = `<ns2:GetInventoryLevelsRequest xmlns:ns2="http://www.promostandards.org/WSDL/InventoryService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/Inventory/2.0.0/SharedObjects/">
@@ -731,14 +677,13 @@ Deno.serve(async (req: Request) => {
           );
         }
 
-        // S&S Activewear PromoStandards Pricing API - NO B-PREFIX
-        // S&S uses raw style numbers: "64000", "G500", "DG536", etc.
-        // The B-prefix is a SanMar convention, NOT S&S!
-        const normalizedPricingProductId = normalizeSsProductId(productId);
-        console.log(`[SS Pricing] Raw input: "${productId}" -> Normalized: "${normalizedPricingProductId}"`);
+        // S&S Activewear PromoStandards Pricing API requires B-prefixed productId
+        // Example: style "2000" -> "B02000", style "64000" -> "B64000"
+        const normalizedPricingProductId = normalizeSsPromoStandardsProductId(productId);
+        console.log(`[SS Pricing] Raw input: "${productId}" -> B-prefixed: "${normalizedPricingProductId}"`);
 
 
-        const fobId = validateFobId(url.searchParams.get("fobId"));
+        const fobId = validateSsFobId(url.searchParams.get("fobId"));
         const priceType = "Customer";
         const configurationType = "Blank";
         const currency = "USD";
@@ -1034,7 +979,7 @@ Deno.serve(async (req: Request) => {
         const colorName = url.searchParams.get("colorName");
         const partIdTag = partId ? `<shar:partId>${partId}</shar:partId>` : '';
 
-        const mediaProductId = getSsMediaStyleNumber(productId);
+        const mediaProductId = normalizeSsPromoStandardsProductId(productId);
         console.log(`[SS Media] Raw input: "${productId}" -> MediaContent productId: "${mediaProductId}", partId: "${partId || 'none'}", colorName: "${colorName || 'none'}"`);
 
         const soapBody = `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">

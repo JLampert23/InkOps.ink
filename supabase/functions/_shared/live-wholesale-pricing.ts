@@ -1,3 +1,5 @@
+import { normalizeSsPromoStandardsProductId } from "./ss-promostandards-normalizer.ts";
+
 export interface VendorCredentials {
   id: string;
   password: string;
@@ -65,9 +67,14 @@ export async function getLiveWholesalePricing(
   productId: string,
   fobId: string
 ): Promise<WholesalePriceItem[]> {
+  // S&S Activewear PromoStandards requires B-prefixed productId
+  const normalizedProductId = vendor.name === "ssactivewear"
+    ? normalizeSsPromoStandardsProductId(productId)
+    : productId;
+
   const escapedId = escapeXml(vendor.credentials.id);
   const escapedPassword = escapeXml(vendor.credentials.password);
-  const escapedProductId = escapeXml(productId);
+  const escapedProductId = escapeXml(normalizedProductId);
   const escapedFobId = escapeXml(fobId);
 
   const soapBody = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">

@@ -7,6 +7,7 @@ import {
   buildSSActivewearCdnFallbackUrl,
   logImageOperation,
 } from "../_shared/image-cache.ts";
+import { normalizeSsPromoStandardsProductId } from "../_shared/ss-promostandards-normalizer.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,42 +22,6 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: st
       setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
     ),
   ]);
-}
-
-function normalizeSsProductId(input: string): string {
-  if (!input) return '';
-
-  let cleaned = input.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
-
-  // If it already has letters (like DG536, PC54, G500, etc.), it's a manufacturer style number
-  // These should be passed through as-is (no B prefix needed)
-  if (/[A-Z]/.test(cleaned) && !/^B\d+$/.test(cleaned)) {
-    // It's a manufacturer style number like DG536, PC54, G500, etc.
-    // Remove any leading B if it was incorrectly added previously
-    if (cleaned.startsWith('B') && cleaned.length > 1 && /[A-Z]/.test(cleaned.substring(1))) {
-      // But only if what follows has letters too (like BDG536 -> DG536)
-      // Keep it if it's like B18500 (which is correct)
-      const afterB = cleaned.substring(1);
-      if (/[A-Z]/.test(afterB)) {
-        cleaned = afterB;
-      }
-    }
-    return cleaned;
-  }
-
-  // If it starts with B followed by numbers only (B18500), keep it
-  if (/^B\d+$/.test(cleaned)) {
-    return cleaned;
-  }
-
-  // Pure numeric input (like 18500) - these are S&S internal IDs and need B prefix
-  if (/^\d+$/.test(cleaned)) {
-    cleaned = cleaned.padStart(5, '0');
-    return 'B' + cleaned;
-  }
-
-  // For anything else, return as-is
-  return cleaned;
 }
 
 interface ColorOption {
@@ -287,7 +252,7 @@ async function searchSSActivewearCache(
   style: string
 ): Promise<ProductResult | null> {
   try {
-    const normalizedStyle = normalizeSsProductId(style);
+    const normalizedStyle = normalizeSsPromoStandardsProductId(style);
     console.log(`[SSA Cache] Searching for raw="${style}" or normalized="${normalizedStyle}"`);
 
     let styleData = null;
