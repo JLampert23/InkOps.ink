@@ -731,23 +731,12 @@ Deno.serve(async (req: Request) => {
           );
         }
 
-        // S&S PromoStandards Pricing API - REQUIRES B-PREFIX
-        // Examples: "64000" -> "B64000", "G5000" -> "B5000"
+        // S&S Activewear PromoStandards Pricing API - NO B-PREFIX
+        // S&S uses raw style numbers: "64000", "G500", "DG536", etc.
+        // The B-prefix is a SanMar convention, NOT S&S!
+        const normalizedPricingProductId = normalizeSsProductId(productId);
+        console.log(`[SS Pricing] Raw input: "${productId}" -> Normalized: "${normalizedPricingProductId}"`);
 
-        let styleUppercase = productId.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-
-        // Strip G prefix if present (Gildan convention)
-        if (styleUppercase.startsWith('G') && /^G\d+$/.test(styleUppercase)) {
-          styleUppercase = styleUppercase.substring(1);
-        }
-
-        // Ensure B-prefix for S&S PromoStandards Pricing API
-        let normalizedPricingProductId: string;
-        if (styleUppercase.startsWith('B')) {
-          normalizedPricingProductId = styleUppercase;
-        } else {
-          normalizedPricingProductId = 'B' + styleUppercase;
-        }
 
         const fobId = validateFobId(url.searchParams.get("fobId"));
         const priceType = "Customer";
