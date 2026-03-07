@@ -305,62 +305,98 @@ Deno.serve(async (req: Request) => {
       },
     };
 
-    // STEP 1: First call Product Data API to get the internal B-prefixed productId
-    // S&S Pricing API requires the internal product ID (e.g., "B00393"), NOT the style number (e.g., "996MR")
-    console.log('📦 Step 1: Fetching Product Data to extract internal productId...');
-    const productResponse = await makePromoStandardsRequest(
-      PROMOSTANDARDS_ENDPOINTS.productData,
-      "getProduct",
-      productSoap
-    ).then(value => ({ status: 'fulfilled' as const, value }))
-     .catch(reason => ({ status: 'rejected' as const, reason }));
+    // STEP 1: Fetch Product Data AND Media in parallel first
+    // We need Media first because URLs like https://cdn.ssactivewear.com/images/style/393_fl.jpg
+    // contain the REAL internal product ID (393) that the Pricing API requires
+    console.log('📦 Step 1: Fetching Product Data and Media to extract internal productId...');
 
-    // Extract internal productId from Product Data response (B-prefixed)
-    // S&S Activewear uses B-prefixed internal IDs (e.g., "B00760") for the Pricing API
-    // The XML structure has productId at the Product level AND inside each Part element
-    // We need the PRODUCT-level one (B-prefixed), not part-level ones (SKU format)
+    const [productResponse, initialMediaResponse] = await Promise.allSettled([
+      makePromoStandardsRequest(
+        PROMOSTANDARDS_ENDPOINTS.productData,
+        "getProduct",
+        productSoap
+      ),
+      makePromoStandardsRequest(
+        PROMOSTANDARDS_ENDPOINTS.media,
+        "getMediaContent",
+        mediaSoap
+      ),
+    ]);
+
+    // Helper function to extract internal numeric ID from S&S CDN URLs
+    // URLs look like: https://cdn.ssactivewear.com/images/style/393_fl.jpg
+    // The number before the underscore is the internal product ID
+    function extractInternalIdFromMediaUrls(xmlDoc: string): string | null {
+      const urlPattern = /https?:\/\/cdn\.ssactivewear\.com\/images\/[^"'<>\s]*?\/(\d+)_[a-z]+\.jpg/gi;
+      const matches = xmlDoc.matchAll(urlPattern);
+      const ids = new Set<string>();
+
+      for (const match of matches) {
+        ids.add(match[1]);
+      }
+
+      if (ids.size === 1) {
+        return Array.from(ids)[0];
+      } else if (ids.size > 1) {
+        console.log('📸 Found multiple internal IDs in media URLs:', Array.from(ids));
+        return Array.from(ids)[0];
+      }
+      return null;
+    }
+
+    // Extract internal productId - try multiple strategies
     let internalProductId: string | null = null;
-    if (productResponse.status === 'fulfilled' && productResponse.value) {
-      const xmlDoc = productResponse.value;
+    let internalIdSource = 'none';
 
-      // Strategy: Find all productId values, then pick the B-prefixed one
-      // The B-prefixed productId is always at the Product level, not Part level
+    // Strategy 1: Extract from Media API URLs (most reliable for S&S)
+    if (initialMediaResponse.status === 'fulfilled' && initialMediaResponse.value) {
+      const mediaXml = initialMediaResponse.value;
+      const idFromMedia = extractInternalIdFromMediaUrls(mediaXml);
+      if (idFromMedia) {
+        // Convert to B-prefixed format: 393 -> B00393
+        internalProductId = `B${idFromMedia.padStart(5, '0')}`;
+        internalIdSource = 'media-url';
+        console.log('📸 Extracted internal ID from Media URLs:', idFromMedia, '-> Pricing ID:', internalProductId);
+      }
+    }
+
+    // Strategy 2: Find B-prefixed productId in Product Data response
+    if (!internalProductId && productResponse.status === 'fulfilled' && productResponse.value) {
+      const xmlDoc = productResponse.value;
       const allProductIdMatches = xmlDoc.matchAll(/<(?:[a-zA-Z0-9]+:)?productId[^>]*>([^<]+)<\/(?:[a-zA-Z0-9]+:)?productId>/gi);
       const allProductIds = Array.from(allProductIdMatches, m => m[1].trim());
 
       console.log('📦 All productId values found in XML:', allProductIds.slice(0, 10), allProductIds.length > 10 ? `... (${allProductIds.length} total)` : '');
 
-      // Find the B-prefixed productId (internal S&S format)
       const bPrefixedId = allProductIds.find(id => /^B\d+$/i.test(id));
 
       if (bPrefixedId) {
         internalProductId = bPrefixedId;
+        internalIdSource = 'product-data';
         console.log('📦 Found B-prefixed internal productId:', internalProductId);
       } else {
-        // Fallback: take the first productId that appears before any Part blocks
-        // This extracts content between <Product> and first <Part>
         const productHeaderMatch = xmlDoc.match(/<(?:[a-zA-Z0-9]+:)?Product[^>]*>([\s\S]*?)<(?:[a-zA-Z0-9]+:)?Part/i);
         if (productHeaderMatch) {
           const productHeader = productHeaderMatch[1];
           const headerProductIdMatch = productHeader.match(/<(?:[a-zA-Z0-9]+:)?productId[^>]*>([^<]+)<\/(?:[a-zA-Z0-9]+:)?productId>/i);
           if (headerProductIdMatch && headerProductIdMatch[1]) {
             internalProductId = headerProductIdMatch[1].trim();
+            internalIdSource = 'product-header';
             console.log('📦 Extracted productId from Product header (pre-Part):', internalProductId);
           }
-        }
-
-        if (!internalProductId) {
-          console.warn('📦 WARNING: Could not find B-prefixed productId. Available IDs:', allProductIds.slice(0, 5));
-          console.warn('📦 XML snippet (first 2000 chars):', xmlDoc.substring(0, 2000));
         }
       }
     }
 
-    // STEP 2: Now make the remaining requests in parallel, using the internal productId for pricing
-    console.log('📦 Step 2: Fetching Inventory, Pricing, and Media in parallel...');
-    console.log('💰 Using productId for Pricing API:', internalProductId || cleanedStyleNumber);
+    if (!internalProductId) {
+      console.warn('📦 WARNING: Could not find internal productId from any source');
+    }
 
-    const [inventoryResponse, livePricingResponse, mediaResponse] = await Promise.allSettled([
+    // STEP 2: Now make the remaining requests, using the internal productId for pricing
+    console.log('📦 Step 2: Fetching Inventory and Pricing...');
+    console.log('💰 Using productId for Pricing API:', internalProductId || cleanedStyleNumber, `(source: ${internalIdSource})`);
+
+    const [inventoryResponse, livePricingResponse] = await Promise.allSettled([
       // 1. Inventory (if partId provided, otherwise skip)
       partId ? makePromoStandardsRequest(
         PROMOSTANDARDS_ENDPOINTS.inventory,
@@ -374,19 +410,18 @@ Deno.serve(async (req: Request) => {
       ) : Promise.resolve(null),
       // 2. Live Wholesale Pricing with FOB - use internal B-prefixed productId if available
       getLiveWholesalePricing(ssaVendorConfig, internalProductId || cleanedStyleNumber, SSA_DEFAULT_FOB_ID),
-      // 3. Media Content - use styleNumber as productId and partId for color-specific images
-      makePromoStandardsRequest(
-        PROMOSTANDARDS_ENDPOINTS.media,
-        "getMediaContent",
-        mediaSoap
-      ),
     ]);
+
+    // Use the media response from Step 1
+    const mediaResponse = initialMediaResponse;
 
     console.log('📊 PromoStandards API Results:', {
       product: productResponse.status,
       inventory: inventoryResponse.status,
       livePricing: livePricingResponse.status,
       media: mediaResponse.status,
+      internalProductId,
+      internalIdSource,
       productError: productResponse.status === 'rejected' ? productResponse.reason : null,
       inventoryError: inventoryResponse.status === 'rejected' ? inventoryResponse.reason : null,
       livePricingCount: livePricingResponse.status === 'fulfilled' ? livePricingResponse.value.length : 0,
@@ -902,6 +937,8 @@ Deno.serve(async (req: Request) => {
         pricing: pricingData,
         media: mediaData,
         debug: {
+          internalProductId,
+          internalIdSource,
           mediaResponseStatus: mediaResponse.status,
           mediaXmlFull: mediaResponse.status === 'fulfilled' && mediaResponse.value
             ? mediaResponse.value
