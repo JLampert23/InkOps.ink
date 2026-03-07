@@ -731,17 +731,8 @@ Deno.serve(async (req: Request) => {
           );
         }
 
-        // ============================================================
         // S&S PromoStandards Pricing API - REQUIRES B-PREFIX
-        // S&S Activewear PromoStandards Pricing API requires the
-        // B-prefixed product ID format for ALL styles.
-        //
-        // Normalization rules:
-        // - Numeric styles: "64000" -> "B64000"
-        // - G-prefix styles: "G5000" -> "B5000"
-        // - Already B-prefix: "B5000" -> "B5000"
-        // - Alphanumeric: "PC54" -> "BPC54"
-        // ============================================================
+        // Examples: "64000" -> "B64000", "G5000" -> "B5000"
 
         let styleUppercase = productId.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
 
