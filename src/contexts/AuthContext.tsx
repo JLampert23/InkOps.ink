@@ -33,6 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const mountedRef = useRef(true);
+  const currentUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -94,6 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         setSession(session);
         setUser(session?.user ?? null);
+        currentUserIdRef.current = session?.user?.id ?? null;
 
         if (session?.user) {
           await Promise.all([
@@ -114,10 +116,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mountedRef.current) return;
 
-      setSession(session);
-      setUser(session?.user ?? null);
+      const newUserId = session?.user?.id ?? null;
+      const userChanged = newUserId !== currentUserIdRef.current;
 
-      if (session?.user) {
+      setSession(session);
+
+      if (userChanged) {
+        setUser(session?.user ?? null);
+        currentUserIdRef.current = newUserId;
+      }
+
+      if (event === 'SIGNED_OUT' || !session?.user) {
+        setUser(null);
+        setUserProfile(null);
+        setCompanySettings(null);
+        currentUserIdRef.current = null;
+      } else if (userChanged && session?.user) {
         (async () => {
           try {
             await Promise.all([
@@ -128,9 +142,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.error('Error in auth state change:', err);
           }
         })();
-      } else {
-        setUserProfile(null);
-        setCompanySettings(null);
       }
     });
 

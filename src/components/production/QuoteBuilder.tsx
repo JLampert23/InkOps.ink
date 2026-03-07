@@ -358,26 +358,24 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
 
   // Load company settings, customers, and fees on mount
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
 
     loadCompanySettings();
     loadCustomers();
     loadAvailableFees();
-  }, [user]);
+  }, [user?.id]);
 
   // Handle quote loading or creation
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
 
     if (initialQuoteId) {
-      // If we have an initial quote ID, set it and load
       setQuoteId(initialQuoteId);
       loadQuote(initialQuoteId);
     } else {
-      // Don't create draft automatically - only create when user takes action
       loadDefaultFees();
     }
-  }, [user, initialQuoteId]);
+  }, [user?.id, initialQuoteId]);
 
   useEffect(() => {
     if (selectedCustomerId && !quoteId) {
