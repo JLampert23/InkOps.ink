@@ -733,14 +733,32 @@ Deno.serve(async (req: Request) => {
 
         // ============================================================
         // S&S PromoStandards Pricing API
-        // S&S Activewear requires the "B" prefix for pricing API
-        // Example: PC54 -> BPC54
+        // S&S Activewear uses DIFFERENT product ID formats:
+        // - Numeric styles (Gildan): 5000 -> B05000 (B-prefix + padded)
+        // - Alphanumeric styles: PC54 stays PC54 (NO B-prefix)
         // ============================================================
 
         const styleUppercase = productId.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-        const normalizedPricingProductId = styleUppercase.startsWith('B')
-          ? styleUppercase
-          : `B${styleUppercase}`;
+
+        // Determine if this is a numeric-only style (needs B-prefix and padding)
+        // or an alphanumeric style (use as-is)
+        let normalizedPricingProductId: string;
+
+        if (/^\d+$/.test(styleUppercase)) {
+          // Pure numeric style (e.g., "5000") - add B prefix and pad to 5 digits
+          normalizedPricingProductId = 'B' + styleUppercase.padStart(5, '0');
+        } else if (styleUppercase.startsWith('G') && /^G\d+$/.test(styleUppercase)) {
+          // Gildan G-prefix (e.g., "G5000") - convert to B-prefix format
+          const numericPart = styleUppercase.substring(1);
+          normalizedPricingProductId = 'B' + numericPart.padStart(5, '0');
+        } else if (styleUppercase.startsWith('B') && /^B\d+$/.test(styleUppercase)) {
+          // Already B-prefixed numeric (e.g., "B5000") - just ensure padding
+          const numericPart = styleUppercase.substring(1);
+          normalizedPricingProductId = 'B' + numericPart.padStart(5, '0');
+        } else {
+          // Alphanumeric style (e.g., "PC54", "DG536") - use as-is, NO B-prefix
+          normalizedPricingProductId = styleUppercase;
+        }
 
         const fobId = validateFobId(url.searchParams.get("fobId"));
         const priceType = "Customer";
