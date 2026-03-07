@@ -1,7 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { getLiveWholesalePricing, type VendorConfig } from "../_shared/live-wholesale-pricing.ts";
-import { normalizeSsPromoStandardsProductId } from "../_shared/ss-promostandards-normalizer.ts";
 
 const SSA_DEFAULT_FOB_ID = "NJ";
 
@@ -259,14 +258,12 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // S&S PromoStandards requires B-prefixed productId for all endpoints
-    const bPrefixedProductId = normalizeSsPromoStandardsProductId(styleNumber);
-    console.log('Unified PromoStandards Request:', { styleNumber, bPrefixedProductId, partId });
+    console.log('Unified PromoStandards Request:', { styleNumber, partId });
 
     // XML-escape credentials to prevent authentication issues
     const escapedAccountNumber = escapeXml(credentials.accountNumber);
     const escapedApiKey = escapeXml(decryptedApiKey);
-    const escapedBPrefixedProductId = escapeXml(bPrefixedProductId);
+    const escapedStyleNumber = escapeXml(styleNumber);
     const escapedPartId = partId ? escapeXml(partId) : '';
 
     // Store SOAP bodies for debugging
@@ -274,8 +271,20 @@ Deno.serve(async (req: Request) => {
   <shar:wsVersion>2.0.0</shar:wsVersion>
   <shar:id>${escapedAccountNumber}</shar:id>
   <shar:password>${escapedApiKey}</shar:password>
-  <shar:productId>${escapedBPrefixedProductId}</shar:productId>
+  <shar:productId>${escapedStyleNumber}</shar:productId>
 </ns2:GetProductRequest>`;
+
+    // S&S Activewear MediaContent uses raw style number (NOT B-prefixed like SanMar)
+    // Clean the style number: uppercase, remove non-alphanumeric, strip any erroneous B prefix
+    let cleanedStyleNumber = styleNumber.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (cleanedStyleNumber.startsWith('B') && cleanedStyleNumber.length > 1) {
+      const afterB = cleanedStyleNumber.substring(1);
+      // If it looks like an accidentally B-prefixed style, strip the B
+      if (/[A-Z]/.test(afterB) || /^\d+$/.test(afterB)) {
+        cleanedStyleNumber = afterB;
+      }
+    }
+    const escapedCleanedStyleNumber = escapeXml(cleanedStyleNumber);
 
     const partIdTag = partId ? `\n  <shar:partId>${escapedPartId}</shar:partId>` : '';
     const mediaSoap = `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
@@ -283,7 +292,7 @@ Deno.serve(async (req: Request) => {
   <shar:id>${escapedAccountNumber}</shar:id>
   <shar:password>${escapedApiKey}</shar:password>
   <shar:mediaType>Image</shar:mediaType>
-  <shar:productId>${escapedBPrefixedProductId}</shar:productId>${partIdTag}
+  <shar:productId>${escapedCleanedStyleNumber}</shar:productId>${partIdTag}
 </ns2:GetMediaContentRequest>`;
 
     // Build vendor config for live wholesale pricing
@@ -312,12 +321,12 @@ Deno.serve(async (req: Request) => {
   <shar:wsVersion>2.0.0</shar:wsVersion>
   <shar:id>${escapedAccountNumber}</shar:id>
   <shar:password>${escapedApiKey}</shar:password>
-  <shar:productId>${escapedBPrefixedProductId}</shar:productId>
+  <shar:productId>${escapedPartId}</shar:productId>
 </ns2:GetInventoryLevelsRequest>`
       ) : Promise.resolve(null),
-      // 3. Live Wholesale Pricing with FOB (S&S requires B-prefixed productId)
-      getLiveWholesalePricing(ssaVendorConfig, bPrefixedProductId, SSA_DEFAULT_FOB_ID),
-      // 4. Media Content
+      // 3. Live Wholesale Pricing with FOB (S&S uses raw style numbers, NOT B-prefixed)
+      getLiveWholesalePricing(ssaVendorConfig, cleanedStyleNumber, SSA_DEFAULT_FOB_ID),
+      // 4. Media Content - use styleNumber as productId and partId for color-specific images
       makePromoStandardsRequest(
         PROMOSTANDARDS_ENDPOINTS.media,
         "getMediaContent",

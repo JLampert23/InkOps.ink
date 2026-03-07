@@ -10,8 +10,6 @@
  * All calls are made in parallel for optimal performance.
  */
 
-import { normalizeSsPromoStandardsProductId } from "./ss-promostandards-normalizer.ts";
-
 const PROMOSTANDARDS_ENDPOINTS = {
   productData: "https://promostandards.ssactivewear.com/productdata/v2/productdataservicev2.svc",
   inventory: "https://promostandards.ssactivewear.com/inventory/v2/inventoryservice.svc",
@@ -164,9 +162,7 @@ export async function fetchUnifiedPromoStandardsData(
   const { styleNumber, partId } = request;
   const { accountNumber, apiKey } = credentials;
 
-  // S&S PromoStandards requires B-prefixed productId for all endpoints
-  const bPrefixedProductId = normalizeSsPromoStandardsProductId(styleNumber);
-  console.log('🔄 Fetching unified PromoStandards data:', { styleNumber, bPrefixedProductId, partId });
+  console.log('🔄 Fetching unified PromoStandards data:', { styleNumber, partId });
 
   // Make all 4 requests in parallel
   const [productResponse, inventoryResponse, pricingResponse, mediaResponse] = await Promise.allSettled([
@@ -178,7 +174,7 @@ export async function fetchUnifiedPromoStandardsData(
   <shar:wsVersion>2.0.0</shar:wsVersion>
   <shar:id>${accountNumber}</shar:id>
   <shar:password>${apiKey}</shar:password>
-  <shar:productId>${bPrefixedProductId}</shar:productId>
+  <shar:productId>${styleNumber}</shar:productId>
 </ns2:GetProductRequest>`
     ),
     // 2. Inventory (if partId provided, otherwise skip)
@@ -189,7 +185,7 @@ export async function fetchUnifiedPromoStandardsData(
   <shar:wsVersion>2.0.0</shar:wsVersion>
   <shar:id>${accountNumber}</shar:id>
   <shar:password>${apiKey}</shar:password>
-  <shar:productId>${bPrefixedProductId}</shar:productId>
+  <shar:productId>${partId}</shar:productId>
 </ns2:GetInventoryLevelsRequest>`
     ) : Promise.resolve(null),
     // 3. Pricing (if partId provided, otherwise skip)
@@ -200,7 +196,7 @@ export async function fetchUnifiedPromoStandardsData(
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${accountNumber}</shar:id>
   <shar:password>${apiKey}</shar:password>
-  <shar:productId>${bPrefixedProductId}</shar:productId>
+  <shar:productId>${partId}</shar:productId>
   <shar:currency>USD</shar:currency>
   <shar:priceType>Customer</shar:priceType>
 </ns2:GetConfigurationAndPricingRequest>`
@@ -214,7 +210,7 @@ export async function fetchUnifiedPromoStandardsData(
   <shar:id>${accountNumber}</shar:id>
   <shar:password>${apiKey}</shar:password>
   <shar:mediaType>Image</shar:mediaType>
-  <shar:productId>${bPrefixedProductId}</shar:productId>${partId ? `
+  <shar:productId>${styleNumber}</shar:productId>${partId ? `
   <shar:partId>${partId}</shar:partId>` : ''}
 </ns2:GetMediaContentRequest>`
     ),

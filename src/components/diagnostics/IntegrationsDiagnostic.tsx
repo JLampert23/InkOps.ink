@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Check, X, Loader2, AlertCircle, RefreshCw, Zap, Mail, DollarSign } from 'lucide-react';
+import { Check, X, Loader2, AlertCircle, RefreshCw, Zap, Mail, Send } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 
 interface DiagnosticResult {
@@ -16,9 +16,6 @@ export function IntegrationsDiagnostic() {
   const [portalResult, setPortalResult] = useState<any>(null);
   const [sendingMagicLink, setSendingMagicLink] = useState(false);
   const [magicLinkResult, setMagicLinkResult] = useState<any>(null);
-  const [ssPricingTesting, setSSPricingTesting] = useState(false);
-  const [ssPricingResult, setSSPricingResult] = useState<any>(null);
-  const [ssPricingProductId, setSSPricingProductId] = useState('64000');
 
   useEffect(() => {
     runDiagnostics();
@@ -120,16 +117,14 @@ export function IntegrationsDiagnostic() {
       }
       setResults([...diagnostics]);
 
-      // 5. Test product search endpoint with vendor-specific styles
+      // 5. Test product search endpoint
       if (settings?.sanmar_enabled || settings?.ssactivewear_enabled) {
-        const testStyle = settings?.sanmar_enabled ? 'PC54' : '64000';
-        const vendorName = settings?.sanmar_enabled ? 'SanMar' : 'S&S';
-        diagnostics.push({ name: 'Product Search API', status: 'checking', message: `Testing with ${testStyle} (${vendorName})...` });
+        diagnostics.push({ name: 'Product Search API', status: 'checking', message: 'Testing with PC54...' });
         setResults([...diagnostics]);
 
         try {
           const response = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/product-search?style=${testStyle}`,
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/product-search?style=PC54`,
             {
               method: 'GET',
               headers: {
@@ -146,7 +141,7 @@ export function IntegrationsDiagnostic() {
             diagnostics[4] = {
               name: 'Product Search API',
               status: 'success',
-              message: `Found ${data.count} result(s) for ${testStyle}`,
+              message: `Found ${data.count} result(s)`,
               details: data
             };
           } else {
@@ -320,54 +315,6 @@ export function IntegrationsDiagnostic() {
     setSendingMagicLink(false);
   };
 
-  const testSSPricing = async () => {
-    setSSPricingTesting(true);
-    setSSPricingResult(null);
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session) {
-        setSSPricingResult({
-          status: 'error',
-          message: 'Not authenticated'
-        });
-        setSSPricingTesting(false);
-        return;
-      }
-
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ssactivewear-api?action=pricing&productId=${encodeURIComponent(ssPricingProductId)}`;
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'X-User-Token': session.access_token,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = await response.json();
-
-      setSSPricingResult({
-        status: response.ok && data.success ? 'success' : 'error',
-        httpStatus: response.status,
-        message: data.success
-          ? `Found ${data.priceBreaks?.length || 0} price breaks`
-          : (data.error || 'No pricing data returned'),
-        data
-      });
-    } catch (error: any) {
-      setSSPricingResult({
-        status: 'error',
-        message: error.message,
-        error: error.toString(),
-      });
-    }
-
-    setSSPricingTesting(false);
-  };
-
   const getStatusIcon = (status: DiagnosticResult['status']) => {
     switch (status) {
       case 'checking':
@@ -538,115 +485,6 @@ export function IntegrationsDiagnostic() {
               <pre className="mt-2 text-xs bg-gray-900 text-gray-100 p-3 rounded overflow-x-auto max-h-96">
                 {JSON.stringify(portalResult.data || portalResult, null, 2)}
               </pre>
-            </div>
-          )}
-        </div>
-
-        <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            S&S Activewear Pricing Debug
-          </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Test the S&S PromoStandards pricing API with full debug output including raw SOAP request/response.
-          </p>
-          <div className="flex flex-wrap items-end gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Product ID / Style
-              </label>
-              <input
-                type="text"
-                value={ssPricingProductId}
-                onChange={(e) => setSSPricingProductId(e.target.value)}
-                placeholder="e.g., 64000, 5000, 2000"
-                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white w-48"
-              />
-            </div>
-            <button
-              onClick={testSSPricing}
-              disabled={ssPricingTesting || !ssPricingProductId.trim()}
-              className="flex items-center gap-2 px-6 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
-            >
-              <DollarSign className={`w-5 h-5 ${ssPricingTesting ? 'animate-pulse' : ''}`} />
-              {ssPricingTesting ? 'Testing...' : 'Test S&S Pricing'}
-            </button>
-          </div>
-
-          {ssPricingResult && (
-            <div className={`mt-4 p-4 rounded-lg border-2 ${
-              ssPricingResult.status === 'success'
-                ? 'bg-green-50 border-green-200 dark:bg-green-900/10 dark:border-green-800'
-                : 'bg-red-50 border-red-200 dark:bg-red-900/10 dark:border-red-800'
-            }`}>
-              <div className="flex items-center gap-2 mb-2">
-                {ssPricingResult.status === 'success' ? (
-                  <Check className="w-5 h-5 text-green-600" />
-                ) : (
-                  <X className="w-5 h-5 text-red-600" />
-                )}
-                <span className="font-semibold text-gray-900 dark:text-white">
-                  {ssPricingResult.status === 'success' ? 'Success' : 'Error'}
-                  {ssPricingResult.httpStatus && ` (HTTP ${ssPricingResult.httpStatus})`}
-                </span>
-              </div>
-              {ssPricingResult.message && (
-                <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">{ssPricingResult.message}</p>
-              )}
-
-              {ssPricingResult.data?.debug && (
-                <div className="space-y-3 mb-4">
-                  <details>
-                    <summary className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:text-gray-900 dark:hover:text-white">
-                      SOAP Request Sent
-                    </summary>
-                    <pre className="mt-2 text-xs bg-gray-800 text-green-400 p-3 rounded overflow-x-auto max-h-64">
-                      {ssPricingResult.data.debug.soapRequest || 'N/A'}
-                    </pre>
-                  </details>
-
-                  <details>
-                    <summary className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:text-gray-900 dark:hover:text-white">
-                      Raw XML Response
-                    </summary>
-                    <pre className="mt-2 text-xs bg-gray-800 text-blue-400 p-3 rounded overflow-x-auto max-h-64">
-                      {ssPricingResult.data.debug.rawResponse || 'N/A'}
-                    </pre>
-                  </details>
-
-                  {ssPricingResult.data.debug.soapFault && (
-                    <div className="p-3 bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded">
-                      <p className="text-sm font-semibold text-red-800 dark:text-red-300">SOAP Fault Detected:</p>
-                      <pre className="mt-1 text-xs text-red-700 dark:text-red-400">
-                        {ssPricingResult.data.debug.soapFault}
-                      </pre>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded">
-                      <span className="font-medium">Has PartArray:</span>{' '}
-                      <span className={ssPricingResult.data.debug.hasPartArray ? 'text-green-600' : 'text-red-600'}>
-                        {ssPricingResult.data.debug.hasPartArray ? 'Yes' : 'No'}
-                      </span>
-                    </div>
-                    <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded">
-                      <span className="font-medium">Has PartPriceArray:</span>{' '}
-                      <span className={ssPricingResult.data.debug.hasPartPriceArray ? 'text-green-600' : 'text-red-600'}>
-                        {ssPricingResult.data.debug.hasPartPriceArray ? 'Yes' : 'No'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <details>
-                <summary className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer hover:text-gray-900 dark:hover:text-white">
-                  Full JSON Response
-                </summary>
-                <pre className="mt-2 text-xs bg-gray-900 text-gray-100 p-3 rounded overflow-x-auto max-h-96">
-                  {JSON.stringify(ssPricingResult.data || ssPricingResult, null, 2)}
-                </pre>
-              </details>
             </div>
           )}
         </div>
