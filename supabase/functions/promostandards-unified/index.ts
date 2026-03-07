@@ -306,89 +306,13 @@ Deno.serve(async (req: Request) => {
       },
     };
 
-    // STEP 1: Fetch internal styleID from S&S REST API first
-    // The S&S Pricing API requires the internal styleID (not the customer-facing style number)
-    // Example: Gildan 2000 has styleID 760, which needs to be formatted as "B00760" for pricing
-    console.log('📦 Step 1: Fetching internal styleID from S&S REST API...');
-
+    // Internal pricing ID will be extracted from Product Data partId values
+    // Per S&S PromoStandards docs: partId like "B00760033" contains internal ID "B00760" (first 6 chars)
     let internalProductId: string | null = null;
     let internalIdSource = 'none';
-    let rawStyleId: string | null = null;
 
-    // STRATEGY 1 (PRIMARY): Call S&S REST API to get the internal styleID
-    // This is the ONLY reliable way to get the correct ID for pricing
-    try {
-      const ssaRestApiUrl = `https://api.ssactivewear.com/v2/products/?style=${encodeURIComponent(styleNumber)}`;
-      console.log('🔍 Calling S&S REST API for internal styleID:', ssaRestApiUrl);
-
-      const restApiResponse = await fetch(ssaRestApiUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Basic ${btoa(`${credentials.accountNumber}:${decryptedApiKey}`)}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (restApiResponse.ok) {
-        const restApiData = await restApiResponse.json();
-        if (Array.isArray(restApiData) && restApiData.length > 0) {
-          // The styleID is consistent across all SKUs of the same style
-          rawStyleId = String(restApiData[0].styleID);
-          // Format as B-prefixed 6-character ID: 760 -> B00760
-          internalProductId = `B${rawStyleId.padStart(5, '0')}`;
-          internalIdSource = 'rest-api-styleID';
-          console.log('✅ Got internal styleID from REST API:', rawStyleId, '-> Pricing ID:', internalProductId);
-
-          // Cache the internal ID to the styles table for future lookups
-          try {
-            await supabase
-              .from('styles')
-              .upsert({
-                company_id: companyId,
-                style_number: styleNumber,
-                ss_internal_id: rawStyleId,
-                last_synced: new Date().toISOString(),
-              }, {
-                onConflict: 'company_id,style_number'
-              });
-            console.log('💾 Cached styleID to styles table');
-          } catch (cacheErr: any) {
-            console.warn('⚠️ Failed to cache styleID:', cacheErr.message);
-          }
-        } else {
-          console.warn('⚠️ S&S REST API returned empty array for style:', styleNumber);
-        }
-      } else {
-        const errorText = await restApiResponse.text().catch(() => '');
-        console.warn('⚠️ S&S REST API error:', restApiResponse.status, errorText.substring(0, 200));
-      }
-    } catch (restErr: any) {
-      console.warn('⚠️ S&S REST API call failed:', restErr.message);
-    }
-
-    // STRATEGY 2 (FALLBACK): Check cached styleID in database
-    if (!internalProductId) {
-      try {
-        const { data: cachedStyle } = await supabase
-          .from('styles')
-          .select('ss_internal_id')
-          .eq('company_id', companyId)
-          .eq('style_number', styleNumber)
-          .maybeSingle();
-
-        if (cachedStyle?.ss_internal_id) {
-          rawStyleId = cachedStyle.ss_internal_id;
-          internalProductId = `B${rawStyleId.padStart(5, '0')}`;
-          internalIdSource = 'database-cache';
-          console.log('💾 Using cached styleID from database:', rawStyleId, '-> Pricing ID:', internalProductId);
-        }
-      } catch (dbErr: any) {
-        console.warn('⚠️ Database lookup failed:', dbErr.message);
-      }
-    }
-
-    // STEP 2: Fetch Product Data AND Media in parallel
-    console.log('📦 Step 2: Fetching Product Data and Media...');
+    // STEP 1: Fetch Product Data AND Media in parallel
+    console.log('📦 Step 1: Fetching Product Data and Media...');
 
     const [productResponse, initialMediaResponse] = await Promise.allSettled([
       makePromoStandardsRequest(
@@ -403,91 +327,49 @@ Deno.serve(async (req: Request) => {
       ),
     ]);
 
-    // Helper function to extract internal numeric ID from S&S CDN URLs (backup strategy)
-    // URLs look like: https://cdn.ssactivewear.com/images/style/393_fl.jpg
-    function extractInternalIdFromMediaUrls(xmlDoc: string): string | null {
-      const urlPattern = /https?:\/\/cdn\.ssactivewear\.com\/images\/[^"'<>\s]*?\/(\d+)_[a-z]+\.jpg/gi;
-      const matches = xmlDoc.matchAll(urlPattern);
-      const ids = new Set<string>();
-
-      for (const match of matches) {
-        ids.add(match[1]);
-      }
-
-      if (ids.size === 1) {
-        return Array.from(ids)[0];
-      } else if (ids.size > 1) {
-        console.log('📸 Found multiple internal IDs in media URLs:', Array.from(ids));
-        return Array.from(ids)[0];
-      }
-      return null;
-    }
-
-    // STRATEGY 3 (BACKUP): Extract from Media API URLs if REST API failed
-    if (!internalProductId && initialMediaResponse.status === 'fulfilled' && initialMediaResponse.value) {
-      const mediaXml = initialMediaResponse.value;
-      const idFromMedia = extractInternalIdFromMediaUrls(mediaXml);
-      if (idFromMedia) {
-        rawStyleId = idFromMedia;
-        internalProductId = `B${idFromMedia.padStart(5, '0')}`;
-        internalIdSource = 'media-url';
-        console.log('📸 Extracted internal ID from Media URLs:', idFromMedia, '-> Pricing ID:', internalProductId);
-      }
-    }
-
-    // STRATEGY 4 (LAST RESORT): Find B-prefixed productId in Product Data response
-    if (!internalProductId && productResponse.status === 'fulfilled' && productResponse.value) {
+    // Extract internal pricing ID from Product Data partId values
+    // Per S&S PromoStandards documentation (page 7):
+    // - partId values look like "B00760033" (style 2000)
+    // - The first 6 characters "B00760" is the internal ID needed for pricing API
+    if (productResponse.status === 'fulfilled' && productResponse.value) {
       const xmlDoc = productResponse.value;
-      const allProductIdMatches = xmlDoc.matchAll(/<(?:[a-zA-Z0-9]+:)?productId[^>]*>([^<]+)<\/(?:[a-zA-Z0-9]+:)?productId>/gi);
-      const allProductIds = Array.from(allProductIdMatches, m => m[1].trim());
+      const partIdPattern = /<(?:[a-zA-Z0-9]+:)?partId[^>]*>([^<]+)<\/(?:[a-zA-Z0-9]+:)?partId>/gi;
+      const partIdMatches = Array.from(xmlDoc.matchAll(partIdPattern), m => m[1].trim());
 
-      console.log('📦 All productId values found in XML:', allProductIds.slice(0, 10), allProductIds.length > 10 ? `... (${allProductIds.length} total)` : '');
+      if (partIdMatches.length > 0) {
+        // Find first B-prefixed partId (e.g., "B00760033")
+        const bPrefixedPartId = partIdMatches.find(id => /^B\d{5,}/i.test(id));
 
-      const bPrefixedId = allProductIds.find(id => /^B\d+$/i.test(id));
-
-      if (bPrefixedId) {
-        internalProductId = bPrefixedId;
-        internalIdSource = 'product-data';
-        console.log('📦 Found B-prefixed internal productId:', internalProductId);
-      } else {
-        const productHeaderMatch = xmlDoc.match(/<(?:[a-zA-Z0-9]+:)?Product[^>]*>([\s\S]*?)<(?:[a-zA-Z0-9]+:)?Part/i);
-        if (productHeaderMatch) {
-          const productHeader = productHeaderMatch[1];
-          const headerProductIdMatch = productHeader.match(/<(?:[a-zA-Z0-9]+:)?productId[^>]*>([^<]+)<\/(?:[a-zA-Z0-9]+:)?productId>/i);
-          if (headerProductIdMatch && headerProductIdMatch[1]) {
-            internalProductId = headerProductIdMatch[1].trim();
-            internalIdSource = 'product-header';
-            console.log('📦 Extracted productId from Product header (pre-Part):', internalProductId);
-          }
+        if (bPrefixedPartId) {
+          // Extract first 6 characters as the internal pricing ID (e.g., "B00760")
+          internalProductId = bPrefixedPartId.substring(0, 6).toUpperCase();
+          internalIdSource = 'partId-extraction';
+          console.log('📦 Extracted internal pricing ID from partId:', bPrefixedPartId, '->', internalProductId);
+        } else {
+          console.log('📦 No B-prefixed partId found in Product Data. Sample partIds:', partIdMatches.slice(0, 3));
         }
       }
     }
 
     if (!internalProductId) {
-      console.warn('📦 WARNING: Could not find internal productId from any source');
+      console.warn('📦 WARNING: Could not extract internal productId from Product Data partId values');
     }
 
-    // STEP 3: Now make the remaining requests
-    // PRICING APPROACH: Use internal styleID (B-prefixed) FIRST - this is the correct format for S&S
-    console.log('📦 Step 3: Fetching Inventory and Pricing...');
+    // STEP 2: Fetch Inventory and Pricing
+    // Use internal pricing ID extracted from partId (e.g., B00760 for Gildan 2000)
+    console.log('📦 Step 2: Fetching Inventory and Pricing...');
 
     // Build list of productId formats to try for pricing (in order of preference)
     const pricingIdCandidates: { id: string; source: string }[] = [];
 
-    // 1. FIRST: Try the internal styleID from REST API (most reliable - e.g., B00760 for Gildan 2000)
+    // 1. PRIMARY: Use internal ID extracted from partId (e.g., B00760)
     if (internalProductId) {
       pricingIdCandidates.push({ id: internalProductId, source: internalIdSource });
     }
 
-    // 2. FALLBACK: Try the plain style number (rarely works but worth trying)
+    // 2. FALLBACK: Try the plain style number (may work for some products)
     if (!pricingIdCandidates.some(c => c.id === cleanedStyleNumber)) {
       pricingIdCandidates.push({ id: cleanedStyleNumber, source: 'style-number' });
-    }
-
-    // 3. LAST RESORT: Try B-prefixed version of the style number itself
-    const bPrefixedStyle = `B${cleanedStyleNumber.replace(/^B/i, '').padStart(5, '0')}`;
-    if (!pricingIdCandidates.some(c => c.id === bPrefixedStyle)) {
-      pricingIdCandidates.push({ id: bPrefixedStyle, source: 'b-prefixed-style' });
     }
 
     console.log('💰 Pricing API candidates to try:', pricingIdCandidates);
@@ -545,7 +427,6 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Use the media response from Step 1
     const mediaResponse = initialMediaResponse;
 
     console.log('📊 PromoStandards API Results:', {
