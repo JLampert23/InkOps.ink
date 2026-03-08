@@ -25,38 +25,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: st
 
 function normalizeSsProductId(input: string): string {
   if (!input) return '';
-
-  let cleaned = input.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
-
-  // If it already has letters (like DG536, PC54, G500, etc.), it's a manufacturer style number
-  // These should be passed through as-is (no B prefix needed)
-  if (/[A-Z]/.test(cleaned) && !/^B\d+$/.test(cleaned)) {
-    // It's a manufacturer style number like DG536, PC54, G500, etc.
-    // Remove any leading B if it was incorrectly added previously
-    if (cleaned.startsWith('B') && cleaned.length > 1 && /[A-Z]/.test(cleaned.substring(1))) {
-      // But only if what follows has letters too (like BDG536 -> DG536)
-      // Keep it if it's like B18500 (which is correct)
-      const afterB = cleaned.substring(1);
-      if (/[A-Z]/.test(afterB)) {
-        cleaned = afterB;
-      }
-    }
-    return cleaned;
-  }
-
-  // If it starts with B followed by numbers only (B18500), keep it
-  if (/^B\d+$/.test(cleaned)) {
-    return cleaned;
-  }
-
-  // Pure numeric input (like 18500) - these are S&S internal IDs and need B prefix
-  if (/^\d+$/.test(cleaned)) {
-    cleaned = cleaned.padStart(5, '0');
-    return 'B' + cleaned;
-  }
-
-  // For anything else, return as-is
-  return cleaned;
+  return input.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
 interface ColorOption {
@@ -634,68 +603,10 @@ async function fetchAndCacheSSActivewear(
     }
 
     if (!cachedPricingMap || cachedPricingMap.size === 0) {
-      console.log('[SSA Pricing] PromoStandards returned no pricing, trying REST API fallback...');
-      try {
-        const { data: ssSettings } = await supabaseAdmin
-          .from("company_settings")
-          .select("ssactivewear_username, ssactivewear_api_key_encrypted")
-          .eq("id", companyId)
-          .maybeSingle();
-
-        if (ssSettings?.ssactivewear_username && ssSettings?.ssactivewear_api_key_encrypted) {
-          const decryptResp = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${supabaseServiceKey}`,
-            },
-            body: JSON.stringify({ action: "decrypt", token: ssSettings.ssactivewear_api_key_encrypted }),
-          });
-
-          if (decryptResp.ok) {
-            const { result: decKey } = await decryptResp.json();
-            const restUrl = `https://api.ssactivewear.com/v2/products/?style=${encodeURIComponent(style)}`;
-            const restResp = await fetch(restUrl, {
-              method: 'GET',
-              headers: {
-                'Authorization': `Basic ${btoa(`${ssSettings.ssactivewear_username}:${decKey}`)}`,
-                'Content-Type': 'application/json',
-              },
-            });
-
-            if (restResp.ok) {
-              const restData = await restResp.json();
-              if (Array.isArray(restData) && restData.length > 0) {
-                cachedPricingMap = new Map();
-                for (const variant of restData) {
-                  const pid = variant.sku || variant.partID;
-                  const price = parseFloat(variant.customerPrice || variant.piecePrice || variant.salePrice || variant.casePrice || '0');
-                  if (pid && price > 0) {
-                    cachedPricingMap.set(pid, price);
-                    await supabaseAdmin
-                      .from("ss_catalog_pricing")
-                      .upsert({
-                        company_id: companyId,
-                        part_number: pid,
-                        unit_price: price,
-                        quantity_min: 1,
-                        quantity_max: 99999,
-                        discount_code: null,
-                        price_expiry_date: null,
-                      }, { onConflict: "company_id,part_number,quantity_min" });
-                  }
-                }
-                console.log(`[SSA Pricing] REST API fallback cached pricing for ${cachedPricingMap.size} parts`);
-              }
-            }
-          }
-        }
-      } catch (restPricingErr: any) {
-        console.warn('[SSA Pricing] REST API pricing fallback failed:', restPricingErr.message);
-      }
+      console.log('[SSA Pricing] PromoStandards returned no pricing - pricing data may require internal product ID');
     }
 
-    // Fetch and cache media (images) - check cache first, then PromoStandards, then REST API fallback
+    // Fetch and cache media (images) - check cache first, then PromoStandards API
     let mediaContent: any[] = [];
     let imageCacheHit = false;
     let usedCdnFallback = false;
@@ -739,92 +650,7 @@ async function fetchAndCacheSSActivewear(
         }
       }
 
-      // Step 3: If PromoStandards returned no images, try REST API fallback
-      if (mediaContent.length === 0) {
-        console.log('PromoStandards media empty, trying REST API fallback...');
-        try {
-          const { data: settings } = await supabaseAdmin
-            .from("company_settings")
-            .select("ssactivewear_username, ssactivewear_api_key_encrypted")
-            .eq("id", companyId)
-            .maybeSingle();
-
-          if (settings?.ssactivewear_username && settings?.ssactivewear_api_key_encrypted) {
-            const decryptResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${supabaseServiceKey}`,
-              },
-              body: JSON.stringify({
-                action: "decrypt",
-                token: settings.ssactivewear_api_key_encrypted,
-              }),
-            });
-
-            if (decryptResponse.ok) {
-              const decryptResult = await decryptResponse.json();
-              const decryptedApiKey = decryptResult.result;
-
-              const ssaRestApiUrl = `https://api.ssactivewear.com/v2/products/?style=${encodeURIComponent(style)}`;
-              const restApiResponse = await fetch(ssaRestApiUrl, {
-                method: 'GET',
-                headers: {
-                  'Authorization': `Basic ${btoa(`${settings.ssactivewear_username}:${decryptedApiKey}`)}`,
-                  'Content-Type': 'application/json',
-                },
-              });
-
-              if (restApiResponse.ok) {
-                const restApiData = await restApiResponse.json();
-                console.log(`REST API returned ${Array.isArray(restApiData) ? restApiData.length : 0} products`);
-
-                if (Array.isArray(restApiData) && restApiData.length > 0) {
-                  for (const product of restApiData) {
-                    if (product.colorFrontImage) {
-                      mediaContent.push({
-                        url: product.colorFrontImage,
-                        partId: product.sku || product.partID,
-                        classTypeName: 'Front',
-                        color: product.colorName,
-                      });
-                    }
-                    if (product.colorBackImage) {
-                      mediaContent.push({
-                        url: product.colorBackImage,
-                        partId: product.sku || product.partID,
-                        classTypeName: 'Rear',
-                        color: product.colorName,
-                      });
-                    }
-                    if (product.colorSideImage) {
-                      mediaContent.push({
-                        url: product.colorSideImage,
-                        partId: product.sku || product.partID,
-                        classTypeName: 'Side',
-                        color: product.colorName,
-                      });
-                    }
-                    if (product.colorSwatchImage) {
-                      mediaContent.push({
-                        url: product.colorSwatchImage,
-                        partId: product.sku || product.partID,
-                        classTypeName: 'Swatch',
-                        color: product.colorName,
-                      });
-                    }
-                  }
-                  logImageOperation("ssactivewear", style, "api_fetch", { imageCount: mediaContent.length, endpoint: "REST API fallback" });
-                }
-              }
-            }
-          }
-        } catch (restApiError: any) {
-          console.warn('REST API fallback failed:', restApiError.message);
-        }
-      }
-
-      // Step 4: If still no images, use CDN fallback
+      // Step 3: If still no images, use CDN fallback
       if (mediaContent.length === 0) {
         logImageOperation("ssactivewear", style, "cdn_fallback", { fallbackUsed: true });
         usedCdnFallback = true;

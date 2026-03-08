@@ -61,11 +61,12 @@ const ssaSuccessResponse = `<?xml version="1.0" encoding="utf-8"?>
       <ns2:Configuration>
         <ns2:PartArray>
           <ns2:Part>
-            <ns2:partId>B00760-Black-S</ns2:partId>
+            <ns2:partId>B00760033</ns2:partId>
+            <ns2:partDescription>Antique Cherry Red (S)</ns2:partDescription>
             <ns2:PartPriceArray>
               <ns2:PartPrice>
                 <ns2:minQuantity>1</ns2:minQuantity>
-                <ns2:price>4.99</ns2:price>
+                <ns2:price>2.50</ns2:price>
                 <ns2:discountCode>A</ns2:discountCode>
                 <ns2:priceEffectiveDate>2024-02-01</ns2:priceEffectiveDate>
                 <ns2:priceExpiryDate>2024-06-30</ns2:priceExpiryDate>
@@ -161,8 +162,8 @@ Deno.test("S&S success response - parses namespaced XML correctly", async () => 
   const results = await getLiveWholesalePricing(mockSSAConfig, "B00760", "IL");
 
   assertEquals(results.length, 1);
-  assertEquals(results[0].partId, "B00760-Black-S");
-  assertEquals(results[0].price, 4.99);
+  assertEquals(results[0].partId, "B00760033");
+  assertEquals(results[0].price, 2.50);
   assertEquals(results[0].minQty, 1);
   assertEquals(results[0].discountCode, "A");
   assertEquals(results[0].effectiveDate, "2024-02-01");

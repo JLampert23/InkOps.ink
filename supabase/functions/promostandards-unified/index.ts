@@ -80,22 +80,7 @@ function escapeXml(unsafe: string): string {
 
 function normalizeSsProductId(input: string): string {
   if (!input) return '';
-
-  let cleaned = input.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-
-  if (cleaned.startsWith('B') && cleaned.length > 1) {
-    cleaned = cleaned.substring(1);
-  }
-
-  if (cleaned.startsWith('G') && /^G\d+$/.test(cleaned)) {
-    cleaned = cleaned.substring(1);
-  }
-
-  if (/^\d+$/.test(cleaned)) {
-    cleaned = cleaned.padStart(5, '0');
-  }
-
-  return 'B' + cleaned;
+  return input.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
 Deno.serve(async (req: Request) => {
@@ -380,40 +365,46 @@ Deno.serve(async (req: Request) => {
     console.log('📦 Step 2: Fetching Inventory and Pricing...');
 
     // Build list of productId formats to try for pricing (in order of preference)
+    // Per S&S PromoStandards docs: pricing API requires the internal product ID (e.g., "B00760")
+    // which is extracted from the first 6 chars of any partId returned by Product Data API
     const pricingIdCandidates: { id: string; source: string }[] = [];
 
-    // 1. PRIMARY: Use normalized style number with B-prefix (e.g., "64000" -> "B64000")
-    const normalizedStyleId = normalizeSsProductId(cleanedStyleNumber);
-    if (normalizedStyleId) {
-      pricingIdCandidates.push({ id: normalizedStyleId, source: 'normalized-style' });
-      console.log('💰 Normalized style number for pricing:', cleanedStyleNumber, '->', normalizedStyleId);
-    }
-
-    // 2. SECONDARY: Use internal ID extracted from partId (e.g., B00760)
-    if (internalProductId && !pricingIdCandidates.some(c => c.id === internalProductId)) {
+    // 1. PRIMARY: Use internal ID extracted from partId (e.g., B00760) - this is the correct format
+    if (internalProductId) {
       pricingIdCandidates.push({ id: internalProductId, source: internalIdSource });
+      console.log('💰 Internal pricing ID (primary):', internalProductId);
     }
 
-    // 3. FALLBACK: Try the plain style number (may work for some products)
+    // 2. SECONDARY: Use normalized style number with B-prefix as fallback (e.g., "64000" -> "B64000")
+    const normalizedStyleId = normalizeSsProductId(cleanedStyleNumber);
+    if (normalizedStyleId && !pricingIdCandidates.some(c => c.id === normalizedStyleId)) {
+      pricingIdCandidates.push({ id: normalizedStyleId, source: 'normalized-style' });
+      console.log('💰 Normalized style number (fallback):', cleanedStyleNumber, '->', normalizedStyleId);
+    }
+
+    // 3. LAST RESORT: Try the plain style number
     if (!pricingIdCandidates.some(c => c.id === cleanedStyleNumber)) {
       pricingIdCandidates.push({ id: cleanedStyleNumber, source: 'style-number' });
     }
 
     console.log('💰 Pricing API candidates to try:', pricingIdCandidates);
 
+    // For inventory, use internal product ID (e.g., "B00760") to get all parts at once
+    // Falls back to style number if internal ID not available
+    const inventoryProductId = internalProductId || pricingIdCandidates[0]?.id || escapedStyleNumber;
+    const escapedInventoryProductId = escapeXml(inventoryProductId);
+
     const [inventoryResponse, livePricingResponse] = await Promise.allSettled([
-      // 1. Inventory (if partId provided, otherwise skip)
-      partId ? makePromoStandardsRequest(
+      makePromoStandardsRequest(
         PROMOSTANDARDS_ENDPOINTS.inventory,
         "getInventoryLevels",
         `<ns2:GetInventoryLevelsRequest xmlns:ns2="http://www.promostandards.org/WSDL/InventoryService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/Inventory/2.0.0/SharedObjects/">
   <shar:wsVersion>2.0.0</shar:wsVersion>
   <shar:id>${escapedAccountNumber}</shar:id>
   <shar:password>${escapedApiKey}</shar:password>
-  <shar:productId>${escapedPartId}</shar:productId>
+  <shar:productId>${escapedInventoryProductId}</shar:productId>
 </ns2:GetInventoryLevelsRequest>`
-      ) : Promise.resolve(null),
-      // 2. Live Wholesale Pricing - try first candidate (plain style number)
+      ),
       getLiveWholesalePricing(ssaVendorConfig, pricingIdCandidates[0].id, SSA_DEFAULT_FOB_ID),
     ]);
 
@@ -454,13 +445,11 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const mediaResponse = initialMediaResponse;
-
     console.log('📊 PromoStandards API Results:', {
       product: productResponse.status,
       inventory: inventoryResponse.status,
       livePricing: finalPricingResponse.status,
-      media: mediaResponse.status,
+      media: initialMediaResponse.status,
       usedPricingId,
       usedPricingSource,
       internalProductId,
@@ -469,7 +458,7 @@ Deno.serve(async (req: Request) => {
       productError: productResponse.status === 'rejected' ? productResponse.reason : null,
       inventoryError: inventoryResponse.status === 'rejected' ? inventoryResponse.reason : null,
       livePricingCount: finalPricingResponse.status === 'fulfilled' ? finalPricingResponse.value.length : 0,
-      mediaError: mediaResponse.status === 'rejected' ? mediaResponse.reason : null,
+      mediaError: initialMediaResponse.status === 'rejected' ? initialMediaResponse.reason : null,
     });
 
     // Parse Product Data
@@ -645,188 +634,18 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Parse Media Content with fallback for error 105
+    // Parse Media Content from PromoStandards API only
     const mediaData: any = {};
-    console.log('📸 Media Response Status:', mediaResponse.status);
+    console.log('📸 Media Response Status:', initialMediaResponse.status);
 
     let mediaAuthError: { code: string; description: string } | null = null;
-    let finalMediaResponse = mediaResponse;
-    let usedRestApiFallback = false;
 
-    // Check if media request failed or returned error 105
-    if (mediaResponse.status === 'fulfilled' && mediaResponse.value) {
-      const errorCodeMatch = mediaResponse.value.match(/<code>(\d+)<\/code>/);
-      const errorDescMatch = mediaResponse.value.match(/<description>(.*?)<\/description>/);
-
-      const hasMediaError = errorCodeMatch && errorDescMatch;
-      const hasEmptyMediaContent = !hasMediaError && !mediaResponse.value.includes('<MediaContent>');
-
-      if (hasMediaError && errorCodeMatch[1] === '105') {
-        mediaAuthError = {
-          code: errorCodeMatch[1],
-          description: errorDescMatch[1]
-        };
-        console.warn('📸 Media API error 105 (auth failed), trying SSActivewear REST API fallback...');
-      }
-
-      // Fall back to REST API if we got an auth error OR if PromoStandards returned empty results
-      if ((hasMediaError && errorCodeMatch[1] === '105') || hasEmptyMediaContent) {
-        if (hasEmptyMediaContent) {
-          console.warn('📸 PromoStandards returned empty MediaContentArray, trying SSActivewear REST API fallback...');
-        }
-
-        // Use SSActivewear REST API as fallback for images
-        try {
-          const ssaRestApiUrl = `https://api.ssactivewear.com/v2/products/?style=${encodeURIComponent(styleNumber)}`;
-          console.log('📸 Calling SSActivewear REST API:', ssaRestApiUrl);
-
-          const restApiResponse = await fetch(ssaRestApiUrl, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Basic ${btoa(`${credentials.accountNumber}:${decryptedApiKey}`)}`,
-              'Content-Type': 'application/json',
-            },
-          });
-
-          if (restApiResponse.ok) {
-            const restApiData = await restApiResponse.json();
-            console.log('📸 REST API returned', Array.isArray(restApiData) ? restApiData.length : 1, 'products');
-
-            if (Array.isArray(restApiData) && restApiData.length > 0) {
-              usedRestApiFallback = true;
-
-              const SSA_IMAGE_BASE = 'https://www.ssactivewear.com/';
-              const normalizeImageUrl = (url: any): string | null => {
-                if (!url || typeof url !== 'string' || url.trim().length === 0) return null;
-                const trimmed = url.trim();
-                if (trimmed.startsWith('http')) return trimmed;
-                if (trimmed.startsWith('Images/') || trimmed.startsWith('images/')) return SSA_IMAGE_BASE + trimmed;
-                return null;
-              };
-              const isValidImageUrl = (url: any): boolean => {
-                return normalizeImageUrl(url) !== null;
-              };
-
-              let targetColor: string | null = null;
-              let productsForColor: any[] = [];
-
-              if (partId) {
-                const selectedPart = productData.parts?.find((p: any) => p.partId === partId);
-                targetColor = selectedPart?.colorName || null;
-                console.log('📸 Looking up color for partId:', { partId, targetColor });
-
-                if (targetColor) {
-                  productsForColor = restApiData.filter((p: any) =>
-                    p.colorName?.toLowerCase() === targetColor!.toLowerCase()
-                  );
-                }
-
-                if (productsForColor.length === 0 && targetColor) {
-                  const targetWords = targetColor.toLowerCase().split(/[\s/]+/);
-                  productsForColor = restApiData.filter((p: any) => {
-                    const pColor = p.colorName?.toLowerCase();
-                    if (!pColor) return false;
-                    const pWords = pColor.split(/[\s/]+/);
-                    const matching = targetWords.filter(w => w.length > 2 && pWords.includes(w));
-                    return matching.length > 0 && (matching.length * 2) / (targetWords.length + pWords.length) >= 0.5;
-                  });
-                  if (productsForColor.length > 0) {
-                    console.log('📸 Fuzzy color match found:', productsForColor.length, 'products');
-                  }
-                }
-
-                if (productsForColor.length === 0) {
-                  const colorPortion = partId.replace(/^[A-Z0-9]+-/i, '').replace(/-[A-Z0-9]+$/i, '').toLowerCase();
-                  if (colorPortion && colorPortion !== partId.toLowerCase()) {
-                    productsForColor = restApiData.filter((p: any) =>
-                      p.colorName?.toLowerCase()?.includes(colorPortion) ||
-                      p.color1?.toLowerCase()?.includes(colorPortion)
-                    );
-                    console.log('📸 Filtered REST by extracted color portion:', { colorPortion, matchCount: productsForColor.length });
-                  }
-                }
-
-                if (productsForColor.length === 0) {
-                  const matched = restApiData.find((p: any) =>
-                    p.sku === partId ||
-                    p.styleID === partId ||
-                    p.gtin === partId
-                  );
-                  if (matched) {
-                    targetColor = matched.colorName || null;
-                    productsForColor = restApiData.filter((p: any) =>
-                      p.colorName === matched.colorName
-                    );
-                  }
-                }
-
-                console.log('📸 Color match result:', { partId, targetColor, matchCount: productsForColor.length });
-              }
-
-              const productsToUse = productsForColor.length > 0 ? productsForColor : [restApiData[0]];
-              if (productsForColor.length === 0) {
-                console.warn('📸 No color match found, falling back to first product');
-              }
-
-              // Extract images ONLY from the selected color's product(s)
-              let front: string | null = null;
-              let back: string | null = null;
-              let side: string | null = null;
-
-              for (const product of productsToUse) {
-                if (!front) {
-                  front = normalizeImageUrl(product.colorFrontImage) || normalizeImageUrl(product.colorOnModelFrontImage) || normalizeImageUrl(product.styleFrontImage);
-                }
-                if (!back) {
-                  back = normalizeImageUrl(product.colorBackImage) || normalizeImageUrl(product.colorOnModelBackImage) || normalizeImageUrl(product.styleBackImage);
-                }
-                if (!side) {
-                  side = normalizeImageUrl(product.colorSideImage) || normalizeImageUrl(product.colorDirectSideImage) || normalizeImageUrl(product.colorOnModelSideImage) || normalizeImageUrl(product.styleSideImage);
-                }
-              }
-
-              // Build minimal image set for the selected color
-              mediaData.images = [];
-              if (front) mediaData.images.push({ url: front, productId: styleNumber, partId: partId || '', classTypeName: 'Front', color: targetColor || '', singlePart: false });
-              if (back) mediaData.images.push({ url: back, productId: styleNumber, partId: partId || '', classTypeName: 'Rear', color: targetColor || '', singlePart: false });
-              if (side) mediaData.images.push({ url: side, productId: styleNumber, partId: partId || '', classTypeName: 'Side', color: targetColor || '', singlePart: false });
-
-              // Return ONLY front/back/side for the selected color
-              mediaData.views = {
-                front,
-                rear: back,
-                side,
-                lifestyle: null,
-                frontImages: front ? [front] : [],
-                rearImages: back ? [back] : [],
-                sideImages: side ? [side] : [],
-                lifestyleImages: [],
-                otherImages: [],
-              };
-
-              console.log('📸 REST API images loaded (color-filtered):', {
-                partId,
-                targetColor,
-                front: !!front,
-                back: !!back,
-                side: !!side,
-              });
-            }
-          } else {
-            const errorText = await restApiResponse.text().catch(() => '');
-            console.warn('📸 REST API returned error:', restApiResponse.status, errorText);
-          }
-        } catch (restApiError) {
-          console.error('📸 REST API fallback failed:', restApiError);
-        }
-      }
-    } else if (mediaResponse.status === 'rejected') {
-      console.error('📸 Media Request Failed:', mediaResponse.reason);
+    if (initialMediaResponse.status === 'rejected') {
+      console.error('📸 Media Request Failed:', initialMediaResponse.reason);
     }
 
-    // Only process PromoStandards media if we didn't already get images from REST API fallback
-    if (!usedRestApiFallback && finalMediaResponse.status === 'fulfilled' && finalMediaResponse.value) {
-      const xmlDoc = finalMediaResponse.value;
+    if (initialMediaResponse.status === 'fulfilled' && initialMediaResponse.value) {
+      const xmlDoc = initialMediaResponse.value;
       console.log('📸 Media XML Response (first 1000 chars):', xmlDoc.substring(0, 1000));
 
       const errorCodeMatch = xmlDoc.match(/<code>(\d+)<\/code>/);
@@ -986,11 +805,11 @@ Deno.serve(async (req: Request) => {
           pricingAttempts,
           internalProductId,
           internalIdSource,
-          mediaResponseStatus: mediaResponse.status,
-          mediaXmlFull: verbose && mediaResponse.status === 'fulfilled' && mediaResponse.value
-            ? mediaResponse.value
+          mediaResponseStatus: initialMediaResponse.status,
+          mediaXmlFull: verbose && initialMediaResponse.status === 'fulfilled' && initialMediaResponse.value
+            ? initialMediaResponse.value
             : null,
-          mediaError: mediaResponse.status === 'rejected' ? mediaResponse.reason?.toString() : null,
+          mediaError: initialMediaResponse.status === 'rejected' ? initialMediaResponse.reason?.toString() : null,
           mediaAuthError,
           pricingAuthError,
           pricingSource: pricingData.parts?.length > 0

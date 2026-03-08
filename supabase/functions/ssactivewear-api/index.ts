@@ -54,19 +54,16 @@ function getSsMediaStyleNumber(styleNumber: string): string {
 
 function normalizeSsProductId(input: string): string {
   if (!input) return '';
+  return input.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
 
-  let cleaned = input.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
-
-  if (cleaned.startsWith('B') && cleaned.length > 1) {
-    const afterB = cleaned.substring(1);
-    if (/[A-Z]/.test(afterB)) {
-      cleaned = afterB;
-    } else if (/^\d+$/.test(afterB)) {
-      cleaned = afterB;
-    }
-  }
-
-  return cleaned;
+function escapeXml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
 }
 
 function validateFobId(fobId: string | null): string {
@@ -363,8 +360,8 @@ Deno.serve(async (req: Request) => {
 
         const soapBody = `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
   <shar:wsVersion>2.0.0</shar:wsVersion>
-  <shar:id>${credentials.accountNumber}</shar:id>
-  <shar:password>${decryptedApiKey}</shar:password>
+  <shar:id>${escapeXml(credentials.accountNumber)}</shar:id>
+  <shar:password>${escapeXml(decryptedApiKey)}</shar:password>
   <shar:productId>${testProductId}</shar:productId>
 </ns2:GetProductRequest>`;
 
@@ -511,9 +508,9 @@ Deno.serve(async (req: Request) => {
 
         const soapBody = `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
   <shar:wsVersion>2.0.0</shar:wsVersion>
-  <shar:id>${credentials.accountNumber}</shar:id>
-  <shar:password>${decryptedApiKey}</shar:password>
-  <shar:productId>${normalizedProductId}</shar:productId>
+  <shar:id>${escapeXml(credentials.accountNumber)}</shar:id>
+  <shar:password>${escapeXml(decryptedApiKey)}</shar:password>
+  <shar:productId>${escapeXml(normalizedProductId)}</shar:productId>
 </ns2:GetProductRequest>`;
 
         console.log(`[SS Product] SOAP Request Body:\n${soapBody}`);
@@ -635,9 +632,9 @@ Deno.serve(async (req: Request) => {
 
         const soapBody = `<ns2:GetInventoryLevelsRequest xmlns:ns2="http://www.promostandards.org/WSDL/InventoryService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/Inventory/2.0.0/SharedObjects/">
   <shar:wsVersion>2.0.0</shar:wsVersion>
-  <shar:id>${credentials.accountNumber}</shar:id>
-  <shar:password>${decryptedApiKey}</shar:password>
-  <shar:productId>${normalizedProductId}</shar:productId>
+  <shar:id>${escapeXml(credentials.accountNumber)}</shar:id>
+  <shar:password>${escapeXml(decryptedApiKey)}</shar:password>
+  <shar:productId>${escapeXml(normalizedProductId)}</shar:productId>
 </ns2:GetInventoryLevelsRequest>`;
 
         console.log(`[SS Inventory] SOAP Request Body:\n${soapBody}`);
@@ -737,11 +734,11 @@ Deno.serve(async (req: Request) => {
 
         const soapBody = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
-  <shar:id>${credentials.accountNumber}</shar:id>
-  <shar:password>${decryptedApiKey}</shar:password>
-  <shar:productId>${normalizedProductId}</shar:productId>
+  <shar:id>${escapeXml(credentials.accountNumber)}</shar:id>
+  <shar:password>${escapeXml(decryptedApiKey)}</shar:password>
+  <shar:productId>${escapeXml(normalizedProductId)}</shar:productId>
   <shar:currency>USD</shar:currency>
-  <shar:fobId>${fobId}</shar:fobId>
+  <shar:fobId>${escapeXml(fobId)}</shar:fobId>
   <shar:priceType>Customer</shar:priceType>
   <shar:localizationCountry>US</shar:localizationCountry>
   <shar:localizationLanguage>en</shar:localizationLanguage>
@@ -859,17 +856,17 @@ Deno.serve(async (req: Request) => {
 
         const partId = url.searchParams.get("partId");
         const colorName = url.searchParams.get("colorName");
-        const partIdTag = partId ? `<shar:partId>${partId}</shar:partId>` : '';
+        const partIdTag = partId ? `<shar:partId>${escapeXml(partId)}</shar:partId>` : '';
 
         const mediaProductId = getSsMediaStyleNumber(productId);
         console.log(`[SS Media] Raw input: "${productId}" -> MediaContent productId: "${mediaProductId}", partId: "${partId || 'none'}", colorName: "${colorName || 'none'}"`);
 
         const soapBody = `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
-  <shar:id>${credentials.accountNumber}</shar:id>
-  <shar:password>${decryptedApiKey}</shar:password>
+  <shar:id>${escapeXml(credentials.accountNumber)}</shar:id>
+  <shar:password>${escapeXml(decryptedApiKey)}</shar:password>
   <shar:mediaType>Image</shar:mediaType>
-  <shar:productId>${mediaProductId}</shar:productId>
+  <shar:productId>${escapeXml(mediaProductId)}</shar:productId>
   ${partIdTag}
 </ns2:GetMediaContentRequest>`;
 
