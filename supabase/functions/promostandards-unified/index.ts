@@ -34,7 +34,7 @@ async function makePromoStandardsRequest(
     method: "POST",
     headers: {
       "Content-Type": "text/xml; charset=utf-8",
-      "SOAPAction": `"${soapAction}"`,
+      "SOAPAction": soapAction,
     },
     body: soapEnvelope,
   });
@@ -337,12 +337,12 @@ Deno.serve(async (req: Request) => {
     const [productResponse, initialMediaResponse] = await Promise.allSettled([
       makePromoStandardsRequest(
         PROMOSTANDARDS_ENDPOINTS.productData,
-        "http://www.promostandards.org/WSDL/ProductDataService/2.0.0/GetProduct",
+        "getProduct",
         productSoap
       ),
       makePromoStandardsRequest(
         PROMOSTANDARDS_ENDPOINTS.media,
-        "http://www.promostandards.org/WSDL/MediaService/1.0.0/GetMediaContent",
+        "getMediaContent",
         mediaSoap
       ),
     ]);
@@ -405,7 +405,7 @@ Deno.serve(async (req: Request) => {
       // 1. Inventory (if partId provided, otherwise skip)
       partId ? makePromoStandardsRequest(
         PROMOSTANDARDS_ENDPOINTS.inventory,
-        "http://www.promostandards.org/WSDL/Inventory/2.0.0/GetInventoryLevels",
+        "getInventoryLevels",
         `<ns2:GetInventoryLevelsRequest xmlns:ns2="http://www.promostandards.org/WSDL/InventoryService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/Inventory/2.0.0/SharedObjects/">
   <shar:wsVersion>2.0.0</shar:wsVersion>
   <shar:id>${escapedAccountNumber}</shar:id>
