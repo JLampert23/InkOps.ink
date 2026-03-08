@@ -1414,6 +1414,13 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           }
         } else {
           console.warn('⚠️ No pricing data in unified response');
+
+          // Check if API explicitly said pricing unavailable
+          if (unifiedData.pricingAvailable === false && unifiedData.pricingUnavailableReason) {
+            console.warn('⚠️ PRICING UNAVAILABLE:', unifiedData.pricingUnavailableReason);
+            showNotification('Pricing unavailable for this product. You can enter the wholesale cost manually in the line item.', 'warning');
+          }
+
           console.warn('⚠️ Full pricing debug info:', {
             pricingAttempts: unifiedData.debug?.pricingAttempts,
             usedPricingId: unifiedData.debug?.usedPricingId,
@@ -2623,16 +2630,20 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                       <td className="p-1 border border-gray-300 dark:border-slate-800 text-center text-base text-blue-600 dark:text-blue-400 font-bold">
                         {calculateItemsTotal(item)}
                       </td>
-                      <td className="p-0 border border-gray-300 dark:border-slate-800 relative group/price">
+                      <td className={`p-0 border border-gray-300 dark:border-slate-800 relative group/price ${!item.wholesale_price || item.wholesale_price === 0 ? 'bg-amber-50 dark:bg-amber-900/20' : ''}`}>
                         <input
                           type="number"
                           step="0.01"
                           min="0"
                           value={item.unit_price}
                           onChange={(e) => updateItem(group.id, itemIdx, 'unit_price', parseFloat(e.target.value) || 0)}
-                          className="w-full px-2 py-2 bg-white dark:bg-slate-900 border-0 text-gray-900 dark:text-white text-base text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          className={`w-full px-2 py-2 border-0 text-gray-900 dark:text-white text-base text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${!item.wholesale_price || item.wholesale_price === 0 ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-white dark:bg-slate-900'}`}
                         />
-                        {(item.wholesale_price || getGroupImprints(group.label).length > 0) && (
+                        {!item.wholesale_price || item.wholesale_price === 0 ? (
+                          <div className="absolute top-0 right-0 p-0.5" title="Wholesale pricing unavailable - enter manually">
+                            <Info className="w-3 h-3 text-amber-500 dark:text-amber-400" />
+                          </div>
+                        ) : (item.wholesale_price || getGroupImprints(group.label).length > 0) && (
                           <div className="absolute top-0 right-0 p-0.5 opacity-0 group-hover/price:opacity-100 transition-opacity z-10">
                             <div className="relative group/tip">
                               <Info className="w-3 h-3 text-gray-400 dark:text-slate-500 cursor-help" />

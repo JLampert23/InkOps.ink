@@ -868,6 +868,12 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // Determine pricing availability
+    const hasPricing = pricingData.parts && pricingData.parts.length > 0;
+    const pricingUnavailableReason = !hasPricing
+      ? "This product is not available through S&S ActiveWear's PromoStandards Pricing API. Please enter pricing manually or contact your distributor."
+      : null;
+
     // Return unified response
     return new Response(
       JSON.stringify({
@@ -878,6 +884,8 @@ Deno.serve(async (req: Request) => {
         inventory: inventoryData,
         pricing: pricingData,
         media: mediaData,
+        pricingAvailable: hasPricing,
+        pricingUnavailableReason,
         debug: {
           usedPricingId,
           usedPricingSource,
