@@ -157,9 +157,9 @@ function getAllXmlMatches(xmlText: string, pattern: RegExp): RegExpMatchArray[] 
  */
 export async function fetchUnifiedPromoStandardsData(
   credentials: PromoStandardsCredentials,
-  request: PromoStandardsRequest
+  request: PromoStandardsRequest & { fobId?: string }
 ): Promise<UnifiedPromoStandardsResponse> {
-  const { styleNumber, partId } = request;
+  const { styleNumber, partId, fobId = 'NJ' } = request;
   const { accountNumber, apiKey } = credentials;
 
   console.log('🔄 Fetching unified PromoStandards data:', { styleNumber, partId });
@@ -198,7 +198,11 @@ export async function fetchUnifiedPromoStandardsData(
   <shar:password>${apiKey}</shar:password>
   <shar:productId>${partId}</shar:productId>
   <shar:currency>USD</shar:currency>
+  <shar:fobId>${fobId}</shar:fobId>
   <shar:priceType>Customer</shar:priceType>
+  <shar:localizationCountry>US</shar:localizationCountry>
+  <shar:localizationLanguage>en</shar:localizationLanguage>
+  <shar:configurationType>Blank</shar:configurationType>
 </ns2:GetConfigurationAndPricingRequest>`
     ) : Promise.resolve(null),
     // 4. Media Content
@@ -294,12 +298,12 @@ export async function fetchUnifiedPromoStandardsData(
   const pricingData: PricingData = { parts: [] };
   if (pricingResponse.status === 'fulfilled' && pricingResponse.value) {
     const xmlDoc = pricingResponse.value;
-    const partPattern = /<Part>([\s\S]*?)<\/Part>/gi;
+    const partPattern = /<(?:[a-zA-Z0-9]+:)?Part[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Part>/gi;
     const partMatches = getAllXmlMatches(xmlDoc, partPattern);
 
     pricingData.parts = partMatches.map(match => {
       const partXml = match[1];
-      const pricePattern = /<Price>([\s\S]*?)<\/Price>/gi;
+      const pricePattern = /<(?:[a-zA-Z0-9]+:)?PartPrice[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?PartPrice>/gi;
       const priceMatches = getAllXmlMatches(partXml, pricePattern);
 
       return {
@@ -307,7 +311,7 @@ export async function fetchUnifiedPromoStandardsData(
         prices: priceMatches.map(priceMatch => {
           const priceXml = priceMatch[1];
           return {
-            minQuantity: parseInt(getXmlValue(priceXml, "minQuantity") || "0"),
+            minQuantity: parseInt(getXmlValue(priceXml, "minQuantity") || "1"),
             price: parseFloat(getXmlValue(priceXml, "price") || "0"),
             discountCode: getXmlValue(priceXml, "discountCode") || "",
           };

@@ -123,26 +123,27 @@ export async function getCachedPricing(partNumber: string, quantity: number = 1)
 export async function getSSActivewearWholesalePrice(
   style: string,
   color: string,
-  size: string
+  _size: string
 ): Promise<number | null> {
   try {
-    const partNumber = `${style}-${color}-${size}`.toUpperCase();
-    console.log(`[SSActivewear] Looking up wholesale price for: ${partNumber}`);
+    console.log(`[SSActivewear] Looking up wholesale price for: ${style}/${color}`);
 
-    const cachedPrice = await getCachedPricing(partNumber, 1);
-    if (cachedPrice !== null) {
-      console.log(`[SSActivewear] Found cached price for ${partNumber}: $${cachedPrice}`);
-      return cachedPrice;
+    const { data: cachedPricing } = await supabase
+      .from('ss_catalog_pricing')
+      .select('part_number, unit_price')
+      .ilike('part_number', `%${style.replace(/[^a-zA-Z0-9]/g, '')}%`)
+      .or(`price_expiry_date.gte.${new Date().toISOString().split('T')[0]},price_expiry_date.is.null`)
+      .order('quantity_min', { ascending: true })
+      .limit(10);
+
+    if (cachedPricing && cachedPricing.length > 0) {
+      const price = cachedPricing[0].unit_price;
+      console.log(`[SSActivewear] Found cached price for ${style}: $${price}`);
+      return price;
     }
 
-    const styleOnlyPrice = await getCachedPricing(style.toUpperCase(), 1);
-    if (styleOnlyPrice !== null) {
-      console.log(`[SSActivewear] Found cached price for style ${style}: $${styleOnlyPrice}`);
-      return styleOnlyPrice;
-    }
-
-    console.log(`[SSActivewear] No cached price found for ${partNumber}, fetching from API...`);
-    const pricingData = await getProductPricing(partNumber, false);
+    console.log(`[SSActivewear] No cached price found for ${style}/${color}, fetching from API...`);
+    const pricingData = await getProductPricing(style, false);
 
     if (pricingData?.priceArray && pricingData.priceArray.length > 0) {
       const lowestTier = pricingData.priceArray.reduce((lowest, current) => {
@@ -152,11 +153,11 @@ export async function getSSActivewearWholesalePrice(
         return lowest;
       }, pricingData.priceArray[0]);
 
-      console.log(`[SSActivewear] API returned price for ${partNumber}: $${lowestTier.price}`);
+      console.log(`[SSActivewear] API returned price for ${style}: $${lowestTier.price}`);
       return lowestTier.price;
     }
 
-    console.log(`[SSActivewear] No price found for ${partNumber}`);
+    console.log(`[SSActivewear] No price found for ${style}/${color}`);
     return null;
   } catch (error) {
     console.error('[SSActivewear] Error getting wholesale price:', error);
@@ -182,7 +183,7 @@ export async function getProductPricing(partId: string, useCache: boolean = true
     const token = await getAuthToken();
 
     const response = await fetch(
-      `${EDGE_FUNCTION_URL}?action=pricing&partId=${encodeURIComponent(partId)}`,
+      `${EDGE_FUNCTION_URL}?action=pricing&productId=${encodeURIComponent(partId)}`,
       {
         headers: {
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
