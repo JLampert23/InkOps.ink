@@ -311,19 +311,88 @@ Deno.serve(async (req: Request) => {
       },
     };
 
-    // Internal pricing ID will be extracted from Product Data partId values
-    // Per S&S PromoStandards docs: partId like "B00760033" contains internal ID "B00760" (first 6 chars)
+    // CRITICAL FIX: S&S requires 6-character internal product IDs (e.g., "B22035" for "996MR")
+    // We must discover this ID FIRST by calling Inventory API, which is more forgiving with raw style numbers
+    // and returns partIds we can extract the internal ID from.
     let internalProductId: string | null = null;
     let internalIdSource = 'none';
 
-    // STEP 1: Fetch Product Data AND Media in parallel
-    console.log('📦 Step 1: Fetching Product Data and Media...');
+    // STEP 0: Try to discover internal product ID from Inventory API first
+    console.log('🔍 Step 0: Discovering internal product ID from Inventory API...');
+    console.log('🔍 Trying style variations:', { raw: styleNumber, cleaned: cleanedStyleNumber });
+
+    // Try multiple style number formats to discover the internal ID
+    const styleVariations = [
+      cleanedStyleNumber,                                                    // Raw cleaned style (e.g., "996MR")
+      `B${cleanedStyleNumber}`,                                              // B-prefixed (e.g., "B996MR")
+      cleanedStyleNumber.replace(/^0+/, ''),                                 // Strip leading zeros (e.g., "00760" -> "760")
+      cleanedStyleNumber.match(/^\d+$/) ? cleanedStyleNumber.padStart(5, '0') : cleanedStyleNumber, // Pad to 5 digits if numeric
+    ].filter((v, i, a) => a.indexOf(v) === i); // Remove duplicates
+
+    for (const tryStyle of styleVariations) {
+      const escapedTryStyle = escapeXml(tryStyle);
+      const inventoryDiscoverySoap = `<ns2:GetInventoryLevelsRequest xmlns:ns2="http://www.promostandards.org/WSDL/Inventory/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/Inventory/2.0.0/SharedObjects/">
+  <shar:wsVersion>2.0.0</shar:wsVersion>
+  <shar:id>${escapedAccountNumber}</shar:id>
+  <shar:password>${escapedApiKey}</shar:password>
+  <shar:productId>${escapedTryStyle}</shar:productId>
+</ns2:GetInventoryLevelsRequest>`;
+
+      try {
+        console.log(`🔍 Trying Inventory discovery with style: ${tryStyle}`);
+        const inventoryDiscoveryResponse = await makePromoStandardsRequest(
+          PROMOSTANDARDS_ENDPOINTS.inventory,
+          "getInventoryLevels",
+          inventoryDiscoverySoap
+        );
+
+        // Extract partId from inventory response
+        const partIdPattern = /<(?:[a-zA-Z0-9]+:)?partId[^>]*>([^<]+)<\/(?:[a-zA-Z0-9]+:)?partId>/gi;
+        const partIdMatches = Array.from(inventoryDiscoveryResponse.matchAll(partIdPattern), m => m[1].trim());
+
+        if (partIdMatches.length > 0) {
+          // Find first B-prefixed partId (e.g., "B00760033" or "B22035597")
+          const bPrefixedPartId = partIdMatches.find(id => /^B\d{5,}/i.test(id));
+
+          if (bPrefixedPartId) {
+            // Extract ONLY first 6 characters as the internal pricing ID (e.g., "B22035")
+            internalProductId = bPrefixedPartId.substring(0, 6).toUpperCase();
+            internalIdSource = 'inventory-discovery';
+            console.log(`✅ SUCCESS! Discovered internal ID from Inventory: ${tryStyle} -> partId ${bPrefixedPartId} -> ${internalProductId}`);
+            break; // Found it! Stop trying other variations
+          }
+        }
+      } catch (error) {
+        console.log(`⚠️ Inventory discovery failed for ${tryStyle}:`, error);
+        // Continue trying other variations
+      }
+    }
+
+    if (!internalProductId) {
+      console.log('❌ Failed to discover internal product ID from any style variation');
+      console.log('⚠️ Will attempt Product Data API with raw style as fallback, but pricing may fail');
+    }
+
+    // Now use the discovered internal ID (or fallback to raw style) for Product Data
+    const productIdToUse = internalProductId || escapedStyleNumber;
+    console.log(`📦 Using productId for API calls: ${productIdToUse} (source: ${internalIdSource || 'raw-style-fallback'})`);
+
+    // Update Product Data SOAP to use the correct internal ID
+    const correctedProductSoap = `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
+  <shar:wsVersion>2.0.0</shar:wsVersion>
+  <shar:id>${escapedAccountNumber}</shar:id>
+  <shar:password>${escapedApiKey}</shar:password>
+  <shar:productId>${productIdToUse}</shar:productId>
+</ns2:GetProductRequest>`;
+
+    // STEP 1: Fetch Product Data AND Media in parallel (using correct internal ID)
+    console.log('📦 Step 1: Fetching Product Data and Media with corrected product ID...');
 
     const [productResponse, initialMediaResponse] = await Promise.allSettled([
       makePromoStandardsRequest(
         PROMOSTANDARDS_ENDPOINTS.productData,
         "getProduct",
-        productSoap
+        correctedProductSoap
       ),
       makePromoStandardsRequest(
         PROMOSTANDARDS_ENDPOINTS.media,
@@ -332,25 +401,19 @@ Deno.serve(async (req: Request) => {
       ),
     ]);
 
-    // Extract internal pricing ID from Product Data partId values
-    // Per S&S PromoStandards documentation (page 7):
-    // - partId values look like "B00760033" (Gildan 2000) or "B22035597" (Jerzees 996MR)
-    // - The first 6 characters (B + 5 digits) is the internal ID needed for pricing API
-    // - Example: "B00760033" -> "B00760", "B22035597" -> "B22035"
-    if (productResponse.status === 'fulfilled' && productResponse.value) {
+    // If we still don't have an internal ID, try extracting from Product Data as last resort
+    if (!internalProductId && productResponse.status === 'fulfilled' && productResponse.value) {
+      console.log('🔍 Attempting to extract internal ID from Product Data response as fallback...');
       const xmlDoc = productResponse.value;
       const partIdPattern = /<(?:[a-zA-Z0-9]+:)?partId[^>]*>([^<]+)<\/(?:[a-zA-Z0-9]+:)?partId>/gi;
       const partIdMatches = Array.from(xmlDoc.matchAll(partIdPattern), m => m[1].trim());
 
       if (partIdMatches.length > 0) {
-        // Find first B-prefixed partId (e.g., "B00760033" or "B22035597")
         const bPrefixedPartId = partIdMatches.find(id => /^B\d{5,}/i.test(id));
-
         if (bPrefixedPartId) {
-          // Extract ONLY first 6 characters as the internal pricing ID (e.g., "B00760")
           internalProductId = bPrefixedPartId.substring(0, 6).toUpperCase();
-          internalIdSource = 'partId-extraction';
-          console.log('📦 Extracted internal pricing ID from partId:', bPrefixedPartId, '->', internalProductId, '(6 chars only)');
+          internalIdSource = 'product-data-fallback';
+          console.log('✅ Extracted internal ID from Product Data:', bPrefixedPartId, '->', internalProductId);
         } else {
           console.log('📦 No B-prefixed partId found in Product Data. Sample partIds:', partIdMatches.slice(0, 3));
         }
