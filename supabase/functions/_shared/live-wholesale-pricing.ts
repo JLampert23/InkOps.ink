@@ -96,7 +96,7 @@ export async function getLiveWholesalePricing(
       method: "POST",
       headers: {
         "Content-Type": "text/xml; charset=utf-8",
-        "SOAPAction": `"getConfigurationAndPricing"`,
+        "SOAPAction": `"http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/GetConfigurationAndPricing"`,
       },
       body: soapEnvelope,
     });

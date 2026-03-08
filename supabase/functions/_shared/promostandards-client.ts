@@ -169,7 +169,7 @@ export async function fetchUnifiedPromoStandardsData(
     // 1. Product Data
     makePromoStandardsRequest(
       PROMOSTANDARDS_ENDPOINTS.productData,
-      "getProduct",
+      "http://www.promostandards.org/WSDL/ProductDataService/2.0.0/GetProduct",
       `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
   <shar:wsVersion>2.0.0</shar:wsVersion>
   <shar:id>${accountNumber}</shar:id>
@@ -180,7 +180,7 @@ export async function fetchUnifiedPromoStandardsData(
     // 2. Inventory (if partId provided, otherwise skip)
     partId ? makePromoStandardsRequest(
       PROMOSTANDARDS_ENDPOINTS.inventory,
-      "getInventoryLevels",
+      "http://www.promostandards.org/WSDL/Inventory/2.0.0/GetInventoryLevels",
       `<ns2:GetInventoryLevelsRequest xmlns:ns2="http://www.promostandards.org/WSDL/InventoryService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/Inventory/2.0.0/SharedObjects/">
   <shar:wsVersion>2.0.0</shar:wsVersion>
   <shar:id>${accountNumber}</shar:id>
@@ -191,7 +191,7 @@ export async function fetchUnifiedPromoStandardsData(
     // 3. Pricing (if partId provided, otherwise skip)
     partId ? makePromoStandardsRequest(
       PROMOSTANDARDS_ENDPOINTS.pricing,
-      "getConfigurationAndPricing",
+      "http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/GetConfigurationAndPricing",
       `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${accountNumber}</shar:id>
@@ -204,7 +204,7 @@ export async function fetchUnifiedPromoStandardsData(
     // 4. Media Content
     makePromoStandardsRequest(
       PROMOSTANDARDS_ENDPOINTS.media,
-      "getMediaContent",
+      "http://www.promostandards.org/WSDL/MediaService/1.0.0/GetMediaContent",
       `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${accountNumber}</shar:id>
