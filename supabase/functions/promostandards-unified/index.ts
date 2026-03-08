@@ -365,29 +365,30 @@ Deno.serve(async (req: Request) => {
     console.log('📦 Step 2: Fetching Inventory and Pricing...');
 
     // Build list of productId formats to try for pricing (in order of preference)
-    // Per S&S PromoStandards docs: pricing API requires the internal product ID (e.g., "B00760")
-    // which is extracted from the first 6 chars of any partId returned by Product Data API
+    // Try plain style number FIRST as most brands use this format
+    // Then try normalized B-prefix format, then internal product ID last
     const pricingIdCandidates: { id: string; source: string }[] = [];
 
-    // 1. PRIMARY: Use internal ID extracted from partId (e.g., B00760) - this is the correct format
-    if (internalProductId) {
-      pricingIdCandidates.push({ id: internalProductId, source: internalIdSource });
-      console.log('💰 Internal pricing ID (primary):', internalProductId);
+    // 1. PRIMARY: Try plain style number first (e.g., "331", "64000", "18500")
+    if (!pricingIdCandidates.some(c => c.id === cleanedStyleNumber)) {
+      pricingIdCandidates.push({ id: cleanedStyleNumber, source: 'style-number' });
+      console.log('💰 Plain style number (primary):', cleanedStyleNumber);
     }
 
     // 2. SECONDARY: Use normalized style number with B-prefix as fallback (e.g., "64000" -> "B64000")
     const normalizedStyleId = normalizeSsProductId(cleanedStyleNumber);
     if (normalizedStyleId && !pricingIdCandidates.some(c => c.id === normalizedStyleId)) {
       pricingIdCandidates.push({ id: normalizedStyleId, source: 'normalized-style' });
-      console.log('💰 Normalized style number (fallback):', cleanedStyleNumber, '->', normalizedStyleId);
+      console.log('💰 Normalized B-prefix style (secondary):', cleanedStyleNumber, '->', normalizedStyleId);
     }
 
-    // 3. LAST RESORT: Try the plain style number
-    if (!pricingIdCandidates.some(c => c.id === cleanedStyleNumber)) {
-      pricingIdCandidates.push({ id: cleanedStyleNumber, source: 'style-number' });
+    // 3. LAST RESORT: Use internal ID extracted from partId (e.g., B00760)
+    if (internalProductId) {
+      pricingIdCandidates.push({ id: internalProductId, source: internalIdSource });
+      console.log('💰 Internal pricing ID (last resort):', internalProductId);
     }
 
-    console.log('💰 Pricing API candidates to try:', pricingIdCandidates);
+    console.log('💰 Pricing API candidates to try (in order):', pricingIdCandidates);
 
     // For inventory, use internal product ID (e.g., "B00760") to get all parts at once
     // Falls back to style number if internal ID not available

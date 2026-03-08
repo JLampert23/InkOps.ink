@@ -1414,15 +1414,28 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           }
         } else {
           console.warn('⚠️ No pricing data in unified response');
+          console.warn('⚠️ Full pricing debug info:', {
+            pricingAttempts: unifiedData.debug?.pricingAttempts,
+            usedPricingId: unifiedData.debug?.usedPricingId,
+            usedPricingSource: unifiedData.debug?.usedPricingSource,
+            pricingPartsCount: unifiedData.debug?.pricingPartsCount,
+            pricingMapCount: unifiedData.debug?.pricingMapCount,
+            pricingSource: unifiedData.debug?.pricingSource,
+            livePricingStatus: unifiedData.debug?.livePricingStatus,
+            livePricingCount: unifiedData.debug?.livePricingCount,
+          });
 
           // Fall back to cached pricing if available
           if (color.pricing?.wholesale) {
             freshPrice = color.pricing.wholesale;
             console.log('💰 Using cached pricing from search results:', freshPrice);
+          } else {
+            console.error('❌ NO PRICING AVAILABLE for style:', product.style, 'color:', color.code);
+            console.error('❌ Pricing attempts made:', unifiedData.debug?.pricingAttempts);
           }
         }
 
-        console.log('🐛 Debug info from API:', unifiedData.debug);
+        console.log('🐛 Complete debug info from API:', unifiedData.debug);
 
         if (unifiedData.debug?.mediaAuthError) {
           console.warn('⚠️ SSActivewear Media API Authentication Error:', unifiedData.debug.mediaAuthError);
@@ -1727,10 +1740,6 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       }
       return grp;
     });
-
-    if (wholesalePrice === 0) {
-      showNotification('warning', 'Garment pricing unavailable', 'Please enter the wholesale cost manually for this item.');
-    }
 
     setItemGroups(newGroups);
     setShowProductDropdown(false);

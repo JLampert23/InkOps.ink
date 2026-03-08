@@ -83,6 +83,8 @@ export async function getLiveWholesalePricing(
   <shar:configurationType>Blank</shar:configurationType>
 </ns2:GetConfigurationAndPricingRequest>`;
 
+  console.log(`[LivePricing] 📤 Sending request for productId: "${productId}" | vendor: ${vendor.name} | fobId: ${fobId}`);
+
   const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Header/>
@@ -108,23 +110,23 @@ export async function getLiveWholesalePricing(
     }
 
     const xmlText = await response.text();
-    console.log(`[LivePricing] Response received for ${productId}: ${xmlText.length} bytes`);
+    console.log(`[LivePricing] 📥 Response received for productId "${productId}": ${xmlText.length} bytes`);
 
     if (isSoapFault(xmlText)) {
-      console.error("[LivePricing] SOAP fault in pricing response:", xmlText.substring(0, 500));
+      console.error(`[LivePricing] ❌ SOAP fault in pricing response for "${productId}":`, xmlText.substring(0, 500));
       return [];
     }
 
     const promoError = getPromoStandardsError(xmlText);
     if (promoError) {
-      console.error("[LivePricing] PromoStandards error:", promoError.code, promoError.description);
+      console.error(`[LivePricing] ❌ PromoStandards error for "${productId}":`, promoError.code, promoError.description);
       return [];
     }
 
     const results: WholesalePriceItem[] = [];
     const partBlocks = getAllXmlBlocks(xmlText, "Part");
 
-    console.log(`[LivePricing] Found ${partBlocks.length} Part blocks for product ${productId}`);
+    console.log(`[LivePricing] 📦 Found ${partBlocks.length} Part blocks for productId "${productId}"`);
 
     for (const partXml of partBlocks) {
       const partId = getXmlValue(partXml, "partId");
@@ -150,25 +152,30 @@ export async function getLiveWholesalePricing(
     }
 
     if (results.length === 0) {
-      console.warn("[LivePricing] Zero price results parsed for", productId);
-      console.warn("[LivePricing] FULL RESPONSE:", xmlText);
+      console.warn(`[LivePricing] ⚠️ Zero price results parsed for productId "${productId}"`);
+      console.warn(`[LivePricing] ⚠️ Part blocks found: ${partBlocks.length}`);
+      console.warn("[LivePricing] ⚠️ FULL XML RESPONSE (first 2000 chars):", xmlText.substring(0, 2000));
 
       const bodyMatch = xmlText.match(/<(?:[a-zA-Z0-9]+:)?Body[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Body>/i);
       if (bodyMatch) {
-        console.warn("[LivePricing] SOAP Body content:", bodyMatch[1]);
+        console.warn("[LivePricing] ⚠️ SOAP Body content (first 1000 chars):", bodyMatch[1].substring(0, 1000));
       }
 
       const configMatch = xmlText.match(/<(?:[a-zA-Z0-9]+:)?Configuration[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Configuration>/i);
       if (configMatch) {
-        console.log("[LivePricing] Found Configuration block, checking for pricing data inside...");
+        console.log("[LivePricing] 📦 Found Configuration block, checking for pricing data inside...");
+      } else {
+        console.warn("[LivePricing] ⚠️ No Configuration block found in response");
       }
 
       const priceMatch = xmlText.match(/<(?:[a-zA-Z0-9]+:)?PartPrice[^>]*>/i);
       if (priceMatch) {
-        console.log("[LivePricing] Found PartPrice tags but Part blocks not parsed correctly");
+        console.log("[LivePricing] 💰 Found PartPrice tags but Part blocks not parsed correctly");
+      } else {
+        console.warn("[LivePricing] ⚠️ No PartPrice tags found in response");
       }
     } else {
-      console.log(`[LivePricing] Parsed ${results.length} price entries. Sample:`, results[0]);
+      console.log(`[LivePricing] ✅ Successfully parsed ${results.length} price entries for "${productId}". Sample:`, results[0]);
     }
 
     return results;
