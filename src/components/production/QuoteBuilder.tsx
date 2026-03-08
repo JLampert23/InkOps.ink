@@ -2643,17 +2643,19 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                           <div className="absolute top-0 right-0 p-0.5" title="Wholesale pricing unavailable - enter manually">
                             <Info className="w-3 h-3 text-amber-500 dark:text-amber-400" />
                           </div>
-                        ) : (item.wholesale_price || getGroupImprints(group.label).length > 0) && (
-                          <div className="absolute top-0 right-0 p-0.5 opacity-0 group-hover/price:opacity-100 transition-opacity z-10">
-                            <div className="relative group/tip">
-                              <Info className="w-3 h-3 text-gray-400 dark:text-slate-500 cursor-help" />
-                              <UnitPriceTooltip
-                                item={item}
-                                groupImprints={getGroupImprints(group.label)}
-                                garmentMarkup={companySettings?.default_garment_markup || 0}
-                              />
+                        ) : (
+                          (item.wholesale_price || getGroupImprints(group.label).length > 0) && (
+                            <div className="absolute top-0 right-0 p-0.5 opacity-0 group-hover/price:opacity-100 transition-opacity z-10">
+                              <div className="relative group/tip">
+                                <Info className="w-3 h-3 text-gray-400 dark:text-slate-500 cursor-help" />
+                                <UnitPriceTooltip
+                                  item={item}
+                                  groupImprints={getGroupImprints(group.label)}
+                                  garmentMarkup={companySettings?.default_garment_markup || 0}
+                                />
+                              </div>
                             </div>
-                          </div>
+                          )
                         )}
                       </td>
                       <td className="p-1 border border-gray-300 dark:border-slate-800 text-right text-base font-semibold text-gray-900 dark:text-white">
