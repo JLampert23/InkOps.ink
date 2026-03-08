@@ -732,11 +732,55 @@ Deno.serve(async (req: Request) => {
         const fobId = validateFobId(url.searchParams.get("fobId"));
         console.log(`[SS Pricing] Raw input: "${productId}" -> Normalized: "${normalizedProductId}", FOB: ${fobId}`);
 
-        const soapBody = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
-  <shar:wsVersion>1.0.0</shar:wsVersion>
+        const pricingIdsToTry: string[] = [normalizedProductId];
+
+        const isAlreadyInternalId = /^B\d{4,5}$/i.test(normalizedProductId);
+        if (!isAlreadyInternalId) {
+          console.log(`[SS Pricing] Input "${normalizedProductId}" does not look like an internal ID (B#####), fetching Product Data to extract it...`);
+          try {
+            const prodSoapBody = `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
+  <shar:wsVersion>2.0.0</shar:wsVersion>
   <shar:id>${escapeXml(credentials.accountNumber)}</shar:id>
   <shar:password>${escapeXml(decryptedApiKey)}</shar:password>
   <shar:productId>${escapeXml(normalizedProductId)}</shar:productId>
+</ns2:GetProductRequest>`;
+
+            const prodXml = await makePromoStandardsRequest(
+              PROMOSTANDARDS_ENDPOINTS.productData,
+              "getProduct",
+              prodSoapBody,
+              credentials.accountNumber,
+              decryptedApiKey
+            );
+
+            const partIdMatches = Array.from(
+              prodXml.matchAll(/<(?:[a-zA-Z0-9]+:)?partId[^>]*>([^<]+)<\/(?:[a-zA-Z0-9]+:)?partId>/gi),
+              m => m[1].trim()
+            );
+            const bPrefixed = partIdMatches.find(id => /^B\d{5,}/i.test(id));
+            if (bPrefixed) {
+              const internalId = bPrefixed.substring(0, 6).toUpperCase();
+              console.log(`[SS Pricing] Extracted internal pricing ID: ${bPrefixed} -> ${internalId}`);
+              pricingIdsToTry.unshift(internalId);
+            } else {
+              console.log(`[SS Pricing] No B-prefixed partId found in Product Data response`);
+            }
+          } catch (prodErr: any) {
+            console.warn(`[SS Pricing] Failed to fetch Product Data for internal ID extraction: ${prodErr.message}`);
+          }
+        }
+
+        let parts: any[] = [];
+        let usedPricingId = normalizedProductId;
+
+        for (const pricingId of pricingIdsToTry) {
+          console.log(`[SS Pricing] Trying pricing with productId: "${pricingId}"`);
+
+          const soapBody = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
+  <shar:wsVersion>1.0.0</shar:wsVersion>
+  <shar:id>${escapeXml(credentials.accountNumber)}</shar:id>
+  <shar:password>${escapeXml(decryptedApiKey)}</shar:password>
+  <shar:productId>${escapeXml(pricingId)}</shar:productId>
   <shar:currency>USD</shar:currency>
   <shar:fobId>${escapeXml(fobId)}</shar:fobId>
   <shar:priceType>Customer</shar:priceType>
@@ -745,71 +789,51 @@ Deno.serve(async (req: Request) => {
   <shar:configurationType>Blank</shar:configurationType>
 </ns2:GetConfigurationAndPricingRequest>`;
 
-        console.log(`[SS Pricing] SOAP Request Body:\n${soapBody}`);
-
-        const xmlResponse = await makePromoStandardsRequest(
-          PROMOSTANDARDS_ENDPOINTS.pricing,
-          "getConfigurationAndPricing",
-          soapBody,
-          credentials.accountNumber,
-          decryptedApiKey
-        );
-
-        console.log(`[SS Pricing] SOAP Response (first 1000 chars):\n${xmlResponse.substring(0, 1000)}`);
-
-        const parseResult = parseXmlResponse(xmlResponse);
-
-        if (!parseResult.success) {
-          console.error(`[SS Pricing] PromoStandards error for ${normalizedProductId}:`, parseResult.error);
-          return new Response(
-            JSON.stringify({
-              success: false,
-              vendor: "SSActivewear",
-              supplier: "ssactivewear",
-              action,
-              error: "ProductNotFound",
-              productId: normalizedProductId,
-              rawInput: productId,
-              errorDetails: parseResult.error?.description,
-              errorCode: parseResult.error?.code,
-              data: []
-            }),
-            {
-              status: 200,
-              headers: { ...corsHeaders, "Content-Type": "application/json" }
-            }
+          const xmlResponse = await makePromoStandardsRequest(
+            PROMOSTANDARDS_ENDPOINTS.pricing,
+            "getConfigurationAndPricing",
+            soapBody,
+            credentials.accountNumber,
+            decryptedApiKey
           );
-        }
 
-        const xmlDoc = parseResult.xmlText!;
-
-        const partPattern = /<(?:[a-zA-Z0-9]+:)?Part[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Part>/gi;
-        const parts: any[] = [];
-        let partMatch;
-
-        while ((partMatch = partPattern.exec(xmlDoc)) !== null) {
-          const partXml = partMatch[1];
-          const partId = getXmlValue(partXml, "partId");
-
-          const pricePattern = /<(?:[a-zA-Z0-9]+:)?PartPrice[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?PartPrice>/gi;
-          const prices: any[] = [];
-          let priceMatch;
-
-          while ((priceMatch = pricePattern.exec(partXml)) !== null) {
-            const priceXml = priceMatch[1];
-            prices.push({
-              quantity: parseInt(getXmlValue(priceXml, "minQuantity") || "1"),
-              price: parseFloat(getXmlValue(priceXml, "price") || "0"),
-            });
+          const parseResult = parseXmlResponse(xmlResponse);
+          if (!parseResult.success) {
+            console.warn(`[SS Pricing] Error for "${pricingId}": ${parseResult.error?.description}`);
+            continue;
           }
 
-          parts.push({
-            partId,
-            prices
-          });
-        }
+          const xmlDoc = parseResult.xmlText!;
+          const partPattern = /<(?:[a-zA-Z0-9]+:)?Part[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Part>/gi;
+          let partMatch;
 
-        console.log(`[SS Pricing] Found ${parts.length} parts with pricing for ${normalizedProductId}`);
+          while ((partMatch = partPattern.exec(xmlDoc)) !== null) {
+            const partXml = partMatch[1];
+            const partId = getXmlValue(partXml, "partId");
+
+            const pricePattern = /<(?:[a-zA-Z0-9]+:)?PartPrice[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?PartPrice>/gi;
+            const prices: any[] = [];
+            let priceMatch;
+
+            while ((priceMatch = pricePattern.exec(partXml)) !== null) {
+              const priceXml = priceMatch[1];
+              prices.push({
+                quantity: parseInt(getXmlValue(priceXml, "minQuantity") || "1"),
+                price: parseFloat(getXmlValue(priceXml, "price") || "0"),
+              });
+            }
+
+            parts.push({ partId, prices });
+          }
+
+          if (parts.length > 0) {
+            usedPricingId = pricingId;
+            console.log(`[SS Pricing] SUCCESS with "${pricingId}": ${parts.length} parts with pricing`);
+            break;
+          } else {
+            console.log(`[SS Pricing] No parts returned for "${pricingId}", trying next...`);
+          }
+        }
 
         if (parts.length === 0) {
           return new Response(
@@ -822,6 +846,7 @@ Deno.serve(async (req: Request) => {
               productId: normalizedProductId,
               rawInput: productId,
               errorDetails: "No pricing data returned",
+              triedIds: pricingIdsToTry,
               data: []
             }),
             {
@@ -836,7 +861,7 @@ Deno.serve(async (req: Request) => {
             success: true,
             supplier: "ssactivewear",
             action,
-            productId: normalizedProductId,
+            productId: usedPricingId,
             data: parts,
           }),
           {

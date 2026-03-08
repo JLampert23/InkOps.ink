@@ -555,8 +555,19 @@ async function fetchAndCacheSSActivewear(
     }
 
     let cachedPricingMap: Map<string, number> | null = null;
+    let internalPricingId = style;
+    if (productData.parts && Array.isArray(productData.parts)) {
+      const bPrefixedPart = productData.parts.find((p: any) => p.partId && /^B\d{5,}/i.test(p.partId));
+      if (bPrefixedPart) {
+        internalPricingId = bPrefixedPart.partId.substring(0, 6).toUpperCase();
+        console.log(`[SSA Pricing] Extracted internal pricing ID from partId: ${bPrefixedPart.partId} -> ${internalPricingId}`);
+      } else {
+        console.log(`[SSA Pricing] No B-prefixed partId found, using raw style: ${style}`);
+      }
+    }
+
     try {
-      const pricingUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=pricing&productId=${encodeURIComponent(style)}&companyId=${encodeURIComponent(companyId)}`;
+      const pricingUrl = `${supabaseUrl}/functions/v1/ssactivewear-api?action=pricing&productId=${encodeURIComponent(internalPricingId)}&companyId=${encodeURIComponent(companyId)}`;
       const pricingResponse = await fetch(pricingUrl, {
         headers: { "Authorization": `Bearer ${supabaseServiceKey}` },
       });
