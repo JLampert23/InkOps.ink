@@ -192,7 +192,7 @@ Deno.serve(async (req: Request) => {
     console.log('📋 Fetching company settings for company_id:', companyId);
     const { data: settings, error: settingsError } = await supabase
       .from("company_settings")
-      .select("ssactivewear_enabled, ssactivewear_username, ssactivewear_api_key_encrypted")
+      .select("ssactivewear_enabled, ssactivewear_username, ssactivewear_api_key_encrypted, ssactivewear_fob_id")
       .eq("id", companyId)
       .maybeSingle();
 
@@ -201,6 +201,7 @@ Deno.serve(async (req: Request) => {
       enabled: settings?.ssactivewear_enabled,
       hasUsername: !!settings?.ssactivewear_username,
       hasApiKey: !!settings?.ssactivewear_api_key_encrypted,
+      fobId: settings?.ssactivewear_fob_id,
       error: settingsError
     });
 
@@ -300,6 +301,10 @@ Deno.serve(async (req: Request) => {
   <shar:mediaType>Image</shar:mediaType>
   <shar:productId>${escapedCleanedStyleNumber}</shar:productId>${partIdTag}
 </ns2:GetMediaContentRequest>`;
+
+    // Get company-specific FOB warehouse or use default
+    const companyFobId = settings?.ssactivewear_fob_id || SSA_DEFAULT_FOB_ID;
+    console.log('📦 Using FOB warehouse:', companyFobId);
 
     // Build vendor config for live wholesale pricing
     const ssaVendorConfig: VendorConfig = {
@@ -472,7 +477,7 @@ Deno.serve(async (req: Request) => {
   <shar:productId>${escapedInventoryProductId}</shar:productId>
 </ns2:GetInventoryLevelsRequest>`
       ),
-      getLiveWholesalePricing(ssaVendorConfig, pricingIdCandidates[0].id, SSA_DEFAULT_FOB_ID),
+      getLiveWholesalePricing(ssaVendorConfig, pricingIdCandidates[0].id, companyFobId),
     ]);
 
     // Track which pricing ID we actually used
@@ -495,7 +500,7 @@ Deno.serve(async (req: Request) => {
         const candidate = pricingIdCandidates[i];
         console.log(`💰 Trying pricing candidate ${i + 1}/${pricingIdCandidates.length}: ${candidate.id} (${candidate.source})`);
 
-        const retryResult = await getLiveWholesalePricing(ssaVendorConfig, candidate.id, SSA_DEFAULT_FOB_ID);
+        const retryResult = await getLiveWholesalePricing(ssaVendorConfig, candidate.id, companyFobId);
         pricingAttempts.push({
           id: candidate.id,
           source: candidate.source,

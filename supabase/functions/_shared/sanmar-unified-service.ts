@@ -94,7 +94,7 @@ async function getSanMarCredentials(companyId: string): Promise<SanMarCredential
 
   const { data, error } = await supabase
     .from('company_settings')
-    .select('sanmar_promo_username, sanmar_promo_password_encrypted')
+    .select('sanmar_promo_username, sanmar_promo_password_encrypted, sanmar_fob_id')
     .eq('id', companyId)
     .maybeSingle();
 
@@ -124,6 +124,7 @@ async function getSanMarCredentials(companyId: string): Promise<SanMarCredential
   return {
     id: data.sanmar_promo_username,
     password: decryptedPassword,
+    fobId: data.sanmar_fob_id || SANMAR_DEFAULT_FOB_ID,
   };
 }
 
@@ -166,7 +167,7 @@ export async function getUnifiedGarment(
 
     // Fetch pricing (using live wholesale pricing), inventory, and media in parallel
     const [livePricingResult, inventoryResult, mediaResult] = await Promise.allSettled([
-      getLiveWholesalePricing(vendorConfig, style, SANMAR_DEFAULT_FOB_ID),
+      getLiveWholesalePricing(vendorConfig, style, credentials.fobId || SANMAR_DEFAULT_FOB_ID),
       fetchSanMarInventory(credentials, partId),
       fetchSanMarMedia(credentials, style, partId),
     ]);
@@ -257,7 +258,7 @@ export async function getUnifiedStyle(
     // Fetch product data and live wholesale pricing in parallel
     const [unifiedDataResult, livePricingResult] = await Promise.allSettled([
       fetchUnifiedSanMarData(credentials, { styleNumber: style }),
-      getLiveWholesalePricing(vendorConfig, style, SANMAR_DEFAULT_FOB_ID),
+      getLiveWholesalePricing(vendorConfig, style, credentials.fobId || SANMAR_DEFAULT_FOB_ID),
     ]);
 
     if (unifiedDataResult.status === 'rejected') {
@@ -392,7 +393,7 @@ export async function getGarmentPricing(
     };
 
     // Use live wholesale pricing with FOB
-    const livePricing = await getLiveWholesalePricing(vendorConfig, style, SANMAR_DEFAULT_FOB_ID);
+    const livePricing = await getLiveWholesalePricing(vendorConfig, style, credentials.fobId || SANMAR_DEFAULT_FOB_ID);
     const partPricing = livePricing.filter(p => p.partId === matchingPart.partId);
 
     if (partPricing.length > 0) {

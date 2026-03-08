@@ -32,6 +32,7 @@ const SANMAR_PROMOSTANDARDS_ENDPOINTS = {
 export interface SanMarCredentials {
   id: string;       // SanMar.com username
   password: string; // SanMar.com password
+  fobId?: string;   // FOB warehouse ID
 }
 
 export interface SanMarRequest {
