@@ -333,23 +333,24 @@ Deno.serve(async (req: Request) => {
     ]);
 
     // Extract internal pricing ID from Product Data partId values
-    // Per S&S PromoStandards documentation (page 7):
-    // - partId values look like "B00760033" (style 2000)
-    // - The first 6 characters "B00760" is the internal ID needed for pricing API
+    // Per S&S PromoStandards documentation:
+    // - partId values look like "B00760033" (Gildan 2000) or "B22035597" (Jerzees 996MR)
+    // - Different brands use different internal ID lengths
+    // - We'll extract the full B-prefixed partId to try multiple lengths
     if (productResponse.status === 'fulfilled' && productResponse.value) {
       const xmlDoc = productResponse.value;
       const partIdPattern = /<(?:[a-zA-Z0-9]+:)?partId[^>]*>([^<]+)<\/(?:[a-zA-Z0-9]+:)?partId>/gi;
       const partIdMatches = Array.from(xmlDoc.matchAll(partIdPattern), m => m[1].trim());
 
       if (partIdMatches.length > 0) {
-        // Find first B-prefixed partId (e.g., "B00760033")
+        // Find first B-prefixed partId (e.g., "B00760033" or "B22035597")
         const bPrefixedPartId = partIdMatches.find(id => /^B\d{5,}/i.test(id));
 
         if (bPrefixedPartId) {
-          // Extract first 6 characters as the internal pricing ID (e.g., "B00760")
-          internalProductId = bPrefixedPartId.substring(0, 6).toUpperCase();
+          // Store the full B-prefixed partId - we'll try different lengths for pricing
+          internalProductId = bPrefixedPartId.toUpperCase();
           internalIdSource = 'partId-extraction';
-          console.log('📦 Extracted internal pricing ID from partId:', bPrefixedPartId, '->', internalProductId);
+          console.log('📦 Extracted full B-prefixed partId for pricing:', internalProductId);
         } else {
           console.log('📦 No B-prefixed partId found in Product Data. Sample partIds:', partIdMatches.slice(0, 3));
         }
@@ -365,15 +366,36 @@ Deno.serve(async (req: Request) => {
     console.log('📦 Step 2: Fetching Inventory and Pricing...');
 
     // Build list of productId formats to try for pricing (in order of preference)
-    // SSActivewear requires the 6-character internal product ID (e.g., B00760) extracted from partId
-    // This is the ONLY format that reliably works for their PromoStandards Pricing API
+    // SSActivewear uses B-prefixed internal IDs extracted from partId
+    // Different brands use different lengths, so we try multiple truncations
     const pricingIdCandidates: { id: string; source: string }[] = [];
 
-    // 1. PRIMARY: Use internal ID extracted from partId (e.g., B00760 for Gildan 2000)
-    // This is extracted from partId values like "B00760033" -> "B00760"
+    // 1. PRIMARY: Try different lengths of the B-prefixed partId
+    // Different brands use different internal ID lengths:
+    // - Some use 6 chars: "B00760" (Gildan)
+    // - Some use 7 chars: "B220355" (Jerzees)
+    // - Some use the full partId: "B22035597"
     if (internalProductId) {
-      pricingIdCandidates.push({ id: internalProductId, source: internalIdSource });
-      console.log('💰 Internal pricing ID (PRIMARY - required by SSA):', internalProductId);
+      // Try full partId first
+      pricingIdCandidates.push({
+        id: internalProductId,
+        source: `${internalIdSource}-full-${internalProductId.length}chars`
+      });
+      console.log('💰 Full partId (try first):', internalProductId, `(${internalProductId.length} chars)`);
+
+      // Try 7-character version (B + 6 digits)
+      if (internalProductId.length > 7) {
+        const id7 = internalProductId.substring(0, 7);
+        pricingIdCandidates.push({ id: id7, source: `${internalIdSource}-7chars` });
+        console.log('💰 7-char version:', id7);
+      }
+
+      // Try 6-character version (B + 5 digits) - documented standard
+      if (internalProductId.length > 6) {
+        const id6 = internalProductId.substring(0, 6);
+        pricingIdCandidates.push({ id: id6, source: `${internalIdSource}-6chars` });
+        console.log('💰 6-char version:', id6);
+      }
     }
 
     // 2. FALLBACK: Use normalized style number with B-prefix (e.g., "2000" -> "B2000")
