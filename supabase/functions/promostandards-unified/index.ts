@@ -429,15 +429,14 @@ Deno.serve(async (req: Request) => {
     console.log('📦 Step 2: Fetching Inventory and Pricing...');
 
     // Build list of productId formats to try for pricing (in order of preference)
-    // SSActivewear requires the 6-character internal product ID (e.g., B00760) extracted from partId
-    // This is the ONLY format that reliably works for their PromoStandards Pricing API
+    // S&S ActiveWear Pricing API accepts different formats than other APIs
     const pricingIdCandidates: { id: string; source: string }[] = [];
 
-    // 1. PRIMARY: Use internal ID extracted from partId (e.g., B00760 for Gildan 2000, B22035 for Jerzees 996MR)
-    // This is extracted from partId values like "B00760033" -> "B00760" or "B22035597" -> "B22035"
-    if (internalProductId) {
-      pricingIdCandidates.push({ id: internalProductId, source: internalIdSource });
-      console.log('💰 Internal pricing ID (PRIMARY - required by SSA):', internalProductId);
+    // 1. PRIMARY: Try plain style number first (e.g., "996MR")
+    // This is what S&S expects for most products in their Pricing API
+    if (!pricingIdCandidates.some(c => c.id === cleanedStyleNumber)) {
+      pricingIdCandidates.push({ id: cleanedStyleNumber, source: 'style-number' });
+      console.log('💰 Plain style number (PRIMARY for Pricing API):', cleanedStyleNumber);
     }
 
     // 2. FALLBACK: Use normalized style number with B-prefix (e.g., "2000" -> "B2000")
@@ -447,11 +446,12 @@ Deno.serve(async (req: Request) => {
       console.log('💰 Normalized B-prefix style (fallback):', cleanedStyleNumber, '->', normalizedStyleId);
     }
 
-    // 3. LAST RESORT: Try plain style number (e.g., "2000")
-    // This rarely works for SSActivewear but kept as final fallback
-    if (!pricingIdCandidates.some(c => c.id === cleanedStyleNumber)) {
-      pricingIdCandidates.push({ id: cleanedStyleNumber, source: 'style-number' });
-      console.log('💰 Plain style number (last resort):', cleanedStyleNumber);
+    // 3. ALTERNATIVE: Use internal ID extracted from partId (e.g., B00760 for Gildan 2000, B22035 for Jerzees 996MR)
+    // This is extracted from partId values like "B00760033" -> "B00760" or "B22035597" -> "B22035"
+    // Sometimes works but not always reliable for Pricing API
+    if (internalProductId && !pricingIdCandidates.some(c => c.id === internalProductId)) {
+      pricingIdCandidates.push({ id: internalProductId, source: internalIdSource });
+      console.log('💰 Internal pricing ID (alternative):', internalProductId);
     }
 
     console.log('💰 Pricing API candidates to try (in order):', pricingIdCandidates);
