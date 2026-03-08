@@ -78,6 +78,26 @@ function escapeXml(unsafe: string): string {
     .replace(/'/g, '&apos;');
 }
 
+function normalizeSsProductId(input: string): string {
+  if (!input) return '';
+
+  let cleaned = input.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+  if (cleaned.startsWith('B') && cleaned.length > 1) {
+    cleaned = cleaned.substring(1);
+  }
+
+  if (cleaned.startsWith('G') && /^G\d+$/.test(cleaned)) {
+    cleaned = cleaned.substring(1);
+  }
+
+  if (/^\d+$/.test(cleaned)) {
+    cleaned = cleaned.padStart(5, '0');
+  }
+
+  return 'B' + cleaned;
+}
+
 Deno.serve(async (req: Request) => {
   console.log('🟢 Function invoked - verifyJWT is FALSE');
 
@@ -362,12 +382,19 @@ Deno.serve(async (req: Request) => {
     // Build list of productId formats to try for pricing (in order of preference)
     const pricingIdCandidates: { id: string; source: string }[] = [];
 
-    // 1. PRIMARY: Use internal ID extracted from partId (e.g., B00760)
-    if (internalProductId) {
+    // 1. PRIMARY: Use normalized style number with B-prefix (e.g., "64000" -> "B64000")
+    const normalizedStyleId = normalizeSsProductId(cleanedStyleNumber);
+    if (normalizedStyleId) {
+      pricingIdCandidates.push({ id: normalizedStyleId, source: 'normalized-style' });
+      console.log('💰 Normalized style number for pricing:', cleanedStyleNumber, '->', normalizedStyleId);
+    }
+
+    // 2. SECONDARY: Use internal ID extracted from partId (e.g., B00760)
+    if (internalProductId && !pricingIdCandidates.some(c => c.id === internalProductId)) {
       pricingIdCandidates.push({ id: internalProductId, source: internalIdSource });
     }
 
-    // 2. FALLBACK: Try the plain style number (may work for some products)
+    // 3. FALLBACK: Try the plain style number (may work for some products)
     if (!pricingIdCandidates.some(c => c.id === cleanedStyleNumber)) {
       pricingIdCandidates.push({ id: cleanedStyleNumber, source: 'style-number' });
     }
