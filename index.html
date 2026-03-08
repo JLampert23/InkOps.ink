@@ -11,25 +11,45 @@
     <meta name="twitter:image" content="https://bolt.new/static/og_default.png" />
     <script>
       (function() {
-        var saved = localStorage.getItem('darkMode');
-        var isDark = saved !== null ? JSON.parse(saved) : false;
-        if (isDark) document.documentElement.classList.add('dark');
+        try {
+          var saved = localStorage.getItem('darkMode');
+          var isDark = saved !== null ? JSON.parse(saved) : false;
+          if (isDark) {
+            document.documentElement.classList.add('dark');
+            document.body.style.backgroundColor = '#0f172a';
+          }
+        } catch (e) {
+          console.error('Error reading darkMode from localStorage:', e);
+        }
       })();
     </script>
     <style>
+      html.dark body {
+        background-color: #0f172a !important;
+      }
       #initial-loader {
         position: fixed;
         top: 0;
         left: 0;
         right: 0;
         bottom: 0;
-        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #f8fafc 100%);
+        background: #f8fafc;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         z-index: 9999;
         transition: opacity 0.3s ease-out;
+      }
+      html.dark #initial-loader {
+        background: #0f172a;
+      }
+      html.dark #initial-loader .spinner {
+        border-color: #334155;
+        border-top-color: #f97316;
+      }
+      html.dark #initial-loader .text {
+        color: #94a3b8;
       }
       #initial-loader.fade-out {
         opacity: 0;
@@ -55,7 +75,7 @@
       }
     </style>
   </head>
-  <body style="background-color:#f8fafc;margin:0">
+  <body style="margin:0">
     <div id="initial-loader">
       <div class="spinner"></div>
       <div class="text">Loading...</div>

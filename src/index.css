@@ -33,12 +33,17 @@
 
   body {
     overflow-x: hidden;
-    background-color: #0f172a;
+    background-color: #f8fafc;
+    transition: background-color 0.2s ease-in-out;
   }
 
   /* Dark mode defaults */
   .dark {
     color-scheme: dark;
+  }
+
+  .dark body {
+    background-color: #0f172a;
   }
 }
 
