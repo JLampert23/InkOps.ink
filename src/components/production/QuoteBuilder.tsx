@@ -1423,7 +1423,24 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
             pricingSource: unifiedData.debug?.pricingSource,
             livePricingStatus: unifiedData.debug?.livePricingStatus,
             livePricingCount: unifiedData.debug?.livePricingCount,
+            pricingDebugInfo: unifiedData.debug?.pricingDebugInfo,
           });
+
+          // Log the raw XML response from Pricing API if available
+          if (unifiedData.debug?.pricingDebugInfo) {
+            const debugInfo = unifiedData.debug.pricingDebugInfo;
+            console.error('🔍 PRICING API DEBUG INFO:', {
+              hasSoapFault: debugInfo.hasSoapFault,
+              hasPromoError: debugInfo.hasPromoError,
+              partBlocksFound: debugInfo.partBlocksFound,
+              errorDetails: debugInfo.errorDetails,
+            });
+
+            if (debugInfo.rawXmlSample) {
+              console.error('📄 RAW XML RESPONSE FROM S&S PRICING API (first 2000 chars):');
+              console.error(debugInfo.rawXmlSample);
+            }
+          }
 
           // Fall back to cached pricing if available
           if (color.pricing?.wholesale) {

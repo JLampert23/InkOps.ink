@@ -478,15 +478,17 @@ Deno.serve(async (req: Request) => {
     // Track which pricing ID we actually used
     let usedPricingId = pricingIdCandidates[0].id;
     let usedPricingSource = pricingIdCandidates[0].source;
-    let pricingAttempts: { id: string; source: string; resultCount: number }[] = [{
+    let pricingDebugInfo: any = null;
+    let pricingAttempts: { id: string; source: string; resultCount: number; debugInfo?: any }[] = [{
       id: pricingIdCandidates[0].id,
       source: pricingIdCandidates[0].source,
-      resultCount: livePricingResponse.status === 'fulfilled' ? livePricingResponse.value.length : 0
+      resultCount: livePricingResponse.status === 'fulfilled' ? livePricingResponse.value.prices.length : 0,
+      debugInfo: livePricingResponse.status === 'fulfilled' ? livePricingResponse.value.debugInfo : null
     }];
 
     // If first attempt returned no results, try remaining candidates
     let finalPricingResponse = livePricingResponse;
-    if (livePricingResponse.status === 'fulfilled' && livePricingResponse.value.length === 0 && pricingIdCandidates.length > 1) {
+    if (livePricingResponse.status === 'fulfilled' && livePricingResponse.value.prices.length === 0 && pricingIdCandidates.length > 1) {
       console.log('💰 First pricing attempt returned 0 results, trying alternative IDs...');
 
       for (let i = 1; i < pricingIdCandidates.length; i++) {
@@ -497,19 +499,28 @@ Deno.serve(async (req: Request) => {
         pricingAttempts.push({
           id: candidate.id,
           source: candidate.source,
-          resultCount: retryResult.length
+          resultCount: retryResult.prices.length,
+          debugInfo: retryResult.debugInfo
         });
 
-        if (retryResult.length > 0) {
-          console.log(`💰 SUCCESS with ${candidate.id}: ${retryResult.length} price entries`);
+        if (retryResult.prices.length > 0) {
+          console.log(`💰 SUCCESS with ${candidate.id}: ${retryResult.prices.length} price entries`);
           finalPricingResponse = { status: 'fulfilled', value: retryResult } as PromiseFulfilledResult<typeof retryResult>;
           usedPricingId = candidate.id;
           usedPricingSource = candidate.source;
           break;
         } else {
           console.log(`💰 No results with ${candidate.id}, continuing...`);
+          if (retryResult.debugInfo) {
+            pricingDebugInfo = retryResult.debugInfo;
+          }
         }
       }
+    }
+
+    // Capture debug info from the final response if available
+    if (livePricingResponse.status === 'fulfilled' && livePricingResponse.value.debugInfo) {
+      pricingDebugInfo = livePricingResponse.value.debugInfo;
     }
 
     console.log('📊 PromoStandards API Results:', {
@@ -522,9 +533,10 @@ Deno.serve(async (req: Request) => {
       internalProductId,
       internalIdSource,
       pricingAttempts,
+      pricingDebugInfo,
       productError: productResponse.status === 'rejected' ? productResponse.reason : null,
       inventoryError: inventoryResponse.status === 'rejected' ? inventoryResponse.reason : null,
-      livePricingCount: finalPricingResponse.status === 'fulfilled' ? finalPricingResponse.value.length : 0,
+      livePricingCount: finalPricingResponse.status === 'fulfilled' ? finalPricingResponse.value.prices.length : 0,
       mediaError: initialMediaResponse.status === 'rejected' ? initialMediaResponse.reason : null,
     });
 
@@ -594,8 +606,8 @@ Deno.serve(async (req: Request) => {
     let pricingAuthError: { code: string; description: string } | null = null;
     let usedCache = false;
 
-    if (finalPricingResponse.status === 'fulfilled' && finalPricingResponse.value.length > 0) {
-      const livePricing = finalPricingResponse.value;
+    if (finalPricingResponse.status === 'fulfilled' && finalPricingResponse.value.prices.length > 0) {
+      const livePricing = finalPricingResponse.value.prices;
       console.log('💰 Live wholesale pricing received:', livePricing.length, 'price entries');
 
       // Group by partId
@@ -885,7 +897,8 @@ Deno.serve(async (req: Request) => {
           pricingPartsCount: pricingData.parts?.length || 0,
           pricingMapCount: pricingData.pricesByPartId ? Object.keys(pricingData.pricesByPartId).length : 0,
           livePricingStatus: finalPricingResponse.status,
-          livePricingCount: finalPricingResponse.status === 'fulfilled' ? finalPricingResponse.value.length : 0,
+          livePricingCount: finalPricingResponse.status === 'fulfilled' ? finalPricingResponse.value.prices.length : 0,
+          pricingDebugInfo: pricingDebugInfo || null,
           soapRequests: verbose ? {
             productDataRequest: productSoap,
             mediaRequest: mediaSoap,

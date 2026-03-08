@@ -18,6 +18,17 @@ export interface WholesalePriceItem {
   expiryDate: string | null;
 }
 
+export interface PricingResult {
+  prices: WholesalePriceItem[];
+  debugInfo?: {
+    rawXmlSample?: string;
+    partBlocksFound: number;
+    hasSoapFault: boolean;
+    hasPromoError: boolean;
+    errorDetails?: { code: string; description: string };
+  };
+}
+
 function escapeXml(str: string): string {
   return str
     .replace(/&/g, "&amp;")
@@ -64,7 +75,7 @@ export async function getLiveWholesalePricing(
   vendor: VendorConfig,
   productId: string,
   fobId: string
-): Promise<WholesalePriceItem[]> {
+): Promise<PricingResult> {
   const escapedId = escapeXml(vendor.credentials.id);
   const escapedPassword = escapeXml(vendor.credentials.password);
   const escapedProductId = escapeXml(productId);
@@ -106,21 +117,48 @@ export async function getLiveWholesalePricing(
     if (!response.ok) {
       const errorBody = await response.text().catch(() => '');
       console.error(`[LivePricing] HTTP ${response.status} ${response.statusText} for ${productId}:`, errorBody.substring(0, 500));
-      return [];
+      return {
+        prices: [],
+        debugInfo: {
+          rawXmlSample: errorBody.substring(0, 1000),
+          partBlocksFound: 0,
+          hasSoapFault: false,
+          hasPromoError: false,
+        }
+      };
     }
 
     const xmlText = await response.text();
     console.log(`[LivePricing] 📥 Response received for productId "${productId}": ${xmlText.length} bytes`);
 
-    if (isSoapFault(xmlText)) {
+    const hasSoapFault = isSoapFault(xmlText);
+    const promoError = getPromoStandardsError(xmlText);
+
+    if (hasSoapFault) {
       console.error(`[LivePricing] ❌ SOAP fault in pricing response for "${productId}":`, xmlText.substring(0, 500));
-      return [];
+      return {
+        prices: [],
+        debugInfo: {
+          rawXmlSample: xmlText.substring(0, 2000),
+          partBlocksFound: 0,
+          hasSoapFault: true,
+          hasPromoError: false,
+        }
+      };
     }
 
-    const promoError = getPromoStandardsError(xmlText);
     if (promoError) {
       console.error(`[LivePricing] ❌ PromoStandards error for "${productId}":`, promoError.code, promoError.description);
-      return [];
+      return {
+        prices: [],
+        debugInfo: {
+          rawXmlSample: xmlText.substring(0, 2000),
+          partBlocksFound: 0,
+          hasSoapFault: false,
+          hasPromoError: true,
+          errorDetails: promoError,
+        }
+      };
     }
 
     const results: WholesalePriceItem[] = [];
@@ -174,14 +212,32 @@ export async function getLiveWholesalePricing(
       } else {
         console.warn("[LivePricing] ⚠️ No PartPrice tags found in response");
       }
+
+      return {
+        prices: [],
+        debugInfo: {
+          rawXmlSample: xmlText.substring(0, 2000),
+          partBlocksFound: partBlocks.length,
+          hasSoapFault: false,
+          hasPromoError: false,
+        }
+      };
     } else {
       console.log(`[LivePricing] ✅ Successfully parsed ${results.length} price entries for "${productId}". Sample:`, results[0]);
     }
 
-    return results;
+    return { prices: results };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error(`[LivePricing] Error for ${productId}: ${message}`);
-    return [];
+    return {
+      prices: [],
+      debugInfo: {
+        rawXmlSample: `Error: ${message}`,
+        partBlocksFound: 0,
+        hasSoapFault: false,
+        hasPromoError: false,
+      }
+    };
   }
 }
