@@ -418,15 +418,26 @@ Deno.serve(async (req: Request) => {
     let ppcTiers: { minQuantity: number; price: number }[] = [];
     let ppcError: string | null = null;
 
-    if (internalProductId && partId) {
+    if (partId) {
       console.log('💰 Step 1.5: Fetching PPC Customer Pricing...');
-      console.log('💰 PPC Request params:', { internalProductId, partId, fobId: settings.ssactivewear_fob_id });
+
+      // S&S PPC API expects productId to match partId format
+      // partId format: "B22035597" where first 6 chars is product, rest is color/size
+      // Try using full partId as productId first, then fall back to extracted prefix
+      const ppcProductId = partId.substring(0, 6).toUpperCase();
+
+      console.log('💰 PPC Request params:', {
+        ppcProductId,
+        partId,
+        internalProductId,
+        fobId: settings.ssactivewear_fob_id
+      });
 
       const ppcSoap = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${escapedAccountNumber}</shar:id>
   <shar:password>${escapedApiKey}</shar:password>
-  <shar:productId>${escapeXml(internalProductId)}</shar:productId>
+  <shar:productId>${escapeXml(ppcProductId)}</shar:productId>
   <shar:partId>${escapedPartId}</shar:partId>
   <shar:currency>USD</shar:currency>
   <shar:fobId>${escapeXml(settings.ssactivewear_fob_id || '')}</shar:fobId>
