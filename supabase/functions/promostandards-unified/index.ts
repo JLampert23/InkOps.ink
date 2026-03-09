@@ -431,6 +431,8 @@ Deno.serve(async (req: Request) => {
   <shar:currency>USD</shar:currency>
   <shar:fobId>${escapeXml(settings.ssactivewear_fob_id || '')}</shar:fobId>
   <shar:priceType>Customer</shar:priceType>
+  <shar:localizationCountry>US</shar:localizationCountry>
+  <shar:localizationLanguage>en</shar:localizationLanguage>
   <shar:configurationType>Blank</shar:configurationType>
 </ns2:GetConfigurationAndPricingRequest>`;
 
