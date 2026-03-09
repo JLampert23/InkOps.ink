@@ -429,18 +429,36 @@ Deno.serve(async (req: Request) => {
       console.warn('📦 WARNING: Could not extract internal productId from Product Data partId values');
     }
 
-    // STEP 2: Fetch Inventory ONLY
-    // PRICING DISABLED: We no longer call Pricing & Configuration endpoint
-    // We will extract base prices directly from Product Data 2.0.0
-    console.log('📦 Step 2: Fetching Inventory...');
-    console.log('[SSS Base Pricing Only] Bypassing Pricing & Configuration endpoint');
+    // STEP 2: Fetch Inventory and Pricing & Configuration
+    console.log('📦 Step 2: Fetching Inventory and Pricing & Configuration...');
 
     // For inventory, use internal product ID (e.g., "B00760") to get all parts at once
     // Falls back to style number if internal ID not available
     const inventoryProductId = internalProductId || cleanedStyleNumber;
     const escapedInventoryProductId = escapeXml(inventoryProductId);
 
-    const [inventoryResponse] = await Promise.allSettled([
+    // Get company-specific FOB warehouse or use default
+    const companyFobId = settings?.ssactivewear_fob_id || SSA_DEFAULT_FOB_ID;
+    console.log('📦 Using FOB warehouse:', companyFobId);
+
+    // Use internal product ID for pricing (required by S&S)
+    const pricingProductId = internalProductId || cleanedStyleNumber;
+    const escapedPricingProductId = escapeXml(pricingProductId);
+
+    const pricingSoap = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
+  <shar:wsVersion>1.0.0</shar:wsVersion>
+  <shar:id>${escapedAccountNumber}</shar:id>
+  <shar:password>${escapedApiKey}</shar:password>
+  <shar:productId>${escapedPricingProductId}</shar:productId>
+  <shar:currency>USD</shar:currency>
+  <shar:fobId>${companyFobId}</shar:fobId>
+  <shar:priceType>Customer</shar:priceType>
+  <shar:localizationCountry>US</shar:localizationCountry>
+  <shar:localizationLanguage>en</shar:localizationLanguage>
+  <shar:configurationType>Blank</shar:configurationType>
+</ns2:GetConfigurationAndPricingRequest>`;
+
+    const [inventoryResponse, pricingResponse] = await Promise.allSettled([
       makePromoStandardsRequest(
         PROMOSTANDARDS_ENDPOINTS.inventory,
         "getInventoryLevels",
@@ -451,27 +469,33 @@ Deno.serve(async (req: Request) => {
   <shar:productId>${escapedInventoryProductId}</shar:productId>
 </ns2:GetInventoryLevelsRequest>`
       ),
+      makePromoStandardsRequest(
+        PROMOSTANDARDS_ENDPOINTS.pricing,
+        "getConfigurationAndPricing",
+        pricingSoap
+      ),
     ]);
 
-    // Pricing variables - will be populated from Product Data only
-    let usedPricingId = styleNumber;
-    let usedPricingSource = 'base-product-data';
+    // Pricing variables - will be populated from Pricing & Configuration or Product Data fallback
+    let usedPricingId = pricingProductId;
+    let usedPricingSource = 'pricing-and-configuration';
     let pricingDebugInfo: any = null;
     let pricingAttempts: { id: string; source: string; resultCount: number; debugInfo?: any }[] = [];
 
-    // No live pricing response - we're using Product Data only
-    const finalPricingResponse = { status: 'rejected', reason: 'Pricing & Configuration endpoint bypassed' } as PromiseRejectedResult;
+    const finalPricingResponse = pricingResponse;
 
     console.log('📊 PromoStandards API Results:', {
       product: productResponse.status,
       inventory: inventoryResponse.status,
-      pricing: 'base-product-data-only',
+      pricing: finalPricingResponse.status,
       media: initialMediaResponse.status,
-      usedPricingSource: 'base-product-data',
+      usedPricingSource,
+      usedPricingId,
       internalProductId,
       internalIdSource,
       productError: productResponse.status === 'rejected' ? productResponse.reason : null,
       inventoryError: inventoryResponse.status === 'rejected' ? inventoryResponse.reason : null,
+      pricingError: finalPricingResponse.status === 'rejected' ? finalPricingResponse.reason : null,
       mediaError: initialMediaResponse.status === 'rejected' ? initialMediaResponse.reason : null,
     });
 
@@ -536,30 +560,150 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Parse Pricing from Product Data 2.0.0 ONLY (base pricing)
+    // Parse Pricing from Pricing & Configuration 1.0.0
     const pricingData: any = {};
     let pricingAuthError: { code: string; description: string } | null = null;
     let usedCache = false;
     let usedBasePriceFallback = false;
 
-    // ALWAYS extract base pricing from Product Data 2.0.0
-    console.log('[SSS Base Pricing Only] Extracting base prices from Product Data 2.0.0...');
+    if (finalPricingResponse.status === 'fulfilled' && finalPricingResponse.value) {
+      const xmlDoc = finalPricingResponse.value;
+      console.log('💰 Pricing & Configuration XML Response received');
 
-    if (productResponse.status === 'fulfilled' && productResponse.value) {
+      // Check for SOAP errors
+      const errorCodeMatch = xmlDoc.match(/<code>(\d+)<\/code>/);
+      const errorDescMatch = xmlDoc.match(/<description>(.*?)<\/description>/);
+
+      if (errorCodeMatch && errorDescMatch) {
+        pricingAuthError = {
+          code: errorCodeMatch[1],
+          description: errorDescMatch[1]
+        };
+        console.error('💰 Pricing & Configuration API returned error:', pricingAuthError);
+      } else {
+        // Extract Part entries with pricing
+        const partPattern = /<(?:[a-zA-Z0-9]+:)?Part>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Part>/gi;
+        const partMatches = getAllXmlMatches(xmlDoc, partPattern);
+
+        console.log('💰 Found', partMatches.length, 'Part entries in Pricing & Configuration response');
+
+        if (partMatches.length > 0) {
+          const wholesalePrices: any[] = [];
+
+          partMatches.forEach(match => {
+            const partXml = match[1];
+            const partId = getXmlValue(partXml, "partId");
+
+            // Extract PartPrice entries for this part
+            const partPricePattern = /<(?:[a-zA-Z0-9]+:)?PartPrice>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?PartPrice>/gi;
+            const partPriceMatches = getAllXmlMatches(partXml, partPricePattern);
+
+            partPriceMatches.forEach(priceMatch => {
+              const priceXml = priceMatch[1];
+              const minQuantity = parseInt(getXmlValue(priceXml, "minQuantity") || "1");
+              const price = parseFloat(getXmlValue(priceXml, "price") || "0");
+              const discountCode = getXmlValue(priceXml, "discountCode");
+
+              if (partId && price > 0) {
+                wholesalePrices.push({
+                  partId: partId,
+                  price: price,
+                  minQty: minQuantity,
+                  discountCode: discountCode,
+                  effectiveDate: null,
+                  expiryDate: null,
+                  source: 'pricing-and-configuration'
+                });
+              }
+            });
+          });
+
+          if (wholesalePrices.length > 0) {
+            console.log('💰 Successfully extracted', wholesalePrices.length, 'wholesale prices from Pricing & Configuration');
+
+            // Group by partId
+            const partPricingMap = new Map<string, any[]>();
+            wholesalePrices.forEach(item => {
+              if (!partPricingMap.has(item.partId)) {
+                partPricingMap.set(item.partId, []);
+              }
+              partPricingMap.get(item.partId)!.push({
+                minQuantity: item.minQty,
+                price: item.price,
+                discountCode: item.discountCode,
+                effectiveDate: item.effectiveDate,
+                expiryDate: item.expiryDate,
+              });
+            });
+
+            pricingData.parts = Array.from(partPricingMap.entries()).map(([partId, prices]) => ({
+              partId,
+              prices: prices.sort((a, b) => a.minQuantity - b.minQuantity)
+            }));
+
+            console.log('💰 Total wholesale pricing data:', pricingData.parts.length, 'parts');
+
+            // Create a pricing map for easy lookup by partId
+            pricingData.pricesByPartId = {};
+            pricingData.parts.forEach((part: any) => {
+              if (part.partId && part.prices && part.prices.length > 0) {
+                pricingData.pricesByPartId[part.partId] = part.prices[0].price;
+              }
+            });
+            console.log('💰 Wholesale price map created with', Object.keys(pricingData.pricesByPartId).length, 'entries');
+
+            usedPricingSource = 'pricing-and-configuration';
+            pricingAttempts.push({
+              id: usedPricingId,
+              source: 'pricing-and-configuration',
+              resultCount: wholesalePrices.length
+            });
+
+            // Cache wholesale prices
+            try {
+              for (const item of wholesalePrices) {
+                await supabase
+                  .from('ss_catalog_pricing')
+                  .upsert({
+                    company_id: companyId,
+                    part_number: item.partId,
+                    unit_price: item.price,
+                    quantity_min: item.minQty || 1,
+                    quantity_max: 99999,
+                    discount_code: item.discountCode || null,
+                    price_expiry_date: item.expiryDate || null,
+                  }, {
+                    onConflict: "company_id,part_number,quantity_min"
+                  });
+              }
+              console.log('💰 Cached', wholesalePrices.length, 'wholesale pricing entries to ss_catalog_pricing');
+            } catch (cacheErr: any) {
+              console.warn('💰 Failed to cache wholesale pricing:', cacheErr.message);
+            }
+          } else {
+            console.warn('💰 No valid wholesale prices found in Pricing & Configuration response');
+          }
+        } else {
+          console.warn('💰 No Part entries found in Pricing & Configuration response');
+        }
+      }
+    }
+
+    // FALLBACK: If Pricing & Configuration failed, try Product Data 2.0.0 base pricing
+    if ((!pricingData.parts || pricingData.parts.length === 0) && productResponse.status === 'fulfilled' && productResponse.value) {
+      console.log('💰 Pricing & Configuration unavailable, falling back to Product Data base pricing...');
+
       try {
         const xmlDoc = productResponse.value;
 
-        // Look for ProductPriceGroupArray with groupName="CatalogPrice"
-        // Extract ProductPrice entries where quantityMin = 1
         const productPricePattern = /<(?:[a-zA-Z0-9]+:)?ProductPrice>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?ProductPrice>/gi;
         const productPriceMatches = getAllXmlMatches(xmlDoc, productPricePattern);
 
         if (productPriceMatches.length > 0) {
-          console.log('[SSS Base Pricing Only] Found', productPriceMatches.length, 'ProductPrice entries in Product Data');
+          console.log('💰 Found', productPriceMatches.length, 'ProductPrice entries in Product Data');
 
           const basePrices: any[] = [];
 
-          // Parse each ProductPrice entry - only take quantityMin = 1 (base price)
           productPriceMatches.forEach(match => {
             const priceXml = match[1];
             const partId = getXmlValue(priceXml, "partId");
@@ -580,16 +724,10 @@ Deno.serve(async (req: Request) => {
           });
 
           if (basePrices.length > 0) {
-            console.log('[SSS Base Pricing Only]', {
-              styleNumber,
-              basePrice: basePrices[0]?.price,
-              priceSource: 'base-product-data',
-              totalPriceEntries: basePrices.length
-            });
-
+            console.log('💰 Successfully extracted', basePrices.length, 'base prices from Product Data');
             usedBasePriceFallback = true;
+            usedPricingSource = 'base-product-data';
 
-            // Group by partId (same structure as wholesale pricing)
             const partPricingMap = new Map<string, any[]>();
             basePrices.forEach(item => {
               if (!partPricingMap.has(item.partId)) {
@@ -609,18 +747,15 @@ Deno.serve(async (req: Request) => {
               prices
             }));
 
-            console.log('[SSS Base Pricing Only] Total base pricing data:', pricingData.parts.length, 'parts');
-
-            // Create a pricing map for easy lookup by partId
             pricingData.pricesByPartId = {};
             pricingData.parts.forEach((part: any) => {
               if (part.partId && part.prices && part.prices.length > 0) {
                 pricingData.pricesByPartId[part.partId] = part.prices[0].price;
               }
             });
-            console.log('[SSS Base Pricing Only] Base price map created with', Object.keys(pricingData.pricesByPartId).length, 'entries');
 
-            // Cache base prices to ss_catalog_pricing
+            console.log('💰 Base price map created with', Object.keys(pricingData.pricesByPartId).length, 'entries');
+
             try {
               for (const item of basePrices) {
                 await supabase
@@ -637,24 +772,20 @@ Deno.serve(async (req: Request) => {
                     onConflict: "company_id,part_number,quantity_min"
                   });
               }
-              console.log('[SSS Base Pricing Only] Cached', basePrices.length, 'base pricing entries to ss_catalog_pricing');
+              console.log('💰 Cached', basePrices.length, 'base pricing entries to ss_catalog_pricing');
             } catch (cacheErr: any) {
-              console.warn('[SSS Base Pricing Only] Failed to cache base pricing:', cacheErr.message);
+              console.warn('💰 Failed to cache base pricing:', cacheErr.message);
             }
-          } else {
-            console.warn('[SSS Base Pricing Only] No valid base prices found in Product Data (need quantityMin=1 and price>0)');
           }
-        } else {
-          console.warn('[SSS Base Pricing Only] No ProductPrice entries found in Product Data response');
         }
       } catch (basePriceErr: any) {
-        console.error('[SSS Base Pricing Only] Failed to extract base prices from Product Data:', basePriceErr.message);
+        console.error('💰 Failed to extract base prices from Product Data:', basePriceErr.message);
       }
     }
 
-    // If Product Data extraction failed, check DB cache
+    // FINAL FALLBACK: Check DB cache
     if (!pricingData.parts || pricingData.parts.length === 0) {
-      console.warn('[SSS Base Pricing Only] Product Data extraction unsuccessful, checking DB cache...');
+      console.warn('💰 No pricing from API, checking DB cache...');
 
       const partIds = productData.parts?.map((p: any) => p.partId).filter(Boolean) || [];
 
@@ -670,6 +801,7 @@ Deno.serve(async (req: Request) => {
 
         if (cachedPricing && cachedPricing.length > 0) {
           usedCache = true;
+          usedPricingSource = 'cache';
 
           const partPricingMap = new Map();
           cachedPricing.forEach(row => {
@@ -695,9 +827,9 @@ Deno.serve(async (req: Request) => {
             }
           });
 
-          console.log('[SSS Base Pricing Only] Using cached pricing:', pricingData.parts.length, 'parts');
+          console.log('💰 Using cached pricing:', pricingData.parts.length, 'parts');
         } else {
-          console.warn('[SSS Base Pricing Only] No cached pricing found either');
+          console.warn('💰 No cached pricing found either');
         }
       }
     }
@@ -892,13 +1024,11 @@ Deno.serve(async (req: Request) => {
           mediaError: initialMediaResponse.status === 'rejected' ? initialMediaResponse.reason?.toString() : null,
           mediaAuthError,
           pricingAuthError,
-          pricingSource: pricingData.parts?.length > 0
-            ? (usedCache ? 'cache' : 'base-product-data')
-            : 'none',
-          pricingMethod: 'base-product-data-only',
+          pricingSource: usedPricingSource,
+          pricingMethod: usedPricingSource === 'pricing-and-configuration' ? 'wholesale-pricing' : (usedBasePriceFallback ? 'base-product-data-fallback' : 'cache'),
           pricingPartsCount: pricingData.parts?.length || 0,
           pricingMapCount: pricingData.pricesByPartId ? Object.keys(pricingData.pricesByPartId).length : 0,
-          wholesalePricingBypassed: true,
+          usedBasePriceFallback,
           soapRequests: verbose ? {
             productDataRequest: productSoap,
             mediaRequest: mediaSoap,
