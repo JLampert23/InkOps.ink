@@ -11,6 +11,7 @@ const PROMOSTANDARDS_ENDPOINTS = {
   productData: "https://promostandards.ssactivewear.com/productdata/v2/productdataservicev2.svc",
   inventory: "https://promostandards.ssactivewear.com/inventory/v2/inventoryservice.svc",
   media: "https://promostandards.ssactivewear.com/mediacontent/v1/mediacontentservice.svc",
+  pricingAndConfiguration: "https://promostandards.ssactivewear.com/pricingandconfiguration/1.0.0/pricingandconfiguration.svc",
 };
 
 async function makePromoStandardsRequest(
@@ -253,6 +254,7 @@ Deno.serve(async (req: Request) => {
     const styleNumber = url.searchParams.get("styleNumber")?.trim();
     const partId = url.searchParams.get("partId")?.trim();
     const verbose = url.searchParams.get("verbose") === "true";
+    const testPpc = url.searchParams.get("testPpc") === "true";
 
     if (!styleNumber) {
       return new Response(
@@ -411,6 +413,73 @@ Deno.serve(async (req: Request) => {
       console.warn('📦 WARNING: Could not extract internal productId from Product Data partId values');
     }
 
+    // STEP 1.5: Fetch Pricing & Configuration (Customer/EQP pricing)
+    let ppcPrice: number | null = null;
+    let ppcTiers: { minQuantity: number; price: number }[] = [];
+    let ppcError: string | null = null;
+
+    if (internalProductId && partId) {
+      console.log('💰 Step 1.5: Fetching PPC Customer Pricing...');
+      console.log('💰 PPC Request params:', { internalProductId, partId, fobId: settings.ssactivewear_fob_id });
+
+      const ppcSoap = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
+  <shar:wsVersion>1.0.0</shar:wsVersion>
+  <shar:id>${escapedAccountNumber}</shar:id>
+  <shar:password>${escapedApiKey}</shar:password>
+  <shar:productId>${escapeXml(internalProductId)}</shar:productId>
+  <shar:partId>${escapedPartId}</shar:partId>
+  <shar:currency>USD</shar:currency>
+  <shar:fobId>${escapeXml(settings.ssactivewear_fob_id || '')}</shar:fobId>
+  <shar:priceType>Customer</shar:priceType>
+  <shar:configurationType>Blank</shar:configurationType>
+</ns2:GetConfigurationAndPricingRequest>`;
+
+      try {
+        const ppcResponse = await makePromoStandardsRequest(
+          PROMOSTANDARDS_ENDPOINTS.pricingAndConfiguration,
+          "getConfigurationAndPricing",
+          ppcSoap
+        );
+
+        console.log('💰 PPC Response received, parsing PartPrice blocks...');
+
+        const partPricePattern = /<(?:[a-zA-Z0-9]+:)?PartPrice[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?PartPrice>/gi;
+        const partPriceMatches = getAllXmlMatches(ppcResponse, partPricePattern);
+
+        console.log('💰 Found', partPriceMatches.length, 'PartPrice entries');
+
+        partPriceMatches.forEach(match => {
+          const priceXml = match[1];
+          const minQuantity = parseInt(getXmlValue(priceXml, "minQuantity") || "1");
+          const price = parseFloat(getXmlValue(priceXml, "price") || "0");
+
+          if (price > 0) {
+            ppcTiers.push({ minQuantity, price });
+          }
+        });
+
+        ppcTiers.sort((a, b) => a.minQuantity - b.minQuantity);
+
+        if (ppcTiers.length > 0) {
+          ppcPrice = ppcTiers[0].price;
+          console.log('💰 PPC Customer pricing extracted:', { ppcPrice, tierCount: ppcTiers.length, allTiers: ppcTiers });
+        } else {
+          console.warn('💰 No PartPrice entries found in PPC response');
+          const errorCode = getXmlValue(ppcResponse, "code");
+          const errorDesc = getXmlValue(ppcResponse, "description");
+          if (errorCode || errorDesc) {
+            ppcError = `PPC Error ${errorCode || 'unknown'}: ${errorDesc || 'No pricing data returned'}`;
+            console.error('💰 PPC API returned error:', ppcError);
+          }
+        }
+      } catch (err: any) {
+        ppcError = err.message || 'Unknown PPC error';
+        console.error('💰 PPC request failed:', ppcError);
+      }
+    } else {
+      console.log('💰 Skipping PPC call - missing required params:', { hasInternalProductId: !!internalProductId, hasPartId: !!partId });
+    }
+
     // STEP 2: Fetch Inventory
     console.log('📦 Step 2: Fetching Inventory...');
 
@@ -550,6 +619,23 @@ Deno.serve(async (req: Request) => {
     } else {
       console.warn('💰 Product Data not available for base pricing extraction');
     }
+
+    // Merge PPC + Base Pricing
+    let finalPrice: number | null = null;
+    let pricingSource: string | null = null;
+
+    if (ppcPrice) {
+      finalPrice = ppcPrice;
+      pricingSource = "customer-pricing";
+    } else if (basePrice) {
+      finalPrice = basePrice;
+      pricingSource = "base-pricing";
+    } else {
+      finalPrice = null;
+      pricingSource = "none";
+    }
+
+    console.log('💰 Final pricing decision:', { finalPrice, pricingSource, ppcPrice, basePrice });
 
     // Parse Media Content from PromoStandards API only
     const mediaData: any = {};
@@ -707,10 +793,32 @@ Deno.serve(async (req: Request) => {
     }
 
     // Determine pricing availability
-    const hasPricing = basePrice !== null && basePrice > 0;
+    const hasPricing = finalPrice !== null && finalPrice > 0;
     const pricingUnavailableReason = !hasPricing
-      ? "Base pricing not available in Product Data. Please enter pricing manually."
+      ? "Pricing not available. Please enter pricing manually."
       : null;
+
+    // PPC Test Harness - return early with test data
+    if (testPpc) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          testHarness: true,
+          styleNumber,
+          partId,
+          internalProductId,
+          pricingTest: {
+            ppcPrice,
+            ppcTiers,
+            ppcError,
+            basePrice,
+            finalPrice,
+            pricingSource
+          }
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Return unified response
     return new Response(
@@ -721,8 +829,11 @@ Deno.serve(async (req: Request) => {
         product: productData,
         inventory: inventoryData,
         pricing: {
-          usedPricingSource,
-          basePrice: basePrice,
+          price: finalPrice,
+          source: pricingSource,
+          ppcTiers,
+          ppcError,
+          basePrice,
         },
         media: mediaData,
         pricingAvailable: hasPricing,
@@ -738,6 +849,11 @@ Deno.serve(async (req: Request) => {
           mediaAuthError,
           usedPricingSource,
           basePrice,
+          ppcPrice,
+          ppcTiers,
+          ppcError,
+          finalPrice,
+          pricingSource,
           soapRequests: verbose ? {
             productDataRequest: productSoap,
             mediaRequest: mediaSoap,
