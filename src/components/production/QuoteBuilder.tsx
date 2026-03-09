@@ -1372,21 +1372,26 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           imageCount: unifiedData.media?.images?.length,
           viewsKeys: unifiedData.media?.views ? Object.keys(unifiedData.media.views) : [],
           hasPricing: !!unifiedData.pricing,
-          pricingPartsCount: unifiedData.pricing?.parts?.length || 0,
-          hasPriceMap: !!unifiedData.pricing?.pricesByPartId,
+          basePrice: unifiedData.pricing?.basePrice,
+          pricingSource: unifiedData.pricing?.usedPricingSource,
+          pricingAvailable: unifiedData.pricingAvailable,
         });
 
-        // Extract fresh pricing for this specific partId
-        if (unifiedData.pricing?.pricesByPartId && Object.keys(unifiedData.pricing.pricesByPartId).length > 0) {
+        // Extract fresh pricing - check basePrice first (new API format)
+        if (unifiedData.pricing?.basePrice && unifiedData.pricing.basePrice > 0) {
+          freshPrice = unifiedData.pricing.basePrice;
+          console.log('💰 Fresh pricing found from basePrice:', {
+            partId: color.code,
+            price: freshPrice,
+            source: unifiedData.pricing.usedPricingSource
+          });
+        } else if (unifiedData.pricing?.pricesByPartId && Object.keys(unifiedData.pricing.pricesByPartId).length > 0) {
+          // Legacy fallback: check pricesByPartId map
           const priceForPart = unifiedData.pricing.pricesByPartId[color.code];
           if (priceForPart) {
             freshPrice = priceForPart;
-            console.log('💰 Fresh pricing found for part:', { partId: color.code, price: freshPrice });
+            console.log('💰 Fresh pricing found for part (legacy):', { partId: color.code, price: freshPrice });
           } else {
-            console.warn('⚠️ No price found for exact part:', color.code, 'Available parts:', Object.keys(unifiedData.pricing.pricesByPartId));
-
-            // Try to find a matching partId from the available prices
-            // SSActivewear partIds often include style-color-size format
             const availablePartIds = Object.keys(unifiedData.pricing.pricesByPartId);
             const matchingPartId = availablePartIds.find(pid =>
               pid.includes(color.code) || color.code.includes(pid)
@@ -1396,7 +1401,6 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
               freshPrice = unifiedData.pricing.pricesByPartId[matchingPartId];
               console.log('💰 Found matching partId:', { requested: color.code, matched: matchingPartId, price: freshPrice });
             } else if (availablePartIds.length > 0) {
-              // Use the first available price as a fallback
               const firstPartId = availablePartIds[0];
               freshPrice = unifiedData.pricing.pricesByPartId[firstPartId];
               console.log('💰 Using first available price as fallback:', { partId: firstPartId, price: freshPrice });
@@ -1406,7 +1410,6 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
             }
           }
         } else if (unifiedData.pricing?.parts && unifiedData.pricing.parts.length > 0) {
-          // Try to get pricing from the parts array directly
           const firstPart = unifiedData.pricing.parts[0];
           if (firstPart?.prices && firstPart.prices.length > 0) {
             freshPrice = firstPart.prices[0].price;
