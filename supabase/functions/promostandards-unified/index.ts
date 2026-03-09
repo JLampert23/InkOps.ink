@@ -192,7 +192,7 @@ Deno.serve(async (req: Request) => {
     console.log('📋 Fetching company settings for company_id:', companyId);
     const { data: settings, error: settingsError } = await supabase
       .from("company_settings")
-      .select("ssactivewear_enabled, ssactivewear_username, ssactivewear_api_key_encrypted, ssactivewear_fob_id, default_garment_markup")
+      .select("ssactivewear_enabled, ssactivewear_username, ssactivewear_api_key_encrypted, ssactivewear_fob_id")
       .eq("id", companyId)
       .maybeSingle();
 
@@ -257,8 +257,6 @@ Deno.serve(async (req: Request) => {
     const styleNumber = url.searchParams.get("styleNumber")?.trim();
     const partId = url.searchParams.get("partId")?.trim();
     const verbose = url.searchParams.get("verbose") === "true";
-    const quantity = parseInt(url.searchParams.get("quantity") || "1");
-    const imprintCost = parseFloat(url.searchParams.get("imprintCost") || "0");
 
     if (!styleNumber) {
       return new Response(
@@ -267,11 +265,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    console.log('Unified PromoStandards Request:', { styleNumber, partId, verbose, quantity, imprintCost });
-
-    // Get garment markup percentage from company settings
-    const garmentMarkupPercentage = settings?.default_garment_markup || 0;
-    console.log('💰 Garment markup percentage:', garmentMarkupPercentage);
+    console.log('Unified PromoStandards Request:', { styleNumber, partId, verbose });
 
     // XML-escape credentials to prevent authentication issues
     const escapedAccountNumber = escapeXml(credentials.accountNumber);
@@ -994,64 +988,6 @@ Deno.serve(async (req: Request) => {
       ? "This product is not available through S&S ActiveWear's PromoStandards Pricing API. Please enter pricing manually or contact your distributor."
       : null;
 
-    // UNIFIED PRICING PIPELINE
-    let garment_base_cost = 0;
-    let priceSource = "zero";
-
-    if (partId && pricingData.pricesByPartId) {
-      // 1. Try live wholesale pricing first
-      const wholesalePrice = pricingData.pricesByPartId[partId];
-      if (wholesalePrice && wholesalePrice > 0) {
-        garment_base_cost = wholesalePrice;
-        priceSource = usedBasePriceFallback ? "base" : (usedCache ? "cached" : "wholesale");
-        console.log('[UnifiedPricing] Using wholesale/base/cached price:', { partId, garment_base_cost, priceSource });
-      } else {
-        // 2. If wholesale returned zero, try cached pricing as fallback
-        console.log('[UnifiedPricing] Wholesale price missing or zero, checking cache for partId:', partId);
-        const { data: cachedPrice } = await supabase
-          .from('ss_catalog_pricing')
-          .select('unit_price')
-          .eq('company_id', companyId)
-          .eq('part_number', partId)
-          .eq('quantity_min', 1)
-          .or(`price_expiry_date.gte.${new Date().toISOString().split('T')[0]},price_expiry_date.is.null`)
-          .maybeSingle();
-
-        if (cachedPrice && cachedPrice.unit_price && parseFloat(cachedPrice.unit_price) > 0) {
-          garment_base_cost = parseFloat(cachedPrice.unit_price);
-          priceSource = "cached";
-          console.log('[UnifiedPricing] Using cached price:', { partId, garment_base_cost });
-        } else {
-          // 3. Final fallback to zero
-          garment_base_cost = 0;
-          priceSource = "zero";
-          console.log('[UnifiedPricing] No pricing found, using zero:', { partId });
-        }
-      }
-    }
-
-    // Calculate garment cost with markup
-    const garment_cost_with_markup = garment_base_cost * (1 + (garmentMarkupPercentage / 100));
-
-    // Calculate final unit price (garment + imprint)
-    const unit_price = garment_cost_with_markup + imprintCost;
-
-    // Calculate total price
-    const total_price = unit_price * quantity;
-
-    console.log('[UnifiedPricing]', {
-      styleNumber,
-      partId,
-      priceSource,
-      garment_base_cost,
-      garment_markup_percentage: garmentMarkupPercentage,
-      garment_cost_with_markup,
-      imprint_cost: imprintCost,
-      unit_price,
-      quantity,
-      total_price
-    });
-
     // Return unified response
     return new Response(
       JSON.stringify({
@@ -1060,15 +996,7 @@ Deno.serve(async (req: Request) => {
         partId: partId || null,
         product: productData,
         inventory: inventoryData,
-        pricing: {
-          ...pricingData,
-          priceSource,
-          garment_base_cost,
-          garment_cost_with_markup,
-          imprint_cost: imprintCost,
-          unit_price,
-          total_price
-        },
+        pricing: pricingData,
         media: mediaData,
         pricingAvailable: hasPricing,
         pricingUnavailableReason,

@@ -58,6 +58,25 @@ Deno.serve(async (req: Request) => {
     // Use service role key for database operations
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Get user's company_id
+    const { data: userProfile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('company_id')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profileError || !userProfile?.company_id) {
+      return new Response(
+        JSON.stringify({ error: "User company not found" }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const companyId = userProfile.company_id;
+
     const { invoiceId, customerId, phoneNumber, messageBody }: SendSMSRequest = await req.json();
 
     if (!invoiceId || !phoneNumber || !messageBody) {
@@ -74,6 +93,7 @@ Deno.serve(async (req: Request) => {
     const { data: settings, error: settingsError } = await supabase
       .from("company_settings")
       .select("twilio_account_sid, twilio_auth_token, twilio_phone_number, twilio_enabled")
+      .eq('id', companyId)
       .maybeSingle();
 
     if (settingsError || !settings) {

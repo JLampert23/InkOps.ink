@@ -1,22 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase-client';
 import { useNotification } from '../../contexts/NotificationContext';
-import {
-  FileText,
-  Search,
-  Plus,
-  Clock,
-  Send,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  Loader2,
-  Edit,
-  Eye,
-  Copy,
-  RefreshCw,
-  Trash2,
-} from 'lucide-react';
+import { FileText, Search, Plus, Clock, Send, CheckCircle, XCircle, AlertCircle, Loader2, CreditCard as Edit, Eye, Copy, RefreshCw, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface QuotesListProps {
@@ -27,11 +12,11 @@ interface QuotesListProps {
 
 interface Quote {
   id: string;
-  quote_number: string;
-  customer_name: string;
-  customer_company: string;
-  customer_email: string;
-  total: number;
+  quote_number: string | null;
+  customer_name: string | null;
+  customer_company: string | null;
+  customer_email: string | null;
+  total: number | null;
   status: string;
   created_at: string;
   sent_at: string | null;
@@ -44,46 +29,21 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('active');
   const [duplicating, setDuplicating] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
     loadQuotes();
-  }, [statusFilter]);
-
-  useEffect(() => {
-    const channel = supabase
-      .channel('quotes-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'quotes',
-        },
-        () => {
-          loadQuotes();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, []);
 
   const loadQuotes = async () => {
     setLoading(true);
     try {
-      let query = supabase
+      const query = supabase
         .from('quotes')
         .select('*')
         .order('created_at', { ascending: false });
-
-      if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
-      }
 
       const { data, error } = await query;
 
@@ -103,23 +63,15 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
 
     setDuplicating(quoteId);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      const { data, error } = await supabase.functions.invoke(
+        `quote-actions/${quoteId}/duplicate`,
+        { method: 'POST' }
+      );
 
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quote-actions/${quoteId}/duplicate`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to duplicate quote');
+      if (error) {
+        throw error;
       }
 
-      const data = await response.json();
       showNotification(`Quote duplicated as ${data.quote.quote_number}`, 'success');
       loadQuotes();
     } catch (error) {
@@ -172,25 +124,38 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
       case 'expired':
         return { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400', icon: AlertCircle, label: 'Expired' };
       case 'converted':
-        return { color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400', icon: CheckCircle, label: 'Converted' };
+        return { color: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400', icon: CheckCircle, label: 'Converted' };
       default:
         return { color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300', icon: Clock, label: status };
     }
   };
 
-  const filteredQuotes = quotes.filter(
-    (quote) =>
-      quote.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      quote.quote_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  const filteredQuotes = quotes.filter((quote) => {
+    const matchesSearch =
+      (quote.customer_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (quote.quote_number || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (quote.customer_company || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (quote.customer_email || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      (quote.customer_email || '').toLowerCase().includes(searchTerm.toLowerCase());
+
+    let matchesStatus = true;
+    if (statusFilter === 'all') {
+      matchesStatus = true;
+    } else if (statusFilter === 'active') {
+      matchesStatus = ['draft', 'sent'].includes(quote.status);
+    } else if (statusFilter === 'approved') {
+      matchesStatus = ['approved', 'converted'].includes(quote.status);
+    } else {
+      matchesStatus = quote.status === statusFilter;
+    }
+
+    return matchesSearch && matchesStatus;
+  });
 
   const stats = {
-    total: quotes.length,
+    active: quotes.filter(q => ['draft', 'sent'].includes(q.status)).length,
     draft: quotes.filter(q => q.status === 'draft').length,
     sent: quotes.filter(q => q.status === 'sent').length,
-    approved: quotes.filter(q => q.status === 'approved').length,
+    approved: quotes.filter(q => ['approved', 'converted'].includes(q.status)).length,
     rejected: quotes.filter(q => q.status === 'rejected').length,
   };
 
@@ -220,27 +185,62 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
-          <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Total Quotes</div>
-        </div>
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
-          <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">{stats.draft}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Unsent</div>
-        </div>
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
-          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.sent}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Sent</div>
-        </div>
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
-          <div className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.approved}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Approved</div>
-        </div>
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
-          <div className="text-2xl font-bold text-red-600 dark:text-red-400">{stats.rejected}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Rejected</div>
-        </div>
+      <div className="grid grid-cols-5 gap-2">
+        <button
+          onClick={() => setStatusFilter('active')}
+          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all ${
+            statusFilter === 'active'
+              ? 'border-gray-900 dark:border-white ring-2 ring-gray-900 dark:ring-white'
+              : 'border-gray-200 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
+          } p-3 text-left cursor-pointer`}
+        >
+          <div className="text-xl font-bold text-gray-900 dark:text-white">{stats.active}</div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">Active</div>
+        </button>
+        <button
+          onClick={() => setStatusFilter('draft')}
+          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all ${
+            statusFilter === 'draft'
+              ? 'border-gray-600 dark:border-gray-400 ring-2 ring-gray-600 dark:ring-gray-400'
+              : 'border-gray-200 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
+          } p-3 text-left cursor-pointer`}
+        >
+          <div className="text-xl font-bold text-gray-600 dark:text-gray-400">{stats.draft}</div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">Unsent</div>
+        </button>
+        <button
+          onClick={() => setStatusFilter('sent')}
+          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all ${
+            statusFilter === 'sent'
+              ? 'border-blue-600 dark:border-blue-400 ring-2 ring-blue-600 dark:ring-blue-400'
+              : 'border-gray-200 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
+          } p-3 text-left cursor-pointer`}
+        >
+          <div className="text-xl font-bold text-blue-600 dark:text-blue-400">{stats.sent}</div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">Sent</div>
+        </button>
+        <button
+          onClick={() => setStatusFilter('approved')}
+          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all ${
+            statusFilter === 'approved'
+              ? 'border-green-600 dark:border-green-400 ring-2 ring-green-600 dark:ring-green-400'
+              : 'border-gray-200 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
+          } p-3 text-left cursor-pointer`}
+        >
+          <div className="text-xl font-bold text-green-600 dark:text-green-400">{stats.approved}</div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">Approved</div>
+        </button>
+        <button
+          onClick={() => setStatusFilter('rejected')}
+          className={`bg-white dark:bg-slate-800 rounded-lg shadow-sm border transition-all ${
+            statusFilter === 'rejected'
+              ? 'border-red-600 dark:border-red-400 ring-2 ring-red-600 dark:ring-red-400'
+              : 'border-gray-200 dark:border-slate-700 hover:border-gray-400 dark:hover:border-slate-500'
+          } p-3 text-left cursor-pointer`}
+        >
+          <div className="text-xl font-bold text-red-600 dark:text-red-400">{stats.rejected}</div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">Rejected</div>
+        </button>
       </div>
 
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-4">
@@ -261,13 +261,13 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
               onChange={(e) => setStatusFilter(e.target.value)}
               className="px-4 py-2.5 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
             >
-              <option value="all">All Status</option>
+              <option value="active">Active (Unsent + Sent)</option>
+              <option value="all">All Quotes</option>
               <option value="draft">Unsent</option>
               <option value="sent">Sent</option>
               <option value="approved">Approved</option>
               <option value="rejected">Rejected</option>
               <option value="expired">Expired</option>
-              <option value="converted">Converted</option>
             </select>
           </div>
         </div>
@@ -337,12 +337,12 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <FileText className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm font-semibold text-gray-900 dark:text-white">{quote.quote_number}</span>
+                          <span className="text-sm font-semibold text-gray-900 dark:text-white">{quote.quote_number || 'N/A'}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <div>
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">{quote.customer_name}</div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">{quote.customer_name || 'N/A'}</div>
                           {quote.customer_company && (
                             <div className="text-xs text-gray-500 dark:text-gray-400">{quote.customer_company}</div>
                           )}
@@ -358,7 +358,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="text-sm font-semibold text-gray-900 dark:text-white">${quote.total.toFixed(2)}</div>
+                        <div className="text-sm font-semibold text-gray-900 dark:text-white">${(quote.total ?? 0).toFixed(2)}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-600 dark:text-gray-400">
@@ -401,7 +401,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
                             )}
                           </button>
                           <button
-                            onClick={() => handleDelete(quote.id, quote.quote_number)}
+                            onClick={() => handleDelete(quote.id, quote.quote_number || 'N/A')}
                             disabled={deleting === quote.id}
                             className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
                             title="Delete Quote"

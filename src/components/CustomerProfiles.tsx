@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Search, User, DollarSign, FileText, AlertCircle, ExternalLink, Plus, Edit2, Trash2, Save, X, Gift, Upload, File, MapPin, Phone, Mail, Globe, Building } from 'lucide-react';
+import { Search, User, DollarSign, FileText, AlertCircle, ExternalLink, Plus, Edit2, Trash2, Save, X, Gift, Upload, File, MapPin, Phone, Mail, Globe, Building, Image } from 'lucide-react';
 import { Invoice } from '../types/printavo';
 import { formatCurrency, calculateCustomerLifetimeValue, calculateCustomerOutstandingBalance } from '../utils/financial-aggregations';
 import { format, parseISO } from 'date-fns';
@@ -295,6 +295,7 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
   const [isAddingContact, setIsAddingContact] = useState(false);
   const [editingCreditId, setEditingCreditId] = useState<string | null>(null);
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
+  const [showArtworkLibrary, setShowArtworkLibrary] = useState(false);
 
   const [editedCustomer, setEditedCustomer] = useState<DatabaseCustomer | null>(databaseCustomer);
 
@@ -619,17 +620,44 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
 
   return (
     <div className="space-y-6">
+      {/* Quick Action Bar */}
+      <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg shadow-lg p-4">
+        <div className="flex items-center justify-between">
+          <div className="text-white">
+            <h3 className="text-lg font-bold">Customer Artwork</h3>
+            <p className="text-sm text-green-100">View and manage {customer.name}'s artwork files</p>
+          </div>
+          <button
+            onClick={() => setShowArtworkLibrary(true)}
+            className="flex items-center gap-2 px-6 py-3 bg-white text-green-600 rounded-lg hover:bg-green-50 transition-colors shadow-lg font-bold text-lg"
+          >
+            <Image className="w-6 h-6" />
+            Open Artwork Library
+          </button>
+        </div>
+      </div>
+
       {/* Customer Info Header */}
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow border border-gray-200 dark:border-slate-700 p-6">
         {!databaseCustomer ? (
-          <div className="text-center py-8">
-            <div className="mb-4">
+          <div className="py-8">
+            <div className="text-center mb-4">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{customer.name}</h2>
               {customer.email && (
                 <p className="text-gray-600 dark:text-gray-400">{customer.email}</p>
               )}
             </div>
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <button
+                onClick={() => setShowArtworkLibrary(true)}
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                title="View customer artwork library"
+              >
+                <Image className="w-4 h-4" />
+                Artwork Library
+              </button>
+            </div>
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 max-w-2xl mx-auto">
               <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-3">
                 This customer exists in your invoices but doesn't have an editable profile yet. Create one to add contacts, addresses, and more details.
               </p>
@@ -718,8 +746,8 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
                 </div>
               ) : (
                 <div>
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
+                  <div className="flex flex-col lg:flex-row items-start lg:justify-between gap-4 mb-4">
+                    <div className="flex-1 min-w-0">
                       <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{customer.name}</h2>
                       <div className="mt-2 space-y-1">
                         {databaseCustomer.contact_name && (
@@ -750,13 +778,23 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
                         )}
                       </div>
                     </div>
-                    <button
-                      onClick={() => setIsEditingInfo(true)}
-                      className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shrink-0 ml-4"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                      Edit Info
-                    </button>
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
+                      <button
+                        onClick={() => setShowArtworkLibrary(true)}
+                        className="flex items-center justify-center gap-2 px-6 py-3 text-base font-semibold bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-lg"
+                        title="View customer artwork library"
+                      >
+                        <Image className="w-5 h-5" />
+                        Artwork Library
+                      </button>
+                      <button
+                        onClick={() => setIsEditingInfo(true)}
+                        className="flex items-center justify-center gap-2 px-6 py-3 text-base font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-lg"
+                      >
+                        <Edit2 className="w-5 h-5" />
+                        Edit Info
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1166,6 +1204,14 @@ function CustomerDetail({ customer, databaseCustomer, onUpdate }: CustomerDetail
           </div>
         </div>
       )}
+
+      {/* Artwork Library Modal */}
+      {showArtworkLibrary && (
+        <CustomerArtworkLibrary
+          customerId={customer.id}
+          onClose={() => setShowArtworkLibrary(false)}
+        />
+      )}
     </div>
   );
 }
@@ -1421,5 +1467,203 @@ function FundraisingCreditRow({ credit, isEditing, onEdit, onSave, onCancel, onD
         </div>
       </td>
     </tr>
+  );
+}
+
+interface CustomerArtworkLibraryProps {
+  customerId: string;
+  onClose: () => void;
+}
+
+interface CustomerArtwork {
+  id: string;
+  file_name: string;
+  file_url: string;
+  file_type: string;
+  file_size: number;
+  width_inches: number | null;
+  height_inches: number | null;
+  tags: string[];
+  uploaded_at: string;
+}
+
+function CustomerArtworkLibrary({ customerId, onClose }: CustomerArtworkLibraryProps) {
+  const [artwork, setArtwork] = useState<CustomerArtwork[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadArtwork();
+  }, [customerId]);
+
+  const loadArtwork = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('customer_artwork')
+        .select('*')
+        .eq('customer_id', customerId)
+        .order('uploaded_at', { ascending: false });
+
+      if (error) {
+        console.error('Error loading artwork:', error);
+        throw error;
+      }
+      setArtwork(data || []);
+    } catch (error) {
+      console.error('Failed to load artwork library:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteArtwork = async (artworkId: string, fileUrl: string) => {
+    if (!confirm('Are you sure you want to delete this artwork? This action cannot be undone.')) {
+      return;
+    }
+
+    setDeleting(artworkId);
+    try {
+      // Extract the file path from the URL
+      const urlParts = fileUrl.split('/customer-artwork/');
+      if (urlParts.length > 1) {
+        const filePath = urlParts[1].split('?')[0];
+
+        // Delete from storage
+        const { error: storageError } = await supabase.storage
+          .from('customer-artwork')
+          .remove([filePath]);
+
+        if (storageError) {
+          console.error('Error deleting file from storage:', storageError);
+        }
+      }
+
+      // Delete from database
+      const { error: dbError } = await supabase
+        .from('customer_artwork')
+        .delete()
+        .eq('id', artworkId);
+
+      if (dbError) {
+        throw dbError;
+      }
+
+      // Remove from local state
+      setArtwork(artwork.filter(a => a.id !== artworkId));
+    } catch (error) {
+      console.error('Error deleting artwork:', error);
+      alert('Failed to delete artwork');
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-5xl max-h-[85vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b dark:border-slate-600">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Customer Artwork Library</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 dark:text-gray-300 dark:hover:text-white transition-colors"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Loading artwork...</p>
+              </div>
+            </div>
+          ) : artwork.length === 0 ? (
+            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+              <File className="w-12 h-12 mx-auto mb-3 text-gray-400 dark:text-gray-500" />
+              <p className="text-lg font-medium mb-1">No artwork uploaded yet</p>
+              <p className="text-sm">Artwork will appear here once uploaded</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {artwork.map((item) => (
+                <div
+                  key={item.id}
+                  className="bg-white dark:bg-slate-700 border-2 border-gray-200 dark:border-slate-600 rounded-lg p-3 hover:border-blue-500 hover:shadow-lg transition-all relative group"
+                >
+                  <button
+                    onClick={() => handleDeleteArtwork(item.id, item.file_url)}
+                    disabled={deleting === item.id}
+                    className="absolute top-2 right-2 p-2 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 hover:bg-red-700 transition-all shadow-lg disabled:opacity-50 z-10"
+                    title="Delete artwork"
+                  >
+                    {deleting === item.id ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                  </button>
+                  <div className="aspect-square bg-gray-100 dark:bg-slate-800 rounded-lg mb-3 flex items-center justify-center overflow-hidden">
+                    {item.file_type.startsWith('image/') ? (
+                      <img
+                        src={item.file_url}
+                        alt={item.file_name}
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <File className="w-10 h-10 text-gray-400 dark:text-gray-500" />
+                    )}
+                  </div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate" title={item.file_name}>
+                    {item.file_name}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {item.width_inches && item.height_inches
+                      ? `${item.width_inches}" × ${item.height_inches}"`
+                      : 'No dimensions'}
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                    {new Date(item.uploaded_at).toLocaleDateString()}
+                  </p>
+                  {item.tags && item.tags.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {item.tags.slice(0, 3).map((tag, i) => (
+                        <span
+                          key={i}
+                          className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                      {item.tags.length > 3 && (
+                        <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs rounded">
+                          +{item.tags.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 py-4 border-t dark:border-slate-600 bg-gray-50 dark:bg-slate-900 rounded-b-lg">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {artwork.length} {artwork.length === 1 ? 'artwork' : 'artworks'} in library
+            </p>
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

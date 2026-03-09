@@ -1,15 +1,42 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, CreditCard as Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, RefreshCw, Bug, MessageSquare, Eye, EyeOff, Grid3x3, FileText, CheckCircle, GripVertical, Workflow } from 'lucide-react';
+import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, CreditCard as Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, RefreshCw, MessageSquare, Eye, EyeOff, Grid3x3, FileText, CheckCircle, GripVertical, Workflow, Mail, Package, AlertTriangle, Copy, Check, Columns3, Wrench } from 'lucide-react';
 import { supabase } from '../lib/supabase-client';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
+import { domainVerificationService } from '../services/domain-verification-service';
 import AutomatedReports from './automation/AutomatedReports';
 import WorkflowBuilder from './production/WorkflowBuilder';
+import ShortCodeReference from './email/ShortCodeReference';
 
 const AutomationsDashboard = lazy(() => import('./automations/AutomationsDashboard').then(m => ({ default: m.AutomationsDashboard })));
 const StripePayments = lazy(() => import('./production/StripePayments').then(m => ({ default: m.StripePayments })));
 const PriceMatricesManager = lazy(() => import('./production/PriceMatricesManager').then(m => ({ default: m.PriceMatricesManager })));
 const InkThreadColorsManager = lazy(() => import('./production/InkThreadColorsManager').then(m => ({ default: m.InkThreadColorsManager })));
+const CommunicationTemplatesManager = lazy(() => import('./email/CommunicationTemplatesManager').then(m => ({ default: m.default })));
+const ReceivingSettings = lazy(() => import('./settings/ReceivingSettings').then(m => ({ default: m.default })));
+const POSettings = lazy(() => import('./settings/POSettings').then(m => ({ default: m.default })));
+const ShipStationSettings = lazy(() => import('./settings/ShipStationSettings').then(m => ({ default: m.default })));
+const ChipplyIntegrationSettings = lazy(() => import('./chipply/ChipplyIntegrationSettings').then(m => ({ default: m.ChipplyIntegrationSettings })));
+const CustomInvoiceStatusManager = lazy(() => import('./settings/CustomInvoiceStatusManager').then(m => ({ default: m.CustomInvoiceStatusManager })));
+const BoxLabelSettings = lazy(() => import('./settings/BoxLabelSettings'));
+const RichTextTermsEditor = lazy(() => import('./settings/RichTextTermsEditor'));
+const KanbanSettings = lazy(() => import('./settings/KanbanSettings'));
+
+const SSACTIVEWEAR_WAREHOUSES = [
+  { id: 'NJ', name: 'Robbinsville, New Jersey' },
+  { id: 'IL', name: 'Lockport, Illinois' },
+  { id: 'KS', name: 'Olathe, Kansas' },
+  { id: 'TX', name: 'Fort Worth, Texas' },
+  { id: 'GA', name: 'McDonough, Georgia' },
+  { id: 'NV', name: 'Reno, Nevada' },
+  { id: 'DS', name: 'Dropship' },
+];
+
+const SANMAR_WAREHOUSES = [
+  { id: '1', name: 'Primary Distribution Center' },
+  { id: '2', name: 'Eastern Distribution Center' },
+  { id: '3', name: 'Western Distribution Center' },
+];
 
 interface CompanySettings {
   id: string;
@@ -23,12 +50,34 @@ interface CompanySettings {
   available_invoice_statuses: string[];
   selected_invoice_statuses: string[];
   billing_selected_invoice_statuses: string[];
-  printavo_username: string | null;
-  printavo_api_token_encrypted: string | null;
   resend_api_key: string | null;
   stripe_public_key: string | null;
   stripe_secret_key: string | null;
   stripe_webhook_secret: string | null;
+  sanmar_account_number: string | null;
+  sanmar_promo_username: string | null;
+  sanmar_promo_password_encrypted: string | null;
+  sanmar_enabled: boolean | null;
+  ssactivewear_username: string | null;
+  ssactivewear_api_key_encrypted: string | null;
+  ssactivewear_enabled: boolean | null;
+  shipstation_api_key: string | null;
+  shipstation_api_secret: string | null;
+  shipstation_default_ship_from_name: string | null;
+  shipstation_default_ship_from_company: string | null;
+  shipstation_default_ship_from_address1: string | null;
+  shipstation_default_ship_from_address2: string | null;
+  shipstation_default_ship_from_city: string | null;
+  shipstation_default_ship_from_state: string | null;
+  shipstation_default_ship_from_postal_code: string | null;
+  shipstation_default_ship_from_country: string | null;
+  shipstation_default_carrier_code: string | null;
+  shipstation_default_service_code: string | null;
+  customer_url: string | null;
+  customer_url_verification_status: string | null;
+  customer_url_verification_token: string | null;
+  customer_url_verified_at: string | null;
+  customer_url_verification_expires_at: string | null;
 }
 
 interface UserProfile {
@@ -37,15 +86,6 @@ interface UserProfile {
   full_name: string | null;
   role: string;
   created_at: string;
-}
-
-interface PrintavoStatus {
-  id: string;
-  name: string;
-  color: string | null;
-  position: number;
-  type: string | null;
-  is_billing_eligible: boolean;
 }
 
 interface InvoiceFee {
@@ -58,6 +98,8 @@ interface InvoiceFee {
   is_taxed: boolean;
   show_by_default: boolean;
   is_active: boolean;
+  category: string | null;
+  sort_order: number;
   created_at: string;
   updated_at: string;
 }
@@ -89,6 +131,7 @@ interface TypeOfWork {
   company_id: string;
   work_type_name: string;
   color_type: 'ink' | 'thread' | 'none';
+  imprint_color: string | null;
   sort_order: number;
   is_active: boolean;
   created_at: string;
@@ -107,12 +150,13 @@ interface ProductionStation {
 }
 
 type SettingsTab =
-  | 'company-info' | 'quote-invoice-settings'
-  | 'printavo-integration' | 'square-integration' | 'resend-integration' | 'twilio-integration' | 'stripe-payments' | 'supplier-integrations'
+  | 'company-info' | 'quote-invoice-settings' | 'box-label'
+  | 'square-integration' | 'resend-integration' | 'twilio-integration' | 'stripe-payments' | 'supplier-integrations' | 'shipstation-integration' | 'chipply-integration'
   | 'user-management' | 'user-security'
-  | 'billing-status-filters'
   | 'automated-reports' | 'automations'
-  | 'production-general' | 'scheduler-settings' | 'invoice-fees' | 'price-matrices';
+  | 'manage-goods' | 'receiving-settings' | 'po-settings'
+  | 'production-general' | 'scheduler-settings' | 'kanban-settings' | 'invoice-fees' | 'price-matrices'
+  | 'email-templates' | 'urls';
 
 interface AccountSettingsProps {
   initialTab?: SettingsTab;
@@ -132,6 +176,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [productionExpanded, setProductionExpanded] = useState(false);
   const [accountingExpanded, setAccountingExpanded] = useState(false);
   const [companySettingsExpanded, setCompanySettingsExpanded] = useState(false);
+  const [communicationsExpanded, setCommunicationsExpanded] = useState(false);
+  const [manageGoodsExpanded, setManageGoodsExpanded] = useState(false);
+
+  const collapseAllExcept = (section: 'integrations' | 'production' | 'accounting' | 'company' | 'communications' | 'manageGoods') => {
+    if (section !== 'integrations') setIntegrationsExpanded(false);
+    if (section !== 'production') setProductionExpanded(false);
+    if (section !== 'accounting') setAccountingExpanded(false);
+    if (section !== 'company') setCompanySettingsExpanded(false);
+    if (section !== 'communications') setCommunicationsExpanded(false);
+    if (section !== 'manageGoods') setManageGoodsExpanded(false);
+  };
 
   const [companyName, setCompanyName] = useState('');
   const [companyAddress, setCompanyAddress] = useState('');
@@ -145,14 +200,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [secondaryLogoPreview, setSecondaryLogoPreview] = useState<string | null>(null);
   const [savingCompany, setSavingCompany] = useState(false);
 
-  const [printavoUsername, setPrintavoUsername] = useState('');
-  const [printavoToken, setPrintavoToken] = useState('');
-  const [showPrintavoToken, setShowPrintavoToken] = useState(false);
-  const [savingIntegration, setSavingIntegration] = useState(false);
-  const [testingConnection, setTestingConnection] = useState(false);
-  const [testResult, setTestResult] = useState<any>(null);
-  const [testLoading, setTestLoading] = useState(false);
-  const [testData, setTestData] = useState<any>(null);
 
   const [squareAccessToken, setSquareAccessToken] = useState('');
   const [showSquareToken, setShowSquareToken] = useState(false);
@@ -169,6 +216,13 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [savingResend, setSavingResend] = useState(false);
   const [testingResend, setTestingResend] = useState(false);
   const [resendTestResult, setResendTestResult] = useState<any>(null);
+
+  const [customerUrl, setCustomerUrl] = useState('');
+  const [savingCustomerUrl, setSavingCustomerUrl] = useState(false);
+  const [verificationStatus, setVerificationStatus] = useState<'unverified' | 'verified' | 'failed'>('unverified');
+  const [verificationToken, setVerificationToken] = useState<string | null>(null);
+  const [verifyingDomain, setVerifyingDomain] = useState(false);
+  const [copiedToken, setCopiedToken] = useState(false);
 
   const [stripePublicKey, setStripePublicKey] = useState('');
   const [showStripePublicKey, setShowStripePublicKey] = useState(false);
@@ -194,18 +248,33 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   // Supplier Integration States
   const [sanmarEnabled, setSanmarEnabled] = useState(false);
-  const [sanmarApiKey, setSanmarApiKey] = useState('');
-  const [showSanmarApiKey, setShowSanmarApiKey] = useState(false);
-  const [sanmarCustomerId, setSanmarCustomerId] = useState('');
+  const [sanmarUsername, setSanmarUsername] = useState('');
+  const [sanmarPassword, setSanmarPassword] = useState('');
+  const [showSanmarPassword, setShowSanmarPassword] = useState(false);
   const [sanmarHasCredentials, setSanmarHasCredentials] = useState(false);
+  const [sanmarFobId, setSanmarFobId] = useState('1');
   const [ssaEnabled, setSsaEnabled] = useState(false);
   const [ssaAccountNumber, setSsaAccountNumber] = useState('');
   const [ssaApiKey, setSsaApiKey] = useState('');
+  const [showSsaAccountNumber, setShowSsaAccountNumber] = useState(false);
   const [showSsaApiKey, setShowSsaApiKey] = useState(false);
   const [ssaHasCredentials, setSsaHasCredentials] = useState(false);
-  const [savingSuppliers, setSavingSuppliers] = useState(false);
+  const [ssaFobId, setSsaFobId] = useState('NJ');
+  const [savingSanmar, setSavingSanmar] = useState(false);
+  const [savingSSA, setSavingSSA] = useState(false);
   const [testingSuppliers, setTestingSuppliers] = useState(false);
   const [supplierTestResult, setSupplierTestResult] = useState<any>(null);
+  const [testingSanmar, setTestingSanmar] = useState(false);
+  const [sanmarTestResult, setSanmarTestResult] = useState<any>(null);
+  const [testingSSA, setTestingSSA] = useState(false);
+  const [ssaTestResult, setSsaTestResult] = useState<any>(null);
+  const [syncingCatalog, setSyncingCatalog] = useState(false);
+  const [catalogSyncResult, setCatalogSyncResult] = useState<any>(null);
+
+  const [diagnosticsExpanded, setDiagnosticsExpanded] = useState(false);
+  const [testStyleNumber, setTestStyleNumber] = useState('18000');
+  const [testingPricing, setTestingPricing] = useState(false);
+  const [pricingTestResult, setPricingTestResult] = useState<any>(null);
 
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -226,16 +295,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [loadingStatuses, setLoadingStatuses] = useState(false);
   const [savingStatuses, setSavingStatuses] = useState(false);
   const [syncingStatuses, setSyncingStatuses] = useState(false);
-  const [syncingPrintavoData, setSyncingPrintavoData] = useState(false);
-  const [syncResult, setSyncResult] = useState<{ success: boolean; message: string } | null>(null);
-
   const [billingSelectedStatuses, setBillingSelectedStatuses] = useState<string[]>([]);
   const [savingBillingStatuses, setSavingBillingStatuses] = useState(false);
-
-  const [fullStatuses, setFullStatuses] = useState<PrintavoStatus[]>([]);
-  const [pendingBillingChanges, setPendingBillingChanges] = useState<Map<string, boolean>>(new Map());
-  const [savingBillingFilters, setSavingBillingFilters] = useState(false);
-  const [billingFiltersSaveMessage, setBillingFiltersSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const [unlockPin, setUnlockPin] = useState('');
   const [unlockPinConfirm, setUnlockPinConfirm] = useState('');
@@ -250,6 +311,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [feeFormData, setFeeFormData] = useState({
     fee_name: '',
     description: '',
+    category: '',
     amount: '',
     amount_type: 'dollar' as 'dollar' | 'percent',
     is_taxed: false,
@@ -277,6 +339,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [customLineItemOptions, setCustomLineItemOptions] = useState<string[]>([]);
   const [newLineItemOption, setNewLineItemOption] = useState('');
   const [savingLineItemOptions, setSavingLineItemOptions] = useState(false);
+  const [draggedLineItemIndex, setDraggedLineItemIndex] = useState<number | null>(null);
   const [showAddWorkTypeModal, setShowAddWorkTypeModal] = useState(false);
   const [showBulkAddWorkTypesModal, setShowBulkAddWorkTypesModal] = useState(false);
   const [bulkWorkTypesText, setBulkWorkTypesText] = useState('');
@@ -285,6 +348,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [workTypeFormData, setWorkTypeFormData] = useState({
     work_type_name: '',
     color_type: 'ink' as 'ink' | 'thread' | 'none',
+    imprint_color: '#6b7280' as string,
   });
   const [savingWorkType, setSavingWorkType] = useState(false);
 
@@ -299,6 +363,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   const [invoiceTerms, setInvoiceTerms] = useState('');
   const [savingInvoiceTerms, setSavingInvoiceTerms] = useState(false);
+  const [quoteTerms, setQuoteTerms] = useState('');
+  const [savingQuoteTerms, setSavingQuoteTerms] = useState(false);
+
+  const [defaultGarmentMarkup, setDefaultGarmentMarkup] = useState(0);
+  const [savingGarmentMarkup, setSavingGarmentMarkup] = useState(false);
 
   const [colorStitchOptions, setColorStitchOptions] = useState<ColorStitchOption[]>([]);
   const [loadingColorStitch, setLoadingColorStitch] = useState(false);
@@ -371,7 +440,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   useEffect(() => {
     loadSettings();
     loadUsers();
-    loadAvailableStatuses();
     loadStatusesFromDatabase();
     loadInvoiceFees();
     loadDecorationLocations();
@@ -383,12 +451,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   useEffect(() => {
     const integrationTabs: SettingsTab[] = [
-      'printavo-integration',
       'square-integration',
       'resend-integration',
       'twilio-integration',
       'stripe-payments',
-      'supplier-integrations'
+      'supplier-integrations',
+      'chipply-integration'
     ];
 
     if (!canAccessIntegrations && integrationTabs.includes(activeTab)) {
@@ -396,12 +464,37 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     }
   }, [activeTab, canAccessIntegrations]);
 
+  useEffect(() => {
+    if (companySettings?.id) {
+      loadSupplierIntegrationSettings();
+    }
+  }, [companySettings]);
+
   const loadSettings = async () => {
     try {
       setLoading(true);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('No authenticated user found');
+        return;
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profileError || !profile?.company_id) {
+        console.error('Error fetching user profile or company_id:', profileError);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('company_settings')
         .select('*')
+        .eq('id', profile.company_id)
         .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
@@ -418,12 +511,20 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setAvailableStatuses(data.available_invoice_statuses || []);
         setSelectedStatuses(data.selected_invoice_statuses || []);
         setBillingSelectedStatuses(data.billing_selected_invoice_statuses || []);
-        setPrintavoUsername(data.printavo_username || '');
         setSquareEnvironment(data.square_environment || 'production');
+        setSquareAccessToken(data.square_access_token ? '••••••••••••••••' : '');
+        setSquareApplicationId(data.square_application_id || '');
+        setSquareLocationId(data.square_location_id || '');
         setEmailFromAddress(data.email_from_address || '');
-        setStripePublicKey(data.stripe_public_key || '');
-        setStripeSecretKey(data.stripe_secret_key || '');
-        setStripeWebhookSecret(data.stripe_webhook_secret || '');
+        setResendApiKey(data.resend_api_key ? '••••••••••••••••' : '');
+        setCustomerUrl(data.customer_url || '');
+        setVerificationStatus(data.customer_url_verification_status || 'unverified');
+        setVerificationToken(data.customer_url_verification_token || null);
+        setStripePublicKey(data.stripe_public_key ? '••••••••••••••••' : '');
+        setStripeSecretKey(data.stripe_secret_key ? '••••••••••••••••' : '');
+        setStripeWebhookSecret(data.stripe_webhook_secret ? '••••••••••••••••' : '');
+        setTwilioAccountSid(data.twilio_account_sid || '');
+        setTwilioAuthToken(data.twilio_auth_token ? '••••••••••••••••' : '');
         setTwilioPhoneNumber(data.twilio_phone_number || '');
         setTwilioEnabled(data.twilio_enabled || false);
         setDefaultSendMethod(data.default_send_method || 'email');
@@ -432,6 +533,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         setNumberStartNumber(data.number_start_number || 1);
         setCustomLineItemOptions(data.custom_line_item_options || []);
         setInvoiceTerms(data.invoice_terms || '');
+        setQuoteTerms(data.quote_terms || '');
+        setDefaultGarmentMarkup(data.default_garment_markup || 0);
       }
     } catch (err) {
       console.error('Error loading settings:', err);
@@ -442,51 +545,32 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   const loadSupplierIntegrationSettings = async () => {
     try {
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('company_id')
-        .eq('id', user?.id)
-        .maybeSingle();
+      if (!companySettings?.id) return;
 
-      if (!profile?.company_id) return;
+      const sanmarHasCreds = !!(companySettings.sanmar_promo_username && companySettings.sanmar_promo_password_encrypted);
+      const ssaHasCreds = !!(companySettings.ssactivewear_api_key_encrypted);
 
-      const { data, error } = await supabase
-        .from('integration_settings')
-        .select('*')
-        .eq('company_id', profile.company_id)
-        .maybeSingle();
+      setSanmarEnabled(companySettings.sanmar_enabled || false);
+      setSsaEnabled(companySettings.ssactivewear_enabled || false);
+      setSanmarHasCredentials(sanmarHasCreds);
+      setSsaHasCredentials(ssaHasCreds);
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error loading supplier integration settings:', error);
-        return;
-      }
+      setSanmarUsername(companySettings.sanmar_promo_username || '');
+      setSanmarPassword(sanmarHasCreds ? '••••••••••••••••' : '');
+      setSsaApiKey(ssaHasCreds ? '••••••••••••••••' : '');
+      setSsaAccountNumber(ssaHasCreds ? '••••••••••••••••' : '');
 
-      if (data) {
-        setSanmarEnabled(data.sanmar_enabled || false);
-        setSsaEnabled(data.ssactivewear_enabled || false);
+      setSanmarFobId((companySettings as any).sanmar_fob_id || '1');
+      setSsaFobId((companySettings as any).ssactivewear_fob_id || 'NJ');
 
-        // Check if credentials exist
-        const sanmarHasCreds = !!(data.sanmar_credentials &&
-          typeof data.sanmar_credentials === 'object' &&
-          Object.keys(data.sanmar_credentials).length > 0 &&
-          data.sanmar_credentials.apiKey);
-
-        const ssaHasCreds = !!(data.ssactivewear_credentials &&
-          typeof data.ssactivewear_credentials === 'object' &&
-          Object.keys(data.ssactivewear_credentials).length > 0 &&
-          data.ssactivewear_credentials.accountNumber &&
-          data.ssactivewear_credentials.apiKey);
-
-        setSanmarHasCredentials(sanmarHasCreds);
-        setSsaHasCredentials(ssaHasCreds);
-
-        console.log('Loaded supplier integration settings:', {
-          sanmarEnabled: data.sanmar_enabled,
-          ssaEnabled: data.ssactivewear_enabled,
-          sanmarHasCreds,
-          ssaHasCreds
-        });
-      }
+      console.log('Loaded supplier integration settings:', {
+        sanmarEnabled: companySettings.sanmar_enabled,
+        ssaEnabled: companySettings.ssactivewear_enabled,
+        sanmarHasCreds,
+        ssaHasCreds,
+        sanmarFobId: (companySettings as any).sanmar_fob_id,
+        ssaFobId: (companySettings as any).ssactivewear_fob_id
+      });
     } catch (err) {
       console.error('Error loading supplier integration settings:', err);
     }
@@ -635,109 +719,69 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
       if (error) throw error;
 
-      showNotification('success', 'Settings Saved', 'Payment terms have been updated successfully!');
+      showNotification('success', 'Settings Saved', 'Invoice terms have been updated successfully!');
       await loadSettings();
     } catch (err) {
-      console.error('Error saving payment terms:', err);
-      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save payment terms');
+      console.error('Error saving invoice terms:', err);
+      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save invoice terms');
     } finally {
       setSavingInvoiceTerms(false);
     }
   };
 
-  const loadAvailableStatuses = async (): Promise<string[]> => {
+  const saveQuoteTerms = async () => {
+    if (!companySettings) {
+      showNotification('error', 'Error', 'Company settings not loaded');
+      return;
+    }
+
     try {
-      setLoadingStatuses(true);
+      setSavingQuoteTerms(true);
 
-      // Refresh the session to get a fresh access token
-      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
-      if (sessionError || !session) {
-        console.warn('Unable to refresh session for status loading, falling back to local data');
-        const { data, error } = await supabase
-          .from('printavo_invoices_calculated')
-          .select('status')
-          .not('status', 'is', null);
+      const { error } = await supabase
+        .from('company_settings')
+        .update({
+          quote_terms: quoteTerms,
+        })
+        .eq('id', companySettings.id);
 
-        if (error) throw error;
+      if (error) throw error;
 
-        const uniqueStatuses = Array.from(
-          new Set(data?.map(item => item.status).filter(status => status && status.trim() !== '') || [])
-        ).sort();
-
-        setAvailableStatuses(uniqueStatuses);
-        return uniqueStatuses;
-      }
-
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/printavo-company`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        console.error('Printavo API error:', response.status);
-        console.error('Error details:', JSON.stringify(errorData, null, 2));
-        console.warn('Could not fetch statuses from Printavo API, falling back to local data');
-        const { data, error } = await supabase
-          .from('printavo_invoices_calculated')
-          .select('status')
-          .not('status', 'is', null);
-
-        if (error) throw error;
-
-        const uniqueStatuses = Array.from(
-          new Set(data?.map(item => item.status).filter(status => status && status.trim() !== '') || [])
-        ).sort();
-
-        setAvailableStatuses(uniqueStatuses);
-        return uniqueStatuses;
-      }
-
-      const result = await response.json();
-
-      if (result.success && result.statuses) {
-        setAvailableStatuses(result.statuses);
-        return result.statuses;
-      } else {
-        const { data, error } = await supabase
-          .from('printavo_invoices_calculated')
-          .select('status')
-          .not('status', 'is', null);
-
-        if (error) throw error;
-
-        const uniqueStatuses = Array.from(
-          new Set(data?.map(item => item.status).filter(status => status && status.trim() !== '') || [])
-        ).sort();
-
-        setAvailableStatuses(uniqueStatuses);
-        return uniqueStatuses;
-      }
+      showNotification('success', 'Settings Saved', 'Quote terms have been updated successfully!');
+      await loadSettings();
     } catch (err) {
-      console.error('Error loading statuses:', err);
-      try {
-        const { data, error } = await supabase
-          .from('printavo_invoices_calculated')
-          .select('status')
-          .not('status', 'is', null);
-
-        if (!error) {
-          const uniqueStatuses = Array.from(
-            new Set(data?.map(item => item.status).filter(status => status && status.trim() !== '') || [])
-          ).sort();
-          setAvailableStatuses(uniqueStatuses);
-          return uniqueStatuses;
-        }
-      } catch (fallbackErr) {
-        console.error('Fallback status loading also failed:', fallbackErr);
-      }
-      return [];
+      console.error('Error saving quote terms:', err);
+      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save quote terms');
     } finally {
-      setLoadingStatuses(false);
+      setSavingQuoteTerms(false);
+    }
+  };
+
+  const saveGarmentMarkup = async () => {
+    if (!companySettings) {
+      showNotification('error', 'Error', 'Company settings not loaded');
+      return;
+    }
+
+    try {
+      setSavingGarmentMarkup(true);
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update({
+          default_garment_markup: defaultGarmentMarkup,
+        })
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
+
+      showNotification('success', 'Settings Saved', 'Default garment markup has been updated successfully!');
+      await loadSettings();
+    } catch (err) {
+      console.error('Error saving garment markup:', err);
+      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save garment markup');
+    } finally {
+      setSavingGarmentMarkup(false);
     }
   };
 
@@ -751,12 +795,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       if (error) throw error;
 
       if (data && data.length > 0) {
-        setFullStatuses(data);
         const billingEligible = data
-          .filter(s => s.is_billing_eligible)
-          .map(s => s.name);
+          .filter((s: { is_billing_eligible: boolean; name: string }) => s.is_billing_eligible)
+          .map((s: { name: string }) => s.name);
         setBillingSelectedStatuses(billingEligible);
-        const allNames = data.map(s => s.name);
+        const allNames = data.map((s: { name: string }) => s.name);
         if (availableStatuses.length === 0) {
           setAvailableStatuses(allNames);
         }
@@ -766,84 +809,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     }
   };
 
-  const toggleBillingEligibility = (statusId: string, currentValue: boolean) => {
-    const newPending = new Map(pendingBillingChanges);
-    const currentPendingValue = newPending.get(statusId);
-
-    if (currentPendingValue !== undefined) {
-      if (currentPendingValue === currentValue) {
-        newPending.delete(statusId);
-      } else {
-        newPending.set(statusId, !currentValue);
-      }
-    } else {
-      newPending.set(statusId, !currentValue);
-    }
-
-    setPendingBillingChanges(newPending);
-    setBillingFiltersSaveMessage(null);
-
-    setFullStatuses(prev =>
-      prev.map(s =>
-        s.id === statusId
-          ? { ...s, is_billing_eligible: !s.is_billing_eligible }
-          : s
-      )
-    );
-  };
-
-  const getEffectiveBillingEligibility = (status: PrintavoStatus): boolean => {
-    const pendingValue = pendingBillingChanges.get(status.id);
-    return pendingValue !== undefined ? pendingValue : status.is_billing_eligible;
-  };
-
-  const saveBillingFilters = async () => {
-    if (pendingBillingChanges.size === 0) {
-      setBillingFiltersSaveMessage({ type: 'success', text: 'No changes to save' });
-      setTimeout(() => setBillingFiltersSaveMessage(null), 3000);
-      return;
-    }
-
-    try {
-      setSavingBillingFilters(true);
-      setBillingFiltersSaveMessage(null);
-
-      for (const [statusId, isEligible] of pendingBillingChanges) {
-        const { error } = await supabase
-          .from('printavo_statuses')
-          .update({
-            is_billing_eligible: isEligible,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', statusId);
-
-        if (error) throw error;
-      }
-
-      const eligibleNames = fullStatuses
-        .filter(s => s.is_billing_eligible)
-        .map(s => s.name);
-      setBillingSelectedStatuses(eligibleNames);
-
-      setPendingBillingChanges(new Map());
-      setBillingFiltersSaveMessage({ type: 'success', text: 'Billing status filters saved successfully!' });
-
-      setTimeout(() => setBillingFiltersSaveMessage(null), 4000);
-    } catch (err) {
-      console.error('Error saving billing filters:', err);
-      setBillingFiltersSaveMessage({ type: 'error', text: 'Failed to save filters. Please try again.' });
-
-      await loadStatusesFromDatabase();
-    } finally {
-      setSavingBillingFilters(false);
-    }
-  };
-
-  const discardBillingChanges = async () => {
-    setPendingBillingChanges(new Map());
-    setBillingFiltersSaveMessage(null);
-    await loadStatusesFromDatabase();
-  };
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1007,26 +972,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         company_logo_secondary_url: secondaryLogoUrl,
       };
 
-      if (companySettings?.id) {
-        const { error } = await supabase
-          .from('company_settings')
-          .update(settingsData)
-          .eq('id', companySettings.id);
-
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from('company_settings')
-          .insert([{
-            ...settingsData,
-            owner_id: user.id
-          }])
-          .select()
-          .single();
-
-        if (error) throw error;
-        setCompanySettings(data);
+      if (!companySettings?.id) {
+        showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
+        return;
       }
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update(settingsData)
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
 
       showNotification('success', 'Settings Saved', 'Company settings have been updated successfully!');
       setLogoFile(null);
@@ -1038,157 +994,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       showNotification('error', 'Save Failed', 'Failed to save company settings. Please try again.');
     } finally {
       setSavingCompany(false);
-    }
-  };
-
-  const testPrintavoConnection = async () => {
-    try {
-      setTestingConnection(true);
-      setTestResult(null);
-
-      // Get fresh session token
-      const session = await getFreshSession();
-
-      // Call the edge function with manual fetch to get full error details
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-printavo`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({}),
-      });
-
-      const result = await response.json();
-
-      // Show full response including error details
-      setTestResult(result);
-    } catch (err) {
-      console.error('Error testing connection:', err);
-      setTestResult({
-        success: false,
-        error: err instanceof Error ? err.message : 'Failed to test connection',
-      });
-    } finally {
-      setTestingConnection(false);
-    }
-  };
-
-  const runPrintavoTest = async () => {
-    setTestLoading(true);
-    setTestData(null);
-    try {
-      // Get session for auth
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setTestData({
-          success: false,
-          error: 'You must be logged in to run this test'
-        });
-        return;
-      }
-
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-printavo`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({}),
-      });
-
-      const result = await response.json();
-      setTestData(result);
-    } catch (error) {
-      setTestData({ error: error instanceof Error ? error.message : 'Unknown error' });
-    } finally {
-      setTestLoading(false);
-    }
-  };
-
-  const saveIntegration = async () => {
-    if (!printavoUsername.trim()) {
-      showNotification('warning', 'Username Required', 'Printavo username/email is required');
-      return;
-    }
-
-    if (!printavoToken.trim()) {
-      showNotification('warning', 'API Token Required', 'Printavo API token is required');
-      return;
-    }
-
-    try {
-      setSavingIntegration(true);
-
-      if (!import.meta.env.VITE_SUPABASE_URL) {
-        showNotification('error', 'Configuration Error', 'VITE_SUPABASE_URL environment variable is not set. Please configure it in your Vercel project settings.');
-        return;
-      }
-
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        showNotification('error', 'Not Authenticated', 'You must be logged in to update integration settings');
-        return;
-      }
-
-      const encryptResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crypto-service`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          action: 'encrypt',
-          token: printavoToken,
-        }),
-      });
-
-      if (!encryptResponse.ok) {
-        const errorData = await encryptResponse.json();
-        throw new Error(errorData.error || 'Failed to encrypt API token');
-      }
-
-      const { result: encryptedToken } = await encryptResponse.json();
-
-      const settingsData = {
-        printavo_username: printavoUsername,
-        printavo_api_token_encrypted: encryptedToken,
-        encryption_key_version: 'v1',
-      };
-
-      if (companySettings?.id) {
-        const { error } = await supabase
-          .from('company_settings')
-          .update(settingsData)
-          .eq('id', companySettings.id);
-
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from('company_settings')
-          .insert([{
-            company_name: companyName || '',
-            owner_id: user.id,
-            ...settingsData
-          }])
-          .select()
-          .single();
-
-        if (error) throw error;
-        setCompanySettings(data);
-      }
-
-      showNotification('success', 'Printavo Connected', 'Integration settings have been saved successfully!');
-      setPrintavoToken('');
-      setTestResult(null);
-      await loadSettings();
-      await loadAvailableStatuses();
-    } catch (err) {
-      console.error('Error saving integration settings:', err);
-      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save integration settings. Please try again.');
-    } finally {
-      setSavingIntegration(false);
     }
   };
 
@@ -1213,8 +1018,9 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       }
 
       let encryptedToken = null;
+      const isPlaceholder = squareAccessToken === '••••••••••••••••';
 
-      if (squareAccessToken.trim()) {
+      if (squareAccessToken.trim() && !isPlaceholder) {
         const encryptResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crypto-service`, {
           method: 'POST',
           headers: {
@@ -1246,30 +1052,20 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         settingsData.square_access_token = encryptedToken;
       }
 
-      if (companySettings?.id) {
-        const { error } = await supabase
-          .from('company_settings')
-          .update(settingsData)
-          .eq('id', companySettings.id);
-
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from('company_settings')
-          .insert([{
-            company_name: companyName || '',
-            owner_id: user.id,
-            ...settingsData
-          }])
-          .select()
-          .single();
-
-        if (error) throw error;
-        setCompanySettings(data);
+      if (!companySettings?.id) {
+        showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
+        return;
       }
 
+      const { error } = await supabase
+        .from('company_settings')
+        .update(settingsData)
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
+
       showNotification('success', 'Square Connected', 'Integration settings have been saved successfully!');
-      setSquareAccessToken('');
+      setSquareAccessToken('••••••••••••••••');
       setSquareTestResult(null);
       await loadSettings();
     } catch (err) {
@@ -1334,30 +1130,20 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         settingsData.email_from_address = emailFromAddress.trim();
       }
 
-      if (companySettings?.id) {
-        const { error } = await supabase
-          .from('company_settings')
-          .update(settingsData)
-          .eq('id', companySettings.id);
-
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from('company_settings')
-          .insert([{
-            company_name: companyName || '',
-            owner_id: user.id,
-            ...settingsData
-          }])
-          .select()
-          .single();
-
-        if (error) throw error;
-        setCompanySettings(data);
+      if (!companySettings?.id) {
+        showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
+        return;
       }
 
+      const { error } = await supabase
+        .from('company_settings')
+        .update(settingsData)
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
+
       showNotification('success', 'Resend Connected', 'Integration settings have been saved successfully!');
-      setResendApiKey('');
+      setResendApiKey('••••••••••••••••');
       setResendTestResult(null);
       await loadSettings();
     } catch (err) {
@@ -1365,6 +1151,120 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save Resend settings. Please try again.');
     } finally {
       setSavingResend(false);
+    }
+  };
+
+  const saveCustomerUrl = async () => {
+    try {
+      setSavingCustomerUrl(true);
+
+      if (!companySettings?.id) {
+        showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
+        return;
+      }
+
+      // Validate URL format
+      let urlToSave = customerUrl.trim();
+
+      if (!urlToSave) {
+        // Allow clearing the URL
+        const { error } = await supabase
+          .from('company_settings')
+          .update({
+            customer_url: null,
+            customer_url_verification_status: 'unverified',
+            customer_url_verification_token: null,
+            customer_url_verified_at: null,
+            customer_url_verification_expires_at: null
+          })
+          .eq('id', companySettings.id);
+
+        if (error) throw error;
+
+        showNotification('success', 'Customer URL Cleared', 'Your custom URL has been cleared.');
+        await loadSettings();
+        return;
+      }
+
+      // Must start with https://
+      if (!urlToSave.startsWith('https://')) {
+        showNotification('error', 'Invalid URL', 'Customer URL must start with https://');
+        return;
+      }
+
+      // Strip trailing slashes
+      urlToSave = urlToSave.replace(/\/+$/, '');
+
+      // Validate URL format
+      try {
+        new URL(urlToSave);
+      } catch {
+        showNotification('error', 'Invalid URL', 'Please enter a valid URL format');
+        return;
+      }
+
+      // Request domain verification
+      const result = await domainVerificationService.requestVerification(companySettings.id, urlToSave);
+
+      if (!result.success) {
+        showNotification('error', 'Verification Request Failed', result.error || 'Failed to request domain verification');
+        return;
+      }
+
+      setVerificationToken(result.token || null);
+      setVerificationStatus('unverified');
+      showNotification('success', 'Verification Requested', 'Please add the DNS TXT record to verify your domain ownership.');
+      await loadSettings();
+    } catch (err) {
+      console.error('Error saving customer URL:', err);
+      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save customer URL. Please try again.');
+    } finally {
+      setSavingCustomerUrl(false);
+    }
+  };
+
+  const verifyDomain = async () => {
+    try {
+      setVerifyingDomain(true);
+
+      if (!companySettings?.id) {
+        showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
+        return;
+      }
+
+      const result = await domainVerificationService.verifyDomain(companySettings.id);
+
+      if (result.success) {
+        showNotification('success', 'Domain Verified!', 'Your domain has been successfully verified and is now active.');
+        setVerificationStatus('verified');
+        await loadSettings();
+      } else {
+        const errorMsg = result.error || 'Failed to verify domain';
+        const isDnsPropagation = errorMsg.includes('TXT record not found') || errorMsg.includes('DNS');
+        showNotification(
+          isDnsPropagation ? 'info' : 'error',
+          isDnsPropagation ? 'DNS Not Ready Yet' : 'Verification Failed',
+          errorMsg
+        );
+      }
+    } catch (err) {
+      console.error('Error verifying domain:', err);
+      showNotification('error', 'Verification Failed', err instanceof Error ? err.message : 'Failed to verify domain. Please try again.');
+    } finally {
+      setVerifyingDomain(false);
+    }
+  };
+
+  const copyTokenToClipboard = async () => {
+    if (verificationToken) {
+      try {
+        await navigator.clipboard.writeText(verificationToken);
+        setCopiedToken(true);
+        setTimeout(() => setCopiedToken(false), 2000);
+        showNotification('success', 'Copied!', 'Verification token copied to clipboard');
+      } catch (err) {
+        showNotification('error', 'Copy Failed', 'Failed to copy token to clipboard');
+      }
     }
   };
 
@@ -1475,32 +1375,22 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
-      if (companySettings?.id) {
-        const { error } = await supabase
-          .from('company_settings')
-          .update(settingsData)
-          .eq('id', companySettings.id);
-
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from('company_settings')
-          .insert([{
-            company_name: companyName || '',
-            owner_id: user.id,
-            ...settingsData
-          }])
-          .select()
-          .single();
-
-        if (error) throw error;
-        setCompanySettings(data);
+      if (!companySettings?.id) {
+        showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
+        return;
       }
 
+      const { error } = await supabase
+        .from('company_settings')
+        .update(settingsData)
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
+
       showNotification('success', 'Stripe Connected', 'Integration settings have been saved successfully!');
-      setStripePublicKey('');
-      setStripeSecretKey('');
-      setStripeWebhookSecret('');
+      setStripePublicKey('••••••••••••••••');
+      setStripeSecretKey('••••••••••••••••');
+      setStripeWebhookSecret('••••••••••••••••');
       setStripeTestResult(null);
       await loadSettings();
     } catch (err) {
@@ -1601,31 +1491,21 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
-      if (companySettings?.id) {
-        const { error } = await supabase
-          .from('company_settings')
-          .update(settingsData)
-          .eq('id', companySettings.id);
-
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from('company_settings')
-          .insert([{
-            company_name: companyName || '',
-            owner_id: user.id,
-            ...settingsData
-          }])
-          .select()
-          .single();
-
-        if (error) throw error;
-        setCompanySettings(data);
+      if (!companySettings?.id) {
+        showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
+        return;
       }
 
+      const { error } = await supabase
+        .from('company_settings')
+        .update(settingsData)
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
+
       showNotification('success', 'Twilio Connected', 'Integration settings have been saved successfully!');
-      setTwilioAccountSid('');
-      setTwilioAuthToken('');
+      setTwilioAccountSid(twilioAccountSid.trim() ? '••••••••••••••••' : '');
+      setTwilioAuthToken('••••••••••••••••');
       setTwilioTestResult(null);
       await loadSettings();
     } catch (err) {
@@ -1776,45 +1656,42 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     }
   };
 
-  const saveSupplierIntegrations = async () => {
-    if (!sanmarEnabled && !ssaEnabled) {
-      showNotification('warning', 'No Integration Enabled', 'Please enable at least one supplier integration');
-      return;
-    }
-
+  const saveSanmarSettings = async () => {
     try {
-      setSavingSuppliers(true);
+      setSavingSanmar(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         showNotification('error', 'Not Authenticated', 'You must be logged in to update supplier settings');
         return;
       }
 
-      // Get user's company_id
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (!profile?.company_id) {
-        showNotification('error', 'Company Not Found', 'Could not find your company');
+      if (!companySettings?.id) {
+        showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
         return;
       }
 
-      // Check if integration settings already exist
-      const { data: existing } = await supabase
-        .from('integration_settings')
-        .select('*')
-        .eq('company_id', profile.company_id)
-        .maybeSingle();
+      console.log('[SanMar Save] Starting save operation', {
+        vendorKey: 'sanmar',
+        enabled: sanmarEnabled,
+        hasExistingCredentials: sanmarHasCredentials,
+      });
 
-      // Prepare SanMar credentials
-      let sanmarCredentials = existing?.sanmar_credentials || {};
+      const settingsData: Record<string, any> = {
+        sanmar_enabled: sanmarEnabled,
+        sanmar_fob_id: sanmarFobId,
+      };
+
       if (sanmarEnabled) {
-        // Only require new API key if no credentials exist yet OR if user is updating them
-        if (sanmarApiKey.trim()) {
-          // User is providing a new API key, encrypt it
+        const newUsername = sanmarUsername.trim();
+        if (newUsername && newUsername !== '••••••••••••••••') {
+          settingsData.sanmar_promo_username = newUsername;
+          console.log('[SanMar Save] Updating username');
+        } else {
+          console.log('[SanMar Save] Preserving existing username (field empty or masked)');
+        }
+
+        const newPassword = sanmarPassword.trim();
+        if (newPassword && newPassword !== '••••••••••••••••') {
           const encryptResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crypto-service`, {
             method: 'POST',
             headers: {
@@ -1823,38 +1700,92 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             },
             body: JSON.stringify({
               action: 'encrypt',
-              token: sanmarApiKey,
+              token: newPassword,
             }),
           });
 
           if (!encryptResponse.ok) {
-            throw new Error('Failed to encrypt SanMar API key');
+            throw new Error('Failed to encrypt SanMar password');
           }
 
-          const { result: encryptedApiKey } = await encryptResponse.json();
-          sanmarCredentials = {
-            apiKey: encryptedApiKey,
-            customerId: sanmarCustomerId.trim() || sanmarCredentials.customerId,
-          };
-        } else if (!sanmarHasCredentials) {
-          // No existing credentials and no new credentials provided
-          showNotification('warning', 'SanMar API Key Required', 'Please enter your SanMar API key to enable this integration');
-          return;
-        } else if (sanmarCustomerId.trim()) {
-          // Update just the customer ID while keeping existing API key
-          sanmarCredentials = {
-            ...sanmarCredentials,
-            customerId: sanmarCustomerId.trim(),
-          };
+          const { result: encryptedPassword } = await encryptResponse.json();
+          settingsData.sanmar_promo_password_encrypted = encryptedPassword;
+          console.log('[SanMar Save] Updating password (encrypted)');
+        } else {
+          console.log('[SanMar Save] Preserving existing password (field empty or masked)');
         }
+
+        if (!sanmarHasCredentials && (!settingsData.sanmar_promo_username || !settingsData.sanmar_promo_password_encrypted)) {
+          showNotification('warning', 'SanMar Credentials Required', 'Please enter Username and Password to enable SanMar integration');
+          return;
+        }
+      } else {
+        settingsData.sanmar_promo_username = null;
+        settingsData.sanmar_promo_password_encrypted = null;
+        console.log('[SanMar Save] Clearing credentials (disabled)');
       }
 
-      // Prepare SSActivewear credentials
-      let ssaCredentials = existing?.ssactivewear_credentials || {};
+      console.log('[SanMar Save] Saving to database', {
+        fieldsToUpdate: Object.keys(settingsData),
+        preservedFields: ['ssactivewear_*']
+      });
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update(settingsData)
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
+
+      showNotification('success', 'SanMar Settings Saved', 'SanMar integration settings have been saved successfully!');
+      setSanmarPassword(sanmarPassword.trim() && sanmarPassword !== '••••••••••••••••' ? '••••••••••••••••' : sanmarPassword);
+      setSanmarTestResult(null);
+      await loadSettings();
+      await loadSupplierIntegrationSettings();
+    } catch (err) {
+      console.error('[SanMar Save] Error:', err);
+      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save SanMar settings');
+    } finally {
+      setSavingSanmar(false);
+    }
+  };
+
+  const saveSSActivewearSettings = async () => {
+    try {
+      setSavingSSA(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        showNotification('error', 'Not Authenticated', 'You must be logged in to update supplier settings');
+        return;
+      }
+
+      if (!companySettings?.id) {
+        showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
+        return;
+      }
+
+      console.log('[SSActivewear Save] Starting save operation', {
+        vendorKey: 'ssactivewear',
+        enabled: ssaEnabled,
+        hasExistingCredentials: ssaHasCredentials,
+      });
+
+      const settingsData: Record<string, any> = {
+        ssactivewear_enabled: ssaEnabled,
+        ssactivewear_fob_id: ssaFobId,
+      };
+
       if (ssaEnabled) {
-        // Only require new credentials if none exist yet OR if user is updating them
-        if (ssaAccountNumber.trim() && ssaApiKey.trim()) {
-          // User is providing new credentials, encrypt the API key
+        const newAccountNumber = ssaAccountNumber.trim();
+        if (newAccountNumber && newAccountNumber !== '••••••••••••••••') {
+          settingsData.ssactivewear_username = newAccountNumber;
+          console.log('[SSActivewear Save] Updating account number');
+        } else {
+          console.log('[SSActivewear Save] Preserving existing account number (field empty or masked)');
+        }
+
+        const newApiKey = ssaApiKey.trim();
+        if (newApiKey && newApiKey !== '••••••••••••••••') {
           const encryptResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crypto-service`, {
             method: 'POST',
             headers: {
@@ -1863,75 +1794,54 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             },
             body: JSON.stringify({
               action: 'encrypt',
-              token: ssaApiKey,
+              token: newApiKey,
             }),
           });
 
-        if (!encryptResponse.ok) {
-          throw new Error('Failed to encrypt SSActivewear API key');
+          if (!encryptResponse.ok) {
+            throw new Error('Failed to encrypt SSActivewear API key');
+          }
+
+          const { result: encryptedApiKey } = await encryptResponse.json();
+          settingsData.ssactivewear_api_key_encrypted = encryptedApiKey;
+          console.log('[SSActivewear Save] Updating API key (encrypted)');
+        } else {
+          console.log('[SSActivewear Save] Preserving existing API key (field empty or masked)');
         }
 
-        const { result: encryptedApiKey } = await encryptResponse.json();
-        ssaCredentials = {
-          accountNumber: ssaAccountNumber.trim(),
-          apiKey: encryptedApiKey,
-        };
-        } else if (!ssaHasCredentials) {
-          // No existing credentials and no new credentials provided
-          showNotification('warning', 'SSActivewear Credentials Required', 'Please enter your SSActivewear account number and API key to enable this integration');
+        if (!ssaHasCredentials && (!settingsData.ssactivewear_username || !settingsData.ssactivewear_api_key_encrypted)) {
+          showNotification('warning', 'SSActivewear Credentials Required', 'Please enter your account number and API key to enable this integration');
           return;
-        } else if (ssaAccountNumber.trim()) {
-          // Update just the account number while keeping existing API key
-          ssaCredentials = {
-            ...ssaCredentials,
-            accountNumber: ssaAccountNumber.trim(),
-          };
         }
-      }
-
-      const settingsData = {
-        company_id: profile.company_id,
-        sanmar_enabled: sanmarEnabled,
-        sanmar_credentials: sanmarCredentials,
-        ssactivewear_enabled: ssaEnabled,
-        ssactivewear_credentials: ssaCredentials,
-      };
-
-      console.log('Saving integration settings:', { existing, settingsData });
-
-      if (existing) {
-        // Update existing record
-        const { data, error } = await supabase
-          .from('integration_settings')
-          .update(settingsData)
-          .eq('id', existing.id)
-          .select();
-
-        console.log('Update result:', { data, error });
-        if (error) throw error;
       } else {
-        // Insert new record
-        const { data, error } = await supabase
-          .from('integration_settings')
-          .insert([settingsData])
-          .select();
-
-        console.log('Insert result:', { data, error });
-        if (error) throw error;
+        settingsData.ssactivewear_api_key_encrypted = null;
+        settingsData.ssactivewear_username = null;
+        console.log('[SSActivewear Save] Clearing credentials (disabled)');
       }
 
-      showNotification('success', 'Supplier Integrations Saved', 'Supplier integration settings have been saved successfully!');
-      setSanmarApiKey('');
-      setSanmarCustomerId('');
-      setSsaAccountNumber('');
-      setSsaApiKey('');
-      setSupplierTestResult(null);
+      console.log('[SSActivewear Save] Saving to database', {
+        fieldsToUpdate: Object.keys(settingsData),
+        preservedFields: ['sanmar_*']
+      });
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update(settingsData)
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
+
+      showNotification('success', 'SSActivewear Settings Saved', 'SSActivewear integration settings have been saved successfully!');
+      setSsaAccountNumber(ssaAccountNumber.trim() && ssaAccountNumber !== '••••••••••••••••' ? '••••••••••••••••' : ssaAccountNumber);
+      setSsaApiKey(ssaApiKey.trim() && ssaApiKey !== '••••••••••••••••' ? '••••••••••••••••' : ssaApiKey);
+      setSsaTestResult(null);
+      await loadSettings();
       await loadSupplierIntegrationSettings();
     } catch (err) {
-      console.error('Error saving supplier integrations:', err);
-      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save supplier integrations');
+      console.error('[SSActivewear Save] Error:', err);
+      showNotification('error', 'Save Failed', err instanceof Error ? err.message : 'Failed to save SSActivewear settings');
     } finally {
-      setSavingSuppliers(false);
+      setSavingSSA(false);
     }
   };
 
@@ -1940,44 +1850,33 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setTestingSuppliers(true);
       setSupplierTestResult(null);
 
-      // Get a fresh session token
-      let session;
-      try {
-        session = await getFreshSession();
-      } catch (err) {
+      if (!companySettings?.id) {
         setSupplierTestResult({
           success: false,
-          error: err instanceof Error ? err.message : 'Authentication error',
+          error: 'Company settings not loaded. Please refresh the page.',
         });
         return;
       }
 
-      // Get user's company_id
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('company_id')
-        .eq('id', user.id)
-        .maybeSingle();
+      const sanmarHasCreds = !!(companySettings.sanmar_promo_username && companySettings.sanmar_promo_password_encrypted);
+      const ssaHasCreds = !!(companySettings.ssactivewear_api_key_encrypted);
 
-      if (!profile?.company_id) {
-        setSupplierTestResult({
-          success: false,
-          error: 'Could not find your company',
-        });
-        return;
-      }
-
-      // Get integration settings
-      const { data: settings } = await supabase
-        .from('integration_settings')
-        .select('*')
-        .eq('company_id', profile.company_id)
-        .maybeSingle();
-
-      if (!settings || (!settings.sanmar_enabled && !settings.ssactivewear_enabled)) {
+      if (!sanmarHasCreds && !ssaHasCreds) {
         setSupplierTestResult({
           success: false,
           error: 'No supplier integrations enabled. Please save your credentials first.',
+        });
+        return;
+      }
+
+      // Get fresh session token
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
+      if (!token) {
+        setSupplierTestResult({
+          success: false,
+          error: 'No authentication token available. Please sign in again.',
         });
         return;
       }
@@ -1986,14 +1885,16 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       let hasError = false;
 
       // Test SanMar if enabled
-      if (settings.sanmar_enabled) {
+      if (sanmarHasCreds) {
         try {
           const response = await fetch(
             `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sanmar-api?action=search&style=PC54`,
             {
+              method: 'GET',
               headers: {
-                'Authorization': `Bearer ${session.access_token}`,
-                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                'X-User-Token': token,
+                'Content-Type': 'application/json',
               },
             }
           );
@@ -2015,21 +1916,22 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       }
 
       // Test SSActivewear if enabled
-      if (settings.ssactivewear_enabled) {
+      if (ssaHasCreds) {
         try {
-          const authHeader = `Bearer ${session.access_token}`;
+          const authHeader = `Bearer ${token}`;
           console.log('Testing SSActivewear with auth token:', {
             tokenPrefix: authHeader.substring(0, 30) + '...',
-            tokenLength: session.access_token.length,
-            hasToken: !!session.access_token
+            tokenLength: token.length,
+            hasToken: !!token
           });
 
           const response = await fetch(
             `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ssactivewear-api?action=brands`,
             {
               headers: {
-                'Authorization': authHeader,
+                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
                 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                'X-User-Token': token,
               },
             }
           );
@@ -2074,6 +1976,445 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       });
     } finally {
       setTestingSuppliers(false);
+    }
+  };
+
+  const testSanmarConnection = async () => {
+    console.log('🧪 Testing SanMar connection...', {
+      enabled: sanmarEnabled,
+      hasCredentials: sanmarHasCredentials,
+      companySettingsId: companySettings?.id,
+      hasUsername: !!companySettings?.sanmar_promo_username,
+      hasPassword: !!companySettings?.sanmar_promo_password_encrypted
+    });
+
+    try {
+      setTestingSanmar(true);
+      setSanmarTestResult(null);
+
+      if (!companySettings?.id) {
+        console.error('❌ Company settings not loaded');
+        setSanmarTestResult({
+          success: false,
+          error: 'Company settings not loaded. Please refresh the page.',
+        });
+        return;
+      }
+
+      const sanmarHasCreds = !!(companySettings.sanmar_promo_username && companySettings.sanmar_promo_password_encrypted);
+
+      if (!sanmarHasCreds) {
+        console.error('❌ SanMar credentials not saved');
+        setSanmarTestResult({
+          success: false,
+          error: 'SanMar API credentials not saved. Please save your credentials first.',
+        });
+        return;
+      }
+
+      // Try to refresh the session first
+      console.log('🔄 Attempting to refresh session...');
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+
+      if (refreshError) {
+        console.warn('⚠️ Session refresh failed:', refreshError.message);
+      } else {
+        console.log('✅ Session refreshed successfully');
+      }
+
+      // Get fresh session token
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+      console.log('🔍 Session check:', {
+        hasSession: !!sessionData.session,
+        hasToken: !!sessionData.session?.access_token,
+        expiresAt: sessionData.session?.expires_at,
+        now: Math.floor(Date.now() / 1000),
+        sessionError: sessionError?.message
+      });
+
+      const token = sessionData.session?.access_token;
+
+      if (!token) {
+        console.error('❌ No auth token available');
+        setSanmarTestResult({
+          success: false,
+          error: 'No authentication token available. Please sign in again.',
+        });
+        return;
+      }
+
+      const testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sanmar-api?action=test`;
+      console.log('📡 Calling SanMar API:', testUrl);
+      console.log('🔑 Token length:', token.length, 'First 20 chars:', token.substring(0, 20));
+
+      const response = await fetch(testUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'X-User-Token': token,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('📥 SanMar response:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ SanMar connection successful!', data);
+        if (data.success) {
+          setSanmarTestResult({
+            success: true,
+            message: data.message || 'PromoStandards API connected successfully!',
+          });
+        } else {
+          setSanmarTestResult({
+            success: false,
+            error: data.message || 'API connection test failed',
+          });
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('❌ SanMar connection failed:', {
+          status: response.status,
+          errorData,
+          errorMessage: errorData.error,
+          errorDetails: errorData.message,
+          fullResponse: JSON.stringify(errorData, null, 2)
+        });
+
+        // Check for JWT expiration
+        if (response.status === 401 && errorData.message?.includes('Invalid JWT')) {
+          setSanmarTestResult({
+            success: false,
+            error: 'Your session has expired. Please sign out and sign back in to continue.',
+          });
+          return;
+        }
+
+        setSanmarTestResult({
+          success: false,
+          error: errorData.error || errorData.message || `API connection failed (${response.status})`,
+        });
+      }
+    } catch (err) {
+      console.error('SanMar API test exception:', err);
+      setSanmarTestResult({
+        success: false,
+        error: err instanceof Error ? err.message : 'API connection failed',
+      });
+    } finally {
+      setTestingSanmar(false);
+    }
+  };
+
+  const testSSAConnection = async () => {
+    console.log('🧪 Testing SSActivewear connection...', {
+      enabled: ssaEnabled,
+      hasCredentials: ssaHasCredentials,
+      companySettingsId: companySettings?.id,
+      hasEncryptedKey: !!companySettings?.ssactivewear_api_key_encrypted
+    });
+
+    try {
+      setTestingSSA(true);
+      setSsaTestResult(null);
+
+      if (!companySettings?.id) {
+        console.error('❌ Company settings not loaded');
+        setSsaTestResult({
+          success: false,
+          error: 'Company settings not loaded. Please refresh the page.',
+        });
+        return;
+      }
+
+      const ssaHasCreds = !!(companySettings.ssactivewear_api_key_encrypted);
+
+      if (!ssaHasCreds) {
+        console.error('❌ SSActivewear credentials not saved');
+        setSsaTestResult({
+          success: false,
+          error: 'SSActivewear credentials not saved. Please save your credentials first.',
+        });
+        return;
+      }
+
+      // Try to refresh the session first
+      console.log('🔄 Attempting to refresh session...');
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+
+      if (refreshError) {
+        console.warn('⚠️ Session refresh failed:', refreshError.message);
+      } else {
+        console.log('✅ Session refreshed successfully');
+      }
+
+      // Get fresh session token
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+      console.log('🔍 Session check:', {
+        hasSession: !!sessionData.session,
+        hasToken: !!sessionData.session?.access_token,
+        expiresAt: sessionData.session?.expires_at,
+        now: Math.floor(Date.now() / 1000),
+        sessionError: sessionError?.message
+      });
+
+      const token = sessionData.session?.access_token;
+
+      if (!token) {
+        console.error('❌ No auth token available');
+        setSsaTestResult({
+          success: false,
+          error: 'No authentication token available. Please sign in again.',
+        });
+        return;
+      }
+
+      const testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ssactivewear-api?action=brands`;
+      console.log('📡 Calling SSActivewear API:', testUrl);
+      console.log('🔑 Token length:', token.length, 'First 20 chars:', token.substring(0, 20));
+
+      const response = await fetch(testUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'X-User-Token': token,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('📥 SSActivewear response:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ SSActivewear connection successful!', data);
+        setSsaTestResult({
+          success: true,
+          message: data.message || 'Connected successfully! Retrieved brand list.',
+        });
+      } else {
+        const errorText = await response.text();
+        console.error('❌ SSActivewear connection failed:', {
+          status: response.status,
+          errorText
+        });
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText || 'Unknown error' };
+        }
+
+        // Check for JWT expiration
+        if (response.status === 401 && (errorData.message?.includes('Invalid JWT') || errorText.includes('Invalid JWT'))) {
+          setSsaTestResult({
+            success: false,
+            error: 'Your session has expired. Please sign out and sign back in to continue.',
+          });
+          return;
+        }
+
+        setSsaTestResult({
+          success: false,
+          error: errorData.error || `Connection failed (${response.status})`,
+        });
+      }
+    } catch (err) {
+      console.error('SSActivewear test exception:', err);
+      setSsaTestResult({
+        success: false,
+        error: err instanceof Error ? err.message : 'Connection failed',
+      });
+    } finally {
+      setTestingSSA(false);
+    }
+  };
+
+  const testSSAPricing = async () => {
+    if (!testStyleNumber.trim()) {
+      setPricingTestResult({
+        success: false,
+        error: 'Please enter a style number to test',
+      });
+      return;
+    }
+
+    try {
+      setTestingPricing(true);
+      setPricingTestResult(null);
+
+      if (!companySettings?.id) {
+        setPricingTestResult({
+          success: false,
+          error: 'Company settings not loaded. Please refresh the page.',
+        });
+        return;
+      }
+
+      const ssaHasCreds = !!(companySettings.ssactivewear_api_key_encrypted);
+      if (!ssaHasCreds) {
+        setPricingTestResult({
+          success: false,
+          error: 'SSActivewear credentials not saved. Please save your credentials first.',
+        });
+        return;
+      }
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
+      if (!token) {
+        setPricingTestResult({
+          success: false,
+          error: 'No authentication token available. Please sign in again.',
+        });
+        return;
+      }
+
+      const testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/promostandards-unified?styleNumber=${encodeURIComponent(testStyleNumber.trim())}&verbose=true`;
+      console.log('[Pricing Test] Calling:', testUrl);
+
+      const response = await fetch(testUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'X-User-Token': token,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      console.log('[Pricing Test] Response:', data);
+
+      if (response.ok && data.success) {
+        const pricingCount = data.pricing?.parts?.length || 0;
+        const productName = data.product?.productName || 'Unknown';
+        const debug = data.debug || {};
+
+        setPricingTestResult({
+          success: pricingCount > 0,
+          productName,
+          pricingCount,
+          usedPricingId: debug.usedPricingId,
+          usedPricingSource: debug.usedPricingSource,
+          pricingAttempts: debug.pricingAttempts,
+          pricingSource: debug.pricingSource,
+          message: pricingCount > 0
+            ? `Found ${pricingCount} price entries for "${productName}" using ID: ${debug.usedPricingId} (${debug.usedPricingSource})`
+            : `Product found ("${productName}") but no pricing data returned. Attempted IDs: ${debug.pricingAttempts?.map((a: any) => `${a.id}(${a.resultCount})`).join(', ') || 'none'}`,
+          rawDebug: debug,
+        });
+      } else {
+        setPricingTestResult({
+          success: false,
+          error: data.error || `Request failed (${response.status})`,
+          details: data.details,
+        });
+      }
+    } catch (err) {
+      console.error('[Pricing Test] Exception:', err);
+      setPricingTestResult({
+        success: false,
+        error: err instanceof Error ? err.message : 'Test failed',
+      });
+    } finally {
+      setTestingPricing(false);
+    }
+  };
+
+  const syncSSACatalog = async () => {
+    try {
+      setSyncingCatalog(true);
+      setCatalogSyncResult(null);
+
+      if (!companySettings?.id) {
+        setCatalogSyncResult({
+          success: false,
+          error: 'Company settings not loaded. Please refresh the page.',
+        });
+        return;
+      }
+
+      const ssaHasCreds = !!(companySettings.ssactivewear_api_key_encrypted);
+
+      if (!ssaHasCreds) {
+        setCatalogSyncResult({
+          success: false,
+          error: 'SSActivewear credentials not saved. Please save your credentials first.',
+        });
+        return;
+      }
+
+      // Get fresh session token
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
+      if (!token) {
+        setCatalogSyncResult({
+          success: false,
+          error: 'No authentication token available. Please sign in again.',
+        });
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-ss-catalog`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'X-User-Token': token,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({}),
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const result = data.result || {};
+        setCatalogSyncResult({
+          success: true,
+          message: `Catalog sync completed! Processed ${result.totalStyles || 0} styles (${result.successCount || 0} successful, ${result.failureCount || 0} failed).`,
+          details: result,
+        });
+        showNotification('success', 'Catalog Synced', `Successfully synced ${result.successCount || 0} products from SSActivewear`);
+      } else {
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText || 'Unknown error' };
+        }
+        setCatalogSyncResult({
+          success: false,
+          error: errorData.error || 'Sync failed',
+        });
+        showNotification('error', 'Sync Failed', errorData.error || 'Failed to sync catalog');
+      }
+    } catch (err) {
+      console.error('Catalog sync exception:', err);
+      setCatalogSyncResult({
+        success: false,
+        error: err instanceof Error ? err.message : 'Sync failed',
+      });
+      showNotification('error', 'Sync Failed', err instanceof Error ? err.message : 'Failed to sync catalog');
+    } finally {
+      setSyncingCatalog(false);
     }
   };
 
@@ -2131,20 +2472,26 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setTestingResend(true);
       setResendTestResult(null);
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('You must be logged in to test the connection');
+      // Get fresh session token
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
+      if (!token) {
+        throw new Error('No authentication token available. Please sign in again.');
       }
 
       if (!user?.email) {
         throw new Error('User email not found');
       }
 
+      console.log('Testing Resend with fresh token...');
+
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'X-User-Token': token,
         },
         body: JSON.stringify({
           to: user.email,
@@ -2371,27 +2718,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         selected_invoice_statuses: selectedStatuses,
       };
 
-      if (companySettings?.id) {
-        const { error } = await supabase
-          .from('company_settings')
-          .update(settingsData)
-          .eq('id', companySettings.id);
-
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from('company_settings')
-          .insert([{
-            company_name: companyName || '',
-            owner_id: user.id,
-            ...settingsData
-          }])
-          .select()
-          .single();
-
-        if (error) throw error;
-        setCompanySettings(data);
+      if (!companySettings?.id) {
+        showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
+        return;
       }
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update(settingsData)
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
 
       showNotification('success', 'Status Preferences Saved', 'Status preferences saved successfully!');
     } catch (err) {
@@ -2418,27 +2755,17 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         billing_selected_invoice_statuses: billingSelectedStatuses,
       };
 
-      if (companySettings?.id) {
-        const { error } = await supabase
-          .from('company_settings')
-          .update(settingsData)
-          .eq('id', companySettings.id);
-
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from('company_settings')
-          .insert([{
-            company_name: companyName || '',
-            owner_id: user.id,
-            ...settingsData
-          }])
-          .select()
-          .single();
-
-        if (error) throw error;
-        setCompanySettings(data);
+      if (!companySettings?.id) {
+        showNotification('error', 'Error', 'Company settings not loaded. Please refresh the page.');
+        return;
       }
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update(settingsData)
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
 
       showNotification('success', 'Billing Status Saved', 'Billing status preferences saved successfully!');
     } catch (err) {
@@ -2452,57 +2779,13 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const syncStatuses = async () => {
     try {
       setSyncingStatuses(true);
-      await loadAvailableStatuses();
       await loadStatusesFromDatabase();
-      showNotification('success', 'Statuses Synced', 'Successfully synced statuses from Printavo!');
+      showNotification('success', 'Statuses Synced', 'Successfully synced statuses!');
     } catch (err) {
       console.error('Error syncing statuses:', err);
       showNotification('error', 'Sync Failed', 'Failed to sync statuses. Please try again.');
     } finally {
       setSyncingStatuses(false);
-    }
-  };
-
-  const syncPrintavoData = async () => {
-    try {
-      setSyncingPrintavoData(true);
-      setSyncResult(null);
-
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('You must be logged in to sync Printavo data');
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/printavo-sync`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ mode: 'quick' }),
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to start sync');
-      }
-
-      setSyncResult({
-        success: true,
-        message: 'Sync started successfully! This may take a few minutes. Your data will be updated in the background.',
-      });
-    } catch (err) {
-      console.error('Error syncing Printavo data:', err);
-      setSyncResult({
-        success: false,
-        message: err instanceof Error ? err.message : 'Failed to sync data',
-      });
-    } finally {
-      setSyncingPrintavoData(false);
     }
   };
 
@@ -2513,7 +2796,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         .from('invoice_fees')
         .select('*')
         .eq('is_active', true)
-        .order('created_at', { ascending: false });
+        .order('category', { ascending: true, nullsFirst: false })
+        .order('sort_order', { ascending: true });
 
       if (error) throw error;
       setInvoiceFees(data || []);
@@ -2529,6 +2813,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     setFeeFormData({
       fee_name: '',
       description: '',
+      category: '',
       amount: '',
       amount_type: 'dollar',
       is_taxed: false,
@@ -2546,6 +2831,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     setFeeFormData({
       fee_name: fee.fee_name,
       description: fee.description,
+      category: fee.category || '',
       amount: fee.amount.toString(),
       amount_type: fee.amount_type,
       is_taxed: fee.is_taxed,
@@ -2581,6 +2867,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           .update({
             fee_name: feeFormData.fee_name,
             description: feeFormData.description,
+            category: feeFormData.category || null,
             amount: amount,
             amount_type: feeFormData.amount_type,
             is_taxed: feeFormData.is_taxed,
@@ -2599,16 +2886,31 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
         console.log('Creating invoice fee with company_id:', currentUserProfile.company_id);
 
+        // Calculate max sort_order for the category
+        const category = feeFormData.category || null;
+        const { data: existingFees } = await supabase
+          .from('invoice_fees')
+          .select('sort_order')
+          .eq('company_id', currentUserProfile.company_id)
+          .eq('is_active', true)
+          .is('category', category);
+
+        const maxSortOrder = existingFees && existingFees.length > 0
+          ? Math.max(...existingFees.map(f => f.sort_order))
+          : -1;
+
         const { data, error } = await supabase
           .from('invoice_fees')
           .insert([{
             company_id: currentUserProfile.company_id,
             fee_name: feeFormData.fee_name,
             description: feeFormData.description,
+            category: category,
             amount: amount,
             amount_type: feeFormData.amount_type,
             is_taxed: feeFormData.is_taxed,
             show_by_default: feeFormData.show_by_default,
+            sort_order: maxSortOrder + 1,
           }])
           .select();
 
@@ -2638,8 +2940,13 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     e.preventDefault();
     if (draggedFeeIndex === null || draggedFeeIndex === index) return;
 
+    const draggedFee = invoiceFees[draggedFeeIndex];
+    const targetFee = invoiceFees[index];
+
+    // Only allow dragging within the same category
+    if ((draggedFee.category || null) !== (targetFee.category || null)) return;
+
     const newFees = [...invoiceFees];
-    const draggedFee = newFees[draggedFeeIndex];
     newFees.splice(draggedFeeIndex, 1);
     newFees.splice(index, 0, draggedFee);
 
@@ -2647,8 +2954,29 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     setDraggedFeeIndex(index);
   };
 
-  const handleFeeDragEnd = () => {
-    setDraggedFeeIndex(null);
+  const handleFeeDragEnd = async () => {
+    if (draggedFeeIndex === null) return;
+
+    try {
+      // Update sort_order for all fees in the UI
+      const updates = invoiceFees.map((fee, index) => ({
+        id: fee.id,
+        sort_order: index
+      }));
+
+      for (const update of updates) {
+        await supabase
+          .from('invoice_fees')
+          .update({ sort_order: update.sort_order })
+          .eq('id', update.id);
+      }
+    } catch (err) {
+      console.error('Error updating sort order:', err);
+      showNotification('error', 'Sort Failed', 'Failed to save new order.');
+      loadInvoiceFees(); // Reload to reset
+    } finally {
+      setDraggedFeeIndex(null);
+    }
   };
 
   const deleteFee = async (feeId: string) => {
@@ -2713,15 +3041,32 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
-      const newFees = lines.map(feeName => ({
-        company_id: currentUserProfile!.company_id,
-        fee_name: feeName,
-        description: '',
-        amount: 0,
-        amount_type: 'dollar',
-        is_taxed: false,
-        show_by_default: false,
-      }));
+      // Get max sort_order for uncategorized fees
+      const { data: existingFees } = await supabase
+        .from('invoice_fees')
+        .select('sort_order')
+        .eq('company_id', currentUserProfile!.company_id)
+        .eq('is_active', true)
+        .is('category', null);
+
+      let maxSortOrder = existingFees && existingFees.length > 0
+        ? Math.max(...existingFees.map(f => f.sort_order))
+        : -1;
+
+      const newFees = lines.map(feeName => {
+        maxSortOrder++;
+        return {
+          company_id: currentUserProfile!.company_id,
+          fee_name: feeName,
+          description: '',
+          category: null,
+          amount: 0,
+          amount_type: 'dollar',
+          is_taxed: false,
+          show_by_default: false,
+          sort_order: maxSortOrder,
+        };
+      });
 
       const { error } = await supabase
         .from('invoice_fees')
@@ -2991,6 +3336,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     setWorkTypeFormData({
       work_type_name: '',
       color_type: 'ink',
+      imprint_color: '#6b7280',
     });
     setEditingWorkTypeId(null);
   };
@@ -3004,6 +3350,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
     setWorkTypeFormData({
       work_type_name: workType.work_type_name,
       color_type: workType.color_type,
+      imprint_color: workType.imprint_color || '#6b7280',
     });
     setEditingWorkTypeId(workType.id);
     setShowAddWorkTypeModal(true);
@@ -3029,6 +3376,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           .update({
             work_type_name: workTypeFormData.work_type_name,
             color_type: workTypeFormData.color_type,
+            imprint_color: workTypeFormData.imprint_color,
           })
           .eq('id', editingWorkTypeId);
 
@@ -3045,6 +3393,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             company_id: currentUserProfile.company_id,
             work_type_name: workTypeFormData.work_type_name,
             color_type: workTypeFormData.color_type,
+            imprint_color: workTypeFormData.imprint_color,
             sort_order: nextSortOrder,
           }]);
 
@@ -3120,6 +3469,28 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       showNotification('error', 'Remove Failed', 'Failed to remove option. Please try again.');
     } finally {
       setSavingLineItemOptions(false);
+    }
+  };
+
+  const reorderLineItemOptions = async (fromIndex: number, toIndex: number) => {
+    if (!companySettings?.id || fromIndex === toIndex) return;
+
+    try {
+      const updatedOptions = [...customLineItemOptions];
+      const [movedItem] = updatedOptions.splice(fromIndex, 1);
+      updatedOptions.splice(toIndex, 0, movedItem);
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update({ custom_line_item_options: updatedOptions })
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
+
+      setCustomLineItemOptions(updatedOptions);
+    } catch (err: any) {
+      console.error('Error reordering line item options:', err);
+      showNotification('error', 'Reorder Failed', 'Failed to reorder options. Please try again.');
     }
   };
 
@@ -3418,7 +3789,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           {/* Company Settings Section - Collapsible */}
           <div className="mb-2">
             <button
-              onClick={() => setCompanySettingsExpanded(!companySettingsExpanded)}
+              onClick={() => { collapseAllExcept('company'); setCompanySettingsExpanded(!companySettingsExpanded); }}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-slate-700/50"
             >
               <Building2 className="w-4 h-4 flex-shrink-0 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
@@ -3508,6 +3879,24 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   </div>
                   {activeTab === 'user-security' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
                 </button>
+
+                <button
+                  onClick={() => setActiveTab('box-label')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'box-label'
+                      ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                  style={{ animationDelay: '60ms' }}
+                >
+                  <Package className={`w-4 h-4 flex-shrink-0 ${activeTab === 'box-label' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'box-label' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      Box Label
+                    </div>
+                  </div>
+                  {activeTab === 'box-label' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                </button>
               </div>
             )}
           </div>
@@ -3516,7 +3905,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           {canAccessIntegrations && (
             <div className="mb-2">
               <button
-                onClick={() => setIntegrationsExpanded(!integrationsExpanded)}
+                onClick={() => { collapseAllExcept('integrations'); setIntegrationsExpanded(!integrationsExpanded); }}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-slate-700/50"
               >
                 <LinkIcon className="w-4 h-4 flex-shrink-0 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
@@ -3535,25 +3924,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               {integrationsExpanded && (
                 <div className="mt-1 ml-2 space-y-1 collapsible-section collapsible-section-enter">
                   <button
-                    onClick={() => setActiveTab('printavo-integration')}
-                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
-                      activeTab === 'printavo-integration'
-                        ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
-                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
-                    }`}
-                  >
-                    <Key className={`w-4 h-4 flex-shrink-0 ${activeTab === 'printavo-integration' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
-                    <div className="flex-1 text-left">
-                      <div className={`font-medium text-sm ${activeTab === 'printavo-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                        Printavo
-                      </div>
-                    </div>
-                    {activeTab === 'printavo-integration' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
-                  </button>
-
-                  <button
                     onClick={() => setActiveTab('square-integration')}
-                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group relative ${
                       activeTab === 'square-integration'
                         ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
                         : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
@@ -3562,8 +3934,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   >
                     <CreditCard className={`w-4 h-4 flex-shrink-0 ${activeTab === 'square-integration' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                     <div className="flex-1 text-left">
-                      <div className={`font-medium text-sm ${activeTab === 'square-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      <div className={`font-medium text-sm flex items-center gap-2 ${activeTab === 'square-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                         Square
+                        <div
+                          className={`w-2 h-2 rounded-full ${companySettings?.square_access_token ? 'bg-green-500' : 'bg-red-500'}`}
+                          title={companySettings?.square_access_token ? "Credentials saved" : "Credentials missing"}
+                        />
                       </div>
                     </div>
                     {activeTab === 'square-integration' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
@@ -3571,7 +3947,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                   <button
                     onClick={() => setActiveTab('resend-integration')}
-                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group relative ${
                       activeTab === 'resend-integration'
                         ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
                         : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
@@ -3580,8 +3956,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   >
                     <SettingsIcon className={`w-4 h-4 flex-shrink-0 ${activeTab === 'resend-integration' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                     <div className="flex-1 text-left">
-                      <div className={`font-medium text-sm ${activeTab === 'resend-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      <div className={`font-medium text-sm flex items-center gap-2 ${activeTab === 'resend-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                         Resend Email
+                        <div
+                          className={`w-2 h-2 rounded-full ${companySettings?.resend_api_key ? 'bg-green-500' : 'bg-red-500'}`}
+                          title={companySettings?.resend_api_key ? "Credentials saved" : "Credentials missing"}
+                        />
                       </div>
                     </div>
                     {activeTab === 'resend-integration' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
@@ -3589,7 +3969,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                   <button
                     onClick={() => setActiveTab('twilio-integration')}
-                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group relative ${
                       activeTab === 'twilio-integration'
                         ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
                         : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
@@ -3598,8 +3978,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   >
                     <MessageSquare className={`w-4 h-4 flex-shrink-0 ${activeTab === 'twilio-integration' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                     <div className="flex-1 text-left">
-                      <div className={`font-medium text-sm ${activeTab === 'twilio-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      <div className={`font-medium text-sm flex items-center gap-2 ${activeTab === 'twilio-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                         Twilio SMS
+                        <div
+                          className={`w-2 h-2 rounded-full ${companySettings?.twilio_auth_token ? 'bg-green-500' : 'bg-red-500'}`}
+                          title={companySettings?.twilio_auth_token ? "Credentials saved" : "Credentials missing"}
+                        />
                       </div>
                     </div>
                     {activeTab === 'twilio-integration' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
@@ -3607,7 +3991,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                   <button
                     onClick={() => setActiveTab('stripe-payments')}
-                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group relative ${
                       activeTab === 'stripe-payments'
                         ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
                         : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
@@ -3616,8 +4000,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   >
                     <CreditCard className={`w-4 h-4 flex-shrink-0 ${activeTab === 'stripe-payments' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                     <div className="flex-1 text-left">
-                      <div className={`font-medium text-sm ${activeTab === 'stripe-payments' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      <div className={`font-medium text-sm flex items-center gap-2 ${activeTab === 'stripe-payments' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                         Stripe
+                        <div
+                          className={`w-2 h-2 rounded-full ${(companySettings?.stripe_public_key && companySettings?.stripe_secret_key) ? 'bg-green-500' : 'bg-red-500'}`}
+                          title={(companySettings?.stripe_public_key && companySettings?.stripe_secret_key) ? "Credentials saved" : "Credentials missing"}
+                        />
                       </div>
                     </div>
                     {activeTab === 'stripe-payments' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
@@ -3625,7 +4013,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                   <button
                     onClick={() => setActiveTab('supplier-integrations')}
-                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group relative ${
                       activeTab === 'supplier-integrations'
                         ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
                         : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
@@ -3634,11 +4022,56 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   >
                     <Grid3x3 className={`w-4 h-4 flex-shrink-0 ${activeTab === 'supplier-integrations' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
                     <div className="flex-1 text-left">
-                      <div className={`font-medium text-sm ${activeTab === 'supplier-integrations' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      <div className={`font-medium text-sm flex items-center gap-2 ${activeTab === 'supplier-integrations' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                         Garment Suppliers
+                        <div
+                          className={`w-2 h-2 rounded-full ${((companySettings?.sanmar_promo_username && companySettings?.sanmar_promo_password_encrypted) || companySettings?.ssactivewear_api_key_encrypted) ? 'bg-green-500' : 'bg-red-500'}`}
+                          title={((companySettings?.sanmar_promo_username && companySettings?.sanmar_promo_password_encrypted) || companySettings?.ssactivewear_api_key_encrypted) ? "Credentials saved" : "Credentials missing"}
+                        />
                       </div>
                     </div>
                     {activeTab === 'supplier-integrations' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('shipstation-integration')}
+                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group relative ${
+                      activeTab === 'shipstation-integration'
+                        ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
+                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                    style={{ animationDelay: '80ms' }}
+                  >
+                    <Package className={`w-4 h-4 flex-shrink-0 ${activeTab === 'shipstation-integration' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                    <div className="flex-1 text-left">
+                      <div className={`font-medium text-sm flex items-center gap-2 ${activeTab === 'shipstation-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                        ShipStation
+                        <div
+                          className={`w-2 h-2 rounded-full ${(companySettings?.shipstation_api_key && companySettings?.shipstation_api_secret) ? 'bg-green-500' : 'bg-red-500'}`}
+                          title={(companySettings?.shipstation_api_key && companySettings?.shipstation_api_secret) ? "Credentials saved" : "Credentials missing"}
+                        />
+                      </div>
+                    </div>
+                    {activeTab === 'shipstation-integration' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('chipply-integration')}
+                    className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group relative ${
+                      activeTab === 'chipply-integration'
+                        ? 'bg-green-50 dark:bg-blue-600/20 text-green-700 dark:text-blue-400 shadow-sm'
+                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                    style={{ animationDelay: '90ms' }}
+                  >
+                    <Package className={`w-4 h-4 flex-shrink-0 ${activeTab === 'chipply-integration' ? 'text-green-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                    <div className="flex-1 text-left">
+                      <div className={`font-medium text-sm flex items-center gap-2 ${activeTab === 'chipply-integration' ? 'text-green-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                        Chipply
+                        <span className="w-2 h-2 bg-green-500 rounded-full" />
+                      </div>
+                    </div>
+                    {activeTab === 'chipply-integration' && <div className="w-1 h-6 bg-green-600 dark:bg-blue-500 rounded-full absolute right-0" />}
                   </button>
                 </div>
               )}
@@ -3648,7 +4081,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           {/* Accounting Settings Section - Collapsible */}
           <div className="mb-2">
             <button
-              onClick={() => setAccountingExpanded(!accountingExpanded)}
+              onClick={() => { collapseAllExcept('accounting'); setAccountingExpanded(!accountingExpanded); }}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-slate-700/50"
             >
               <CreditCard className="w-4 h-4 flex-shrink-0 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
@@ -3666,23 +4099,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
             {accountingExpanded && (
               <div className="mt-1 ml-2 space-y-1 collapsible-section collapsible-section-enter">
-                <button
-                  onClick={() => setActiveTab('billing-status-filters')}
-                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
-                    activeTab === 'billing-status-filters'
-                      ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                >
-                  <Filter className={`w-4 h-4 flex-shrink-0 ${activeTab === 'billing-status-filters' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
-                  <div className="flex-1 text-left">
-                    <div className={`font-medium text-sm ${activeTab === 'billing-status-filters' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                      Billing Filters
-                    </div>
-                  </div>
-                  {activeTab === 'billing-status-filters' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
-                </button>
-
                 <button
                   onClick={() => setActiveTab('automated-reports')}
                   className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
@@ -3704,10 +4120,67 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             )}
           </div>
 
+          {/* Manage Goods Section - Collapsible */}
+          <div className="mb-2">
+            <button
+              onClick={() => { collapseAllExcept('manageGoods'); setManageGoodsExpanded(!manageGoodsExpanded); }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-slate-700/50"
+            >
+              <Package className="w-4 h-4 flex-shrink-0 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
+              <div className="flex-1 text-left">
+                <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                  Manage Goods
+                </div>
+              </div>
+              {manageGoodsExpanded ? (
+                <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200" />
+              ) : (
+                <ChevronUp className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200 rotate-180" />
+              )}
+            </button>
+
+            {manageGoodsExpanded && (
+              <div className="mt-1 ml-2 space-y-1 collapsible-section collapsible-section-enter">
+                <button
+                  onClick={() => setActiveTab('receiving-settings')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'receiving-settings'
+                      ? 'bg-purple-50 dark:bg-purple-600/20 text-purple-700 dark:text-purple-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Package className={`w-4 h-4 flex-shrink-0 ${activeTab === 'receiving-settings' ? 'text-purple-600 dark:text-purple-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'receiving-settings' ? 'text-purple-700 dark:text-purple-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      Receiving Settings
+                    </div>
+                  </div>
+                  {activeTab === 'receiving-settings' && <div className="w-1 h-6 bg-purple-600 dark:bg-purple-500 rounded-full absolute right-0" />}
+                </button>
+                <button
+                  onClick={() => setActiveTab('po-settings')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'po-settings'
+                      ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  <SettingsIcon className={`w-4 h-4 flex-shrink-0 ${activeTab === 'po-settings' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'po-settings' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      PO Settings
+                    </div>
+                  </div>
+                  {activeTab === 'po-settings' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Production Settings Section - Collapsible */}
           <div className="mb-2">
             <button
-              onClick={() => setProductionExpanded(!productionExpanded)}
+              onClick={() => { collapseAllExcept('production'); setProductionExpanded(!productionExpanded); }}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-slate-700/50"
             >
               <SettingsIcon className="w-4 h-4 flex-shrink-0 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
@@ -3761,6 +4234,24 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 </button>
 
                 <button
+                  onClick={() => setActiveTab('kanban-settings')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'kanban-settings'
+                      ? 'bg-green-50 dark:bg-green-600/20 text-green-700 dark:text-green-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                  style={{ animationDelay: '60ms' }}
+                >
+                  <Columns3 className={`w-4 h-4 flex-shrink-0 ${activeTab === 'kanban-settings' ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'kanban-settings' ? 'text-green-700 dark:text-green-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      Kanban Board
+                    </div>
+                  </div>
+                  {activeTab === 'kanban-settings' && <div className="w-1 h-6 bg-green-600 dark:bg-green-500 rounded-full absolute right-0" />}
+                </button>
+
+                <button
                   onClick={() => setActiveTab('automations')}
                   className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
                     activeTab === 'automations'
@@ -3798,6 +4289,65 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
               </div>
             )}
           </div>
+
+          {/* Communications Section - Collapsible */}
+          <div className="mb-2">
+            <button
+              onClick={() => { collapseAllExcept('communications'); setCommunicationsExpanded(!communicationsExpanded); }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-slate-700/50"
+            >
+              <Mail className="w-4 h-4 flex-shrink-0 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
+              <div className="flex-1 text-left">
+                <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                  Communications
+                </div>
+              </div>
+              {communicationsExpanded ? (
+                <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200" />
+              ) : (
+                <ChevronUp className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200 rotate-180" />
+              )}
+            </button>
+
+            {communicationsExpanded && (
+              <div className="mt-1 ml-2 space-y-1 collapsible-section collapsible-section-enter">
+                <button
+                  onClick={() => setActiveTab('email-templates')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'email-templates'
+                      ? 'bg-purple-50 dark:bg-purple-600/20 text-purple-700 dark:text-purple-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Mail className={`w-4 h-4 flex-shrink-0 ${activeTab === 'email-templates' ? 'text-purple-600 dark:text-purple-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'email-templates' ? 'text-purple-700 dark:text-purple-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      Email Templates
+                    </div>
+                  </div>
+                  {activeTab === 'email-templates' && <div className="w-1 h-6 bg-purple-600 dark:bg-purple-500 rounded-full absolute right-0" />}
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('urls')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'urls'
+                      ? 'bg-purple-50 dark:bg-purple-600/20 text-purple-700 dark:text-purple-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  <LinkIcon className={`w-4 h-4 flex-shrink-0 ${activeTab === 'urls' ? 'text-purple-600 dark:text-purple-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'urls' ? 'text-purple-700 dark:text-purple-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      URLs
+                    </div>
+                  </div>
+                  {activeTab === 'urls' && <div className="w-1 h-6 bg-purple-600 dark:bg-purple-500 rounded-full absolute right-0" />}
+                </button>
+              </div>
+            )}
+          </div>
+
         </nav>
       </div>
 
@@ -4033,232 +4583,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             </div>
           )}
 
-          {activeTab === 'printavo-integration' && canAccessIntegrations && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Printavo Integration</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Connect your Printavo account to sync data</p>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Printavo Email / Username
-                  </label>
-                  <input
-                    type="email"
-                    value={printavoUsername}
-                    onChange={(e) => setPrintavoUsername(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="your@email.com"
-                  />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Your Printavo account email</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Printavo API Token
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showPrintavoToken ? 'text' : 'password'}
-                      value={printavoToken}
-                      onChange={(e) => setPrintavoToken(e.target.value)}
-                      className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder={companySettings?.printavo_api_token_encrypted ? '••••••••••••••••' : 'Enter your API token'}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPrintavoToken(!showPrintavoToken)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                      tabIndex={-1}
-                    >
-                      {showPrintavoToken ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    {companySettings?.printavo_api_token_encrypted
-                      ? 'Token is saved and encrypted. Enter a new token to update it.'
-                      : 'Find your API token in Printavo Settings → Integrations'}
-                  </p>
-                </div>
-
-                <div className="pt-4">
-                  <button
-                    onClick={saveIntegration}
-                    disabled={savingIntegration}
-                    className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                  >
-                    {savingIntegration ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4" />
-                        Save Credentials
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {companySettings?.printavo_username && (
-                  <>
-                    <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
-                          <Key className="w-5 h-5" />
-                          <div>
-                            <p className="font-medium">Integration Active</p>
-                            <p className="text-sm mt-1">Connected as: {companySettings.printavo_username}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={syncPrintavoData}
-                            disabled={syncingPrintavoData}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                          >
-                            {syncingPrintavoData ? (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                Syncing...
-                              </>
-                            ) : (
-                              <>
-                                <RefreshCw className="w-4 h-4" />
-                                Sync Now
-                              </>
-                            )}
-                          </button>
-                          <button
-                            onClick={testPrintavoConnection}
-                            disabled={testingConnection}
-                            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/30 disabled:opacity-50 transition-colors"
-                          >
-                            {testingConnection ? (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                Testing...
-                              </>
-                            ) : (
-                              'Test Connection'
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {syncResult && (
-                      <div className={`mt-4 p-4 rounded-lg border ${syncResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
-                        <p className={`text-sm ${syncResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
-                          {syncResult.message}
-                        </p>
-                      </div>
-                    )}
-
-                    {testResult && (
-                      <div className={`p-4 rounded-lg border ${
-                        testResult.success
-                          ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
-                          : testResult.error === 'Rate limit exceeded'
-                            ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
-                            : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-                      }`}>
-                        <div className="space-y-3">
-                          <div className={`font-medium text-lg ${
-                            testResult.success
-                              ? 'text-green-800 dark:text-green-200'
-                              : testResult.error === 'Rate limit exceeded'
-                                ? 'text-yellow-800 dark:text-yellow-200'
-                                : 'text-red-800 dark:text-red-200'
-                          }`}>
-                            {testResult.success
-                              ? '✓ Connection Successful!'
-                              : testResult.error === 'Rate limit exceeded'
-                                ? '⚠ Rate Limit Exceeded'
-                                : '✗ Connection Failed'}
-                          </div>
-
-                          {testResult.success && testResult.company && (
-                            <div className="text-sm text-green-700 dark:text-green-300">
-                              Connected to: <strong>{testResult.company.name}</strong>
-                            </div>
-                          )}
-
-                          {testResult.error === 'Rate limit exceeded' && (
-                            <div className="text-sm text-yellow-800 dark:text-yellow-200 space-y-2">
-                              <p className="font-medium">
-                                {testResult.printavoError || 'Too many requests to Printavo API. Please wait a moment before testing again.'}
-                              </p>
-                              <p className="text-xs">
-                                Your credentials may be correct, but Printavo is temporarily limiting API requests.
-                                Wait 30-60 seconds and try again.
-                              </p>
-                            </div>
-                          )}
-
-                          {testResult.error && testResult.error !== 'Rate limit exceeded' && (
-                            <div className="text-sm text-red-700 dark:text-red-300 font-medium">
-                              Error: {testResult.error}
-                            </div>
-                          )}
-
-                          {testResult.printavoError && testResult.error !== 'Rate limit exceeded' && (
-                            <div className="text-sm text-red-700 dark:text-red-300 font-medium">
-                              Printavo Error: {testResult.printavoError}
-                            </div>
-                          )}
-
-                          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
-                            <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Diagnostics:</div>
-                            <pre className="text-xs p-3 bg-white dark:bg-slate-900 rounded border border-gray-300 dark:border-gray-600 overflow-x-auto max-h-96">
-                              {JSON.stringify(testResult, null, 2)}
-                            </pre>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="mt-6 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Bug className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
-                          <span className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">Debug: Test Printavo Data Structure</span>
-                        </div>
-                        <button
-                          onClick={runPrintavoTest}
-                          disabled={testLoading}
-                          className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50 transition-colors"
-                        >
-                          {testLoading ? 'Loading...' : 'Run Test'}
-                        </button>
-                      </div>
-                    </div>
-
-                    {testData && (
-                      <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 border border-gray-200 dark:border-slate-600">
-                        <div className="flex items-center justify-between mb-4">
-                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Printavo API Response</h3>
-                          <button
-                            onClick={() => setTestData(null)}
-                            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-                          >
-                            Close
-                          </button>
-                        </div>
-                        <pre className="bg-gray-50 dark:bg-slate-900 p-4 rounded overflow-auto max-h-96 text-xs">
-                          {JSON.stringify(testData, null, 2)}
-                        </pre>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-
           {activeTab === 'square-integration' && canAccessIntegrations && (
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
               <div>
@@ -4266,10 +4590,46 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Connect your Square account to access payment data</p>
               </div>
 
+              {companySettings?.square_access_token && (
+                <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
+                      <CheckCircle className="w-5 h-5" />
+                      <div>
+                        <p className="font-medium">Square Integration Active</p>
+                        <p className="text-sm mt-1">Credentials are securely stored and encrypted</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={testSquareConnection}
+                      disabled={testingSquare}
+                      className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/30 disabled:opacity-50 transition-colors"
+                    >
+                      {testingSquare ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Testing...
+                        </>
+                      ) : (
+                        'Test Connection'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Square Access Token <span className="text-red-500">*</span>
+                    <div className="flex items-center gap-2">
+                      Square Access Token <span className="text-red-500">*</span>
+                      {companySettings?.square_access_token && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs rounded-full">
+                          <CheckCircle className="w-3 h-3" />
+                          Saved
+                        </span>
+                      )}
+                    </div>
                   </label>
                   <div className="relative">
                     <input
@@ -4358,35 +4718,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   </button>
                 </div>
 
-                {companySettings?.square_access_token && (
-                  <>
-                    <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
-                          <Key className="w-5 h-5" />
-                          <div>
-                            <p className="font-medium">Square Integration Active</p>
-                            <p className="text-sm mt-1">Environment: {companySettings.square_environment || 'production'}</p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={testSquareConnection}
-                          disabled={testingSquare}
-                          className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/30 disabled:opacity-50 transition-colors"
-                        >
-                          {testingSquare ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Testing...
-                            </>
-                          ) : (
-                            'Test Connection'
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    {squareTestResult && (
+                {squareTestResult && (
                       <div className={`p-4 rounded-lg border ${squareTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
                         <div className="space-y-3">
                           {squareTestResult.success ? (
@@ -4435,8 +4767,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           </div>
                         </div>
                       </div>
-                    )}
-                  </>
                 )}
               </div>
             </div>
@@ -4449,10 +4779,46 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Connect Resend to send transactional emails</p>
               </div>
 
+              {companySettings?.resend_api_key && (
+                <div className="p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-purple-800 dark:text-purple-200">
+                      <CheckCircle className="w-5 h-5" />
+                      <div>
+                        <p className="font-medium">Resend Integration Active</p>
+                        <p className="text-sm mt-1">Email credentials are securely stored and encrypted</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={testResendConnection}
+                      disabled={testingResend}
+                      className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/30 disabled:opacity-50 transition-colors"
+                    >
+                      {testingResend ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Testing...
+                        </>
+                      ) : (
+                        'Test Connection'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Resend API Key <span className="text-red-500">*</span>
+                    <div className="flex items-center gap-2">
+                      Resend API Key <span className="text-red-500">*</span>
+                      {companySettings?.resend_api_key && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs rounded-full">
+                          <CheckCircle className="w-3 h-3" />
+                          Saved
+                        </span>
+                      )}
+                    </div>
                   </label>
                   <div className="relative">
                     <input
@@ -4528,35 +4894,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   </button>
                 </div>
 
-                {companySettings?.resend_api_key && (
-                  <>
-                    <div className="mt-6 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-purple-800 dark:text-purple-200">
-                          <Key className="w-5 h-5" />
-                          <div>
-                            <p className="font-medium">Resend Integration Active</p>
-                            <p className="text-sm mt-1">Email sending is configured and ready to use</p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={testResendConnection}
-                          disabled={testingResend}
-                          className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/30 disabled:opacity-50 transition-colors"
-                        >
-                          {testingResend ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                              Testing...
-                            </>
-                          ) : (
-                            'Test Connection'
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    {resendTestResult && (
+                {resendTestResult && (
                       <div className={`p-4 rounded-lg border ${resendTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
                         <div className="space-y-3">
                           {resendTestResult.success ? (
@@ -4596,8 +4934,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           </div>
                         </div>
                       </div>
-                    )}
-                  </>
                 )}
 
                 <div className="mt-6 p-4 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg">
@@ -5197,198 +5533,21 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             </div>
           )}
 
-          {activeTab === 'billing-status-filters' && (
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Billing & Payments Status Filters</h2>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Select which statuses should appear in Billing Queue, then click Save to apply.</p>
+          {activeTab === 'box-label' && companySettings && (
+            <Suspense
+              fallback={
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
                 </div>
-                <button
-                  onClick={syncStatuses}
-                  disabled={syncingStatuses || loadingStatuses}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {syncingStatuses ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Syncing...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="w-4 h-4" />
-                      Sync from Printavo
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {billingFiltersSaveMessage && (
-                <div className={`flex items-center gap-2 p-3 rounded-lg ${
-                  billingFiltersSaveMessage.type === 'success'
-                    ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200'
-                    : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200'
-                }`}>
-                  {billingFiltersSaveMessage.type === 'success' ? (
-                    <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  )}
-                  <span className="text-sm font-medium">{billingFiltersSaveMessage.text}</span>
-                </div>
-              )}
-
-              {loadingStatuses ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-spin" />
-                </div>
-              ) : fullStatuses.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-500 dark:text-gray-400 mb-4">No statuses found. Click "Sync from Printavo" to fetch all available statuses.</p>
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between mb-4">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {fullStatuses.filter(s => s.is_billing_eligible).length} of {fullStatuses.length} statuses enabled for billing
-                      {pendingBillingChanges.size > 0 && (
-                        <span className="ml-2 text-amber-600 dark:text-amber-400 font-medium">
-                          ({pendingBillingChanges.size} unsaved change{pendingBillingChanges.size !== 1 ? 's' : ''})
-                        </span>
-                      )}
-                    </p>
-                  </div>
-
-                  {['Invoice', 'Quote'].map(statusType => {
-                    const typeStatuses = fullStatuses.filter(s => s.type === statusType);
-                    if (typeStatuses.length === 0) return null;
-                    return (
-                      <div key={statusType} className="mb-6">
-                        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                          <Layers className="w-4 h-4" />
-                          {statusType} Statuses ({typeStatuses.length})
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                          {typeStatuses.map(status => (
-                            <button
-                              key={status.id}
-                              onClick={() => toggleBillingEligibility(status.id, status.is_billing_eligible)}
-                              className={`flex items-center gap-3 p-3 rounded-lg transition-all border ${
-                                status.is_billing_eligible
-                                  ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30'
-                                  : 'bg-white dark:bg-slate-700 border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-600'
-                              }`}
-                            >
-                              <div
-                                className="w-4 h-4 rounded-full flex-shrink-0 border border-gray-300 dark:border-gray-600"
-                                style={{ backgroundColor: status.color || '#9ca3af' }}
-                              />
-                              <span className={`text-sm flex-1 text-left ${status.is_billing_eligible ? 'text-blue-900 dark:text-blue-200 font-medium' : 'text-gray-700 dark:text-gray-300'}`}>
-                                {status.name}
-                              </span>
-                              <div className={`w-5 h-5 rounded flex items-center justify-center ${
-                                status.is_billing_eligible ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
-                              }`}>
-                                {status.is_billing_eligible && (
-                                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                  </svg>
-                                )}
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {fullStatuses.filter(s => !s.type || (s.type !== 'Invoice' && s.type !== 'Quote')).length > 0 && (
-                    <div className="mb-6">
-                      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                        <Layers className="w-4 h-4" />
-                        Other Statuses
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {fullStatuses.filter(s => !s.type || (s.type !== 'Invoice' && s.type !== 'Quote')).map(status => (
-                          <button
-                            key={status.id}
-                            onClick={() => toggleBillingEligibility(status.id, status.is_billing_eligible)}
-                            className={`flex items-center gap-3 p-3 rounded-lg transition-all border ${
-                              status.is_billing_eligible
-                                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30'
-                                : 'bg-white dark:bg-slate-700 border-gray-200 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-600'
-                            }`}
-                          >
-                            <div
-                              className="w-4 h-4 rounded-full flex-shrink-0 border border-gray-300 dark:border-gray-600"
-                              style={{ backgroundColor: status.color || '#9ca3af' }}
-                            />
-                            <span className={`text-sm flex-1 text-left ${status.is_billing_eligible ? 'text-blue-900 dark:text-blue-200 font-medium' : 'text-gray-700 dark:text-gray-300'}`}>
-                              {status.name}
-                            </span>
-                            <div className={`w-5 h-5 rounded flex items-center justify-center ${
-                              status.is_billing_eligible ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-600'
-                            }`}>
-                              {status.is_billing_eligible && (
-                                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                </svg>
-                              )}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="pt-6 border-t border-gray-200 dark:border-slate-600 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={saveBillingFilters}
-                        disabled={savingBillingFilters || pendingBillingChanges.size === 0}
-                        className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-all ${
-                          pendingBillingChanges.size > 0
-                            ? 'bg-green-600 text-white hover:bg-green-700 shadow-sm'
-                            : 'bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                        } disabled:opacity-50`}
-                      >
-                        {savingBillingFilters ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          <>
-                            <Save className="w-4 h-4" />
-                            Save Filters
-                          </>
-                        )}
-                      </button>
-                      {pendingBillingChanges.size > 0 && (
-                        <button
-                          onClick={discardBillingChanges}
-                          disabled={savingBillingFilters}
-                          className="px-4 py-2.5 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-                        >
-                          Discard Changes
-                        </button>
-                      )}
-                    </div>
-                    {pendingBillingChanges.size > 0 && (
-                      <p className="text-sm text-amber-600 dark:text-amber-400">
-                        You have unsaved changes
-                      </p>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
+              }
+            >
+              <BoxLabelSettings
+                companyId={companySettings.id}
+                primaryLogoUrl={companySettings.company_logo_primary_url}
+                secondaryLogoUrl={companySettings.company_logo_secondary_url}
+              />
+            </Suspense>
           )}
-
 
           {activeTab === 'automated-reports' && (
             <AutomatedReports />
@@ -5404,6 +5563,16 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             </Suspense>
           )}
 
+          {activeTab === 'kanban-settings' && companySettings?.id && (
+            <Suspense fallback={
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 flex items-center justify-center">
+                <Loader2 className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-spin" />
+              </div>
+            }>
+              <KanbanSettings companyId={companySettings.id} />
+            </Suspense>
+          )}
+
           {activeTab === 'price-matrices' && (
             <Suspense fallback={
               <div className="flex items-center justify-center py-12">
@@ -5412,6 +5581,229 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             }>
               <PriceMatricesManager />
             </Suspense>
+          )}
+
+          {activeTab === 'email-templates' && (
+            <Suspense fallback={
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 text-purple-600 dark:text-purple-400 animate-spin" />
+              </div>
+            }>
+              <CommunicationTemplatesManager />
+            </Suspense>
+          )}
+
+          {activeTab === 'urls' && (
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Customer-Facing URLs</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+                  Configure custom branded domains for customer-facing invoice and quote links
+                </p>
+                {!isAdmin && (
+                  <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-800 dark:text-amber-200 text-sm">
+                    Access Denied: Only Admins and Super Admins can edit URL settings.
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Customer URL
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="url"
+                      value={customerUrl}
+                      onChange={(e) => setCustomerUrl(e.target.value)}
+                      disabled={!isAdmin}
+                      className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-slate-800 disabled:cursor-not-allowed"
+                      placeholder="https://yourdomain.com"
+                    />
+                    {companySettings?.customer_url && (
+                      <div className="flex items-center gap-2">
+                        {verificationStatus === 'verified' && (
+                          <span className="inline-flex items-center gap-1 px-3 py-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded-lg text-sm font-medium">
+                            <CheckCircle className="w-4 h-4" />
+                            Verified
+                          </span>
+                        )}
+                        {verificationStatus === 'unverified' && (
+                          <span className="inline-flex items-center gap-1 px-3 py-2 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 rounded-lg text-sm font-medium">
+                            <Clock className="w-4 h-4" />
+                            Unverified
+                          </span>
+                        )}
+                        {verificationStatus === 'failed' && (
+                          <span className="inline-flex items-center gap-1 px-3 py-2 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 rounded-lg text-sm font-medium">
+                            <AlertTriangle className="w-4 h-4" />
+                            Failed
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    This URL will be used for all customer-facing invoice and quote links.
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Examples: <code className="bg-gray-100 dark:bg-slate-700 px-1 rounded">https://acmeprinting.com</code> or <code className="bg-gray-100 dark:bg-slate-700 px-1 rounded">https://acme.inkops.com</code>
+                  </p>
+                </div>
+
+                {verificationToken && verificationStatus === 'unverified' && (
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-yellow-900 dark:text-yellow-100 mb-3 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      Domain Verification Required
+                    </h3>
+                    <p className="text-xs text-yellow-800 dark:text-yellow-200 mb-3">
+                      To verify ownership of your domain, add the following TXT record to your DNS settings:
+                    </p>
+                    <div className="bg-yellow-100 dark:bg-yellow-900/40 rounded-lg p-3 space-y-2">
+                      <div>
+                        <span className="text-xs font-medium text-yellow-900 dark:text-yellow-100">Type:</span>
+                        <code className="ml-2 text-xs text-yellow-800 dark:text-yellow-200">TXT</code>
+                      </div>
+                      <div>
+                        <span className="text-xs font-medium text-yellow-900 dark:text-yellow-100">Name:</span>
+                        <code className="ml-2 text-xs text-yellow-800 dark:text-yellow-200">@ (or root domain)</code>
+                      </div>
+                      <div>
+                        <span className="text-xs font-medium text-yellow-900 dark:text-yellow-100">Value:</span>
+                        <div className="flex items-center gap-2 mt-1">
+                          <code className="flex-1 text-xs bg-yellow-200 dark:bg-yellow-900/60 text-yellow-900 dark:text-yellow-100 px-2 py-1 rounded break-all">
+                            {verificationToken}
+                          </code>
+                          <button
+                            onClick={copyTokenToClipboard}
+                            className="px-3 py-1 bg-yellow-600 dark:bg-yellow-700 text-white rounded hover:bg-yellow-700 dark:hover:bg-yellow-600 transition-colors flex items-center gap-1 text-xs"
+                          >
+                            {copiedToken ? (
+                              <>
+                                <Check className="w-3 h-3" />
+                                Copied!
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3 h-3" />
+                                Copy
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-yellow-800 dark:text-yellow-200 mt-3">
+                      After adding the DNS record, click the "Verify Domain" button below. DNS propagation can take up to 48 hours.
+                    </p>
+                  </div>
+                )}
+
+                {verificationStatus === 'failed' && (
+                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-red-900 dark:text-red-100 mb-2 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      Verification Failed
+                    </h3>
+                    <p className="text-xs text-red-800 dark:text-red-200">
+                      We couldn't verify your domain. Please ensure the TXT record is correctly added and try again.
+                      DNS changes can take up to 48 hours to propagate.
+                    </p>
+                  </div>
+                )}
+
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">Requirements</h3>
+                  <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
+                    <li>Must be a valid URL format</li>
+                    <li>Must include <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">https://</code></li>
+                    <li>Trailing slashes will be automatically removed</li>
+                    <li>Must be unique across all companies</li>
+                    <li>Domain ownership must be verified via DNS TXT record</li>
+                    <li>If not set, system falls back to default INKOPS domain</li>
+                  </ul>
+                </div>
+
+                {companySettings?.customer_url && verificationStatus === 'verified' && (
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-green-900 dark:text-green-100 mb-2 flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4" />
+                      Active Custom URL
+                    </h3>
+                    <p className="text-xs text-green-800 dark:text-green-200">
+                      Your invoices and quotes will use: <code className="bg-green-100 dark:bg-green-800 px-1 rounded font-mono">{companySettings.customer_url}</code>
+                    </p>
+                  </div>
+                )}
+
+                {isAdmin && (
+                  <div className="flex gap-3">
+                    <button
+                      onClick={saveCustomerUrl}
+                      disabled={savingCustomerUrl}
+                      className="px-6 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                    >
+                      {savingCustomerUrl ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Requesting...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4" />
+                          Request Verification
+                        </>
+                      )}
+                    </button>
+
+                    {verificationToken && (verificationStatus === 'unverified' || verificationStatus === 'failed') && (
+                      <button
+                        onClick={verifyDomain}
+                        disabled={verifyingDomain}
+                        className={`px-6 py-2 text-white rounded-lg disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors flex items-center gap-2 ${
+                          verificationStatus === 'failed'
+                            ? 'bg-orange-600 dark:bg-orange-500 hover:bg-orange-700 dark:hover:bg-orange-600'
+                            : 'bg-green-600 dark:bg-green-500 hover:bg-green-700 dark:hover:bg-green-600'
+                        }`}
+                      >
+                        {verifyingDomain ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Verifying...
+                          </>
+                        ) : verificationStatus === 'failed' ? (
+                          <>
+                            <RefreshCw className="w-4 h-4" />
+                            Retry Verification
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="w-4 h-4" />
+                            Verify Domain
+                          </>
+                        )}
+                      </button>
+                    )}
+
+                    {customerUrl && verificationStatus !== 'verified' && (
+                      <button
+                        onClick={() => {
+                          setCustomerUrl('');
+                          setVerificationToken(null);
+                          setVerificationStatus('unverified');
+                        }}
+                        disabled={savingCustomerUrl}
+                        className="px-6 py-2 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
           )}
 
           {activeTab === 'stripe-payments' && canAccessIntegrations && (
@@ -5634,7 +6026,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       onChange={(e) => setSanmarEnabled(e.target.checked)}
                       className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
                     />
-                    <span className="text-lg font-semibold text-gray-900 dark:text-white">SanMar API</span>
+                    <span className="text-lg font-semibold text-gray-900 dark:text-white">SanMar PromoStandards</span>
                   </label>
                 </div>
 
@@ -5645,48 +6037,129 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
                         <div className="flex-1">
                           <p className="text-sm font-medium text-green-800 dark:text-green-300">Credentials Saved</p>
-                          <p className="text-xs text-green-700 dark:text-green-400 mt-0.5">Leave fields blank to keep existing credentials, or enter new values to update</p>
+                          <p className="text-xs text-green-700 dark:text-green-400 mt-0.5">Leave password blank to keep existing, or enter new password to update</p>
                         </div>
                       </div>
                     )}
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        API Key {!sanmarHasCredentials && <span className="text-red-500">*</span>}
+                        PromoStandards Username {!sanmarHasCredentials && <span className="text-red-500">*</span>}
                       </label>
-                      <div className="relative">
-                        <input
-                          type={showSanmarApiKey ? 'text' : 'password'}
-                          value={sanmarApiKey}
-                          onChange={(e) => setSanmarApiKey(e.target.value)}
-                          className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder={sanmarHasCredentials ? "Leave blank to keep existing" : "Enter your SanMar API key"}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowSanmarApiKey(!showSanmarApiKey)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                          tabIndex={-1}
-                        >
-                          {showSanmarApiKey ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                        </button>
-                      </div>
+                      <input
+                        type="text"
+                        value={sanmarUsername}
+                        onChange={(e) => setSanmarUsername(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Your PromoStandards username"
+                      />
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        {sanmarHasCredentials ? 'Enter a new API key only if you want to update it' : 'Get your API key from SanMar Developer Portal'}
+                        Your PromoStandards username from SanMar
                       </p>
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Customer ID
+                        PromoStandards Password {!sanmarHasCredentials && <span className="text-red-500">*</span>}
                       </label>
-                      <input
-                        type="text"
-                        value={sanmarCustomerId}
-                        onChange={(e) => setSanmarCustomerId(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Your SanMar customer ID (optional)"
-                      />
+                      <div className="relative">
+                        <input
+                          type={showSanmarPassword ? 'text' : 'password'}
+                          value={sanmarPassword}
+                          onChange={(e) => setSanmarPassword(e.target.value)}
+                          className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder={sanmarHasCredentials ? "Leave blank to keep existing" : "Enter your PromoStandards API password"}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowSanmarPassword(!showSanmarPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                          tabIndex={-1}
+                        >
+                          {showSanmarPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {sanmarHasCredentials ? 'Enter a new password only if you want to update it' : 'Your SanMar PromoStandards password'}
+                      </p>
                     </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        FOB Warehouse <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={sanmarFobId}
+                        onChange={(e) => setSanmarFobId(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        {SANMAR_WAREHOUSES.map((warehouse) => (
+                          <option key={warehouse.id} value={warehouse.id}>
+                            {warehouse.name} ({warehouse.id})
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Select your preferred shipping warehouse. This affects wholesale pricing from SanMar.
+                      </p>
+                    </div>
+
+                    <div className="flex gap-3 mt-4">
+                      <button
+                        onClick={saveSanmarSettings}
+                        disabled={savingSanmar}
+                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                      >
+                        {savingSanmar ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4" />
+                            Save SanMar Settings
+                          </>
+                        )}
+                      </button>
+                      {sanmarHasCredentials && (
+                        <button
+                          onClick={testSanmarConnection}
+                          disabled={testingSanmar}
+                          className="px-4 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                        >
+                          {testingSanmar ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+                              Testing...
+                            </>
+                          ) : (
+                            <>
+                              <Zap className="w-4 h-4" />
+                              Test Connection
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+
+                    {sanmarTestResult && (
+                      <div className={`p-4 rounded-lg border ${sanmarTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
+                        <div className="flex items-start gap-3">
+                          <div className={`flex-shrink-0 w-6 h-6 rounded-full ${sanmarTestResult.success ? 'bg-green-500' : 'bg-red-500'} flex items-center justify-center text-white text-sm font-bold`}>
+                            {sanmarTestResult.success ? '✓' : '✕'}
+                          </div>
+                          <div className="flex-1">
+                            <h4 className={`font-medium ${sanmarTestResult.success ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'}`}>
+                              {sanmarTestResult.success ? 'Connection Successful!' : 'Connection Failed'}
+                            </h4>
+                            <p className={`text-sm mt-1 ${sanmarTestResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
+                              {sanmarTestResult.message || sanmarTestResult.error}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -5720,13 +6193,23 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Account Number {!ssaHasCredentials && <span className="text-red-500">*</span>}
                       </label>
-                      <input
-                        type="text"
-                        value={ssaAccountNumber}
-                        onChange={(e) => setSsaAccountNumber(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder={ssaHasCredentials ? "Leave blank to keep existing" : "Your SSActivewear account number"}
-                      />
+                      <div className="relative">
+                        <input
+                          type={showSsaAccountNumber ? 'text' : 'password'}
+                          value={ssaAccountNumber}
+                          onChange={(e) => setSsaAccountNumber(e.target.value)}
+                          className="w-full px-4 py-2 pr-10 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder={ssaHasCredentials ? "Leave blank to keep existing" : "Your SSActivewear account number"}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowSsaAccountNumber(!showSsaAccountNumber)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                          tabIndex={-1}
+                        >
+                          {showSsaAccountNumber ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
+                      </div>
                       {ssaHasCredentials && (
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                           Enter a new account number only if you want to update it
@@ -5761,95 +6244,272 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         </p>
                       )}
                     </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        FOB Warehouse <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={ssaFobId}
+                        onChange={(e) => setSsaFobId(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        {SSACTIVEWEAR_WAREHOUSES.map((warehouse) => (
+                          <option key={warehouse.id} value={warehouse.id}>
+                            {warehouse.name} ({warehouse.id})
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Select your preferred shipping warehouse. This affects wholesale pricing from SSActivewear.
+                      </p>
+                    </div>
+
+                    <div className="flex gap-3 mt-4">
+                      <button
+                        onClick={saveSSActivewearSettings}
+                        disabled={savingSSA}
+                        className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                      >
+                        {savingSSA ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4" />
+                            Save SSActivewear Settings
+                          </>
+                        )}
+                      </button>
+                      {ssaHasCredentials && (
+                        <button
+                          onClick={testSSAConnection}
+                          disabled={testingSSA}
+                          className="px-4 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                        >
+                          {testingSSA ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+                              Testing...
+                            </>
+                          ) : (
+                            <>
+                              <Zap className="w-4 h-4" />
+                              Test
+                            </>
+                          )}
+                        </button>
+                      )}
+                      {ssaHasCredentials && (
+                        <button
+                          onClick={syncSSACatalog}
+                          disabled={syncingCatalog}
+                          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                        >
+                          {syncingCatalog ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              Syncing...
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="w-4 h-4" />
+                              Sync
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+
+                    {ssaTestResult && (
+                      <div className={`p-4 rounded-lg border ${ssaTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
+                        <div className="flex items-start gap-3">
+                          <div className={`flex-shrink-0 w-6 h-6 rounded-full ${ssaTestResult.success ? 'bg-green-500' : 'bg-red-500'} flex items-center justify-center text-white text-sm font-bold`}>
+                            {ssaTestResult.success ? '✓' : '✕'}
+                          </div>
+                          <div className="flex-1">
+                            <h4 className={`font-medium ${ssaTestResult.success ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'}`}>
+                              {ssaTestResult.success ? 'Connection Successful!' : 'Connection Failed'}
+                            </h4>
+                            <p className={`text-sm mt-1 ${ssaTestResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
+                              {ssaTestResult.message || ssaTestResult.error}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {catalogSyncResult && (
+                      <div className={`p-4 rounded-lg border ${catalogSyncResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
+                        <div className="flex items-start gap-3">
+                          <div className={`flex-shrink-0 w-6 h-6 rounded-full ${catalogSyncResult.success ? 'bg-green-500' : 'bg-red-500'} flex items-center justify-center text-white text-sm font-bold`}>
+                            {catalogSyncResult.success ? '✓' : '✕'}
+                          </div>
+                          <div className="flex-1">
+                            <h4 className={`font-medium ${catalogSyncResult.success ? 'text-green-900 dark:text-green-100' : 'text-red-900 dark:text-red-100'}`}>
+                              {catalogSyncResult.success ? 'Catalog Sync Successful!' : 'Catalog Sync Failed'}
+                            </h4>
+                            <p className={`text-sm mt-1 ${catalogSyncResult.success ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
+                              {catalogSyncResult.message || catalogSyncResult.error}
+                            </p>
+                            {catalogSyncResult.success && catalogSyncResult.details && (
+                              <div className="mt-2 text-xs space-y-1 text-green-700 dark:text-green-300">
+                                <p>Total Companies: {catalogSyncResult.details.totalCompanies || 0}</p>
+                                <p>Total Styles: {catalogSyncResult.details.totalStyles || 0}</p>
+                                {catalogSyncResult.details.errors && catalogSyncResult.details.errors.length > 0 && (
+                                  <p className="text-orange-600 dark:text-orange-400">
+                                    {catalogSyncResult.details.errors.length} error(s) occurred
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Collapsible Pricing Diagnostics */}
+                    <div className="mt-4 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                      <button
+                        onClick={() => setDiagnosticsExpanded(!diagnosticsExpanded)}
+                        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Wrench className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Pricing API Diagnostics</span>
+                        </div>
+                        {diagnosticsExpanded ? (
+                          <ChevronUp className="w-4 h-4 text-gray-500" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-gray-500" />
+                        )}
+                      </button>
+
+                      {diagnosticsExpanded && (
+                        <div className="p-4 space-y-4 border-t border-gray-200 dark:border-gray-700">
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            Test the S&S Activewear PromoStandards Pricing API with a specific style number to verify pricing data is being retrieved correctly.
+                          </p>
+
+                          <div className="flex gap-3 items-end">
+                            <div className="flex-1">
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                Style Number
+                              </label>
+                              <input
+                                type="text"
+                                value={testStyleNumber}
+                                onChange={(e) => setTestStyleNumber(e.target.value)}
+                                placeholder="e.g., 18000, 5000, 64000"
+                                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              />
+                            </div>
+                            <button
+                              onClick={testSSAPricing}
+                              disabled={testingPricing || !testStyleNumber.trim()}
+                              className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                            >
+                              {testingPricing ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  Testing...
+                                </>
+                              ) : (
+                                <>
+                                  <Zap className="w-4 h-4" />
+                                  Test Pricing
+                                </>
+                              )}
+                            </button>
+                          </div>
+
+                          {pricingTestResult && (
+                            <div className={`p-4 rounded-lg border ${pricingTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'}`}>
+                              <div className="flex items-start gap-3">
+                                <div className={`flex-shrink-0 w-6 h-6 rounded-full ${pricingTestResult.success ? 'bg-green-500' : 'bg-amber-500'} flex items-center justify-center text-white text-sm font-bold`}>
+                                  {pricingTestResult.success ? '✓' : '!'}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className={`font-medium ${pricingTestResult.success ? 'text-green-900 dark:text-green-100' : 'text-amber-900 dark:text-amber-100'}`}>
+                                    {pricingTestResult.success ? 'Pricing Retrieved Successfully' : pricingTestResult.error ? 'Test Failed' : 'No Pricing Data Found'}
+                                  </h4>
+                                  <p className={`text-sm mt-1 ${pricingTestResult.success ? 'text-green-800 dark:text-green-200' : 'text-amber-800 dark:text-amber-200'}`}>
+                                    {pricingTestResult.message || pricingTestResult.error}
+                                  </p>
+
+                                  {pricingTestResult.pricingAttempts && pricingTestResult.pricingAttempts.length > 0 && (
+                                    <div className="mt-3 p-3 bg-white/50 dark:bg-slate-800/50 rounded border border-gray-200 dark:border-gray-700">
+                                      <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">ProductId Attempts:</p>
+                                      <div className="space-y-1">
+                                        {pricingTestResult.pricingAttempts.map((attempt: any, idx: number) => (
+                                          <div key={idx} className="flex items-center gap-2 text-xs">
+                                            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-white ${attempt.resultCount > 0 ? 'bg-green-500' : 'bg-gray-400'}`}>
+                                              {attempt.resultCount > 0 ? '✓' : idx + 1}
+                                            </span>
+                                            <code className="px-1.5 py-0.5 bg-gray-100 dark:bg-slate-700 rounded font-mono">
+                                              {attempt.id}
+                                            </code>
+                                            <span className="text-gray-500 dark:text-gray-400">
+                                              ({attempt.source}) - {attempt.resultCount} results
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {pricingTestResult.success && (
+                                    <div className="mt-2 text-xs text-green-700 dark:text-green-300">
+                                      <p>Pricing Source: {pricingTestResult.pricingSource}</p>
+                                      <p>Total Price Entries: {pricingTestResult.pricingCount}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* Save Button */}
-              <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
-                <div className="text-xs text-gray-500 dark:text-gray-400">
-                  <p>Enable at least one integration to auto-populate product information when creating quotes</p>
+              {/* Information Footer */}
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  <p>Each supplier's settings are saved independently. Saving one supplier will not affect the other.</p>
                 </div>
-                <button
-                  onClick={saveSupplierIntegrations}
-                  disabled={savingSuppliers || (!sanmarEnabled && !ssaEnabled)}
-                  className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                >
-                  {savingSuppliers ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4" />
-                      Save Supplier Credentials
-                    </>
-                  )}
-                </button>
               </div>
-
-              {/* Connection Status */}
-              {(sanmarEnabled || ssaEnabled) && (
-                <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-blue-800 dark:text-blue-200">
-                      <Grid3x3 className="w-5 h-5" />
-                      <div>
-                        <p className="font-medium">Supplier Integrations Active</p>
-                        <p className="text-sm mt-1">
-                          {sanmarEnabled && ssaEnabled ? 'SanMar and SSActivewear are configured' :
-                           sanmarEnabled ? 'SanMar is configured' : 'SSActivewear is configured'}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={testSupplierConnections}
-                      disabled={testingSuppliers}
-                      className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-700 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 disabled:opacity-50 transition-colors"
-                    >
-                      {testingSuppliers ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Testing...
-                        </>
-                      ) : (
-                        'Test Connections'
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Test Results */}
-              {supplierTestResult && (
-                <div className={`p-4 rounded-lg border ${supplierTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
-                  <div className="space-y-3">
-                    {supplierTestResult.success ? (
-                      <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-bold">
-                          ✓
-                        </div>
-                        <div className="flex-1">
-                          <h4 className="font-medium text-green-900 dark:text-green-100">Connections Successful!</h4>
-                          <p className="text-sm text-green-800 dark:text-green-200 mt-1">{supplierTestResult.message}</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-red-500 flex items-center justify-center text-white text-sm font-bold">
-                          ✕
-                        </div>
-                        <div className="flex-1">
-                          <h4 className="font-medium text-red-900 dark:text-red-100">Connection Failed</h4>
-                          <p className="text-sm text-red-800 dark:text-red-200 mt-1">{supplierTestResult.error}</p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
+          )}
+
+          {/* ShipStation Integration Section */}
+          {activeTab === 'shipstation-integration' && canAccessIntegrations && (
+            <Suspense
+              fallback={
+                <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 flex items-center justify-center">
+                  <Loader2 className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-spin" />
+                </div>
+              }
+            >
+              <ShipStationSettings />
+            </Suspense>
+          )}
+
+          {/* Chipply Integration Section */}
+          {activeTab === 'chipply-integration' && canAccessIntegrations && (
+            <Suspense
+              fallback={
+                <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 flex items-center justify-center">
+                  <Loader2 className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-spin" />
+                </div>
+              }
+            >
+              <ChipplyIntegrationSettings onBack={() => setActiveTab('company-info')} />
+            </Suspense>
           )}
 
           {/* Production General Settings Section */}
@@ -5860,7 +6520,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Invoice Fees</h2>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">Configure additional fees for invoices</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Drag to reorder within categories</p>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <button
@@ -5889,52 +6549,88 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     <p className="text-xs">No fees yet</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-1">
-                    {invoiceFees.map((fee, index) => (
-                      <div
-                        key={fee.id}
-                        draggable
-                        onDragStart={() => handleFeeDragStart(index)}
-                        onDragOver={(e) => handleFeeDragOver(e, index)}
-                        onDragEnd={handleFeeDragEnd}
-                        className="flex items-center gap-1 p-1.5 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors cursor-move group"
-                      >
-                        <GripVertical className="w-3 h-3 text-gray-400 dark:text-gray-500 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-xs font-medium text-gray-900 dark:text-white truncate">{fee.fee_name}</h3>
-                          <div className="flex items-center gap-0.5 flex-wrap mt-0.5">
-                            <span className="px-1 py-0.5 text-[10px] font-medium rounded bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 whitespace-nowrap">
-                              {fee.amount_type === 'dollar' ? `$${fee.amount.toFixed(2)}` : `${fee.amount}%`}
-                            </span>
-                            {fee.is_taxed && (
-                              <span className="px-1 py-0.5 text-[10px] font-medium rounded bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 whitespace-nowrap">
-                                T
-                              </span>
-                            )}
-                            {fee.show_by_default && (
-                              <span className="px-1 py-0.5 text-[10px] font-medium rounded bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 whitespace-nowrap">
-                                A
-                              </span>
-                            )}
+                  (() => {
+                    // Group fees by category
+                    const groupedFees: { [key: string]: InvoiceFee[] } = {};
+                    invoiceFees.forEach(fee => {
+                      const category = fee.category || 'Uncategorized';
+                      if (!groupedFees[category]) {
+                        groupedFees[category] = [];
+                      }
+                      groupedFees[category].push(fee);
+                    });
+
+                    const categories = Object.keys(groupedFees).sort((a, b) => {
+                      if (a === 'Uncategorized') return 1;
+                      if (b === 'Uncategorized') return -1;
+                      return a.localeCompare(b);
+                    });
+
+                    return (
+                      <div className="space-y-2">
+                        {categories.map(category => (
+                          <div key={category}>
+                            <h3 className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1 px-1">
+                              {category}
+                            </h3>
+                            <div className="space-y-0.5">
+                              {groupedFees[category].map((fee) => {
+                                const globalIndex = invoiceFees.indexOf(fee);
+                                return (
+                                  <div
+                                    key={fee.id}
+                                    draggable
+                                    onDragStart={() => handleFeeDragStart(globalIndex)}
+                                    onDragOver={(e) => handleFeeDragOver(e, globalIndex)}
+                                    onDragEnd={handleFeeDragEnd}
+                                    className={`flex items-center gap-2 px-2 py-1.5 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors cursor-move ${
+                                      draggedFeeIndex === globalIndex ? 'opacity-50' : ''
+                                    }`}
+                                  >
+                                    <GripVertical className="w-3 h-3 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-xs font-medium text-gray-900 dark:text-white">
+                                          {fee.fee_name}
+                                        </span>
+                                        {fee.show_by_default && (
+                                          <span className="text-[10px] px-1 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded font-medium">
+                                            Auto
+                                          </span>
+                                        )}
+                                        {fee.is_taxed && (
+                                          <span className="text-[10px] px-1 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded font-medium">
+                                            Tax
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                      <span className="text-xs font-semibold text-gray-900 dark:text-white whitespace-nowrap">
+                                        {fee.amount_type === 'dollar' ? `$${fee.amount.toFixed(2)}` : `${fee.amount}%`}
+                                      </span>
+                                      <button
+                                        onClick={() => openEditFeeModal(fee)}
+                                        className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                                      >
+                                        <Edit className="w-3 h-3" />
+                                      </button>
+                                      <button
+                                        onClick={() => deleteFee(fee.id)}
+                                        className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex flex-col gap-0.5 flex-shrink-0">
-                          <button
-                            onClick={() => openEditFeeModal(fee)}
-                            className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
-                          >
-                            <Edit className="w-3 h-3" />
-                          </button>
-                          <button
-                            onClick={() => deleteFee(fee.id)}
-                            className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })()
                 )}
               </div>
 
@@ -6006,15 +6702,15 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 )}
               </div>
 
-              {/* Ink Colors */}
-              <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" /></div>}>
-                <InkThreadColorsManager colorType="ink" />
-              </Suspense>
-
-              {/* Thread Colors */}
-              <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" /></div>}>
-                <InkThreadColorsManager colorType="thread" />
-              </Suspense>
+              {/* Ink & Thread Colors - Side by Side */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" /></div>}>
+                  <InkThreadColorsManager colorType="ink" />
+                </Suspense>
+                <Suspense fallback={<div className="flex items-center justify-center py-12"><Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" /></div>}>
+                  <InkThreadColorsManager colorType="thread" />
+                </Suspense>
+              </div>
 
               {/* Custom Line Item Options */}
               <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-3 space-y-2">
@@ -6062,9 +6758,31 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     {customLineItemOptions.map((option, index) => (
                       <div
                         key={index}
-                        className="flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
+                        draggable
+                        onDragStart={(e) => {
+                          setDraggedLineItemIndex(index);
+                          e.dataTransfer.effectAllowed = 'move';
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = 'move';
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          if (draggedLineItemIndex !== null && draggedLineItemIndex !== index) {
+                            reorderLineItemOptions(draggedLineItemIndex, index);
+                          }
+                          setDraggedLineItemIndex(null);
+                        }}
+                        onDragEnd={() => setDraggedLineItemIndex(null)}
+                        className={`flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors ${
+                          draggedLineItemIndex === index ? 'opacity-50' : ''
+                        }`}
                       >
-                        <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <div className="cursor-grab active:cursor-grabbing text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">
+                            <GripVertical className="w-4 h-4" />
+                          </div>
                           <h3 className="text-xs font-medium text-gray-900 dark:text-white truncate">{option}</h3>
                         </div>
                         <div className="flex items-center gap-0.5 ml-2">
@@ -6126,6 +6844,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         key={workType.id}
                         className="flex items-center gap-1 p-1.5 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors"
                       >
+                        <div
+                          className="w-3 h-3 rounded-full border-2 border-white dark:border-slate-800 shadow-sm flex-shrink-0"
+                          style={{ backgroundColor: workType.imprint_color || '#6b7280' }}
+                          title="Imprint Color"
+                        />
                         <div className="flex-1 min-w-0">
                           <h3 className="text-xs font-medium text-gray-900 dark:text-white truncate">{workType.work_type_name}</h3>
                           <span className={`px-1 py-0.5 text-[10px] font-medium rounded whitespace-nowrap inline-block mt-0.5 ${
@@ -6249,6 +6972,27 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             </div>
           )}
 
+          {/* Receiving Settings Section */}
+          {activeTab === 'receiving-settings' && (
+            <Suspense fallback={
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 text-green-600 dark:text-green-400 animate-spin" />
+              </div>
+            }>
+              <ReceivingSettings />
+            </Suspense>
+          )}
+
+          {activeTab === 'po-settings' && (
+            <Suspense fallback={
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" />
+              </div>
+            }>
+              <POSettings />
+            </Suspense>
+          )}
+
           {/* Invoice Fees Section */}
           {activeTab === 'invoice-fees' && (
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
@@ -6257,13 +7001,22 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Invoice Fees</h2>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Configure additional fees that can be applied to invoices</p>
                 </div>
-                <button
-                  onClick={openAddFeeModal}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add Fee
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowBulkAddFeesModal(true)}
+                    className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Bulk
+                  </button>
+                  <button
+                    onClick={openAddFeeModal}
+                    className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add
+                  </button>
+                </div>
               </div>
 
               <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
@@ -6272,7 +7025,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   <div>
                     <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">Invoice Fee Management</h3>
                     <p className="text-sm text-blue-800 dark:text-blue-200">
-                      Create fees that auto-populate in quotes/invoices. Fees marked as "Show By Default" will be automatically added to new quotes and invoices.
+                      Create fees that auto-populate in quotes/invoices. Drag to reorder within categories. Fees marked as "Auto-Add" will be automatically added to new quotes and invoices.
                     </p>
                   </div>
                 </div>
@@ -6287,71 +7040,86 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   <CreditCard className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-3" />
                   <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Invoice Fees</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                    You haven't created any invoice fees yet. Click "Add Fee" to create your first fee.
+                    You haven't created any invoice fees yet. Click "Add" to create your first fee.
                   </p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {invoiceFees.map((fee) => (
-                    <div
-                      key={fee.id}
-                      className="border border-gray-200 dark:border-slate-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-semibold text-gray-900 dark:text-white">{fee.fee_name}</h3>
-                            {fee.show_by_default && (
-                              <span className="text-xs px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full font-medium">
-                                Auto-Add
-                              </span>
-                            )}
-                            {fee.is_taxed && (
-                              <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full font-medium">
-                                Taxed
-                              </span>
-                            )}
-                          </div>
-                          {fee.description && (
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{fee.description}</p>
-                          )}
-                          <div className="text-lg font-bold text-gray-900 dark:text-white">
-                            {fee.amount_type === 'dollar' ? `$${fee.amount.toFixed(2)}` : `${fee.amount}%`}
+                (() => {
+                  // Group fees by category
+                  const groupedFees: { [key: string]: InvoiceFee[] } = {};
+                  invoiceFees.forEach(fee => {
+                    const category = fee.category || 'Uncategorized';
+                    if (!groupedFees[category]) {
+                      groupedFees[category] = [];
+                    }
+                    groupedFees[category].push(fee);
+                  });
+
+                  const categories = Object.keys(groupedFees).sort((a, b) => {
+                    if (a === 'Uncategorized') return 1;
+                    if (b === 'Uncategorized') return -1;
+                    return a.localeCompare(b);
+                  });
+
+                  return (
+                    <div className="space-y-4">
+                      {categories.map(category => (
+                        <div key={category}>
+                          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 px-2">
+                            {category}
+                          </h3>
+                          <div className="space-y-1">
+                            {groupedFees[category].map((fee, localIndex) => {
+                              const globalIndex = invoiceFees.indexOf(fee);
+                              return (
+                                <div
+                                  key={fee.id}
+                                  draggable
+                                  onDragStart={() => handleFeeDragStart(globalIndex)}
+                                  onDragOver={(e) => handleFeeDragOver(e, globalIndex)}
+                                  onDragEnd={handleFeeDragEnd}
+                                  className={`flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-slate-700 rounded hover:bg-gray-100 dark:hover:bg-slate-650 transition-colors cursor-move ${
+                                    draggedFeeIndex === globalIndex ? 'opacity-50' : ''
+                                  }`}
+                                >
+                                  <GripVertical className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                        {fee.fee_name}
+                                      </span>
+                                      {fee.show_by_default && (
+                                        <span className="text-xs px-1.5 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded font-medium">
+                                          Auto-Add
+                                        </span>
+                                      )}
+                                      {fee.is_taxed && (
+                                        <span className="text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded font-medium">
+                                          Taxed
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-3 flex-shrink-0">
+                                    <span className="text-sm font-semibold text-gray-900 dark:text-white whitespace-nowrap">
+                                      {fee.amount_type === 'dollar' ? `$${fee.amount.toFixed(2)}` : `${fee.amount}%`}
+                                    </span>
+                                    <button
+                                      onClick={() => deleteFee(fee.id)}
+                                      className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => toggleFeeDefault(fee.id, fee.show_by_default)}
-                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-gray-100 dark:hover:bg-slate-600 rounded-lg transition-colors"
-                            title={fee.show_by_default ? 'Disable auto-add' : 'Enable auto-add'}
-                          >
-                            {fee.show_by_default ? (
-                              <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                              </svg>
-                            ) : (
-                              <svg className="w-5 h-5" fill="none" viewBox="0 0 20 20" stroke="currentColor">
-                                <circle cx="10" cy="10" r="8" strokeWidth="2" />
-                              </svg>
-                            )}
-                          </button>
-                          <button
-                            onClick={() => openEditFeeModal(fee)}
-                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-slate-600 rounded-lg transition-colors"
-                          >
-                            <Edit className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => deleteFee(fee.id)}
-                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-gray-100 dark:hover:bg-slate-600 rounded-lg transition-colors"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  );
+                })()
               )}
             </div>
           )}
@@ -6387,6 +7155,27 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         placeholder="e.g., Processing Fee, Late Fee"
                         className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
                       />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Category
+                      </label>
+                      <select
+                        value={feeFormData.category}
+                        onChange={(e) => setFeeFormData({ ...feeFormData, category: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                      >
+                        <option value="">Uncategorized</option>
+                        {workTypes.map((workType) => (
+                          <option key={workType.id} value={workType.work_type_name}>
+                            {workType.work_type_name}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Group related fees by work type category.
+                      </p>
                     </div>
 
                     <div>
@@ -6642,6 +7431,32 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                             <p className="text-xs text-gray-600 dark:text-gray-400">Laser Engraving, Heat Press, etc.</p>
                           </div>
                         </label>
+                      </div>
+                    </div>
+
+                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                      <h3 className="text-sm font-semibold text-green-900 dark:text-green-100 mb-2">Imprint Color</h3>
+                      <p className="text-sm text-green-800 dark:text-green-200 mb-3">
+                        Choose a color to visually identify this work type in the Kanban Calendar and other views.
+                      </p>
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="color"
+                            value={workTypeFormData.imprint_color}
+                            onChange={(e) => setWorkTypeFormData({ ...workTypeFormData, imprint_color: e.target.value })}
+                            className="w-16 h-10 rounded cursor-pointer border-2 border-gray-300 dark:border-slate-600"
+                          />
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-8 h-8 rounded-full border-2 border-white shadow-md"
+                              style={{ backgroundColor: workTypeFormData.imprint_color }}
+                            />
+                            <span className="text-sm font-mono text-gray-700 dark:text-gray-300">
+                              {workTypeFormData.imprint_color}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -7202,8 +8017,105 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                 </div>
               </div>
 
-              {/* Payment Terms */}
+              {/* Quote & Invoice Terms */}
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Quote & Invoice Terms</h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Set default terms that will appear on quotes and invoices. Supports rich text formatting.</p>
+                </div>
+
+                <div className="space-y-6 border-t border-gray-200 dark:border-slate-700 pt-4">
+                  <Suspense fallback={<div className="flex items-center justify-center py-8"><Loader2 className="w-6 h-6 text-blue-600 animate-spin" /></div>}>
+                    <RichTextTermsEditor
+                      label="Quote Terms"
+                      description="These terms will appear at the bottom of all quote PDFs"
+                      value={quoteTerms}
+                      onChange={setQuoteTerms}
+                      onSave={saveQuoteTerms}
+                      placeholder="Enter your default quote terms, e.g., 'This quote is valid for 30 days. Prices subject to change...'"
+                      saving={savingQuoteTerms}
+                    />
+                  </Suspense>
+
+                  <div className="border-t border-gray-200 dark:border-slate-700 pt-6">
+                    <Suspense fallback={<div className="flex items-center justify-center py-8"><Loader2 className="w-6 h-6 text-blue-600 animate-spin" /></div>}>
+                      <RichTextTermsEditor
+                        label="Invoice Terms"
+                        description="These terms will appear at the bottom of all invoice PDFs"
+                        value={invoiceTerms}
+                        onChange={setInvoiceTerms}
+                        onSave={saveInvoiceTerms}
+                        placeholder="Enter your default payment terms, e.g., 'Payment due within 30 days of invoice date...'"
+                        saving={savingInvoiceTerms}
+                      />
+                    </Suspense>
+                  </div>
+                </div>
+              </div>
+
+              {/* Garment Markup Settings */}
               <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Garment Markup</h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Set the default markup percentage applied to wholesale garment prices</p>
+                </div>
+
+                <div className="space-y-4 border-t border-gray-200 dark:border-slate-700 pt-4">
+                  <div>
+                    <label htmlFor="garment-markup" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Default Markup Percentage
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        id="garment-markup"
+                        value={defaultGarmentMarkup}
+                        onChange={(e) => setDefaultGarmentMarkup(Math.max(0, parseFloat(e.target.value) || 0))}
+                        min="0"
+                        step="1"
+                        className="w-32 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+                      />
+                      <span className="text-sm text-gray-600 dark:text-gray-400">%</span>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      This markup is applied to the wholesale price from vendors. 0% = sell at cost, 50% = 1.5x, 100% = 2x
+                    </p>
+                  </div>
+
+                  <div className="bg-gray-50 dark:bg-slate-700 rounded-lg p-3 border border-gray-200 dark:border-slate-600">
+                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Example:</p>
+                    <div className="space-y-1 text-sm">
+                      <p className="text-gray-600 dark:text-gray-400">
+                        Wholesale price: <span className="font-mono font-semibold text-gray-900 dark:text-white">$10.00</span>
+                      </p>
+                      <p className="text-gray-600 dark:text-gray-400">
+                        With {defaultGarmentMarkup}% markup: <span className="font-mono font-semibold text-green-600 dark:text-green-400">${(10 * (1 + defaultGarmentMarkup / 100)).toFixed(2)}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={saveGarmentMarkup}
+                    disabled={savingGarmentMarkup}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {savingGarmentMarkup ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Save Markup Settings
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* REMOVED: Old Payment Terms section replaced by rich text editors above */}
+              {false && <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-4">
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Payment Terms</h2>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Set default payment terms that will appear on quotes and invoices</p>
@@ -7252,37 +8164,25 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     )}
                   </button>
                 </div>
-              </div>
+              </div>}
 
               {/* Custom Invoice Status */}
-              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 space-y-6">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Custom Invoice Status</h2>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Create and manage custom invoice status labels for your workflow</p>
-                </div>
-
-              <div className="space-y-4">
-                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <Filter className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <h3 className="text-sm font-semibold text-green-900 dark:text-green-100 mb-1">Custom Status Management</h3>
-                      <p className="text-sm text-green-800 dark:text-green-200">
-                        Define custom status labels beyond the standard Printavo statuses to better match your unique business processes and workflows.
-                      </p>
-                    </div>
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
+                <Suspense fallback={
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-6 h-6 text-blue-600 dark:text-blue-400 animate-spin" />
                   </div>
-                </div>
-
-                <div className="border border-gray-200 dark:border-slate-700 rounded-lg p-6 text-center">
-                  <Filter className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-3" />
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Custom Status Labels Coming Soon</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 max-w-md mx-auto">
-                    The ability to create custom invoice status labels will be available in an upcoming release. This feature will enable you to define status categories that align with your specific business needs and reporting requirements.
-                  </p>
-                </div>
+                }>
+                  {companySettings && (
+                    <CustomInvoiceStatusManager companyId={companySettings.id} />
+                  )}
+                </Suspense>
               </div>
-            </div>
+
+              {/* Email Short Codes Reference */}
+              <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
+                <ShortCodeReference showPreview={true} />
+              </div>
             </div>
           )}
 

@@ -1,0 +1,485 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabase-client';
+import {
+  Loader2,
+  Plus,
+  X,
+  FileText,
+  Building2,
+  CheckCircle,
+} from 'lucide-react';
+import { format } from 'date-fns';
+import { POSettingsService } from '../../services/po-settings-service';
+
+interface LineItemPayload {
+  style_number: string;
+  product_name: string;
+  color: string;
+  size: string;
+  quantity: number;
+}
+
+interface Vendor {
+  id: string;
+  vendor_name: string;
+}
+
+interface POSelectionModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  vendorName: string;
+  vendorId: string | null;
+  companyId: string;
+  items: LineItemPayload[];
+  vendors: Vendor[];
+  onSuccess: (poNumber: string) => void;
+}
+
+interface OpenPO {
+  id: string;
+  po_number: string;
+  status: string;
+  created_at: string;
+  total_cost: number;
+}
+
+export function POSelectionModal({
+  isOpen,
+  onClose,
+  vendorName,
+  vendorId: initialVendorId,
+  companyId,
+  items,
+  vendors,
+  onSuccess,
+}: POSelectionModalProps) {
+  const [loading, setLoading] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [openPOs, setOpenPOs] = useState<OpenPO[]>([]);
+  const [selectedPOId, setSelectedPOId] = useState<string>('');
+  const [activeVendorId, setActiveVendorId] = useState<string | null>(initialVendorId);
+  const [activeVendorName, setActiveVendorName] = useState(vendorName);
+  const [needsVendorSelect, setNeedsVendorSelect] = useState(!initialVendorId);
+  const [pickedVendorId, setPickedVendorId] = useState<string>('');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setActiveVendorId(initialVendorId);
+    setActiveVendorName(vendorName);
+    setSelectedPOId('');
+    setPickedVendorId('');
+    if (initialVendorId) {
+      setNeedsVendorSelect(false);
+      loadOpenPOs(initialVendorId);
+    } else {
+      setNeedsVendorSelect(true);
+      setOpenPOs([]);
+      setLoading(false);
+    }
+  }, [isOpen, initialVendorId, vendorName]);
+
+  const loadOpenPOs = async (vid: string) => {
+    try {
+      setLoading(true);
+      setSelectedPOId('');
+
+      const { data, error } = await supabase
+        .from('purchase_orders')
+        .select('id, po_number, status, created_at, total_cost')
+        .eq('company_id', companyId)
+        .eq('vendor_id', vid)
+        .in('status', ['draft', 'sent'])
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      setOpenPOs(data || []);
+    } catch (error) {
+      console.error('Error loading open POs:', error);
+      setOpenPOs([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVendorConfirm = () => {
+    if (!pickedVendorId) return;
+    const v = vendors.find((x) => x.id === pickedVendorId);
+    if (!v) return;
+    setActiveVendorId(v.id);
+    setActiveVendorName(v.vendor_name);
+    setNeedsVendorSelect(false);
+    loadOpenPOs(v.id);
+  };
+
+  const insertLineItems = async (poId: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { data: maxLine } = await supabase
+      .from('purchase_order_line_items')
+      .select('line_number')
+      .eq('po_id', poId)
+      .order('line_number', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    let lineNumber = maxLine?.line_number || 0;
+
+    const rows = items.map((item) => ({
+      company_id: companyId,
+      po_id: poId,
+      line_number: ++lineNumber,
+      style_number: item.style_number,
+      product_name: item.product_name,
+      color: item.color,
+      size: item.size,
+      quantity_ordered: item.quantity,
+      quantity_received: 0,
+      unit_cost: 0,
+      extended_cost: 0,
+    }));
+
+    const { error } = await supabase
+      .from('purchase_order_line_items')
+      .insert(rows);
+
+    if (error) throw error;
+
+    await supabase.from('purchase_order_activity_log').insert({
+      company_id: companyId,
+      po_id: poId,
+      action: 'items_added_from_report',
+      performed_by: user.id,
+      performed_by_name: user.email || 'User',
+      notes: `Added ${items.length} item(s) from Garment Purchase Report`,
+    });
+  };
+
+  const handleAddToExisting = async (poId: string) => {
+    try {
+      setProcessing(true);
+      await insertLineItems(poId);
+      const po = openPOs.find((p) => p.id === poId);
+      onSuccess(po?.po_number || 'PO');
+      onClose();
+    } catch (error: any) {
+      console.error('Error adding to PO:', error);
+      alert(`Failed to add items: ${error.message}`);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleCreateNew = async () => {
+    if (!activeVendorId) return;
+    try {
+      setProcessing(true);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const poNumber = await POSettingsService.generatePONumber();
+
+      const { data: po, error: poError } = await supabase
+        .from('purchase_orders')
+        .insert({
+          company_id: companyId,
+          po_number: poNumber,
+          vendor_id: activeVendorId,
+          status: 'draft',
+          subtotal: 0,
+          tax_amount: 0,
+          shipping_cost: 0,
+          total_cost: 0,
+          internal_notes: 'Created from Garment Purchase Report',
+          created_by: user.id,
+        })
+        .select()
+        .single();
+
+      if (poError) throw poError;
+
+      let lineNumber = 0;
+      const rows = items.map((item) => ({
+        company_id: companyId,
+        po_id: po.id,
+        line_number: ++lineNumber,
+        style_number: item.style_number,
+        product_name: item.product_name,
+        color: item.color,
+        size: item.size,
+        quantity_ordered: item.quantity,
+        quantity_received: 0,
+        unit_cost: 0,
+        extended_cost: 0,
+      }));
+
+      const { error } = await supabase
+        .from('purchase_order_line_items')
+        .insert(rows);
+
+      if (error) throw error;
+
+      await supabase.from('purchase_order_activity_log').insert({
+        company_id: companyId,
+        po_id: po.id,
+        action: 'created',
+        performed_by: user.id,
+        performed_by_name: user.email || 'User',
+        notes: 'PO created from Garment Purchase Report',
+      });
+
+      onSuccess(poNumber);
+      onClose();
+    } catch (error: any) {
+      console.error('Error creating PO:', error);
+      alert(`Failed to create PO: ${error.message}`);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  const totalQty = items.reduce((sum, i) => sum + i.quantity, 0);
+
+  return (
+    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-900 rounded-lg max-w-lg w-full border border-slate-700 shadow-2xl">
+        <div className="p-6 border-b border-slate-700">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-600 rounded-lg">
+                <Building2 className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">
+                  Add to Purchase Order
+                </h3>
+                <p className="text-sm text-gray-400 mt-0.5">
+                  {items.length} line items &middot; {totalQty} units
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              disabled={processing}
+              className="p-2 hover:bg-slate-700 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5 text-gray-400" />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6">
+          {needsVendorSelect ? (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-300">
+                Select the vendor for this purchase order.
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Vendor
+                </label>
+                <select
+                  value={pickedVendorId}
+                  onChange={(e) => setPickedVendorId(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-slate-800 border border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-white"
+                >
+                  <option value="">Choose a vendor...</option>
+                  {vendors.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.vendor_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleVendorConfirm}
+                  disabled={!pickedVendorId}
+                  className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-1 justify-center"
+                >
+                  Continue
+                </button>
+              </div>
+            </div>
+          ) : loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+            </div>
+          ) : openPOs.length === 0 ? (
+            <div className="text-center py-4">
+              <FileText className="w-10 h-10 text-gray-500 mx-auto mb-3" />
+              <p className="text-white font-medium mb-1">No Open PO Found</p>
+              <p className="text-sm text-gray-400 mb-6">
+                No open purchase order found for{' '}
+                <span className="text-white font-medium">
+                  {activeVendorName}
+                </span>
+                . Create a new one?
+              </p>
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={onClose}
+                  disabled={processing}
+                  className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateNew}
+                  disabled={processing}
+                  className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {processing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Plus className="w-4 h-4" />
+                  )}
+                  Create New PO
+                </button>
+              </div>
+            </div>
+          ) : openPOs.length === 1 ? (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-300">
+                Add these garments to{' '}
+                <span className="font-semibold text-white">
+                  {openPOs[0].po_number}
+                </span>{' '}
+                or create a new PO?
+              </p>
+              <div className="p-3 bg-slate-800 rounded-lg border border-slate-600">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-white">
+                      {openPOs[0].po_number}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {openPOs[0].status === 'draft' ? 'Draft' : 'Sent'}{' '}
+                      &middot; Created{' '}
+                      {format(new Date(openPOs[0].created_at), 'MMM d, h:mm a')}
+                    </p>
+                  </div>
+                  <span className="text-sm text-gray-400">
+                    ${openPOs[0].total_cost.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={onClose}
+                  disabled={processing}
+                  className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateNew}
+                  disabled={processing}
+                  className="flex items-center gap-2 px-4 py-2 border border-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:opacity-50 transition-colors"
+                >
+                  {processing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Plus className="w-4 h-4" />
+                  )}
+                  New PO
+                </button>
+                <button
+                  onClick={() => handleAddToExisting(openPOs[0].id)}
+                  disabled={processing}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors flex-1 justify-center"
+                >
+                  {processing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <CheckCircle className="w-4 h-4" />
+                  )}
+                  Add to {openPOs[0].po_number}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-300">
+                Select a PO to add garments to, or create a new PO.
+              </p>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {openPOs.map((po) => (
+                  <button
+                    key={po.id}
+                    onClick={() => setSelectedPOId(po.id)}
+                    className={`w-full p-3 rounded-lg border text-left transition-colors ${
+                      selectedPOId === po.id
+                        ? 'border-blue-500 bg-blue-900/20'
+                        : 'border-slate-600 bg-slate-800 hover:border-slate-500'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-white">
+                          {po.po_number}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {po.status === 'draft' ? 'Draft' : 'Sent'} &middot;{' '}
+                          {format(new Date(po.created_at), 'MMM d, h:mm a')}
+                        </p>
+                      </div>
+                      <span className="text-sm text-gray-400">
+                        ${po.total_cost.toFixed(2)}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={onClose}
+                  disabled={processing}
+                  className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateNew}
+                  disabled={processing}
+                  className="flex items-center gap-2 px-4 py-2 border border-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:opacity-50 transition-colors"
+                >
+                  {processing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Plus className="w-4 h-4" />
+                  )}
+                  New PO
+                </button>
+                <button
+                  onClick={() =>
+                    selectedPOId && handleAddToExisting(selectedPOId)
+                  }
+                  disabled={!selectedPOId || processing}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-1 justify-center"
+                >
+                  {processing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <CheckCircle className="w-4 h-4" />
+                  )}
+                  Add to Selected PO
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -4,7 +4,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, apikey, x-client-info",
 };
 
 Deno.serve(async (req: Request) => {
@@ -17,28 +17,49 @@ Deno.serve(async (req: Request) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
+      console.error("Missing authorization header");
       throw new Error("Missing authorization header");
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey, {
+    const token = authHeader.replace("Bearer ", "");
+    console.log("Token received (first 20 chars):", token.substring(0, 20) + "...");
+
+    // Use service role to validate the token
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+
+    const {
+      data: { user },
+      error: userError,
+    } = await supabaseAdmin.auth.getUser(token);
+
+    if (userError) {
+      console.error("JWT validation error:", userError);
+      throw new Error(`Invalid JWT: ${userError.message}`);
+    }
+
+    if (!user) {
+      console.error("No user found for token");
+      throw new Error("Not authenticated - no user found");
+    }
+
+    console.log("User authenticated:", user.id);
+
+    // Create client with user's token for RLS
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
         headers: { Authorization: authHeader },
       },
     });
-
-    // Get authenticated user
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      throw new Error("Not authenticated");
-    }
 
     // Get user profile and company_id
     const { data: profile } = await supabase
@@ -53,10 +74,52 @@ Deno.serve(async (req: Request) => {
 
     const url = new URL(req.url);
     const pathParts = url.pathname.split("/").filter(Boolean);
-    const quoteId = pathParts[pathParts.length - 1];
+    const lastPath = pathParts[pathParts.length - 1];
+    const quoteId = lastPath && lastPath.match(/^[0-9a-f-]{36}$/i) ? lastPath : null;
+
+    // POST /draft - Create minimal draft quote
+    if (req.method === "POST" && (lastPath === "draft" || url.pathname.endsWith("/draft"))) {
+      // Generate quote number
+      const { data: quoteNumber } = await supabase.rpc("generate_quote_number", {
+        p_company_id: profile.company_id
+      });
+
+      const quoteData = {
+        quote_number: quoteNumber,
+        company_id: profile.company_id,
+        customer_id: null,
+        customer_name: "Draft Quote",
+        status: "draft",
+        subtotal: 0,
+        tax_rate: 0,
+        tax_amount: 0,
+        total: 0,
+        autosave_enabled: true,
+        created_by: user.id,
+      };
+
+      const { data: quote, error: quoteError } = await supabase
+        .from("quotes")
+        .insert([quoteData])
+        .select()
+        .single();
+
+      if (quoteError) throw quoteError;
+
+      return new Response(
+        JSON.stringify({ quote }),
+        {
+          status: 201,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
 
     // GET /quotes - List quotes with filters
-    if (req.method === "GET" && !quoteId.match(/^[0-9a-f-]{36}$/i)) {
+    if (req.method === "GET" && !quoteId) {
       const status = url.searchParams.get("status");
       const customerId = url.searchParams.get("customer_id");
       const search = url.searchParams.get("search");

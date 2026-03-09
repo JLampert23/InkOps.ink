@@ -1,8 +1,8 @@
 import { ApolloClient, InMemoryCache, HttpLink, ApolloLink, from } from '@apollo/client';
 import { onError } from '@apollo/client/link/error';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://cuaukcvccxvfpuxaciac.supabase.co';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1YXVrY3ZjY3h2ZnB1eGFjaWFjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY1NjA4NTQsImV4cCI6MjA4MjEzNjg1NH0.I-FDsR0oezVPxKcWgFmV-MMolV6E-lYcoA7Ew8ZgKYU';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 const httpLink = new HttpLink({
   uri: `${SUPABASE_URL}/functions/v1/printavo-proxy`,

@@ -1,10 +1,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { renderTemplate, formatCurrency, formatDate, type ShortCodeData } from '../_shared/shortcode-engine.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey, X-User-Token",
 };
 
 interface EmailAttachment {
@@ -20,6 +21,7 @@ interface EmailRequest {
   data?: Record<string, any>;
   html?: string;
   attachments?: EmailAttachment[];
+  shortCodeData?: ShortCodeData;
 }
 
 interface ResendResponse {
@@ -38,60 +40,94 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Missing authorization header');
-    }
-
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
+
     if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
       throw new Error('Supabase configuration missing');
     }
 
-    // Extract JWT from Bearer token
-    const jwt = authHeader.replace('Bearer ', '');
+    const userToken = req.headers.get('X-User-Token') || '';
+    const authHeader = req.headers.get('Authorization');
+    const bearerToken = authHeader?.replace('Bearer ', '') || '';
+    const isServiceCall = bearerToken === supabaseServiceKey;
+    const token = isServiceCall ? bearerToken : (userToken || bearerToken);
 
-    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
-
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(jwt);
-
-    console.log('User validation result:', { user: user?.id, error: userError?.message });
-
-    if (userError || !user) {
-      const errorMsg = userError?.message || 'No user found';
-      console.error('Authentication failed:', errorMsg);
-      return new Response(
-        JSON.stringify({ code: 401, message: `Invalid JWT: ${errorMsg}` }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+    if (!token) {
+      throw new Error('Missing authorization');
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { data: settings, error: settingsError } = await supabase
+    let companyId: string;
+
+    if (isServiceCall) {
+      const body = await req.clone().json();
+      if (!body.company_id) {
+        throw new Error('company_id is required for service-to-service calls');
+      }
+      companyId = body.company_id;
+    } else {
+      const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
+        auth: { autoRefreshToken: false, persistSession: false }
+      });
+
+      const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
+
+      if (userError || !user) {
+        return new Response(
+          JSON.stringify({
+            code: 401,
+            message: `Invalid JWT: ${userError?.message || 'No user found'}`,
+          }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      const { data: userProfile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!userProfile?.company_id) {
+        throw new Error('User company not found');
+      }
+      companyId = userProfile.company_id;
+    }
+
+    const { data: companySettings, error: settingsError } = await supabase
       .from('company_settings')
-      .select('resend_api_key, email_from_address')
+      .select('resend_api_key, email_from_address, company_name')
+      .eq('id', companyId)
       .maybeSingle();
 
     if (settingsError) {
-      throw new Error(`Failed to load settings: ${settingsError.message}`);
+      throw new Error(`Failed to load company settings: ${settingsError.message}`);
     }
 
-    if (!settings?.resend_api_key) {
-      throw new Error('Resend API key not configured. Please add it in Settings → Integrations.');
+    if (!companySettings) {
+      throw new Error('Company settings not found.');
     }
 
-    if (!settings?.email_from_address) {
-      throw new Error('From email address not configured. Please add it in Settings → Integrations.');
+    if (!companySettings.resend_api_key) {
+      throw new Error('Resend API key not configured. Please add it in Account Settings.');
     }
 
-    const cryptoResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
+    if (!companySettings.email_from_address) {
+      throw new Error('From email address not configured. Please add it in Account Settings.');
+    }
+
+    const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
+    if (!encryptionKey) {
+      throw new Error('ENCRYPTION_KEY environment variable not set');
+    }
+
+    const decryptResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -99,19 +135,23 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify({
         action: 'decrypt',
-        token: settings.resend_api_key,
+        token: companySettings.resend_api_key,
       }),
     });
 
-    if (!cryptoResponse.ok) {
-      const errorData = await cryptoResponse.json();
-      throw new Error(`Failed to decrypt API key: ${errorData.error || 'Unknown error'}`);
+    if (!decryptResponse.ok) {
+      const errorData = await decryptResponse.json();
+      throw new Error(`Failed to decrypt Resend API key: ${errorData.error || 'Unknown error'}`);
     }
 
-    const { result: RESEND_API_KEY } = await cryptoResponse.json();
+    const { result: decryptedApiKey } = await decryptResponse.json();
+
+    const RESEND_API_KEY = decryptedApiKey;
+    const fromEmail = companySettings.email_from_address;
+    const fromName = companySettings.company_name || '';
 
     const emailRequest: EmailRequest = await req.json();
-    const { to, subject, template, data, html: customHtml, attachments } = emailRequest;
+    const { to, subject, template, data, html: customHtml, attachments, shortCodeData } = emailRequest;
 
     if (!to || !subject) {
       return new Response(
@@ -129,12 +169,25 @@ Deno.serve(async (req: Request) => {
       html = generateEmailTemplate(template, data || {});
     }
 
+    // Apply short code replacement if shortCodeData is provided
+    if (html && shortCodeData) {
+      html = renderTemplate(html, shortCodeData);
+    }
+
+    // Also apply short codes to subject line
+    let finalSubject = subject;
+    if (shortCodeData) {
+      finalSubject = renderTemplate(subject, shortCodeData);
+    }
+
     const toArray = Array.isArray(to) ? to : [to];
 
+    const fromAddress = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
+
     const emailPayload: any = {
-      from: data?.from || settings.email_from_address,
+      from: fromAddress,
       to: toArray,
-      subject: subject,
+      subject: finalSubject,
       html: html,
     };
 
@@ -144,6 +197,15 @@ Deno.serve(async (req: Request) => {
         content: att.content,
       }));
     }
+
+    console.log('Sending email with payload:', {
+      from: emailPayload.from,
+      to: emailPayload.to,
+      subject: emailPayload.subject,
+      hasHtml: !!emailPayload.html,
+      htmlLength: emailPayload.html?.length,
+      attachmentCount: emailPayload.attachments?.length || 0,
+    });
 
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',

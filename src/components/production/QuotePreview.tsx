@@ -12,6 +12,7 @@ interface QuotePreviewProps {
 export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
   const [quote, setQuote] = useState<any>(null);
   const [lineItems, setLineItems] = useState<any[]>([]);
+  const [imprints, setImprints] = useState<any[]>([]);
   const [companySettings, setCompanySettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -22,14 +23,16 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
   const loadQuoteData = async () => {
     setLoading(true);
     try {
-      const [quoteRes, itemsRes, settingsRes] = await Promise.all([
+      const [quoteRes, itemsRes, imprintsRes, settingsRes] = await Promise.all([
         supabase.from('quotes').select('*').eq('id', quoteId).single(),
         supabase.from('quote_line_items').select('*').eq('quote_id', quoteId).order('line_number'),
+        supabase.from('quote_imprints').select('*').eq('quote_id', quoteId).order('imprint_number'),
         supabase.from('company_settings').select('*').maybeSingle(),
       ]);
 
       if (quoteRes.data) setQuote(quoteRes.data);
       if (itemsRes.data) setLineItems(itemsRes.data);
+      if (imprintsRes.data) setImprints(imprintsRes.data);
       if (settingsRes.data) setCompanySettings(settingsRes.data);
     } catch (err) {
       console.error('Error loading quote:', err);
@@ -191,34 +194,43 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
 
     const items = lineItems.filter(item => item.line_type === 'item' || !item.line_type);
     const fees = lineItems.filter(item => item.line_type === 'fee');
-    const imprints = lineItems.filter(item => item.line_type === 'imprint');
 
     if (items.length > 0) {
-      const itemRows = items.map(item => [
-        item.item_number || '',
-        item.color || '',
-        item.description || '',
-        item.qty_yxs || '',
-        item.qty_ys || '',
-        item.qty_ym || '',
-        item.qty_yl || '',
-        item.qty_yxl || '',
-        item.qty_xs || '',
-        item.qty_s || '',
-        item.qty_m || '',
-        item.qty_l || '',
-        item.qty_xl || '',
-        item.qty_2xl || '',
-        item.qty_3xl || '',
-        item.qty_4xl || '',
-        item.quantity || 0,
-        `$${(item.unit_price || 0).toFixed(2)}`,
-        `$${(item.total_price || 0).toFixed(2)}`,
-      ]);
+      const itemRows = items.map(item => {
+        const sizeQty = (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) +
+                       (item.qty_yl || 0) + (item.qty_yxl || 0) + (item.qty_xs || 0) +
+                       (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) +
+                       (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
+                       (item.qty_4xl || 0);
+        const totalItems = sizeQty + (item.quantity || 0);
+
+        return [
+          item.item_number || '',
+          item.color || '',
+          item.description || '',
+          item.qty_yxs || '',
+          item.qty_ys || '',
+          item.qty_ym || '',
+          item.qty_yl || '',
+          item.qty_yxl || '',
+          item.qty_xs || '',
+          item.qty_s || '',
+          item.qty_m || '',
+          item.qty_l || '',
+          item.qty_xl || '',
+          item.qty_2xl || '',
+          item.qty_3xl || '',
+          item.qty_4xl || '',
+          item.quantity || '',
+          totalItems,
+          `$${(item.unit_price || 0).toFixed(2)}`,
+          `$${(item.total_price || 0).toFixed(2)}`,
+        ];
+      });
 
       autoTable(doc, {
         startY: yPos,
-        head: [['Item #', 'Color', 'Description', 'YXS', 'YS', 'YM', 'YL', 'YXL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', 'Qty', 'Price', 'Total']],
+        head: [['Item #', 'Color', 'Description', 'YXS', 'YS', 'YM', 'YL', 'YXL', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', 'Qty', 'Items', 'Price', 'Total']],
         body: itemRows,
         theme: 'grid',
         styles: { fontSize: 6, cellPadding: 0.5 },
@@ -228,22 +240,44 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
       yPos = (doc as any).lastAutoTable.finalY + 8;
     }
 
+    // Imprints section
     if (imprints.length > 0) {
       imprints.forEach((imprint) => {
         doc.setFontSize(9);
         doc.setFont('helvetica', 'bold');
         doc.text(`IMPRINT #${imprint.imprint_number || ''}`, 14, yPos);
         yPos += 5;
+
         doc.setFontSize(8);
         doc.setFont('helvetica', 'normal');
-        if (imprint.decoration_method) {
-          doc.text(`${imprint.decoration_method.toUpperCase()}`, 14, yPos);
+
+        if (imprint.location) {
+          doc.text(`Location: ${imprint.location}`, 14, yPos);
           yPos += 4;
         }
-        if (imprint.description) {
-          doc.text(imprint.description, 14, yPos);
+
+        if (imprint.type_of_work) {
+          doc.text(`${imprint.type_of_work.toUpperCase()}`, 14, yPos);
           yPos += 4;
         }
+
+        const artworkImages = imprint.artwork_images && Array.isArray(imprint.artwork_images)
+          ? imprint.artwork_images
+          : imprint.artwork_url
+            ? [imprint.artwork_url]
+            : [];
+
+        if (artworkImages.length > 0) {
+          doc.text(`${artworkImages.length} artwork variation(s)`, 14, yPos);
+          yPos += 4;
+        }
+
+        if (imprint.details) {
+          const detailLines = doc.splitTextToSize(imprint.details, 180);
+          doc.text(detailLines, 14, yPos);
+          yPos += detailLines.length * 4;
+        }
+
         yPos += 4;
       });
     }
@@ -505,7 +539,8 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
                       <th className="border border-gray-400 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>3XL</th>
                       <th className="border border-gray-400 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>4XL</th>
                       <th className="border border-gray-400 px-1 py-0.5 text-center font-semibold">Qty</th>
-                      <th className="border border-gray-400 px-1 py-0.5 text-right font-semibold">Items Price</th>
+                      <th className="border border-gray-400 px-1 py-0.5 text-center font-semibold">Items</th>
+                      <th className="border border-gray-400 px-1 py-0.5 text-right font-semibold">Unit Price</th>
                       <th className="border border-gray-400 px-1 py-0.5 text-right font-semibold">Total</th>
                     </tr>
                   </thead>
@@ -526,17 +561,18 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
                         <>
                           {groupLabel && (
                             <tr key={`group-${groupIdx}`} className="bg-gray-200">
-                              <td colSpan={18} className="border border-gray-400 px-2 py-1 font-bold text-gray-900">
+                              <td colSpan={20} className="border border-gray-400 px-2 py-1 font-bold text-gray-900">
                                 {groupLabel}
                               </td>
                             </tr>
                           )}
                           {groupItems.map((item, idx) => {
-                            const totalQty = (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) +
+                            const sizeQty = (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) +
                                             (item.qty_yl || 0) + (item.qty_yxl || 0) + (item.qty_xs || 0) +
                                             (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) +
                                             (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
                                             (item.qty_4xl || 0);
+                            const totalItems = sizeQty + (item.quantity || 0);
                             return (
                               <tr key={`${groupIdx}-${idx}`}>
                                 <td className="border border-gray-400 px-1 py-0.5">{item.item_number || ''}</td>
@@ -555,7 +591,8 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
                                 <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_2xl || ''}</td>
                                 <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_3xl || ''}</td>
                                 <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_4xl || ''}</td>
-                                <td className="border border-gray-400 px-1 py-0.5 text-center">{totalQty}</td>
+                                <td className="border border-gray-400 px-1 py-0.5 text-center">{item.quantity || ''}</td>
+                                <td className="border border-gray-400 px-1 py-0.5 text-center font-semibold text-blue-600">{totalItems}</td>
                                 <td className="border border-gray-400 px-1 py-0.5 text-right">${(item.unit_price || 0).toFixed(2)}</td>
                                 <td className="border border-gray-400 px-1 py-0.5 text-right">${(item.total_price || 0).toFixed(2)}</td>
                               </tr>
@@ -570,26 +607,46 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
             )}
 
             {/* Imprint Section */}
-            {lineItems.filter(item => item.line_type === 'imprint').length > 0 && (
+            {imprints.length > 0 && (
               <div className="mb-3">
-                {lineItems.filter(item => item.line_type === 'imprint').map((imprint, idx) => (
-                  <div key={idx} className="mb-2">
-                    <h4 className="font-bold text-xs text-gray-900 mb-0.5">
-                      IMPRINT #{imprint.imprint_number || `${quote.quote_number}-${idx + 1}`}
-                    </h4>
-                    {imprint.decoration_method && (
-                      <p className="text-xs text-gray-700 font-medium uppercase mb-1">{imprint.decoration_method}</p>
-                    )}
-                    {imprint.artwork_url && (
-                      <div className="my-1">
-                        <img src={imprint.artwork_url} alt="Artwork" className="h-20 border border-gray-300" />
-                      </div>
-                    )}
-                    {imprint.description && (
-                      <p className="text-xs text-gray-600">{imprint.description}</p>
-                    )}
-                  </div>
-                ))}
+                {imprints.map((imprint, idx) => {
+                  const artworkImages = imprint.artwork_images && Array.isArray(imprint.artwork_images)
+                    ? imprint.artwork_images
+                    : imprint.artwork_url
+                      ? [imprint.artwork_url]
+                      : [];
+
+                  return (
+                    <div key={idx} className="mb-3 border border-gray-300 p-2 bg-gray-50">
+                      <h4 className="font-bold text-xs text-gray-900 mb-1">
+                        IMPRINT #{imprint.imprint_number || `${idx + 1}`}
+                      </h4>
+                      {imprint.location && (
+                        <p className="text-xs text-gray-700 mb-1">
+                          <span className="font-semibold">Location:</span> {imprint.location}
+                        </p>
+                      )}
+                      {imprint.type_of_work && (
+                        <p className="text-xs text-gray-700 font-medium uppercase mb-1">{imprint.type_of_work}</p>
+                      )}
+                      {artworkImages.length > 0 && (
+                        <div className="my-2 flex gap-3 flex-wrap">
+                          {artworkImages.map((url: string, imgIdx: number) => (
+                            <img
+                              key={imgIdx}
+                              src={url}
+                              alt={`Artwork ${imgIdx + 1}`}
+                              className="h-24 w-24 object-contain border-2 border-gray-400 bg-white rounded shadow-sm"
+                            />
+                          ))}
+                        </div>
+                      )}
+                      {imprint.details && (
+                        <p className="text-xs text-gray-600 mt-1">{imprint.details}</p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
 

@@ -16,7 +16,9 @@ import {
   Mail,
   MapPin,
   MessageSquare,
+  Package,
   Phone,
+  Printer,
   RefreshCw,
   RotateCcw,
   Send,
@@ -28,6 +30,7 @@ import {
   AlertCircle,
   Lock,
   Unlock,
+  Truck,
 } from 'lucide-react';
 import { invoiceDetailService, InvoiceDetail as InvoiceDetailType } from '../../services/invoice-detail-service';
 import { billingService } from '../../services/billing-service';
@@ -42,6 +45,25 @@ interface InvoiceDetailProps {
   onNavigateToCustomer?: (searchTerm: string, customerEmail: string) => void;
 }
 
+function getCarrierTrackingUrl(carrier: string | null, trackingNumber: string | null): string | null {
+  if (!trackingNumber) return null;
+  const carrierLower = (carrier || '').toLowerCase();
+
+  if (carrierLower.includes('ups')) {
+    return `https://www.ups.com/track?tracknum=${encodeURIComponent(trackingNumber)}`;
+  }
+  if (carrierLower.includes('fedex')) {
+    return `https://www.fedex.com/fedextrack/?trknbr=${encodeURIComponent(trackingNumber)}`;
+  }
+  if (carrierLower.includes('usps')) {
+    return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${encodeURIComponent(trackingNumber)}`;
+  }
+  if (carrierLower.includes('dhl')) {
+    return `https://www.dhl.com/us-en/home/tracking/tracking-express.html?submit=1&tracking-id=${encodeURIComponent(trackingNumber)}`;
+  }
+  return null;
+}
+
 export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: InvoiceDetailProps) {
   const [invoice, setInvoice] = useState<InvoiceDetailType | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,7 +71,6 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
   const [generatingLink, setGeneratingLink] = useState(false);
   const [sendingInvoice, setSendingInvoice] = useState(false);
   const [markingPaid, setMarkingPaid] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   const [creatingStripeInvoice, setCreatingStripeInvoice] = useState(false);
   const [stripeInvoiceUrl, setStripeInvoiceUrl] = useState<string | null>(null);
   const [notesExpanded, setNotesExpanded] = useState(true);
@@ -63,14 +84,50 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
   const [userRole, setUserRole] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [reverting, setReverting] = useState(false);
+  const [shippingWithShipStation, setShippingWithShipStation] = useState(false);
+  const [showShipConfirm, setShowShipConfirm] = useState(false);
+  const [showShippingAddressModal, setShowShippingAddressModal] = useState(false);
+  const [shippingAddressForm, setShippingAddressForm] = useState({
+    shipping_line1: '',
+    shipping_line2: '',
+    shipping_city: '',
+    shipping_state: '',
+    shipping_zip: '',
+    shipping_country: 'US',
+  });
+  const [savingAddress, setSavingAddress] = useState(false);
+  const [labelUrls, setLabelUrls] = useState<Array<{ label_data: string; tracking_number: string; package_index: number }>>([]);
   const [companySettings, setCompanySettings] = useState<{
     company_name: string | null;
     company_address: string | null;
+    company_city: string | null;
+    company_state: string | null;
+    company_zip: string | null;
     company_phone: string | null;
     company_email: string | null;
     company_website: string | null;
+    company_logo_primary_url: string | null;
     invoice_terms: string | null;
   } | null>(null);
+  const [numPackages, setNumPackages] = useState(1);
+  const [packages, setPackages] = useState<Array<{
+    weight_oz: number;
+    length: number;
+    width: number;
+    height: number;
+  }>>([{ weight_oz: 16, length: 12, width: 9, height: 3 }]);
+  const [showRateSelectionModal, setShowRateSelectionModal] = useState(false);
+  const [availableRates, setAvailableRates] = useState<Array<{
+    serviceName: string;
+    serviceCode: string;
+    carrierCode: string;
+    packageCode?: string;
+    shipmentCost: number;
+    otherCost: number;
+    deliveryDays?: number | null;
+  }>>([]);
+  const [selectedRateIndex, setSelectedRateIndex] = useState<number | null>(null);
+  const [buyingLabelWithRate, setBuyingLabelWithRate] = useState(false);
 
   useEffect(() => {
     loadInvoice();
@@ -81,16 +138,20 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
     try {
       const { data } = await supabase
         .from('company_settings')
-        .select('twilio_enabled, company_name, company_address, company_phone, company_email, company_website, invoice_terms')
+        .select('twilio_enabled, company_name, company_address, company_city, company_state, company_zip, company_phone, company_email, company_website, company_logo_primary_url, invoice_terms')
         .maybeSingle();
       if (data) {
         setTwilioEnabled(data.twilio_enabled || false);
         setCompanySettings({
           company_name: data.company_name,
           company_address: data.company_address,
+          company_city: data.company_city,
+          company_state: data.company_state,
+          company_zip: data.company_zip,
           company_phone: data.company_phone,
           company_email: data.company_email,
           company_website: data.company_website,
+          company_logo_primary_url: data.company_logo_primary_url,
           invoice_terms: data.invoice_terms,
         });
       }
@@ -125,6 +186,22 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
         console.log('Raw Data:', data.rawData);
         setInvoice(data);
         setCustomerPhone(data.contact.phone);
+
+        if (data.shippingLabelUrl) {
+          setLabelUrl(data.shippingLabelUrl);
+        } else if (data.rawData?.shipping_status === 'label_created') {
+          const { data: labelData } = await supabase
+            .from('shipping_labels')
+            .select('label_url')
+            .eq('invoice_id', invoiceId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (labelData?.label_url) {
+            setLabelUrl(labelData.label_url);
+          }
+        }
       }
     } catch (err) {
       setError('Failed to load invoice');
@@ -276,19 +353,6 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
     alert('Payment recorded successfully!');
   };
 
-  const handleSync = async () => {
-    if (!invoice) return;
-    setSyncing(true);
-    try {
-      await invoiceDetailService.syncInvoice(invoice.printavoInvoiceId);
-      await loadInvoice();
-    } catch (err: any) {
-      alert(err.message || 'Failed to sync invoice');
-    } finally {
-      setSyncing(false);
-    }
-  };
-
   const handleCopyLink = async () => {
     if (!invoice?.stripePaymentLink?.url) return;
     await navigator.clipboard.writeText(invoice.stripePaymentLink.url);
@@ -319,6 +383,266 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
       alert(err.message || 'Failed to revert invoice');
     } finally {
       setReverting(false);
+    }
+  };
+
+  const handleSaveShippingAddress = async () => {
+    if (!invoice) return;
+    setSavingAddress(true);
+
+    try {
+      const { error } = await supabase
+        .from('printavo_invoices')
+        .update(shippingAddressForm)
+        .eq('id', invoice.id);
+
+      if (error) throw error;
+
+      const payload = {
+        invoice_id: invoice.id,
+        packages: packages,
+        fetch_rates: true,
+      };
+
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const response = await fetch(
+        "https://cuaukcvccxvfpuxaciac.supabase.co/functions/v1/ship-invoice",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session?.access_token}`
+          },
+          body: JSON.stringify(payload)
+        }
+      );
+
+      const responseText = await response.text();
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch {
+        throw new Error(`Server error: ${responseText.substring(0, 200)}`);
+      }
+
+      if (!result.success) {
+        let errorMsg = result.error || 'Failed to fetch shipping rates';
+        if (result.carrier_errors && result.carrier_errors.length > 0) {
+          console.log('Carrier errors:', result.carrier_errors);
+        }
+        if (result.debug) {
+          console.log('Debug info:', result.debug);
+        }
+        throw new Error(errorMsg);
+      }
+
+      if (result.mode === 'rates' && result.rates) {
+        setAvailableRates(result.rates);
+        setSelectedRateIndex(null);
+        setShowShippingAddressModal(false);
+        setShowRateSelectionModal(true);
+      } else if (result.labels && result.labels.length > 0) {
+        setLabelUrls(result.labels);
+        setShowShippingAddressModal(false);
+        await loadInvoice();
+        alert('Shipping label(s) created successfully');
+      } else if (result.label_url) {
+        setLabelUrls([{ label_data: result.label_url, tracking_number: result.tracking_number, package_index: 0 }]);
+        setShowShippingAddressModal(false);
+        await loadInvoice();
+        alert('Shipping label(s) created successfully');
+      }
+    } catch (err: any) {
+      console.error('Error fetching shipping rates:', err);
+      alert(err.message || 'Failed to fetch shipping rates');
+    } finally {
+      setSavingAddress(false);
+    }
+  };
+
+  const handleBuyLabelWithSelectedRate = async () => {
+    if (!invoice || selectedRateIndex === null) return;
+    setBuyingLabelWithRate(true);
+
+    try {
+      const selectedRate = availableRates[selectedRateIndex];
+
+      const requestBody = {
+        invoice_id: invoice.id,
+        packages: packages,
+        selected_rate: {
+          carrierCode: selectedRate.carrierCode,
+          serviceCode: selectedRate.serviceCode,
+          packageCode: selectedRate.packageCode || 'package',
+        },
+      };
+
+      const makeRequest = async (retryCount = 0): Promise<Response> => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+          if (refreshError || !refreshedSession) {
+            throw new Error('Session expired. Please refresh the page and try again.');
+          }
+        }
+
+        const currentSession = (await supabase.auth.getSession()).data.session;
+        if (!currentSession) throw new Error('Not authenticated');
+
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ship-invoice`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${currentSession.access_token}`,
+              'Content-Type': 'application/json',
+              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            },
+            body: JSON.stringify(requestBody),
+          }
+        );
+
+        if (response.status === 401 && retryCount < 1) {
+          const { error: refreshErr } = await supabase.auth.refreshSession();
+          if (refreshErr) {
+            throw new Error('Your session has expired. Please refresh the page and log in again.');
+          }
+          return makeRequest(retryCount + 1);
+        }
+
+        return response;
+      };
+
+      const response = await makeRequest();
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create shipping label');
+      }
+
+      if (result.labels && result.labels.length > 0) {
+        setLabelUrls(result.labels);
+      } else if (result.label_url) {
+        setLabelUrls([{ label_data: result.label_url, tracking_number: result.tracking_number, package_index: 0 }]);
+      }
+
+      setShowRateSelectionModal(false);
+      setAvailableRates([]);
+      setSelectedRateIndex(null);
+      await loadInvoice();
+      alert('Shipping label(s) created successfully');
+    } catch (err: any) {
+      console.error('Error creating shipping label:', err);
+      alert(err.message || 'Failed to create shipping label');
+    } finally {
+      setBuyingLabelWithRate(false);
+    }
+  };
+
+  const handleNumPackagesChange = (num: number) => {
+    const clampedNum = Math.max(1, Math.min(20, num));
+    setNumPackages(clampedNum);
+
+    const newPackages = [...packages];
+    while (newPackages.length < clampedNum) {
+      newPackages.push({ weight_oz: 16, length: 12, width: 9, height: 3 });
+    }
+    while (newPackages.length > clampedNum) {
+      newPackages.pop();
+    }
+    setPackages(newPackages);
+  };
+
+  const handlePackageChange = (index: number, field: keyof typeof packages[0], value: number) => {
+    const newPackages = [...packages];
+    newPackages[index] = { ...newPackages[index], [field]: value };
+    setPackages(newPackages);
+  };
+
+  const handleShipWithShipStation = async () => {
+    if (!invoice) return;
+    setShowShipConfirm(false);
+    setShippingWithShipStation(true);
+
+    try {
+      const requestBody: { invoice_id: string; packages?: typeof packages; fetch_rates: boolean } = {
+        invoice_id: invoice.id,
+        fetch_rates: true,
+      };
+
+      if (numPackages >= 1) {
+        requestBody.packages = packages;
+      }
+
+      const makeRequest = async (retryCount = 0): Promise<Response> => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+          if (refreshError || !refreshedSession) {
+            throw new Error('Session expired. Please refresh the page and try again.');
+          }
+        }
+
+        const currentSession = (await supabase.auth.getSession()).data.session;
+        if (!currentSession) throw new Error('Not authenticated');
+
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ship-invoice`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${currentSession.access_token}`,
+              'Content-Type': 'application/json',
+              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            },
+            body: JSON.stringify(requestBody),
+          }
+        );
+
+        if (response.status === 401 && retryCount < 1) {
+          const { error: refreshErr } = await supabase.auth.refreshSession();
+          if (refreshErr) {
+            throw new Error('Your session has expired. Please refresh the page and log in again.');
+          }
+          return makeRequest(retryCount + 1);
+        }
+
+        return response;
+      };
+
+      const response = await makeRequest();
+      const result = await response.json();
+
+      console.log('ShipStation response:', result);
+
+      if (!result.success) {
+        console.error('ShipStation error:', result);
+        if (result.carrier_errors) {
+          console.log('Carrier errors:', result.carrier_errors);
+        }
+        if (result.debug) {
+          console.log('Debug info:', result.debug);
+        }
+        throw new Error(result.error || 'Failed to fetch shipping rates');
+      }
+
+      if (result.mode === 'rates' && result.rates) {
+        const rates = Array.isArray(result.rates) ? result.rates : [];
+        if (rates.length === 0) {
+          throw new Error('No shipping rates available for this destination');
+        }
+        setAvailableRates(rates);
+        setSelectedRateIndex(null);
+        setShowRateSelectionModal(true);
+      } else {
+        throw new Error('Unexpected response from shipping service');
+      }
+    } catch (err: any) {
+      console.error('ShipStation error:', err);
+      alert(err.message || 'Failed to fetch shipping rates');
+    } finally {
+      setShippingWithShipStation(false);
     }
   };
 
@@ -453,27 +777,112 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                   )}
                 </div>
               </div>
-              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1 truncate">
-                Printavo ID: {invoice.printavoInvoiceId}
-              </p>
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">
+                  Printavo ID: {invoice.printavoInvoiceId}
+                </p>
+                {invoice.rawData?.shipping_status && (
+                  <span
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
+                      invoice.rawData.shipping_status === 'sent_to_shipstation'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                        : 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-400'
+                    }`}
+                  >
+                    <Truck className="w-3 h-3" />
+                    {invoice.rawData.shipping_status === 'sent_to_shipstation' ? 'Order Created' : 'Not Sent'}
+                  </span>
+                )}
+                {!invoice.rawData?.shipping_status && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-400">
+                    <Truck className="w-3 h-3" />
+                    Not Sent
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2 lg:gap-3 flex-wrap">
+            {invoice.statusStage !== 'draft' &&
+              (!invoice.rawData?.shipping_status ||
+                invoice.rawData?.shipping_status === 'not_sent' ||
+                invoice.rawData?.shipping_status === 'sent_to_shipstation') &&
+              labelUrls.length === 0 && invoice.shippingLabels.length === 0 && (
+              <button
+                onClick={() => {
+                  setShippingAddressForm({
+                    shipping_line1: invoice.shippingAddress.line1 || invoice.billingAddress.line1 || '',
+                    shipping_line2: invoice.shippingAddress.line2 || invoice.billingAddress.line2 || '',
+                    shipping_city: invoice.shippingAddress.city || invoice.billingAddress.city || '',
+                    shipping_state: invoice.shippingAddress.state || invoice.billingAddress.state || '',
+                    shipping_zip: invoice.shippingAddress.zip || invoice.billingAddress.zip || '',
+                    shipping_country: invoice.shippingAddress.country || 'US',
+                  });
+                  setShowShippingAddressModal(true);
+                }}
+                disabled={shippingWithShipStation}
+                className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-white bg-blue-600 dark:bg-blue-700 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 transition-colors disabled:opacity-50 whitespace-nowrap"
+              >
+                {shippingWithShipStation ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Truck className="w-4 h-4" />
+                )}
+                <span className="hidden lg:inline">Ship with ShipStation</span>
+                <span className="lg:hidden hidden sm:inline">Ship</span>
+              </button>
+            )}
+            {(invoice.shippingLabels.length > 0 || labelUrls.length > 0) && (
+              <>
+                {(labelUrls.length > 0 ? labelUrls : invoice.shippingLabels.map(l => ({
+                  label_data: l.labelUrl || '',
+                  tracking_number: l.trackingNumber || '',
+                  package_index: 0
+                }))).map((label, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      const url = label.label_data;
+                      if (url.startsWith('data:application/pdf;base64,')) {
+                        const base64Data = url.replace('data:application/pdf;base64,', '');
+                        const byteCharacters = atob(base64Data);
+                        const byteNumbers = new Array(byteCharacters.length);
+                        for (let i = 0; i < byteCharacters.length; i++) {
+                          byteNumbers[i] = byteCharacters.charCodeAt(i);
+                        }
+                        const byteArray = new Uint8Array(byteNumbers);
+                        const blob = new Blob([byteArray], { type: 'application/pdf' });
+                        const blobUrl = URL.createObjectURL(blob);
+                        window.open(blobUrl, '_blank');
+                      } else if (url) {
+                        window.open(url, '_blank');
+                      }
+                    }}
+                    className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors whitespace-nowrap"
+                    title={label.tracking_number ? `Tracking: ${label.tracking_number}` : undefined}
+                  >
+                    <Printer className="w-4 h-4" />
+                    <span className="hidden lg:inline">
+                      {(labelUrls.length > 1 || invoice.shippingLabels.length > 1) ? `Label ${idx + 1}` : 'Print Label'}
+                    </span>
+                    <span className="lg:hidden hidden sm:inline">
+                      {(labelUrls.length > 1 || invoice.shippingLabels.length > 1) ? `#${idx + 1}` : 'Label'}
+                    </span>
+                  </button>
+                ))}
+              </>
+            )}
             <button
-              onClick={handleSync}
-              disabled={syncing}
-              className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors disabled:opacity-50 whitespace-nowrap"
-            >
-              <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Sync</span>
-            </button>
-            <button
-              onClick={() => invoice && generateInvoicePDF(invoice, {
+              onClick={async () => invoice && await generateInvoicePDF(invoice, {
                 companyName: companySettings?.company_name || undefined,
                 companyAddress: companySettings?.company_address || undefined,
+                companyCity: companySettings?.company_city || undefined,
+                companyState: companySettings?.company_state || undefined,
+                companyZip: companySettings?.company_zip || undefined,
                 companyPhone: companySettings?.company_phone || undefined,
                 companyEmail: companySettings?.company_email || undefined,
                 companyWebsite: companySettings?.company_website || undefined,
+                companyLogoUrl: companySettings?.company_logo_primary_url || undefined,
                 invoiceTerms: companySettings?.invoice_terms || undefined,
               })}
               className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors whitespace-nowrap"
@@ -565,6 +974,17 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                     </a>
                   </div>
                 )}
+                {invoiceDetailService.hasAddress(invoice.billingAddress) && (
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5" />
+                      Address
+                    </p>
+                    <p className="font-medium text-gray-900 dark:text-white whitespace-pre-line">
+                      {invoiceDetailService.formatAddress(invoice.billingAddress)}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -639,6 +1059,51 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                   <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
                     {invoiceDetailService.formatAddress(invoice.shippingAddress)}
                   </p>
+                  {invoice.shipping_labels && Array.isArray(invoice.shipping_labels) && invoice.shipping_labels.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
+                      <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">
+                        Shipping Labels
+                      </h4>
+                      <div className="space-y-2">
+                        {invoice.shipping_labels.map((label, index) => {
+                          const trackingUrl = label.carrier && label.tracking_number
+                            ? getCarrierTrackingUrl(label.carrier, label.tracking_number)
+                            : null;
+                          return (
+                            <div key={index} className="text-sm">
+                              <span className="font-medium text-gray-700 dark:text-gray-300">
+                                Package {index + 1}:
+                              </span>{' '}
+                              {trackingUrl ? (
+                                <a
+                                  href={trackingUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 dark:text-blue-400 hover:underline font-mono"
+                                >
+                                  {label.tracking_number}
+                                </a>
+                              ) : (
+                                <span className="font-mono text-gray-600 dark:text-gray-400">
+                                  {label.tracking_number || 'N/A'}
+                                </span>
+                              )}
+                              {label.carrier && (
+                                <span className="text-gray-500 dark:text-gray-400 ml-2">
+                                  {label.carrier}
+                                </span>
+                              )}
+                              {label.service && (
+                                <span className="text-gray-500 dark:text-gray-400 ml-1">
+                                  - {label.service}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -769,6 +1234,14 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
                       </td>
                     </tr>
                   )}
+                  <tr>
+                    <td colSpan={6} className="px-6 py-3 text-right text-sm font-medium text-gray-500 dark:text-gray-400">
+                      Shipping
+                    </td>
+                    <td className="px-6 py-3 text-right text-sm font-medium text-gray-900 dark:text-white">
+                      {invoice.shippingCost > 0 ? `$${invoice.shippingCost.toFixed(2)}` : '—'}
+                    </td>
+                  </tr>
                   {invoice.discounts > 0 && (
                     <tr>
                       <td colSpan={6} className="px-6 py-3 text-right text-sm font-medium text-gray-500 dark:text-gray-400">
@@ -980,6 +1453,47 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
               )}
             </div>
           </div>
+
+          {/* Tracking Information */}
+          {invoice.shippingLabels && invoice.shippingLabels.length > 0 && (
+            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <Truck className="w-5 h-5 text-gray-400 dark:text-gray-500" />
+                Tracking Information
+              </h2>
+              <div className="space-y-3">
+                {invoice.shippingLabels.map((label, index) => {
+                  const trackingUrl = getCarrierTrackingUrl(label.carrier, label.trackingNumber);
+                  return (
+                    <div key={label.id} className="p-3 bg-gray-50 dark:bg-slate-900 rounded-lg">
+                      {invoice.shippingLabels.length > 1 && (
+                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                          Package {index + 1}:
+                        </p>
+                      )}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Package className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                        {trackingUrl ? (
+                          <a
+                            href={trackingUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-mono"
+                          >
+                            {label.trackingNumber}
+                          </a>
+                        ) : (
+                          <span className="text-sm text-gray-700 dark:text-gray-300 font-mono">
+                            {label.trackingNumber || 'N/A'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Stripe Payment Link */}
           {invoice.stripePaymentLink && (
@@ -1427,6 +1941,386 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
           onClose={() => setShowPaymentModal(false)}
           onSuccess={handlePaymentSuccess}
         />
+      )}
+
+      {/* Shipping Address Modal */}
+      {showShippingAddressModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Add Shipping Address</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Shipping address is required to create a shipping label
+              </p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Street Address Line 1 *
+                </label>
+                <input
+                  type="text"
+                  value={shippingAddressForm.shipping_line1}
+                  onChange={(e) =>
+                    setShippingAddressForm({ ...shippingAddressForm, shipping_line1: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                  placeholder="123 Main St"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Street Address Line 2
+                </label>
+                <input
+                  type="text"
+                  value={shippingAddressForm.shipping_line2}
+                  onChange={(e) =>
+                    setShippingAddressForm({ ...shippingAddressForm, shipping_line2: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                  placeholder="Apt, Suite, etc."
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    City *
+                  </label>
+                  <input
+                    type="text"
+                    value={shippingAddressForm.shipping_city}
+                    onChange={(e) =>
+                      setShippingAddressForm({ ...shippingAddressForm, shipping_city: e.target.value })
+                    }
+                    className="w-full px-4 py-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                    placeholder="City"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    State *
+                  </label>
+                  <input
+                    type="text"
+                    value={shippingAddressForm.shipping_state}
+                    onChange={(e) =>
+                      setShippingAddressForm({ ...shippingAddressForm, shipping_state: e.target.value })
+                    }
+                    className="w-full px-4 py-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                    placeholder="CA"
+                    maxLength={2}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    ZIP Code *
+                  </label>
+                  <input
+                    type="text"
+                    value={shippingAddressForm.shipping_zip}
+                    onChange={(e) =>
+                      setShippingAddressForm({ ...shippingAddressForm, shipping_zip: e.target.value })
+                    }
+                    className="w-full px-4 py-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                    placeholder="12345"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Country
+                  </label>
+                  <input
+                    type="text"
+                    value={shippingAddressForm.shipping_country}
+                    onChange={(e) =>
+                      setShippingAddressForm({ ...shippingAddressForm, shipping_country: e.target.value })
+                    }
+                    className="w-full px-4 py-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                    placeholder="US"
+                  />
+                </div>
+              </div>
+
+              {/* Shipping Packages */}
+              <div className="border-t border-gray-200 dark:border-slate-700 pt-4 mt-4">
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                  <Package className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                  Shipping Packages
+                </h4>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Number of Packages
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={numPackages}
+                      onChange={(e) => handleNumPackagesChange(parseInt(e.target.value) || 1)}
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                    />
+                  </div>
+
+                  <div className="space-y-4 max-h-60 overflow-y-auto">
+                    {packages.map((pkg, index) => (
+                      <div
+                        key={index}
+                        className="p-4 bg-gray-50 dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-700"
+                      >
+                        <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+                          Package {index + 1}
+                        </h4>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                              Weight (oz)
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.1}
+                              value={pkg.weight_oz}
+                              onChange={(e) =>
+                                handlePackageChange(index, 'weight_oz', parseFloat(e.target.value) || 0)
+                              }
+                              className="w-full px-2 py-1.5 text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                              Length (in)
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.1}
+                              value={pkg.length}
+                              onChange={(e) =>
+                                handlePackageChange(index, 'length', parseFloat(e.target.value) || 0)
+                              }
+                              className="w-full px-2 py-1.5 text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                              Width (in)
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.1}
+                              value={pkg.width}
+                              onChange={(e) =>
+                                handlePackageChange(index, 'width', parseFloat(e.target.value) || 0)
+                              }
+                              className="w-full px-2 py-1.5 text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                              Height (in)
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.1}
+                              value={pkg.height}
+                              onChange={(e) =>
+                                handlePackageChange(index, 'height', parseFloat(e.target.value) || 0)
+                              }
+                              className="w-full px-2 py-1.5 text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {numPackages > 1 && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Multi-package shipment: {numPackages} packages will be created with ShipStation
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-slate-700 flex justify-end gap-3">
+              <button
+                onClick={() => setShowShippingAddressModal(false)}
+                disabled={savingAddress}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveShippingAddress}
+                disabled={
+                  savingAddress ||
+                  !shippingAddressForm.shipping_line1 ||
+                  !shippingAddressForm.shipping_city ||
+                  !shippingAddressForm.shipping_state ||
+                  !shippingAddressForm.shipping_zip
+                }
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {savingAddress ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Loading Rates...
+                  </>
+                ) : (
+                  <>
+                    <Truck className="w-4 h-4" />
+                    Get Rates
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rate Selection Modal */}
+      {showRateSelectionModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Select Shipping Rate</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Choose a shipping service for this order
+              </p>
+            </div>
+            <div className="p-6">
+              {availableRates.length === 0 ? (
+                <div className="text-center py-8">
+                  <Package className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                  <p className="text-gray-500 dark:text-gray-400">No shipping rates available</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {availableRates.map((rate, index) => (
+                    <button
+                      key={`${rate.carrierCode}-${rate.serviceCode}-${index}`}
+                      onClick={() => setSelectedRateIndex(index)}
+                      className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                        selectedRateIndex === index
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                          : 'border-gray-200 dark:border-slate-700 hover:border-gray-300 dark:hover:border-slate-600'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-gray-900 dark:text-white">
+                              {rate.serviceName}
+                            </span>
+                            <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-400 rounded">
+                              {rate.carrierCode}
+                            </span>
+                          </div>
+                          {rate.deliveryDays !== null && rate.deliveryDays !== undefined && (
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                              Estimated delivery: {rate.deliveryDays} {rate.deliveryDays === 1 ? 'day' : 'days'}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <span className="text-lg font-semibold text-gray-900 dark:text-white">
+                            ${(rate.shipmentCost + rate.otherCost).toFixed(2)}
+                          </span>
+                          {rate.otherCost > 0 && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              (${rate.shipmentCost.toFixed(2)} + ${rate.otherCost.toFixed(2)} fees)
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {selectedRateIndex === index && (
+                        <div className="mt-2 flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                          <CheckCircle className="w-4 h-4" />
+                          <span className="text-sm font-medium">Selected</span>
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-slate-700 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowRateSelectionModal(false);
+                  setAvailableRates([]);
+                  setSelectedRateIndex(null);
+                }}
+                disabled={buyingLabelWithRate}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBuyLabelWithSelectedRate}
+                disabled={selectedRateIndex === null || buyingLabelWithRate}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {buyingLabelWithRate ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Creating Label...
+                  </>
+                ) : (
+                  <>
+                    <Truck className="w-4 h-4" />
+                    Buy Label with Selected Rate
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Get Shipping Rates Confirmation Modal */}
+      {showShipConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Get Shipping Rates</h3>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-700 dark:text-gray-300">
+                Fetch available shipping rates for this invoice?
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                You'll be able to compare carrier options and select the best rate before purchasing a label.
+              </p>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 dark:border-slate-700 flex justify-end gap-3">
+              <button
+                onClick={() => setShowShipConfirm(false)}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleShipWithShipStation}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Truck className="w-4 h-4" />
+                Get Rates
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

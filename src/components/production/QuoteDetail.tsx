@@ -13,9 +13,21 @@ import {
   RefreshCw,
   Download,
   Plus,
+  Pencil,
+  X,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import MockupGenerator from './MockupGenerator';
+import { ManageImprintsModal } from './ManageImprintsModal';
+import { SendQuoteModal } from './SendQuoteModal';
+import { generateQuotePDF, QuotePDFData } from '../../utils/quote-pdf-export';
+import { useNotification } from '../../contexts/NotificationContext';
+
+function decodeHtmlEntities(text: string): string {
+  if (!text) return text;
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = text;
+  return textarea.value;
+}
 
 interface QuoteDetailProps {
   quoteId: string;
@@ -27,11 +39,13 @@ interface Quote {
   id: string;
   quote_number: string;
   nickname?: string;
+  company_id?: string;
   customer_id?: string;
   customer_name: string;
   customer_email: string;
   customer_company: string;
   customer_phone: string;
+  was_reopened?: boolean;
   bill_company?: string;
   bill_name?: string;
   bill_address_1?: string;
@@ -117,40 +131,43 @@ interface QuoteImprint {
   pricing_matrix_column?: string;
   thread_ink_color?: string;
   mockups?: any[];
+  group_label?: string | null;
+  imprint_number?: string;
+  num_colors?: number;
+  description?: string;
+  artwork_description?: string;
+  artwork_url?: string;
+  artwork_images?: string[];
 }
 
-interface Proof {
-  id: string;
-  proof_number: string;
-  line_item_id: string;
-  group_label: string | null;
-  garment_image_url: string | null;
-  composite_image_url: string | null;
-  garment_name: string | null;
-  status: string;
-  created_at: string;
-  updated_at: string;
+interface CompanySettings {
+  company_name: string | null;
+  company_address: string | null;
+  company_city: string | null;
+  company_state: string | null;
+  company_zip: string | null;
+  company_phone: string | null;
+  company_email: string | null;
+  company_website: string | null;
+  company_logo_primary_url: string | null;
+  company_logo_secondary_url: string | null;
 }
 
 export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProps) {
+  const { showNotification } = useNotification();
   const [quote, setQuote] = useState<Quote | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [quoteImprints, setQuoteImprints] = useState<QuoteImprint[]>([]);
-  const [proofs, setProofs] = useState<Proof[]>([]);
+  const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [showSendModal, setShowSendModal] = useState(false);
-  const [sending, setSending] = useState(false);
   const [converting, setConverting] = useState(false);
-  const [showProofGenerator, setShowProofGenerator] = useState(false);
-  const [selectedLineItem, setSelectedLineItem] = useState<LineItem | null>(null);
+  const [showManageImprints, setShowManageImprints] = useState(false);
   const [selectedGroupLabel, setSelectedGroupLabel] = useState<string>('');
   const [showProofModal, setShowProofModal] = useState(false);
   const [selectedProofImage, setSelectedProofImage] = useState<string>('');
-
-  const [expiresInDays, setExpiresInDays] = useState(30);
-  const [singleUse, setSingleUse] = useState(true);
-  const [autoApproveAfterDays, setAutoApproveAfterDays] = useState<number | null>(null);
-  const [autoConvertOnApproval, setAutoConvertOnApproval] = useState(false);
+  const [reopening, setReopening] = useState(false);
+  const [approving, setApproving] = useState(false);
 
   useEffect(() => {
     loadQuoteDetails();
@@ -167,16 +184,40 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
 
       if (quoteError) throw quoteError;
 
-      // If quote has customer_id, fetch customer zip codes
+      // If quote has customer_id, fetch customer details if billing info is missing
       if (quoteData.customer_id) {
         const { data: customerData } = await supabase
           .from('customers')
-          .select('billing_zip, shipping_zip')
+          .select('*')
           .eq('id', quoteData.customer_id)
           .maybeSingle();
 
         if (customerData) {
-          // Merge customer zip codes into quote if quote doesn't have them
+          // Populate billing info from customer if quote doesn't have it
+          if (!quoteData.bill_company && !quoteData.bill_address_1) {
+            quoteData.bill_company = customerData.company_name;
+            quoteData.bill_name = customerData.contact_name;
+            quoteData.bill_address_1 = customerData.billing_address_line1;
+            quoteData.bill_address_2 = customerData.billing_address_line2;
+            quoteData.bill_city = customerData.billing_city;
+            quoteData.bill_state = customerData.billing_state;
+            quoteData.bill_zip = customerData.billing_zip;
+            quoteData.bill_email = customerData.email;
+            quoteData.bill_phone = customerData.phone;
+          }
+
+          // Populate shipping info from customer if quote doesn't have it
+          if (!quoteData.ship_company && !quoteData.ship_address_1) {
+            quoteData.ship_company = customerData.company_name;
+            quoteData.ship_name = customerData.contact_name;
+            quoteData.ship_address_1 = customerData.shipping_address_line1;
+            quoteData.ship_address_2 = customerData.shipping_address_line2;
+            quoteData.ship_city = customerData.shipping_city;
+            quoteData.ship_state = customerData.shipping_state;
+            quoteData.ship_zip = customerData.shipping_zip;
+          }
+
+          // Merge zip codes if still missing
           if (!quoteData.bill_zip && customerData.billing_zip) {
             quoteData.bill_zip = customerData.billing_zip;
           }
@@ -203,18 +244,40 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         .eq('quote_id', quoteId)
         .order('sort_order');
 
+      console.log('QuoteDetail: Imprints fetch result:', { imprintsData, imprintsError });
+
       if (!imprintsError) {
         setQuoteImprints(imprintsData || []);
+      } else {
+        console.error('QuoteDetail: Error fetching imprints:', imprintsError);
       }
 
-      const { data: proofsData, error: proofsError } = await supabase
-        .from('proofs')
-        .select('id, proof_number, line_item_id, group_label, garment_image_url, composite_image_url, garment_name, status, created_at, updated_at')
-        .eq('quote_id', quoteId)
-        .order('created_at', { ascending: false });
+      const companyIdToUse = quoteData.company_id;
+      console.log('QuoteDetail: Fetching company settings for company_id:', companyIdToUse);
 
-      if (!proofsError) {
-        setProofs(proofsData || []);
+      if (companyIdToUse) {
+        const { data: settings, error: settingsError } = await supabase
+          .from('company_settings')
+          .select(`
+            company_name,
+            company_address,
+            company_city,
+            company_state,
+            company_zip,
+            company_phone,
+            company_email,
+            company_website,
+            company_logo_primary_url,
+            company_logo_secondary_url,
+            quote_terms
+          `)
+          .eq('id', companyIdToUse)
+          .maybeSingle();
+
+        console.log('QuoteDetail: Company settings result:', { settings, settingsError });
+        setCompanySettings(settings);
+      } else {
+        console.log('QuoteDetail: No company_id found on quote');
       }
     } catch (error) {
       console.error('Error loading quote:', error);
@@ -223,39 +286,130 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
     }
   };
 
-  const handleSendApproval = async () => {
+  const handleDownloadQuote = async () => {
+    if (!quote) return;
+
+    console.log('QuoteDetail: handleDownloadQuote called');
+    console.log('QuoteDetail: quote company_logo_url:', quote.company_logo_url);
+    console.log('QuoteDetail: companySettings:', companySettings);
+
+    const quotePDFData: QuotePDFData = {
+      ...quote,
+      company_name: quote.company_name || companySettings?.company_name || null,
+      company_address: quote.company_address || companySettings?.company_address || null,
+      company_city: quote.company_city || companySettings?.company_city || null,
+      company_state: quote.company_state || companySettings?.company_state || null,
+      company_zip: quote.company_zip || companySettings?.company_zip || null,
+      company_phone: quote.company_phone || companySettings?.company_phone || null,
+      company_email: quote.company_email || companySettings?.company_email || null,
+      company_website: quote.company_website || companySettings?.company_website || null,
+      company_logo_url: quote.company_logo_url || companySettings?.company_logo_primary_url || companySettings?.company_logo_secondary_url || null,
+      company_logo_secondary_url: companySettings?.company_logo_secondary_url || null,
+      quote_terms: (companySettings as any)?.quote_terms || null,
+      line_items: lineItems,
+      imprints: quoteImprints.map(imprint => ({
+        id: imprint.id,
+        type_of_work: imprint.type_of_work,
+        location: imprint.location,
+        num_colors: imprint.num_colors,
+        description: imprint.description || '',
+        details: imprint.details,
+        artwork_description: imprint.artwork_description,
+        thread_ink_color: imprint.thread_ink_color,
+        artwork_url: imprint.artwork_url,
+        artwork_images: imprint.artwork_images,
+        mockups: imprint.mockups,
+        group_label: imprint.group_label,
+      })),
+    };
+
     try {
-      setSending(true);
+      await generateQuotePDF(quotePDFData);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF');
+    }
+  };
+
+  const handleReopenQuote = async () => {
+    if (!quote) return;
+
+    setReopening(true);
+    try {
+      const { error } = await supabase
+        .from('quotes')
+        .update({
+          status: 'draft',
+          was_reopened: true,
+          approved_at: null
+        })
+        .eq('id', quoteId);
+
+      if (error) throw error;
+
+      await supabase
+        .from('quote_activity_log')
+        .insert({
+          quote_id: quoteId,
+          company_id: quote.company_id,
+          action: 'reopened',
+          performed_by_name: 'User',
+          meta: { previous_status: 'approved' }
+        });
+
+      showNotification('Quote reopened for editing', 'success');
+      loadQuoteDetails();
+      onEdit();
+    } catch (error) {
+      console.error('Error reopening quote:', error);
+      showNotification('Failed to reopen quote', 'error');
+    } finally {
+      setReopening(false);
+    }
+  };
+
+  const handleApproveQuote = async () => {
+    if (!quote) return;
+
+    if (!confirm(`Are you sure you want to approve ${quote.quote_number}?\n\nThis will:\n- Create a Work Order\n- Create an Invoice\n- Push garment requirements to the purchase report\n- Trigger all approval automations`)) {
+      return;
+    }
+
+    setApproving(true);
+    try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quote-actions`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'send_approval',
-          quote_id: quoteId,
-          expires_in_days: expiresInDays,
-          single_use: singleUse,
-          auto_approve_after_days: autoApproveAfterDays,
-          auto_convert_on_approval: autoConvertOnApproval,
-        }),
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quote-actions/${quoteId}/approve`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            approver_name: 'Manual Approval',
+          }),
+        }
+      );
 
-      if (!response.ok) throw new Error('Failed to send approval');
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to approve quote');
+      }
 
-      alert('Quote sent for approval!');
-      setShowSendModal(false);
+      const result = await response.json();
+      showNotification(
+        `Quote approved! Work Order ${result.work_order.work_order_number} and Invoice ${result.invoice.invoice_number} created.`,
+        'success'
+      );
       loadQuoteDetails();
-    } catch (error) {
-      console.error('Error sending approval:', error);
-      alert('Failed to send approval');
+    } catch (error: any) {
+      console.error('Error approving quote:', error);
+      showNotification(error.message || 'Failed to approve quote', 'error');
     } finally {
-      setSending(false);
+      setApproving(false);
     }
   };
 
@@ -335,120 +489,75 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             {quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {(quote.status === 'draft' || quote.status === 'sent') && (
             <button
               onClick={onEdit}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
             >
-              <Edit className="w-4 h-4" />
+              <Edit className="w-3 h-3" />
               Edit Quote
             </button>
           )}
-          {quote.status === 'draft' && (
+          {quote.status === 'approved' && (
             <button
-              onClick={() => setShowSendModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm"
+              onClick={handleReopenQuote}
+              disabled={reopening}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-amber-600 text-white rounded hover:bg-amber-700 transition-colors disabled:opacity-50"
             >
-              <Send className="w-4 h-4" />
-              Send to Customer
+              {reopening ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <Pencil className="w-3 h-3" />
+              )}
+              Edit Quote
             </button>
           )}
+          {quote.status !== 'approved' && (
+            <button
+              onClick={handleApproveQuote}
+              disabled={approving}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-colors disabled:opacity-50"
+            >
+              {approving ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <CheckCircle className="w-3 h-3" />
+              )}
+              Approve Quote
+            </button>
+          )}
+          <button
+            onClick={handleDownloadQuote}
+            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-slate-600 text-white rounded hover:bg-slate-700 transition-colors"
+          >
+            <Download className="w-3 h-3" />
+            Download PDF
+          </button>
+          <button
+            onClick={() => setShowSendModal(true)}
+            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+          >
+            <Send className="w-3 h-3" />
+            {quote.status === 'draft' ? 'Send to Customer' : 'Resend'}
+          </button>
         </div>
       </div>
 
+      {/* Reopened Banner */}
+      {quote.was_reopened && quote.status === 'draft' && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex items-center gap-3">
+          <RefreshCw className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+          <p className="text-amber-800 dark:text-amber-300 text-sm font-medium">
+            This quote has been reopened for editing.
+          </p>
+        </div>
+      )}
+
       {/* Traditional Invoice Layout */}
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
-        {/* Header Section - Logo, Company Info, Key Dates */}
-        <div className="p-8 border-b border-gray-300 dark:border-slate-600">
-          <div className="flex items-start justify-between gap-8">
-            {/* Left: Company Logo and Info */}
-            <div className="flex items-start gap-6 flex-1">
-              {quote.company_logo_url && (
-                <img
-                  src={quote.company_logo_url}
-                  alt={quote.company_name || 'Company Logo'}
-                  className="h-24 w-auto object-contain"
-                />
-              )}
-              <div className="text-sm">
-                {quote.company_name && (
-                  <p className="font-bold text-lg text-gray-900 dark:text-white mb-2">{quote.company_name}</p>
-                )}
-                {quote.company_address && <p className="text-gray-700 dark:text-gray-300">{quote.company_address}</p>}
-                {quote.company_city && (
-                  <p className="text-gray-700 dark:text-gray-300">
-                    {quote.company_city}, {quote.company_state} {quote.company_zip}
-                  </p>
-                )}
-                {quote.company_phone && <p className="text-gray-700 dark:text-gray-300 mt-1">{quote.company_phone}</p>}
-                {quote.company_website && (
-                  <p className="text-blue-600 dark:text-blue-400 mt-1">
-                    <a href={quote.company_website} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                      {quote.company_website}
-                    </a>
-                  </p>
-                )}
-                {quote.company_email && (
-                  <p className="text-blue-600 dark:text-blue-400">
-                    <a href={`mailto:${quote.company_email}`} className="hover:underline">
-                      {quote.company_email}
-                    </a>
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Right: Key Dates and Totals */}
-            <div className="bg-gray-50 dark:bg-slate-700/50 rounded-lg p-6 min-w-[320px]">
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Created</span>
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {quote.created_date ? format(new Date(quote.created_date), 'MMMM d, yyyy') : format(new Date(quote.created_at), 'MMMM d, yyyy')}
-                  </span>
-                </div>
-                {quote.customer_due_date && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Customer Due Date</span>
-                    <span className="font-medium text-gray-900 dark:text-white">
-                      {format(new Date(quote.customer_due_date), 'MMMM d, yyyy')}
-                    </span>
-                  </div>
-                )}
-                {quote.invoice_date && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Invoice Date</span>
-                    <span className="font-medium text-gray-900 dark:text-white">
-                      {format(new Date(quote.invoice_date), 'MMMM d, yyyy')}
-                    </span>
-                  </div>
-                )}
-                {quote.payment_due_date && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600 dark:text-gray-400">Payment Due Date</span>
-                    <span className="font-medium text-gray-900 dark:text-white">
-                      {format(new Date(quote.payment_due_date), 'MMMM d, yyyy')}
-                    </span>
-                  </div>
-                )}
-                <div className="border-t border-gray-300 dark:border-slate-600 pt-2 mt-3">
-                  <div className="flex justify-between text-base">
-                    <span className="font-semibold text-gray-900 dark:text-white">Total</span>
-                    <span className="font-bold text-gray-900 dark:text-white">${quote.total.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-base mt-1">
-                    <span className="font-semibold text-gray-900 dark:text-white">Outstanding</span>
-                    <span className="font-bold text-blue-600 dark:text-blue-400">${quote.total.toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Customer Billing and Shipping */}
-        <div className="grid grid-cols-2 gap-8 p-8 border-b border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700/30">
+        {/* Customer Info and Quote Details */}
+        <div className="grid grid-cols-3 gap-6 p-8 border-b border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800">
           {/* Customer Billing */}
           <div>
             <h3 className="font-bold text-gray-900 dark:text-white mb-3 text-sm">Customer Billing</h3>
@@ -462,17 +571,15 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                   {quote.bill_city}, {quote.bill_state} {quote.bill_zip}
                 </p>
               )}
-              {quote.customer_email && (
+              {(quote.bill_email || quote.customer_email) && (
                 <p className="text-blue-600 dark:text-blue-400 mt-1">
-                  <a href={`mailto:${quote.customer_email}`} className="hover:underline">{quote.customer_email}</a>
+                  <a href={`mailto:${quote.bill_email || quote.customer_email}`} className="hover:underline">
+                    {quote.bill_email || quote.customer_email}
+                  </a>
                 </p>
               )}
-              {quote.customer_phone && <p className="text-gray-700 dark:text-gray-300">{quote.customer_phone}</p>}
-              {quote.bill_phone && <p className="text-gray-700 dark:text-gray-300">{quote.bill_phone}</p>}
-              {quote.bill_email && (
-                <p className="text-blue-600 dark:text-blue-400">
-                  <a href={`mailto:${quote.bill_email}`} className="hover:underline">{quote.bill_email}</a>
-                </p>
+              {(quote.bill_phone || quote.customer_phone) && (
+                <p className="text-gray-700 dark:text-gray-300">{quote.bill_phone || quote.customer_phone}</p>
               )}
               {!quote.bill_company && !quote.bill_name && !quote.bill_address_1 && (
                 <p className="text-gray-500 dark:text-gray-400 italic">No billing address provided</p>
@@ -498,11 +605,60 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
               )}
             </div>
           </div>
+
+          {/* Quote Details */}
+          <div>
+            <h3 className="font-bold text-gray-900 dark:text-white mb-3 text-sm">Quote Details</h3>
+            <div className="text-sm space-y-2">
+              {quote.po_number && (
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">PO #: </span>
+                  <span className="text-gray-900 dark:text-white font-medium">{quote.po_number}</span>
+                </div>
+              )}
+              {quote.delivery_method && (
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">Delivery: </span>
+                  <span className="text-gray-900 dark:text-white font-medium">{quote.delivery_method}</span>
+                </div>
+              )}
+              {quote.customer_due_date && (
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">Customer Due: </span>
+                  <span className="text-gray-900 dark:text-white font-medium">
+                    {format(new Date(quote.customer_due_date), 'MMM d, yyyy')}
+                  </span>
+                </div>
+              )}
+              {quote.invoice_date && (
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">Invoice Date: </span>
+                  <span className="text-gray-900 dark:text-white font-medium">
+                    {format(new Date(quote.invoice_date), 'MMM d, yyyy')}
+                  </span>
+                </div>
+              )}
+              {quote.payment_due_date && (
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">Payment Due: </span>
+                  <span className="text-gray-900 dark:text-white font-medium">
+                    {format(new Date(quote.payment_due_date), 'MMM d, yyyy')}
+                  </span>
+                </div>
+              )}
+              {quote.terms && (
+                <div>
+                  <span className="text-gray-600 dark:text-gray-400">Terms: </span>
+                  <span className="text-gray-900 dark:text-white font-medium">{quote.terms}</span>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Line Items Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-base">
             {/* Only show main thead when no groups have labels */}
             {!itemGroups.some(([label]) => label) && (
               <thead className="bg-gray-100 dark:bg-slate-700/50 border-b-2 border-gray-300 dark:border-slate-600">
@@ -510,22 +666,23 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                   <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Item #</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Color</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white min-w-[250px]">Description</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YXS</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YS</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YM</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YL</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YXL</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">XS</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">S</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">M</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">L</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">XL</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">2XL</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">3XL</th>
-                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">4XL</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">YXS</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">YS</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">YM</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">YL</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">YXL</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">XS</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">S</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">M</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">L</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">XL</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">2XL</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">3XL</th>
+                  <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">4XL</th>
                   <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Qty</th>
-                  <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">Price</th>
-                  <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">Total</th>
+                  <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Items</th>
+                  <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[100px]">Unit Price</th>
+                  <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[100px]">Total</th>
                 </tr>
               </thead>
             )}
@@ -535,13 +692,13 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                   {/* Spacer between groups */}
                   {groupIdx > 0 && (
                     <tr>
-                      <td colSpan={18} className="h-4 bg-transparent"></td>
+                      <td colSpan={20} className="h-4 bg-transparent"></td>
                     </tr>
                   )}
                   {/* Group header */}
                   {groupLabel && (
                     <tr className="bg-gray-100 dark:bg-slate-800 border-t-2 border-b-2 border-gray-300 dark:border-slate-600">
-                      <td colSpan={18} className="px-4 py-3">
+                      <td colSpan={20} className="px-4 py-3">
                         <div className="font-semibold text-gray-900 dark:text-white text-base">
                           {groupLabel}
                         </div>
@@ -554,173 +711,224 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                       <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Item #</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white">Color</th>
                       <th className="px-4 py-3 text-left font-semibold text-gray-900 dark:text-white min-w-[250px]">Description</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YXS</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YS</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YM</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YL</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">YXL</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">XS</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">S</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">M</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">L</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">XL</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">2XL</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">3XL</th>
-                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-xs">4XL</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">YXS</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">YS</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">YM</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">YL</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">YXL</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">XS</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">S</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">M</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">L</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">XL</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">2XL</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">3XL</th>
+                      <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">4XL</th>
                       <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Qty</th>
-                      <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">Price</th>
-                      <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">Total</th>
+                      <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Items</th>
+                      <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[100px]">Unit Price</th>
+                      <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[100px]">Total</th>
                     </tr>
                   )}
                   {/* Group items */}
                   {groupItems.map((item) => {
-                    const itemQty = (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) +
+                    const sizeQty = (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) +
                                    (item.qty_yl || 0) + (item.qty_yxl || 0) + (item.qty_xs || 0) +
                                    (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) +
                                    (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
                                    (item.qty_4xl || 0);
+                    const totalItems = sizeQty + ((item as any).quantity || 0);
 
                     return (
                       <React.Fragment key={item.id}>
                         <tr className="border-b border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/30">
-                      <td className="px-4 py-4 text-gray-700 dark:text-gray-300 font-mono text-xs">
+                      <td className="px-4 py-4 text-gray-700 dark:text-gray-300 font-mono text-base">
                         {item.item_number || '-'}
                       </td>
-                      <td className="px-4 py-4 text-gray-700 dark:text-gray-300">
+                      <td className="px-4 py-4 text-gray-700 dark:text-gray-300 text-base">
                         {item.color || '-'}
                       </td>
-                      <td className="px-4 py-4 text-gray-900 dark:text-white">
-                        {item.description}
+                      <td className="px-4 py-4 text-gray-900 dark:text-white text-base">
+                        {decodeHtmlEntities(item.description)}
                         {item.notes && (
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic">{item.notes}</p>
+                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 italic">{item.notes}</p>
                         )}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_yxs || ''}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_ys || ''}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_ym || ''}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_yl || ''}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_yxl || ''}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_xs || ''}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_s || ''}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_m || ''}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_l || ''}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_xl || ''}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_2xl || ''}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_3xl || ''}
                       </td>
-                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-xs">
+                      <td className="px-2 py-4 text-center text-gray-700 dark:text-gray-300 text-sm">
                         {item.qty_4xl || ''}
                       </td>
-                      <td className="px-4 py-4 text-center text-gray-900 dark:text-white font-semibold">
-                        {itemQty}
+                      <td className="px-4 py-4 text-center text-gray-700 dark:text-gray-300 text-base">
+                        {(item as any).quantity || ''}
                       </td>
-                      <td className="px-4 py-4 text-right text-gray-700 dark:text-gray-300">
+                      <td className="px-4 py-4 text-center text-gray-900 dark:text-white font-bold text-base text-blue-600 dark:text-blue-400">
+                        {totalItems}
+                      </td>
+                      <td className="px-4 py-4 text-right text-gray-700 dark:text-gray-300 text-base">
                         ${item.unit_price.toFixed(2)}
                       </td>
-                      <td className="px-4 py-4 text-right text-gray-900 dark:text-white font-semibold">
+                      <td className="px-4 py-4 text-right text-gray-900 dark:text-white font-semibold text-base">
                         ${item.total_price.toFixed(2)}
                       </td>
                     </tr>
                   </React.Fragment>
                 );
               })}
-                  {/* Always show Generate Mockup button and imprints list for this group */}
+                  {/* List imprints for this group */}
                   <tr>
-                    <td colSpan={18} className="px-4 py-2 bg-gray-50 dark:bg-slate-800/50">
+                    <td colSpan={20} className="px-4 py-2 bg-gray-50 dark:bg-slate-800/50">
                       <div className="space-y-3">
-                        <button
-                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors flex items-center gap-2"
-                          onClick={() => {
-                            const garmentItem = groupItems.find(li => li.line_type === 'garment');
-                            const firstLineItem = garmentItem || groupItems[0];
-                            if (firstLineItem) {
-                              setSelectedLineItem(firstLineItem);
-                              setSelectedGroupLabel(groupLabel);
-                              setShowProofGenerator(true);
-                            }
-                          }}
-                        >
-                          <Plus className="w-4 h-4" />
-                          Mockup
-                        </button>
-
                         {/* List imprints for this group */}
                         {(() => {
-                          const groupImprints = quoteImprints.filter(imp =>
-                            (imp as any).group_label === groupLabel ||
-                            ((imp as any).group_label === null && quoteImprints.filter(i => (i as any).group_label === null).length > 0)
-                          );
+                          // Filter imprints to match this group's label
+                          const normalizeLabel = (label: string | null | undefined) => label || '';
+                          const normalizedGroupLabel = normalizeLabel(groupLabel);
+
+                          let groupImprints;
+                          // If there's only one group with an empty label, show all imprints
+                          if (itemGroups.length === 1 && !groupLabel) {
+                            groupImprints = quoteImprints;
+                          } else {
+                            // Otherwise, filter by exact group_label match
+                            groupImprints = quoteImprints.filter(imp => {
+                              const imprintLabel = normalizeLabel((imp as any).group_label);
+                              return imprintLabel === normalizedGroupLabel;
+                            });
+                          }
+
+                          console.log('QuoteDetail: Imprints display check:', {
+                            groupLabel,
+                            itemGroupsLength: itemGroups.length,
+                            allImprints: quoteImprints.length,
+                            groupImprints: groupImprints.length,
+                            groupImprintsData: groupImprints
+                          });
+
                           if (groupImprints.length === 0) return null;
 
                           const garmentItem = groupItems.find(li => li.line_type === 'garment');
                           const firstLineItem = garmentItem || groupItems[0];
 
                           return (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                               {groupImprints.map((imprint, idx) => {
-                                const matchingProof = proofs.find(proof =>
-                                  proof.group_label === groupLabel &&
-                                  proof.line_item_id === firstLineItem.id
-                                );
+                                const hasMockups = imprint.mockups && imprint.mockups.length > 0;
 
                                 return (
                                   <div
                                     key={imprint.id}
-                                    className="bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-3"
+                                    className="bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-4"
                                   >
-                                    <div className="flex items-start justify-between mb-2">
-                                      <span className="text-xs font-bold text-gray-900 dark:text-white">
+                                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                      <span className="text-sm font-extrabold text-gray-900 dark:text-white">
                                         {quote.quote_number}-{String(idx + 1).padStart(2, '0')}
                                       </span>
-                                      <span className="text-xs px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded">
+                                      <span className="text-sm font-bold px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded">
                                         {imprint.type_of_work}
                                       </span>
+                                      <span className="text-sm font-bold text-gray-900 dark:text-white">
+                                        {imprint.location}
+                                      </span>
                                     </div>
-                                    <div className="text-sm font-medium text-gray-900 dark:text-white mb-1">
-                                      {imprint.location}
-                                    </div>
-                                    {imprint.thread_ink_color && (
+                                    {imprint.details && (
                                       <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                                        Color: {imprint.thread_ink_color}
+                                        {imprint.details}
                                       </div>
                                     )}
 
-                                    {matchingProof && (matchingProof.composite_image_url || matchingProof.garment_image_url) && (
+                                    {(() => {
+                                      const artworkImages = imprint.artwork_images && Array.isArray(imprint.artwork_images)
+                                        ? imprint.artwork_images
+                                        : imprint.artwork_url
+                                          ? [imprint.artwork_url]
+                                          : [];
+
+                                      if (artworkImages.length === 0) return null;
+
+                                      return (
+                                        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
+                                          <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                            Art Files {artworkImages.length > 1 && `(${artworkImages.length} variations)`}:
+                                          </div>
+                                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                                            {artworkImages.map((url: string, imgIdx: number) => (
+                                              <div key={imgIdx} className="aspect-square">
+                                                <img
+                                                  src={url}
+                                                  alt={`Artwork ${imgIdx + 1}`}
+                                                  className="w-full h-full object-contain rounded border-2 border-gray-300 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800 shadow-sm"
+                                                  onClick={() => {
+                                                    setSelectedProofImage(url);
+                                                    setShowProofModal(true);
+                                                  }}
+                                                />
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      );
+                                    })()}
+
+                                    {hasMockups && (
                                       <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
-                                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">Proof / Mockup</p>
-                                        <img
-                                          src={matchingProof.composite_image_url || matchingProof.garment_image_url!}
-                                          alt={matchingProof.garment_name || 'Proof'}
-                                          className="w-full aspect-square object-cover rounded border border-gray-200 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all"
-                                          onClick={() => {
-                                            setSelectedProofImage(matchingProof.composite_image_url || matchingProof.garment_image_url!);
-                                            setShowProofModal(true);
-                                          }}
-                                        />
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{matchingProof.proof_number}</p>
+                                        <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                          Mockups:
+                                        </div>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                                          {imprint.mockups.map((mockup: any, mockupIdx: number) => {
+                                            const mockupUrl = typeof mockup === 'string' ? mockup : mockup?.url;
+                                            if (!mockupUrl) return null;
+
+                                            return (
+                                              <div key={`mockup-${mockupIdx}`} className="aspect-square">
+                                                <img
+                                                  src={mockupUrl}
+                                                  alt={`Mockup ${mockupIdx + 1}`}
+                                                  className="w-full h-full object-contain rounded border border-gray-200 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800"
+                                                  onClick={() => {
+                                                    setSelectedProofImage(mockupUrl);
+                                                    setShowProofModal(true);
+                                                  }}
+                                                />
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
                                       </div>
                                     )}
                                   </div>
@@ -737,6 +945,56 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             </tbody>
           </table>
         </div>
+
+        {/* Fees Section */}
+        {fees.length > 0 && (
+          <div className="px-8 py-6 border-t border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+            <div className="flex justify-end">
+              <div className="w-1/2">
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Additional Fees</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-100 dark:bg-slate-700/50 border-b border-gray-300 dark:border-slate-600">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-semibold text-gray-900 dark:text-white text-sm">Fee</th>
+                        <th className="px-3 py-2 text-left font-semibold text-gray-900 dark:text-white text-sm">Description</th>
+                        <th className="px-3 py-2 text-center font-semibold text-gray-900 dark:text-white text-sm">Qty</th>
+                        <th className="px-3 py-2 text-right font-semibold text-gray-900 dark:text-white text-sm">Amount</th>
+                        <th className="px-3 py-2 text-right font-semibold text-gray-900 dark:text-white text-sm">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {fees.map((fee) => {
+                        const feeName = fee.description.includes(' - ') ? fee.description.split(' - ')[0] : fee.description;
+                        const feeDescription = fee.description.includes(' - ') ? fee.description.split(' - ').slice(1).join(' - ') : '';
+
+                        return (
+                          <tr key={fee.id} className="border-b border-gray-200 dark:border-slate-700">
+                            <td className="px-3 py-2 text-gray-900 dark:text-white text-sm">
+                              {feeName}
+                            </td>
+                            <td className="px-3 py-2 text-gray-700 dark:text-gray-300 text-sm">
+                              {feeDescription || '-'}
+                            </td>
+                            <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300 text-sm">
+                              {(fee as any).quantity || 1}
+                            </td>
+                            <td className="px-3 py-2 text-right text-gray-700 dark:text-gray-300 text-sm">
+                              ${fee.unit_price.toFixed(2)}
+                            </td>
+                            <td className="px-3 py-2 text-right text-gray-900 dark:text-white font-semibold text-sm">
+                              ${fee.total_price.toFixed(2)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Imprints Section */}
         {imprints.length > 0 && (
@@ -764,6 +1022,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         {/* Totals Summary */}
         <div className="p-8 border-t border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700/30">
           <div className="flex justify-end">
+            {/* Right: Totals */}
             <div className="w-80 space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="font-semibold text-gray-900 dark:text-white">Total Quantity</span>
@@ -807,130 +1066,44 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
           </div>
         </div>
 
-        {/* Terms and Conditions */}
-        {quote.terms && (
-          <div className="p-8 border-t border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800">
-            <div className="text-xs text-gray-600 dark:text-gray-400 space-y-2">
-              <p className="whitespace-pre-wrap">{quote.terms}</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Send Modal */}
-      {showSendModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-lg max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Send Quote for Approval
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Expires in (Days)
-                </label>
-                <input
-                  type="number"
-                  value={expiresInDays}
-                  onChange={(e) => setExpiresInDays(parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
-                  min="1"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="singleUse"
-                  checked={singleUse}
-                  onChange={(e) => setSingleUse(e.target.checked)}
-                  className="rounded"
-                />
-                <label htmlFor="singleUse" className="text-sm text-gray-700 dark:text-gray-300">
-                  Single-use link
-                </label>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Auto-Approve After (Days)
-                </label>
-                <input
-                  type="number"
-                  value={autoApproveAfterDays || ''}
-                  onChange={(e) => setAutoApproveAfterDays(e.target.value ? parseInt(e.target.value) : null)}
-                  placeholder="Leave empty to disable"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
-                  min="1"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="autoConvert"
-                  checked={autoConvertOnApproval}
-                  onChange={(e) => setAutoConvertOnApproval(e.target.checked)}
-                  className="rounded"
-                />
-                <label htmlFor="autoConvert" className="text-sm text-gray-700 dark:text-gray-300">
-                  Auto-convert when approved
-                </label>
-              </div>
-              <div className="flex gap-2 pt-4">
-                <button
-                  onClick={() => setShowSendModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSendApproval}
-                  disabled={sending}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  Send
-                </button>
-              </div>
-            </div>
+        {/* Invoice Creation Date */}
+        <div className="p-8 border-t border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800">
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            Created: <span className="font-medium text-gray-900 dark:text-white">
+              {quote.created_date ? format(new Date(quote.created_date), 'MMMM d, yyyy') : format(new Date(quote.created_at), 'MMMM d, yyyy')}
+            </span>
           </div>
         </div>
+      </div>
+
+      {/* Send Quote Modal */}
+      {showSendModal && quote && (
+        <SendQuoteModal
+          quoteId={quoteId}
+          quoteNumber={quote.quote_number}
+          customerName={quote.customer_name}
+          customerEmail={quote.customer_email || quote.bill_email || ''}
+          totalAmount={quote.total || 0}
+          onClose={() => setShowSendModal(false)}
+          onSuccess={() => {
+            setShowSendModal(false);
+            loadQuoteDetails();
+          }}
+        />
       )}
 
-      {(() => {
-        console.log('Render check - showProofGenerator:', showProofGenerator);
-        console.log('Render check - selectedLineItem:', selectedLineItem);
-        console.log('Render check - quote:', quote);
-
-        if (showProofGenerator && selectedLineItem && quote) {
-          console.log('Rendering ProofGenerator with:', {
-            lineItemId: selectedLineItem.id,
-            quoteId,
-            customerId: quote.customer_id,
-            garmentStyle: selectedLineItem.item_number,
-            garmentColor: selectedLineItem.color,
-          });
-          return (
-            <MockupGenerator
-              lineItemId={selectedLineItem.id}
-              quoteId={quoteId}
-              customerId={quote.customer_id}
-              garmentStyle={selectedLineItem.item_number}
-              garmentColor={selectedLineItem.color}
-              groupLabel={selectedGroupLabel}
-              onClose={() => {
-                console.log('MockupGenerator onClose called');
-                setShowProofGenerator(false);
-                setSelectedLineItem(null);
-                setSelectedGroupLabel('');
-              }}
-              onSave={() => {
-                console.log('MockupGenerator onSave called');
-                loadQuoteDetails();
-              }}
-            />
-          );
-        }
-        return null;
-      })()}
+      <ManageImprintsModal
+        isOpen={showManageImprints}
+        onClose={() => {
+          setShowManageImprints(false);
+          setSelectedGroupLabel('');
+          loadQuoteDetails();
+        }}
+        quoteId={quoteId}
+        initialGroupLabel={selectedGroupLabel}
+        quote={quote}
+        lineItems={lineItems}
+      />
 
       {showProofModal && (
         <div

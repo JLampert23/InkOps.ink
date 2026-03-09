@@ -34,18 +34,17 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const token = authHeader.replace("Bearer ", "");
-    console.log('Token length:', token.length);
-
-    // Use service role key for auth validation
-    const supabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
+    // Create client with anon key and auth header to get user
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: authHeader,
+        },
+      },
     });
 
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
+    // Get the authenticated user
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
 
     console.log('User lookup result:', { userId: user?.id, error: userError?.message });
 
@@ -54,8 +53,7 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({
           error: "Unauthorized",
-          details: userError?.message || 'No user found',
-          tokenLength: token.length
+          details: userError?.message || 'No user found'
         }),
         {
           status: 401,
@@ -64,6 +62,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Now use service role for database operations
     const supabaseAuth = createClient(supabaseUrl, supabaseServiceRoleKey);
 
     const { invoiceId, paymentType, amount, checkNumber, notes, paymentDate, customerId } = await req.json();
@@ -98,27 +97,52 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: invoice, error: invoiceError } = await supabaseAuth
-      .from("printavo_invoices")
-      .select("id, invoice_number, total, amount_paid, balance_remaining, customer_id")
+    // Try new invoices table first, then fall back to printavo_invoices
+    let invoice: any = null;
+    let isNewInvoice = false;
+
+    const { data: newInvoice, error: newInvoiceError } = await supabaseAuth
+      .from("invoices")
+      .select("id, invoice_number, total, balance_due, customer_id")
       .eq("id", invoiceId)
       .maybeSingle();
 
-    if (invoiceError || !invoice) {
-      return new Response(
-        JSON.stringify({ error: "Invoice not found" }),
-        {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+    if (newInvoice) {
+      invoice = {
+        id: newInvoice.id,
+        invoice_number: newInvoice.invoice_number,
+        total: newInvoice.total,
+        amount_paid: newInvoice.total - newInvoice.balance_due,
+        balance_remaining: newInvoice.balance_due,
+        customer_id: newInvoice.customer_id,
+      };
+      isNewInvoice = true;
+    } else {
+      // Fall back to printavo_invoices
+      const { data: oldInvoice, error: oldInvoiceError } = await supabaseAuth
+        .from("printavo_invoices")
+        .select("id, invoice_number, total, amount_paid, balance_remaining, customer_id")
+        .eq("id", invoiceId)
+        .maybeSingle();
+
+      if (oldInvoiceError || !oldInvoice) {
+        return new Response(
+          JSON.stringify({ error: "Invoice not found" }),
+          {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+      invoice = oldInvoice;
+      isNewInvoice = false;
     }
 
     if (amount > invoice.balance_remaining) {
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: "Payment amount exceeds invoice balance",
-          balance: invoice.balance_remaining 
+          balance: invoice.balance_remaining
         }),
         {
           status: 400,
@@ -278,41 +302,80 @@ Deno.serve(async (req: Request) => {
     const newBalance = invoice.total - newAmountPaid;
     const isFullyPaid = newBalance <= 0;
 
-    const invoiceUpdate: any = {
-      amount_paid: newAmountPaid,
-      balance_remaining: newBalance,
-      amount_outstanding: newBalance,
-    };
+    // Update the appropriate invoice table
+    if (isNewInvoice) {
+      const invoiceUpdate: any = {
+        balance_due: newBalance,
+        status_stage: isFullyPaid ? 'paid' : 'partial',
+      };
 
-    if (isFullyPaid) {
-      invoiceUpdate.status = 'PAID';
-      invoiceUpdate.is_financially_locked = true;
-      invoiceUpdate.locked_at = new Date().toISOString();
-      invoiceUpdate.locked_by = user.email;
-    }
+      if (isFullyPaid) {
+        invoiceUpdate.status = 'paid';
+        invoiceUpdate.is_financially_locked = true;
+        invoiceUpdate.locked_at = new Date().toISOString();
+        invoiceUpdate.locked_by = user.email;
+      }
 
-    const { error: updateError } = await supabaseAuth
-      .from("printavo_invoices")
-      .update(invoiceUpdate)
-      .eq("id", invoiceId);
+      const { error: updateError } = await supabaseAuth
+        .from("invoices")
+        .update(invoiceUpdate)
+        .eq("id", invoiceId);
 
-    if (updateError) {
-      console.error("Error updating invoice:", updateError);
-      await supabaseAuth.from("payments").delete().eq("id", payment.id);
-      return new Response(
-        JSON.stringify({ error: "Failed to update invoice", details: updateError.message }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
+      if (updateError) {
+        console.error("Error updating invoice:", updateError);
+        await supabaseAuth.from("payments").delete().eq("id", payment.id);
+        return new Response(
+          JSON.stringify({ error: "Failed to update invoice", details: updateError.message }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
 
-    if (isFullyPaid) {
-      await supabaseAuth
-        .from("billing_queue")
-        .update({ payment_status: 'paid' })
-        .eq("printavo_invoice_id", invoiceId);
+      if (isFullyPaid) {
+        await supabaseAuth
+          .from("billing_queue")
+          .update({ payment_status: 'paid' })
+          .eq("invoice_id", invoiceId);
+      }
+    } else {
+      const invoiceUpdate: any = {
+        amount_paid: newAmountPaid,
+        balance_remaining: newBalance,
+        amount_outstanding: newBalance,
+      };
+
+      if (isFullyPaid) {
+        invoiceUpdate.status = 'PAID';
+        invoiceUpdate.is_financially_locked = true;
+        invoiceUpdate.locked_at = new Date().toISOString();
+        invoiceUpdate.locked_by = user.email;
+      }
+
+      const { error: updateError } = await supabaseAuth
+        .from("printavo_invoices")
+        .update(invoiceUpdate)
+        .eq("id", invoiceId);
+
+      if (updateError) {
+        console.error("Error updating invoice:", updateError);
+        await supabaseAuth.from("payments").delete().eq("id", payment.id);
+        return new Response(
+          JSON.stringify({ error: "Failed to update invoice", details: updateError.message }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      if (isFullyPaid) {
+        await supabaseAuth
+          .from("billing_queue")
+          .update({ payment_status: 'paid' })
+          .eq("printavo_invoice_id", invoiceId);
+      }
     }
 
     await supabaseAuth.from('communication_logs').insert([{
