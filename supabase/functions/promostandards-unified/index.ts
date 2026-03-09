@@ -502,10 +502,10 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Extract BASE PRICING from Product Data 2.0.0 (Part > PartPriceArray > PartPrice > price)
+    // Extract BASE PRICING from Product Data 2.0.0
+    // S&S returns pricing in: ProductPriceGroupArray > ProductPriceGroup > ProductPriceArray > ProductPrice > price
     const pricingData: any = { parts: [], pricesByPartId: {} };
     let usedPricingSource = 'none';
-    let pricingDebugInfo: any = {};
 
     if (productResponse.status === 'fulfilled' && productResponse.value) {
       console.log('💰 Extracting base pricing from Product Data 2.0.0...');
@@ -513,25 +513,39 @@ Deno.serve(async (req: Request) => {
       try {
         const xmlDoc = productResponse.value;
 
-        // Store sample of Product Data XML for debugging
-        pricingDebugInfo.productDataXmlSample = xmlDoc.substring(0, 2000);
+        // Extract ProductPriceGroup entries which contain the base pricing
+        const priceGroupPattern = /<(?:[a-zA-Z0-9]+:)?ProductPriceGroup[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?ProductPriceGroup>/gi;
+        const priceGroupMatches = getAllXmlMatches(xmlDoc, priceGroupPattern);
 
-        // Check what price-related tags exist in the XML
-        const hasPartPrice = /<(?:[a-zA-Z0-9]+:)?PartPrice[^>]*>/i.test(xmlDoc);
-        const hasPrice = /<(?:[a-zA-Z0-9]+:)?Price[^>]*>/i.test(xmlDoc);
-        const hasPartPriceArray = /<(?:[a-zA-Z0-9]+:)?PartPriceArray[^>]*>/i.test(xmlDoc);
-        const hasPriceArray = /<(?:[a-zA-Z0-9]+:)?PriceArray[^>]*>/i.test(xmlDoc);
+        console.log('💰 Found', priceGroupMatches.length, 'ProductPriceGroup entries');
 
-        pricingDebugInfo.tagDetection = {
-          hasPartPrice,
-          hasPrice,
-          hasPartPriceArray,
-          hasPriceArray,
-        };
+        // Build a map of groupName -> price for quick lookup
+        const groupPriceMap = new Map<string, number>();
 
-        console.log('💰 Tag detection in Product Data XML:', pricingDebugInfo.tagDetection);
+        priceGroupMatches.forEach(match => {
+          const groupXml = match[1];
+          const groupName = getXmlValue(groupXml, "groupName");
 
-        // Updated regex to handle attributes on Part element: <Part> or <ns:Part> or <Part attr="val">
+          // Extract ProductPrice entries within this group
+          const productPricePattern = /<(?:[a-zA-Z0-9]+:)?ProductPrice[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?ProductPrice>/gi;
+          const productPriceMatches = getAllXmlMatches(groupXml, productPricePattern);
+
+          productPriceMatches.forEach(priceMatch => {
+            const priceXml = priceMatch[1];
+            const price = parseFloat(getXmlValue(priceXml, "price") || "0");
+
+            if (price > 0 && groupName) {
+              // Use the first (lowest quantity) price for each group
+              if (!groupPriceMap.has(groupName)) {
+                groupPriceMap.set(groupName, price);
+              }
+            }
+          });
+        });
+
+        console.log('💰 Group price map:', Object.fromEntries(groupPriceMap));
+
+        // Now extract parts and match them to price groups
         const partPattern = /<(?:[a-zA-Z0-9]+:)?Part(?:\s[^>]*)?>[\s\S]*?<\/(?:[a-zA-Z0-9]+:)?Part>/gi;
         const partMatches: string[] = [];
         let partMatch;
@@ -539,79 +553,32 @@ Deno.serve(async (req: Request) => {
           partMatches.push(partMatch[0]);
         }
 
-        console.log('💰 Found', partMatches.length, 'Part entries in Product Data');
-        pricingDebugInfo.partCount = partMatches.length;
-
-        // Log first Part element for debugging
-        if (partMatches.length > 0) {
-          const firstPartXml = partMatches[0];
-          console.log('💰 First Part XML sample (800 chars):', firstPartXml.substring(0, 800));
-          pricingDebugInfo.firstPartSample = firstPartXml.substring(0, 1000);
-
-          // Check what's inside the first Part
-          const innerTagsMatch = firstPartXml.match(/<([a-zA-Z0-9:]+)[^>]*>/g);
-          const uniqueInnerTags = [...new Set(innerTagsMatch?.map(t => t.replace(/<([a-zA-Z0-9:]+).*/, '$1')) || [])];
-          console.log('💰 Tags found inside Part element:', uniqueInnerTags.slice(0, 20));
-          pricingDebugInfo.tagsInsidePart = uniqueInnerTags;
-        }
+        console.log('💰 Found', partMatches.length, 'Part entries');
 
         const basePrices: { partId: string; price: number; minQty: number }[] = [];
 
-        partMatches.forEach((fullPartXml, idx) => {
-          // Extract content between Part tags
+        partMatches.forEach(fullPartXml => {
           const partContentMatch = fullPartXml.match(/<(?:[a-zA-Z0-9]+:)?Part[^>]*>([\s\S]*)<\/(?:[a-zA-Z0-9]+:)?Part>/i);
           const partXml = partContentMatch ? partContentMatch[1] : fullPartXml;
 
           const partId = getXmlValue(partXml, "partId");
+          const partGroup = getXmlValue(partXml, "partGroup") || getXmlValue(partXml, "priceGroup");
 
           if (!partId) return;
 
-          // Try multiple patterns to find pricing data
-          // Pattern 1: PartPrice with optional attributes
-          let partPricePattern = /<(?:[a-zA-Z0-9]+:)?PartPrice[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?PartPrice>/gi;
-          let partPriceMatches = getAllXmlMatches(partXml, partPricePattern);
-
-          // Pattern 2: If no PartPrice found, try just "Price"
-          if (partPriceMatches.length === 0) {
-            const pricePattern = /<(?:[a-zA-Z0-9]+:)?Price[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Price>/gi;
-            partPriceMatches = getAllXmlMatches(partXml, pricePattern);
-            if (partPriceMatches.length > 0 && idx === 0) {
-              console.log('💰 Found Price tags (not PartPrice) in Part element');
-            }
+          // Try to get price from part's price group
+          let price = 0;
+          if (partGroup && groupPriceMap.has(partGroup)) {
+            price = groupPriceMap.get(partGroup)!;
+          } else if (groupPriceMap.size > 0) {
+            // Fallback: use the first available price group
+            price = groupPriceMap.values().next().value;
           }
 
-          // Log first part's pricing search results
-          if (idx === 0) {
-            console.log(`💰 First Part (${partId}): found ${partPriceMatches.length} price entries`);
-            pricingDebugInfo.firstPartPriceCount = partPriceMatches.length;
-
-            // If no prices found, check if PartPriceArray exists but is empty or structured differently
-            const hasPriceArrayInPart = /<(?:[a-zA-Z0-9]+:)?PartPriceArray/i.test(partXml);
-            console.log(`💰 First Part has PartPriceArray tag: ${hasPriceArrayInPart}`);
-            pricingDebugInfo.firstPartHasPriceArray = hasPriceArrayInPart;
-
-            if (hasPriceArrayInPart && partPriceMatches.length === 0) {
-              // Extract PartPriceArray content for debugging
-              const priceArrayMatch = partXml.match(/<(?:[a-zA-Z0-9]+:)?PartPriceArray[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?PartPriceArray>/i);
-              if (priceArrayMatch) {
-                console.log('💰 PartPriceArray content (500 chars):', priceArrayMatch[1].substring(0, 500));
-                pricingDebugInfo.priceArrayContent = priceArrayMatch[1].substring(0, 500);
-              }
-            }
+          if (price > 0) {
+            basePrices.push({ partId, price, minQty: 1 });
           }
-
-          partPriceMatches.forEach(priceMatch => {
-            const priceXml = priceMatch[1];
-            const price = parseFloat(getXmlValue(priceXml, "price") || "0");
-            const minQty = parseInt(getXmlValue(priceXml, "minQuantity") || "1");
-
-            if (price > 0) {
-              basePrices.push({ partId, price, minQty });
-            }
-          });
         });
-
-        pricingDebugInfo.totalPricesExtracted = basePrices.length;
 
         if (basePrices.length > 0) {
           console.log('💰 Successfully extracted', basePrices.length, 'base prices from Product Data 2.0.0');
@@ -646,16 +613,13 @@ Deno.serve(async (req: Request) => {
             samplePrice: basePrices[0]?.price,
           });
         } else {
-          console.warn('💰 No PartPrice entries found in Product Data parts');
-          console.warn('💰 Debug info:', JSON.stringify(pricingDebugInfo, null, 2));
+          console.warn('💰 No base prices extracted from Product Data');
         }
       } catch (err: any) {
         console.error('💰 Failed to extract base pricing:', err.message);
-        pricingDebugInfo.error = err.message;
       }
     } else {
       console.warn('💰 Product Data not available for base pricing extraction');
-      pricingDebugInfo.productDataUnavailable = true;
     }
 
     // Parse Media Content from PromoStandards API only
@@ -847,7 +811,6 @@ Deno.serve(async (req: Request) => {
           usedPricingSource,
           pricingPartsCount: pricingData.parts?.length || 0,
           pricingMapCount: pricingData.pricesByPartId ? Object.keys(pricingData.pricesByPartId).length : 0,
-          pricingDebugInfo: pricingDebugInfo || null,
           soapRequests: verbose ? {
             productDataRequest: productSoap,
             mediaRequest: mediaSoap,
