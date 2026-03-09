@@ -449,10 +449,9 @@ Deno.serve(async (req: Request) => {
     if (effectivePartId && internalProductId) {
       console.log('💰 Step 1.5: Fetching PPC Customer Pricing...');
 
-      // S&S PPC API requires:
-      // - productId: 6-character internal ID (e.g., "B00760")
-      // - partId: Full SKU identifier (e.g., "B00760033" = productId + color/size code)
-      const ppcProductId = internalProductId; // Already 6 chars from discovery
+      // S&S PPC API requires FULL partId for both productId and partId fields
+      // e.g., "B00760033" - the complete SKU identifier including color/size suffix
+      const ppcProductId = discoveredPartId || effectivePartId;
 
       console.log('💰 PPC Request params:', {
         ppcProductId,
@@ -467,7 +466,7 @@ Deno.serve(async (req: Request) => {
   <shar:id>${escapedAccountNumber}</shar:id>
   <shar:password>${escapedApiKey}</shar:password>
   <shar:productId>${escapeXml(ppcProductId)}</shar:productId>
-  <shar:partId>${escapeXml(effectivePartId)}</shar:partId>
+  <shar:partId>${escapeXml(ppcProductId)}</shar:partId>
   <shar:currency>USD</shar:currency>
   <shar:fobId>${escapeXml(settings.ssactivewear_fob_id || '')}</shar:fobId>
   <shar:priceType>Customer</shar:priceType>
