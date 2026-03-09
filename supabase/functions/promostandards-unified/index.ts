@@ -1,8 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
-import { getLiveWholesalePricing, type VendorConfig } from "../_shared/live-wholesale-pricing.ts";
-
-const SSA_DEFAULT_FOB_ID = "NJ";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,7 +10,6 @@ const corsHeaders = {
 const PROMOSTANDARDS_ENDPOINTS = {
   productData: "https://promostandards.ssactivewear.com/productdata/v2/productdataservicev2.svc",
   inventory: "https://promostandards.ssactivewear.com/inventory/v2/inventoryservice.svc",
-  pricing: "https://promostandards.ssactivewear.com/PricingAndConfiguration/1.0.0/PricingAndConfigurationService.svc",
   media: "https://promostandards.ssactivewear.com/mediacontent/v1/mediacontentservice.svc",
 };
 
@@ -302,16 +298,6 @@ Deno.serve(async (req: Request) => {
   <shar:productId>${escapedCleanedStyleNumber}</shar:productId>${partIdTag}
 </ns2:GetMediaContentRequest>`;
 
-    // Build vendor config for live wholesale pricing
-    const ssaVendorConfig: VendorConfig = {
-      name: "ssactivewear",
-      pricingEndpoint: PROMOSTANDARDS_ENDPOINTS.pricing,
-      credentials: {
-        id: credentials.accountNumber,
-        password: decryptedApiKey,
-      },
-    };
-
     // CRITICAL FIX: S&S requires 6-character internal product IDs (e.g., "B22035" for "996MR")
     // We must discover this ID FIRST by calling Inventory API, which is more forgiving with raw style numbers
     // and returns partIds we can extract the internal ID from.
@@ -425,36 +411,13 @@ Deno.serve(async (req: Request) => {
       console.warn('📦 WARNING: Could not extract internal productId from Product Data partId values');
     }
 
-    // STEP 2: Fetch Inventory and Pricing & Configuration
-    console.log('📦 Step 2: Fetching Inventory and Pricing & Configuration...');
+    // STEP 2: Fetch Inventory
+    console.log('📦 Step 2: Fetching Inventory...');
 
-    // For inventory, use internal product ID (e.g., "B00760") to get all parts at once
-    // Falls back to style number if internal ID not available
     const inventoryProductId = internalProductId || cleanedStyleNumber;
     const escapedInventoryProductId = escapeXml(inventoryProductId);
 
-    // Get company-specific FOB warehouse (reuse from earlier)
-    const fobWarehouseId = settings?.ssactivewear_fob_id || SSA_DEFAULT_FOB_ID;
-    console.log('📦 Using FOB warehouse for pricing:', fobWarehouseId);
-
-    // Use internal product ID for pricing (required by S&S)
-    const pricingProductId = internalProductId || cleanedStyleNumber;
-    const escapedPricingProductId = escapeXml(pricingProductId);
-
-    const pricingSoap = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
-  <shar:wsVersion>1.0.0</shar:wsVersion>
-  <shar:id>${escapedAccountNumber}</shar:id>
-  <shar:password>${escapedApiKey}</shar:password>
-  <shar:productId>${escapedPricingProductId}</shar:productId>
-  <shar:currency>USD</shar:currency>
-  <shar:fobId>DEFAULT</shar:fobId>
-  <shar:priceType>Distributor</shar:priceType>
-  <shar:localizationCountry>US</shar:localizationCountry>
-  <shar:localizationLanguage>en</shar:localizationLanguage>
-  <shar:configurationType>Decorated</shar:configurationType>
-</ns2:GetConfigurationAndPricingRequest>`;
-
-    const [inventoryResponse, pricingResponse] = await Promise.allSettled([
+    const [inventoryResponse] = await Promise.allSettled([
       makePromoStandardsRequest(
         PROMOSTANDARDS_ENDPOINTS.inventory,
         "getInventoryLevels",
@@ -465,62 +428,16 @@ Deno.serve(async (req: Request) => {
   <shar:productId>${escapedInventoryProductId}</shar:productId>
 </ns2:GetInventoryLevelsRequest>`
       ),
-      makePromoStandardsRequest(
-        PROMOSTANDARDS_ENDPOINTS.pricing,
-        "getConfigurationAndPricing",
-        pricingSoap
-      ),
     ]);
-
-    // Pricing variables - will be populated from Pricing & Configuration or Product Data fallback
-    let usedPricingId = pricingProductId;
-    let usedPricingSource = 'none';
-    let pricingDebugInfo: any = null;
-    let pricingAttempts: { id: string; source: string; resultCount: number; error?: string; debugInfo?: any }[] = [];
-
-    const finalPricingResponse = pricingResponse;
-
-    // CRITICAL: Log whether the Pricing & Configuration call was even attempted
-    console.log('💰 === PRICING & CONFIGURATION DEBUG START ===');
-    console.log('💰 pricingResponse.status:', finalPricingResponse.status);
-    console.log('💰 pricingProductId used:', pricingProductId);
-    console.log('💰 pricingSoap body was:', pricingSoap);
-
-    if (finalPricingResponse.status === 'rejected') {
-      console.log('💰 PRICING CALL REJECTED:', finalPricingResponse.reason);
-      pricingAttempts.push({
-        id: pricingProductId,
-        source: 'pricing-and-configuration',
-        resultCount: 0,
-        error: String(finalPricingResponse.reason),
-      });
-    } else if (finalPricingResponse.status === 'fulfilled') {
-      console.log('💰 PRICING CALL FULFILLED - response length:', finalPricingResponse.value?.length || 0);
-      console.log('💰 PRICING RESPONSE PREVIEW (first 1000 chars):', finalPricingResponse.value?.substring(0, 1000));
-    }
-
-    console.log('💰 PRICING RESPONSE DEBUG:', {
-      status: finalPricingResponse.status,
-      hasValue: finalPricingResponse.status === 'fulfilled' && !!finalPricingResponse.value,
-      valueLength: finalPricingResponse.status === 'fulfilled' ? finalPricingResponse.value?.length : 0,
-      valuePreview: finalPricingResponse.status === 'fulfilled' && finalPricingResponse.value
-        ? finalPricingResponse.value.substring(0, 500)
-        : null,
-      rejection: finalPricingResponse.status === 'rejected' ? String(finalPricingResponse.reason) : null
-    });
 
     console.log('📊 PromoStandards API Results:', {
       product: productResponse.status,
       inventory: inventoryResponse.status,
-      pricing: finalPricingResponse.status,
       media: initialMediaResponse.status,
-      usedPricingSource,
-      usedPricingId,
       internalProductId,
       internalIdSource,
       productError: productResponse.status === 'rejected' ? productResponse.reason : null,
       inventoryError: inventoryResponse.status === 'rejected' ? inventoryResponse.reason : null,
-      pricingError: finalPricingResponse.status === 'rejected' ? finalPricingResponse.reason : null,
       mediaError: initialMediaResponse.status === 'rejected' ? initialMediaResponse.reason : null,
     });
 
@@ -585,353 +502,83 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Parse Pricing from Pricing & Configuration 1.0.0
-    const pricingData: any = {};
-    let pricingAuthError: { code: string; description: string } | null = null;
-    let usedCache = false;
-    let usedBasePriceFallback = false;
+    // Extract BASE PRICING from Product Data 2.0.0 (Part > PartPriceArray > PartPrice > price)
+    const pricingData: any = { parts: [], pricesByPartId: {} };
+    let usedPricingSource = 'none';
 
-    if (finalPricingResponse.status === 'fulfilled' && finalPricingResponse.value) {
-      const xmlDoc = finalPricingResponse.value;
-      console.log('💰 Pricing & Configuration XML Response received, length:', xmlDoc.length);
-
-      // Check for SOAP faults first
-      const soapFaultMatch = xmlDoc.match(/<(?:soap:)?Fault>([\s\S]*?)<\/(?:soap:)?Fault>/i);
-      if (soapFaultMatch) {
-        console.error('💰 SOAP FAULT detected:', soapFaultMatch[1].substring(0, 500));
-        pricingAttempts.push({
-          id: pricingProductId,
-          source: 'pricing-and-configuration',
-          resultCount: 0,
-          error: 'SOAP Fault: ' + soapFaultMatch[1].substring(0, 200),
-        });
-      }
-
-      // Check for PromoStandards error codes
-      const errorCodeMatch = xmlDoc.match(/<(?:[a-zA-Z0-9]+:)?code[^>]*>(\d+)<\/(?:[a-zA-Z0-9]+:)?code>/i);
-      const errorDescMatch = xmlDoc.match(/<(?:[a-zA-Z0-9]+:)?description[^>]*>(.*?)<\/(?:[a-zA-Z0-9]+:)?description>/i);
-
-      if (errorCodeMatch) {
-        pricingAuthError = {
-          code: errorCodeMatch[1],
-          description: errorDescMatch ? errorDescMatch[1] : 'Unknown error'
-        };
-        console.error('💰 Pricing & Configuration API returned error:', pricingAuthError);
-        pricingAttempts.push({
-          id: pricingProductId,
-          source: 'pricing-and-configuration',
-          resultCount: 0,
-          error: `Error ${pricingAuthError.code}: ${pricingAuthError.description}`,
-        });
-      } else {
-        // Extract Part entries with pricing - try multiple patterns
-        // Pattern 1: Standard Part element
-        let partPattern = /<(?:[a-zA-Z0-9]+:)?Part>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Part>/gi;
-        let partMatches = getAllXmlMatches(xmlDoc, partPattern);
-
-        console.log('💰 Pattern 1 (Part): Found', partMatches.length, 'Part entries');
-
-        // Pattern 2: Try PartArray > Part if first pattern fails
-        if (partMatches.length === 0) {
-          const partArrayMatch = xmlDoc.match(/<(?:[a-zA-Z0-9]+:)?PartArray[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?PartArray>/i);
-          if (partArrayMatch) {
-            console.log('💰 Found PartArray, extracting Parts from it...');
-            partMatches = getAllXmlMatches(partArrayMatch[1], partPattern);
-            console.log('💰 Pattern 2 (PartArray>Part): Found', partMatches.length, 'Part entries');
-          }
-        }
-
-        // Pattern 3: Try Configuration > Part
-        if (partMatches.length === 0) {
-          const configMatch = xmlDoc.match(/<(?:[a-zA-Z0-9]+:)?Configuration[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Configuration>/i);
-          if (configMatch) {
-            console.log('💰 Found Configuration element, extracting Parts...');
-            partMatches = getAllXmlMatches(configMatch[1], partPattern);
-            console.log('💰 Pattern 3 (Configuration>Part): Found', partMatches.length, 'Part entries');
-          }
-        }
-
-        // Log sample of XML for debugging if no parts found
-        if (partMatches.length === 0) {
-          console.log('💰 NO PARTS FOUND - XML structure sample (2000 chars):', xmlDoc.substring(0, 2000));
-          console.log('💰 Looking for any price-related elements...');
-          const priceElementMatch = xmlDoc.match(/<[^>]*[Pp]rice[^>]*>/g);
-          console.log('💰 Price-related elements found:', priceElementMatch?.slice(0, 10));
-        }
-
-        console.log('💰 Found', partMatches.length, 'Part entries in Pricing & Configuration response');
-
-        if (partMatches.length > 0) {
-          const wholesalePrices: any[] = [];
-
-          partMatches.forEach(match => {
-            const partXml = match[1];
-            const partId = getXmlValue(partXml, "partId");
-
-            // Extract PartPrice entries for this part
-            const partPricePattern = /<(?:[a-zA-Z0-9]+:)?PartPrice>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?PartPrice>/gi;
-            const partPriceMatches = getAllXmlMatches(partXml, partPricePattern);
-
-            partPriceMatches.forEach(priceMatch => {
-              const priceXml = priceMatch[1];
-              const minQuantity = parseInt(getXmlValue(priceXml, "minQuantity") || "1");
-              const price = parseFloat(getXmlValue(priceXml, "price") || "0");
-              const discountCode = getXmlValue(priceXml, "discountCode");
-
-              if (partId && price > 0) {
-                wholesalePrices.push({
-                  partId: partId,
-                  price: price,
-                  minQty: minQuantity,
-                  discountCode: discountCode,
-                  effectiveDate: null,
-                  expiryDate: null,
-                  source: 'pricing-and-configuration'
-                });
-              }
-            });
-          });
-
-          if (wholesalePrices.length > 0) {
-            console.log('💰 Successfully extracted', wholesalePrices.length, 'wholesale prices from Pricing & Configuration');
-
-            // Group by partId
-            const partPricingMap = new Map<string, any[]>();
-            wholesalePrices.forEach(item => {
-              if (!partPricingMap.has(item.partId)) {
-                partPricingMap.set(item.partId, []);
-              }
-              partPricingMap.get(item.partId)!.push({
-                minQuantity: item.minQty,
-                price: item.price,
-                discountCode: item.discountCode,
-                effectiveDate: item.effectiveDate,
-                expiryDate: item.expiryDate,
-              });
-            });
-
-            pricingData.parts = Array.from(partPricingMap.entries()).map(([partId, prices]) => ({
-              partId,
-              prices: prices.sort((a, b) => a.minQuantity - b.minQuantity)
-            }));
-
-            console.log('💰 Total wholesale pricing data:', pricingData.parts.length, 'parts');
-
-            // Create a pricing map for easy lookup by partId
-            pricingData.pricesByPartId = {};
-            pricingData.parts.forEach((part: any) => {
-              if (part.partId && part.prices && part.prices.length > 0) {
-                pricingData.pricesByPartId[part.partId] = part.prices[0].price;
-              }
-            });
-            console.log('💰 Wholesale price map created with', Object.keys(pricingData.pricesByPartId).length, 'entries');
-
-            usedPricingSource = 'pricing-and-configuration';
-            pricingAttempts.push({
-              id: usedPricingId,
-              source: 'pricing-and-configuration',
-              resultCount: wholesalePrices.length,
-              debugInfo: {
-                partMatchCount: partMatches.length,
-                samplePartId: wholesalePrices[0]?.partId,
-                samplePrice: wholesalePrices[0]?.price,
-              }
-            });
-
-            // Cache wholesale prices
-            try {
-              for (const item of wholesalePrices) {
-                await supabase
-                  .from('ss_catalog_pricing')
-                  .upsert({
-                    company_id: companyId,
-                    part_number: item.partId,
-                    unit_price: item.price,
-                    quantity_min: item.minQty || 1,
-                    quantity_max: 99999,
-                    discount_code: item.discountCode || null,
-                    price_expiry_date: item.expiryDate || null,
-                  }, {
-                    onConflict: "company_id,part_number,quantity_min"
-                  });
-              }
-              console.log('💰 Cached', wholesalePrices.length, 'wholesale pricing entries to ss_catalog_pricing');
-            } catch (cacheErr: any) {
-              console.warn('💰 Failed to cache wholesale pricing:', cacheErr.message);
-            }
-          } else {
-            console.warn('💰 No valid wholesale prices found in Pricing & Configuration response');
-            pricingAttempts.push({
-              id: pricingProductId,
-              source: 'pricing-and-configuration',
-              resultCount: 0,
-              error: 'No valid wholesale prices extracted from Part entries',
-              debugInfo: { partMatchCount: partMatches.length }
-            });
-          }
-        } else {
-          console.warn('💰 No Part entries found in Pricing & Configuration response');
-          pricingAttempts.push({
-            id: pricingProductId,
-            source: 'pricing-and-configuration',
-            resultCount: 0,
-            error: 'No Part entries found in response XML',
-          });
-        }
-      }
-    } else if (finalPricingResponse.status === 'fulfilled' && !finalPricingResponse.value) {
-      console.error('💰 Pricing response fulfilled but value is empty/null');
-      pricingAttempts.push({
-        id: pricingProductId,
-        source: 'pricing-and-configuration',
-        resultCount: 0,
-        error: 'Response fulfilled but value is empty',
-      });
-    }
-
-    // FALLBACK: If Pricing & Configuration failed, try Product Data 2.0.0 base pricing
-    if ((!pricingData.parts || pricingData.parts.length === 0) && productResponse.status === 'fulfilled' && productResponse.value) {
-      console.log('💰 Pricing & Configuration unavailable, falling back to Product Data base pricing...');
+    if (productResponse.status === 'fulfilled' && productResponse.value) {
+      console.log('💰 Extracting base pricing from Product Data 2.0.0...');
 
       try {
         const xmlDoc = productResponse.value;
 
-        const productPricePattern = /<(?:[a-zA-Z0-9]+:)?ProductPrice>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?ProductPrice>/gi;
-        const productPriceMatches = getAllXmlMatches(xmlDoc, productPricePattern);
+        const partPattern = /<(?:[a-zA-Z0-9]+:)?Part>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Part>/gi;
+        const partMatches = getAllXmlMatches(xmlDoc, partPattern);
 
-        if (productPriceMatches.length > 0) {
-          console.log('💰 Found', productPriceMatches.length, 'ProductPrice entries in Product Data');
+        console.log('💰 Found', partMatches.length, 'Part entries in Product Data');
 
-          const basePrices: any[] = [];
+        const basePrices: { partId: string; price: number; minQty: number }[] = [];
 
-          productPriceMatches.forEach(match => {
-            const priceXml = match[1];
-            const partId = getXmlValue(priceXml, "partId");
-            const quantityMin = parseInt(getXmlValue(priceXml, "quantityMin") || "1");
+        partMatches.forEach(match => {
+          const partXml = match[1];
+          const partId = getXmlValue(partXml, "partId");
+
+          if (!partId) return;
+
+          const partPricePattern = /<(?:[a-zA-Z0-9]+:)?PartPrice>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?PartPrice>/gi;
+          const partPriceMatches = getAllXmlMatches(partXml, partPricePattern);
+
+          partPriceMatches.forEach(priceMatch => {
+            const priceXml = priceMatch[1];
             const price = parseFloat(getXmlValue(priceXml, "price") || "0");
+            const minQty = parseInt(getXmlValue(priceXml, "minQuantity") || "1");
 
-            if (partId && price > 0 && quantityMin === 1) {
-              basePrices.push({
-                partId: partId,
-                price: price,
-                minQty: quantityMin,
-                discountCode: null,
-                effectiveDate: null,
-                expiryDate: null,
-                source: 'base-product-data'
-              });
+            if (price > 0) {
+              basePrices.push({ partId, price, minQty });
             }
           });
+        });
 
-          if (basePrices.length > 0) {
-            console.log('💰 Successfully extracted', basePrices.length, 'base prices from Product Data');
-            usedBasePriceFallback = true;
-            usedPricingSource = 'base-product-data';
+        if (basePrices.length > 0) {
+          console.log('💰 Successfully extracted', basePrices.length, 'base prices from Product Data 2.0.0');
+          usedPricingSource = 'base-pricing';
 
-            const partPricingMap = new Map<string, any[]>();
-            basePrices.forEach(item => {
-              if (!partPricingMap.has(item.partId)) {
-                partPricingMap.set(item.partId, []);
-              }
-              partPricingMap.get(item.partId)!.push({
-                minQuantity: item.minQty,
-                price: item.price,
-                discountCode: item.discountCode,
-                effectiveDate: item.effectiveDate,
-                expiryDate: item.expiryDate,
-              });
-            });
-
-            pricingData.parts = Array.from(partPricingMap.entries()).map(([partId, prices]) => ({
-              partId,
-              prices
-            }));
-
-            pricingData.pricesByPartId = {};
-            pricingData.parts.forEach((part: any) => {
-              if (part.partId && part.prices && part.prices.length > 0) {
-                pricingData.pricesByPartId[part.partId] = part.prices[0].price;
-              }
-            });
-
-            console.log('💰 Base price map created with', Object.keys(pricingData.pricesByPartId).length, 'entries');
-
-            try {
-              for (const item of basePrices) {
-                await supabase
-                  .from('ss_catalog_pricing')
-                  .upsert({
-                    company_id: companyId,
-                    part_number: item.partId,
-                    unit_price: item.price,
-                    quantity_min: item.minQty || 1,
-                    quantity_max: 99999,
-                    discount_code: item.discountCode || null,
-                    price_expiry_date: item.expiryDate || null,
-                  }, {
-                    onConflict: "company_id,part_number,quantity_min"
-                  });
-              }
-              console.log('💰 Cached', basePrices.length, 'base pricing entries to ss_catalog_pricing');
-            } catch (cacheErr: any) {
-              console.warn('💰 Failed to cache base pricing:', cacheErr.message);
+          const partPricingMap = new Map<string, { minQuantity: number; price: number }[]>();
+          basePrices.forEach(item => {
+            if (!partPricingMap.has(item.partId)) {
+              partPricingMap.set(item.partId, []);
             }
-          }
-        }
-      } catch (basePriceErr: any) {
-        console.error('💰 Failed to extract base prices from Product Data:', basePriceErr.message);
-      }
-    }
-
-    // FINAL FALLBACK: Check DB cache
-    if (!pricingData.parts || pricingData.parts.length === 0) {
-      console.warn('💰 No pricing from API, checking DB cache...');
-
-      const partIds = productData.parts?.map((p: any) => p.partId).filter(Boolean) || [];
-
-      if (partIds.length > 0) {
-        const { data: cachedPricing } = await supabase
-          .from('ss_catalog_pricing')
-          .select('part_number, unit_price, quantity_min, quantity_max, discount_code')
-          .eq('company_id', companyId)
-          .in('part_number', partIds)
-          .or(`price_expiry_date.gte.${new Date().toISOString().split('T')[0]},price_expiry_date.is.null`)
-          .order('part_number')
-          .order('quantity_min');
-
-        if (cachedPricing && cachedPricing.length > 0) {
-          usedCache = true;
-          usedPricingSource = 'cache';
-
-          const partPricingMap = new Map();
-          cachedPricing.forEach(row => {
-            if (!partPricingMap.has(row.part_number)) {
-              partPricingMap.set(row.part_number, []);
-            }
-            partPricingMap.get(row.part_number).push({
-              minQuantity: row.quantity_min,
-              price: parseFloat(row.unit_price),
-              discountCode: row.discount_code,
+            partPricingMap.get(item.partId)!.push({
+              minQuantity: item.minQty,
+              price: item.price,
             });
           });
 
           pricingData.parts = Array.from(partPricingMap.entries()).map(([partId, prices]) => ({
             partId,
-            prices
+            prices: prices.sort((a, b) => a.minQuantity - b.minQuantity)
           }));
 
-          pricingData.pricesByPartId = {};
           pricingData.parts.forEach((part: any) => {
             if (part.partId && part.prices && part.prices.length > 0) {
               pricingData.pricesByPartId[part.partId] = part.prices[0].price;
             }
           });
 
-          console.log('💰 Using cached pricing:', pricingData.parts.length, 'parts');
+          console.log('💰 Base pricing map created:', {
+            partsCount: pricingData.parts.length,
+            priceMapCount: Object.keys(pricingData.pricesByPartId).length,
+            samplePartId: basePrices[0]?.partId,
+            samplePrice: basePrices[0]?.price,
+          });
         } else {
-          console.warn('💰 No cached pricing found either');
+          console.warn('💰 No PartPrice entries found in Product Data parts');
         }
+      } catch (err: any) {
+        console.error('💰 Failed to extract base pricing:', err.message);
       }
+    } else {
+      console.warn('💰 Product Data not available for base pricing extraction');
     }
 
     // Parse Media Content from PromoStandards API only
@@ -1092,7 +739,7 @@ Deno.serve(async (req: Request) => {
     // Determine pricing availability
     const hasPricing = pricingData.parts && pricingData.parts.length > 0;
     const pricingUnavailableReason = !hasPricing
-      ? "This product is not available through S&S ActiveWear's PromoStandards Pricing API. Please enter pricing manually or contact your distributor."
+      ? "Base pricing not available in Product Data. Please enter pricing manually."
       : null;
 
     // Return unified response
@@ -1105,8 +752,6 @@ Deno.serve(async (req: Request) => {
         inventory: inventoryData,
         pricing: {
           usedPricingSource,
-          usedPricingId,
-          pricingAttempts,
           parts: pricingData?.parts || [],
           pricesByPartId: pricingData?.pricesByPartId || {}
         },
@@ -1122,19 +767,12 @@ Deno.serve(async (req: Request) => {
             : null,
           mediaError: initialMediaResponse.status === 'rejected' ? initialMediaResponse.reason?.toString() : null,
           mediaAuthError,
-          pricingAuthError,
-          pricingAttempts,
-          usedPricingId,
           usedPricingSource,
-          pricingSource: usedPricingSource,
-          pricingMethod: usedPricingSource === 'pricing-and-configuration' ? 'wholesale-pricing' : (usedBasePriceFallback ? 'base-product-data-fallback' : 'cache'),
           pricingPartsCount: pricingData.parts?.length || 0,
           pricingMapCount: pricingData.pricesByPartId ? Object.keys(pricingData.pricesByPartId).length : 0,
-          usedBasePriceFallback,
           soapRequests: verbose ? {
             productDataRequest: productSoap,
             mediaRequest: mediaSoap,
-            pricingRequest: pricingSoap,
           } : undefined,
           credentials: verbose ? {
             accountNumber: credentials.accountNumber,
