@@ -338,6 +338,24 @@ Deno.serve(async (req: Request) => {
 
     const { result: decryptedApiKey } = await decryptResponse.json();
 
+    console.log('🔐 Decrypted API key info:', {
+      length: decryptedApiKey?.length,
+      startsWithWhitespace: decryptedApiKey?.trim() !== decryptedApiKey,
+      hasNewlines: decryptedApiKey?.includes('\n') || decryptedApiKey?.includes('\r'),
+      first10: decryptedApiKey?.substring(0, 10),
+      last10: decryptedApiKey?.substring(decryptedApiKey.length - 10)
+    });
+
+    // Trim any whitespace from credentials
+    const cleanedApiKey = decryptedApiKey.trim();
+    const cleanedAccountNumber = credentials.accountNumber.trim();
+
+    console.log('🔐 Cleaned credentials:', {
+      accountNumber: cleanedAccountNumber,
+      apiKeyLength: cleanedApiKey.length,
+      apiKeyFirst10: cleanedApiKey.substring(0, 10)
+    });
+
     const url = new URL(req.url);
     const action = url.searchParams.get("action");
     const productId = url.searchParams.get("productId") || url.searchParams.get("style");
@@ -375,8 +393,8 @@ Deno.serve(async (req: Request) => {
             PROMOSTANDARDS_ENDPOINTS.productData,
             "getProduct",
             soapBody,
-            credentials.accountNumber,
-            decryptedApiKey
+            cleanedAccountNumber,
+            cleanedApiKey
           );
 
           console.log('');
