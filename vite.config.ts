@@ -5,16 +5,8 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   optimizeDeps: {
-    include: [
-      'react',
-      'react-dom',
-      'lucide-react',
-      '@supabase/supabase-js',
-      'date-fns',
-      'recharts',
-    ],
+    exclude: ['lucide-react'],
   },
-  appType: 'spa',
   server: {
     watch: {
       // Ignore files that shouldn't trigger HMR

@@ -5,110 +5,12 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>InkOps</title>
-    <meta name="app-version" content="1.0.0" />
     <meta property="og:image" content="https://bolt.new/static/og_default.png" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://bolt.new/static/og_default.png" />
-    <script>
-      (function() {
-        try {
-          var saved = localStorage.getItem('darkMode');
-          var isDark = saved !== null ? JSON.parse(saved) : false;
-          if (isDark) {
-            document.documentElement.classList.add('dark');
-          }
-        } catch (e) {
-          console.error('Error reading darkMode from localStorage:', e);
-        }
-      })();
-    </script>
-    <style>
-      html.dark body {
-        background-color: #0f172a !important;
-      }
-      #initial-loader {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: #f8fafc;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        z-index: 9999;
-        transition: opacity 0.3s ease-out;
-      }
-      html.dark #initial-loader {
-        background: #0f172a;
-      }
-      html.dark #initial-loader .spinner {
-        border-color: #334155;
-        border-top-color: #f97316;
-      }
-      html.dark #initial-loader .text {
-        color: #94a3b8;
-      }
-      #initial-loader.fade-out {
-        opacity: 0;
-        pointer-events: none;
-      }
-      #initial-loader .spinner {
-        width: 48px;
-        height: 48px;
-        border: 4px solid #e2e8f0;
-        border-top-color: #f97316;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-      }
-      #initial-loader .text {
-        margin-top: 16px;
-        color: #64748b;
-        font-family: system-ui, -apple-system, sans-serif;
-        font-size: 14px;
-        letter-spacing: 0.05em;
-      }
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
-    </style>
   </head>
-  <body style="margin:0">
-    <div id="initial-loader">
-      <div class="spinner"></div>
-      <div class="text">Loading...</div>
-    </div>
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <script>
-      // Safety fallback: remove loader after 20s if React never hides it
-      setTimeout(function() {
-        var loader = document.getElementById('initial-loader');
-        if (loader) {
-          loader.classList.add('fade-out');
-          setTimeout(function() { if (loader.parentNode) loader.remove(); }, 300);
-        }
-      }, 20000);
-
-      var _errorTimeout = null;
-      window.addEventListener('error', function(e) {
-        console.error('Global error:', e.error);
-        if (_errorTimeout) return;
-        _errorTimeout = setTimeout(function() {
-          var root = document.getElementById('root');
-          if (root && root.children.length === 0) {
-            root.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f8fafc;padding:20px"><div style="max-width:400px;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.08);padding:24px;text-align:center"><h1 style="font-size:20px;font-weight:bold;color:#1e293b;margin-bottom:8px">Something went wrong</h1><p style="color:#64748b;margin-bottom:16px">The application encountered an error loading.</p><button onclick="window.location.reload()" style="padding:8px 20px;background:#f97316;color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600">Refresh Page</button></div></div>';
-            var loader = document.getElementById('initial-loader');
-            if (loader) loader.remove();
-          }
-          _errorTimeout = null;
-        }, 3000);
-      });
-
-      window.addEventListener('unhandledrejection', function(e) {
-        console.error('Unhandled promise rejection:', e.reason);
-      });
-    </script>
   </body>
 </html>

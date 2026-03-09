@@ -75,46 +75,46 @@ export default function SquareData() {
   const getColorClasses = (color: string, variant: 'bg' | 'text' | 'border' | 'hover') => {
     const colorMap: Record<string, Record<string, string>> = {
       blue: {
-        bg: 'bg-blue-50 dark:bg-blue-900/30',
-        text: 'text-blue-600 dark:text-blue-400',
-        border: 'border-blue-200 dark:border-blue-700',
-        hover: 'hover:bg-blue-100 dark:hover:bg-blue-900/50'
+        bg: 'bg-blue-50',
+        text: 'text-blue-600',
+        border: 'border-blue-200',
+        hover: 'hover:bg-blue-100'
       },
       green: {
-        bg: 'bg-green-50 dark:bg-green-900/30',
-        text: 'text-green-600 dark:text-green-400',
-        border: 'border-green-200 dark:border-green-700',
-        hover: 'hover:bg-green-100 dark:hover:bg-green-900/50'
+        bg: 'bg-green-50',
+        text: 'text-green-600',
+        border: 'border-green-200',
+        hover: 'hover:bg-green-100'
       },
       orange: {
-        bg: 'bg-orange-50 dark:bg-orange-900/30',
-        text: 'text-orange-600 dark:text-orange-400',
-        border: 'border-orange-200 dark:border-orange-700',
-        hover: 'hover:bg-orange-100 dark:hover:bg-orange-900/50'
+        bg: 'bg-orange-50',
+        text: 'text-orange-600',
+        border: 'border-orange-200',
+        hover: 'hover:bg-orange-100'
       },
       teal: {
-        bg: 'bg-teal-50 dark:bg-teal-900/30',
-        text: 'text-teal-600 dark:text-teal-400',
-        border: 'border-teal-200 dark:border-teal-700',
-        hover: 'hover:bg-teal-100 dark:hover:bg-teal-900/50'
+        bg: 'bg-teal-50',
+        text: 'text-teal-600',
+        border: 'border-teal-200',
+        hover: 'hover:bg-teal-100'
       },
       red: {
-        bg: 'bg-red-50 dark:bg-red-900/30',
-        text: 'text-red-600 dark:text-red-400',
-        border: 'border-red-200 dark:border-red-700',
-        hover: 'hover:bg-red-100 dark:hover:bg-red-900/50'
+        bg: 'bg-red-50',
+        text: 'text-red-600',
+        border: 'border-red-200',
+        hover: 'hover:bg-red-100'
       },
       indigo: {
-        bg: 'bg-indigo-50 dark:bg-indigo-900/30',
-        text: 'text-indigo-600 dark:text-indigo-400',
-        border: 'border-indigo-200 dark:border-indigo-700',
-        hover: 'hover:bg-indigo-100 dark:hover:bg-indigo-900/50'
+        bg: 'bg-indigo-50',
+        text: 'text-indigo-600',
+        border: 'border-indigo-200',
+        hover: 'hover:bg-indigo-100'
       },
       pink: {
-        bg: 'bg-pink-50 dark:bg-pink-900/30',
-        text: 'text-pink-600 dark:text-pink-400',
-        border: 'border-pink-200 dark:border-pink-700',
-        hover: 'hover:bg-pink-100 dark:hover:bg-pink-900/50'
+        bg: 'bg-pink-50',
+        text: 'text-pink-600',
+        border: 'border-pink-200',
+        hover: 'hover:bg-pink-100'
       },
     };
     return colorMap[color]?.[variant] || colorMap.blue[variant];
@@ -150,18 +150,18 @@ export default function SquareData() {
       <div>
         <button
           onClick={() => setActiveModule(null)}
-          className="mb-6 flex items-center gap-2 px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+          className="mb-6 flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Dashboard
         </button>
 
         <Suspense fallback={
-          <div className="bg-white dark:bg-slate-800 rounded-lg shadow dark:shadow-slate-900/50 p-8">
+          <div className="bg-white rounded-lg shadow p-8">
             <div className="text-center">
-              <Loader2 className="w-12 h-12 text-green-600 dark:text-green-400 animate-spin mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Loading Module</h3>
-              <p className="text-gray-600 dark:text-gray-400">Initializing {modules.find(m => m.id === activeModule)?.name}...</p>
+              <Loader2 className="w-12 h-12 text-green-600 animate-spin mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Loading Module</h3>
+              <p className="text-gray-600">Initializing {modules.find(m => m.id === activeModule)?.name}...</p>
             </div>
           </div>
         }>
@@ -174,8 +174,8 @@ export default function SquareData() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Square Dashboard</h1>
-        <p className="text-sm font-bold text-gray-600 dark:text-gray-400">Select a category to view and analyze your Square data</p>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Square Dashboard</h1>
+        <p className="text-sm font-bold text-gray-600">Select a category to view and analyze your Square data</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -185,7 +185,7 @@ export default function SquareData() {
             <button
               key={module.id}
               onClick={() => setActiveModule(module.id)}
-              className={`text-left p-6 rounded-xl border-2 transition-all duration-200 ${getColorClasses(module.color, 'bg')} ${getColorClasses(module.color, 'border')} ${getColorClasses(module.color, 'hover')} hover:shadow-lg dark:hover:shadow-slate-900/50 hover:scale-105`}
+              className={`text-left p-6 rounded-xl border-2 transition-all duration-200 ${getColorClasses(module.color, 'bg')} ${getColorClasses(module.color, 'border')} ${getColorClasses(module.color, 'hover')} hover:shadow-lg hover:scale-105`}
             >
               <div className={`inline-flex p-3 rounded-lg ${getColorClasses(module.color, 'bg')} mb-4`}>
                 <Icon className={`w-6 h-6 ${getColorClasses(module.color, 'text')}`} />
@@ -193,7 +193,7 @@ export default function SquareData() {
               <h3 className={`text-lg font-semibold mb-2 ${getColorClasses(module.color, 'text')}`}>
                 {module.name}
               </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-sm text-gray-600">
                 {module.description}
               </p>
             </button>
@@ -201,12 +201,12 @@ export default function SquareData() {
         })}
       </div>
 
-      <div className="mt-8 p-6 bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Getting Started</h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+      <div className="mt-8 p-6 bg-gray-50 border border-gray-200 rounded-lg">
+        <h3 className="text-sm font-semibold text-gray-900 mb-2">Getting Started</h3>
+        <p className="text-sm text-gray-600 mb-3">
           To use Square Data modules, ensure your Square credentials are configured in Account Settings.
         </p>
-        <p className="text-xs text-gray-500 dark:text-gray-500">
+        <p className="text-xs text-gray-500">
           Each module provides options to filter, export, and analyze your Square data. Select a category above to begin.
         </p>
       </div>

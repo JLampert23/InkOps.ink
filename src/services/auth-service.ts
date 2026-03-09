@@ -90,28 +90,9 @@ export async function signUpCompany(data: CompanySignupData): Promise<{ error: E
 
 export async function getCompanySettings(): Promise<CompanySettings | null> {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
-      console.error('No authenticated user found');
-      return null;
-    }
-
-    const { data: profile, error: profileError } = await supabase
-      .from('user_profiles')
-      .select('company_id')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    if (profileError || !profile?.company_id) {
-      console.error('Error fetching user profile or company_id:', profileError);
-      return null;
-    }
-
     const { data, error } = await supabase
       .from('company_settings')
       .select('*')
-      .eq('id', profile.company_id)
       .maybeSingle();
 
     if (error) {
