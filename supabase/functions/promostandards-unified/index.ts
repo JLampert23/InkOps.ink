@@ -871,7 +871,14 @@ Deno.serve(async (req: Request) => {
         partId: partId || null,
         product: productData,
         inventory: inventoryData,
-        pricing: pricingData,
+        pricing: {
+          usedPricingSource,
+          usedPricingId,
+          pricingAttempts,
+          pricingPartsCount: pricingData?.parts?.length || 0,
+          pricesByPartId: pricingData?.pricesByPartId || {},
+          pricingData
+        },
         media: mediaData,
         pricingAvailable: hasPricing,
         pricingUnavailableReason,
