@@ -503,8 +503,9 @@ Deno.serve(async (req: Request) => {
     }
 
     // Extract BASE PRICING from Product Data 2.0.0
-    // S&S returns pricing in: ProductPriceGroupArray > ProductPriceGroup > ProductPriceArray > ProductPrice > price
-    const pricingData: any = { parts: [], pricesByPartId: {} };
+    // Base pricing is at PRODUCT level, NOT part level
+    // Structure: ProductPriceGroupArray > ProductPriceGroup > ProductPriceArray > ProductPrice > price
+    let basePrice: number | null = null;
     let usedPricingSource = 'none';
 
     if (productResponse.status === 'fulfilled' && productResponse.value) {
@@ -513,107 +514,35 @@ Deno.serve(async (req: Request) => {
       try {
         const xmlDoc = productResponse.value;
 
-        // Extract ProductPriceGroup entries which contain the base pricing
-        const priceGroupPattern = /<(?:[a-zA-Z0-9]+:)?ProductPriceGroup[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?ProductPriceGroup>/gi;
-        const priceGroupMatches = getAllXmlMatches(xmlDoc, priceGroupPattern);
+        // Extract ProductPrice entries directly - base pricing applies to the entire product
+        const productPricePattern = /<(?:[a-zA-Z0-9]+:)?ProductPrice[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?ProductPrice>/gi;
+        const productPriceMatches = getAllXmlMatches(xmlDoc, productPricePattern);
 
-        console.log('💰 Found', priceGroupMatches.length, 'ProductPriceGroup entries');
+        console.log('💰 Found', productPriceMatches.length, 'ProductPrice entries');
 
-        // Build a map of groupName -> price for quick lookup
-        const groupPriceMap = new Map<string, number>();
+        // Extract all prices with their quantity minimums
+        const priceTiers: { quantityMin: number; price: number }[] = [];
 
-        priceGroupMatches.forEach(match => {
-          const groupXml = match[1];
-          const groupName = getXmlValue(groupXml, "groupName");
-
-          // Extract ProductPrice entries within this group
-          const productPricePattern = /<(?:[a-zA-Z0-9]+:)?ProductPrice[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?ProductPrice>/gi;
-          const productPriceMatches = getAllXmlMatches(groupXml, productPricePattern);
-
-          productPriceMatches.forEach(priceMatch => {
-            const priceXml = priceMatch[1];
-            const price = parseFloat(getXmlValue(priceXml, "price") || "0");
-
-            if (price > 0 && groupName) {
-              // Use the first (lowest quantity) price for each group
-              if (!groupPriceMap.has(groupName)) {
-                groupPriceMap.set(groupName, price);
-              }
-            }
-          });
-        });
-
-        console.log('💰 Group price map:', Object.fromEntries(groupPriceMap));
-
-        // Now extract parts and match them to price groups
-        const partPattern = /<(?:[a-zA-Z0-9]+:)?Part(?:\s[^>]*)?>[\s\S]*?<\/(?:[a-zA-Z0-9]+:)?Part>/gi;
-        const partMatches: string[] = [];
-        let partMatch;
-        while ((partMatch = partPattern.exec(xmlDoc)) !== null) {
-          partMatches.push(partMatch[0]);
-        }
-
-        console.log('💰 Found', partMatches.length, 'Part entries');
-
-        const basePrices: { partId: string; price: number; minQty: number }[] = [];
-
-        partMatches.forEach(fullPartXml => {
-          const partContentMatch = fullPartXml.match(/<(?:[a-zA-Z0-9]+:)?Part[^>]*>([\s\S]*)<\/(?:[a-zA-Z0-9]+:)?Part>/i);
-          const partXml = partContentMatch ? partContentMatch[1] : fullPartXml;
-
-          const partId = getXmlValue(partXml, "partId");
-          const partGroup = getXmlValue(partXml, "partGroup") || getXmlValue(partXml, "priceGroup");
-
-          if (!partId) return;
-
-          // Try to get price from part's price group
-          let price = 0;
-          if (partGroup && groupPriceMap.has(partGroup)) {
-            price = groupPriceMap.get(partGroup)!;
-          } else if (groupPriceMap.size > 0) {
-            // Fallback: use the first available price group
-            price = groupPriceMap.values().next().value;
-          }
+        productPriceMatches.forEach(match => {
+          const priceXml = match[1];
+          const price = parseFloat(getXmlValue(priceXml, "price") || "0");
+          const quantityMin = parseInt(getXmlValue(priceXml, "quantityMin") || "1");
 
           if (price > 0) {
-            basePrices.push({ partId, price, minQty: 1 });
+            priceTiers.push({ quantityMin, price });
           }
         });
 
-        if (basePrices.length > 0) {
-          console.log('💰 Successfully extracted', basePrices.length, 'base prices from Product Data 2.0.0');
+        // Sort by quantityMin and take the first (base) price
+        priceTiers.sort((a, b) => a.quantityMin - b.quantityMin);
+
+        if (priceTiers.length > 0) {
+          basePrice = priceTiers[0].price;
           usedPricingSource = 'base-pricing';
-
-          const partPricingMap = new Map<string, { minQuantity: number; price: number }[]>();
-          basePrices.forEach(item => {
-            if (!partPricingMap.has(item.partId)) {
-              partPricingMap.set(item.partId, []);
-            }
-            partPricingMap.get(item.partId)!.push({
-              minQuantity: item.minQty,
-              price: item.price,
-            });
-          });
-
-          pricingData.parts = Array.from(partPricingMap.entries()).map(([partId, prices]) => ({
-            partId,
-            prices: prices.sort((a, b) => a.minQuantity - b.minQuantity)
-          }));
-
-          pricingData.parts.forEach((part: any) => {
-            if (part.partId && part.prices && part.prices.length > 0) {
-              pricingData.pricesByPartId[part.partId] = part.prices[0].price;
-            }
-          });
-
-          console.log('💰 Base pricing map created:', {
-            partsCount: pricingData.parts.length,
-            priceMapCount: Object.keys(pricingData.pricesByPartId).length,
-            samplePartId: basePrices[0]?.partId,
-            samplePrice: basePrices[0]?.price,
-          });
+          console.log('💰 Successfully extracted base price from Product Data 2.0.0:', basePrice);
+          console.log('💰 All price tiers:', priceTiers);
         } else {
-          console.warn('💰 No base prices extracted from Product Data');
+          console.warn('💰 No ProductPrice entries found in Product Data');
         }
       } catch (err: any) {
         console.error('💰 Failed to extract base pricing:', err.message);
@@ -778,7 +707,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Determine pricing availability
-    const hasPricing = pricingData.parts && pricingData.parts.length > 0;
+    const hasPricing = basePrice !== null && basePrice > 0;
     const pricingUnavailableReason = !hasPricing
       ? "Base pricing not available in Product Data. Please enter pricing manually."
       : null;
@@ -793,8 +722,7 @@ Deno.serve(async (req: Request) => {
         inventory: inventoryData,
         pricing: {
           usedPricingSource,
-          parts: pricingData?.parts || [],
-          pricesByPartId: pricingData?.pricesByPartId || {}
+          basePrice: basePrice,
         },
         media: mediaData,
         pricingAvailable: hasPricing,
@@ -809,8 +737,7 @@ Deno.serve(async (req: Request) => {
           mediaError: initialMediaResponse.status === 'rejected' ? initialMediaResponse.reason?.toString() : null,
           mediaAuthError,
           usedPricingSource,
-          pricingPartsCount: pricingData.parts?.length || 0,
-          pricingMapCount: pricingData.pricesByPartId ? Object.keys(pricingData.pricesByPartId).length : 0,
+          basePrice,
           soapRequests: verbose ? {
             productDataRequest: productSoap,
             mediaRequest: mediaSoap,
