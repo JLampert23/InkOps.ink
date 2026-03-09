@@ -302,10 +302,6 @@ Deno.serve(async (req: Request) => {
   <shar:productId>${escapedCleanedStyleNumber}</shar:productId>${partIdTag}
 </ns2:GetMediaContentRequest>`;
 
-    // Get company-specific FOB warehouse or use default
-    const companyFobId = settings?.ssactivewear_fob_id || SSA_DEFAULT_FOB_ID;
-    console.log('📦 Using FOB warehouse:', companyFobId);
-
     // Build vendor config for live wholesale pricing
     const ssaVendorConfig: VendorConfig = {
       name: "ssactivewear",
@@ -437,9 +433,9 @@ Deno.serve(async (req: Request) => {
     const inventoryProductId = internalProductId || cleanedStyleNumber;
     const escapedInventoryProductId = escapeXml(inventoryProductId);
 
-    // Get company-specific FOB warehouse or use default
-    const companyFobId = settings?.ssactivewear_fob_id || SSA_DEFAULT_FOB_ID;
-    console.log('📦 Using FOB warehouse:', companyFobId);
+    // Get company-specific FOB warehouse (reuse from earlier)
+    const fobWarehouseId = settings?.ssactivewear_fob_id || SSA_DEFAULT_FOB_ID;
+    console.log('📦 Using FOB warehouse for pricing:', fobWarehouseId);
 
     // Use internal product ID for pricing (required by S&S)
     const pricingProductId = internalProductId || cleanedStyleNumber;
@@ -451,7 +447,7 @@ Deno.serve(async (req: Request) => {
   <shar:password>${escapedApiKey}</shar:password>
   <shar:productId>${escapedPricingProductId}</shar:productId>
   <shar:currency>USD</shar:currency>
-  <shar:fobId>${companyFobId}</shar:fobId>
+  <shar:fobId>${fobWarehouseId}</shar:fobId>
   <shar:priceType>Customer</shar:priceType>
   <shar:localizationCountry>US</shar:localizationCountry>
   <shar:localizationLanguage>en</shar:localizationLanguage>
