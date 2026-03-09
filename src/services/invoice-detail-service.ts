@@ -68,30 +68,6 @@ export interface SMSLog {
   sentAt: string;
 }
 
-export interface ShippingLabel {
-  id: string;
-  labelUrl: string | null;
-  trackingNumber: string | null;
-  carrier: string | null;
-  service: string | null;
-  cost: number | null;
-  weightOz: number | null;
-  packageLength: number | null;
-  packageWidth: number | null;
-  packageHeight: number | null;
-  shipDate: string | null;
-  createdAt: string;
-}
-
-export interface ShippingLabelJsonb {
-  label_url?: string;
-  tracking_number?: string;
-  carrier?: string;
-  service?: string;
-  shipment_id?: string;
-  cost?: number;
-}
-
 export interface InvoiceDetail {
   id: string;
   printavoInvoiceId: string;
@@ -112,7 +88,6 @@ export interface InvoiceDetail {
   lineItems: InvoiceLineItem[];
   fees: InvoiceFee[];
   feesTotal: number;
-  shippingCost: number;
 
   subtotal: number;
   tax: number;
@@ -144,10 +119,6 @@ export interface InvoiceDetail {
   lockedAt: string | null;
   lockedBy: string | null;
 
-  shippingLabelUrl: string | null;
-  shippingLabels: ShippingLabel[];
-  shipping_labels: ShippingLabelJsonb[];
-
   rawData: any;
 }
 
@@ -165,19 +136,11 @@ export const invoiceDetailService = {
         return null;
       }
 
-      const { data: invoiceLineItems } = await supabase
-        .from('invoice_line_items')
-        .select('*')
-        .eq('invoice_id', printavoInvoiceId)
-        .order('line_number', { ascending: true });
-
-      const { data: printavoLineItems } = await supabase
+      const { data: lineItems } = await supabase
         .from('printavo_line_items')
         .select('*')
         .eq('invoice_id', printavoInvoiceId)
         .order('line_item_group_id', { ascending: true });
-
-      const useInvoiceLineItems = invoiceLineItems && invoiceLineItems.length > 0;
 
       const { data: billingQueueItem } = await supabase
         .from('billing_queue')
@@ -218,13 +181,6 @@ export const invoiceDetailService = {
         .select('*')
         .eq('invoice_id', printavoInvoiceId)
         .order('sent_at', { ascending: false });
-
-      const { data: shippingLabelsData } = await supabase
-        .from('shipping_labels')
-        .select('*')
-        .eq('invoice_id', printavoInvoiceId)
-        .is('voided_at', null)
-        .order('created_at', { ascending: true });
 
       const rawData = invoice.raw_data || {};
       const contact = rawData.contact || {};
@@ -296,85 +252,46 @@ export const invoiceDetailService = {
         customerPO: rawData.customerPurchaseOrder || rawData.poNumber || null,
         customerId: invoice.customer_id || customer.id || null,
 
-        lineItems: useInvoiceLineItems
-          ? (invoiceLineItems || []).filter((item: any) => item.item_type !== 'fee').map((item: any) => {
-              let sizes = '-';
-              if (item.sizes && typeof item.sizes === 'object') {
-                const sizeEntries = Object.entries(item.sizes)
-                  .filter(([_, qty]) => qty && Number(qty) > 0)
-                  .map(([size, qty]) => `${size}:${qty}`);
-                sizes = sizeEntries.join(', ') || '-';
-              }
+        lineItems: (lineItems || []).map((item: any) => {
+          // Use extracted fields from database if available, otherwise parse from description
+          const hasExtractedData = item.extracted_style || item.extracted_color || item.extracted_sizes;
 
-              return {
-                id: item.id,
-                description: item.description || 'Line Item',
-                quantity: item.quantity || 0,
-                unitPrice: parseFloat(item.unit_price) || 0,
-                totalPrice: parseFloat(item.total) || parseFloat(item.subtotal) || 0,
-                lineItemGroupId: null,
-                style: item.style_number || item.style_name || '-',
-                color: item.color || '-',
-                sizes,
-                rawData: null,
-              };
-            })
-          : (printavoLineItems || []).map((item: any) => {
-              const hasExtractedData = item.extracted_style || item.extracted_color || item.extracted_sizes;
+          let style = item.extracted_style || '-';
+          let color = item.extracted_color || '-';
+          let sizes = '-';
 
-              let style = item.extracted_style || '-';
-              let color = item.extracted_color || '-';
-              let sizes = '-';
+          // Format extracted sizes object into display string
+          if (item.extracted_sizes && typeof item.extracted_sizes === 'object') {
+            const sizeEntries = Object.entries(item.extracted_sizes)
+              .filter(([_, qty]) => qty && Number(qty) > 0)
+              .map(([size, qty]) => `${size}:${qty}`);
+            sizes = sizeEntries.join(', ') || '-';
+          }
 
-              if (item.extracted_sizes && typeof item.extracted_sizes === 'object') {
-                const sizeEntries = Object.entries(item.extracted_sizes)
-                  .filter(([_, qty]) => qty && Number(qty) > 0)
-                  .map(([size, qty]) => `${size}:${qty}`);
-                sizes = sizeEntries.join(', ') || '-';
-              }
+          // Fallback to parsing if no extracted data
+          if (!hasExtractedData) {
+            const parsed = this.parseLineItemDetails(item.description, item.raw_data);
+            style = parsed.style;
+            color = parsed.color;
+            sizes = parsed.sizes;
+          }
 
-              if (!hasExtractedData) {
-                const parsed = this.parseLineItemDetails(item.description, item.raw_data);
-                style = parsed.style;
-                color = parsed.color;
-                sizes = parsed.sizes;
-              }
+          return {
+            id: item.id,
+            description: item.description || 'Line Item',
+            quantity: item.quantity || 0,
+            unitPrice: parseFloat(item.unit_price) || 0,
+            totalPrice: parseFloat(item.total_price) || 0,
+            lineItemGroupId: item.line_item_group_id,
+            style,
+            color,
+            sizes,
+            rawData: item.raw_data,
+          };
+        }),
 
-              return {
-                id: item.id,
-                description: item.description || 'Line Item',
-                quantity: item.quantity || 0,
-                unitPrice: parseFloat(item.unit_price) || 0,
-                totalPrice: parseFloat(item.total_price) || 0,
-                lineItemGroupId: item.line_item_group_id,
-                style,
-                color,
-                sizes,
-                rawData: item.raw_data,
-              };
-            }),
-
-        fees: useInvoiceLineItems
-          ? (invoiceLineItems || [])
-              .filter((item: any) => item.item_type === 'fee')
-              .map((item: any) => ({
-                id: item.id,
-                name: item.description || 'Fee',
-                description: item.description || 'Additional Charge',
-                amount: parseFloat(item.total) || parseFloat(item.subtotal) || 0,
-                taxable: parseFloat(item.tax_amount) > 0,
-              }))
-          : this.extractFees(rawData),
-        feesTotal: useInvoiceLineItems
-          ? (invoiceLineItems || [])
-              .filter((item: any) => item.item_type === 'fee')
-              .reduce((sum: number, item: any) => sum + (parseFloat(item.total) || parseFloat(item.subtotal) || 0), 0)
-          : this.calculateFeesTotal(rawData),
-        shippingCost: useInvoiceLineItems
-          ? (invoiceLineItems || [])
-              .filter((item: any) => item.item_type === 'shipping')
-              .reduce((sum: number, item: any) => sum + (parseFloat(item.total) || parseFloat(item.subtotal) || 0), 0)
-          : 0,
+        fees: this.extractFees(rawData),
+        feesTotal: this.calculateFeesTotal(rawData),
 
         subtotal: parseFloat(invoice.subtotal) || 0,
         tax: parseFloat(invoice.tax) || 0,
@@ -452,23 +369,6 @@ export const invoiceDetailService = {
         isFinanciallyLocked: invoice.is_financially_locked || false,
         lockedAt: invoice.locked_at || null,
         lockedBy: invoice.locked_by || null,
-
-        shippingLabelUrl: invoice.shipping_label_url || null,
-        shippingLabels: (shippingLabelsData || []).map((label: any) => ({
-          id: label.id,
-          labelUrl: label.label_url,
-          trackingNumber: label.tracking_number,
-          carrier: label.carrier,
-          service: label.service,
-          cost: label.cost,
-          weightOz: label.weight_oz,
-          packageLength: label.package_length,
-          packageWidth: label.package_width,
-          packageHeight: label.package_height,
-          shipDate: label.ship_date,
-          createdAt: label.created_at,
-        })),
-        shipping_labels: Array.isArray(invoice.shipping_labels) ? invoice.shipping_labels : [],
 
         rawData,
       };

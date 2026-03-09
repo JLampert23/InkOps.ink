@@ -17,6 +17,28 @@ interface PrintavoStatus {
   type: string | null;
 }
 
+async function decryptToken(encryptedToken: string, supabaseUrl: string, serviceRoleKey: string): Promise<string> {
+  const response = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${serviceRoleKey}`,
+    },
+    body: JSON.stringify({
+      action: 'decrypt',
+      token: encryptedToken,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(`Decryption failed: ${error.error || 'Unknown error'}`);
+  }
+
+  const data = await response.json();
+  return data.result;
+}
+
 async function fetchAllStatuses(email: string, token: string): Promise<PrintavoStatus[]> {
   const query = `
     query GetAllStatuses {
@@ -138,9 +160,9 @@ Deno.serve(async (req: Request) => {
     const { data: roleData, error: roleError } = await supabase
       .rpc('get_user_role', { user_id: user.id });
 
-    if (roleError || !['super_admin', 'admin'].includes(roleData)) {
+    if (roleError || roleData !== 'super_admin') {
       return new Response(
-        JSON.stringify({ error: "Access denied. Admin role required." }),
+        JSON.stringify({ error: "Access denied. Super Admin role required." }),
         {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -148,17 +170,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: profile } = await supabase
-      .from("user_profiles")
-      .select("company_id")
-      .eq("id", user.id)
-      .maybeSingle();
+    const { data: companyData, error: companyError } = await supabase
+      .rpc('get_user_company_id', { user_id: user.id });
 
-    if (!profile?.company_id) {
+    if (companyError || !companyData) {
       return new Response(
-        JSON.stringify({ error: "Company not found" }),
+        JSON.stringify({ error: "Failed to fetch user company" }),
         {
-          status: 404,
+          status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
@@ -167,14 +186,14 @@ Deno.serve(async (req: Request) => {
     const { data: settings, error: settingsError } = await supabase
       .from('company_settings')
       .select('printavo_username, printavo_api_token_encrypted')
-      .eq('id', profile.company_id)
+      .eq('id', companyData)
       .maybeSingle();
 
     if (settingsError) {
       console.error('Settings error:', settingsError);
       return new Response(
         JSON.stringify({
-          error: "Failed to fetch Printavo settings",
+          error: "Failed to fetch company settings",
           details: settingsError.message,
         }),
         {
@@ -184,11 +203,11 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (!settings?.printavo_username || !settings?.printavo_api_token_encrypted) {
+    if (!settings || !settings.printavo_username || !settings.printavo_api_token_encrypted) {
       return new Response(
         JSON.stringify({
           error: "Printavo credentials not configured",
-          message: "Please configure Printavo username and API token in Account Settings",
+          message: "Please configure Printavo credentials in Account Settings",
         }),
         {
           status: 400,
@@ -197,29 +216,12 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const decryptResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": authHeader,
-      },
-      body: JSON.stringify({
-        action: "decrypt",
-        token: settings.printavo_api_token_encrypted,
-      }),
-    });
-
-    if (!decryptResponse.ok) {
-      return new Response(
-        JSON.stringify({ error: "Failed to decrypt Printavo credentials" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const { result: decryptedToken } = await decryptResponse.json();
-
     const printavoEmail = settings.printavo_username;
-    const printavoToken = decryptedToken;
+    const printavoToken = await decryptToken(
+      settings.printavo_api_token_encrypted,
+      supabaseUrl,
+      supabaseServiceRoleKey
+    );
 
     const statuses = await fetchAllStatuses(printavoEmail, printavoToken);
 

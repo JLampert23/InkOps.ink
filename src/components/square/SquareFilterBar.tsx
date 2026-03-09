@@ -2,6 +2,11 @@ import { useState } from 'react';
 import { Search, Calendar, ArrowUpDown } from 'lucide-react';
 import { format } from 'date-fns';
 
+interface DateRangeOption {
+  label: string;
+  value: string;
+}
+
 interface SquareFilterBarProps {
   searchPlaceholder?: string;
   sortOptions?: { label: string; value: string }[];
@@ -150,18 +155,18 @@ export default function SquareFilterBar({
   };
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-lg shadow dark:shadow-slate-900/50 p-6 mb-6">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Filters</h3>
+    <div className="bg-white rounded-lg shadow p-6 mb-6">
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">Filters</h3>
 
       <div className="flex flex-col lg:flex-row gap-4 mb-6">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => handleSearchChange(e.target.value)}
             placeholder={searchPlaceholder}
-            className="w-full pl-11 pr-4 py-2.5 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+            className="w-full pl-11 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm"
           />
         </div>
 
@@ -170,7 +175,7 @@ export default function SquareFilterBar({
             <select
               value={sortBy}
               onChange={(e) => handleSortChange(e.target.value)}
-              className="px-4 py-2.5 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+              className="px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
             >
               {sortOptions.map(option => (
                 <option key={option.value} value={option.value}>
@@ -180,10 +185,10 @@ export default function SquareFilterBar({
             </select>
             <button
               onClick={toggleSortDirection}
-              className="px-3 py-2.5 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+              className="px-3 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}
             >
-              <ArrowUpDown className={`w-5 h-5 text-gray-600 dark:text-gray-400 ${sortDirection === 'desc' ? 'rotate-180' : ''} transition-transform`} />
+              <ArrowUpDown className={`w-5 h-5 text-gray-600 ${sortDirection === 'desc' ? 'rotate-180' : ''} transition-transform`} />
             </button>
           </div>
         )}
@@ -192,7 +197,7 @@ export default function SquareFilterBar({
       {showDateRange && (
         <>
           <div className="mb-4">
-            <label className="flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-white mb-3">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-900 mb-3">
               <Calendar className="w-4 h-4" />
               Date Range
             </label>
@@ -212,7 +217,7 @@ export default function SquareFilterBar({
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                     selectedRange === value && !useCustomRange
                       ? 'bg-blue-600 text-white shadow-md'
-                      : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
                   {label}
@@ -230,7 +235,7 @@ export default function SquareFilterBar({
                 onChange={() => setUseCustomRange(true)}
                 className="w-4 h-4 text-blue-600"
               />
-              <label htmlFor="customRange" className="text-sm font-medium text-gray-900 dark:text-white">
+              <label htmlFor="customRange" className="text-sm font-medium text-gray-900">
                 Custom Range
               </label>
             </div>
@@ -240,21 +245,21 @@ export default function SquareFilterBar({
                 value={customRange.start}
                 onChange={(e) => setCustomRange(prev => ({ ...prev, start: e.target.value }))}
                 onBlur={handleCustomRangeChange}
-                className="px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
-              <span className="text-sm text-gray-600 dark:text-gray-400">to</span>
+              <span className="text-sm text-gray-600">to</span>
               <input
                 type="date"
                 value={customRange.end}
                 onChange={(e) => setCustomRange(prev => ({ ...prev, end: e.target.value }))}
                 onBlur={handleCustomRangeChange}
-                className="px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
           </div>
 
-          <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg px-4 py-3">
-            <p className="text-sm text-blue-900 dark:text-blue-300">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+            <p className="text-sm text-blue-900">
               <span className="font-medium">Showing:</span> {getDisplayDateRange()}
             </p>
           </div>

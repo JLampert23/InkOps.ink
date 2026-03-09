@@ -7,6 +7,51 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits', 'deriveKey']
+  );
+
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    true,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function decryptToken(encryptedToken: string, encryptionKey: string): Promise<string> {
+  const combined = new Uint8Array(
+    atob(encryptedToken).split('').map(c => c.charCodeAt(0))
+  );
+
+  const salt = combined.slice(0, 16);
+  const iv = combined.slice(16, 28);
+  const encryptedData = combined.slice(28);
+
+  const key = await deriveKey(encryptionKey, salt);
+
+  const decryptedData = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: iv },
+    key,
+    encryptedData
+  );
+
+  const decoder = new TextDecoder();
+  return decoder.decode(decryptedData);
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -19,10 +64,27 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
 
     const diagnostics: any = {
       timestamp: new Date().toISOString(),
+      encryptionKeySet: !!encryptionKey,
+      encryptionKeyLength: encryptionKey?.length || 0,
     };
+
+    if (!encryptionKey) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "ENCRYPTION_KEY not configured in Supabase Edge Function secrets",
+          diagnostics,
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
 
     // Get the user's JWT token from the Authorization header
     const authHeader = req.headers.get('Authorization');
@@ -76,23 +138,45 @@ Deno.serve(async (req: Request) => {
     const companyId = userProfile.company_id;
     diagnostics.companyId = companyId;
 
-    // Get Printavo integration settings
-    const { data: integrationSettings, error: settingsError } = await serviceSupabase
-      .from('integration_settings')
-      .select('config, is_enabled')
-      .eq('company_id', companyId)
-      .eq('provider_name', 'printavo')
+    // Now get company_settings for this specific company
+    const { data: settings, error: settingsError } = await serviceSupabase
+      .from('company_settings')
+      .select('printavo_username, printavo_api_token_encrypted')
+      .eq('id', companyId)
       .maybeSingle();
 
-    diagnostics.settingsFound = !!integrationSettings;
-    diagnostics.isEnabled = integrationSettings?.is_enabled;
+    diagnostics.settingsFound = !!settings;
+    diagnostics.usernameSet = !!settings?.printavo_username;
+    diagnostics.encryptedTokenSet = !!settings?.printavo_api_token_encrypted;
+    diagnostics.encryptedTokenLength = settings?.printavo_api_token_encrypted?.length || 0;
 
-    if (settingsError) {
+    if (settingsError || !settings || !settings.printavo_username || !settings.printavo_api_token_encrypted) {
       return new Response(
         JSON.stringify({
           success: false,
-          error: "Failed to load Printavo settings",
-          details: settingsError.message,
+          error: "Printavo credentials not found in company_settings",
+          diagnostics,
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    let decryptedToken: string;
+    try {
+      decryptedToken = await decryptToken(settings.printavo_api_token_encrypted, encryptionKey);
+      diagnostics.decryptionSuccess = true;
+      diagnostics.decryptedTokenLength = decryptedToken.length;
+      diagnostics.decryptedTokenPreview = decryptedToken.substring(0, 4) + "..." + decryptedToken.substring(decryptedToken.length - 4);
+    } catch (error) {
+      diagnostics.decryptionSuccess = false;
+      diagnostics.decryptionError = error instanceof Error ? error.message : "Unknown error";
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Failed to decrypt token - ENCRYPTION_KEY may have changed",
           diagnostics,
         }),
         {
@@ -101,45 +185,6 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
-
-    if (!integrationSettings?.is_enabled) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "Printavo integration not enabled",
-          diagnostics,
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    const config = integrationSettings.config as any;
-
-    diagnostics.emailSet = !!config?.email;
-    diagnostics.tokenSet = !!config?.api_token;
-
-    if (!config?.email || !config?.api_token) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "Printavo credentials incomplete. Please configure email and API token in Account Settings.",
-          diagnostics,
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    const printavoEmail = config.email;
-    const printavoToken = config.api_token;
-
-    diagnostics.tokenLength = printavoToken.length;
-    diagnostics.tokenPreview = printavoToken.substring(0, 4) + "..." + printavoToken.substring(printavoToken.length - 4);
 
     const url = new URL(req.url);
     const testType = url.searchParams.get('test') || 'customer';
@@ -215,8 +260,8 @@ Deno.serve(async (req: Request) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        email: printavoEmail,
-        token: printavoToken,
+        email: settings.printavo_username,
+        token: decryptedToken,
       },
       body: JSON.stringify({
         query: testQuery,

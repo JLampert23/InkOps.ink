@@ -9,7 +9,6 @@ interface ScheduleEntry {
   id: string;
   company_id: string;
   quote_id: string | null;
-  work_order_id: string | null;
   line_item_id: string | null;
   imprint_id: string | null;
   type_of_work: string;
@@ -58,10 +57,9 @@ interface FilterConfig {
 
 interface ProductionSchedulerProps {
   typeOfWork: string;
-  onNavigateToWorkOrder?: (workOrderId: string) => void;
 }
 
-export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder }: ProductionSchedulerProps) {
+export default function ProductionScheduler({ typeOfWork }: ProductionSchedulerProps) {
   const { user, companySettings } = useAuth();
   const [entries, setEntries] = useState<ScheduleEntry[]>([]);
   const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([]);
@@ -87,7 +85,6 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
   const [availableStations, setAvailableStations] = useState<Array<{ id: string; station_name: string }>>([]);
 
   const loadWorkflowSteps = async () => {
-    setLoading(true);
     try {
       const { data: typeData } = await supabase
         .from('type_of_work_settings')
@@ -115,9 +112,6 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
               is_default: status.is_default || false,
             })),
           })));
-        } else {
-          setWorkflowSteps([]);
-          setLoading(false);
         }
 
         // Load stations for this work type
@@ -131,13 +125,9 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
         if (stationsData) {
           setAvailableStations(stationsData);
         }
-      } else {
-        setWorkflowSteps([]);
-        setLoading(false);
       }
     } catch (error) {
       console.error('Error loading workflow steps:', error);
-      setLoading(false);
     }
   };
 
@@ -654,19 +644,8 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
                         </div>
                       )}
                     </td>
-                    <td className="px-3 py-3 text-sm font-medium">
-                      {entry.imprint_number ? (
-                        entry.work_order_id && onNavigateToWorkOrder ? (
-                          <button
-                            onClick={() => onNavigateToWorkOrder(entry.work_order_id!)}
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline transition-colors"
-                          >
-                            {entry.imprint_number}
-                          </button>
-                        ) : (
-                          <span className="text-gray-900 dark:text-white">{entry.imprint_number}</span>
-                        )
-                      ) : '-'}
+                    <td className="px-3 py-3 text-sm text-gray-900 dark:text-white font-medium">
+                      {entry.imprint_number || '-'}
                     </td>
                     <td className="px-3 py-3 text-sm text-gray-900 dark:text-white">
                       {entry.customer_name || '-'}

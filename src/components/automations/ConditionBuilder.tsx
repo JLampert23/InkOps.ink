@@ -23,7 +23,7 @@ export function ConditionBuilder({ conditions, onUpdate, onRemove }: ConditionBu
           <select
             value={condition.value}
             onChange={(e) => onUpdate(condition.id, { value: e.target.value })}
-            className="flex-1 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
           >
             <option value="">Select value...</option>
             {option.options?.map(opt => (
@@ -40,7 +40,7 @@ export function ConditionBuilder({ conditions, onUpdate, onRemove }: ConditionBu
             type="number"
             value={condition.value}
             onChange={(e) => onUpdate(condition.id, { value: e.target.value })}
-            className="flex-1 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
             placeholder="Enter number..."
           />
         );
@@ -51,7 +51,7 @@ export function ConditionBuilder({ conditions, onUpdate, onRemove }: ConditionBu
             type="date"
             value={condition.value}
             onChange={(e) => onUpdate(condition.id, { value: e.target.value })}
-            className="flex-1 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
           />
         );
 
@@ -61,7 +61,7 @@ export function ConditionBuilder({ conditions, onUpdate, onRemove }: ConditionBu
             type="text"
             value={condition.value}
             onChange={(e) => onUpdate(condition.id, { value: e.target.value })}
-            className="flex-1 px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
             placeholder="Enter value..."
           />
         );
@@ -77,27 +77,27 @@ export function ConditionBuilder({ conditions, onUpdate, onRemove }: ConditionBu
           <div key={condition.id}>
             {index > 0 && (
               <div className="flex items-center gap-2 mb-2">
-                <div className="h-px flex-1 bg-gray-200 dark:bg-slate-700" />
+                <div className="h-px flex-1 bg-gray-200" />
                 <select
                   value={condition.logicOperator || 'AND'}
                   onChange={(e) => onUpdate(condition.id, { logicOperator: e.target.value as 'AND' | 'OR' })}
-                  className="px-3 py-1 text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 font-medium text-gray-700 dark:text-gray-300"
+                  className="px-3 py-1 text-sm border border-gray-300 rounded bg-white font-medium text-gray-700"
                 >
                   <option value="AND">AND</option>
                   <option value="OR">OR</option>
                 </select>
-                <div className="h-px flex-1 bg-gray-200 dark:bg-slate-700" />
+                <div className="h-px flex-1 bg-gray-200" />
               </div>
             )}
 
-            <div className="bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700 rounded-lg p-4">
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
               <div className="flex items-center gap-2 mb-3">
-                <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                <span className="text-xs font-medium text-gray-500 uppercase">
                   Condition {index + 1}
                 </span>
                 <button
                   onClick={() => onRemove(condition.id)}
-                  className="ml-auto p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                  className="ml-auto p-1 text-red-600 hover:bg-red-50 rounded"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -107,7 +107,7 @@ export function ConditionBuilder({ conditions, onUpdate, onRemove }: ConditionBu
                 <select
                   value={condition.field}
                   onChange={(e) => onUpdate(condition.id, { field: e.target.value as any, value: '' })}
-                  className="px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                  className="px-3 py-2 border border-gray-300 rounded-lg bg-white"
                 >
                   {CONDITION_OPTIONS.map(opt => (
                     <option key={opt.value} value={opt.value}>
@@ -119,7 +119,7 @@ export function ConditionBuilder({ conditions, onUpdate, onRemove }: ConditionBu
                 <select
                   value={condition.operator}
                   onChange={(e) => onUpdate(condition.id, { operator: e.target.value as any })}
-                  className="px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                  className="px-3 py-2 border border-gray-300 rounded-lg bg-white"
                 >
                   {option?.operators.map(op => (
                     <option key={op} value={op}>

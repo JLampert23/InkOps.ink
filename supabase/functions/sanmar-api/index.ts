@@ -1,21 +1,25 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
-import {
-  fetchUnifiedSanMarData,
-  fetchSanMarProductData,
-  fetchSanMarInventory,
-  fetchSanMarPricing,
-  fetchSanMarMedia,
-  testSanMarConnection,
-  type SanMarCredentials,
-  type SanMarUnifiedResponse,
-} from "../_shared/sanmar-promostandards-client.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey, X-User-Token",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
+
+const SANMAR_API_BASE = "https://api.sanmar.com";
+
+interface SanMarCredentials {
+  apiKey: string;
+  customerId: string;
+  username?: string;
+  password?: string;
+}
+
+interface ProductSearchParams {
+  style: string;
+  companyId: string;
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -29,297 +33,177 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
-
-    const userToken = req.headers.get("X-User-Token") || "";
     const authHeader = req.headers.get("Authorization");
-    const bearerToken = authHeader?.replace('Bearer ', '') || "";
-    const isServiceRoleKey = bearerToken === supabaseServiceRoleKey;
-    const token = isServiceRoleKey ? bearerToken : (userToken || bearerToken);
-
-    if (!token) {
+    if (!authHeader) {
       return new Response(
-        JSON.stringify({ code: 401, message: "Missing authorization" }),
+        JSON.stringify({ error: "Missing authorization header" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const url = new URL(req.url);
+    const token = authHeader.replace("Bearer ", "");
 
-    let companyId: string;
-
-    if (isServiceRoleKey) {
-      const qsCompanyId = url.searchParams.get("companyId");
-      if (!qsCompanyId) {
-        return new Response(
-          JSON.stringify({ code: 400, message: "companyId query param required for service-role calls" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+    const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
       }
-      companyId = qsCompanyId;
-    } else {
-      const jwtParts = token.split('.');
-      if (jwtParts.length !== 3) {
-        return new Response(
-          JSON.stringify({ code: 401, message: "Invalid JWT format" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+    });
 
-      let userId: string;
-      try {
-        const payload = JSON.parse(atob(jwtParts[1]));
-        userId = payload.sub;
-        if (!userId) throw new Error("No sub claim in JWT");
-        console.log('✅ JWT decoded, user ID:', userId);
-      } catch (e) {
-        console.error('Failed to decode JWT:', e);
-        return new Response(
-          JSON.stringify({ code: 401, message: "Failed to decode JWT" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
-      const { data: profile } = await supabaseAdmin
-        .from("user_profiles")
-        .select("company_id")
-        .eq("id", userId)
-        .maybeSingle();
-
-      if (!profile?.company_id) {
-        return new Response(
-          JSON.stringify({ code: 404, message: "Company not found for user" }),
-          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      companyId = profile.company_id;
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized", details: authError?.message }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    // Get SanMar PromoStandards credentials from company_settings
-    const { data: settings } = await supabaseAdmin
-      .from("company_settings")
-      .select("sanmar_promo_username, sanmar_promo_password_encrypted")
-      .eq("id", companyId)
+    // Get user's company_id
+    const { data: profile } = await supabase
+      .from("user_profiles")
+      .select("company_id")
+      .eq("id", user.id)
       .maybeSingle();
 
-    if (!settings?.sanmar_promo_username || !settings?.sanmar_promo_password_encrypted) {
+    if (!profile?.company_id) {
       return new Response(
-        JSON.stringify({
-          error: "SanMar PromoStandards credentials not configured",
-          message: "Please configure your SanMar username and password in Account Settings > Integrations > SanMar"
-        }),
+        JSON.stringify({ error: "Company not found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Get SanMar credentials from company_settings
+    const { data: settings } = await supabase
+      .from("company_settings")
+      .select("sanmar_username, sanmar_api_key_encrypted")
+      .eq("id", profile.company_id)
+      .maybeSingle();
+
+    if (!settings?.sanmar_username || !settings?.sanmar_api_key_encrypted) {
+      return new Response(
+        JSON.stringify({ error: "SanMar credentials not configured" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Decrypt the password
+    const credentials = {
+      apiKey: settings.sanmar_api_key_encrypted,
+      customerId: settings.sanmar_username,
+      username: settings.sanmar_username
+    } as SanMarCredentials;
+
+    // Decrypt the API key
     const decryptResponse = await fetch(`${supabaseUrl}/functions/v1/crypto-service`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${supabaseServiceRoleKey}`,
+        "Authorization": authHeader,
       },
       body: JSON.stringify({
         action: "decrypt",
-        token: settings.sanmar_promo_password_encrypted,
+        token: credentials.apiKey,
       }),
     });
 
     if (!decryptResponse.ok) {
-      console.error("Failed to decrypt SanMar password");
+      console.error("Failed to decrypt SanMar API key");
       return new Response(
         JSON.stringify({ error: "Failed to decrypt credentials" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const { result: decryptedPassword } = await decryptResponse.json();
+    const { result: decryptedApiKey } = await decryptResponse.json();
 
-    const credentials: SanMarCredentials = {
-      id: settings.sanmar_promo_username,
-      password: decryptedPassword
-    };
-
-    console.log(`🔑 SanMar credentials loaded for company ${companyId}`);
-    console.log(`👤 Username: ${credentials.id}`);
-
-    const action = url.searchParams.get("action") || "unified";
+    // Parse request
+    const url = new URL(req.url);
+    const action = url.searchParams.get("action");
     const style = url.searchParams.get("style");
-    const partId = url.searchParams.get("partId") || undefined;
 
-    console.log(`📋 Request params: action=${action}, style=${style}, partId=${partId}`);
+    if (!style) {
+      return new Response(
+        JSON.stringify({ error: "Style number required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    let responseData: any;
+    // Call SanMar API based on action
+    let sanmarUrl = "";
+    let method = "GET";
 
-    // Handle different action types
     switch (action) {
-      case "test":
-      case "brands":
-        // Test connection using PC54 (SanMar style number)
-        console.log('🧪 Starting SanMar connection test...');
-        try {
-          const testResult = await Promise.race([
-            testSanMarConnection(credentials),
-            new Promise((_, reject) =>
-              setTimeout(() => reject(new Error('Connection test timed out after 25 seconds')), 25000)
-            )
-          ]) as boolean;
-
-          responseData = {
-            success: testResult,
-            supplier: "sanmar",
-            action,
-            authenticated: testResult,
-            message: testResult
-              ? "SanMar PromoStandards connection successful! Test product (PC54) found."
-              : "SanMar PromoStandards connection failed - check credentials"
-          };
-          console.log('✅ SanMar connection test completed:', testResult);
-        } catch (error: any) {
-          console.error('❌ SanMar connection test error:', error.message);
-          responseData = {
-            success: false,
-            supplier: "sanmar",
-            action,
-            authenticated: false,
-            error: error.message || 'Connection test failed',
-            message: `SanMar connection test failed: ${error.message}`
-          };
-        }
-        break;
-
-      case "unified":
-        // Fetch all data in parallel (recommended)
-        if (!style) {
-          return new Response(
-            JSON.stringify({ error: "Style number required" }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        responseData = await fetchUnifiedSanMarData(credentials, {
-          styleNumber: style,
-          partId
-        });
-        break;
-
-      case "product":
-        // Fetch only product data
-        if (!style) {
-          return new Response(
-            JSON.stringify({ error: "Style number required" }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        try {
-          const productData = await fetchSanMarProductData(credentials, style);
-          responseData = {
-            success: true,
-            supplier: "sanmar",
-            action: "product",
-            data: productData
-          };
-        } catch (productError: any) {
-          console.error(`Product fetch failed for ${style}:`, productError.message);
-          return new Response(
-            JSON.stringify({
-              success: false,
-              supplier: "sanmar",
-              action: "product",
-              error: productError.message || "Product not found",
-              style: style
-            }),
-            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        break;
-
-      case "inventory":
-        // Fetch inventory for a specific part
-        if (!partId) {
-          return new Response(
-            JSON.stringify({ error: "Part ID required for inventory lookup" }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        const inventoryData = await fetchSanMarInventory(credentials, partId);
-        responseData = {
-          success: true,
-          supplier: "sanmar",
-          action: "inventory",
-          data: inventoryData
-        };
-        break;
-
-      case "pricing":
-        // Fetch pricing for a specific part
-        if (!partId) {
-          return new Response(
-            JSON.stringify({ error: "Part ID required for pricing lookup" }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        const pricingData = await fetchSanMarPricing(credentials, partId);
-        responseData = {
-          success: true,
-          supplier: "sanmar",
-          action: "pricing",
-          data: pricingData
-        };
-        break;
-
-      case "media":
-        // Fetch media/images
-        if (!style) {
-          return new Response(
-            JSON.stringify({ error: "Style number required" }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-        const mediaData = await fetchSanMarMedia(credentials, style, partId);
-        console.log(`[SanMar Media Action] Style: ${style}, images returned: ${mediaData.images?.length || 0}`);
-        if (mediaData.images?.length === 0) {
-          console.warn(`[SanMar Media Action] WARNING: Zero images returned from PromoStandards Media API for ${style}. The Media Content Service may not be included in this SanMar account.`);
-        } else {
-          const colorSample = [...new Set(mediaData.images.map((i: any) => i.color).filter(Boolean))].slice(0, 5);
-          console.log(`[SanMar Media Action] Colors in images: ${colorSample.join(', ')}`);
-        }
-        responseData = {
-          success: true,
-          supplier: "sanmar",
-          action: "media",
-          data: mediaData
-        };
-        break;
-
       case "search":
-        // Legacy compatibility - treat as unified product search
-        if (!style) {
+        // Search for products by style
+        sanmarUrl = `${SANMAR_API_BASE}/products/search?style=${encodeURIComponent(style)}`;
+        break;
+      case "colors":
+        // Get all colors for a style
+        sanmarUrl = `${SANMAR_API_BASE}/products/${encodeURIComponent(style)}/colors`;
+        break;
+      case "pricing":
+        const color = url.searchParams.get("color");
+        if (!color) {
           return new Response(
-            JSON.stringify({ error: "Style number required" }),
+            JSON.stringify({ error: "Color required for pricing" }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-        const searchData = await fetchUnifiedSanMarData(credentials, {
-          styleNumber: style,
-          partId
-        });
-        responseData = {
-          success: true,
-          supplier: "sanmar",
-          action: "search",
-          data: searchData
-        };
+        sanmarUrl = `${SANMAR_API_BASE}/products/${encodeURIComponent(style)}/pricing?color=${encodeURIComponent(color)}`;
         break;
-
+      case "inventory":
+        const colorCode = url.searchParams.get("color");
+        if (!colorCode) {
+          return new Response(
+            JSON.stringify({ error: "Color required for inventory" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        sanmarUrl = `${SANMAR_API_BASE}/products/${encodeURIComponent(style)}/inventory?color=${encodeURIComponent(colorCode)}`;
+        break;
       default:
         return new Response(
-          JSON.stringify({ error: `Invalid action: ${action}` }),
+          JSON.stringify({ error: "Invalid action" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
 
+    // Make request to SanMar API with decrypted key
+    const sanmarHeaders: Record<string, string> = {
+      "Authorization": `Bearer ${decryptedApiKey}`,
+      "Content-Type": "application/json",
+    };
+
+    if (credentials.customerId) {
+      sanmarHeaders["X-Customer-Id"] = credentials.customerId;
+    }
+
+    const sanmarResponse = await fetch(sanmarUrl, {
+      method,
+      headers: sanmarHeaders,
+    });
+
+    if (!sanmarResponse.ok) {
+      const errorText = await sanmarResponse.text();
+      console.error("SanMar API error:", errorText);
+      return new Response(
+        JSON.stringify({
+          error: "SanMar API request failed",
+          details: errorText,
+          status: sanmarResponse.status
+        }),
+        { status: sanmarResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const data = await sanmarResponse.json();
+
     return new Response(
-      JSON.stringify(responseData),
+      JSON.stringify({
+        success: true,
+        supplier: "sanmar",
+        data,
+      }),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
@@ -328,29 +212,8 @@ Deno.serve(async (req: Request) => {
 
   } catch (error: any) {
     console.error("SanMar API function error:", error);
-
-    // Check if it's a PromoStandards authentication error
-    if (error.name === 'PromoStandardsError') {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: error.message,
-          code: error.code,
-          supplier: "sanmar",
-          message: `SanMar PromoStandards authentication failed: ${error.message}`
-        }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Return clear error messages
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message || "Internal server error",
-        supplier: "sanmar",
-        details: error.stack
-      }),
+      JSON.stringify({ error: error.message || "Internal server error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

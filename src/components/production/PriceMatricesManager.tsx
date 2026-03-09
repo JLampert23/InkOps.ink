@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Edit2, Save, X, Grid3x3, Upload } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Trash2, Edit2, Save, X, Grid3x3 } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -23,7 +23,6 @@ export function PriceMatricesManager() {
   const [loading, setLoading] = useState(true);
   const [editingMatrix, setEditingMatrix] = useState<PriceMatrix | null>(null);
   const [showEditor, setShowEditor] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadMatrices();
@@ -52,7 +51,7 @@ export function PriceMatricesManager() {
       id: '',
       name: '',
       description: '',
-      matrix_type: '',
+      matrix_type: 'general',
       setup_fee: 0,
       columns: ['Column 1', 'Column 2', 'Column 3'],
       rows: ['Row 1', 'Row 2', 'Row 3'],
@@ -88,89 +87,6 @@ export function PriceMatricesManager() {
     setEditingMatrix(null);
   };
 
-  const parseCSV = (csvText: string): { headers: string[], rows: any[][] } => {
-    const lines = csvText.trim().split('\n');
-    const headers = lines[0].split(',').map(h => h.trim());
-    const rows = lines.slice(1).map(line => {
-      return line.split(',').map(cell => cell.trim());
-    });
-    return { headers, rows };
-  };
-
-  const handleCSVUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const text = await file.text();
-      const { headers, rows } = parseCSV(text);
-
-      const quantityIndex = headers.findIndex(h => h.toLowerCase() === 'quantity');
-      if (quantityIndex === -1) {
-        showNotification('error', 'Invalid CSV', 'CSV must have a "Quantity" column');
-        return;
-      }
-
-      const columnHeaders: string[] = [];
-      const columnIndices: number[] = [];
-
-      headers.forEach((header, idx) => {
-        if (idx === quantityIndex) return;
-        if (header.toLowerCase().startsWith('column')) {
-          columnHeaders.push(header);
-          columnIndices.push(idx);
-        }
-      });
-
-      if (columnHeaders.length === 0) {
-        showNotification('error', 'Invalid CSV', 'CSV must have column headers (e.g., "Column 1", "Column 2")');
-        return;
-      }
-
-      const rowLabels: string[] = [];
-      const cells: Record<string, number> = {};
-
-      rows.forEach((row, rowIdx) => {
-        const quantity = row[quantityIndex];
-        if (!quantity) return;
-
-        rowLabels.push(quantity);
-
-        columnIndices.forEach((colIdx, colPosition) => {
-          const value = parseFloat(row[colIdx]);
-          if (!isNaN(value)) {
-            cells[`${rowIdx}-${colPosition}`] = value;
-          }
-        });
-      });
-
-      const matrixName = file.name.replace('.csv', '');
-
-      setEditingMatrix({
-        id: '',
-        name: matrixName,
-        description: `Imported from ${file.name}`,
-        matrix_type: '',
-        setup_fee: 0,
-        columns: columnHeaders,
-        rows: rowLabels,
-        cells: cells,
-        is_active: true,
-      });
-      setShowEditor(true);
-
-      showNotification('success', 'CSV Imported', `Successfully imported ${rowLabels.length} rows and ${columnHeaders.length} columns`);
-
-    } catch (error) {
-      console.error('Error parsing CSV:', error);
-      showNotification('error', 'Import Failed', 'Failed to parse CSV file');
-    }
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
@@ -179,29 +95,13 @@ export function PriceMatricesManager() {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Price Matrices</h2>
             <p className="text-sm text-gray-600 dark:text-gray-400">Create and manage pricing tables with custom columns and rows</p>
           </div>
-          <div className="flex items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv"
-              onChange={handleCSVUpload}
-              className="hidden"
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Upload className="w-4 h-4" />
-              Import CSV
-            </button>
-            <button
-              onClick={createNewMatrix}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              New Matrix
-            </button>
-          </div>
+          <button
+            onClick={createNewMatrix}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            New Matrix
+          </button>
         </div>
 
         {loading ? (
@@ -212,22 +112,13 @@ export function PriceMatricesManager() {
           <div className="text-center py-12 bg-gray-50 dark:bg-slate-700/50 rounded-lg">
             <Grid3x3 className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-3" />
             <p className="text-gray-600 dark:text-gray-400 mb-4">No price matrices created yet</p>
-            <div className="flex items-center justify-center gap-3">
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <Upload className="w-4 h-4" />
-                Import from CSV
-              </button>
-              <button
-                onClick={createNewMatrix}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Create Your First Matrix
-              </button>
-            </div>
+            <button
+              onClick={createNewMatrix}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Create Your First Matrix
+            </button>
           </div>
         ) : (
           <div className="grid gap-4">
@@ -240,11 +131,9 @@ export function PriceMatricesManager() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="text-md font-semibold text-gray-900 dark:text-white">{matrix.name}</h3>
-                      {matrix.matrix_type && (
-                        <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs rounded">
-                          {matrix.matrix_type}
-                        </span>
-                      )}
+                      <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs rounded">
+                        {matrix.matrix_type.replace('_', ' ')}
+                      </span>
                       {matrix.is_active && (
                         <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded">
                           Active
@@ -316,27 +205,6 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
   const [cells, setCells] = useState<Record<string, number>>(matrix.cells);
   const [isActive, setIsActive] = useState(matrix.is_active);
   const [saving, setSaving] = useState(false);
-  const [typesOfWork, setTypesOfWork] = useState<string[]>([]);
-
-  useEffect(() => {
-    const loadTypesOfWork = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('type_of_work_settings')
-          .select('work_type_name')
-          .eq('is_active', true)
-          .order('sort_order');
-
-        if (error) throw error;
-
-        const typeNames = data?.map(item => item.work_type_name) || [];
-        setTypesOfWork(typeNames);
-      } catch (err) {
-        console.error('Error loading types of work:', err);
-      }
-    };
-    loadTypesOfWork();
-  }, []);
 
   const addColumn = () => {
     setColumns([...columns, `Column ${columns.length + 1}`]);
@@ -457,9 +325,9 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-auto">
-      <div className="bg-white dark:bg-slate-800 rounded-lg w-full max-w-[95vw] my-4 flex flex-col shadow-xl">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-slate-700 sticky top-0 bg-white dark:bg-slate-800 z-10">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-lg w-full max-w-6xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-slate-700">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
             {matrix.id ? 'Edit Price Matrix' : 'Create Price Matrix'}
           </h2>
@@ -468,25 +336,25 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
           </button>
         </div>
 
-        <div className="overflow-auto p-4 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="flex-1 overflow-auto p-6 space-y-6">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Matrix Name <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="e.g., T-Shirt Pricing"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Status
               </label>
-              <label className="flex items-center gap-2 cursor-pointer h-9">
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={isActive}
@@ -499,38 +367,39 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Description
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
-              className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
               placeholder="Optional description"
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Matrix Type
               </label>
               <select
                 value={matrixType}
                 onChange={(e) => setMatrixType(e.target.value)}
-                className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">Select type of work</option>
-                {typesOfWork.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
+                <option value="general">General</option>
+                <option value="screen_print">Screen Print</option>
+                <option value="embroidery">Embroidery</option>
+                <option value="dtg">DTG (Direct to Garment)</option>
+                <option value="vinyl">Vinyl</option>
+                <option value="sublimation">Sublimation</option>
+                <option value="heat_transfer">Heat Transfer</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Setup Fee
               </label>
               <input
@@ -539,32 +408,34 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
                 min="0"
                 value={setupFee}
                 onChange={(e) => setSetupFee(e.target.value)}
-                className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="0.00"
               />
             </div>
           </div>
 
-          <div className="border border-gray-300 dark:border-slate-600 rounded-lg overflow-hidden">
-            <div className="overflow-x-auto overflow-y-auto max-h-[50vh]">
-              <table className="w-full border-collapse text-xs">
-                <thead className="sticky top-0 bg-gray-50 dark:bg-slate-700 z-10">
-                  <tr>
-                    <th className="border border-gray-300 dark:border-slate-600 p-1 min-w-[100px] bg-gray-50 dark:bg-slate-700">
-                      <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Quantity</span>
+          <div className="overflow-x-auto">
+            <div className="inline-block min-w-full align-middle">
+              <table className="min-w-full border border-gray-300 dark:border-slate-600">
+                <thead>
+                  <tr className="bg-gray-50 dark:bg-slate-700">
+                    <th className="border border-gray-300 dark:border-slate-600 p-2 w-48">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Row / Column</span>
+                      </div>
                     </th>
                     {columns.map((col, colIndex) => (
-                      <th key={colIndex} className="border border-gray-300 dark:border-slate-600 p-1 min-w-[90px] bg-gray-50 dark:bg-slate-700">
-                        <div className="flex items-center gap-0.5">
+                      <th key={colIndex} className="border border-gray-300 dark:border-slate-600 p-2 min-w-32">
+                        <div className="flex items-center gap-1">
                           <input
                             type="text"
                             value={col}
                             onChange={(e) => updateColumn(colIndex, e.target.value)}
-                            className="flex-1 min-w-0 px-1.5 py-0.5 text-xs border border-gray-300 dark:border-gray-600 dark:bg-slate-800 dark:text-white rounded"
+                            className="flex-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 dark:bg-slate-800 dark:text-white rounded"
                           />
                           <button
                             onClick={() => removeColumn(colIndex)}
-                            className="p-0.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded flex-shrink-0"
+                            className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
                             title="Remove column"
                           >
                             <X className="w-3 h-3" />
@@ -572,31 +443,31 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
                         </div>
                       </th>
                     ))}
-                    <th className="border border-gray-300 dark:border-slate-600 p-1 w-10 bg-gray-50 dark:bg-slate-700">
+                    <th className="border border-gray-300 dark:border-slate-600 p-2 w-16">
                       <button
                         onClick={addColumn}
-                        className="p-0.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded"
+                        className="p-1 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded"
                         title="Add column"
                       >
-                        <Plus className="w-3.5 h-3.5" />
+                        <Plus className="w-4 h-4" />
                       </button>
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((row, rowIndex) => (
-                    <tr key={rowIndex} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
-                      <td className="border border-gray-300 dark:border-slate-600 p-1 bg-gray-50 dark:bg-slate-700/50">
-                        <div className="flex items-center gap-0.5">
+                    <tr key={rowIndex}>
+                      <td className="border border-gray-300 dark:border-slate-600 p-2 bg-gray-50 dark:bg-slate-700">
+                        <div className="flex items-center gap-1">
                           <input
                             type="text"
                             value={row}
                             onChange={(e) => updateRow(rowIndex, e.target.value)}
-                            className="flex-1 min-w-0 px-1.5 py-0.5 text-xs border border-gray-300 dark:border-gray-600 dark:bg-slate-800 dark:text-white rounded"
+                            className="flex-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 dark:bg-slate-800 dark:text-white rounded"
                           />
                           <button
                             onClick={() => removeRow(rowIndex)}
-                            className="p-0.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded flex-shrink-0"
+                            className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
                             title="Remove row"
                           >
                             <X className="w-3 h-3" />
@@ -604,28 +475,28 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
                         </div>
                       </td>
                       {columns.map((_, colIndex) => (
-                        <td key={colIndex} className="border border-gray-300 dark:border-slate-600 p-1">
+                        <td key={colIndex} className="border border-gray-300 dark:border-slate-600 p-2">
                           <input
                             type="number"
                             step="0.01"
                             value={cells[`${rowIndex}-${colIndex}`] || ''}
                             onChange={(e) => updateCell(rowIndex, colIndex, e.target.value)}
-                            className="w-full px-1.5 py-0.5 text-xs border border-gray-300 dark:border-gray-600 dark:bg-slate-900 dark:text-white rounded text-right"
+                            className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 dark:bg-slate-900 dark:text-white rounded text-right"
                             placeholder="0.00"
                           />
                         </td>
                       ))}
-                      <td className="border border-gray-300 dark:border-slate-600 p-1"></td>
+                      <td className="border border-gray-300 dark:border-slate-600 p-2"></td>
                     </tr>
                   ))}
                   <tr>
-                    <td className="border border-gray-300 dark:border-slate-600 p-1 bg-gray-50 dark:bg-slate-700">
+                    <td className="border border-gray-300 dark:border-slate-600 p-2 bg-gray-50 dark:bg-slate-700">
                       <button
                         onClick={addRow}
-                        className="w-full flex items-center justify-center gap-1 p-0.5 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded"
+                        className="w-full flex items-center justify-center gap-2 p-1 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded"
                       >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span className="text-xs">Add</span>
+                        <Plus className="w-4 h-4" />
+                        <span className="text-sm">Add Row</span>
                       </button>
                     </td>
                     <td colSpan={columns.length + 1} className="border border-gray-300 dark:border-slate-600"></td>
@@ -636,26 +507,26 @@ function MatrixEditor({ matrix, onSave, onCancel }: MatrixEditorProps) {
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900 sticky bottom-0">
+        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-slate-700">
           <button
             onClick={onCancel}
-            className="px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
+            className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
           >
             {saving ? (
               <>
-                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 Saving...
               </>
             ) : (
               <>
-                <Save className="w-3.5 h-3.5" />
+                <Save className="w-4 h-4" />
                 Save Matrix
               </>
             )}

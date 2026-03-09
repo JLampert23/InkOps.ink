@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Users, Search, ChevronRight, Mail, Phone, DollarSign, Loader2, FileText, CreditCard, FileSpreadsheet, Gift, Plus, Save, X, Edit2, Trash2, Upload, Image, ExternalLink } from 'lucide-react';
+import { Users, Search, ChevronRight, Mail, Phone, DollarSign, Loader2, FileText, CreditCard, FileSpreadsheet, Gift, Plus, Save, X, Edit2, Trash2, Upload } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format } from 'date-fns';
 import { InvoiceDetail } from '../billing/InvoiceDetail';
 import { useNotification } from '../../contexts/NotificationContext';
 import EditCustomerModal from './EditCustomerModal';
-import { CustomerArtworkLibrary } from './CustomerArtworkLibrary';
 import {
   exportCustomerListToPDF,
   exportCustomerListToCSV,
@@ -14,7 +13,6 @@ import {
   downloadCSV,
   PaymentHistoryItem,
 } from '../../utils/customer-export';
-import { getCustomerPortalUrl } from '../../utils/portal-url';
 
 interface Customer {
   id: string;
@@ -77,11 +75,6 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [savingCredit, setSavingCredit] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showArtworkLibrary, setShowArtworkLibrary] = useState(false);
-  const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
-  const [artworkCustomerId, setArtworkCustomerId] = useState<string | null>(null);
-  const [portalEnabled, setPortalEnabled] = useState(false);
-  const [inkopsSubdomain, setInkopsSubdomain] = useState<string | null>(null);
 
   useEffect(() => {
     loadCustomers();
@@ -143,15 +136,11 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
     try {
       const { data: settings } = await supabase
         .from('company_settings')
-        .select('company_name, inkops_subdomain')
+        .select('company_name')
         .single();
 
       if (settings?.company_name) {
         setCompanyName(settings.company_name);
-        setPortalEnabled(true);
-      }
-      if (settings?.inkops_subdomain) {
-        setInkopsSubdomain(settings.inkops_subdomain);
       }
     } catch (error) {
       console.error('Error loading company settings:', error);
@@ -525,7 +514,7 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
                   </div>
                 </button>
                 {onCreateQuote && (
-                  <div className="mt-2 pl-2 flex flex-wrap gap-2">
+                  <div className="mt-2 pl-2">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -535,29 +524,6 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
                     >
                       <FileText className="w-4 h-4" />
                       Create Quote
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setArtworkCustomerId(customer.id);
-                        setShowArtworkLibrary(true);
-                      }}
-                      className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 rounded-lg transition-colors border border-green-200 dark:border-green-800"
-                      title="View customer artwork library"
-                    >
-                      <Image className="w-4 h-4" />
-                      Artwork Library
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingCustomerId(customer.id);
-                        setShowEditModal(true);
-                      }}
-                      className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors border border-blue-200 dark:border-blue-800"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                      Edit Customer
                     </button>
                   </div>
                 )}
@@ -579,28 +545,19 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
           {selectedCustomer ? (
             <>
               <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
-                <div className="mb-2 flex items-start justify-between">
-                  <div>
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex-1">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{selectedCustomer.company_name}</h3>
                     {selectedCustomer.contact_name && (
                       <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{selectedCustomer.contact_name}</p>
                     )}
                   </div>
                   <button
-                    onClick={() => {
-                      const portalUrl = getCustomerPortalUrl(selectedCustomer.id, inkopsSubdomain, companyName);
-                      window.open(portalUrl, '_blank');
-                    }}
-                    disabled={!portalEnabled}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                      portalEnabled
-                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 border border-blue-200 dark:border-blue-800'
-                        : 'bg-gray-100 dark:bg-slate-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
-                    }`}
-                    title={portalEnabled ? 'Open Customer Portal' : 'Customer Portal is not enabled for this company'}
+                    onClick={() => setShowEditModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shrink-0 ml-4"
                   >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    Customer Portal
+                    <Edit2 className="w-4 h-4" />
+                    Edit Customer
                   </button>
                 </div>
 
@@ -830,29 +787,12 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
       </div>
 
       {/* Edit Customer Modal */}
-      {editingCustomerId && (
+      {selectedCustomer && (
         <EditCustomerModal
           isOpen={showEditModal}
-          onClose={() => {
-            setShowEditModal(false);
-            setEditingCustomerId(null);
-          }}
-          onSuccess={() => {
-            handleEditSuccess();
-            setEditingCustomerId(null);
-          }}
-          customerId={editingCustomerId}
-        />
-      )}
-
-      {/* Artwork Library Modal */}
-      {artworkCustomerId && showArtworkLibrary && (
-        <CustomerArtworkLibrary
-          customerId={artworkCustomerId}
-          onClose={() => {
-            setShowArtworkLibrary(false);
-            setArtworkCustomerId(null);
-          }}
+          onClose={() => setShowEditModal(false)}
+          onSuccess={handleEditSuccess}
+          customerId={selectedCustomer.id}
         />
       )}
     </div>

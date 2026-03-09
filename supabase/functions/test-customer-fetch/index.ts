@@ -9,6 +9,56 @@ const corsHeaders = {
 
 const PRINTAVO_API_URL = "https://www.printavo.com/api/v2";
 
+async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits', 'deriveKey']
+  );
+
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: salt,
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    true,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function decryptToken(encryptedToken: string, encryptionKey: string): Promise<string> {
+  try {
+    const combined = new Uint8Array(
+      atob(encryptedToken).split('').map(c => c.charCodeAt(0))
+    );
+
+    const salt = combined.slice(0, 16);
+    const iv = combined.slice(16, 28);
+    const encryptedData = combined.slice(28);
+
+    const key = await deriveKey(encryptionKey, salt);
+
+    const decryptedData = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: iv },
+      key,
+      encryptedData
+    );
+
+    const decoder = new TextDecoder();
+    return decoder.decode(decryptedData);
+  } catch (error) {
+    console.error('Decryption error:', error);
+    throw new Error('Failed to decrypt token');
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -20,31 +70,25 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const encryptionKey = Deno.env.get('ENCRYPTION_KEY');
+
+    if (!encryptionKey) {
+      throw new Error('ENCRYPTION_KEY not configured');
+    }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { data: integrationSettings, error: settingsError } = await supabase
-      .from('integration_settings')
-      .select('config, is_enabled')
-      .eq('provider_name', 'printavo')
+    const { data: settings, error: settingsError } = await supabase
+      .from('company_settings')
+      .select('printavo_username, printavo_api_token_encrypted')
       .maybeSingle();
 
-    if (settingsError) {
-      throw new Error(`Failed to load Printavo settings: ${settingsError.message}`);
-    }
-
-    if (!integrationSettings?.is_enabled) {
-      throw new Error('Printavo integration not enabled');
-    }
-
-    const config = integrationSettings.config as any;
-
-    if (!config?.email || !config?.api_token) {
+    if (settingsError || !settings || !settings.printavo_username || !settings.printavo_api_token_encrypted) {
       throw new Error('Printavo credentials not configured');
     }
 
-    const printavoEmail = config.email;
-    const printavoToken = config.api_token;
+    const printavoEmail = settings.printavo_username;
+    const printavoToken = await decryptToken(settings.printavo_api_token_encrypted, encryptionKey);
 
     const customerQuery = `
       query GetCustomer($id: ID!) {

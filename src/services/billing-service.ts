@@ -257,14 +257,10 @@ export const billingService = {
         .order('created_at', { ascending: false });
 
       if (queueError) throw queueError;
-      if (!queueData || queueData.length === 0) return [];
+      if (!queueData) return [];
 
       // Get customer IDs from invoices, then fetch customer data
       const invoiceIds = queueData.map(item => item.printavo_invoice_id);
-
-      // Don't query if no invoice IDs
-      if (invoiceIds.length === 0) return [];
-
       const { data: invoiceData } = await supabase
         .from('printavo_invoices')
         .select('id, customer_id')
@@ -278,34 +274,31 @@ export const billingService = {
       // Get unique customer IDs
       const customerIds = [...new Set(invoiceData?.map(inv => inv.customer_id).filter(Boolean) || [])];
 
-      // Fetch customer data if we have customer IDs
-      let customerDataMap = new Map();
-      if (customerIds.length > 0) {
-        const { data: customerData } = await supabase
-          .from('customers')
-          .select(`
-            id,
-            phone,
-            billing_address_line1,
-            billing_address_line2,
-            billing_city,
-            billing_state,
-            billing_zip,
-            billing_country,
-            shipping_address_line1,
-            shipping_address_line2,
-            shipping_city,
-            shipping_state,
-            shipping_zip,
-            shipping_country
-          `)
-          .in('id', customerIds);
+      // Fetch customer data
+      const { data: customerData } = await supabase
+        .from('customers')
+        .select(`
+          id,
+          phone,
+          billing_address_line1,
+          billing_address_line2,
+          billing_city,
+          billing_state,
+          billing_zip,
+          billing_country,
+          shipping_address_line1,
+          shipping_address_line2,
+          shipping_city,
+          shipping_state,
+          shipping_zip,
+          shipping_country
+        `)
+        .in('id', customerIds);
 
-        // Create a map of customer ID to customer data
-        customerDataMap = new Map(
-          (customerData || []).map(cust => [cust.id, cust])
-        );
-      }
+      // Create a map of customer ID to customer data
+      const customerDataMap = new Map(
+        (customerData || []).map(cust => [cust.id, cust])
+      );
 
       return queueData.map(item => {
         const customerId = invoiceToCustomerMap.get(item.printavo_invoice_id);
@@ -631,9 +624,9 @@ export const billingService = {
 
         const { data: stripePayments } = await supabase
           .from('stripe_payments')
-          .select('created_at, stripe_payment_intent_id, payment_method')
+          .select('payment_date, stripe_payment_intent_id, payment_method')
           .eq('printavo_invoice_id', item.id)
-          .order('created_at', { ascending: false })
+          .order('payment_date', { ascending: false })
           .limit(1)
           .maybeSingle();
 

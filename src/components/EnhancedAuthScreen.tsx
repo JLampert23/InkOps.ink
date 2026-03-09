@@ -1,12 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Lock, Mail, AlertCircle, Loader2, Building2, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { Lock, Mail, AlertCircle, Loader2, Building2, Eye, EyeOff } from 'lucide-react';
 
-interface EnhancedAuthScreenProps {
-  onBackClick?: () => void;
-}
-
-export function EnhancedAuthScreen({ onBackClick }: EnhancedAuthScreenProps) {
+export function EnhancedAuthScreen() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
@@ -59,8 +55,7 @@ export function EnhancedAuthScreen({ onBackClick }: EnhancedAuthScreenProps) {
         if (error) {
           setError(error.message);
         } else {
-          setSuccessMessage('Account created! You can now sign in.');
-          setIsSignUp(false);
+          setSuccessMessage('Company account created successfully! Please sign in to set up your integrations.');
         }
       } else {
         const { error } = await signIn(email, password);
@@ -80,32 +75,23 @@ export function EnhancedAuthScreen({ onBackClick }: EnhancedAuthScreenProps) {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-950 flex items-center justify-center p-4 sm:p-6">
       <div className="w-full max-w-md">
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 p-8 sm:p-10 backdrop-blur-sm">
-          {onBackClick && (
-            <button
-              onClick={onBackClick}
-              className="mb-6 flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors group"
-            >
-              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-              <span className="text-sm font-medium">Back to Home</span>
-            </button>
-          )}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center mb-6 transform hover:scale-105 transition-transform duration-200">
               <img
-                src="/headerlogo.png"
-                alt="INKOPS"
-                className="h-16 w-auto"
+                src="/create_variation_b_f.png"
+                alt="InkOps Logo"
+                className="h-40 w-auto"
               />
             </div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-3 tracking-tight">
-              {isForgotPassword ? 'Reset Password' : isSignUp ? 'Create Account' : 'Sign In'}
+              {isForgotPassword ? 'Reset Password' : isSignUp ? 'Create Company Account' : 'Welcome Back'}
             </h1>
             <p className="text-gray-600 dark:text-gray-400 text-base leading-relaxed">
               {isForgotPassword
                 ? 'Enter your email to receive a password reset link'
                 : isSignUp
-                ? 'Get started with INKOPS'
-                : 'Welcome back'}
+                ? 'Set up your InkOps account'
+                : 'Sign in to InkOps'}
             </p>
           </div>
 
@@ -214,11 +200,11 @@ export function EnhancedAuthScreen({ onBackClick }: EnhancedAuthScreenProps) {
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
                   <span>
-                    {isForgotPassword ? 'Sending...' : isSignUp ? 'Creating...' : 'Signing In...'}
+                    {isForgotPassword ? 'Sending Reset Link...' : isSignUp ? 'Creating Account...' : 'Signing In...'}
                   </span>
                 </>
               ) : (
-                <span>{isForgotPassword ? 'Send Reset Link' : isSignUp ? 'Create Account' : 'Sign In'}</span>
+                <span>{isForgotPassword ? 'Send Reset Link' : isSignUp ? 'Create Company Account' : 'Sign In'}</span>
               )}
             </button>
           </form>
@@ -267,13 +253,21 @@ export function EnhancedAuthScreen({ onBackClick }: EnhancedAuthScreenProps) {
               ) : (
                 <>
                   Don't have an account?{' '}
-                  <span className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">Sign up</span>
+                  <span className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">Create company account</span>
                 </>
               )}
             </button>
           </div>
         </div>
 
+        <div className="text-center mt-8 space-y-2">
+          <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+            Secure multi-tenant authentication powered by Supabase
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-500">
+            All API tokens are encrypted with AES-256-GCM
+          </p>
+        </div>
       </div>
     </div>
   );

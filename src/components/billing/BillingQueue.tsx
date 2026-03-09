@@ -19,7 +19,6 @@ import {
 import { billingService, BillingQueueItem } from '../../services/billing-service';
 import { invoiceDetailService } from '../../services/invoice-detail-service';
 import { generateInvoicePDF } from '../../utils/invoice-pdf-export';
-import { supabase } from '../../lib/supabase-client';
 
 interface BillingQueueProps {
   onSendInvoice?: (item: BillingQueueItem) => void;
@@ -35,37 +34,10 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
   const [downloadingPDF, setDownloadingPDF] = useState<string | null>(null);
   const [creatingStripeInvoices, setCreatingStripeInvoices] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
-  const [companySettings, setCompanySettings] = useState<{
-    company_name: string | null;
-    company_address: string | null;
-    company_city: string | null;
-    company_state: string | null;
-    company_zip: string | null;
-    company_phone: string | null;
-    company_email: string | null;
-    company_website: string | null;
-    company_logo_primary_url: string | null;
-    invoice_terms: string | null;
-  } | null>(null);
 
   useEffect(() => {
     loadQueue();
-    loadCompanySettings();
   }, []);
-
-  const loadCompanySettings = async () => {
-    try {
-      const { data } = await supabase
-        .from('company_settings')
-        .select('company_name, company_address, company_city, company_state, company_zip, company_phone, company_email, company_website, company_logo_primary_url, invoice_terms')
-        .maybeSingle();
-      if (data) {
-        setCompanySettings(data);
-      }
-    } catch (error) {
-      console.error('Error loading company settings:', error);
-    }
-  };
 
   const loadQueue = async () => {
     setLoading(true);
@@ -179,18 +151,7 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
         alert('Failed to load invoice details');
         return;
       }
-      await generateInvoicePDF(invoiceDetail, {
-        companyName: companySettings?.company_name || undefined,
-        companyAddress: companySettings?.company_address || undefined,
-        companyCity: companySettings?.company_city || undefined,
-        companyState: companySettings?.company_state || undefined,
-        companyZip: companySettings?.company_zip || undefined,
-        companyPhone: companySettings?.company_phone || undefined,
-        companyEmail: companySettings?.company_email || undefined,
-        companyWebsite: companySettings?.company_website || undefined,
-        companyLogoUrl: companySettings?.company_logo_primary_url || undefined,
-        invoiceTerms: companySettings?.invoice_terms || undefined,
-      });
+      generateInvoicePDF(invoiceDetail);
     } catch (error: any) {
       alert(error.message || 'Failed to generate PDF');
     } finally {
@@ -362,7 +323,7 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
           <p className="text-gray-600 dark:text-gray-400">
             {statusFilter !== 'all'
               ? 'No invoices match the selected filter'
-              : 'No invoices are currently in the billing queue'}
+              : 'Use the "Sync from Printavo" button in the sidebar to populate the billing queue'}
           </p>
         </div>
       ) : (

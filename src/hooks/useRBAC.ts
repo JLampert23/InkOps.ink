@@ -1,30 +1,23 @@
 import { useState, useEffect } from 'react';
 import { UserRole, UserProfile, RBACPermissions } from '../types/rbac';
 import { RBACService } from '../services/rbac-service';
-import { supabase } from '../lib/supabase-client';
+import { useAuth } from '../contexts/AuthContext';
 
 export function useRBAC() {
+  const { user } = useAuth();
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [permissions, setPermissions] = useState<RBACPermissions | null>(null);
 
   useEffect(() => {
-    loadUserProfile();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        loadUserProfile();
-      } else {
-        setUserProfile(null);
-        setPermissions(null);
-        setLoading(false);
-      }
-    });
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
-  }, []);
+    if (user) {
+      loadUserProfile();
+    } else {
+      setUserProfile(null);
+      setPermissions(null);
+      setLoading(false);
+    }
+  }, [user]);
 
   const loadUserProfile = async () => {
     setLoading(true);
