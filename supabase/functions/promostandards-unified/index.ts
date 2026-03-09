@@ -192,7 +192,7 @@ Deno.serve(async (req: Request) => {
     console.log('📋 Fetching company settings for company_id:', companyId);
     const { data: settings, error: settingsError } = await supabase
       .from("company_settings")
-      .select("ssactivewear_enabled, ssactivewear_username, ssactivewear_api_key_encrypted, ssactivewear_fob_id, garment_markup_percentage")
+      .select("ssactivewear_enabled, ssactivewear_username, ssactivewear_api_key_encrypted, ssactivewear_fob_id, default_garment_markup")
       .eq("id", companyId)
       .maybeSingle();
 
@@ -270,7 +270,7 @@ Deno.serve(async (req: Request) => {
     console.log('Unified PromoStandards Request:', { styleNumber, partId, verbose, quantity, imprintCost });
 
     // Get garment markup percentage from company settings
-    const garmentMarkupPercentage = settings?.garment_markup_percentage || 0;
+    const garmentMarkupPercentage = settings?.default_garment_markup || 0;
     console.log('💰 Garment markup percentage:', garmentMarkupPercentage);
 
     // XML-escape credentials to prevent authentication issues
