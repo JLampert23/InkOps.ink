@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, CreditCard as Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, RefreshCw, MessageSquare, Eye, EyeOff, Grid3x3, FileText, CheckCircle, GripVertical, Workflow, Mail, Package, AlertTriangle, Copy, Check, Columns3, Wrench } from 'lucide-react';
+import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, CreditCard as Edit, Key, Clock, Layers, Zap, CreditCard, ChevronDown, ChevronUp, Settings as SettingsIcon, Link as LinkIcon, RefreshCw, MessageSquare, Eye, EyeOff, Grid3x3, FileText, CheckCircle, GripVertical, Workflow, Mail, Package, AlertTriangle, Copy, Check, Columns3, Wrench, Search } from 'lucide-react';
 import { supabase } from '../lib/supabase-client';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
@@ -273,8 +273,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
   const [diagnosticsExpanded, setDiagnosticsExpanded] = useState(false);
   const [testStyleNumber, setTestStyleNumber] = useState('18000');
+  const [testPartId, setTestPartId] = useState('');
   const [testingPricing, setTestingPricing] = useState(false);
   const [pricingTestResult, setPricingTestResult] = useState<any>(null);
+  const [lookingUpParts, setLookingUpParts] = useState(false);
+  const [availableParts, setAvailableParts] = useState<any[]>([]);
 
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -2283,7 +2286,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
-      const testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/promostandards-unified?styleNumber=${encodeURIComponent(testStyleNumber.trim())}&verbose=true`;
+      let testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/promostandards-unified?styleNumber=${encodeURIComponent(testStyleNumber.trim())}&verbose=true`;
+      if (testPartId.trim()) {
+        testUrl += `&partId=${encodeURIComponent(testPartId.trim())}&testPpc=true`;
+      }
       console.log('[Pricing Test] Calling:', testUrl);
 
       const response = await fetch(testUrl, {
@@ -2300,21 +2306,33 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       console.log('[Pricing Test] Response:', data);
 
       if (response.ok && data.success) {
-        const pricingCount = data.pricing?.parts?.length || 0;
         const productName = data.product?.productName || 'Unknown';
         const debug = data.debug || {};
+        const pricingTest = data.pricingTest || {};
+        const pricing = data.pricing || {};
+
+        const hasPpcPrice = pricingTest.ppcPrice !== null && pricingTest.ppcPrice !== undefined;
+        const hasBasePrice = pricingTest.basePrice !== null && pricingTest.basePrice !== undefined;
+        const finalPrice = pricingTest.finalPrice || pricing.price;
+        const pricingSource = pricingTest.pricingSource || pricing.source;
 
         setPricingTestResult({
-          success: pricingCount > 0,
+          success: finalPrice !== null && finalPrice !== undefined,
           productName,
-          pricingCount,
-          usedPricingId: debug.usedPricingId,
-          usedPricingSource: debug.usedPricingSource,
-          pricingAttempts: debug.pricingAttempts,
-          pricingSource: debug.pricingSource,
-          message: pricingCount > 0
-            ? `Found ${pricingCount} price entries for "${productName}" using ID: ${debug.usedPricingId} (${debug.usedPricingSource})`
-            : `Product found ("${productName}") but no pricing data returned. Attempted IDs: ${debug.pricingAttempts?.map((a: any) => `${a.id}(${a.resultCount})`).join(', ') || 'none'}`,
+          testHarness: data.testHarness || false,
+          partIdProvided: !!testPartId.trim(),
+          internalProductId: pricingTest.internalProductId || debug.internalProductId,
+          ppcPrice: pricingTest.ppcPrice,
+          ppcTiers: pricingTest.ppcTiers || [],
+          ppcError: pricingTest.ppcError || debug.ppcError,
+          basePrice: pricingTest.basePrice || debug.basePrice,
+          finalPrice,
+          pricingSource,
+          message: finalPrice !== null && finalPrice !== undefined
+            ? `Price: $${finalPrice.toFixed(2)} (${pricingSource}) for "${productName}"`
+            : testPartId.trim()
+              ? `No pricing found. PPC Error: ${pricingTest.ppcError || 'Unknown'}`
+              : `Product found ("${productName}") but partId required for Customer Pricing test`,
           rawDebug: debug,
         });
       } else {
@@ -2332,6 +2350,46 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       });
     } finally {
       setTestingPricing(false);
+    }
+  };
+
+  const lookupParts = async () => {
+    if (!testStyleNumber.trim()) return;
+
+    try {
+      setLookingUpParts(true);
+      setAvailableParts([]);
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
+      if (!token) return;
+
+      const testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/promostandards-unified?styleNumber=${encodeURIComponent(testStyleNumber.trim())}`;
+
+      const response = await fetch(testUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'X-User-Token': token,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      if (response.ok && data.success && data.product?.parts) {
+        const uniqueParts = data.product.parts.slice(0, 20).map((part: any) => ({
+          partId: part.partId,
+          colorName: part.colorName,
+          size: part.labelSize,
+        }));
+        setAvailableParts(uniqueParts);
+      }
+    } catch (err) {
+      console.error('[Part Lookup] Exception:', err);
+    } finally {
+      setLookingUpParts(false);
     }
   };
 
@@ -6389,23 +6447,72 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                       {diagnosticsExpanded && (
                         <div className="p-4 space-y-4 border-t border-gray-200 dark:border-gray-700">
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            Test the S&S Activewear PromoStandards Pricing API with a specific style number to verify pricing data is being retrieved correctly.
-                          </p>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                            <p>Test the S&S Activewear PromoStandards Pricing API to verify pricing data retrieval.</p>
+                            <p className="text-amber-600 dark:text-amber-400">Note: Part ID is required to test Customer Pricing (PPC). Without it, only base pricing is tested.</p>
+                          </div>
 
-                          <div className="flex gap-3 items-end">
-                            <div className="flex-1">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
                               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                                 Style Number
                               </label>
-                              <input
-                                type="text"
-                                value={testStyleNumber}
-                                onChange={(e) => setTestStyleNumber(e.target.value)}
-                                placeholder="e.g., 18000, 5000, 64000"
-                                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              />
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  value={testStyleNumber}
+                                  onChange={(e) => {
+                                    setTestStyleNumber(e.target.value);
+                                    setAvailableParts([]);
+                                    setTestPartId('');
+                                  }}
+                                  placeholder="e.g., 18000, 5000, 64000"
+                                  className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                                <button
+                                  onClick={lookupParts}
+                                  disabled={lookingUpParts || !testStyleNumber.trim()}
+                                  className="px-3 py-2 bg-gray-100 dark:bg-slate-600 text-gray-700 dark:text-gray-200 text-sm rounded-lg hover:bg-gray-200 dark:hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                  title="Lookup available parts"
+                                >
+                                  {lookingUpParts ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Search className="w-4 h-4" />
+                                  )}
+                                </button>
+                              </div>
                             </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                Part ID <span className="text-amber-500">(for PPC test)</span>
+                              </label>
+                              {availableParts.length > 0 ? (
+                                <select
+                                  value={testPartId}
+                                  onChange={(e) => setTestPartId(e.target.value)}
+                                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                >
+                                  <option value="">Select a part...</option>
+                                  {availableParts.map((part, idx) => (
+                                    <option key={idx} value={part.partId}>
+                                      {part.partId} - {part.colorName} / {part.size}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <input
+                                  type="text"
+                                  value={testPartId}
+                                  onChange={(e) => setTestPartId(e.target.value)}
+                                  placeholder="e.g., B00660093"
+                                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex justify-end">
                             <button
                               onClick={testSSAPricing}
                               disabled={testingPricing || !testStyleNumber.trim()}
@@ -6439,31 +6546,63 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                                     {pricingTestResult.message || pricingTestResult.error}
                                   </p>
 
-                                  {pricingTestResult.pricingAttempts && pricingTestResult.pricingAttempts.length > 0 && (
+                                  {pricingTestResult.internalProductId && (
                                     <div className="mt-3 p-3 bg-white/50 dark:bg-slate-800/50 rounded border border-gray-200 dark:border-gray-700">
-                                      <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">ProductId Attempts:</p>
-                                      <div className="space-y-1">
-                                        {pricingTestResult.pricingAttempts.map((attempt: any, idx: number) => (
-                                          <div key={idx} className="flex items-center gap-2 text-xs">
-                                            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-white ${attempt.resultCount > 0 ? 'bg-green-500' : 'bg-gray-400'}`}>
-                                              {attempt.resultCount > 0 ? '✓' : idx + 1}
-                                            </span>
-                                            <code className="px-1.5 py-0.5 bg-gray-100 dark:bg-slate-700 rounded font-mono">
-                                              {attempt.id}
-                                            </code>
-                                            <span className="text-gray-500 dark:text-gray-400">
-                                              ({attempt.source}) - {attempt.resultCount} results
-                                            </span>
+                                      <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Internal Product ID:</p>
+                                      <code className="px-2 py-1 bg-gray-100 dark:bg-slate-700 rounded font-mono text-sm">
+                                        {pricingTestResult.internalProductId}
+                                      </code>
+                                    </div>
+                                  )}
+
+                                  {(pricingTestResult.ppcPrice !== null && pricingTestResult.ppcPrice !== undefined) && (
+                                    <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+                                      <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-2">Customer Pricing (PPC):</p>
+                                      <div className="text-lg font-bold text-blue-900 dark:text-blue-100">
+                                        ${pricingTestResult.ppcPrice?.toFixed(2)}
+                                      </div>
+                                      {pricingTestResult.ppcTiers && pricingTestResult.ppcTiers.length > 1 && (
+                                        <div className="mt-2 text-xs text-blue-700 dark:text-blue-300">
+                                          <p className="font-medium mb-1">Quantity Tiers:</p>
+                                          <div className="flex flex-wrap gap-2">
+                                            {pricingTestResult.ppcTiers.map((tier: any, idx: number) => (
+                                              <span key={idx} className="px-2 py-0.5 bg-blue-100 dark:bg-blue-800 rounded">
+                                                {tier.minQuantity}+ @ ${tier.price?.toFixed(2)}
+                                              </span>
+                                            ))}
                                           </div>
-                                        ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {pricingTestResult.ppcError && (
+                                    <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 rounded border border-red-200 dark:border-red-800">
+                                      <p className="text-xs font-medium text-red-700 dark:text-red-300 mb-1">PPC Error:</p>
+                                      <p className="text-sm text-red-600 dark:text-red-400">{pricingTestResult.ppcError}</p>
+                                    </div>
+                                  )}
+
+                                  {(pricingTestResult.basePrice !== null && pricingTestResult.basePrice !== undefined) && (
+                                    <div className="mt-3 p-3 bg-gray-50 dark:bg-slate-700/50 rounded border border-gray-200 dark:border-gray-600">
+                                      <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Base Price (fallback):</p>
+                                      <div className="text-lg font-semibold text-gray-700 dark:text-gray-200">
+                                        ${pricingTestResult.basePrice?.toFixed(2)}
                                       </div>
                                     </div>
                                   )}
 
-                                  {pricingTestResult.success && (
+                                  {!pricingTestResult.partIdProvided && !pricingTestResult.error && (
+                                    <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800">
+                                      <p className="text-xs text-amber-700 dark:text-amber-300">
+                                        Tip: Enter a Part ID above and test again to verify Customer Pricing (PPC) works correctly.
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {pricingTestResult.success && pricingTestResult.pricingSource && (
                                     <div className="mt-2 text-xs text-green-700 dark:text-green-300">
-                                      <p>Pricing Source: {pricingTestResult.pricingSource}</p>
-                                      <p>Total Price Entries: {pricingTestResult.pricingCount}</p>
+                                      <p>Final Pricing Source: <span className="font-medium">{pricingTestResult.pricingSource}</span></p>
                                     </div>
                                   )}
                                 </div>
