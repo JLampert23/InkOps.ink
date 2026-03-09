@@ -341,17 +341,39 @@ Deno.serve(async (req: Request) => {
         const partIdMatches = Array.from(inventoryDiscoveryResponse.matchAll(partIdPattern), m => m[1].trim());
 
         if (partIdMatches.length > 0) {
-          // Find first B-prefixed partId (e.g., "B00760033" or "B22035597")
-          const bPrefixedPartId = partIdMatches.find(id => /^B\d{5,}/i.test(id));
+          console.log(`🔍 Found ${partIdMatches.length} partIds, first 5:`, partIdMatches.slice(0, 5));
 
-          if (bPrefixedPartId) {
-            // Extract ONLY first 6 characters as the internal pricing ID (e.g., "B22035")
-            internalProductId = bPrefixedPartId.substring(0, 6).toUpperCase();
-            // Store the full partId for PPC calls (needs full SKU identifier)
-            discoveredPartId = bPrefixedPartId.toUpperCase();
+          // Find first valid partId - can be B-prefixed (e.g., "B00760033") or numeric (e.g., "2000033")
+          // Must be at least 7+ chars to include product ID + color/size suffix
+          const validPartId = partIdMatches.find(id => {
+            const trimmed = id.trim();
+            // B-prefixed: B + 5 digits + suffix (B00760033)
+            if (/^B\d{5,}/i.test(trimmed)) return true;
+            // Pure numeric: at least 7 digits (2000033 = style 2000 + suffix 033)
+            if (/^\d{7,}$/.test(trimmed)) return true;
+            return false;
+          });
+
+          if (validPartId) {
+            const trimmedPartId = validPartId.trim().toUpperCase();
+
+            // Extract productId (first 6 chars for B-prefix, or style-based for numeric)
+            if (trimmedPartId.startsWith('B')) {
+              internalProductId = trimmedPartId.substring(0, 6);
+            } else {
+              // For numeric partIds like "2000033", extract the style portion
+              // The style is typically the first 4-5 digits before the color/size suffix
+              // We need to figure out where the style ends - look at the original style number length
+              const styleLen = cleanedStyleNumber.length;
+              internalProductId = trimmedPartId.substring(0, styleLen);
+            }
+
+            discoveredPartId = trimmedPartId;
             internalIdSource = 'inventory-discovery';
-            console.log(`✅ SUCCESS! Discovered internal ID from Inventory: ${tryStyle} -> fullPartId ${bPrefixedPartId} -> productId ${internalProductId}`);
-            break; // Found it! Stop trying other variations
+            console.log(`✅ SUCCESS! Discovered from Inventory: ${tryStyle} -> fullPartId ${trimmedPartId} -> productId ${internalProductId}`);
+            break;
+          } else {
+            console.log(`⚠️ No valid partIds found matching pattern (need B+5digits or 7+ digits)`);
           }
         }
       } catch (error) {
