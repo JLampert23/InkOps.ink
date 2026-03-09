@@ -1003,9 +1003,8 @@ Deno.serve(async (req: Request) => {
           usedPricingSource,
           usedPricingId,
           pricingAttempts,
-          pricingPartsCount: pricingData?.parts?.length || 0,
-          pricesByPartId: pricingData?.pricesByPartId || {},
-          pricingData
+          parts: pricingData?.parts || [],
+          pricesByPartId: pricingData?.pricesByPartId || {}
         },
         media: mediaData,
         pricingAvailable: hasPricing,
