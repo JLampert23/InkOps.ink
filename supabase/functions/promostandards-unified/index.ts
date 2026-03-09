@@ -610,6 +610,7 @@ Deno.serve(async (req: Request) => {
     const pricingData: any = {};
     let pricingAuthError: { code: string; description: string } | null = null;
     let usedCache = false;
+    let usedBasePriceFallback = false;
 
     if (finalPricingResponse.status === 'fulfilled' && finalPricingResponse.value.prices.length > 0) {
       const livePricing = finalPricingResponse.value.prices;
@@ -668,7 +669,115 @@ Deno.serve(async (req: Request) => {
         console.warn('💰 Failed to cache pricing:', cacheErr.message);
       }
     } else {
-      console.warn('💰 Live pricing returned empty, checking DB cache...');
+      console.warn('💰 Live pricing returned empty, attempting base price fallback from Product Data...');
+
+      // FALLBACK: If wholesale pricing returned zero results, try to get base price from Product Data
+      if ((!pricingData.parts || pricingData.parts.length === 0) && productResponse.status === 'fulfilled' && productResponse.value) {
+        console.log('💰 Extracting base prices from Product Data endpoint...');
+
+        try {
+          const xmlDoc = productResponse.value;
+
+          // Extract ProductPrice entries from ProductPriceGroupArray
+          const productPricePattern = /<(?:[a-zA-Z0-9]+:)?ProductPrice>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?ProductPrice>/gi;
+          const productPriceMatches = getAllXmlMatches(xmlDoc, productPricePattern);
+
+          if (productPriceMatches.length > 0) {
+            console.log('💰 Found', productPriceMatches.length, 'ProductPrice entries in Product Data');
+
+            const basePrices: any[] = [];
+
+            // Parse each ProductPrice entry
+            productPriceMatches.forEach(match => {
+              const priceXml = match[1];
+              const partId = getXmlValue(priceXml, "partId");
+              const quantityMin = parseInt(getXmlValue(priceXml, "quantityMin") || "1");
+              const price = parseFloat(getXmlValue(priceXml, "price") || "0");
+
+              if (partId && price > 0 && quantityMin === 1) {
+                basePrices.push({
+                  partId: partId,
+                  price: price,
+                  minQty: quantityMin,
+                  discountCode: null,
+                  effectiveDate: null,
+                  expiryDate: null,
+                  source: 'base-price-fallback'
+                });
+              }
+            });
+
+            if (basePrices.length > 0) {
+              console.log('💰 Successfully extracted', basePrices.length, 'base prices from Product Data');
+              usedBasePriceFallback = true;
+
+              // Group by partId (same structure as wholesale pricing)
+              const partPricingMap = new Map<string, any[]>();
+              basePrices.forEach(item => {
+                if (!partPricingMap.has(item.partId)) {
+                  partPricingMap.set(item.partId, []);
+                }
+                partPricingMap.get(item.partId)!.push({
+                  minQuantity: item.minQty,
+                  price: item.price,
+                  discountCode: item.discountCode,
+                  effectiveDate: item.effectiveDate,
+                  expiryDate: item.expiryDate,
+                });
+              });
+
+              pricingData.parts = Array.from(partPricingMap.entries()).map(([partId, prices]) => ({
+                partId,
+                prices
+              }));
+
+              console.log('💰 Total base pricing data:', pricingData.parts.length, 'parts');
+
+              // Create a pricing map for easy lookup by partId
+              pricingData.pricesByPartId = {};
+              pricingData.parts.forEach((part: any) => {
+                if (part.partId && part.prices && part.prices.length > 0) {
+                  pricingData.pricesByPartId[part.partId] = part.prices[0].price;
+                }
+              });
+              console.log('💰 Base price map created with', Object.keys(pricingData.pricesByPartId).length, 'entries');
+
+              // Cache base prices the same way as wholesale pricing
+              try {
+                for (const item of basePrices) {
+                  await supabase
+                    .from('ss_catalog_pricing')
+                    .upsert({
+                      company_id: companyId,
+                      part_number: item.partId,
+                      unit_price: item.price,
+                      quantity_min: item.minQty || 1,
+                      quantity_max: 99999,
+                      discount_code: item.discountCode || null,
+                      price_expiry_date: item.expiryDate || null,
+                    }, {
+                      onConflict: "company_id,part_number,quantity_min"
+                    });
+                }
+                console.log('💰 Cached', basePrices.length, 'base pricing entries to ss_catalog_pricing');
+              } catch (cacheErr: any) {
+                console.warn('💰 Failed to cache base pricing:', cacheErr.message);
+              }
+            } else {
+              console.warn('💰 No valid base prices found in Product Data (need quantityMin=1 and price>0)');
+            }
+          } else {
+            console.warn('💰 No ProductPrice entries found in Product Data response');
+          }
+        } catch (basePriceErr: any) {
+          console.error('💰 Failed to extract base prices from Product Data:', basePriceErr.message);
+        }
+      }
+
+      // If still no pricing from fallback, check DB cache
+      if (!pricingData.parts || pricingData.parts.length === 0) {
+        console.warn('💰 Base price fallback unsuccessful, checking DB cache...');
+      }
 
       if (!pricingData.parts || pricingData.parts.length === 0) {
         const partIds = productData.parts?.map((p: any) => p.partId).filter(Boolean) || [];
@@ -905,8 +1014,9 @@ Deno.serve(async (req: Request) => {
           mediaAuthError,
           pricingAuthError,
           pricingSource: pricingData.parts?.length > 0
-            ? (usedCache ? 'cache' : 'live')
+            ? (usedCache ? 'cache' : (usedBasePriceFallback ? 'base-price-fallback' : 'live'))
             : 'none',
+          usedBasePriceFallback,
           pricingPartsCount: pricingData.parts?.length || 0,
           pricingMapCount: pricingData.pricesByPartId ? Object.keys(pricingData.pricesByPartId).length : 0,
           livePricingStatus: finalPricingResponse.status,
