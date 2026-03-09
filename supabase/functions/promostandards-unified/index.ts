@@ -1123,6 +1123,9 @@ Deno.serve(async (req: Request) => {
           mediaError: initialMediaResponse.status === 'rejected' ? initialMediaResponse.reason?.toString() : null,
           mediaAuthError,
           pricingAuthError,
+          pricingAttempts,
+          usedPricingId,
+          usedPricingSource,
           pricingSource: usedPricingSource,
           pricingMethod: usedPricingSource === 'pricing-and-configuration' ? 'wholesale-pricing' : (usedBasePriceFallback ? 'base-product-data-fallback' : 'cache'),
           pricingPartsCount: pricingData.parts?.length || 0,
@@ -1131,6 +1134,7 @@ Deno.serve(async (req: Request) => {
           soapRequests: verbose ? {
             productDataRequest: productSoap,
             mediaRequest: mediaSoap,
+            pricingRequest: pricingSoap,
           } : undefined,
           credentials: verbose ? {
             accountNumber: credentials.accountNumber,
