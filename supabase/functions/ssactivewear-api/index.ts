@@ -378,8 +378,8 @@ Deno.serve(async (req: Request) => {
 
         const soapBody = `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
   <shar:wsVersion>2.0.0</shar:wsVersion>
-  <shar:id>${escapeXml(credentials.accountNumber)}</shar:id>
-  <shar:password>${escapeXml(decryptedApiKey)}</shar:password>
+  <shar:id>${escapeXml(cleanedAccountNumber)}</shar:id>
+  <shar:password>${escapeXml(cleanedApiKey)}</shar:password>
   <shar:productId>${testProductId}</shar:productId>
 </ns2:GetProductRequest>`;
 
