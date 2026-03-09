@@ -16,7 +16,6 @@
           var isDark = saved !== null ? JSON.parse(saved) : false;
           if (isDark) {
             document.documentElement.classList.add('dark');
-            document.body.style.backgroundColor = '#0f172a';
           }
         } catch (e) {
           console.error('Error reading darkMode from localStorage:', e);
