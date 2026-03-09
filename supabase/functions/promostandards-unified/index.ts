@@ -304,6 +304,7 @@ Deno.serve(async (req: Request) => {
     // We must discover this ID FIRST by calling Inventory API, which is more forgiving with raw style numbers
     // and returns partIds we can extract the internal ID from.
     let internalProductId: string | null = null;
+    let discoveredPartId: string | null = null; // Full partId for PPC calls (e.g., "B00760033")
     let internalIdSource = 'none';
 
     // STEP 0: Try to discover internal product ID from Inventory API first
@@ -346,8 +347,10 @@ Deno.serve(async (req: Request) => {
           if (bPrefixedPartId) {
             // Extract ONLY first 6 characters as the internal pricing ID (e.g., "B22035")
             internalProductId = bPrefixedPartId.substring(0, 6).toUpperCase();
+            // Store the full partId for PPC calls (needs full SKU identifier)
+            discoveredPartId = bPrefixedPartId.toUpperCase();
             internalIdSource = 'inventory-discovery';
-            console.log(`✅ SUCCESS! Discovered internal ID from Inventory: ${tryStyle} -> partId ${bPrefixedPartId} -> ${internalProductId}`);
+            console.log(`✅ SUCCESS! Discovered internal ID from Inventory: ${tryStyle} -> fullPartId ${bPrefixedPartId} -> productId ${internalProductId}`);
             break; // Found it! Stop trying other variations
           }
         }
@@ -418,18 +421,22 @@ Deno.serve(async (req: Request) => {
     let ppcTiers: { minQuantity: number; price: number }[] = [];
     let ppcError: string | null = null;
 
-    if (partId) {
+    // Use provided partId, or fall back to discovered partId from inventory
+    const effectivePartId = (partId && partId.length > 6) ? partId : discoveredPartId;
+
+    if (effectivePartId && internalProductId) {
       console.log('💰 Step 1.5: Fetching PPC Customer Pricing...');
 
-      // S&S PPC API expects productId to match partId format
-      // partId format: "B22035597" where first 6 chars is product, rest is color/size
-      // Try using full partId as productId first, then fall back to extracted prefix
-      const ppcProductId = partId.substring(0, 6).toUpperCase();
+      // S&S PPC API requires:
+      // - productId: 6-character internal ID (e.g., "B00760")
+      // - partId: Full SKU identifier (e.g., "B00760033" = productId + color/size code)
+      const ppcProductId = internalProductId; // Already 6 chars from discovery
 
       console.log('💰 PPC Request params:', {
         ppcProductId,
-        partId,
-        internalProductId,
+        effectivePartId,
+        providedPartId: partId,
+        discoveredPartId,
         fobId: settings.ssactivewear_fob_id
       });
 
@@ -438,7 +445,7 @@ Deno.serve(async (req: Request) => {
   <shar:id>${escapedAccountNumber}</shar:id>
   <shar:password>${escapedApiKey}</shar:password>
   <shar:productId>${escapeXml(ppcProductId)}</shar:productId>
-  <shar:partId>${escapedPartId}</shar:partId>
+  <shar:partId>${escapeXml(effectivePartId)}</shar:partId>
   <shar:currency>USD</shar:currency>
   <shar:fobId>${escapeXml(settings.ssactivewear_fob_id || '')}</shar:fobId>
   <shar:priceType>Customer</shar:priceType>
@@ -490,7 +497,14 @@ Deno.serve(async (req: Request) => {
         console.error('💰 PPC request failed:', ppcError);
       }
     } else {
-      console.log('💰 Skipping PPC call - missing required params:', { hasInternalProductId: !!internalProductId, hasPartId: !!partId });
+      console.log('💰 Skipping PPC call - missing required params:', {
+        hasInternalProductId: !!internalProductId,
+        internalProductId,
+        hasEffectivePartId: !!effectivePartId,
+        providedPartId: partId,
+        discoveredPartId,
+        reason: !internalProductId ? 'No internalProductId discovered' : 'No valid partId (need >6 chars or discovered)'
+      });
     }
 
     // STEP 2: Fetch Inventory
