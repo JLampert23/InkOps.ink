@@ -480,6 +480,15 @@ Deno.serve(async (req: Request) => {
 
     const finalPricingResponse = pricingResponse;
 
+    console.log('💰 PRICING RESPONSE DEBUG:', {
+      status: finalPricingResponse.status,
+      hasValue: !!finalPricingResponse.value,
+      valuePreview: finalPricingResponse.status === 'fulfilled' && finalPricingResponse.value
+        ? finalPricingResponse.value.substring(0, 500)
+        : null,
+      rejection: finalPricingResponse.status === 'rejected' ? finalPricingResponse.reason : null
+    });
+
     console.log('📊 PromoStandards API Results:', {
       product: productResponse.status,
       inventory: inventoryResponse.status,
