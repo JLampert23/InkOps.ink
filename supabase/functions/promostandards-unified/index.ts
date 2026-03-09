@@ -474,19 +474,39 @@ Deno.serve(async (req: Request) => {
 
     // Pricing variables - will be populated from Pricing & Configuration or Product Data fallback
     let usedPricingId = pricingProductId;
-    let usedPricingSource = 'pricing-and-configuration';
+    let usedPricingSource = 'none';
     let pricingDebugInfo: any = null;
-    let pricingAttempts: { id: string; source: string; resultCount: number; debugInfo?: any }[] = [];
+    let pricingAttempts: { id: string; source: string; resultCount: number; error?: string; debugInfo?: any }[] = [];
 
     const finalPricingResponse = pricingResponse;
 
+    // CRITICAL: Log whether the Pricing & Configuration call was even attempted
+    console.log('💰 === PRICING & CONFIGURATION DEBUG START ===');
+    console.log('💰 pricingResponse.status:', finalPricingResponse.status);
+    console.log('💰 pricingProductId used:', pricingProductId);
+    console.log('💰 pricingSoap body was:', pricingSoap);
+
+    if (finalPricingResponse.status === 'rejected') {
+      console.log('💰 PRICING CALL REJECTED:', finalPricingResponse.reason);
+      pricingAttempts.push({
+        id: pricingProductId,
+        source: 'pricing-and-configuration',
+        resultCount: 0,
+        error: String(finalPricingResponse.reason),
+      });
+    } else if (finalPricingResponse.status === 'fulfilled') {
+      console.log('💰 PRICING CALL FULFILLED - response length:', finalPricingResponse.value?.length || 0);
+      console.log('💰 PRICING RESPONSE PREVIEW (first 1000 chars):', finalPricingResponse.value?.substring(0, 1000));
+    }
+
     console.log('💰 PRICING RESPONSE DEBUG:', {
       status: finalPricingResponse.status,
-      hasValue: !!finalPricingResponse.value,
+      hasValue: finalPricingResponse.status === 'fulfilled' && !!finalPricingResponse.value,
+      valueLength: finalPricingResponse.status === 'fulfilled' ? finalPricingResponse.value?.length : 0,
       valuePreview: finalPricingResponse.status === 'fulfilled' && finalPricingResponse.value
         ? finalPricingResponse.value.substring(0, 500)
         : null,
-      rejection: finalPricingResponse.status === 'rejected' ? finalPricingResponse.reason : null
+      rejection: finalPricingResponse.status === 'rejected' ? String(finalPricingResponse.reason) : null
     });
 
     console.log('📊 PromoStandards API Results:', {
@@ -573,22 +593,71 @@ Deno.serve(async (req: Request) => {
 
     if (finalPricingResponse.status === 'fulfilled' && finalPricingResponse.value) {
       const xmlDoc = finalPricingResponse.value;
-      console.log('💰 Pricing & Configuration XML Response received');
+      console.log('💰 Pricing & Configuration XML Response received, length:', xmlDoc.length);
 
-      // Check for SOAP errors
-      const errorCodeMatch = xmlDoc.match(/<code>(\d+)<\/code>/);
-      const errorDescMatch = xmlDoc.match(/<description>(.*?)<\/description>/);
+      // Check for SOAP faults first
+      const soapFaultMatch = xmlDoc.match(/<(?:soap:)?Fault>([\s\S]*?)<\/(?:soap:)?Fault>/i);
+      if (soapFaultMatch) {
+        console.error('💰 SOAP FAULT detected:', soapFaultMatch[1].substring(0, 500));
+        pricingAttempts.push({
+          id: pricingProductId,
+          source: 'pricing-and-configuration',
+          resultCount: 0,
+          error: 'SOAP Fault: ' + soapFaultMatch[1].substring(0, 200),
+        });
+      }
 
-      if (errorCodeMatch && errorDescMatch) {
+      // Check for PromoStandards error codes
+      const errorCodeMatch = xmlDoc.match(/<(?:[a-zA-Z0-9]+:)?code[^>]*>(\d+)<\/(?:[a-zA-Z0-9]+:)?code>/i);
+      const errorDescMatch = xmlDoc.match(/<(?:[a-zA-Z0-9]+:)?description[^>]*>(.*?)<\/(?:[a-zA-Z0-9]+:)?description>/i);
+
+      if (errorCodeMatch) {
         pricingAuthError = {
           code: errorCodeMatch[1],
-          description: errorDescMatch[1]
+          description: errorDescMatch ? errorDescMatch[1] : 'Unknown error'
         };
         console.error('💰 Pricing & Configuration API returned error:', pricingAuthError);
+        pricingAttempts.push({
+          id: pricingProductId,
+          source: 'pricing-and-configuration',
+          resultCount: 0,
+          error: `Error ${pricingAuthError.code}: ${pricingAuthError.description}`,
+        });
       } else {
-        // Extract Part entries with pricing
-        const partPattern = /<(?:[a-zA-Z0-9]+:)?Part>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Part>/gi;
-        const partMatches = getAllXmlMatches(xmlDoc, partPattern);
+        // Extract Part entries with pricing - try multiple patterns
+        // Pattern 1: Standard Part element
+        let partPattern = /<(?:[a-zA-Z0-9]+:)?Part>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Part>/gi;
+        let partMatches = getAllXmlMatches(xmlDoc, partPattern);
+
+        console.log('💰 Pattern 1 (Part): Found', partMatches.length, 'Part entries');
+
+        // Pattern 2: Try PartArray > Part if first pattern fails
+        if (partMatches.length === 0) {
+          const partArrayMatch = xmlDoc.match(/<(?:[a-zA-Z0-9]+:)?PartArray[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?PartArray>/i);
+          if (partArrayMatch) {
+            console.log('💰 Found PartArray, extracting Parts from it...');
+            partMatches = getAllXmlMatches(partArrayMatch[1], partPattern);
+            console.log('💰 Pattern 2 (PartArray>Part): Found', partMatches.length, 'Part entries');
+          }
+        }
+
+        // Pattern 3: Try Configuration > Part
+        if (partMatches.length === 0) {
+          const configMatch = xmlDoc.match(/<(?:[a-zA-Z0-9]+:)?Configuration[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Configuration>/i);
+          if (configMatch) {
+            console.log('💰 Found Configuration element, extracting Parts...');
+            partMatches = getAllXmlMatches(configMatch[1], partPattern);
+            console.log('💰 Pattern 3 (Configuration>Part): Found', partMatches.length, 'Part entries');
+          }
+        }
+
+        // Log sample of XML for debugging if no parts found
+        if (partMatches.length === 0) {
+          console.log('💰 NO PARTS FOUND - XML structure sample (2000 chars):', xmlDoc.substring(0, 2000));
+          console.log('💰 Looking for any price-related elements...');
+          const priceElementMatch = xmlDoc.match(/<[^>]*[Pp]rice[^>]*>/g);
+          console.log('💰 Price-related elements found:', priceElementMatch?.slice(0, 10));
+        }
 
         console.log('💰 Found', partMatches.length, 'Part entries in Pricing & Configuration response');
 
@@ -661,7 +730,12 @@ Deno.serve(async (req: Request) => {
             pricingAttempts.push({
               id: usedPricingId,
               source: 'pricing-and-configuration',
-              resultCount: wholesalePrices.length
+              resultCount: wholesalePrices.length,
+              debugInfo: {
+                partMatchCount: partMatches.length,
+                samplePartId: wholesalePrices[0]?.partId,
+                samplePrice: wholesalePrices[0]?.price,
+              }
             });
 
             // Cache wholesale prices
@@ -687,11 +761,32 @@ Deno.serve(async (req: Request) => {
             }
           } else {
             console.warn('💰 No valid wholesale prices found in Pricing & Configuration response');
+            pricingAttempts.push({
+              id: pricingProductId,
+              source: 'pricing-and-configuration',
+              resultCount: 0,
+              error: 'No valid wholesale prices extracted from Part entries',
+              debugInfo: { partMatchCount: partMatches.length }
+            });
           }
         } else {
           console.warn('💰 No Part entries found in Pricing & Configuration response');
+          pricingAttempts.push({
+            id: pricingProductId,
+            source: 'pricing-and-configuration',
+            resultCount: 0,
+            error: 'No Part entries found in response XML',
+          });
         }
       }
+    } else if (finalPricingResponse.status === 'fulfilled' && !finalPricingResponse.value) {
+      console.error('💰 Pricing response fulfilled but value is empty/null');
+      pricingAttempts.push({
+        id: pricingProductId,
+        source: 'pricing-and-configuration',
+        resultCount: 0,
+        error: 'Response fulfilled but value is empty',
+      });
     }
 
     // FALLBACK: If Pricing & Configuration failed, try Product Data 2.0.0 base pricing
