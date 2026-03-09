@@ -447,11 +447,11 @@ Deno.serve(async (req: Request) => {
   <shar:password>${escapedApiKey}</shar:password>
   <shar:productId>${escapedPricingProductId}</shar:productId>
   <shar:currency>USD</shar:currency>
-  <shar:fobId>${fobWarehouseId}</shar:fobId>
-  <shar:priceType>Customer</shar:priceType>
+  <shar:fobId>DEFAULT</shar:fobId>
+  <shar:priceType>Distributor</shar:priceType>
   <shar:localizationCountry>US</shar:localizationCountry>
   <shar:localizationLanguage>en</shar:localizationLanguage>
-  <shar:configurationType>Blank</shar:configurationType>
+  <shar:configurationType>Decorated</shar:configurationType>
 </ns2:GetConfigurationAndPricingRequest>`;
 
     const [inventoryResponse, pricingResponse] = await Promise.allSettled([
