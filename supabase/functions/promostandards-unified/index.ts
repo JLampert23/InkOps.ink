@@ -447,13 +447,16 @@ Deno.serve(async (req: Request) => {
     }
 
     // Determine the effective internal product ID to use for all API calls
-    const effectiveInternalProductId = internalProductIdParam || internalProductId;
+    const effectiveInternalProductId =
+      internalProductId || internalProductIdParam || escapedStyleNumber;
 
     if (!effectiveInternalProductId) {
       console.error("❌ No internalProductId available — cannot call PPC");
     }
 
-    console.log(`📦 Effective internalProductId for API calls: ${effectiveInternalProductId} (source: ${internalIdSource})`);
+    console.log(
+      `📦 Effective internalProductId for API calls: ${effectiveInternalProductId} (source: ${internalIdSource})`
+    );
 
     // STEP 1.5: Fetch Pricing & Configuration (Customer/EQP pricing)
     let ppcPrice: number | null = null;
