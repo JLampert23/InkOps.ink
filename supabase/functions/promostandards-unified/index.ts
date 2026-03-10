@@ -443,23 +443,21 @@ Deno.serve(async (req: Request) => {
     let ppcTiers: { minQuantity: number; price: number }[] = [];
     let ppcError: string | null = null;
 
-    // Use provided partId, or fall back to discovered partId from inventory
-    const effectivePartId = (partId && partId.length > 6) ? partId : discoveredPartId;
+    // PPC productId MUST be derived ONLY from discoveredPartId (first 6 chars)
+    const ppcProductId = discoveredPartId?.substring(0, 6)?.toUpperCase() || null;
+    const isValidPpcProductId = ppcProductId !== null && ppcProductId.length === 6;
 
-    if (effectivePartId && internalProductId) {
+    if (isValidPpcProductId && discoveredPartId) {
       console.log('💰 Step 1.5: Fetching PPC Customer Pricing...');
 
       // S&S PPC API requires:
-      // - productId: 6-character internal ID (e.g., "B00760")
-      // - partId: FULL partId with all characters (e.g., "B00760033")
-      const ppcProductId = internalProductId; // 6-char internal ID
-      const ppcPartId = discoveredPartId || effectivePartId; // FULL partId
+      // - productId: 6-character internal ID derived from discoveredPartId (e.g., "B00760")
+      // - partId: FULL discoveredPartId (e.g., "B00760033")
+      const ppcPartId = discoveredPartId; // FULL partId from discovery
 
       console.log('💰 PPC Request params:', {
         ppcProductId,
         ppcPartId,
-        effectivePartId,
-        providedPartId: partId,
         discoveredPartId,
         fobId: settings.ssactivewear_fob_id
       });
@@ -522,12 +520,10 @@ Deno.serve(async (req: Request) => {
       }
     } else {
       console.log('💰 Skipping PPC call - missing required params:', {
-        hasInternalProductId: !!internalProductId,
-        internalProductId,
-        hasEffectivePartId: !!effectivePartId,
-        providedPartId: partId,
+        ppcProductId,
+        isValidPpcProductId,
         discoveredPartId,
-        reason: !internalProductId ? 'No internalProductId discovered' : 'No valid partId (need >6 chars or discovered)'
+        reason: !discoveredPartId ? 'No discoveredPartId from inventory' : 'ppcProductId not exactly 6 characters'
       });
     }
 
