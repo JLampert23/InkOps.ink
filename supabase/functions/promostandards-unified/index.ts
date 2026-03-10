@@ -387,8 +387,7 @@ Deno.serve(async (req: Request) => {
         console.log('⚠️ Will attempt Product Data API with raw style as fallback, but pricing may fail');
       }
     }
-
-    // Determine the effective internal product ID to use for all API calls
+     // Determine the effective internal product ID to use for all API calls
     const effectiveInternalProductId =
       internalProductId || internalProductIdParam || escapedStyleNumber;
 
@@ -399,7 +398,6 @@ Deno.serve(async (req: Request) => {
     console.log(
       `📦 Effective internalProductId for API calls: ${effectiveInternalProductId} (source: ${internalIdSource})`
     );
-
     // Update Product Data SOAP to use the effective internal ID
     const correctedProductSoap = `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
   <shar:wsVersion>2.0.0</shar:wsVersion>
