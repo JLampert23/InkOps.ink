@@ -19,10 +19,6 @@ async function makePromoStandardsRequest(
   soapAction: string,
   soapBody: string
 ) {
-  const soapActionHeader = soapAction === 'getConfigurationAndPricing'
-    ? 'http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/getConfigurationAndPricing'
-    : soapAction;
-
   const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Header/>
@@ -35,15 +31,21 @@ async function makePromoStandardsRequest(
     method: "POST",
     headers: {
       "Content-Type": "text/xml; charset=utf-8",
-      "SOAPAction": soapActionHeader,
+      "SOAPAction": soapAction,
     },
     body: soapEnvelope,
   });
 
   const responseText = await response.text();
 
+  // Always include status and body in thrown error so we can see server diagnostics
   if (!response.ok) {
-    throw new Error(`PromoStandards request failed: ${response.status} ${response.statusText}`);
+    const err = new Error(`PromoStandards request failed: ${response.status} ${response.statusText}`);
+    // Attach details for logging
+    (err as any).status = response.status;
+    (err as any).statusText = response.statusText;
+    (err as any).body = responseText;
+    throw err;
   }
 
   return responseText;
