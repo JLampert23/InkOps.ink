@@ -43,10 +43,15 @@ async function makePromoStandardsRequest(
   const responseText = await response.text();
 
   if (!response.ok) {
-    const err = new Error(`PromoStandards request failed: ${response.status} ${response.statusText}`);
+    const isServerError = response.status >= 500;
+    const errorMessage = isServerError
+      ? `S&S Activewear API temporarily unavailable (${response.status}). Please try again later.`
+      : `PromoStandards request failed: ${response.status} ${response.statusText}`;
+    const err = new Error(errorMessage);
     (err as any).status = response.status;
     (err as any).statusText = response.statusText;
     (err as any).body = responseText;
+    (err as any).isUpstreamError = isServerError;
     throw err;
   }
 
