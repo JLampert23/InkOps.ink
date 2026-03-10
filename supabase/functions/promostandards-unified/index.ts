@@ -927,7 +927,7 @@ Deno.serve(async (req: Request) => {
           finalPrice,
           pricingSource,
           soapRequests: verbose ? {
-            productDataRequest: productSoap,
+            productDataRequest: correctedProductSoap,
             mediaRequest: mediaSoap,
           } : undefined,
           credentials: verbose ? {
