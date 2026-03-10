@@ -473,7 +473,7 @@ Deno.serve(async (req: Request) => {
   <shar:productId>${escapeXml(ppcProductId)}</shar:productId>
   <shar:partId>${escapeXml(ppcPartId)}</shar:partId>
   <shar:currency>USD</shar:currency>
-  <shar:fobId>${escapeXml(settings.ssactivewear_fob_id || '')}</shar:fobId>
+  <shar:fobId>${escapeXml((settings.ssactivewear_fob_id || '').toUpperCase())}</shar:fobId>
   <shar:priceType>Customer</shar:priceType>
   <shar:localizationCountry>US</shar:localizationCountry>
   <shar:localizationLanguage>en</shar:localizationLanguage>
