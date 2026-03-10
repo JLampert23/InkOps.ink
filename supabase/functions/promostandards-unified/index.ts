@@ -448,16 +448,13 @@ Deno.serve(async (req: Request) => {
     let ppcError: string | null = null;
 
     // PPC productId MUST be derived ONLY from discoveredPartId (first 6 chars)
-    const ppcProductId = discoveredPartId?.substring(0, 6)?.toUpperCase() || null;
+    const ppcProductId = discoveredPartId?.substring(0, 6) || null;
+    const ppcPartId = discoveredPartId || null;
     const isValidPpcProductId = ppcProductId !== null && ppcProductId.length === 6;
+    const isValidPpcPartId = ppcPartId !== null;
 
-    if (isValidPpcProductId && discoveredPartId) {
+    if (isValidPpcProductId && isValidPpcPartId) {
       console.log('💰 Step 1.5: Fetching PPC Customer Pricing...');
-
-      // S&S PPC API requires:
-      // - productId: 6-character internal ID derived from discoveredPartId (e.g., "B00760")
-      // - partId: FULL discoveredPartId (e.g., "B00760033")
-      const ppcPartId = discoveredPartId; // FULL partId from discovery
 
       console.log('💰 PPC Request params:', {
         ppcProductId,
@@ -473,7 +470,7 @@ Deno.serve(async (req: Request) => {
   <shar:productId>${escapeXml(ppcProductId)}</shar:productId>
   <shar:partId>${escapeXml(ppcPartId)}</shar:partId>
   <shar:currency>USD</shar:currency>
-  <shar:fobId>${escapeXml((settings.ssactivewear_fob_id || '').toUpperCase())}</shar:fobId>
+  <shar:fobId>${escapeXml(settings.ssactivewear_fob_id.toUpperCase())}</shar:fobId>
   <shar:priceType>Customer</shar:priceType>
   <shar:localizationCountry>US</shar:localizationCountry>
   <shar:localizationLanguage>en</shar:localizationLanguage>
