@@ -27,11 +27,15 @@ async function makePromoStandardsRequest(
   </soap:Body>
 </soap:Envelope>`;
 
+  const effectiveSoapAction = soapAction === "getConfigurationAndPricing"
+    ? "http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/getConfigurationAndPricing"
+    : soapAction;
+
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "text/xml; charset=utf-8",
-      "SOAPAction": soapAction,
+      "SOAPAction": effectiveSoapAction,
     },
     body: soapEnvelope,
   });
