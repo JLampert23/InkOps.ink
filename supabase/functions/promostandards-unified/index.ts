@@ -19,6 +19,10 @@ async function makePromoStandardsRequest(
   soapAction: string,
   soapBody: string
 ) {
+  const soapActionHeader = soapAction === 'getConfigurationAndPricing'
+    ? 'http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/getConfigurationAndPricing'
+    : soapAction;
+
   const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Header/>
@@ -31,7 +35,7 @@ async function makePromoStandardsRequest(
     method: "POST",
     headers: {
       "Content-Type": "text/xml; charset=utf-8",
-      "SOAPAction": soapAction,
+      "SOAPAction": soapActionHeader,
     },
     body: soapEnvelope,
   });
@@ -471,10 +475,32 @@ Deno.serve(async (req: Request) => {
     if (effectivePartId && effectiveInternalProductId) {
       console.log('💰 Step 1.5: Fetching PPC Customer Pricing...');
 
-      // S&S PPC API requires:
-      // - productId: 6-character internal ID (e.g., "B00760")
-      // - partId: FULL partId with all characters (e.g., "B00760033")
-      const ppcProductId = effectiveInternalProductId; // 6-char internal ID
+      // Ensure we send a valid 6-char productId to PPC
+      let ppcProductId = effectiveInternalProductId || internalProductIdParam || '';
+
+      // Normalize to uppercase and strip non-alphanumerics
+      ppcProductId = ppcProductId ? ppcProductId.toUpperCase().replace(/[^A-Z0-9]/g, '') : '';
+
+      // If not 6 chars, try to derive from discoveredPartId (e.g., B00760033 -> B00760)
+      if ((!ppcProductId || ppcProductId.length !== 6) && discoveredPartId) {
+        const dp = discoveredPartId.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (dp.startsWith('B') && dp.length >= 6) {
+          ppcProductId = dp.substring(0, 6);
+        } else if (/^\d{6,}$/.test(dp)) {
+          ppcProductId = dp.substring(0, 6);
+        }
+      }
+
+      // As a last numeric fallback, if we have a numeric style, pad to 6
+      if ((!ppcProductId || ppcProductId.length !== 6) && /^\d+$/.test(effectiveInternalProductId || '')) {
+        ppcProductId = (effectiveInternalProductId || '').padStart(6, '0');
+      }
+
+      // Final guard: if still invalid, set to empty so PPC is skipped rather than sending a wrong id
+      if (!ppcProductId || ppcProductId.length !== 6) {
+        ppcProductId = '';
+      }
+
       const ppcPartId = partId || discoveredPartId || effectivePartId; // FULL partId (prefer provided partId)
 
       console.log('💰 PPC Request params:', {
