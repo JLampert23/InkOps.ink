@@ -269,37 +269,30 @@ Deno.serve(async (req: Request) => {
     // XML-escape credentials to prevent authentication issues
     const escapedAccountNumber = escapeXml(credentials.accountNumber);
     const escapedApiKey = escapeXml(decryptedApiKey);
-    const escapedStyleNumber = escapeXml(styleNumber);
+    const escapedStyleNumber = styleNumber ? escapeXml(styleNumber) : '';
     const escapedPartId = partId ? escapeXml(partId) : '';
-
-    // Store SOAP bodies for debugging
-    const productSoap = `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
-  <shar:wsVersion>2.0.0</shar:wsVersion>
-  <shar:id>${escapedAccountNumber}</shar:id>
-  <shar:password>${escapedApiKey}</shar:password>
-  <shar:productId>${escapedStyleNumber}</shar:productId>
-</ns2:GetProductRequest>`;
 
     // S&S Activewear MediaContent uses raw style number (NOT B-prefixed like SanMar)
     // Clean the style number: uppercase, remove non-alphanumeric, strip any erroneous B prefix
-    let cleanedStyleNumber = styleNumber.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (cleanedStyleNumber.startsWith('B') && cleanedStyleNumber.length > 1) {
-      const afterB = cleanedStyleNumber.substring(1);
-      // If it looks like an accidentally B-prefixed style, strip the B
-      if (/[A-Z]/.test(afterB) || /^\d+$/.test(afterB)) {
-        cleanedStyleNumber = afterB;
+    // If no styleNumber provided, use internalProductIdParam as fallback
+    let cleanedStyleNumber = '';
+    if (styleNumber) {
+      cleanedStyleNumber = styleNumber.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (cleanedStyleNumber.startsWith('B') && cleanedStyleNumber.length > 1) {
+        const afterB = cleanedStyleNumber.substring(1);
+        // If it looks like an accidentally B-prefixed style, strip the B
+        if (/[A-Z]/.test(afterB) || /^\d+$/.test(afterB)) {
+          cleanedStyleNumber = afterB;
+        }
       }
+    } else if (internalProductIdParam) {
+      // Use internalProductId as fallback when styleNumber is not provided
+      cleanedStyleNumber = internalProductIdParam.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     }
     const escapedCleanedStyleNumber = escapeXml(cleanedStyleNumber);
 
     const partIdTag = partId ? `\n  <shar:partId>${escapedPartId}</shar:partId>` : '';
-    const mediaSoap = `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
-  <shar:wsVersion>1.0.0</shar:wsVersion>
-  <shar:id>${escapedAccountNumber}</shar:id>
-  <shar:password>${escapedApiKey}</shar:password>
-  <shar:mediaType>Image</shar:mediaType>
-  <shar:productId>${escapedCleanedStyleNumber}</shar:productId>${partIdTag}
-</ns2:GetMediaContentRequest>`;
+    // Note: mediaSoap will be rebuilt later using effectiveInternalProductId
 
     // CRITICAL FIX: S&S requires 6-character internal product IDs (e.g., "B22035" for "996MR")
     // We must discover this ID FIRST by calling Inventory API, which is more forgiving with raw style numbers
@@ -407,8 +400,19 @@ Deno.serve(async (req: Request) => {
   <shar:productId>${escapeXml(effectiveInternalProductId || '')}</shar:productId>
 </ns2:GetProductRequest>`;
 
+    // Build MediaContent SOAP using the effective product ID
+    const mediaProductId = cleanedStyleNumber || effectiveInternalProductId || '';
+    const mediaSoap = `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
+  <shar:wsVersion>1.0.0</shar:wsVersion>
+  <shar:id>${escapedAccountNumber}</shar:id>
+  <shar:password>${escapedApiKey}</shar:password>
+  <shar:mediaType>Image</shar:mediaType>
+  <shar:productId>${escapeXml(mediaProductId)}</shar:productId>${partIdTag}
+</ns2:GetMediaContentRequest>`;
+
     // STEP 1: Fetch Product Data AND Media in parallel (using correct internal ID)
     console.log('📦 Step 1: Fetching Product Data and Media with corrected product ID...');
+    console.log('📦 Media request using productId:', mediaProductId);
 
     const [productResponse, initialMediaResponse] = await Promise.allSettled([
       makePromoStandardsRequest(
