@@ -501,7 +501,7 @@ Deno.serve(async (req: Request) => {
         ppcProductId = '';
       }
 
-      const ppcPartId = partId || discoveredPartId || effectivePartId; // FULL partId (prefer provided partId)
+      const ppcPartId = (partId || discoveredPartId || effectivePartId || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
       console.log('💰 PPC Request params:', {
         ppcProductId,
