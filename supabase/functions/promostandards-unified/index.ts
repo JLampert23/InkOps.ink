@@ -221,6 +221,10 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    const rawFobId = settings.ssactivewear_fob_id;
+    const isValidFobId = typeof rawFobId === "string" && rawFobId.trim().length > 0;
+    const normalizedFobId = isValidFobId ? rawFobId.trim().toUpperCase() : null;
+
     const credentials = {
       accountNumber: settings.ssactivewear_username,
       apiKey: settings.ssactivewear_api_key_encrypted
@@ -453,14 +457,14 @@ Deno.serve(async (req: Request) => {
     const isValidPpcProductId = ppcProductId !== null && ppcProductId.length === 6;
     const isValidPpcPartId = ppcPartId !== null;
 
-    if (isValidPpcProductId && isValidPpcPartId) {
+    if (isValidPpcProductId && isValidPpcPartId && normalizedFobId) {
       console.log('💰 Step 1.5: Fetching PPC Customer Pricing...');
 
       console.log('💰 PPC Request params:', {
         ppcProductId,
         ppcPartId,
         discoveredPartId,
-        fobId: settings.ssactivewear_fob_id
+        fobId: normalizedFobId
       });
 
       const ppcSoap = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
@@ -470,7 +474,7 @@ Deno.serve(async (req: Request) => {
   <shar:productId>${escapeXml(ppcProductId)}</shar:productId>
   <shar:partId>${escapeXml(ppcPartId)}</shar:partId>
   <shar:currency>USD</shar:currency>
-  <shar:fobId>${escapeXml(settings.ssactivewear_fob_id.toUpperCase())}</shar:fobId>
+  <shar:fobId>${escapeXml(normalizedFobId)}</shar:fobId>
   <shar:priceType>Customer</shar:priceType>
   <shar:localizationCountry>US</shar:localizationCountry>
   <shar:localizationLanguage>en</shar:localizationLanguage>
@@ -520,11 +524,15 @@ Deno.serve(async (req: Request) => {
         console.error('💰 PPC request failed:', ppcError);
       }
     } else {
+      if (!normalizedFobId) {
+        console.log("💰 Skipping PPC: Invalid or missing FOB ID in company settings");
+      }
       console.log('💰 Skipping PPC call - missing required params:', {
         ppcProductId,
         isValidPpcProductId,
         discoveredPartId,
-        reason: !discoveredPartId ? 'No discoveredPartId from inventory' : 'ppcProductId not exactly 6 characters'
+        normalizedFobId,
+        reason: !discoveredPartId ? 'No discoveredPartId from inventory' : !normalizedFobId ? 'Invalid or missing FOB ID' : 'ppcProductId not exactly 6 characters'
       });
     }
 
