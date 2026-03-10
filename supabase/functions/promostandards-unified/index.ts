@@ -11,7 +11,7 @@ const PROMOSTANDARDS_ENDPOINTS = {
   productData: "https://promostandards.ssactivewear.com/productdata/v2/productdataservicev2.svc",
   inventory: "https://promostandards.ssactivewear.com/inventory/v2/inventoryservice.svc",
   media: "https://promostandards.ssactivewear.com/mediacontent/v1/mediacontentservice.svc",
-  pricingAndConfiguration: "https://promostandards.ssactivewear.com/PricingAndConfiguration/v1/PricingAndConfigurationService.svc"
+  pricingAndConfiguration: "https://promostandards.ssactivewear.com/pricingandconfiguration/v1/pricingandconfigurationservice.svc",
 };
 
 async function makePromoStandardsRequest(
@@ -19,10 +19,6 @@ async function makePromoStandardsRequest(
   soapAction: string,
   soapBody: string
 ) {
-  const soapActionHeader = soapAction === 'getConfigurationAndPricing'
-    ? 'http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/getConfigurationAndPricing'
-    : soapAction;
-
   const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Header/>
@@ -35,7 +31,7 @@ async function makePromoStandardsRequest(
     method: "POST",
     headers: {
       "Content-Type": "text/xml; charset=utf-8",
-      "SOAPAction": soapActionHeader,
+      "SOAPAction": soapAction,
     },
     body: soapEnvelope,
   });
@@ -43,16 +39,7 @@ async function makePromoStandardsRequest(
   const responseText = await response.text();
 
   if (!response.ok) {
-    const isServerError = response.status >= 500;
-    const errorMessage = isServerError
-      ? `S&S Activewear API temporarily unavailable (${response.status}). Please try again later.`
-      : `PromoStandards request failed: ${response.status} ${response.statusText}`;
-    const err = new Error(errorMessage);
-    (err as any).status = response.status;
-    (err as any).statusText = response.statusText;
-    (err as any).body = responseText;
-    (err as any).isUpstreamError = isServerError;
-    throw err;
+    throw new Error(`PromoStandards request failed: ${response.status} ${response.statusText}`);
   }
 
   return responseText;
@@ -91,17 +78,6 @@ function escapeXml(unsafe: string): string {
 function normalizeSsProductId(input: string): string {
   if (!input) return '';
   return input.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-}
-
-// Discount mapping used when supplier returns List + discountCode instead of explicit Wholesale
-const DISCOUNT_MAP: Record<string, number> = {
-  "A": 0.50, // 50% off
-  "B": 0.40, // 40% off
-  // add other codes as needed
-};
-
-function normalizeId(id?: string) {
-  return (id || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
 Deno.serve(async (req: Request) => {
@@ -275,48 +251,54 @@ Deno.serve(async (req: Request) => {
     const decryptedApiKey = decryptResult.result;
 
     const url = new URL(req.url);
-    const styleNumber = url.searchParams.get("styleNumber")?.trim() || null;
-    const internalProductIdParam = url.searchParams.get("internalProductId")?.trim() || null;
+    const styleNumber = url.searchParams.get("styleNumber")?.trim();
     const partId = url.searchParams.get("partId")?.trim();
     const verbose = url.searchParams.get("verbose") === "true";
     const testPpc = url.searchParams.get("testPpc") === "true";
 
-    if (!styleNumber && !internalProductIdParam) {
+    if (!styleNumber) {
       return new Response(
-        JSON.stringify({ error: "Either styleNumber or internalProductId is required" }),
+        JSON.stringify({ error: "Style number required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log('Unified PromoStandards Request:', { styleNumber, internalProductIdParam, partId, verbose });
+    console.log('Unified PromoStandards Request:', { styleNumber, partId, verbose });
 
     // XML-escape credentials to prevent authentication issues
     const escapedAccountNumber = escapeXml(credentials.accountNumber);
     const escapedApiKey = escapeXml(decryptedApiKey);
-    const escapedStyleNumber = styleNumber ? escapeXml(styleNumber) : '';
+    const escapedStyleNumber = escapeXml(styleNumber);
     const escapedPartId = partId ? escapeXml(partId) : '';
+
+    // Store SOAP bodies for debugging
+    const productSoap = `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
+  <shar:wsVersion>2.0.0</shar:wsVersion>
+  <shar:id>${escapedAccountNumber}</shar:id>
+  <shar:password>${escapedApiKey}</shar:password>
+  <shar:productId>${escapedStyleNumber}</shar:productId>
+</ns2:GetProductRequest>`;
 
     // S&S Activewear MediaContent uses raw style number (NOT B-prefixed like SanMar)
     // Clean the style number: uppercase, remove non-alphanumeric, strip any erroneous B prefix
-    // If no styleNumber provided, use internalProductIdParam as fallback
-    let cleanedStyleNumber = '';
-    if (styleNumber) {
-      cleanedStyleNumber = styleNumber.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-      if (cleanedStyleNumber.startsWith('B') && cleanedStyleNumber.length > 1) {
-        const afterB = cleanedStyleNumber.substring(1);
-        // If it looks like an accidentally B-prefixed style, strip the B
-        if (/[A-Z]/.test(afterB) || /^\d+$/.test(afterB)) {
-          cleanedStyleNumber = afterB;
-        }
+    let cleanedStyleNumber = styleNumber.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (cleanedStyleNumber.startsWith('B') && cleanedStyleNumber.length > 1) {
+      const afterB = cleanedStyleNumber.substring(1);
+      // If it looks like an accidentally B-prefixed style, strip the B
+      if (/[A-Z]/.test(afterB) || /^\d+$/.test(afterB)) {
+        cleanedStyleNumber = afterB;
       }
-    } else if (internalProductIdParam) {
-      // Use internalProductId as fallback when styleNumber is not provided
-      cleanedStyleNumber = internalProductIdParam.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     }
     const escapedCleanedStyleNumber = escapeXml(cleanedStyleNumber);
 
     const partIdTag = partId ? `\n  <shar:partId>${escapedPartId}</shar:partId>` : '';
-    // Note: mediaSoap will be rebuilt later using effectiveInternalProductId
+    const mediaSoap = `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
+  <shar:wsVersion>1.0.0</shar:wsVersion>
+  <shar:id>${escapedAccountNumber}</shar:id>
+  <shar:password>${escapedApiKey}</shar:password>
+  <shar:mediaType>Image</shar:mediaType>
+  <shar:productId>${escapedCleanedStyleNumber}</shar:productId>${partIdTag}
+</ns2:GetMediaContentRequest>`;
 
     // CRITICAL FIX: S&S requires 6-character internal product IDs (e.g., "B22035" for "996MR")
     // We must discover this ID FIRST by calling Inventory API, which is more forgiving with raw style numbers
@@ -325,124 +307,100 @@ Deno.serve(async (req: Request) => {
     let discoveredPartId: string | null = null; // Full partId for PPC calls (e.g., "B00760033")
     let internalIdSource = 'none';
 
-    // PRIORITY RULE: If internalProductIdParam is provided, use it directly (skip discovery)
-    if (internalProductIdParam) {
-      internalProductId = internalProductIdParam.toUpperCase();
-      internalIdSource = 'direct-input';
-      console.log(`🎯 Using directly provided internalProductId: ${internalProductId}`);
-    } else if (styleNumber) {
-      // STEP 0: Try to discover internal product ID from Inventory API first
-      console.log('🔍 Step 0: Discovering internal product ID from Inventory API...');
-      console.log('🔍 Trying style variations:', { raw: styleNumber, cleaned: cleanedStyleNumber });
+    // STEP 0: Try to discover internal product ID from Inventory API first
+    console.log('🔍 Step 0: Discovering internal product ID from Inventory API...');
+    console.log('🔍 Trying style variations:', { raw: styleNumber, cleaned: cleanedStyleNumber });
 
-      // Try multiple style number formats to discover the internal ID
-      const styleVariations = [
-        cleanedStyleNumber,                                                    // Raw cleaned style (e.g., "996MR")
-        `B${cleanedStyleNumber}`,                                              // B-prefixed (e.g., "B996MR")
-        cleanedStyleNumber.replace(/^0+/, ''),                                 // Strip leading zeros (e.g., "00760" -> "760")
-        cleanedStyleNumber.match(/^\d+$/) ? cleanedStyleNumber.padStart(5, '0') : cleanedStyleNumber, // Pad to 5 digits if numeric
-      ].filter((v, i, a) => a.indexOf(v) === i); // Remove duplicates
+    // Try multiple style number formats to discover the internal ID
+    const styleVariations = [
+      cleanedStyleNumber,                                                    // Raw cleaned style (e.g., "996MR")
+      `B${cleanedStyleNumber}`,                                              // B-prefixed (e.g., "B996MR")
+      cleanedStyleNumber.replace(/^0+/, ''),                                 // Strip leading zeros (e.g., "00760" -> "760")
+      cleanedStyleNumber.match(/^\d+$/) ? cleanedStyleNumber.padStart(5, '0') : cleanedStyleNumber, // Pad to 5 digits if numeric
+    ].filter((v, i, a) => a.indexOf(v) === i); // Remove duplicates
 
-      for (const tryStyle of styleVariations) {
-        const escapedTryStyle = escapeXml(tryStyle);
-        const inventoryDiscoverySoap = `<ns2:GetInventoryLevelsRequest xmlns:ns2="http://www.promostandards.org/WSDL/Inventory/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/Inventory/2.0.0/SharedObjects/">
+    for (const tryStyle of styleVariations) {
+      const escapedTryStyle = escapeXml(tryStyle);
+      const inventoryDiscoverySoap = `<ns2:GetInventoryLevelsRequest xmlns:ns2="http://www.promostandards.org/WSDL/Inventory/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/Inventory/2.0.0/SharedObjects/">
   <shar:wsVersion>2.0.0</shar:wsVersion>
   <shar:id>${escapedAccountNumber}</shar:id>
   <shar:password>${escapedApiKey}</shar:password>
   <shar:productId>${escapedTryStyle}</shar:productId>
 </ns2:GetInventoryLevelsRequest>`;
 
-        try {
-          console.log(`🔍 Trying Inventory discovery with style: ${tryStyle}`);
-          const inventoryDiscoveryResponse = await makePromoStandardsRequest(
-            PROMOSTANDARDS_ENDPOINTS.inventory,
-            "getInventoryLevels",
-            inventoryDiscoverySoap
-          );
+      try {
+        console.log(`🔍 Trying Inventory discovery with style: ${tryStyle}`);
+        const inventoryDiscoveryResponse = await makePromoStandardsRequest(
+          PROMOSTANDARDS_ENDPOINTS.inventory,
+          "getInventoryLevels",
+          inventoryDiscoverySoap
+        );
 
-          // Extract partId from inventory response
-          const partIdPattern = /<(?:[a-zA-Z0-9]+:)?partId[^>]*>([^<]+)<\/(?:[a-zA-Z0-9]+:)?partId>/gi;
-          const partIdMatches = Array.from(inventoryDiscoveryResponse.matchAll(partIdPattern), m => m[1].trim());
+        // Extract partId from inventory response
+        const partIdPattern = /<(?:[a-zA-Z0-9]+:)?partId[^>]*>([^<]+)<\/(?:[a-zA-Z0-9]+:)?partId>/gi;
+        const partIdMatches = Array.from(inventoryDiscoveryResponse.matchAll(partIdPattern), m => m[1].trim());
 
-          if (partIdMatches.length > 0) {
-            console.log(`🔍 Found ${partIdMatches.length} partIds, first 5:`, partIdMatches.slice(0, 5));
+        if (partIdMatches.length > 0) {
+          console.log(`🔍 Found ${partIdMatches.length} partIds, first 5:`, partIdMatches.slice(0, 5));
 
-            // Find first valid partId - can be B-prefixed (e.g., "B00760033") or numeric (e.g., "2000033")
-            // Must be at least 7+ chars to include product ID + color/size suffix
-            const validPartId = partIdMatches.find(id => {
-              const trimmed = id.trim();
-              // B-prefixed: B + 5 digits + suffix (B00760033)
-              if (/^B\d{5,}/i.test(trimmed)) return true;
-              // Pure numeric: at least 7 digits (2000033 = style 2000 + suffix 033)
-              if (/^\d{7,}$/.test(trimmed)) return true;
-              return false;
-            });
+          // Find first valid partId - can be B-prefixed (e.g., "B00760033") or numeric (e.g., "2000033")
+          // Must be at least 7+ chars to include product ID + color/size suffix
+          const validPartId = partIdMatches.find(id => {
+            const trimmed = id.trim();
+            // B-prefixed: B + 5 digits + suffix (B00760033)
+            if (/^B\d{5,}/i.test(trimmed)) return true;
+            // Pure numeric: at least 7 digits (2000033 = style 2000 + suffix 033)
+            if (/^\d{7,}$/.test(trimmed)) return true;
+            return false;
+          });
 
-            if (validPartId) {
-              const trimmedPartId = validPartId.trim().toUpperCase();
+          if (validPartId) {
+            const trimmedPartId = validPartId.trim().toUpperCase();
 
-              // Extract productId (first 6 chars for B-prefix, or style-based for numeric)
-              if (trimmedPartId.startsWith('B')) {
-                internalProductId = trimmedPartId.substring(0, 6);
-              } else {
-                // For numeric partIds like "2000033", extract the style portion
-                // The style is typically the first 4-5 digits before the color/size suffix
-                // We need to figure out where the style ends - look at the original style number length
-                const styleLen = cleanedStyleNumber.length;
-                internalProductId = trimmedPartId.substring(0, styleLen);
-              }
-
-              discoveredPartId = trimmedPartId;
-              internalIdSource = 'inventory-discovery';
-              console.log(`✅ SUCCESS! Discovered from Inventory: ${tryStyle} -> fullPartId ${trimmedPartId} -> productId ${internalProductId}`);
-              break;
+            // Extract productId (first 6 chars for B-prefix, or style-based for numeric)
+            if (trimmedPartId.startsWith('B')) {
+              internalProductId = trimmedPartId.substring(0, 6);
             } else {
-              console.log(`⚠️ No valid partIds found matching pattern (need B+5digits or 7+ digits)`);
+              // For numeric partIds like "2000033", extract the style portion
+              // The style is typically the first 4-5 digits before the color/size suffix
+              // We need to figure out where the style ends - look at the original style number length
+              const styleLen = cleanedStyleNumber.length;
+              internalProductId = trimmedPartId.substring(0, styleLen);
             }
+
+            discoveredPartId = trimmedPartId;
+            internalIdSource = 'inventory-discovery';
+            console.log(`✅ SUCCESS! Discovered from Inventory: ${tryStyle} -> fullPartId ${trimmedPartId} -> productId ${internalProductId}`);
+            break;
+          } else {
+            console.log(`⚠️ No valid partIds found matching pattern (need B+5digits or 7+ digits)`);
           }
-        } catch (error) {
-          console.log(`⚠️ Inventory discovery failed for ${tryStyle}:`, error);
-          // Continue trying other variations
         }
-      }
-
-      if (!internalProductId) {
-        console.log('❌ Failed to discover internal product ID from any style variation');
-        console.log('⚠️ Will attempt Product Data API with raw style as fallback, but pricing may fail');
+      } catch (error) {
+        console.log(`⚠️ Inventory discovery failed for ${tryStyle}:`, error);
+        // Continue trying other variations
       }
     }
-     // Determine the effective internal product ID to use for all API calls
-    const effectiveInternalProductId =
-      internalProductId || internalProductIdParam || escapedStyleNumber;
 
-    if (!effectiveInternalProductId) {
-      console.error("❌ No internalProductId available — cannot call PPC");
+    if (!internalProductId) {
+      console.log('❌ Failed to discover internal product ID from any style variation');
+      console.log('⚠️ Will attempt Product Data API with raw style as fallback, but pricing may fail');
     }
 
-    console.log(
-      `📦 Effective internalProductId for API calls: ${effectiveInternalProductId} (source: ${internalIdSource})`
-    );
-    // Update Product Data SOAP to use the effective internal ID
+    // Now use the discovered internal ID (or fallback to raw style) for Product Data
+    const productIdToUse = internalProductId || escapedStyleNumber;
+    console.log(`📦 Using productId for API calls: ${productIdToUse} (source: ${internalIdSource || 'raw-style-fallback'})`);
+
+    // Update Product Data SOAP to use the correct internal ID
     const correctedProductSoap = `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
   <shar:wsVersion>2.0.0</shar:wsVersion>
   <shar:id>${escapedAccountNumber}</shar:id>
   <shar:password>${escapedApiKey}</shar:password>
-  <shar:productId>${escapeXml(effectiveInternalProductId || '')}</shar:productId>
+  <shar:productId>${productIdToUse}</shar:productId>
 </ns2:GetProductRequest>`;
-
-    // Build MediaContent SOAP using the effective product ID
-    const mediaProductId = cleanedStyleNumber || effectiveInternalProductId || '';
-    const mediaSoap = `<ns2:GetMediaContentRequest xmlns:ns2="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
-  <shar:wsVersion>1.0.0</shar:wsVersion>
-  <shar:id>${escapedAccountNumber}</shar:id>
-  <shar:password>${escapedApiKey}</shar:password>
-  <shar:mediaType>Image</shar:mediaType>
-  <shar:productId>${escapeXml(mediaProductId)}</shar:productId>${partIdTag}
-</ns2:GetMediaContentRequest>`;
 
     // STEP 1: Fetch Product Data AND Media in parallel (using correct internal ID)
     console.log('📦 Step 1: Fetching Product Data and Media with corrected product ID...');
-    console.log('📦 Media request using productId:', mediaProductId);
 
     const [productResponse, initialMediaResponse] = await Promise.allSettled([
       makePromoStandardsRequest(
@@ -480,41 +438,22 @@ Deno.serve(async (req: Request) => {
       console.warn('📦 WARNING: Could not extract internal productId from Product Data partId values');
     }
 
-    // STEP 1.5: Fetch Pricing & Configuration (Wholesale pricing preferred)
+    // STEP 1.5: Fetch Pricing & Configuration (Customer/EQP pricing)
     let ppcPrice: number | null = null;
-    let ppcTiers: { minQuantity: number; price: number; priceUom?: string; source?: string }[] = [];
+    let ppcTiers: { minQuantity: number; price: number }[] = [];
     let ppcError: string | null = null;
 
     // Use provided partId, or fall back to discovered partId from inventory
     const effectivePartId = (partId && partId.length > 6) ? partId : discoveredPartId;
 
-    if (effectivePartId && effectiveInternalProductId) {
-      console.log('💰 Step 1.5: Fetching PPC Wholesale Pricing...');
+    if (effectivePartId && internalProductId) {
+      console.log('💰 Step 1.5: Fetching PPC Customer Pricing...');
 
-      // --- BEGIN PPC ID normalization and Wholesale request patch ---
-      let ppcProductId = normalizeId(effectiveInternalProductId || internalProductIdParam || '');
-      let ppcPartId = normalizeId(partId || discoveredPartId || '');
-
-      // If productId is not 6 chars, try to derive from discoveredPartId (e.g., B00760033 -> B00760)
-      if ((!ppcProductId || ppcProductId.length !== 6) && ppcPartId) {
-        const dp = ppcPartId;
-        if (dp.startsWith('B') && dp.length >= 6) {
-          ppcProductId = dp.substring(0, 6);
-        } else if (/^\d{6,}$/.test(dp)) {
-          ppcProductId = dp.substring(0, 6);
-        } else if (/^\d+$/.test(effectiveInternalProductId || '')) {
-          // numeric fallback: pad to 6
-          ppcProductId = (effectiveInternalProductId || '').padStart(6, '0');
-        }
-      }
-
-      // Final guard: if invalid, set to empty so PPC is skipped rather than sending a wrong id
-      if (!ppcProductId || ppcProductId.length !== 6) {
-        ppcProductId = '';
-      }
-
-      // Ensure partId is empty string if invalid
-      if (!ppcPartId) ppcPartId = '';
+      // S&S PPC API requires:
+      // - productId: 6-character internal ID (e.g., "B00760")
+      // - partId: FULL partId with all characters (e.g., "B00760033")
+      const ppcProductId = internalProductId; // 6-char internal ID
+      const ppcPartId = discoveredPartId || effectivePartId; // FULL partId
 
       console.log('💰 PPC Request params:', {
         ppcProductId,
@@ -522,12 +461,9 @@ Deno.serve(async (req: Request) => {
         effectivePartId,
         providedPartId: partId,
         discoveredPartId,
-        effectiveInternalProductId,
-        internalIdSource,
         fobId: settings.ssactivewear_fob_id
       });
 
-      // Build PPC SOAP using derived values and explicitly request Wholesale
       const ppcSoap = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${escapedAccountNumber}</shar:id>
@@ -536,14 +472,12 @@ Deno.serve(async (req: Request) => {
   <shar:partId>${escapeXml(ppcPartId)}</shar:partId>
   <shar:currency>USD</shar:currency>
   <shar:fobId>${escapeXml(settings.ssactivewear_fob_id || '')}</shar:fobId>
-  <shar:priceType>Wholesale</shar:priceType>
+  <shar:priceType>Customer</shar:priceType>
   <shar:localizationCountry>US</shar:localizationCountry>
   <shar:localizationLanguage>en</shar:localizationLanguage>
   <shar:configurationType>Blank</shar:configurationType>
 </ns2:GetConfigurationAndPricingRequest>`;
-      // --- END PPC ID normalization and Wholesale request patch ---
 
-      // --- BEGIN PPC parsing: prefer Wholesale, fallback to List+discount ---
       try {
         const ppcResponse = await makePromoStandardsRequest(
           PROMOSTANDARDS_ENDPOINTS.pricingAndConfiguration,
@@ -554,50 +488,17 @@ Deno.serve(async (req: Request) => {
         console.log('💰 PPC Response received, parsing PartPrice blocks...');
 
         const partPricePattern = /<(?:[a-zA-Z0-9]+:)?PartPrice[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?PartPrice>/gi;
-        const partPriceMatches = getAllXmlMatches(ppcResponse, partPricePattern).map(m => m[1]);
+        const partPriceMatches = getAllXmlMatches(ppcResponse, partPricePattern);
 
         console.log('💰 Found', partPriceMatches.length, 'PartPrice entries');
 
-        function getPriceType(xml: string) {
-          return (getXmlValue(xml, "priceType") || getXmlValue(xml, "PriceType") || "").trim();
-        }
-        function getDiscountCode(xml: string) {
-          return (getXmlValue(xml, "discountCode") || "").trim();
-        }
-        function getPrice(xml: string) {
-          return parseFloat(getXmlValue(xml, "price") || "0");
-        }
-        function getMinQuantity(xml: string) {
-          return parseInt(getXmlValue(xml, "minQuantity") || "1");
-        }
-        function getPriceUom(xml: string) {
-          return (getXmlValue(xml, "priceUom") || "").trim();
-        }
-
-        // Prefer Wholesale blocks
-        const wholesaleBlocks = partPriceMatches.filter(b => getPriceType(b).toLowerCase() === "wholesale");
-        const chosenBlocks = wholesaleBlocks.length ? wholesaleBlocks : partPriceMatches;
-
-        console.log('💰 Wholesale blocks found:', wholesaleBlocks.length, '| Using:', chosenBlocks.length, 'blocks');
-
-        ppcTiers = [];
-        chosenBlocks.forEach(block => {
-          let price = getPrice(block);
-          const minQuantity = getMinQuantity(block);
-          const priceUom = getPriceUom(block);
-          const discountCode = getDiscountCode(block);
-
-          // If we selected List blocks (no Wholesale present) and a discountCode exists, apply it
-          if (!wholesaleBlocks.length && discountCode) {
-            const discount = DISCOUNT_MAP[discountCode.toUpperCase()];
-            if (typeof discount === "number") {
-              console.log(`💰 Applying discount code ${discountCode}: ${discount * 100}% off $${price}`);
-              price = +(price * (1 - discount)).toFixed(2);
-            }
-          }
+        partPriceMatches.forEach(match => {
+          const priceXml = match[1];
+          const minQuantity = parseInt(getXmlValue(priceXml, "minQuantity") || "1");
+          const price = parseFloat(getXmlValue(priceXml, "price") || "0");
 
           if (price > 0) {
-            ppcTiers.push({ minQuantity, price, priceUom, source: wholesaleBlocks.length ? "wholesale" : (discountCode ? `list+${discountCode}` : "list") });
+            ppcTiers.push({ minQuantity, price });
           }
         });
 
@@ -605,7 +506,7 @@ Deno.serve(async (req: Request) => {
 
         if (ppcTiers.length > 0) {
           ppcPrice = ppcTiers[0].price;
-          console.log('💰 PPC Wholesale pricing extracted:', { ppcPrice, tierCount: ppcTiers.length, allTiers: ppcTiers });
+          console.log('💰 PPC Customer pricing extracted:', { ppcPrice, tierCount: ppcTiers.length, allTiers: ppcTiers });
         } else {
           console.warn('💰 No PartPrice entries found in PPC response');
           const errorCode = getXmlValue(ppcResponse, "code");
@@ -619,23 +520,21 @@ Deno.serve(async (req: Request) => {
         ppcError = err.message || 'Unknown PPC error';
         console.error('💰 PPC request failed:', ppcError);
       }
-      // --- END PPC parsing: prefer Wholesale, fallback to List+discount ---
     } else {
       console.log('💰 Skipping PPC call - missing required params:', {
-        hasEffectiveInternalProductId: !!effectiveInternalProductId,
-        effectiveInternalProductId,
+        hasInternalProductId: !!internalProductId,
+        internalProductId,
         hasEffectivePartId: !!effectivePartId,
         providedPartId: partId,
         discoveredPartId,
-        internalIdSource,
-        reason: !effectiveInternalProductId ? 'No internalProductId available' : 'No valid partId (need >6 chars or discovered)'
+        reason: !internalProductId ? 'No internalProductId discovered' : 'No valid partId (need >6 chars or discovered)'
       });
     }
 
     // STEP 2: Fetch Inventory
     console.log('📦 Step 2: Fetching Inventory...');
 
-    const inventoryProductId = effectiveInternalProductId || cleanedStyleNumber;
+    const inventoryProductId = internalProductId || cleanedStyleNumber;
     const escapedInventoryProductId = escapeXml(inventoryProductId);
 
     const [inventoryResponse] = await Promise.allSettled([
@@ -959,9 +858,6 @@ Deno.serve(async (req: Request) => {
           styleNumber,
           partId,
           internalProductId,
-          internalProductIdParam,
-          effectiveInternalProductId,
-          internalIdSource,
           pricingTest: {
             ppcPrice,
             ppcTiers,
@@ -981,7 +877,6 @@ Deno.serve(async (req: Request) => {
         success: true,
         styleNumber,
         partId: partId || null,
-        internalProductId: effectiveInternalProductId,
         product: productData,
         inventory: inventoryData,
         pricing: {
@@ -996,8 +891,6 @@ Deno.serve(async (req: Request) => {
         pricingUnavailableReason,
         debug: {
           internalProductId,
-          internalProductIdParam,
-          effectiveInternalProductId,
           internalIdSource,
           mediaResponseStatus: initialMediaResponse.status,
           mediaXmlFull: verbose && initialMediaResponse.status === 'fulfilled' && initialMediaResponse.value
@@ -1013,7 +906,7 @@ Deno.serve(async (req: Request) => {
           finalPrice,
           pricingSource,
           soapRequests: verbose ? {
-            productDataRequest: correctedProductSoap,
+            productDataRequest: productSoap,
             mediaRequest: mediaSoap,
           } : undefined,
           credentials: verbose ? {
