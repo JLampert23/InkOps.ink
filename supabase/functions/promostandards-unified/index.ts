@@ -38,10 +38,8 @@ async function makePromoStandardsRequest(
 
   const responseText = await response.text();
 
-  // Always include status and body in thrown error so we can see server diagnostics
   if (!response.ok) {
     const err = new Error(`PromoStandards request failed: ${response.status} ${response.statusText}`);
-    // Attach details for logging
     (err as any).status = response.status;
     (err as any).statusText = response.statusText;
     (err as any).body = responseText;
