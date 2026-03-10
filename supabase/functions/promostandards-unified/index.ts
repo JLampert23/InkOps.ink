@@ -390,6 +390,9 @@ Deno.serve(async (req: Request) => {
 
     // Determine the effective internal product ID to use for all API calls
     const effectiveInternalProductId = internalProductIdParam || internalProductId;
+    if (!effectiveInternalProductId) {
+      console.error("❌ No internalProductId available — cannot call PPC");
+    }
     console.log(`📦 Effective internalProductId for API calls: ${effectiveInternalProductId} (source: ${internalIdSource})`)
 
     // Update Product Data SOAP to use the effective internal ID
