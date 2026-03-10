@@ -251,19 +251,20 @@ Deno.serve(async (req: Request) => {
     const decryptedApiKey = decryptResult.result;
 
     const url = new URL(req.url);
-    const styleNumber = url.searchParams.get("styleNumber")?.trim();
+    const styleNumber = url.searchParams.get("styleNumber")?.trim() || null;
+    const internalProductIdParam = url.searchParams.get("internalProductId")?.trim() || null;
     const partId = url.searchParams.get("partId")?.trim();
     const verbose = url.searchParams.get("verbose") === "true";
     const testPpc = url.searchParams.get("testPpc") === "true";
 
-    if (!styleNumber) {
+    if (!styleNumber && !internalProductIdParam) {
       return new Response(
-        JSON.stringify({ error: "Style number required" }),
+        JSON.stringify({ error: "Either styleNumber or internalProductId is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log('Unified PromoStandards Request:', { styleNumber, partId, verbose });
+    console.log('Unified PromoStandards Request:', { styleNumber, internalProductIdParam, partId, verbose });
 
     // XML-escape credentials to prevent authentication issues
     const escapedAccountNumber = escapeXml(credentials.accountNumber);
@@ -307,96 +308,103 @@ Deno.serve(async (req: Request) => {
     let discoveredPartId: string | null = null; // Full partId for PPC calls (e.g., "B00760033")
     let internalIdSource = 'none';
 
-    // STEP 0: Try to discover internal product ID from Inventory API first
-    console.log('🔍 Step 0: Discovering internal product ID from Inventory API...');
-    console.log('🔍 Trying style variations:', { raw: styleNumber, cleaned: cleanedStyleNumber });
+    // PRIORITY RULE: If internalProductIdParam is provided, use it directly (skip discovery)
+    if (internalProductIdParam) {
+      internalProductId = internalProductIdParam.toUpperCase();
+      internalIdSource = 'direct-input';
+      console.log(`🎯 Using directly provided internalProductId: ${internalProductId}`);
+    } else if (styleNumber) {
+      // STEP 0: Try to discover internal product ID from Inventory API first
+      console.log('🔍 Step 0: Discovering internal product ID from Inventory API...');
+      console.log('🔍 Trying style variations:', { raw: styleNumber, cleaned: cleanedStyleNumber });
 
-    // Try multiple style number formats to discover the internal ID
-    const styleVariations = [
-      cleanedStyleNumber,                                                    // Raw cleaned style (e.g., "996MR")
-      `B${cleanedStyleNumber}`,                                              // B-prefixed (e.g., "B996MR")
-      cleanedStyleNumber.replace(/^0+/, ''),                                 // Strip leading zeros (e.g., "00760" -> "760")
-      cleanedStyleNumber.match(/^\d+$/) ? cleanedStyleNumber.padStart(5, '0') : cleanedStyleNumber, // Pad to 5 digits if numeric
-    ].filter((v, i, a) => a.indexOf(v) === i); // Remove duplicates
+      // Try multiple style number formats to discover the internal ID
+      const styleVariations = [
+        cleanedStyleNumber,                                                    // Raw cleaned style (e.g., "996MR")
+        `B${cleanedStyleNumber}`,                                              // B-prefixed (e.g., "B996MR")
+        cleanedStyleNumber.replace(/^0+/, ''),                                 // Strip leading zeros (e.g., "00760" -> "760")
+        cleanedStyleNumber.match(/^\d+$/) ? cleanedStyleNumber.padStart(5, '0') : cleanedStyleNumber, // Pad to 5 digits if numeric
+      ].filter((v, i, a) => a.indexOf(v) === i); // Remove duplicates
 
-    for (const tryStyle of styleVariations) {
-      const escapedTryStyle = escapeXml(tryStyle);
-      const inventoryDiscoverySoap = `<ns2:GetInventoryLevelsRequest xmlns:ns2="http://www.promostandards.org/WSDL/Inventory/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/Inventory/2.0.0/SharedObjects/">
+      for (const tryStyle of styleVariations) {
+        const escapedTryStyle = escapeXml(tryStyle);
+        const inventoryDiscoverySoap = `<ns2:GetInventoryLevelsRequest xmlns:ns2="http://www.promostandards.org/WSDL/Inventory/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/Inventory/2.0.0/SharedObjects/">
   <shar:wsVersion>2.0.0</shar:wsVersion>
   <shar:id>${escapedAccountNumber}</shar:id>
   <shar:password>${escapedApiKey}</shar:password>
   <shar:productId>${escapedTryStyle}</shar:productId>
 </ns2:GetInventoryLevelsRequest>`;
 
-      try {
-        console.log(`🔍 Trying Inventory discovery with style: ${tryStyle}`);
-        const inventoryDiscoveryResponse = await makePromoStandardsRequest(
-          PROMOSTANDARDS_ENDPOINTS.inventory,
-          "getInventoryLevels",
-          inventoryDiscoverySoap
-        );
+        try {
+          console.log(`🔍 Trying Inventory discovery with style: ${tryStyle}`);
+          const inventoryDiscoveryResponse = await makePromoStandardsRequest(
+            PROMOSTANDARDS_ENDPOINTS.inventory,
+            "getInventoryLevels",
+            inventoryDiscoverySoap
+          );
 
-        // Extract partId from inventory response
-        const partIdPattern = /<(?:[a-zA-Z0-9]+:)?partId[^>]*>([^<]+)<\/(?:[a-zA-Z0-9]+:)?partId>/gi;
-        const partIdMatches = Array.from(inventoryDiscoveryResponse.matchAll(partIdPattern), m => m[1].trim());
+          // Extract partId from inventory response
+          const partIdPattern = /<(?:[a-zA-Z0-9]+:)?partId[^>]*>([^<]+)<\/(?:[a-zA-Z0-9]+:)?partId>/gi;
+          const partIdMatches = Array.from(inventoryDiscoveryResponse.matchAll(partIdPattern), m => m[1].trim());
 
-        if (partIdMatches.length > 0) {
-          console.log(`🔍 Found ${partIdMatches.length} partIds, first 5:`, partIdMatches.slice(0, 5));
+          if (partIdMatches.length > 0) {
+            console.log(`🔍 Found ${partIdMatches.length} partIds, first 5:`, partIdMatches.slice(0, 5));
 
-          // Find first valid partId - can be B-prefixed (e.g., "B00760033") or numeric (e.g., "2000033")
-          // Must be at least 7+ chars to include product ID + color/size suffix
-          const validPartId = partIdMatches.find(id => {
-            const trimmed = id.trim();
-            // B-prefixed: B + 5 digits + suffix (B00760033)
-            if (/^B\d{5,}/i.test(trimmed)) return true;
-            // Pure numeric: at least 7 digits (2000033 = style 2000 + suffix 033)
-            if (/^\d{7,}$/.test(trimmed)) return true;
-            return false;
-          });
+            // Find first valid partId - can be B-prefixed (e.g., "B00760033") or numeric (e.g., "2000033")
+            // Must be at least 7+ chars to include product ID + color/size suffix
+            const validPartId = partIdMatches.find(id => {
+              const trimmed = id.trim();
+              // B-prefixed: B + 5 digits + suffix (B00760033)
+              if (/^B\d{5,}/i.test(trimmed)) return true;
+              // Pure numeric: at least 7 digits (2000033 = style 2000 + suffix 033)
+              if (/^\d{7,}$/.test(trimmed)) return true;
+              return false;
+            });
 
-          if (validPartId) {
-            const trimmedPartId = validPartId.trim().toUpperCase();
+            if (validPartId) {
+              const trimmedPartId = validPartId.trim().toUpperCase();
 
-            // Extract productId (first 6 chars for B-prefix, or style-based for numeric)
-            if (trimmedPartId.startsWith('B')) {
-              internalProductId = trimmedPartId.substring(0, 6);
+              // Extract productId (first 6 chars for B-prefix, or style-based for numeric)
+              if (trimmedPartId.startsWith('B')) {
+                internalProductId = trimmedPartId.substring(0, 6);
+              } else {
+                // For numeric partIds like "2000033", extract the style portion
+                // The style is typically the first 4-5 digits before the color/size suffix
+                // We need to figure out where the style ends - look at the original style number length
+                const styleLen = cleanedStyleNumber.length;
+                internalProductId = trimmedPartId.substring(0, styleLen);
+              }
+
+              discoveredPartId = trimmedPartId;
+              internalIdSource = 'inventory-discovery';
+              console.log(`✅ SUCCESS! Discovered from Inventory: ${tryStyle} -> fullPartId ${trimmedPartId} -> productId ${internalProductId}`);
+              break;
             } else {
-              // For numeric partIds like "2000033", extract the style portion
-              // The style is typically the first 4-5 digits before the color/size suffix
-              // We need to figure out where the style ends - look at the original style number length
-              const styleLen = cleanedStyleNumber.length;
-              internalProductId = trimmedPartId.substring(0, styleLen);
+              console.log(`⚠️ No valid partIds found matching pattern (need B+5digits or 7+ digits)`);
             }
-
-            discoveredPartId = trimmedPartId;
-            internalIdSource = 'inventory-discovery';
-            console.log(`✅ SUCCESS! Discovered from Inventory: ${tryStyle} -> fullPartId ${trimmedPartId} -> productId ${internalProductId}`);
-            break;
-          } else {
-            console.log(`⚠️ No valid partIds found matching pattern (need B+5digits or 7+ digits)`);
           }
+        } catch (error) {
+          console.log(`⚠️ Inventory discovery failed for ${tryStyle}:`, error);
+          // Continue trying other variations
         }
-      } catch (error) {
-        console.log(`⚠️ Inventory discovery failed for ${tryStyle}:`, error);
-        // Continue trying other variations
+      }
+
+      if (!internalProductId) {
+        console.log('❌ Failed to discover internal product ID from any style variation');
+        console.log('⚠️ Will attempt Product Data API with raw style as fallback, but pricing may fail');
       }
     }
 
-    if (!internalProductId) {
-      console.log('❌ Failed to discover internal product ID from any style variation');
-      console.log('⚠️ Will attempt Product Data API with raw style as fallback, but pricing may fail');
-    }
+    // Determine the effective internal product ID to use for all API calls
+    const effectiveInternalProductId = internalProductId || escapedStyleNumber || internalProductIdParam;
+    console.log(`📦 Effective internalProductId for API calls: ${effectiveInternalProductId} (source: ${internalIdSource})`)
 
-    // Now use the discovered internal ID (or fallback to raw style) for Product Data
-    const productIdToUse = internalProductId || escapedStyleNumber;
-    console.log(`📦 Using productId for API calls: ${productIdToUse} (source: ${internalIdSource || 'raw-style-fallback'})`);
-
-    // Update Product Data SOAP to use the correct internal ID
+    // Update Product Data SOAP to use the effective internal ID
     const correctedProductSoap = `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
   <shar:wsVersion>2.0.0</shar:wsVersion>
   <shar:id>${escapedAccountNumber}</shar:id>
   <shar:password>${escapedApiKey}</shar:password>
-  <shar:productId>${productIdToUse}</shar:productId>
+  <shar:productId>${escapeXml(effectiveInternalProductId || '')}</shar:productId>
 </ns2:GetProductRequest>`;
 
     // STEP 1: Fetch Product Data AND Media in parallel (using correct internal ID)
@@ -446,14 +454,14 @@ Deno.serve(async (req: Request) => {
     // Use provided partId, or fall back to discovered partId from inventory
     const effectivePartId = (partId && partId.length > 6) ? partId : discoveredPartId;
 
-    if (effectivePartId && internalProductId) {
+    if (effectivePartId && effectiveInternalProductId) {
       console.log('💰 Step 1.5: Fetching PPC Customer Pricing...');
 
       // S&S PPC API requires:
       // - productId: 6-character internal ID (e.g., "B00760")
       // - partId: FULL partId with all characters (e.g., "B00760033")
-      const ppcProductId = internalProductId; // 6-char internal ID
-      const ppcPartId = discoveredPartId || effectivePartId; // FULL partId
+      const ppcProductId = effectiveInternalProductId; // 6-char internal ID
+      const ppcPartId = partId || discoveredPartId || effectivePartId; // FULL partId (prefer provided partId)
 
       console.log('💰 PPC Request params:', {
         ppcProductId,
@@ -461,6 +469,8 @@ Deno.serve(async (req: Request) => {
         effectivePartId,
         providedPartId: partId,
         discoveredPartId,
+        effectiveInternalProductId,
+        internalIdSource,
         fobId: settings.ssactivewear_fob_id
       });
 
@@ -522,19 +532,20 @@ Deno.serve(async (req: Request) => {
       }
     } else {
       console.log('💰 Skipping PPC call - missing required params:', {
-        hasInternalProductId: !!internalProductId,
-        internalProductId,
+        hasEffectiveInternalProductId: !!effectiveInternalProductId,
+        effectiveInternalProductId,
         hasEffectivePartId: !!effectivePartId,
         providedPartId: partId,
         discoveredPartId,
-        reason: !internalProductId ? 'No internalProductId discovered' : 'No valid partId (need >6 chars or discovered)'
+        internalIdSource,
+        reason: !effectiveInternalProductId ? 'No internalProductId available' : 'No valid partId (need >6 chars or discovered)'
       });
     }
 
     // STEP 2: Fetch Inventory
     console.log('📦 Step 2: Fetching Inventory...');
 
-    const inventoryProductId = internalProductId || cleanedStyleNumber;
+    const inventoryProductId = effectiveInternalProductId || cleanedStyleNumber;
     const escapedInventoryProductId = escapeXml(inventoryProductId);
 
     const [inventoryResponse] = await Promise.allSettled([
@@ -858,6 +869,9 @@ Deno.serve(async (req: Request) => {
           styleNumber,
           partId,
           internalProductId,
+          internalProductIdParam,
+          effectiveInternalProductId,
+          internalIdSource,
           pricingTest: {
             ppcPrice,
             ppcTiers,
@@ -877,6 +891,7 @@ Deno.serve(async (req: Request) => {
         success: true,
         styleNumber,
         partId: partId || null,
+        internalProductId: effectiveInternalProductId,
         product: productData,
         inventory: inventoryData,
         pricing: {
@@ -891,6 +906,8 @@ Deno.serve(async (req: Request) => {
         pricingUnavailableReason,
         debug: {
           internalProductId,
+          internalProductIdParam,
+          effectiveInternalProductId,
           internalIdSource,
           mediaResponseStatus: initialMediaResponse.status,
           mediaXmlFull: verbose && initialMediaResponse.status === 'fulfilled' && initialMediaResponse.value
