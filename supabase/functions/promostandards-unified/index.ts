@@ -93,6 +93,17 @@ function normalizeSsProductId(input: string): string {
   return input.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
+// Discount mapping used when supplier returns List + discountCode instead of explicit Wholesale
+const DISCOUNT_MAP: Record<string, number> = {
+  "A": 0.50, // 50% off
+  "B": 0.40, // 40% off
+  // add other codes as needed
+};
+
+function normalizeId(id?: string) {
+  return (id || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
 Deno.serve(async (req: Request) => {
   console.log('🟢 Function invoked - verifyJWT is FALSE');
 
@@ -469,44 +480,41 @@ Deno.serve(async (req: Request) => {
       console.warn('📦 WARNING: Could not extract internal productId from Product Data partId values');
     }
 
-    // STEP 1.5: Fetch Pricing & Configuration (Customer/EQP pricing)
+    // STEP 1.5: Fetch Pricing & Configuration (Wholesale pricing preferred)
     let ppcPrice: number | null = null;
-    let ppcTiers: { minQuantity: number; price: number }[] = [];
+    let ppcTiers: { minQuantity: number; price: number; priceUom?: string; source?: string }[] = [];
     let ppcError: string | null = null;
 
     // Use provided partId, or fall back to discovered partId from inventory
     const effectivePartId = (partId && partId.length > 6) ? partId : discoveredPartId;
 
     if (effectivePartId && effectiveInternalProductId) {
-      console.log('💰 Step 1.5: Fetching PPC Customer Pricing...');
+      console.log('💰 Step 1.5: Fetching PPC Wholesale Pricing...');
 
-      // Ensure we send a valid 6-char productId to PPC
-      let ppcProductId = effectiveInternalProductId || internalProductIdParam || '';
+      // --- BEGIN PPC ID normalization and Wholesale request patch ---
+      let ppcProductId = normalizeId(effectiveInternalProductId || internalProductIdParam || '');
+      let ppcPartId = normalizeId(partId || discoveredPartId || '');
 
-      // Normalize to uppercase and strip non-alphanumerics
-      ppcProductId = ppcProductId ? ppcProductId.toUpperCase().replace(/[^A-Z0-9]/g, '') : '';
-
-      // If not 6 chars, try to derive from discoveredPartId (e.g., B00760033 -> B00760)
-      if ((!ppcProductId || ppcProductId.length !== 6) && discoveredPartId) {
-        const dp = discoveredPartId.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      // If productId is not 6 chars, try to derive from discoveredPartId (e.g., B00760033 -> B00760)
+      if ((!ppcProductId || ppcProductId.length !== 6) && ppcPartId) {
+        const dp = ppcPartId;
         if (dp.startsWith('B') && dp.length >= 6) {
           ppcProductId = dp.substring(0, 6);
         } else if (/^\d{6,}$/.test(dp)) {
           ppcProductId = dp.substring(0, 6);
+        } else if (/^\d+$/.test(effectiveInternalProductId || '')) {
+          // numeric fallback: pad to 6
+          ppcProductId = (effectiveInternalProductId || '').padStart(6, '0');
         }
       }
 
-      // As a last numeric fallback, if we have a numeric style, pad to 6
-      if ((!ppcProductId || ppcProductId.length !== 6) && /^\d+$/.test(effectiveInternalProductId || '')) {
-        ppcProductId = (effectiveInternalProductId || '').padStart(6, '0');
-      }
-
-      // Final guard: if still invalid, set to empty so PPC is skipped rather than sending a wrong id
+      // Final guard: if invalid, set to empty so PPC is skipped rather than sending a wrong id
       if (!ppcProductId || ppcProductId.length !== 6) {
         ppcProductId = '';
       }
 
-      const ppcPartId = (partId || discoveredPartId || effectivePartId || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      // Ensure partId is empty string if invalid
+      if (!ppcPartId) ppcPartId = '';
 
       console.log('💰 PPC Request params:', {
         ppcProductId,
@@ -519,6 +527,7 @@ Deno.serve(async (req: Request) => {
         fobId: settings.ssactivewear_fob_id
       });
 
+      // Build PPC SOAP using derived values and explicitly request Wholesale
       const ppcSoap = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${escapedAccountNumber}</shar:id>
@@ -527,12 +536,14 @@ Deno.serve(async (req: Request) => {
   <shar:partId>${escapeXml(ppcPartId)}</shar:partId>
   <shar:currency>USD</shar:currency>
   <shar:fobId>${escapeXml(settings.ssactivewear_fob_id || '')}</shar:fobId>
-  <shar:priceType>Customer</shar:priceType>
+  <shar:priceType>Wholesale</shar:priceType>
   <shar:localizationCountry>US</shar:localizationCountry>
   <shar:localizationLanguage>en</shar:localizationLanguage>
   <shar:configurationType>Blank</shar:configurationType>
 </ns2:GetConfigurationAndPricingRequest>`;
+      // --- END PPC ID normalization and Wholesale request patch ---
 
+      // --- BEGIN PPC parsing: prefer Wholesale, fallback to List+discount ---
       try {
         const ppcResponse = await makePromoStandardsRequest(
           PROMOSTANDARDS_ENDPOINTS.pricingAndConfiguration,
@@ -543,17 +554,50 @@ Deno.serve(async (req: Request) => {
         console.log('💰 PPC Response received, parsing PartPrice blocks...');
 
         const partPricePattern = /<(?:[a-zA-Z0-9]+:)?PartPrice[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?PartPrice>/gi;
-        const partPriceMatches = getAllXmlMatches(ppcResponse, partPricePattern);
+        const partPriceMatches = getAllXmlMatches(ppcResponse, partPricePattern).map(m => m[1]);
 
         console.log('💰 Found', partPriceMatches.length, 'PartPrice entries');
 
-        partPriceMatches.forEach(match => {
-          const priceXml = match[1];
-          const minQuantity = parseInt(getXmlValue(priceXml, "minQuantity") || "1");
-          const price = parseFloat(getXmlValue(priceXml, "price") || "0");
+        function getPriceType(xml: string) {
+          return (getXmlValue(xml, "priceType") || getXmlValue(xml, "PriceType") || "").trim();
+        }
+        function getDiscountCode(xml: string) {
+          return (getXmlValue(xml, "discountCode") || "").trim();
+        }
+        function getPrice(xml: string) {
+          return parseFloat(getXmlValue(xml, "price") || "0");
+        }
+        function getMinQuantity(xml: string) {
+          return parseInt(getXmlValue(xml, "minQuantity") || "1");
+        }
+        function getPriceUom(xml: string) {
+          return (getXmlValue(xml, "priceUom") || "").trim();
+        }
+
+        // Prefer Wholesale blocks
+        const wholesaleBlocks = partPriceMatches.filter(b => getPriceType(b).toLowerCase() === "wholesale");
+        const chosenBlocks = wholesaleBlocks.length ? wholesaleBlocks : partPriceMatches;
+
+        console.log('💰 Wholesale blocks found:', wholesaleBlocks.length, '| Using:', chosenBlocks.length, 'blocks');
+
+        ppcTiers = [];
+        chosenBlocks.forEach(block => {
+          let price = getPrice(block);
+          const minQuantity = getMinQuantity(block);
+          const priceUom = getPriceUom(block);
+          const discountCode = getDiscountCode(block);
+
+          // If we selected List blocks (no Wholesale present) and a discountCode exists, apply it
+          if (!wholesaleBlocks.length && discountCode) {
+            const discount = DISCOUNT_MAP[discountCode.toUpperCase()];
+            if (typeof discount === "number") {
+              console.log(`💰 Applying discount code ${discountCode}: ${discount * 100}% off $${price}`);
+              price = +(price * (1 - discount)).toFixed(2);
+            }
+          }
 
           if (price > 0) {
-            ppcTiers.push({ minQuantity, price });
+            ppcTiers.push({ minQuantity, price, priceUom, source: wholesaleBlocks.length ? "wholesale" : (discountCode ? `list+${discountCode}` : "list") });
           }
         });
 
@@ -561,7 +605,7 @@ Deno.serve(async (req: Request) => {
 
         if (ppcTiers.length > 0) {
           ppcPrice = ppcTiers[0].price;
-          console.log('💰 PPC Customer pricing extracted:', { ppcPrice, tierCount: ppcTiers.length, allTiers: ppcTiers });
+          console.log('💰 PPC Wholesale pricing extracted:', { ppcPrice, tierCount: ppcTiers.length, allTiers: ppcTiers });
         } else {
           console.warn('💰 No PartPrice entries found in PPC response');
           const errorCode = getXmlValue(ppcResponse, "code");
@@ -575,6 +619,7 @@ Deno.serve(async (req: Request) => {
         ppcError = err.message || 'Unknown PPC error';
         console.error('💰 PPC request failed:', ppcError);
       }
+      // --- END PPC parsing: prefer Wholesale, fallback to List+discount ---
     } else {
       console.log('💰 Skipping PPC call - missing required params:', {
         hasEffectiveInternalProductId: !!effectiveInternalProductId,
