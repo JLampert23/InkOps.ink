@@ -11,7 +11,7 @@ const PROMOSTANDARDS_ENDPOINTS = {
   productData: "https://promostandards.ssactivewear.com/productdata/v2/productdataservicev2.svc",
   inventory: "https://promostandards.ssactivewear.com/inventory/v2/inventoryservice.svc",
   media: "https://promostandards.ssactivewear.com/mediacontent/v1/mediacontentservice.svc",
-  pricingAndConfiguration:  https://promostandards.ssactivewear.com/PricingAndConfiguration/v1/PricingAndConfigurationService.svc
+  pricingAndConfiguration: "https://promostandards.ssactivewear.com/PricingAndConfiguration/v1/PricingAndConfigurationService.svc"
 };
 
 async function makePromoStandardsRequest(
@@ -19,6 +19,10 @@ async function makePromoStandardsRequest(
   soapAction: string,
   soapBody: string
 ) {
+  const soapActionHeader = soapAction === 'getConfigurationAndPricing'
+    ? 'http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/getConfigurationAndPricing'
+    : soapAction;
+
   const soapEnvelope = `<?xml version="1.0" encoding="utf-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Header/>
@@ -31,7 +35,7 @@ async function makePromoStandardsRequest(
     method: "POST",
     headers: {
       "Content-Type": "text/xml; charset=utf-8",
-      "SOAPAction": soapAction,
+      "SOAPAction": soapActionHeader,
     },
     body: soapEnvelope,
   });
