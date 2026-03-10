@@ -388,6 +388,18 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // Determine the effective internal product ID to use for all API calls
+    const effectiveInternalProductId =
+      internalProductId || internalProductIdParam || escapedStyleNumber;
+
+    if (!effectiveInternalProductId) {
+      console.error("❌ No internalProductId available — cannot call PPC");
+    }
+
+    console.log(
+      `📦 Effective internalProductId for API calls: ${effectiveInternalProductId} (source: ${internalIdSource})`
+    );
+
     // Update Product Data SOAP to use the effective internal ID
     const correctedProductSoap = `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
   <shar:wsVersion>2.0.0</shar:wsVersion>
@@ -445,18 +457,6 @@ Deno.serve(async (req: Request) => {
     if (!internalProductId) {
       console.warn('📦 WARNING: Could not extract internal productId from Product Data partId values');
     }
-
-    // Determine the effective internal product ID to use for all API calls
-    const effectiveInternalProductId =
-      internalProductId || internalProductIdParam || escapedStyleNumber;
-
-    if (!effectiveInternalProductId) {
-      console.error("❌ No internalProductId available — cannot call PPC");
-    }
-
-    console.log(
-      `📦 Effective internalProductId for API calls: ${effectiveInternalProductId} (source: ${internalIdSource})`
-    );
 
     // STEP 1.5: Fetch Pricing & Configuration (Customer/EQP pricing)
     let ppcPrice: number | null = null;
