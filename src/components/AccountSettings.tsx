@@ -2319,7 +2319,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         const pricing = data.pricing || {};
 
         const hasPpcPrice = pricingTest.ppcPrice !== null && pricingTest.ppcPrice !== undefined;
-        const hasBasePrice = pricingTest.basePrice !== null && pricingTest.basePrice !== undefined;
         const finalPrice = pricingTest.finalPrice || pricing.price;
         const pricingSource = pricingTest.pricingSource || pricing.source;
 
@@ -2329,17 +2328,19 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           testHarness: data.testHarness || false,
           partIdProvided: !!testPartId.trim(),
           internalProductId: pricingTest.internalProductId || debug.internalProductId,
+          discoveredPartId: data.discoveredPartId || debug.discoveredPartId,
+          priceType: pricingTest.priceType || debug.priceType,
+          fobId: pricingTest.fobId || debug.fobId,
           ppcPrice: pricingTest.ppcPrice,
           ppcTiers: pricingTest.ppcTiers || [],
           ppcError: pricingTest.ppcError || debug.ppcError,
-          basePrice: pricingTest.basePrice || debug.basePrice,
           finalPrice,
           pricingSource,
           message: finalPrice !== null && finalPrice !== undefined
-            ? `Price: $${finalPrice.toFixed(2)} (${pricingSource}) for "${productName}"`
-            : testPartId.trim()
-              ? `No pricing found. PPC Error: ${pricingTest.ppcError || 'Unknown'}`
-              : `Product found ("${productName}") but partId required for Customer Pricing test`,
+            ? `Customer NET Price: $${finalPrice.toFixed(2)} for "${productName}"`
+            : hasPpcPrice
+              ? `Found PPC price: $${pricingTest.ppcPrice.toFixed(2)}`
+              : `No pricing available. ${pricingTest.ppcError || 'Product found but pricing not configured'}`,
           rawDebug: debug,
         });
       } else {
@@ -6475,8 +6476,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       {diagnosticsExpanded && (
                         <div className="p-4 space-y-4 border-t border-gray-200 dark:border-gray-700">
                           <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                            <p>Test the S&S Activewear PromoStandards Pricing API to verify pricing data retrieval.</p>
-                            <p className="text-amber-600 dark:text-amber-400">Note: Part ID is required to test Customer Pricing (PPC). Without it, only base pricing is tested.</p>
+                            <p>Test the S&S Activewear PromoStandards Customer NET Pricing API.</p>
+                            <p className="text-amber-600 dark:text-amber-400">Note: Click the magnifying glass to lookup available parts, then select one to test pricing.</p>
                           </div>
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -6605,25 +6606,21 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                                   {pricingTestResult.ppcError && (
                                     <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 rounded border border-red-200 dark:border-red-800">
-                                      <p className="text-xs font-medium text-red-700 dark:text-red-300 mb-1">PPC Error:</p>
+                                      <p className="text-xs font-medium text-red-700 dark:text-red-300 mb-1">Customer NET Pricing Error:</p>
                                       <p className="text-sm text-red-600 dark:text-red-400">{pricingTestResult.ppcError}</p>
                                     </div>
                                   )}
 
-                                  {(pricingTestResult.basePrice !== null && pricingTestResult.basePrice !== undefined) && (
-                                    <div className="mt-3 p-3 bg-gray-50 dark:bg-slate-700/50 rounded border border-gray-200 dark:border-gray-600">
-                                      <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Base Price (fallback):</p>
-                                      <div className="text-lg font-semibold text-gray-700 dark:text-gray-200">
-                                        ${pricingTestResult.basePrice?.toFixed(2)}
+                                  {pricingTestResult.priceType && (
+                                    <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded border border-slate-200 dark:border-slate-600">
+                                      <p className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">Pricing Configuration:</p>
+                                      <div className="space-y-1 text-xs text-slate-700 dark:text-slate-300">
+                                        <p><span className="font-medium">Price Type:</span> {pricingTestResult.priceType}</p>
+                                        <p><span className="font-medium">FOB Location:</span> {pricingTestResult.fobId || 'Not configured'}</p>
+                                        {pricingTestResult.discoveredPartId && (
+                                          <p><span className="font-medium">Discovered Part ID:</span> {pricingTestResult.discoveredPartId}</p>
+                                        )}
                                       </div>
-                                    </div>
-                                  )}
-
-                                  {!pricingTestResult.partIdProvided && !pricingTestResult.error && (
-                                    <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800">
-                                      <p className="text-xs text-amber-700 dark:text-amber-300">
-                                        Tip: Enter a Part ID above and test again to verify Customer Pricing (PPC) works correctly.
-                                      </p>
                                     </div>
                                   )}
 

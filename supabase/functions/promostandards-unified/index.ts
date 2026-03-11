@@ -459,9 +459,10 @@ Deno.serve(async (req: Request) => {
     let ppcTiers: { minQuantity: number; price: number }[] = [];
     let ppcError: string | null = null;
 
-    // PPC productId MUST be derived ONLY from discoveredPartId (first 6 chars)
+    // ALWAYS use discoveredPartId from API - NEVER prioritize user-provided partId
+    // PPC requires both productId (first 6 chars) and full partId
     const ppcProductId = discoveredPartId?.substring(0, 6) || null;
-    const ppcPartId = partId || discoveredPartId;
+    const ppcPartId = discoveredPartId; // Always use API-discovered partId
     const isValidPpcProductId = ppcProductId !== null && ppcProductId.length === 6;
     const isValidPpcPartId = ppcPartId !== null;
 
@@ -469,10 +470,11 @@ Deno.serve(async (req: Request) => {
       console.log('💰 Step 1.5: Fetching PPC Customer Pricing...');
       console.log('💰 Using priceType:', priceType);
 
-      console.log('💰 PPC Request params:', {
+      console.log('💰 PPC Request params (from API discovery):', {
         ppcProductId,
         ppcPartId,
         discoveredPartId,
+        userProvidedPartId: partId || 'none',
         fobId: normalizedFobId
       });
 
@@ -636,71 +638,19 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Extract BASE PRICING from Product Data 2.0.0
-    // Base pricing is at PRODUCT level, NOT part level
-    // Structure: ProductPriceGroupArray > ProductPriceGroup > ProductPriceArray > ProductPrice > price
-    let basePrice: number | null = null;
-    let usedPricingSource = 'none';
-
-    if (productResponse.status === 'fulfilled' && productResponse.value) {
-      console.log('💰 Extracting base pricing from Product Data 2.0.0...');
-
-      try {
-        const xmlDoc = productResponse.value;
-
-        // Extract ProductPrice entries directly - base pricing applies to the entire product
-        const productPricePattern = /<(?:[a-zA-Z0-9]+:)?ProductPrice[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?ProductPrice>/gi;
-        const productPriceMatches = getAllXmlMatches(xmlDoc, productPricePattern);
-
-        console.log('💰 Found', productPriceMatches.length, 'ProductPrice entries');
-
-        // Extract all prices with their quantity minimums
-        const priceTiers: { quantityMin: number; price: number }[] = [];
-
-        productPriceMatches.forEach(match => {
-          const priceXml = match[1];
-          const price = parseFloat(getXmlValue(priceXml, "price") || "0");
-          const quantityMin = parseInt(getXmlValue(priceXml, "quantityMin") || "1");
-
-          if (price > 0) {
-            priceTiers.push({ quantityMin, price });
-          }
-        });
-
-        // Sort by quantityMin and take the first (base) price
-        priceTiers.sort((a, b) => a.quantityMin - b.quantityMin);
-
-        if (priceTiers.length > 0) {
-          basePrice = priceTiers[0].price;
-          usedPricingSource = 'base-pricing';
-          console.log('💰 Successfully extracted base price from Product Data 2.0.0:', basePrice);
-          console.log('💰 All price tiers:', priceTiers);
-        } else {
-          console.warn('💰 No ProductPrice entries found in Product Data');
-        }
-      } catch (err: any) {
-        console.error('💰 Failed to extract base pricing:', err.message);
-      }
-    } else {
-      console.warn('💰 Product Data not available for base pricing extraction');
-    }
-
-    // Merge PPC + Base Pricing
+    // Use ONLY Customer NET Pricing (PPC) - no base pricing fallback
     let finalPrice: number | null = null;
     let pricingSource: string | null = null;
 
     if (ppcPrice) {
       finalPrice = ppcPrice;
-      pricingSource = "customer-pricing";
-    } else if (basePrice) {
-      finalPrice = basePrice;
-      pricingSource = "base-pricing";
+      pricingSource = "customer-net-pricing";
+      console.log('💰 Using Customer NET Pricing (PPC):', finalPrice);
     } else {
       finalPrice = null;
       pricingSource = "none";
+      console.log('💰 No customer NET pricing available');
     }
-
-    console.log('💰 Final pricing decision:', { finalPrice, pricingSource, ppcPrice, basePrice });
 
     // Parse Media Content from PromoStandards API only
     const mediaData: any = {};
@@ -863,7 +813,7 @@ Deno.serve(async (req: Request) => {
       ? "Pricing not available. Please enter pricing manually."
       : null;
 
-    // PPC Test Harness - return early with test data
+    // PPC Test Harness - return early with test data INCLUDING product object for magnifying glass
     if (testPpc) {
       return new Response(
         JSON.stringify({
@@ -872,13 +822,26 @@ Deno.serve(async (req: Request) => {
           styleNumber,
           partId,
           internalProductId,
+          discoveredPartId,
+          product: productData, // Include full product data for magnifying glass dropdown
+          count: productData?.parts?.length || 0,
           pricingTest: {
+            priceType,
+            fobId: normalizedFobId,
             ppcPrice,
             ppcTiers,
             ppcError,
-            basePrice,
             finalPrice,
-            pricingSource
+            pricingSource,
+            ppcProductId: discoveredPartId?.substring(0, 6) || null,
+            ppcPartId: discoveredPartId,
+          },
+          debug: {
+            internalProductId,
+            internalIdSource,
+            discoveredPartId,
+            ppcProductId: discoveredPartId?.substring(0, 6) || null,
+            ppcPartId: discoveredPartId,
           }
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -898,7 +861,6 @@ Deno.serve(async (req: Request) => {
           source: pricingSource,
           ppcTiers,
           ppcError,
-          basePrice,
         },
         media: mediaData,
         pricingAvailable: hasPricing,
@@ -906,14 +868,15 @@ Deno.serve(async (req: Request) => {
         debug: {
           internalProductId,
           internalIdSource,
+          discoveredPartId,
+          priceType,
+          fobId: normalizedFobId,
           mediaResponseStatus: initialMediaResponse.status,
           mediaXmlFull: verbose && initialMediaResponse.status === 'fulfilled' && initialMediaResponse.value
             ? initialMediaResponse.value
             : null,
           mediaError: initialMediaResponse.status === 'rejected' ? initialMediaResponse.reason?.toString() : null,
           mediaAuthError,
-          usedPricingSource,
-          basePrice,
           ppcPrice,
           ppcTiers,
           ppcError,
