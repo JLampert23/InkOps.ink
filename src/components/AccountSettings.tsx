@@ -2362,7 +2362,10 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   };
 
   const lookupParts = async () => {
-    if (!testStyleNumber.trim()) return;
+    if (!testStyleNumber.trim()) {
+      showNotification('Please enter a style number', 'error');
+      return;
+    }
 
     try {
       setLookingUpParts(true);
@@ -2371,8 +2374,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token;
 
-      if (!token) return;
+      if (!token) {
+        showNotification('Session expired. Please refresh the page.', 'error');
+        return;
+      }
 
+      console.log('[Part Lookup] Fetching parts for style:', testStyleNumber.trim());
       const testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/promostandards-unified?styleNumber=${encodeURIComponent(testStyleNumber.trim())}`;
 
       const response = await fetch(testUrl, {
@@ -2386,6 +2393,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       });
 
       const data = await response.json();
+      console.log('[Part Lookup] Response:', data);
+
       if (response.ok && data.success && data.product?.parts) {
         const uniqueParts = data.product.parts.slice(0, 20).map((part: any) => ({
           partId: part.partId,
@@ -2393,9 +2402,13 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
           size: part.labelSize,
         }));
         setAvailableParts(uniqueParts);
+        showNotification(`Found ${uniqueParts.length} parts for style ${testStyleNumber.trim()}`, 'success');
+      } else {
+        showNotification(data.error || 'Failed to lookup parts', 'error');
       }
     } catch (err) {
       console.error('[Part Lookup] Exception:', err);
+      showNotification(err instanceof Error ? err.message : 'Failed to lookup parts', 'error');
     } finally {
       setLookingUpParts(false);
     }

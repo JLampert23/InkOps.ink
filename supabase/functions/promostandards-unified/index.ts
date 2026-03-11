@@ -464,7 +464,7 @@ Deno.serve(async (req: Request) => {
     const ppcProductId = discoveredPartId?.substring(0, 6) || null;
     const ppcPartId = discoveredPartId; // Always use API-discovered partId
     const isValidPpcProductId = ppcProductId !== null && ppcProductId.length === 6;
-    const isValidPpcPartId = ppcPartId !== null;
+    const isValidPpcPartId = ppcPartId !== null && ppcPartId.length > 0;
 
     if (isValidPpcProductId && isValidPpcPartId && normalizedFobId) {
       console.log('💰 Step 1.5: Fetching PPC Customer Pricing...');
@@ -475,15 +475,20 @@ Deno.serve(async (req: Request) => {
         ppcPartId,
         discoveredPartId,
         userProvidedPartId: partId || 'none',
-        fobId: normalizedFobId
+        fobId: normalizedFobId,
+        priceType
       });
+
+      // Type assertions after validation
+      const validPpcProductId = ppcProductId as string;
+      const validPpcPartId = ppcPartId as string;
 
       const ppcSoap = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${escapedAccountNumber}</shar:id>
   <shar:password>${escapedApiKey}</shar:password>
-  <shar:productId>${escapeXml(ppcProductId)}</shar:productId>
-  <shar:partId>${escapeXml(ppcPartId)}</shar:partId>
+  <shar:productId>${escapeXml(validPpcProductId)}</shar:productId>
+  <shar:partId>${escapeXml(validPpcPartId)}</shar:partId>
   <shar:currency>USD</shar:currency>
   <shar:fobId>${escapeXml(normalizedFobId)}</shar:fobId>
   <shar:priceType>${escapeXml(priceType)}</shar:priceType>
