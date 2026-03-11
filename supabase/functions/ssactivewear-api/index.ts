@@ -20,7 +20,7 @@ interface SSActivewearCredentials {
   apiKey: string;
 }
 
-const VALID_SS_FOB_IDS = ['IL', 'KS', 'NJ', 'TX', 'GA', 'NV', 'DS'];
+const ALL_SS_FOB_IDS = ['IL', 'KS', 'NJ', 'TX', 'GA', 'NV', 'DS'];
 
 /**
  * Normalizes a user-facing style number for S&S MediaContent API.
@@ -64,12 +64,6 @@ function escapeXml(unsafe: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
-}
-
-function validateFobId(fobId: string | null): string {
-  if (!fobId) return 'NJ';
-  const upperFob = fobId.toUpperCase();
-  return VALID_SS_FOB_IDS.includes(upperFob) ? upperFob : 'NJ';
 }
 
 async function makePromoStandardsRequest(
@@ -618,107 +612,6 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      case "inventory": {
-        if (!productId) {
-          return new Response(
-            JSON.stringify({ error: "Product ID required" }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        const normalizedProductId = normalizeSsProductId(productId);
-        const fobId = validateFobId(url.searchParams.get("fobId"));
-        console.log(`[SS Inventory] Raw input: "${productId}" -> Normalized: "${normalizedProductId}", FOB: ${fobId}`);
-
-        const soapBody = `<ns2:GetInventoryLevelsRequest xmlns:ns2="http://www.promostandards.org/WSDL/InventoryService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/Inventory/2.0.0/SharedObjects/">
-  <shar:wsVersion>2.0.0</shar:wsVersion>
-  <shar:id>${escapeXml(credentials.accountNumber)}</shar:id>
-  <shar:password>${escapeXml(decryptedApiKey)}</shar:password>
-  <shar:productId>${escapeXml(normalizedProductId)}</shar:productId>
-</ns2:GetInventoryLevelsRequest>`;
-
-        console.log(`[SS Inventory] SOAP Request Body:\n${soapBody}`);
-
-        const xmlResponse = await makePromoStandardsRequest(
-          PROMOSTANDARDS_ENDPOINTS.inventory,
-          "getInventoryLevels",
-          soapBody,
-          credentials.accountNumber,
-          decryptedApiKey
-        );
-
-        console.log(`[SS Inventory] SOAP Response (first 1000 chars):\n${xmlResponse.substring(0, 1000)}`);
-
-        const parseResult = parseXmlResponse(xmlResponse);
-
-        if (!parseResult.success) {
-          console.error(`[SS Inventory] PromoStandards error for ${normalizedProductId}:`, parseResult.error);
-          return new Response(
-            JSON.stringify({
-              success: false,
-              vendor: "SSActivewear",
-              supplier: "ssactivewear",
-              action,
-              error: "ProductNotFound",
-              productId: normalizedProductId,
-              rawInput: productId,
-              errorDetails: parseResult.error?.description,
-              errorCode: parseResult.error?.code,
-              data: []
-            }),
-            {
-              status: 200,
-              headers: { ...corsHeaders, "Content-Type": "application/json" }
-            }
-          );
-        }
-
-        const xmlDoc = parseResult.xmlText!;
-
-        const partIds = getXmlValues(xmlDoc, "partId");
-        const quantities = getXmlValues(xmlDoc, "quantityAvailable");
-
-        console.log(`[SS Inventory] Found ${partIds.length} parts for ${normalizedProductId}`);
-
-        if (partIds.length === 0) {
-          return new Response(
-            JSON.stringify({
-              success: false,
-              vendor: "SSActivewear",
-              supplier: "ssactivewear",
-              action,
-              error: "ProductNotFound",
-              productId: normalizedProductId,
-              rawInput: productId,
-              errorDetails: "No inventory data returned",
-              data: []
-            }),
-            {
-              status: 200,
-              headers: { ...corsHeaders, "Content-Type": "application/json" }
-            }
-          );
-        }
-
-        const inventoryArray = partIds.map((id, i) => ({
-          partId: id,
-          quantityAvailable: parseInt(quantities[i] || "0"),
-        }));
-
-        return new Response(
-          JSON.stringify({
-            success: true,
-            supplier: "ssactivewear",
-            action,
-            productId: normalizedProductId,
-            data: inventoryArray,
-          }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" }
-          }
-        );
-      }
 
       case "pricing": {
         if (!productId) {
@@ -729,8 +622,8 @@ Deno.serve(async (req: Request) => {
         }
 
         const normalizedProductId = normalizeSsProductId(productId);
-        const fobId = validateFobId(url.searchParams.get("fobId"));
-        console.log(`[SS Pricing] Raw input: "${productId}" -> Normalized: "${normalizedProductId}", FOB: ${fobId}`);
+        console.log(`[SS Pricing] Raw input: "${productId}" -> Normalized: "${normalizedProductId}"`);
+        console.log(`[SS Pricing] Querying ALL warehouses: ${ALL_SS_FOB_IDS.join(', ')}`);
 
         const pricingIdsToTry: string[] = [normalizedProductId];
 
@@ -770,13 +663,15 @@ Deno.serve(async (req: Request) => {
           }
         }
 
-        let parts: any[] = [];
+        let allWarehousePricing: any[] = [];
         let usedPricingId = normalizedProductId;
 
         for (const pricingId of pricingIdsToTry) {
           console.log(`[SS Pricing] Trying pricing with productId: "${pricingId}"`);
 
-          const soapBody = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
+          const warehousePricingPromises = ALL_SS_FOB_IDS.map(async (fobId) => {
+            try {
+              const soapBody = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${escapeXml(credentials.accountNumber)}</shar:id>
   <shar:password>${escapeXml(decryptedApiKey)}</shar:password>
@@ -789,53 +684,65 @@ Deno.serve(async (req: Request) => {
   <shar:configurationType>Blank</shar:configurationType>
 </ns2:GetConfigurationAndPricingRequest>`;
 
-          const xmlResponse = await makePromoStandardsRequest(
-            PROMOSTANDARDS_ENDPOINTS.pricing,
-            "getConfigurationAndPricing",
-            soapBody,
-            credentials.accountNumber,
-            decryptedApiKey
-          );
+              const xmlResponse = await makePromoStandardsRequest(
+                PROMOSTANDARDS_ENDPOINTS.pricing,
+                "getConfigurationAndPricing",
+                soapBody,
+                credentials.accountNumber,
+                decryptedApiKey
+              );
 
-          const parseResult = parseXmlResponse(xmlResponse);
-          if (!parseResult.success) {
-            console.warn(`[SS Pricing] Error for "${pricingId}": ${parseResult.error?.description}`);
-            continue;
-          }
+              const parseResult = parseXmlResponse(xmlResponse);
+              if (!parseResult.success) {
+                console.warn(`[SS Pricing] Error for "${pricingId}" at warehouse ${fobId}: ${parseResult.error?.description}`);
+                return { fobId, parts: [] };
+              }
 
-          const xmlDoc = parseResult.xmlText!;
-          const partPattern = /<(?:[a-zA-Z0-9]+:)?Part[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Part>/gi;
-          let partMatch;
+              const xmlDoc = parseResult.xmlText!;
+              const partPattern = /<(?:[a-zA-Z0-9]+:)?Part[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Part>/gi;
+              let partMatch;
+              const parts: any[] = [];
 
-          while ((partMatch = partPattern.exec(xmlDoc)) !== null) {
-            const partXml = partMatch[1];
-            const partId = getXmlValue(partXml, "partId");
+              while ((partMatch = partPattern.exec(xmlDoc)) !== null) {
+                const partXml = partMatch[1];
+                const partId = getXmlValue(partXml, "partId");
 
-            const pricePattern = /<(?:[a-zA-Z0-9]+:)?PartPrice[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?PartPrice>/gi;
-            const prices: any[] = [];
-            let priceMatch;
+                const pricePattern = /<(?:[a-zA-Z0-9]+:)?PartPrice[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?PartPrice>/gi;
+                const prices: any[] = [];
+                let priceMatch;
 
-            while ((priceMatch = pricePattern.exec(partXml)) !== null) {
-              const priceXml = priceMatch[1];
-              prices.push({
-                quantity: parseInt(getXmlValue(priceXml, "minQuantity") || "1"),
-                price: parseFloat(getXmlValue(priceXml, "price") || "0"),
-              });
+                while ((priceMatch = pricePattern.exec(partXml)) !== null) {
+                  const priceXml = priceMatch[1];
+                  prices.push({
+                    quantity: parseInt(getXmlValue(priceXml, "minQuantity") || "1"),
+                    price: parseFloat(getXmlValue(priceXml, "price") || "0"),
+                  });
+                }
+
+                parts.push({ partId, prices });
+              }
+
+              return { fobId, parts };
+            } catch (err: any) {
+              console.error(`[SS Pricing] Error querying warehouse ${fobId}:`, err.message);
+              return { fobId, parts: [] };
             }
+          });
 
-            parts.push({ partId, prices });
-          }
+          const warehouseResults = await Promise.all(warehousePricingPromises);
 
-          if (parts.length > 0) {
+          const successfulWarehouse = warehouseResults.find(result => result.parts.length > 0);
+          if (successfulWarehouse) {
+            allWarehousePricing = warehouseResults;
             usedPricingId = pricingId;
-            console.log(`[SS Pricing] SUCCESS with "${pricingId}": ${parts.length} parts with pricing`);
+            console.log(`[SS Pricing] SUCCESS with "${pricingId}": received pricing from ${warehouseResults.filter(r => r.parts.length > 0).length} warehouses`);
             break;
           } else {
-            console.log(`[SS Pricing] No parts returned for "${pricingId}", trying next...`);
+            console.log(`[SS Pricing] No parts returned for "${pricingId}" from any warehouse, trying next...`);
           }
         }
 
-        if (parts.length === 0) {
+        if (allWarehousePricing.length === 0 || allWarehousePricing.every(w => w.parts.length === 0)) {
           return new Response(
             JSON.stringify({
               success: false,
@@ -845,7 +752,7 @@ Deno.serve(async (req: Request) => {
               error: "ProductNotFound",
               productId: normalizedProductId,
               rawInput: productId,
-              errorDetails: "No pricing data returned",
+              errorDetails: "No pricing data returned from any warehouse",
               triedIds: pricingIdsToTry,
               data: []
             }),
@@ -856,13 +763,43 @@ Deno.serve(async (req: Request) => {
           );
         }
 
+        const bestWarehousePrices: Map<string, any> = new Map();
+
+        for (const warehouseData of allWarehousePricing) {
+          for (const part of warehouseData.parts) {
+            if (!bestWarehousePrices.has(part.partId)) {
+              bestWarehousePrices.set(part.partId, {
+                partId: part.partId,
+                prices: part.prices,
+                warehouse: warehouseData.fobId,
+                allWarehousePrices: [{ warehouse: warehouseData.fobId, prices: part.prices }]
+              });
+            } else {
+              const existing = bestWarehousePrices.get(part.partId);
+              existing.allWarehousePrices.push({ warehouse: warehouseData.fobId, prices: part.prices });
+
+              const existingLowestPrice = existing.prices[0]?.price || Infinity;
+              const newLowestPrice = part.prices[0]?.price || Infinity;
+
+              if (newLowestPrice < existingLowestPrice) {
+                existing.prices = part.prices;
+                existing.warehouse = warehouseData.fobId;
+              }
+            }
+          }
+        }
+
+        const finalParts = Array.from(bestWarehousePrices.values());
+
         return new Response(
           JSON.stringify({
             success: true,
             supplier: "ssactivewear",
             action,
             productId: usedPricingId,
-            data: parts,
+            data: finalParts,
+            warehouseCount: allWarehousePricing.filter(w => w.parts.length > 0).length,
+            allWarehouses: allWarehousePricing.filter(w => w.parts.length > 0).map(w => w.fobId),
           }),
           {
             status: 200,
@@ -1058,7 +995,7 @@ Deno.serve(async (req: Request) => {
 
       default:
         return new Response(
-          JSON.stringify({ error: "Invalid action. Use: brands, product, search, inventory, pricing, or media" }),
+          JSON.stringify({ error: "Invalid action. Use: brands, product, search, pricing, or media" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }

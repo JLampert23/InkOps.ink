@@ -22,21 +22,6 @@ const BoxLabelSettings = lazy(() => import('./settings/BoxLabelSettings'));
 const RichTextTermsEditor = lazy(() => import('./settings/RichTextTermsEditor'));
 const KanbanSettings = lazy(() => import('./settings/KanbanSettings'));
 
-const SSACTIVEWEAR_WAREHOUSES = [
-  { id: 'NJ', name: 'Robbinsville, New Jersey' },
-  { id: 'IL', name: 'Lockport, Illinois' },
-  { id: 'KS', name: 'Olathe, Kansas' },
-  { id: 'TX', name: 'Fort Worth, Texas' },
-  { id: 'GA', name: 'McDonough, Georgia' },
-  { id: 'NV', name: 'Reno, Nevada' },
-  { id: 'DS', name: 'Dropship' },
-];
-
-const SANMAR_WAREHOUSES = [
-  { id: '1', name: 'Primary Distribution Center' },
-  { id: '2', name: 'Eastern Distribution Center' },
-  { id: '3', name: 'Western Distribution Center' },
-];
 
 interface CompanySettings {
   id: string;
@@ -252,14 +237,12 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [sanmarPassword, setSanmarPassword] = useState('');
   const [showSanmarPassword, setShowSanmarPassword] = useState(false);
   const [sanmarHasCredentials, setSanmarHasCredentials] = useState(false);
-  const [sanmarFobId, setSanmarFobId] = useState('1');
   const [ssaEnabled, setSsaEnabled] = useState(false);
   const [ssaAccountNumber, setSsaAccountNumber] = useState('');
   const [ssaApiKey, setSsaApiKey] = useState('');
   const [showSsaAccountNumber, setShowSsaAccountNumber] = useState(false);
   const [showSsaApiKey, setShowSsaApiKey] = useState(false);
   const [ssaHasCredentials, setSsaHasCredentials] = useState(false);
-  const [ssaFobId, setSsaFobId] = useState('NJ');
   const [ssaPriceType, setSsaPriceType] = useState('Net');
   const [savingSanmar, setSavingSanmar] = useState(false);
   const [savingSSA, setSavingSSA] = useState(false);
@@ -564,8 +547,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       setSsaApiKey(ssaHasCreds ? '••••••••••••••••' : '');
       setSsaAccountNumber(ssaHasCreds ? '••••••••••••••••' : '');
 
-      setSanmarFobId((companySettings as any).sanmar_fob_id || '1');
-      setSsaFobId((companySettings as any).ssactivewear_fob_id || 'NJ');
       // Per S&S IT Department: priceType should be "Customer" (confirmed via official SOAP examples)
       setSsaPriceType((companySettings as any).ssactivewear_price_type || 'Customer');
 
@@ -574,8 +555,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         ssaEnabled: companySettings.ssactivewear_enabled,
         sanmarHasCreds,
         ssaHasCreds,
-        sanmarFobId: (companySettings as any).sanmar_fob_id,
-        ssaFobId: (companySettings as any).ssactivewear_fob_id,
         ssaPriceType: (companySettings as any).ssactivewear_price_type
       });
     } catch (err) {
@@ -1685,7 +1664,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
       const settingsData: Record<string, any> = {
         sanmar_enabled: sanmarEnabled,
-        sanmar_fob_id: sanmarFobId,
       };
 
       if (sanmarEnabled) {
@@ -1783,7 +1761,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
       const settingsData: Record<string, any> = {
         ssactivewear_enabled: ssaEnabled,
-        ssactivewear_fob_id: ssaFobId,
         ssactivewear_price_type: normalizedPriceType,
       };
 
@@ -6168,26 +6145,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       </p>
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        FOB Warehouse <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={sanmarFobId}
-                        onChange={(e) => setSanmarFobId(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        {SANMAR_WAREHOUSES.map((warehouse) => (
-                          <option key={warehouse.id} value={warehouse.id}>
-                            {warehouse.name} ({warehouse.id})
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Select your preferred shipping warehouse. This affects wholesale pricing from SanMar.
-                      </p>
-                    </div>
-
                     <div className="flex gap-3 mt-4">
                       <button
                         onClick={saveSanmarSettings}
@@ -6327,26 +6284,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           Enter a new API key only if you want to update it
                         </p>
                       )}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        FOB Warehouse <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={ssaFobId}
-                        onChange={(e) => setSsaFobId(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      >
-                        {SSACTIVEWEAR_WAREHOUSES.map((warehouse) => (
-                          <option key={warehouse.id} value={warehouse.id}>
-                            {warehouse.name} ({warehouse.id})
-                          </option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Select your preferred shipping warehouse. This affects wholesale pricing from SSActivewear.
-                      </p>
                     </div>
 
                     <div>
