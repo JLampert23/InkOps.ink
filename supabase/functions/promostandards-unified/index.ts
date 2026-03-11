@@ -43,6 +43,8 @@ async function makePromoStandardsRequest(
   const responseText = await response.text();
 
   if (!response.ok) {
+    console.error(`❌ PromoStandards HTTP Error ${response.status}:`, response.statusText);
+    console.error(`Response body (first 1000 chars):`, responseText.substring(0, 1000));
     throw new Error(`PromoStandards request failed: ${response.status} ${response.statusText}`);
   }
 
@@ -502,7 +504,9 @@ Deno.serve(async (req: Request) => {
   <shar:configurationType>Blank</shar:configurationType>
 </ns:GetConfigurationAndPricingRequest>`;
 
-      console.log('💰 PPC SOAP Request:', ppcSoap);
+      console.log('💰 PPC SOAP Request (full):', ppcSoap);
+      console.log('💰 PPC Endpoint:', PROMOSTANDARDS_ENDPOINTS.pricingAndConfiguration);
+      console.log('💰 PPC SOAPAction:', "getConfigurationAndPricing");
 
       try {
         const ppcResponse = await makePromoStandardsRequest(
