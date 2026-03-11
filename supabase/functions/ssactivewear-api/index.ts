@@ -305,7 +305,20 @@ Deno.serve(async (req: Request) => {
       .eq("id", companyId)
       .maybeSingle();
 
+    console.log("🔍 Settings query result:", {
+      hasSettings: !!settings,
+      enabled: settings?.ssactivewear_enabled,
+      hasUsername: !!settings?.ssactivewear_username,
+      hasEncryptedKey: !!settings?.ssactivewear_api_key_encrypted,
+      companyId
+    });
+
     if (!settings?.ssactivewear_enabled || !settings?.ssactivewear_api_key_encrypted || !settings?.ssactivewear_username) {
+      console.error("❌ SSActivewear credentials check failed:", {
+        enabled: settings?.ssactivewear_enabled,
+        hasUsername: !!settings?.ssactivewear_username,
+        hasEncryptedKey: !!settings?.ssactivewear_api_key_encrypted
+      });
       return new Response(
         JSON.stringify({ error: "SSActivewear credentials not configured" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
