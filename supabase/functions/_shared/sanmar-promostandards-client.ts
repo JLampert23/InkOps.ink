@@ -508,58 +508,109 @@ export async function fetchSanMarInventory(
 
 /**
  * Fetches pricing using PromoStandards Pricing & Configuration Service V1.0.0
+ *
+ * CRITICAL: This function queries ALL 7 SanMar warehouses in parallel to find the best price
+ * DO NOT pass partId in the request - use productId (style number) only
  */
 export async function fetchSanMarPricing(
   credentials: SanMarCredentials,
-  partId: string
+  productId: string
 ): Promise<SanMarPricingData> {
-  console.log('💰 Fetching SanMar pricing:', partId);
+  console.log('💰 Fetching SanMar pricing for productId:', productId);
 
-  const fobId = credentials.fobId || 'all';
-  const payload = `<shar:productId>${partId}</shar:productId>
+  // SanMar warehouses to query (all 7)
+  const warehouses = ['1', '2', '3', '4', '5', '6', '7'];
+
+  // Query all warehouses in parallel
+  const warehouseRequests = warehouses.map(async (fobId) => {
+    const payload = `<shar:productId>${escapeXml(productId)}</shar:productId>
       <shar:currency>USD</shar:currency>
       <shar:fobId>${fobId}</shar:fobId>
       <shar:priceType>Customer</shar:priceType>
       <shar:configurationType>Blank</shar:configurationType>`;
 
-  const soapEnvelope = buildSOAPEnvelope(
-    'PricingAndConfiguration',
-    '1.0.0',
-    'GetConfigurationAndPricing',
-    credentials,
-    payload
-  );
+    const soapEnvelope = buildSOAPEnvelope(
+      'PricingAndConfiguration',
+      '1.0.0',
+      'GetConfigurationAndPricing',
+      credentials,
+      payload
+    );
 
-  const responseXml = await callPromoStandardsService(
-    SANMAR_PROMOSTANDARDS_ENDPOINTS.pricing,
-    'getConfigurationAndPricing',
-    soapEnvelope
-  );
+    try {
+      const responseXml = await callPromoStandardsService(
+        SANMAR_PROMOSTANDARDS_ENDPOINTS.pricing,
+        'getConfigurationAndPricing',
+        soapEnvelope
+      );
 
-  // Parse pricing data
-  const pricingData: SanMarPricingData = { parts: [] };
-  const pricingPartPattern = nsElementPattern("Part");
-  const partMatches = getAllXmlMatches(responseXml, pricingPartPattern);
-
-  pricingData.parts = partMatches.map(match => {
-    const partXml = match[1];
-    const pricePattern = nsElementPattern("Price");
-    const priceMatches = getAllXmlMatches(partXml, pricePattern);
-
-    return {
-      partId: getXmlValue(partXml, "partId") || "",
-      prices: priceMatches.map(priceMatch => {
-        const priceXml = priceMatch[1];
-        return {
-          minQuantity: parseInt(getXmlValue(priceXml, "minQuantity") || "0"),
-          price: parseFloat(getXmlValue(priceXml, "price") || "0"),
-          discountCode: getXmlValue(priceXml, "discountCode") || "",
-        };
-      })
-    };
+      return { fobId, responseXml, success: true };
+    } catch (error: any) {
+      console.warn(`Warehouse ${fobId} pricing failed:`, error.message);
+      return { fobId, responseXml: '', success: false };
+    }
   });
 
-  console.log(`✅ Found pricing for ${pricingData.parts.length} parts`);
+  const results = await Promise.all(warehouseRequests);
+
+  // Build pricing map: partId -> { minQty -> { price, fobId } }
+  const pricingMap = new Map<string, Map<number, { price: number; fobId: string }>>();
+  let pricingFobId = '1'; // default to warehouse 1
+
+  for (const { fobId, responseXml, success } of results) {
+    if (!success || !responseXml) continue;
+
+    const pricingPartPattern = nsElementPattern("Part");
+    const partMatches = getAllXmlMatches(responseXml, pricingPartPattern);
+
+    for (const match of partMatches) {
+      const partXml = match[1];
+      const partId = getXmlValue(partXml, "partId") || "";
+      if (!partId) continue;
+
+      if (!pricingMap.has(partId)) {
+        pricingMap.set(partId, new Map());
+      }
+      const partPricing = pricingMap.get(partId)!;
+
+      const pricePattern = nsElementPattern("PartPrice");
+      const priceMatches = getAllXmlMatches(partXml, pricePattern);
+
+      for (const priceMatch of priceMatches) {
+        const priceXml = priceMatch[1];
+        const minQty = parseInt(getXmlValue(priceXml, "minQuantity") || "1");
+        const price = parseFloat(getXmlValue(priceXml, "price") || "0");
+
+        if (!partPricing.has(minQty) || price < partPricing.get(minQty)!.price) {
+          partPricing.set(minQty, { price, fobId });
+          if (minQty === 1) {
+            pricingFobId = fobId;
+          }
+        }
+      }
+    }
+  }
+
+  // Convert pricing map to response format
+  const pricingData: SanMarPricingData = { parts: [] };
+
+  for (const [partId, priceMap] of pricingMap.entries()) {
+    const prices = Array.from(priceMap.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([minQuantity, { price }]) => ({
+        minQuantity,
+        price,
+        discountCode: "",
+      }));
+
+    pricingData.parts.push({
+      partId,
+      prices,
+    });
+  }
+
+  console.log(`✅ Found pricing for ${pricingData.parts.length} parts across all warehouses`);
+  console.log(`✅ Best pricing warehouse (FOB): ${pricingFobId}`);
 
   return pricingData;
 }
@@ -738,28 +789,18 @@ export async function fetchUnifiedSanMarData(
   let inventory: SanMarInventoryData = { items: [] };
   let pricing: SanMarPricingData = { parts: [] };
 
+  // Fetch pricing for the entire style (queries all 7 warehouses)
+  const pricingResult = await Promise.allSettled([
+    fetchSanMarPricing(credentials, styleNumber),
+  ]);
+  pricing = pricingResult[0].status === 'fulfilled' ? pricingResult[0].value : { parts: [] };
+
+  // Optionally fetch inventory for a specific part if provided
   if (partId) {
-    const [inventoryResult, pricingResult] = await Promise.allSettled([
+    const inventoryResult = await Promise.allSettled([
       fetchSanMarInventory(credentials, partId),
-      fetchSanMarPricing(credentials, partId),
     ]);
-    inventory = inventoryResult.status === 'fulfilled' ? inventoryResult.value : { items: [] };
-    pricing = pricingResult.status === 'fulfilled' ? pricingResult.value : { parts: [] };
-  } else {
-    const uniquePartIds = [...new Set(style.parts.map(p => p.partId))].slice(0, 20);
-    console.log(`💰 Fetching pricing for ${uniquePartIds.length} parts`);
-
-    const pricingResults = await Promise.allSettled(
-      uniquePartIds.map(pid => fetchSanMarPricing(credentials, pid))
-    );
-
-    pricing = { parts: [] };
-    for (const result of pricingResults) {
-      if (result.status === 'fulfilled' && result.value.parts) {
-        pricing.parts.push(...result.value.parts);
-      }
-    }
-    console.log(`💰 Got pricing for ${pricing.parts.length} parts`);
+    inventory = inventoryResult[0].status === 'fulfilled' ? inventoryResult[0].value : { items: [] };
   }
 
   const media = mediaResult.status === 'fulfilled'

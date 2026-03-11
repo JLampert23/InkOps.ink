@@ -251,14 +251,14 @@ Deno.serve(async (req: Request) => {
         break;
 
       case "pricing":
-        // Fetch pricing for a specific part
-        if (!partId) {
+        // Fetch pricing for a style (queries all 7 warehouses)
+        if (!style) {
           return new Response(
-            JSON.stringify({ error: "Part ID required for pricing lookup" }),
+            JSON.stringify({ error: "Style number required for pricing lookup" }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-        const pricingData = await fetchSanMarPricing(credentials, partId);
+        const pricingData = await fetchSanMarPricing(credentials, style);
         responseData = {
           success: true,
           supplier: "sanmar",
