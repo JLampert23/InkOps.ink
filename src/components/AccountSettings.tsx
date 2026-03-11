@@ -566,7 +566,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
       setSanmarFobId((companySettings as any).sanmar_fob_id || '1');
       setSsaFobId((companySettings as any).ssactivewear_fob_id || 'NJ');
-      setSsaPriceType((companySettings as any).ssactivewear_price_type || 'Net');
+      // Per S&S IT Department: priceType should be "Customer" (confirmed via official SOAP examples)
+      setSsaPriceType((companySettings as any).ssactivewear_price_type || 'Customer');
 
       console.log('Loaded supplier integration settings:', {
         sanmarEnabled: companySettings.sanmar_enabled,
@@ -1777,7 +1778,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       });
 
       const validPriceTypes = ['Net', 'Customer', 'Blank', 'EQP', 'List'];
-      const normalizedPriceType = validPriceTypes.includes(ssaPriceType) ? ssaPriceType : 'Net';
+      // Per S&S IT Department: priceType should be "Customer" (confirmed via official SOAP examples)
+      const normalizedPriceType = validPriceTypes.includes(ssaPriceType) ? ssaPriceType : 'Customer';
 
       const settingsData: Record<string, any> = {
         ssactivewear_enabled: ssaEnabled,

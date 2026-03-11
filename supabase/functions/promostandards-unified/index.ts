@@ -228,12 +228,13 @@ Deno.serve(async (req: Request) => {
 
     console.log('🏭 FOB ID normalized:', { rawFobId, normalizedFobId });
 
-    const rawPriceType = settings.ssactivewear_price_type || 'Net';
+    // Per S&S IT Department: priceType should be "Customer" (confirmed via official SOAP examples)
+    const rawPriceType = settings.ssactivewear_price_type || 'Customer';
     const validPriceTypes = ['Net', 'Customer', 'Blank', 'EQP', 'List'];
-    const priceType = validPriceTypes.includes(rawPriceType) ? rawPriceType : 'Net';
+    const priceType = validPriceTypes.includes(rawPriceType) ? rawPriceType : 'Customer';
 
     if (!validPriceTypes.includes(rawPriceType)) {
-      console.warn(`⚠️ Invalid price type "${rawPriceType}", defaulting to "Net"`);
+      console.warn(`⚠️ Invalid price type "${rawPriceType}", defaulting to "Customer" (S&S recommended)`);
     }
 
     const credentials = {
