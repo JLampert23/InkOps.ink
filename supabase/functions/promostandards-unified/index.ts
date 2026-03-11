@@ -461,7 +461,7 @@ Deno.serve(async (req: Request) => {
 
     // PPC productId MUST be derived ONLY from discoveredPartId (first 6 chars)
     const ppcProductId = discoveredPartId?.substring(0, 6) || null;
-    const ppcPartId = discoveredPartId || null;
+    const ppcPartId = partId || discoveredPartId;
     const isValidPpcProductId = ppcProductId !== null && ppcProductId.length === 6;
     const isValidPpcPartId = ppcPartId !== null;
 
