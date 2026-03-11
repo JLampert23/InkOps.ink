@@ -2295,11 +2295,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
-      let testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sanmar-api?action=unified&style=${encodeURIComponent(testStyleNumber.trim())}`;
+      let testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ssactivewear-api?action=pricing&productId=${encodeURIComponent(testStyleNumber.trim())}&companyId=${encodeURIComponent(companySettings?.id || '')}`;
       if (testPartId.trim()) {
         testUrl += `&partId=${encodeURIComponent(testPartId.trim())}`;
       }
-      console.log('[Pricing Test] Calling SanMar API:', testUrl);
+      console.log('[Pricing Test] Calling S&S Activewear API:', testUrl);
 
       const response = await fetch(testUrl, {
         method: 'GET',
@@ -2314,42 +2314,42 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       const data = await response.json();
       console.log('[Pricing Test] Response:', data);
 
-      if (response.ok && data.success) {
-        const productName = data.product?.productName || 'Unknown';
-        const debug = data.debug || {};
-        const pricingTest = data.pricingTest || {};
-        const pricing = data.pricing || {};
+      if (response.ok && data.success && data.data && data.data.length > 0) {
+        const pricingData = data.data;
+        const firstPart = pricingData[0];
+        const firstPrice = firstPart?.prices?.[0];
 
-        const hasPpcPrice = pricingTest.ppcPrice !== null && pricingTest.ppcPrice !== undefined;
-        const finalPrice = pricingTest.finalPrice || pricing.price;
-        const pricingSource = pricingTest.pricingSource || pricing.source;
+        const partsList = pricingData.map((part: any) => ({
+          partId: part.partId,
+          prices: part.prices || []
+        }));
 
         setPricingTestResult({
-          success: finalPrice !== null && finalPrice !== undefined,
-          productName,
-          testHarness: data.testHarness || false,
+          success: true,
+          productName: testStyleNumber.trim(),
           partIdProvided: !!testPartId.trim(),
-          internalProductId: pricingTest.internalProductId || debug.internalProductId,
-          discoveredPartId: data.discoveredPartId || debug.discoveredPartId,
-          priceType: pricingTest.priceType || debug.priceType,
-          fobId: pricingTest.fobId || debug.fobId,
-          ppcPrice: pricingTest.ppcPrice,
-          ppcTiers: pricingTest.ppcTiers || [],
-          ppcError: pricingTest.ppcError || debug.ppcError,
-          finalPrice,
-          pricingSource,
-          message: finalPrice !== null && finalPrice !== undefined
-            ? `Customer NET Price: $${finalPrice.toFixed(2)} for "${productName}"`
-            : hasPpcPrice
-              ? `Found PPC price: $${pricingTest.ppcPrice.toFixed(2)}`
-              : `No pricing available. ${pricingTest.ppcError || 'Product found but pricing not configured'}`,
-          rawDebug: debug,
+          productId: data.productId,
+          supplier: 'S&S Activewear',
+          partsCount: pricingData.length,
+          parts: partsList,
+          firstPrice: firstPrice?.price,
+          firstQuantity: firstPrice?.quantity,
+          message: firstPrice
+            ? `Found pricing for ${pricingData.length} part(s). Base price: $${firstPrice.price.toFixed(2)} (min qty: ${firstPrice.quantity})`
+            : `Found ${pricingData.length} part(s) but no pricing available`,
+          rawData: data,
+        });
+      } else if (response.ok && data.success && (!data.data || data.data.length === 0)) {
+        setPricingTestResult({
+          success: false,
+          error: `Style ${testStyleNumber.trim()} not found in S&S Activewear catalog`,
+          details: data.errorDetails || 'No pricing data returned',
         });
       } else {
         setPricingTestResult({
           success: false,
           error: data.error || `Request failed (${response.status})`,
-          details: data.details,
+          details: data.errorDetails || data.details,
         });
       }
     } catch (err) {
@@ -2382,7 +2382,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       }
 
       console.log('[Part Lookup] Fetching parts for style:', testStyleNumber.trim());
-      const testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sanmar-api?action=unified&style=${encodeURIComponent(testStyleNumber.trim())}`;
+      const testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ssactivewear-api?action=product&productId=${encodeURIComponent(testStyleNumber.trim())}&companyId=${encodeURIComponent(companySettings?.id || '')}`;
 
       const response = await fetch(testUrl, {
         method: 'GET',
@@ -2397,16 +2397,19 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       const data = await response.json();
       console.log('[Part Lookup] Response:', data);
 
-      if (response.ok && data.success && data.product?.parts) {
-        const uniqueParts = data.product.parts.slice(0, 20).map((part: any) => ({
+      if (response.ok && data.success && data.data && data.data.length > 0 && data.data[0]?.parts) {
+        const productInfo = data.data[0];
+        const uniqueParts = productInfo.parts.slice(0, 20).map((part: any) => ({
           partId: part.partId,
           colorName: part.colorName,
           size: part.labelSize,
         }));
         setAvailableParts(uniqueParts);
-        showNotification(`Found ${uniqueParts.length} parts for style ${testStyleNumber.trim()}`, 'success');
+        showNotification(`Found ${uniqueParts.length} parts for ${productInfo.productBrand || ''} ${productInfo.productName || testStyleNumber.trim()}`, 'success');
+      } else if (response.ok && data.success && (!data.data || data.data.length === 0)) {
+        showNotification(`Style ${testStyleNumber.trim()} not found in S&S Activewear catalog`, 'error');
       } else {
-        showNotification(data.error || 'Failed to lookup parts', 'error');
+        showNotification(data.error || 'Failed to lookup parts from S&S Activewear', 'error');
       }
     } catch (err) {
       console.error('[Part Lookup] Exception:', err);
@@ -6589,59 +6592,52 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                                     {pricingTestResult.message || pricingTestResult.error}
                                   </p>
 
-                                  {pricingTestResult.internalProductId && (
+                                  {pricingTestResult.productId && (
                                     <div className="mt-3 p-3 bg-white/50 dark:bg-slate-800/50 rounded border border-gray-200 dark:border-gray-700">
-                                      <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Internal Product ID:</p>
+                                      <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Product ID:</p>
                                       <code className="px-2 py-1 bg-gray-100 dark:bg-slate-700 rounded font-mono text-sm">
-                                        {pricingTestResult.internalProductId}
+                                        {pricingTestResult.productId}
                                       </code>
                                     </div>
                                   )}
 
-                                  {(pricingTestResult.ppcPrice !== null && pricingTestResult.ppcPrice !== undefined) && (
+                                  {pricingTestResult.success && pricingTestResult.parts && pricingTestResult.parts.length > 0 && (
                                     <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
-                                      <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-2">Customer Pricing (PPC):</p>
-                                      <div className="text-lg font-bold text-blue-900 dark:text-blue-100">
-                                        ${pricingTestResult.ppcPrice?.toFixed(2)}
-                                      </div>
-                                      {pricingTestResult.ppcTiers && pricingTestResult.ppcTiers.length > 1 && (
-                                        <div className="mt-2 text-xs text-blue-700 dark:text-blue-300">
-                                          <p className="font-medium mb-1">Quantity Tiers:</p>
-                                          <div className="flex flex-wrap gap-2">
-                                            {pricingTestResult.ppcTiers.map((tier: any, idx: number) => (
-                                              <span key={idx} className="px-2 py-0.5 bg-blue-100 dark:bg-blue-800 rounded">
-                                                {tier.minQuantity}+ @ ${tier.price?.toFixed(2)}
-                                              </span>
-                                            ))}
+                                      <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-2">Available Parts with Pricing:</p>
+                                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                                        {pricingTestResult.parts.slice(0, 10).map((part: any, idx: number) => (
+                                          <div key={idx} className="p-2 bg-white dark:bg-slate-800 rounded border border-blue-200 dark:border-blue-700">
+                                            <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">{part.partId}</p>
+                                            {part.prices && part.prices.length > 0 && (
+                                              <div className="flex flex-wrap gap-2 text-xs">
+                                                {part.prices.map((price: any, pidx: number) => (
+                                                  <span key={pidx} className="px-2 py-0.5 bg-blue-100 dark:bg-blue-800 rounded text-blue-900 dark:text-blue-100">
+                                                    {price.quantity}+ @ ${price.price?.toFixed(2)}
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            )}
                                           </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-
-                                  {pricingTestResult.ppcError && (
-                                    <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 rounded border border-red-200 dark:border-red-800">
-                                      <p className="text-xs font-medium text-red-700 dark:text-red-300 mb-1">Customer NET Pricing Error:</p>
-                                      <p className="text-sm text-red-600 dark:text-red-400">{pricingTestResult.ppcError}</p>
-                                    </div>
-                                  )}
-
-                                  {pricingTestResult.priceType && (
-                                    <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded border border-slate-200 dark:border-slate-600">
-                                      <p className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">Pricing Configuration:</p>
-                                      <div className="space-y-1 text-xs text-slate-700 dark:text-slate-300">
-                                        <p><span className="font-medium">Price Type:</span> {pricingTestResult.priceType}</p>
-                                        <p><span className="font-medium">FOB Location:</span> {pricingTestResult.fobId || 'Not configured'}</p>
-                                        {pricingTestResult.discoveredPartId && (
-                                          <p><span className="font-medium">Discovered Part ID:</span> {pricingTestResult.discoveredPartId}</p>
+                                        ))}
+                                        {pricingTestResult.parts.length > 10 && (
+                                          <p className="text-xs text-blue-700 dark:text-blue-300 italic">
+                                            Showing first 10 of {pricingTestResult.parts.length} parts
+                                          </p>
                                         )}
                                       </div>
                                     </div>
                                   )}
 
-                                  {pricingTestResult.success && pricingTestResult.pricingSource && (
+                                  {pricingTestResult.details && (
+                                    <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800">
+                                      <p className="text-xs font-medium text-amber-700 dark:text-amber-300 mb-1">Details:</p>
+                                      <p className="text-sm text-amber-600 dark:text-amber-400">{pricingTestResult.details}</p>
+                                    </div>
+                                  )}
+
+                                  {pricingTestResult.success && pricingTestResult.supplier && (
                                     <div className="mt-2 text-xs text-green-700 dark:text-green-300">
-                                      <p>Final Pricing Source: <span className="font-medium">{pricingTestResult.pricingSource}</span></p>
+                                      <p>Supplier: <span className="font-medium">{pricingTestResult.supplier}</span></p>
                                     </div>
                                   )}
                                 </div>
