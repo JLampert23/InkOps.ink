@@ -467,6 +467,7 @@ Deno.serve(async (req: Request) => {
 
     if (isValidPpcProductId && isValidPpcPartId && normalizedFobId) {
       console.log('💰 Step 1.5: Fetching PPC Customer Pricing...');
+      console.log('💰 Using priceType:', priceType);
 
       console.log('💰 PPC Request params:', {
         ppcProductId,
