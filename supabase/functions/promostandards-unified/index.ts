@@ -193,6 +193,21 @@ Deno.serve(async (req: Request) => {
     });
 
     console.log('📋 Fetching company settings for company_id:', companyId);
+
+    // First, verify the company_settings row exists
+    const { data: settingsCheck, error: checkError } = await supabase
+      .from("company_settings")
+      .select("id, company_name")
+      .eq("id", companyId)
+      .maybeSingle();
+
+    console.log('📋 Company settings existence check:', {
+      companyId,
+      rowExists: !!settingsCheck,
+      companyName: settingsCheck?.company_name,
+      checkError: checkError?.message
+    });
+
     const { data: settings, error: settingsError } = await supabase
       .from("company_settings")
       .select("ssactivewear_enabled, ssactivewear_username, ssactivewear_api_key_encrypted, ssactivewear_fob_id, ssactivewear_price_type")
@@ -209,6 +224,7 @@ Deno.serve(async (req: Request) => {
       hasApiKey: !!settings?.ssactivewear_api_key_encrypted,
       apiKeyLength: settings?.ssactivewear_api_key_encrypted?.length,
       fobId: settings?.ssactivewear_fob_id,
+      priceType: settings?.ssactivewear_price_type,
       settingsError: settingsError?.message
     });
 
