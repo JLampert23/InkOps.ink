@@ -583,7 +583,10 @@ Deno.serve(async (req: Request) => {
     });
 
     // Parse Product Data
-    const productData: any = {};
+    const productData: any = {
+      parts: [], // Initialize as empty array
+      colors: []
+    };
     if (productResponse.status === 'fulfilled' && productResponse.value) {
       const xmlDoc = productResponse.value;
       productData.productName = getXmlValue(xmlDoc, "productName") || "";
