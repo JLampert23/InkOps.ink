@@ -223,7 +223,10 @@ Deno.serve(async (req: Request) => {
 
     const rawFobId = settings.ssactivewear_fob_id;
     const isValidFobId = typeof rawFobId === "string" && rawFobId.trim().length > 0;
-    const normalizedFobId = isValidFobId ? rawFobId.trim().toUpperCase() : null;
+    // Default to 'all' as recommended by SSActivewear (NJ FOB ID is inactive)
+    const normalizedFobId = isValidFobId ? rawFobId.trim().toLowerCase() : 'all';
+
+    console.log('🏭 FOB ID normalized:', { rawFobId, normalizedFobId });
 
     const rawPriceType = settings.ssactivewear_price_type || 'Net';
     const validPriceTypes = ['Net', 'Customer', 'Blank', 'EQP', 'List'];
@@ -483,7 +486,8 @@ Deno.serve(async (req: Request) => {
       const validPpcProductId = ppcProductId as string;
       const validPpcPartId = ppcPartId as string;
 
-      const ppcSoap = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
+      // Use 'ns' prefix instead of 'ns2' to match working SoapUI example
+      const ppcSoap = `<ns:GetConfigurationAndPricingRequest xmlns:ns="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${escapedAccountNumber}</shar:id>
   <shar:password>${escapedApiKey}</shar:password>
@@ -495,7 +499,9 @@ Deno.serve(async (req: Request) => {
   <shar:localizationCountry>US</shar:localizationCountry>
   <shar:localizationLanguage>en</shar:localizationLanguage>
   <shar:configurationType>Blank</shar:configurationType>
-</ns2:GetConfigurationAndPricingRequest>`;
+</ns:GetConfigurationAndPricingRequest>`;
+
+      console.log('💰 PPC SOAP Request:', ppcSoap);
 
       try {
         const ppcResponse = await makePromoStandardsRequest(
@@ -504,7 +510,8 @@ Deno.serve(async (req: Request) => {
           ppcSoap
         );
 
-        console.log('💰 PPC Response received, parsing PartPrice blocks...');
+        console.log('💰 PPC Response received (first 1000 chars):', ppcResponse.substring(0, 1000));
+        console.log('💰 Parsing PartPrice blocks...');
 
         const partPricePattern = /<(?:[a-zA-Z0-9]+:)?PartPrice[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?PartPrice>/gi;
         const partPriceMatches = getAllXmlMatches(ppcResponse, partPricePattern);
@@ -538,6 +545,7 @@ Deno.serve(async (req: Request) => {
       } catch (err: any) {
         ppcError = err.message || 'Unknown PPC error';
         console.error('💰 PPC request failed:', ppcError);
+        console.error('💰 PPC error details:', err);
       }
     } else {
       if (!normalizedFobId) {
