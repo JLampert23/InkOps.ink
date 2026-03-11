@@ -2295,11 +2295,11 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
-      let testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/promostandards-unified?styleNumber=${encodeURIComponent(testStyleNumber.trim())}&verbose=true`;
+      let testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sanmar-api?action=unified&style=${encodeURIComponent(testStyleNumber.trim())}`;
       if (testPartId.trim()) {
-        testUrl += `&partId=${encodeURIComponent(testPartId.trim())}&testPpc=true`;
+        testUrl += `&partId=${encodeURIComponent(testPartId.trim())}`;
       }
-      console.log('[Pricing Test] Calling:', testUrl);
+      console.log('[Pricing Test] Calling SanMar API:', testUrl);
 
       const response = await fetch(testUrl, {
         method: 'GET',
@@ -2382,7 +2382,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       }
 
       console.log('[Part Lookup] Fetching parts for style:', testStyleNumber.trim());
-      const testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/promostandards-unified?styleNumber=${encodeURIComponent(testStyleNumber.trim())}`;
+      const testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sanmar-api?action=unified&style=${encodeURIComponent(testStyleNumber.trim())}`;
 
       const response = await fetch(testUrl, {
         method: 'GET',
