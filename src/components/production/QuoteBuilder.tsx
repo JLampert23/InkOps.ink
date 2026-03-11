@@ -1372,27 +1372,15 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           imageCount: unifiedData.media?.images?.length,
           viewsKeys: unifiedData.media?.views ? Object.keys(unifiedData.media.views) : [],
           hasPricing: !!unifiedData.pricing,
-          price: unifiedData.pricing?.price,
-          pricingSource: unifiedData.pricing?.source,
-          ppcTiers: unifiedData.pricing?.ppcTiers?.length || 0,
-          ppcError: unifiedData.pricing?.ppcError,
+          basePrice: unifiedData.pricing?.basePrice,
+          pricingSource: unifiedData.pricing?.usedPricingSource,
           pricingAvailable: unifiedData.pricingAvailable,
-          pricingUnavailableReason: unifiedData.pricingUnavailableReason,
         });
 
-        // Extract fresh pricing - check price first (current API format)
-        if (unifiedData.pricing?.price && unifiedData.pricing.price > 0) {
-          freshPrice = unifiedData.pricing.price;
-          console.log('💰 Fresh pricing found from unified API:', {
-            partId: color.code,
-            price: freshPrice,
-            source: unifiedData.pricing.source,
-            ppcTiers: unifiedData.pricing.ppcTiers?.length || 0
-          });
-        } else if (unifiedData.pricing?.basePrice && unifiedData.pricing.basePrice > 0) {
-          // Legacy fallback for old API format
+        // Extract fresh pricing - check basePrice first (new API format)
+        if (unifiedData.pricing?.basePrice && unifiedData.pricing.basePrice > 0) {
           freshPrice = unifiedData.pricing.basePrice;
-          console.log('💰 Fresh pricing found from basePrice (legacy):', {
+          console.log('💰 Fresh pricing found from basePrice:', {
             partId: color.code,
             price: freshPrice,
             source: unifiedData.pricing.usedPricingSource
@@ -1475,17 +1463,6 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         }
 
         console.log('🐛 Complete debug info from API:', unifiedData.debug);
-
-        // Log PPC-specific debug info
-        if (unifiedData.debug?.ppcError) {
-          console.error('💰 PPC API Error:', unifiedData.debug.ppcError);
-        }
-        if (unifiedData.debug?.ppcTiers && unifiedData.debug.ppcTiers.length > 0) {
-          console.log('💰 PPC Pricing Tiers:', unifiedData.debug.ppcTiers);
-        }
-        if (unifiedData.debug?.ppcPrice) {
-          console.log('💰 PPC Price from debug:', unifiedData.debug.ppcPrice);
-        }
 
         if (unifiedData.debug?.mediaAuthError) {
           console.warn('⚠️ SSActivewear Media API Authentication Error:', unifiedData.debug.mediaAuthError);
