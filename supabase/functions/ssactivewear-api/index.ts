@@ -208,9 +208,15 @@ Deno.serve(async (req: Request) => {
     }
 
     console.log("🔑 Auth check:", {
+      hasAuthHeader: !!authHeader,
+      hasBearerToken: !!bearerToken,
+      bearerTokenLength: bearerToken.length,
+      bearerTokenStart: bearerToken.substring(0, 20),
+      serviceRoleKeyLength: supabaseServiceRoleKey.length,
+      serviceRoleKeyStart: supabaseServiceRoleKey.substring(0, 20),
+      isServiceRoleKey,
       tokenLength: token.length,
-      tokenStart: token.substring(0, 20),
-      isServiceRoleKey
+      tokenStart: token.substring(0, 20)
     });
 
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
