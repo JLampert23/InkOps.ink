@@ -193,7 +193,7 @@ Deno.serve(async (req: Request) => {
     console.log('📋 Fetching company settings for company_id:', companyId);
     const { data: settings, error: settingsError } = await supabase
       .from("company_settings")
-      .select("ssactivewear_enabled, ssactivewear_username, ssactivewear_api_key_encrypted, ssactivewear_fob_id")
+      .select("ssactivewear_enabled, ssactivewear_username, ssactivewear_api_key_encrypted, ssactivewear_fob_id, ssactivewear_price_type")
       .eq("id", companyId)
       .maybeSingle();
 
@@ -224,6 +224,14 @@ Deno.serve(async (req: Request) => {
     const rawFobId = settings.ssactivewear_fob_id;
     const isValidFobId = typeof rawFobId === "string" && rawFobId.trim().length > 0;
     const normalizedFobId = isValidFobId ? rawFobId.trim().toUpperCase() : null;
+
+    const rawPriceType = settings.ssactivewear_price_type || 'Net';
+    const validPriceTypes = ['Net', 'Customer', 'Blank', 'EQP', 'List'];
+    const priceType = validPriceTypes.includes(rawPriceType) ? rawPriceType : 'Net';
+
+    if (!validPriceTypes.includes(rawPriceType)) {
+      console.warn(`⚠️ Invalid price type "${rawPriceType}", defaulting to "Net"`);
+    }
 
     const credentials = {
       accountNumber: settings.ssactivewear_username,
@@ -475,7 +483,7 @@ Deno.serve(async (req: Request) => {
   <shar:partId>${escapeXml(ppcPartId)}</shar:partId>
   <shar:currency>USD</shar:currency>
   <shar:fobId>${escapeXml(normalizedFobId)}</shar:fobId>
-  <shar:priceType>Customer</shar:priceType>
+  <shar:priceType>${escapeXml(priceType)}</shar:priceType>
   <shar:localizationCountry>US</shar:localizationCountry>
   <shar:localizationLanguage>en</shar:localizationLanguage>
   <shar:configurationType>Blank</shar:configurationType>

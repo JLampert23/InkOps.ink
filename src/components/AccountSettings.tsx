@@ -260,6 +260,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [showSsaApiKey, setShowSsaApiKey] = useState(false);
   const [ssaHasCredentials, setSsaHasCredentials] = useState(false);
   const [ssaFobId, setSsaFobId] = useState('NJ');
+  const [ssaPriceType, setSsaPriceType] = useState('Net');
   const [savingSanmar, setSavingSanmar] = useState(false);
   const [savingSSA, setSavingSSA] = useState(false);
   const [testingSuppliers, setTestingSuppliers] = useState(false);
@@ -565,6 +566,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
       setSanmarFobId((companySettings as any).sanmar_fob_id || '1');
       setSsaFobId((companySettings as any).ssactivewear_fob_id || 'NJ');
+      setSsaPriceType((companySettings as any).ssactivewear_price_type || 'Net');
 
       console.log('Loaded supplier integration settings:', {
         sanmarEnabled: companySettings.sanmar_enabled,
@@ -572,7 +574,8 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         sanmarHasCreds,
         ssaHasCreds,
         sanmarFobId: (companySettings as any).sanmar_fob_id,
-        ssaFobId: (companySettings as any).ssactivewear_fob_id
+        ssaFobId: (companySettings as any).ssactivewear_fob_id,
+        ssaPriceType: (companySettings as any).ssactivewear_price_type
       });
     } catch (err) {
       console.error('Error loading supplier integration settings:', err);
@@ -1773,9 +1776,13 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         hasExistingCredentials: ssaHasCredentials,
       });
 
+      const validPriceTypes = ['Net', 'Customer', 'Blank', 'EQP', 'List'];
+      const normalizedPriceType = validPriceTypes.includes(ssaPriceType) ? ssaPriceType : 'Net';
+
       const settingsData: Record<string, any> = {
         ssactivewear_enabled: ssaEnabled,
         ssactivewear_fob_id: ssaFobId,
+        ssactivewear_price_type: normalizedPriceType,
       };
 
       if (ssaEnabled) {
@@ -6320,6 +6327,26 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       </select>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                         Select your preferred shipping warehouse. This affects wholesale pricing from SSActivewear.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Price Type <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={ssaPriceType}
+                        onChange={(e) => setSsaPriceType(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="Net">Net (Wholesale Distributor Cost)</option>
+                        <option value="Customer">Customer (Contract Pricing)</option>
+                        <option value="Blank">Blank</option>
+                        <option value="EQP">EQP</option>
+                        <option value="List">List</option>
+                      </select>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Select the pricing type to use when fetching wholesale prices from SSActivewear.
                       </p>
                     </div>
 
