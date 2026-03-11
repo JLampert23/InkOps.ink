@@ -200,12 +200,16 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     console.log('📋 Settings fetch result:', {
+      companyId,
       hasSettings: !!settings,
+      settingsIsNull: settings === null,
       enabled: settings?.ssactivewear_enabled,
       hasUsername: !!settings?.ssactivewear_username,
+      usernameValue: settings?.ssactivewear_username ? '***' + settings.ssactivewear_username.slice(-4) : null,
       hasApiKey: !!settings?.ssactivewear_api_key_encrypted,
+      apiKeyLength: settings?.ssactivewear_api_key_encrypted?.length,
       fobId: settings?.ssactivewear_fob_id,
-      error: settingsError
+      settingsError: settingsError?.message
     });
 
     if (!settings?.ssactivewear_enabled || !settings?.ssactivewear_api_key_encrypted || !settings?.ssactivewear_username) {
