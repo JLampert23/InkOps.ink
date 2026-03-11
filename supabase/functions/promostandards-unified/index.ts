@@ -210,7 +210,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: settings, error: settingsError } = await supabase
       .from("company_settings")
-      .select("ssactivewear_enabled, ssactivewear_username, ssactivewear_api_key_encrypted, ssactivewear_fob_id, ssactivewear_price_type")
+      .select("ssactivewear_enabled, ssactivewear_username, ssactivewear_api_key_encrypted, ssactivewear_price_type")
       .eq("id", companyId)
       .maybeSingle();
 
@@ -223,7 +223,6 @@ Deno.serve(async (req: Request) => {
       usernameValue: settings?.ssactivewear_username ? '***' + settings.ssactivewear_username.slice(-4) : null,
       hasApiKey: !!settings?.ssactivewear_api_key_encrypted,
       apiKeyLength: settings?.ssactivewear_api_key_encrypted?.length,
-      fobId: settings?.ssactivewear_fob_id,
       priceType: settings?.ssactivewear_price_type,
       settingsError: settingsError?.message
     });
@@ -243,12 +242,10 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const rawFobId = settings.ssactivewear_fob_id;
-    const isValidFobId = typeof rawFobId === "string" && rawFobId.trim().length > 0;
-    // Default to 'all' as recommended by SSActivewear (NJ FOB ID is inactive)
-    const normalizedFobId = isValidFobId ? rawFobId.trim().toLowerCase() : 'all';
+    // Default to 'all' as recommended by SSActivewear (query all warehouses for best pricing)
+    const normalizedFobId = 'all';
 
-    console.log('🏭 FOB ID normalized:', { rawFobId, normalizedFobId });
+    console.log('🏭 FOB ID set to "all" for multi-warehouse pricing');
 
     // Per S&S IT Department: priceType should be "Customer" (confirmed via official SOAP examples)
     const rawPriceType = settings.ssactivewear_price_type || 'Customer';
