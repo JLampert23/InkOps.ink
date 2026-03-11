@@ -623,6 +623,12 @@ Deno.serve(async (req: Request) => {
       });
 
       productData.colors = Array.from(colorMap.values());
+    } else {
+      console.warn('⚠️ Product Data API failed, parts will not be available');
+      console.warn('Product Response Status:', productResponse.status);
+      if (productResponse.status === 'rejected') {
+        console.warn('Product Response Error:', productResponse.reason);
+      }
     }
 
     // Parse Inventory
@@ -641,6 +647,24 @@ Deno.serve(async (req: Request) => {
           postalCode: getXmlValue(invXml, "postalCode"),
         };
       });
+
+      // FALLBACK: If Product Data failed but we have inventory, build parts from inventory
+      if ((!productData.parts || productData.parts.length === 0) && inventoryData.items && inventoryData.items.length > 0) {
+        console.log('🔄 Product Data failed, building parts list from inventory...');
+        productData.parts = inventoryData.items.map((item: any) => {
+          // Extract color and size from partId if possible
+          // Format: B00660033 (product=B00660, color/size=033)
+          const partId = item.partId || '';
+          return {
+            partId: partId,
+            colorName: '', // Not available from inventory
+            labelSize: '', // Not available from inventory
+            hex: '',
+            approximatePmsColor: '',
+          };
+        });
+        console.log(`✅ Built ${productData.parts.length} parts from inventory data`);
+      }
     }
 
     // Use ONLY Customer NET Pricing (PPC) - no base pricing fallback
