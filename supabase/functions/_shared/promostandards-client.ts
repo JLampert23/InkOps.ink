@@ -13,7 +13,7 @@
 const PROMOSTANDARDS_ENDPOINTS = {
   productData: "https://promostandards.ssactivewear.com/productdata/v2/productdataservicev2.svc",
   inventory: "https://promostandards.ssactivewear.com/inventory/v2/inventoryservice.svc",
-  pricing: "https://promostandards.ssactivewear.com/pricingandconfiguration/v1/pricingandconfigurationservice.svc",
+  pricing: "https://promostandards.ssactivewear.com/PricingAndConfiguration/v1/PricingAndConfigurationService.svc",
   media: "https://promostandards.ssactivewear.com/mediacontent/v1/mediacontentservice.svc",
 };
 
@@ -149,6 +149,23 @@ function getAllXmlMatches(xmlText: string, pattern: RegExp): RegExpMatchArray[] 
 }
 
 /**
+ * Extracts the base product ID from a full SSActivewear part ID
+ * Example: "B50260097" -> "B50260" (removes the last 3 digits which are size code)
+ * Example: "B00760033" -> "B00760" (removes the last 3 digits)
+ */
+function extractProductIdFromPartId(partId: string): string {
+  // SSActivewear part IDs typically follow the pattern: ProductID + ColorCode + SizeCode
+  // The product ID is usually the first 6 characters (e.g., B50260, B00760)
+  // We'll extract by removing the last 3 digits (size code)
+  if (!partId || partId.length < 6) {
+    return partId;
+  }
+
+  // For SSActivewear, the product ID is typically the first 6 characters
+  return partId.substring(0, 6);
+}
+
+/**
  * Fetches unified PromoStandards data for a given style
  *
  * @param credentials - S&S Activewear credentials
@@ -196,7 +213,8 @@ export async function fetchUnifiedPromoStandardsData(
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${accountNumber}</shar:id>
   <shar:password>${apiKey}</shar:password>
-  <shar:productId>${partId}</shar:productId>
+  <shar:productId>${extractProductIdFromPartId(partId)}</shar:productId>
+  <shar:partId>${partId}</shar:partId>
   <shar:currency>USD</shar:currency>
   <shar:fobId>${fobId}</shar:fobId>
   <shar:priceType>Customer</shar:priceType>
