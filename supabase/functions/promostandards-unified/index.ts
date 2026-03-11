@@ -635,11 +635,13 @@ Deno.serve(async (req: Request) => {
     }
 
     // Parse Inventory
-    const inventoryData: any = {};
+    const inventoryData: any = { items: [] };
     if (inventoryResponse.status === 'fulfilled' && inventoryResponse.value) {
       const xmlDoc = inventoryResponse.value;
+      console.log('📦 Inventory XML length:', xmlDoc.length);
       const inventoryPattern = /<(?:[a-zA-Z0-9]+:)?Inventory>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Inventory>/gi;
       const inventoryMatches = getAllXmlMatches(xmlDoc, inventoryPattern);
+      console.log('📦 Inventory matches found:', inventoryMatches.length);
 
       inventoryData.items = inventoryMatches.map(match => {
         const invXml = match[1];
@@ -653,7 +655,7 @@ Deno.serve(async (req: Request) => {
 
       // FALLBACK: If Product Data failed but we have inventory, build parts from inventory
       if ((!productData.parts || productData.parts.length === 0) && inventoryData.items && inventoryData.items.length > 0) {
-        console.log('🔄 Product Data failed, building parts list from inventory...');
+        console.log('🔄 Product Data failed, building parts list from inventory...', inventoryData.items.length, 'items');
         productData.parts = inventoryData.items.map((item: any) => {
           // Extract color and size from partId if possible
           // Format: B00660033 (product=B00660, color/size=033)
@@ -668,6 +670,10 @@ Deno.serve(async (req: Request) => {
         });
         console.log(`✅ Built ${productData.parts.length} parts from inventory data`);
       }
+    } else if (inventoryResponse.status === 'rejected') {
+      console.error('❌ Inventory request failed:', inventoryResponse.reason);
+    } else {
+      console.log('⚠️ No inventory data available');
     }
 
     // Use ONLY Customer NET Pricing (PPC) - no base pricing fallback
