@@ -515,9 +515,12 @@ export async function fetchSanMarPricing(
 ): Promise<SanMarPricingData> {
   console.log('💰 Fetching SanMar pricing:', partId);
 
+  const fobId = credentials.fobId || 'all';
   const payload = `<shar:productId>${partId}</shar:productId>
       <shar:currency>USD</shar:currency>
-      <shar:priceType>Customer</shar:priceType>`;
+      <shar:fobId>${fobId}</shar:fobId>
+      <shar:priceType>Customer</shar:priceType>
+      <shar:configurationType>Blank</shar:configurationType>`;
 
   const soapEnvelope = buildSOAPEnvelope(
     'PricingAndConfiguration',
