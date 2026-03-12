@@ -9,6 +9,15 @@ import MockupGenerator from './MockupGenerator';
 import { SendQuoteModal } from './SendQuoteModal';
 import { getUnifiedProductData, fetchLiveSSActivewearPricing } from '../../services/ssactivewear-promostandards-service';
 import { proxySanMarImageUrl } from '../../utils/sanmar-image-proxy';
+import { recalculateImprintPricesForGroup } from '../../utils/price-matrix-utils';
+
+interface PriceMatrixData {
+  id: string;
+  name: string;
+  rows: string[];
+  columns: string[];
+  cells: Record<string, number>;
+}
 
 function decodeHtmlEntities(text: string): string {
   if (!text) return text;
@@ -283,6 +292,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
   const [showMockupForGroup, setShowMockupForGroup] = useState<string | null>(null);
   const [showSendQuoteModal, setShowSendQuoteModal] = useState(false);
   const [quoteImprints, setQuoteImprints] = useState<any[]>([]);
+  const [priceMatrixCache, setPriceMatrixCache] = useState<Map<string, PriceMatrixData>>(new Map());
 
   const [productSearchResults, setProductSearchResults] = useState<ProductSearchResult[]>([]);
   const [productSearchLoading, setProductSearchLoading] = useState(false);
@@ -701,6 +711,21 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
 
     if (imprints) {
       setQuoteImprints(imprints);
+
+      // Load price matrices for all imprints that have price_matrix_id
+      const matrixIds = [...new Set(imprints.map(imp => imp.price_matrix_id).filter(Boolean))];
+      if (matrixIds.length > 0) {
+        const { data: matrices } = await supabase
+          .from('price_matrices')
+          .select('id, name, rows, columns, cells')
+          .in('id', matrixIds);
+
+        if (matrices) {
+          const matrixMap = new Map<string, PriceMatrixData>();
+          matrices.forEach(m => matrixMap.set(m.id, m as PriceMatrixData));
+          setPriceMatrixCache(matrixMap);
+        }
+      }
     }
 
     setLoading(false);
@@ -853,8 +878,54 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         setUpdatingPriceForGroup(groupId);
       }
 
-      const groupImprints = getGroupImprints(group.label);
+      // Calculate total quantity for the entire group
+      const groupTotalQuantity = group.items.reduce((sum: number, itm: any) => {
+        return sum + calculateItemsTotal(itm);
+      }, 0);
+
+      // Get current imprints for this group
+      let groupImprints = getGroupImprints(group.label);
       const garmentMarkup = companySettings?.default_garment_markup || 0;
+
+      // Recalculate imprint prices based on the new group total quantity
+      if (groupTotalQuantity > 0 && priceMatrixCache.size > 0) {
+        const updatedImprints = recalculateImprintPricesForGroup(
+          groupImprints,
+          group.label || '',
+          groupTotalQuantity,
+          priceMatrixCache
+        );
+
+        // Check if any imprint prices changed
+        const pricesChanged = updatedImprints.some((imp, i) =>
+          imp.price !== groupImprints[i]?.price
+        );
+
+        if (pricesChanged) {
+          // Update quoteImprints state with new prices
+          const newQuoteImprints = quoteImprints.map(imp => {
+            const updated = updatedImprints.find(u => u.id === imp.id);
+            return updated ? { ...imp, price: updated.price } : imp;
+          });
+          setQuoteImprints(newQuoteImprints);
+
+          // Update groupImprints reference for the calculation below
+          groupImprints = updatedImprints;
+
+          // Persist recalculated imprint prices to database if quote is saved
+          if (quoteId && !quoteId.startsWith('temp-')) {
+            for (const imp of updatedImprints) {
+              if (imp.id && imp.price !== undefined) {
+                await supabase
+                  .from('quote_imprints')
+                  .update({ price: imp.price })
+                  .eq('id', imp.id);
+              }
+            }
+          }
+        }
+      }
+
       const totalImprintPrice = groupImprints.reduce((sum, imp) => {
         return sum + (parseFloat(imp.price) || 0);
       }, 0);
