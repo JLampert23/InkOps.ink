@@ -467,30 +467,73 @@ Deno.serve(async (req: Request) => {
     }
 
     // STEP 1.5: Fetch Multi-Warehouse Pricing for ALL parts
+    // MATCHES SSACTIVEWEAR-API IMPLEMENTATION EXACTLY
     console.log('💰 Step 1.5: Fetching Multi-Warehouse Pricing...');
 
-    // Extract the 6-character product ID for pricing queries
-    const pricingProductId = internalProductId || (discoveredPartId ? discoveredPartId.substring(0, 6) : null);
+    const normalizedProductId = normalizeSsProductId(styleNumber);
+    console.log(`[SS Pricing] Raw input: "${styleNumber}" -> Normalized: "${normalizedProductId}"`);
+    console.log(`[SS Pricing] Querying ALL warehouses: ${ALL_SS_FOB_IDS.join(', ')}`);
 
-    // Use the partId parameter from URL if provided, otherwise use discoveredPartId
-    const pricingPartId = partId || discoveredPartId;
+    // Build list of product IDs to try (exactly like ssactivewear-api)
+    const pricingIdsToTry: string[] = [];
+
+    // Add the discovered internal product ID first if we have one
+    if (internalProductId) {
+      pricingIdsToTry.push(internalProductId);
+    }
+
+    // Add normalized product ID as fallback
+    if (!pricingIdsToTry.includes(normalizedProductId)) {
+      pricingIdsToTry.push(normalizedProductId);
+    }
+
+    // Check if input looks like an internal ID already
+    const isAlreadyInternalId = /^B\d{4,5}$/i.test(normalizedProductId);
+    if (!isAlreadyInternalId && !internalProductId) {
+      console.log(`[SS Pricing] Input "${normalizedProductId}" does not look like an internal ID (B#####), fetching Product Data to extract it...`);
+      try {
+        const prodSoapBody = `<ns2:GetProductRequest xmlns:ns2="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/ProductDataService/2.0.0/SharedObjects/">
+  <shar:wsVersion>2.0.0</shar:wsVersion>
+  <shar:id>${escapeXml(credentials.accountNumber)}</shar:id>
+  <shar:password>${escapeXml(decryptedApiKey)}</shar:password>
+  <shar:productId>${escapeXml(normalizedProductId)}</shar:productId>
+</ns2:GetProductRequest>`;
+
+        const prodXml = await makePromoStandardsRequest(
+          PROMOSTANDARDS_ENDPOINTS.productData,
+          "getProduct",
+          prodSoapBody
+        );
+
+        const partIdMatches = Array.from(
+          prodXml.matchAll(/<(?:[a-zA-Z0-9]+:)?partId[^>]*>([^<]+)<\/(?:[a-zA-Z0-9]+:)?partId>/gi),
+          m => m[1].trim()
+        );
+        const bPrefixed = partIdMatches.find(id => /^B\d{5,}/i.test(id));
+        if (bPrefixed) {
+          const extractedInternalId = bPrefixed.substring(0, 6).toUpperCase();
+          console.log(`[SS Pricing] Extracted internal pricing ID: ${bPrefixed} -> ${extractedInternalId}`);
+          pricingIdsToTry.unshift(extractedInternalId);
+        } else {
+          console.log(`[SS Pricing] No B-prefixed partId found in Product Data response`);
+        }
+      } catch (prodErr: any) {
+        console.warn(`[SS Pricing] Failed to fetch Product Data for internal ID extraction: ${prodErr.message}`);
+      }
+    }
 
     // Pricing data structure: Map<partId, { prices, warehouse, allWarehousePrices }>
     const partPricingMap = new Map<string, any>();
     let pricingError: string | null = null;
+    let allWarehousePricing: any[] = [];
+    let usedPricingId = normalizedProductId;
 
-    if (pricingProductId && pricingProductId.length >= 5) {
-      console.log(`💰 Using pricing productId: "${pricingProductId}"`);
-      if (pricingPartId) {
-        console.log(`💰 Using pricing partId: "${pricingPartId}" for customer-specific pricing`);
-      }
-      console.log(`💰 Querying ALL warehouses: ${ALL_SS_FOB_IDS.join(', ')}`);
+    // Try each pricing ID until one succeeds (exactly like ssactivewear-api)
+    for (const pricingId of pricingIdsToTry) {
+      console.log(`[SS Pricing] Trying pricing with productId: "${pricingId}"`);
 
-      // Query all warehouses in parallel
       const warehousePricingPromises = ALL_SS_FOB_IDS.map(async (fobId) => {
         try {
-          // Build SOAP body - include partId if available for customer-specific pricing
-          const partIdElement = pricingPartId ? `\n  <shar:partId>${escapeXml(pricingPartId)}</shar:partId>` : '';
           const soapBody = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${escapeXml(credentials.accountNumber)}</shar:id>
@@ -503,65 +546,72 @@ Deno.serve(async (req: Request) => {
   <shar:localizationLanguage>en</shar:localizationLanguage>
   <shar:configurationType>Blank</shar:configurationType>
 </ns2:GetConfigurationAndPricingRequest>`;
-          
-        const xmlResponse = await makePromoStandardsRequest(
-           PROMOSTANDARDS_ENDPOINTS.pricing,
-           "getConfigurationAndPricing",
-            soapBody,
-            credentials.accountNumber,
-            decryptedApiKey
+
+          const xmlResponse = await makePromoStandardsRequest(
+            PROMOSTANDARDS_ENDPOINTS.pricing,
+            "getConfigurationAndPricing",
+            soapBody
           );
 
           // Check for errors in response
           const errorCode = getXmlValue(xmlResponse, "code");
           const errorDesc = getXmlValue(xmlResponse, "description");
           if (errorCode || errorDesc) {
-            console.warn(`💰 Pricing error for warehouse ${fobId}: ${errorDesc || errorCode}`);
+            console.warn(`[SS Pricing] Error for "${pricingId}" at warehouse ${fobId}: ${errorDesc || errorCode}`);
             return { fobId, parts: [] };
           }
 
-          // Parse all Part blocks
+          const xmlDoc = xmlResponse;
           const partPattern = /<(?:[a-zA-Z0-9]+:)?Part[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Part>/gi;
-          const partMatches = getAllXmlMatches(xmlResponse, partPattern);
+          let partMatch;
           const parts: any[] = [];
 
-          partMatches.forEach(partMatch => {
+          while ((partMatch = partPattern.exec(xmlDoc)) !== null) {
             const partXml = partMatch[1];
-            const partId = getXmlValue(partXml, "partId");
+            const extractedPartId = getXmlValue(partXml, "partId");
 
-            // Parse all PartPrice blocks within this Part
             const pricePattern = /<(?:[a-zA-Z0-9]+:)?PartPrice[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?PartPrice>/gi;
-            const priceMatches = getAllXmlMatches(partXml, pricePattern);
             const prices: any[] = [];
+            let priceMatch;
 
-            priceMatches.forEach(priceMatch => {
+            while ((priceMatch = pricePattern.exec(partXml)) !== null) {
               const priceXml = priceMatch[1];
-              const quantity = parseInt(getXmlValue(priceXml, "minQuantity") || "1");
-              const price = parseFloat(getXmlValue(priceXml, "price") || "0");
-
-              if (price > 0) {
-                prices.push({ quantity, price });
-              }
-            });
-
-            if (partId && prices.length > 0) {
-              prices.sort((a, b) => a.quantity - b.quantity);
-              parts.push({ partId, prices });
+              prices.push({
+                quantity: parseInt(getXmlValue(priceXml, "minQuantity") || "1"),
+                price: parseFloat(getXmlValue(priceXml, "price") || "0"),
+              });
             }
-          });
 
-          console.log(`💰 Warehouse ${fobId}: ${parts.length} parts with pricing`);
+            parts.push({ partId: extractedPartId, prices });
+          }
+
           return { fobId, parts };
         } catch (err: any) {
-          console.error(`💰 Error querying warehouse ${fobId}:`, err.message);
+          console.error(`[SS Pricing] Error querying warehouse ${fobId}:`, err.message);
           return { fobId, parts: [] };
         }
       });
 
       const warehouseResults = await Promise.all(warehousePricingPromises);
 
-      // Find lowest price across all warehouses for each part
-      for (const warehouseData of warehouseResults) {
+      const successfulWarehouse = warehouseResults.find(result => result.parts.length > 0);
+      if (successfulWarehouse) {
+        allWarehousePricing = warehouseResults;
+        usedPricingId = pricingId;
+        console.log(`[SS Pricing] SUCCESS with "${pricingId}": received pricing from ${warehouseResults.filter(r => r.parts.length > 0).length} warehouses`);
+        break;
+      } else {
+        console.log(`[SS Pricing] No parts returned for "${pricingId}" from any warehouse, trying next...`);
+      }
+    }
+
+    if (allWarehousePricing.length === 0 || allWarehousePricing.every(w => w.parts.length === 0)) {
+      pricingError = "No pricing data returned from any warehouse";
+      console.warn('[SS Pricing] WARNING: No pricing data available from any warehouse');
+      console.warn('[SS Pricing] Tried IDs:', pricingIdsToTry);
+    } else {
+      // Find lowest price across all warehouses for each part (exactly like ssactivewear-api)
+      for (const warehouseData of allWarehousePricing) {
         for (const part of warehouseData.parts) {
           if (!partPricingMap.has(part.partId)) {
             partPricingMap.set(part.partId, {
@@ -574,7 +624,6 @@ Deno.serve(async (req: Request) => {
             const existing = partPricingMap.get(part.partId);
             existing.allWarehousePrices.push({ warehouse: warehouseData.fobId, prices: part.prices });
 
-            // Compare lowest price (first tier)
             const existingLowestPrice = existing.prices[0]?.price || Infinity;
             const newLowestPrice = part.prices[0]?.price || Infinity;
 
@@ -586,21 +635,9 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      const successfulWarehouses = warehouseResults.filter(w => w.parts.length > 0);
-      console.log(`💰 Pricing SUCCESS: ${partPricingMap.size} unique parts with pricing from ${successfulWarehouses.length} warehouses`);
-      console.log(`💰 Successful warehouses: ${successfulWarehouses.map(w => w.fobId).join(', ')}`);
-
-      if (partPricingMap.size === 0) {
-        pricingError = "No pricing data returned from any warehouse";
-        console.warn('💰 WARNING: No pricing data available from any warehouse');
-      }
-    } else {
-      pricingError = "Could not determine pricing productId";
-      console.warn('💰 Skipping pricing - no valid productId:', {
-        pricingProductId,
-        internalProductId,
-        discoveredPartId
-      });
+      const successfulWarehouses = allWarehousePricing.filter(w => w.parts.length > 0);
+      console.log(`[SS Pricing] SUCCESS: ${partPricingMap.size} unique parts with pricing from ${successfulWarehouses.length} warehouses`);
+      console.log(`[SS Pricing] Successful warehouses: ${successfulWarehouses.map(w => w.fobId).join(', ')}`);
     }
 
     // STEP 2: Fetch Inventory
@@ -912,7 +949,8 @@ Deno.serve(async (req: Request) => {
           product: productData,
           count: productData?.parts?.length || 0,
           pricingTest: {
-            pricingProductId,
+            usedPricingId,
+            triedIds: pricingIdsToTry,
             partCount: partPricingMap.size,
             warehouseCount: ALL_SS_FOB_IDS.length,
             pricingData,
@@ -924,7 +962,8 @@ Deno.serve(async (req: Request) => {
             internalProductId,
             internalIdSource,
             discoveredPartId,
-            pricingProductId,
+            usedPricingId,
+            triedIds: pricingIdsToTry,
           }
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -952,7 +991,8 @@ Deno.serve(async (req: Request) => {
           internalProductId,
           internalIdSource,
           discoveredPartId,
-          pricingProductId,
+          usedPricingId,
+          triedIds: pricingIdsToTry,
           warehousesQueried: ALL_SS_FOB_IDS,
           partsWithPricing: partPricingMap.size,
           mediaResponseStatus: initialMediaResponse.status,
