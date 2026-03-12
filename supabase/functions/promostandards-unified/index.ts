@@ -493,9 +493,9 @@ Deno.serve(async (req: Request) => {
           const partIdElement = pricingPartId ? `\n  <shar:partId>${escapeXml(pricingPartId)}</shar:partId>` : '';
           const soapBody = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
-  <shar:id>${escapedAccountNumber}</shar:id>
-  <shar:password>${escapedApiKey}</shar:password>
-  <shar:productId>${escapeXml(pricingProductId)}</shar:productId>${partIdElement}
+  <shar:id>${escapeXml(credentials.accountNumber)}</shar:id>
+  <shar:password>${escapeXml(decryptedApiKey)}</shar:password>
+  <shar:productId>${escapeXml(pricingId)}</shar:productId>
   <shar:currency>USD</shar:currency>
   <shar:fobId>${escapeXml(fobId)}</shar:fobId>
   <shar:priceType>Customer</shar:priceType>
@@ -503,7 +503,6 @@ Deno.serve(async (req: Request) => {
   <shar:localizationLanguage>en</shar:localizationLanguage>
   <shar:configurationType>Blank</shar:configurationType>
 </ns2:GetConfigurationAndPricingRequest>`;
-
           const xmlResponse = await makePromoStandardsRequest(
             PROMOSTANDARDS_ENDPOINTS.pricing,
             "getConfigurationAndPricing",
