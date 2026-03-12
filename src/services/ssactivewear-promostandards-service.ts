@@ -468,7 +468,28 @@ export async function getUnifiedProductData(
             const pricesByPartId: Record<string, number> = {};
             const pricingParts: Array<{ partId: string; prices: Array<{ minQuantity: number; price: number }> }> = [];
 
-            if (pricingData.priceArray && Array.isArray(pricingData.priceArray)) {
+            // ssactivewear-api returns data as an array of parts directly:
+            // data: [{ partId: "...", prices: [{quantity, price}], warehouse: "..." }, ...]
+            if (Array.isArray(pricingData)) {
+              console.log('💰 Processing pricing data array with', pricingData.length, 'parts');
+              for (const part of pricingData) {
+                if (part.partId && part.prices?.length > 0) {
+                  // Get the lowest quantity price (usually qty 1)
+                  const lowestPrice = part.prices.reduce((min: any, p: any) =>
+                    (!min || (p.quantity || p.minQuantity || 1) < (min.quantity || min.minQuantity || 1)) ? p : min
+                  , part.prices[0]);
+
+                  pricesByPartId[part.partId] = lowestPrice?.price || 0;
+                  pricingParts.push({
+                    partId: part.partId,
+                    prices: part.prices.map((p: any) => ({
+                      minQuantity: p.quantity || p.minQuantity || 1,
+                      price: p.price || 0,
+                    })),
+                  });
+                }
+              }
+            } else if (pricingData.priceArray && Array.isArray(pricingData.priceArray)) {
               // Single part pricing - use the partId or styleNumber as key
               const effectivePartId = partId || styleNumber;
               pricesByPartId[effectivePartId] = pricingData.priceArray[0]?.price || 0;
@@ -504,13 +525,29 @@ export async function getUnifiedProductData(
               }
             }
 
+            // Find the price for the specific partId requested, or use first available
+            let basePrice = 0;
+            if (partId && pricesByPartId[partId]) {
+              basePrice = pricesByPartId[partId];
+            } else if (Object.keys(pricesByPartId).length > 0) {
+              // Try to find a matching part (partId often includes size suffix like B21060527)
+              const matchingKey = Object.keys(pricesByPartId).find(key =>
+                partId?.startsWith(key) || key.startsWith(partId || '')
+              );
+              if (matchingKey) {
+                basePrice = pricesByPartId[matchingKey];
+              } else {
+                basePrice = Object.values(pricesByPartId)[0] || 0;
+              }
+            }
+
             // Update result with pricing data
             result.pricing = {
               parts: pricingParts,
               pricesByPartId,
-              warehouseCount: pricingData.warehouseCount || 0,
+              warehouseCount: pricingResult.warehouseCount || 0,
               error: null,
-              basePrice: Object.values(pricesByPartId)[0] || 0,
+              basePrice,
               usedPricingSource: 'ssactivewear-api',
             };
             result.pricingAvailable = pricingParts.length > 0;
@@ -520,6 +557,8 @@ export async function getUnifiedProductData(
               partsCount: pricingParts.length,
               pricesByPartIdCount: Object.keys(pricesByPartId).length,
               basePrice: result.pricing.basePrice,
+              requestedPartId: partId,
+              samplePartIds: Object.keys(pricesByPartId).slice(0, 5),
             });
           }
         } else {
