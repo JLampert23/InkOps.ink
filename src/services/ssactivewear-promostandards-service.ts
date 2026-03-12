@@ -453,6 +453,99 @@ export async function getUnifiedProductData(
   }
 }
 
+export interface PartPricing {
+  partId: string;
+  price: number;
+  warehouse: string;
+}
+
+export interface StylePricingResult {
+  success: boolean;
+  styleNumber: string;
+  parts: PartPricing[];
+  error?: string;
+}
+
+export async function fetchLiveSSActivewearPricing(
+  styleNumber: string,
+  companyId?: string
+): Promise<StylePricingResult> {
+  try {
+    const token = await getAuthToken();
+
+    let url = `${EDGE_FUNCTION_URL}?action=pricing&productId=${encodeURIComponent(styleNumber)}`;
+    if (companyId) {
+      url += `&companyId=${encodeURIComponent(companyId)}`;
+    }
+
+    console.log(`[SSA Live Pricing] Fetching pricing for style: ${styleNumber}`);
+
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        'X-User-Token': token,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      console.error(`[SSA Live Pricing] API error for ${styleNumber}:`, errorData);
+      return {
+        success: false,
+        styleNumber,
+        parts: [],
+        error: errorData.error || `HTTP ${response.status}`
+      };
+    }
+
+    const result = await response.json();
+
+    if (!result.success || !result.data || result.data.length === 0) {
+      console.warn(`[SSA Live Pricing] No pricing data for ${styleNumber}:`, result.error || 'No parts returned');
+      return {
+        success: false,
+        styleNumber,
+        parts: [],
+        error: result.error || result.errorDetails || 'No pricing data available'
+      };
+    }
+
+    const parts: PartPricing[] = result.data.map((part: any) => {
+      const lowestTier = part.prices && part.prices.length > 0
+        ? part.prices.reduce((lowest: any, current: any) => {
+            if (!lowest || current.quantity < lowest.quantity) return current;
+            return lowest;
+          }, part.prices[0])
+        : { price: 0 };
+
+      return {
+        partId: part.partId,
+        price: lowestTier.price || 0,
+        warehouse: part.warehouse || 'unknown'
+      };
+    });
+
+    console.log(`[SSA Live Pricing] Found ${parts.length} parts for ${styleNumber}:`,
+      parts.slice(0, 3).map(p => `${p.partId}: $${p.price}`).join(', ') + (parts.length > 3 ? '...' : '')
+    );
+
+    return {
+      success: true,
+      styleNumber,
+      parts
+    };
+  } catch (error: any) {
+    console.error(`[SSA Live Pricing] Exception for ${styleNumber}:`, error);
+    return {
+      success: false,
+      styleNumber,
+      parts: [],
+      error: error.message || 'Network error'
+    };
+  }
+}
+
 export async function getSanMarWholesalePrice(
   style: string,
   color: string,

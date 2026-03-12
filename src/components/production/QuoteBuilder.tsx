@@ -7,7 +7,7 @@ import CreateCustomerModal from '../accounting/CreateCustomerModal';
 import { ManageImprintsModal } from './ManageImprintsModal';
 import MockupGenerator from './MockupGenerator';
 import { SendQuoteModal } from './SendQuoteModal';
-import { getUnifiedProductData } from '../../services/ssactivewear-promostandards-service';
+import { getUnifiedProductData, fetchLiveSSActivewearPricing } from '../../services/ssactivewear-promostandards-service';
 import { proxySanMarImageUrl } from '../../utils/sanmar-image-proxy';
 
 function decodeHtmlEntities(text: string): string {
@@ -288,6 +288,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
   const [productSearchLoading, setProductSearchLoading] = useState(false);
   const [activeSearchItem, setActiveSearchItem] = useState<{ groupId: string; itemIdx: number } | null>(null);
   const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const [updatingPriceForGroup, setUpdatingPriceForGroup] = useState<string | null>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -836,7 +837,6 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
 
   const updatePriceFromMatrixWithGroups = async (groups: any[], groupId: string, itemIndex: number, silent = false) => {
     try {
-      // Find the group
       const group = groups.find(g => g.id === groupId);
       if (!group) {
         if (!silent) showNotification('error', 'Group not found');
@@ -849,101 +849,73 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         return;
       }
 
-      // Get imprints for this group (can be empty - garment-only pricing is allowed)
+      if (!silent) {
+        setUpdatingPriceForGroup(groupId);
+      }
+
       const groupImprints = getGroupImprints(group.label);
-
-      // Get garment markup from company settings
       const garmentMarkup = companySettings?.default_garment_markup || 0;
-
-      // Calculate total imprint price (0 if no imprints)
       const totalImprintPrice = groupImprints.reduce((sum, imp) => {
         return sum + (parseFloat(imp.price) || 0);
       }, 0);
 
-      // If quote is saved in database, call database function to ensure DB is in sync
-      if (quoteId && !quoteId.startsWith('temp-')) {
-        console.log('Recalculating pricing using database function for quote:', quoteId);
+      const ssaItems = group.items.filter((itm: any) =>
+        itm.supplier_name?.toUpperCase() === 'SSACTIVEWEAR' && itm.item_number
+      );
 
-        // Call the database function to recalculate all pricing
-        const { error: calcError } = await supabase.rpc('recalculate_quote_pricing', {
-          p_quote_id: quoteId
+      const uniqueStyles = [...new Set(ssaItems.map((itm: any) => itm.item_number))];
+      const priceLookup: Map<string, number> = new Map();
+      const failedStyles: string[] = [];
+
+      if (uniqueStyles.length > 0 && !silent) {
+        console.log(`[Update Price] Fetching live pricing for ${uniqueStyles.length} SS Activewear style(s):`, uniqueStyles);
+
+        const pricingPromises = uniqueStyles.map(async (style) => {
+          const result = await fetchLiveSSActivewearPricing(style as string, companySettings?.id);
+          return { style, result };
         });
 
-        if (calcError) {
-          console.error('Error recalculating pricing:', calcError);
-          if (!silent) showNotification('error', 'Failed to recalculate pricing', calcError.message);
-          return;
-        }
+        const results = await Promise.all(pricingPromises);
 
-        // Fetch updated prices from database for saved items
-        const { data: updatedLineItems, error: lineItemError } = await supabase
-          .from('quote_line_items')
-          .select('id, unit_price, total_price')
-          .eq('quote_id', quoteId)
-          .eq('group_label', group.label);
-
-        if (lineItemError) {
-          console.error('Error fetching updated prices:', lineItemError);
-        }
-
-        // Apply pricing to ALL items in the group (both saved and unsaved)
-        const newGroups = groups.map(g => {
-          if (g.id === groupId) {
-            const newItems = g.items.map((itm: any) => {
-              // Try to get the price from the database first (for saved items)
-              const updated = updatedLineItems?.find(li => li.id === itm.id);
-
-              let unitPrice: number;
-              if (updated) {
-                unitPrice = parseFloat(updated.unit_price);
-              } else {
-                // Fallback: calculate locally with wholesale + markup + imprints
-                const wholesalePrice = itm.wholesale_price || 0;
-                const garmentCostWithMarkup = wholesalePrice * (1 + garmentMarkup / 100);
-                unitPrice = totalImprintPrice + garmentCostWithMarkup;
-              }
-
-              return {
-                ...itm,
-                unit_price: unitPrice,
-                total_price: calculateItemsTotal(itm) * unitPrice
-              };
-            });
-            return { ...g, items: newItems };
+        for (const { style, result } of results) {
+          if (result.success && result.parts.length > 0) {
+            for (const part of result.parts) {
+              priceLookup.set(part.partId, part.price);
+            }
+            const firstPrice = result.parts[0].price;
+            priceLookup.set(`style:${style}`, firstPrice);
+            console.log(`[Update Price] ${style}: ${result.parts.length} parts, first price: $${firstPrice}`);
+          } else {
+            failedStyles.push(style as string);
+            console.warn(`[Update Price] Failed to fetch pricing for ${style}: ${result.error}`);
           }
-          return g;
-        });
-
-        setItemGroups(newGroups);
-        if (!silent) {
-          const hasImprints = groupImprints.length > 0;
-          const msg = hasImprints
-            ? 'Prices recalculated with imprints and garment markup'
-            : 'Prices calculated with garment markup (no imprints)';
-          showNotification('success', 'Pricing Updated', msg);
         }
-        return;
       }
 
-      // For unsaved quotes (draft mode), calculate pricing locally
-      console.log('Draft mode pricing:', {
-        groupLabel: group.label,
-        imprintCount: groupImprints.length,
-        totalImprintPrice,
-        garmentMarkup,
-        itemCount: group.items.length
-      });
-
-      // Apply the calculated unit price to ALL items in the group
-      // unit_price = imprint_price + garment_cost_with_markup
       const newGroups = groups.map(g => {
         if (g.id === groupId) {
           const newItems = g.items.map((itm: any) => {
-            const wholesalePrice = itm.wholesale_price || 0;
+            let wholesalePrice = itm.wholesale_price || 0;
+            let priceSource = 'existing';
+
+            if (itm.supplier_name?.toUpperCase() === 'SSACTIVEWEAR') {
+              if (itm.supplier_partid && priceLookup.has(itm.supplier_partid)) {
+                wholesalePrice = priceLookup.get(itm.supplier_partid)!;
+                priceSource = 'live-partid';
+              } else if (itm.item_number && priceLookup.has(`style:${itm.item_number}`)) {
+                wholesalePrice = priceLookup.get(`style:${itm.item_number}`)!;
+                priceSource = 'live-style';
+              }
+            }
+
             const garmentCostWithMarkup = wholesalePrice * (1 + garmentMarkup / 100);
             const unitPrice = totalImprintPrice + garmentCostWithMarkup;
+
+            console.log(`[Update Price] Item ${itm.item_number}/${itm.color}: wholesale=$${wholesalePrice.toFixed(2)} (${priceSource}), markup=${garmentMarkup}%, imprints=$${totalImprintPrice.toFixed(2)}, unit=$${unitPrice.toFixed(2)}`);
+
             return {
               ...itm,
+              wholesale_price: wholesalePrice,
               unit_price: unitPrice,
               total_price: calculateItemsTotal(itm) * unitPrice
             };
@@ -954,20 +926,52 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       });
 
       setItemGroups(newGroups);
+
+      if (quoteId && !quoteId.startsWith('temp-')) {
+        const groupItems = newGroups.find(g => g.id === groupId)?.items || [];
+        for (const itm of groupItems) {
+          if (itm.id) {
+            await supabase
+              .from('quote_line_items')
+              .update({
+                wholesale_price: itm.wholesale_price,
+                unit_price: itm.unit_price,
+                total_price: itm.total_price
+              })
+              .eq('id', itm.id);
+          }
+        }
+      }
+
       if (!silent) {
+        setUpdatingPriceForGroup(null);
+
         const sampleItem = group.items[0];
-        const sampleWholesale = sampleItem?.wholesale_price || 0;
+        const sampleWholesale = newGroups.find(g => g.id === groupId)?.items[0]?.wholesale_price || sampleItem?.wholesale_price || 0;
         const sampleGarmentCost = sampleWholesale * (1 + garmentMarkup / 100);
         const sampleUnitPrice = totalImprintPrice + sampleGarmentCost;
         const hasImprints = groupImprints.length > 0;
-        const breakdown = hasImprints
-          ? `Unit: $${sampleUnitPrice.toFixed(2)} (imprint: $${totalImprintPrice.toFixed(2)} + garment: $${sampleGarmentCost.toFixed(2)})`
-          : `Unit: $${sampleUnitPrice.toFixed(2)} (garment with ${garmentMarkup}% markup)`;
-        showNotification('success', 'Price updated', breakdown);
+
+        let msg = '';
+        if (failedStyles.length > 0) {
+          msg = `Prices updated. Note: Could not fetch live pricing for: ${failedStyles.join(', ')}`;
+          showNotification('warning', 'Pricing Partially Updated', msg);
+        } else if (uniqueStyles.length > 0) {
+          const breakdown = hasImprints
+            ? `Unit: $${sampleUnitPrice.toFixed(2)} (garment: $${sampleGarmentCost.toFixed(2)} + imprints: $${totalImprintPrice.toFixed(2)})`
+            : `Unit: $${sampleUnitPrice.toFixed(2)} (garment with ${garmentMarkup}% markup)`;
+          showNotification('success', 'Live Pricing Updated', breakdown);
+        } else {
+          const breakdown = hasImprints
+            ? `Unit: $${sampleUnitPrice.toFixed(2)} (imprint: $${totalImprintPrice.toFixed(2)} + garment: $${sampleGarmentCost.toFixed(2)})`
+            : `Unit: $${sampleUnitPrice.toFixed(2)} (garment with ${garmentMarkup}% markup)`;
+          showNotification('success', 'Price updated', breakdown);
+        }
       }
 
     } catch (error) {
       console.error('Error updating price from matrix:', error);
+      setUpdatingPriceForGroup(null);
       if (!silent) showNotification('error', 'Failed to update price');
     }
   };
@@ -2700,10 +2704,15 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                                 </button>
                                 <button
                                   onClick={() => updatePriceFromMatrix(group.id, 0)}
-                                  className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm flex items-center gap-2 shadow-sm"
+                                  disabled={updatingPriceForGroup === group.id}
+                                  className="px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-wait text-white rounded text-sm flex items-center gap-2 shadow-sm"
                                 >
-                                  <RefreshCw className="w-4 h-4" />
-                                  Update Price
+                                  {updatingPriceForGroup === group.id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <RefreshCw className="w-4 h-4" />
+                                  )}
+                                  {updatingPriceForGroup === group.id ? 'Fetching...' : 'Update Price'}
                                 </button>
                               </div>
                               <div className="flex items-center">
