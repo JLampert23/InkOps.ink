@@ -7,6 +7,7 @@ import CreateCustomerModal from '../accounting/CreateCustomerModal';
 import { ManageImprintsModal } from './ManageImprintsModal';
 import MockupGenerator from './MockupGenerator';
 import { SendQuoteModal } from './SendQuoteModal';
+import { getUnifiedProductData } from '../../services/ssactivewear-promostandards-service';
 import { proxySanMarImageUrl } from '../../utils/sanmar-image-proxy';
 
 function decodeHtmlEntities(text: string): string {
@@ -28,8 +29,7 @@ interface ProductSearchResult {
     name: string;
     code: string;
     image_url?: string;
-    rear_image_url?: string;
-    side_image_url?: string;
+    pricing?: { wholesale?: number; retail?: number };
     stock?: Record<string, number>;
     sizes?: string[];
   }[];
@@ -76,6 +76,7 @@ interface QuoteItem {
   garment_images_data?: any;
   supplier_partid?: string;
   supplier_name?: string;
+  wholesale_price?: number;
 }
 
 interface QuoteFee {
@@ -104,15 +105,15 @@ interface QuoteBuilderProps {
   onCancel?: () => void;
 }
 
-function UnitPriceTooltip({ item, groupImprints }: {
+function UnitPriceTooltip({ item, groupImprints, garmentMarkup }: {
   item: QuoteItem;
   groupImprints: any[];
+  garmentMarkup: number;
 }) {
+  const wholesalePrice = item.wholesale_price || 0;
+  const garmentCostWithMarkup = wholesalePrice * (1 + garmentMarkup / 100);
   const totalImprintPrice = groupImprints.reduce((sum, imp) => sum + (parseFloat(imp.price) || 0), 0);
-
-  if (groupImprints.length === 0) {
-    return null;
-  }
+  const calculatedTotal = garmentCostWithMarkup + totalImprintPrice;
 
   return (
     <div className="hidden group-hover/tip:block absolute bottom-full right-0 mb-1 w-64 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-xl z-50 text-xs pointer-events-none">
@@ -121,26 +122,52 @@ function UnitPriceTooltip({ item, groupImprints }: {
           Unit Price Breakdown
         </div>
 
-        <div className="space-y-1">
-          <div className="font-medium text-gray-700 dark:text-gray-300">Print / Decoration</div>
-          {groupImprints.map((imp, i) => (
-            <div key={imp.id || i} className="flex justify-between text-gray-500 dark:text-gray-400 pl-2">
-              <span className="truncate mr-2">{imp.location || 'Imprint ' + (i + 1)}</span>
-              <span className="shrink-0">${(parseFloat(imp.price) || 0).toFixed(2)}</span>
+        {wholesalePrice > 0 && (
+          <div className="space-y-1">
+            <div className="font-medium text-gray-700 dark:text-gray-300">Garment</div>
+            <div className="flex justify-between text-gray-500 dark:text-gray-400 pl-2">
+              <span>Wholesale</span>
+              <span>${wholesalePrice.toFixed(2)}</span>
             </div>
-          ))}
-          {groupImprints.length > 1 && (
+            <div className="flex justify-between text-gray-500 dark:text-gray-400 pl-2">
+              <span>Markup ({garmentMarkup}%)</span>
+              <span>+${(garmentCostWithMarkup - wholesalePrice).toFixed(2)}</span>
+            </div>
             <div className="flex justify-between font-medium text-gray-700 dark:text-gray-300 pl-2 border-t border-gray-100 dark:border-slate-700 pt-0.5">
-              <span>Print Total</span>
-              <span>${totalImprintPrice.toFixed(2)}</span>
+              <span>Garment Cost</span>
+              <span>${garmentCostWithMarkup.toFixed(2)}</span>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {groupImprints.length > 0 && (
+          <div className="space-y-1">
+            <div className="font-medium text-gray-700 dark:text-gray-300">Print / Decoration</div>
+            {groupImprints.map((imp, i) => (
+              <div key={imp.id || i} className="flex justify-between text-gray-500 dark:text-gray-400 pl-2">
+                <span className="truncate mr-2">{imp.location || 'Imprint ' + (i + 1)}</span>
+                <span className="shrink-0">${(parseFloat(imp.price) || 0).toFixed(2)}</span>
+              </div>
+            ))}
+            {groupImprints.length > 1 && (
+              <div className="flex justify-between font-medium text-gray-700 dark:text-gray-300 pl-2 border-t border-gray-100 dark:border-slate-700 pt-0.5">
+                <span>Print Total</span>
+                <span>${totalImprintPrice.toFixed(2)}</span>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex justify-between font-semibold text-gray-900 dark:text-white border-t border-gray-200 dark:border-slate-600 pt-1.5">
-          <span>Imprint Total</span>
-          <span>${totalImprintPrice.toFixed(2)}</span>
+          <span>Calculated Total</span>
+          <span>${calculatedTotal.toFixed(2)}</span>
         </div>
+
+        {Math.abs(calculatedTotal - item.unit_price) > 0.01 && item.unit_price > 0 && calculatedTotal > 0 && (
+          <div className="text-amber-600 dark:text-amber-400 text-[10px] italic">
+            Actual unit price (${item.unit_price.toFixed(2)}) differs from calculated
+          </div>
+        )}
       </div>
     </div>
   );
@@ -822,10 +849,13 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         return;
       }
 
-      // Get imprints for this group
+      // Get imprints for this group (can be empty - garment-only pricing is allowed)
       const groupImprints = getGroupImprints(group.label);
 
-      // Calculate total imprint price
+      // Get garment markup from company settings
+      const garmentMarkup = companySettings?.default_garment_markup || 0;
+
+      // Calculate total imprint price (0 if no imprints)
       const totalImprintPrice = groupImprints.reduce((sum, imp) => {
         return sum + (parseFloat(imp.price) || 0);
       }, 0);
@@ -867,8 +897,10 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
               if (updated) {
                 unitPrice = parseFloat(updated.unit_price);
               } else {
-                // Fallback: use imprint total price
-                unitPrice = totalImprintPrice;
+                // Fallback: calculate locally with wholesale + markup + imprints
+                const wholesalePrice = itm.wholesale_price || 0;
+                const garmentCostWithMarkup = wholesalePrice * (1 + garmentMarkup / 100);
+                unitPrice = totalImprintPrice + garmentCostWithMarkup;
               }
 
               return {
@@ -886,8 +918,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         if (!silent) {
           const hasImprints = groupImprints.length > 0;
           const msg = hasImprints
-            ? 'Prices recalculated with imprints'
-            : 'Prices updated';
+            ? 'Prices recalculated with imprints and garment markup'
+            : 'Prices calculated with garment markup (no imprints)';
           showNotification('success', 'Pricing Updated', msg);
         }
         return;
@@ -898,14 +930,18 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         groupLabel: group.label,
         imprintCount: groupImprints.length,
         totalImprintPrice,
+        garmentMarkup,
         itemCount: group.items.length
       });
 
       // Apply the calculated unit price to ALL items in the group
+      // unit_price = imprint_price + garment_cost_with_markup
       const newGroups = groups.map(g => {
         if (g.id === groupId) {
           const newItems = g.items.map((itm: any) => {
-            const unitPrice = totalImprintPrice;
+            const wholesalePrice = itm.wholesale_price || 0;
+            const garmentCostWithMarkup = wholesalePrice * (1 + garmentMarkup / 100);
+            const unitPrice = totalImprintPrice + garmentCostWithMarkup;
             return {
               ...itm,
               unit_price: unitPrice,
@@ -919,10 +955,14 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
 
       setItemGroups(newGroups);
       if (!silent) {
+        const sampleItem = group.items[0];
+        const sampleWholesale = sampleItem?.wholesale_price || 0;
+        const sampleGarmentCost = sampleWholesale * (1 + garmentMarkup / 100);
+        const sampleUnitPrice = totalImprintPrice + sampleGarmentCost;
         const hasImprints = groupImprints.length > 0;
         const breakdown = hasImprints
-          ? `Unit: $${totalImprintPrice.toFixed(2)} (imprint total)`
-          : 'Price updated';
+          ? `Unit: $${sampleUnitPrice.toFixed(2)} (imprint: $${totalImprintPrice.toFixed(2)} + garment: $${sampleGarmentCost.toFixed(2)})`
+          : `Unit: $${sampleUnitPrice.toFixed(2)} (garment with ${garmentMarkup}% markup)`;
         showNotification('success', 'Price updated', breakdown);
       }
 
@@ -1215,14 +1255,89 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
     }
   };
 
+  /**
+   * Fetch pricing data only for a specific garment SKU
+   * Used for real-time pricing updates
+   */
+  const fetchGarmentPricing = async (style: string, color: string, size: string) => {
+    try {
+      const { data: { session: freshSession }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !freshSession?.access_token) return null;
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/garments/${style}/${color}/${size}/pricing`,
+        {
+          headers: {
+            'Authorization': `Bearer ${freshSession.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) return null;
+
+      const data = await response.json();
+      return data.pricing;
+    } catch (error) {
+      console.error('Error fetching garment pricing:', error);
+      return null;
+    }
+  };
+
+  /**
+   * Fetch inventory data only for a specific garment SKU
+   * Used for real-time inventory checks
+   */
+  const fetchGarmentInventory = async (style: string, color: string, size: string) => {
+    try {
+      const { data: { session: freshSession }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !freshSession?.access_token) return null;
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/garments/${style}/${color}/${size}/inventory`,
+        {
+          headers: {
+            'Authorization': `Bearer ${freshSession.access_token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) return null;
+
+      const data = await response.json();
+      return data.inventory;
+    } catch (error) {
+      console.error('Error fetching garment inventory:', error);
+      return null;
+    }
+  };
 
   /**
    * Auto-populate line item data when user selects a product color
    *
    * This function handles the complete auto-population workflow:
-   * - Auto-populates product title, description, and images
-   * - For SanMar: Uses images from product-search results
-   * - For SSActivewear: Fetches images from database cache
+   *
+   * FOR SANMAR PRODUCTS:
+   * 1. Fetches unified data from PromoStandards API via sanmarUnifiedService
+   * 2. Auto-populates:
+   *    - Product title and description
+   *    - Available colors and sizes (from variants)
+   *    - Pricing: piece price, case price, MAP, MSRP
+   *    - Inventory: total available + warehouse levels
+   *    - Images: front model, back model, flat images, thumbnails
+   * 3. Fallback to cached data if PromoStandards unavailable
+   *
+   * FOR SSACTIVEWEAR PRODUCTS:
+   * 1. Fetches data from PromoStandards API
+   * 2. Auto-populates pricing and media content
+   * 3. Fallback to cached database images if Media API unavailable
+   *
+   * NO FTP LOGIC - All data comes from PromoStandards services
    */
   const selectProductColor = async (product: ProductSearchResult, colorIdx: number) => {
     console.log('🔵 START selectProductColor:', { product, colorIdx });
@@ -1237,120 +1352,321 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       hasColor: !!color,
       colorName: color?.name,
       colorCode: color?.code,
+      willFetchImages: product.supplier === 'ssactivewear' && !!color?.code,
     });
 
     const garmentImages: Record<string, any> = {};
 
-    if (product.supplier === 'ssactivewear' && color) {
-      const hasSearchResultImages = color.image_url || color.rear_image_url || color.side_image_url;
+    // Fetch garment images AND pricing based on supplier
+    let freshPrice: number | null = null;
 
-      if (hasSearchResultImages) {
-        console.log('🎨 Using SSActivewear images from search results:', {
-          style: product.style,
-          color: color.name,
-          hasImageUrl: !!color.image_url,
-          hasRearImage: !!color.rear_image_url,
-          hasSideImage: !!color.side_image_url,
+    if (product.supplier === 'ssactivewear' && color?.code) {
+      try {
+        console.log('🎨 Fetching SSActivewear garment images & pricing for:', { style: product.style, partId: color.code });
+        const unifiedData = await getUnifiedProductData(product.style, color.code);
+        console.log('📦 Unified data response:', {
+          success: unifiedData.success,
+          hasMedia: !!unifiedData.media,
+          hasViews: !!unifiedData.media?.views,
+          hasImages: !!unifiedData.media?.images,
+          imageCount: unifiedData.media?.images?.length,
+          viewsKeys: unifiedData.media?.views ? Object.keys(unifiedData.media.views) : [],
+          hasPricing: !!unifiedData.pricing,
+          basePrice: unifiedData.pricing?.basePrice,
+          pricingSource: unifiedData.pricing?.usedPricingSource,
+          pricingAvailable: unifiedData.pricingAvailable,
         });
 
-        if (color.image_url) {
-          garmentImages.garment_front_image_url = color.image_url;
-          garmentImages.garment_back_image_url = color.image_url;
-        }
-        if (color.rear_image_url) {
-          garmentImages.garment_rear_image_url = color.rear_image_url;
-          garmentImages.garment_back_image_url = color.rear_image_url;
-        }
-        if (color.side_image_url) {
-          garmentImages.garment_side_image_url = color.side_image_url;
-          garmentImages.garment_sleeve_image_url = color.side_image_url;
-        }
-
-        const allImages: string[] = [];
-        if (color.image_url) allImages.push(color.image_url);
-        if (color.rear_image_url) allImages.push(color.rear_image_url);
-        if (color.side_image_url) allImages.push(color.side_image_url);
-
-        garmentImages.garment_images_data = {
-          frontImages: color.image_url ? [color.image_url] : [],
-          rearImages: color.rear_image_url ? [color.rear_image_url] : [],
-          sideImages: color.side_image_url ? [color.side_image_url] : [],
-          lifestyleImages: [],
-          otherImages: [],
-          allImages,
-        };
-      } else if (color.code) {
-        try {
-          console.log('🎨 Falling back to database cache for SSActivewear images...');
-          const { data: cachedPart } = await supabase
-            .from('parts')
-            .select(`
-              id,
-              images (
-                url,
-                class_type
-              )
-            `)
-            .eq('part_id', color.code)
-            .maybeSingle();
-
-          if (cachedPart?.images && cachedPart.images.length > 0) {
-            console.log(`✅ Found ${cachedPart.images.length} cached images for ${color.code}`);
-
-            const frontImg = cachedPart.images.find((img: any) =>
-              (img.class_type || '').toLowerCase().includes('front')
-            );
-            const rearImg = cachedPart.images.find((img: any) =>
-              (img.class_type || '').toLowerCase().includes('rear') ||
-              (img.class_type || '').toLowerCase().includes('back')
-            );
-            const sideImg = cachedPart.images.find((img: any) =>
-              (img.class_type || '').toLowerCase().includes('side') ||
-              (img.class_type || '').toLowerCase().includes('sleeve')
-            );
-            const lifestyleImg = cachedPart.images.find((img: any) =>
-              (img.class_type || '').toLowerCase().includes('lifestyle')
-            );
-
-            if (frontImg) {
-              garmentImages.garment_front_image_url = frontImg.url;
-              garmentImages.garment_back_image_url = frontImg.url;
-            }
-            if (rearImg) {
-              garmentImages.garment_rear_image_url = rearImg.url;
-            }
-            if (sideImg) {
-              garmentImages.garment_side_image_url = sideImg.url;
-              garmentImages.garment_sleeve_image_url = sideImg.url;
-            }
-            if (lifestyleImg) {
-              garmentImages.garment_lifestyle_image_url = lifestyleImg.url;
-            }
-
-            garmentImages.garment_images_data = {
-              frontImages: frontImg ? [frontImg.url] : [],
-              rearImages: rearImg ? [rearImg.url] : [],
-              sideImages: sideImg ? [sideImg.url] : [],
-              lifestyleImages: lifestyleImg ? [lifestyleImg.url] : [],
-              otherImages: [],
-              allImages: cachedPart.images.map((img: any) => img.url),
-            };
+        // Extract fresh pricing - check basePrice first (new API format)
+        if (unifiedData.pricing?.basePrice && unifiedData.pricing.basePrice > 0) {
+          freshPrice = unifiedData.pricing.basePrice;
+          console.log('💰 Fresh pricing found from basePrice:', {
+            partId: color.code,
+            price: freshPrice,
+            source: unifiedData.pricing.usedPricingSource
+          });
+        } else if (unifiedData.pricing?.pricesByPartId && Object.keys(unifiedData.pricing.pricesByPartId).length > 0) {
+          // Legacy fallback: check pricesByPartId map
+          const priceForPart = unifiedData.pricing.pricesByPartId[color.code];
+          if (priceForPart) {
+            freshPrice = priceForPart;
+            console.log('💰 Fresh pricing found for part (legacy):', { partId: color.code, price: freshPrice });
           } else {
-            console.warn('⚠️ No cached images found for this color');
+            const availablePartIds = Object.keys(unifiedData.pricing.pricesByPartId);
+            const matchingPartId = availablePartIds.find(pid =>
+              pid.includes(color.code) || color.code.includes(pid)
+            );
+
+            if (matchingPartId) {
+              freshPrice = unifiedData.pricing.pricesByPartId[matchingPartId];
+              console.log('💰 Found matching partId:', { requested: color.code, matched: matchingPartId, price: freshPrice });
+            } else if (availablePartIds.length > 0) {
+              const firstPartId = availablePartIds[0];
+              freshPrice = unifiedData.pricing.pricesByPartId[firstPartId];
+              console.log('💰 Using first available price as fallback:', { partId: firstPartId, price: freshPrice });
+            } else if (color.pricing?.wholesale) {
+              freshPrice = color.pricing.wholesale;
+              console.log('💰 Using cached pricing from search results (part not in map):', freshPrice);
+            }
           }
-        } catch (cacheError) {
-          console.error('Failed to load cached images:', cacheError);
+        } else if (unifiedData.pricing?.parts && unifiedData.pricing.parts.length > 0) {
+          const firstPart = unifiedData.pricing.parts[0];
+          if (firstPart?.prices && firstPart.prices.length > 0) {
+            freshPrice = firstPart.prices[0].price;
+            console.log('💰 Using price from parts array:', { partId: firstPart.partId, price: freshPrice });
+          }
+        } else {
+          console.warn('⚠️ No pricing data in unified response');
+
+          // Check if API explicitly said pricing unavailable
+          if (unifiedData.pricingAvailable === false && unifiedData.pricingUnavailableReason) {
+            console.warn('⚠️ PRICING UNAVAILABLE:', unifiedData.pricingUnavailableReason);
+            showNotification('Pricing unavailable for this product. You can enter the wholesale cost manually in the line item.', 'warning');
+          }
+
+          console.warn('⚠️ Full pricing debug info:', {
+            pricingAttempts: unifiedData.debug?.pricingAttempts,
+            usedPricingId: unifiedData.debug?.usedPricingId,
+            usedPricingSource: unifiedData.debug?.usedPricingSource,
+            pricingPartsCount: unifiedData.debug?.pricingPartsCount,
+            pricingMapCount: unifiedData.debug?.pricingMapCount,
+            pricingSource: unifiedData.debug?.pricingSource,
+            livePricingStatus: unifiedData.debug?.livePricingStatus,
+            livePricingCount: unifiedData.debug?.livePricingCount,
+            pricingDebugInfo: unifiedData.debug?.pricingDebugInfo,
+          });
+
+          // Log the raw XML response from Pricing API if available
+          if (unifiedData.debug?.pricingDebugInfo) {
+            const debugInfo = unifiedData.debug.pricingDebugInfo;
+            console.error('🔍 PRICING API DEBUG INFO:', {
+              hasSoapFault: debugInfo.hasSoapFault,
+              hasPromoError: debugInfo.hasPromoError,
+              partBlocksFound: debugInfo.partBlocksFound,
+              errorDetails: debugInfo.errorDetails,
+            });
+
+            if (debugInfo.rawXmlSample) {
+              console.error('📄 RAW XML RESPONSE FROM S&S PRICING API (first 2000 chars):');
+              console.error(debugInfo.rawXmlSample);
+            }
+          }
+
+          // Fall back to cached pricing if available
+          if (color.pricing?.wholesale) {
+            freshPrice = color.pricing.wholesale;
+            console.log('💰 Using cached pricing from search results:', freshPrice);
+          } else {
+            console.error('❌ NO PRICING AVAILABLE for style:', product.style, 'color:', color.code);
+            console.error('❌ Pricing attempts made:', unifiedData.debug?.pricingAttempts);
+          }
         }
+
+        console.log('🐛 Complete debug info from API:', unifiedData.debug);
+
+        if (unifiedData.debug?.mediaAuthError) {
+          console.warn('⚠️ SSActivewear Media API Authentication Error:', unifiedData.debug.mediaAuthError);
+          console.warn('Your SSActivewear account may not have Media API access enabled. Contact SSActivewear support to enable it.');
+        }
+
+        if (unifiedData.debug?.mediaError) {
+          console.error('❌ Media API Error:', unifiedData.debug.mediaError);
+        }
+
+        if (unifiedData.debug?.mediaXmlFull) {
+          console.log('📄 Media XML (first 2000 chars):', unifiedData.debug.mediaXmlFull.substring(0, 2000));
+        }
+
+        // Check if we have live media data from the API
+        // Check both individual views AND the arrays (frontImages, etc.)
+        const hasLiveMediaData = unifiedData.success && unifiedData.media?.views &&
+          (unifiedData.media.views.front || unifiedData.media.views.rear || unifiedData.media.views.side ||
+           (unifiedData.media.views.frontImages && unifiedData.media.views.frontImages.length > 0) ||
+           (unifiedData.media.views.rearImages && unifiedData.media.views.rearImages.length > 0) ||
+           (unifiedData.media.views.sideImages && unifiedData.media.views.sideImages.length > 0) ||
+           (unifiedData.media.views.lifestyleImages && unifiedData.media.views.lifestyleImages.length > 0) ||
+           (unifiedData.media.images && unifiedData.media.images.length > 0));
+
+        // If no live media data, try to use cached images from database
+        // This handles: auth errors (105), empty results, or any other media API issues
+        if (!hasLiveMediaData) {
+          console.log('⚠️ No live media data, attempting to load cached images from database...');
+
+          // Try to get cached images for this partId
+          try {
+            const { data: cachedPart } = await supabase
+              .from('parts')
+              .select(`
+                id,
+                images (
+                  url,
+                  class_type
+                )
+              `)
+              .eq('part_id', color.code)
+              .maybeSingle();
+
+            if (cachedPart?.images && cachedPart.images.length > 0) {
+              console.log(`✅ Found ${cachedPart.images.length} cached images for ${color.code}`);
+
+              // Organize cached images by type
+              const frontImg = cachedPart.images.find((img: any) =>
+                (img.class_type || '').toLowerCase().includes('front')
+              );
+              const rearImg = cachedPart.images.find((img: any) =>
+                (img.class_type || '').toLowerCase().includes('rear') ||
+                (img.class_type || '').toLowerCase().includes('back')
+              );
+              const sideImg = cachedPart.images.find((img: any) =>
+                (img.class_type || '').toLowerCase().includes('side') ||
+                (img.class_type || '').toLowerCase().includes('sleeve')
+              );
+              const lifestyleImg = cachedPart.images.find((img: any) =>
+                (img.class_type || '').toLowerCase().includes('lifestyle')
+              );
+
+              if (frontImg) {
+                garmentImages.garment_front_image_url = frontImg.url;
+                garmentImages.garment_back_image_url = frontImg.url;
+                console.log('✅ Loaded cached front image');
+              }
+              if (rearImg) {
+                garmentImages.garment_rear_image_url = rearImg.url;
+                console.log('✅ Loaded cached rear image');
+              }
+              if (sideImg) {
+                garmentImages.garment_side_image_url = sideImg.url;
+                garmentImages.garment_sleeve_image_url = sideImg.url;
+                console.log('✅ Loaded cached side image');
+              }
+              if (lifestyleImg) {
+                garmentImages.garment_lifestyle_image_url = lifestyleImg.url;
+                console.log('✅ Loaded cached lifestyle image');
+              }
+
+              garmentImages.garment_images_data = {
+                frontImages: frontImg ? [frontImg.url] : [],
+                rearImages: rearImg ? [rearImg.url] : [],
+                sideImages: sideImg ? [sideImg.url] : [],
+                lifestyleImages: lifestyleImg ? [lifestyleImg.url] : [],
+                otherImages: [],
+                allImages: cachedPart.images.map((img: any) => img.url),
+              };
+
+              console.log('✅ Successfully loaded images from database cache');
+            } else {
+              console.warn('⚠️ No cached images found for this color');
+              showNotification('info', 'Product images not yet cached');
+            }
+          } catch (cacheError) {
+            console.error('Failed to load cached images:', cacheError);
+            showNotification('warning', 'No product images available');
+          }
+        }
+
+        if (hasLiveMediaData) {
+          if (unifiedData.media.views.front) {
+            garmentImages.garment_front_image_url = unifiedData.media.views.front;
+            garmentImages.garment_back_image_url = unifiedData.media.views.front;
+            console.log('✅ Set front image:', unifiedData.media.views.front);
+          }
+          if (unifiedData.media.views.rear) {
+            garmentImages.garment_rear_image_url = unifiedData.media.views.rear;
+            console.log('✅ Set rear image:', unifiedData.media.views.rear);
+          }
+          if (unifiedData.media.views.side) {
+            garmentImages.garment_side_image_url = unifiedData.media.views.side;
+            garmentImages.garment_sleeve_image_url = unifiedData.media.views.side;
+            console.log('✅ Set side image:', unifiedData.media.views.side);
+          }
+          if (unifiedData.media.views.lifestyle) {
+            garmentImages.garment_lifestyle_image_url = unifiedData.media.views.lifestyle;
+            console.log('✅ Set lifestyle image:', unifiedData.media.views.lifestyle);
+          }
+
+          const filterValidImages = (images: any[]) => {
+            return (images || []).filter((img: any) => {
+              if (!img) return false;
+              if (typeof img !== 'string') return false;
+              const trimmed = img.trim();
+              if (trimmed === '' || trimmed === 'null' || trimmed === 'undefined') return false;
+
+              // Check if URL points to an actual image file
+              const lowerUrl = trimmed.toLowerCase();
+              const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
+              const hasImageExtension = imageExtensions.some(ext => lowerUrl.includes(ext));
+
+              // Exclude non-image URLs like PDFs, spec sheets, etc.
+              if (lowerUrl.includes('.pdf') || lowerUrl.includes('itemspecs.aspx') || lowerUrl.includes('itemspecsheet.aspx')) {
+                return false;
+              }
+
+              return hasImageExtension;
+            });
+          };
+
+          garmentImages.garment_images_data = {
+            frontImages: filterValidImages(unifiedData.media.views.frontImages || []),
+            rearImages: filterValidImages(unifiedData.media.views.rearImages || []),
+            sideImages: filterValidImages(unifiedData.media.views.sideImages || []),
+            lifestyleImages: filterValidImages(unifiedData.media.views.lifestyleImages || []),
+            otherImages: filterValidImages(unifiedData.media.views.otherImages || []),
+            allImages: filterValidImages((unifiedData.media.images || []).map((img: any) => typeof img === 'string' ? img : img?.url).filter(Boolean)),
+          };
+
+          console.log('✅ Loaded SSActivewear images:', {
+            front: !!garmentImages.garment_front_image_url,
+            rear: !!garmentImages.garment_rear_image_url,
+            side: !!garmentImages.garment_side_image_url,
+            lifestyle: !!garmentImages.garment_lifestyle_image_url,
+            frontImages: garmentImages.garment_images_data.frontImages.length,
+            rearImages: garmentImages.garment_images_data.rearImages.length,
+            sideImages: garmentImages.garment_images_data.sideImages.length,
+            lifestyleImages: garmentImages.garment_images_data.lifestyleImages.length,
+            otherImages: garmentImages.garment_images_data.otherImages.length,
+            allImages: garmentImages.garment_images_data.allImages.length,
+          });
+        } else {
+          console.error('❌ No media data in unified response:', {
+            success: unifiedData.success,
+            hasMedia: !!unifiedData.media,
+            hasViews: !!unifiedData.media?.views,
+            viewsKeys: unifiedData.media?.views ? Object.keys(unifiedData.media.views) : [],
+            front: unifiedData.media?.views?.front,
+            rear: unifiedData.media?.views?.rear,
+            side: unifiedData.media?.views?.side,
+            frontImagesCount: unifiedData.media?.views?.frontImages?.length || 0,
+            rearImagesCount: unifiedData.media?.views?.rearImages?.length || 0,
+            sideImagesCount: unifiedData.media?.views?.sideImages?.length || 0,
+            lifestyleImagesCount: unifiedData.media?.views?.lifestyleImages?.length || 0,
+            rawImagesCount: unifiedData.media?.images?.length || 0,
+          });
+        }
+      } catch (error: any) {
+        console.error('❌ Failed to fetch SSActivewear garment images:', {
+          message: error.message,
+          stack: error.stack,
+          error,
+        });
+        showNotification('error', `Failed to load images: ${error.message}`);
       }
     } else if (product.supplier === 'sanmar' && color) {
-      // Use images from product-search results for SanMar
+      // Use images and pricing directly from product-search results (already fetched)
+      // This avoids extra API calls to the garments endpoint
       console.log('🔷 Using SanMar data from search results:', {
         style: product.style,
         color: color.name,
         hasImageUrl: !!color.image_url,
         hasRearImage: !!color.rear_image_url,
         hasSideImage: !!color.side_image_url,
+        hasPricing: !!color.pricing?.wholesale,
       });
+
+      // Use pricing from search results
+      if (color.pricing?.wholesale) {
+        freshPrice = color.pricing.wholesale;
+        console.log('💰 SanMar pricing from search results:', freshPrice);
+      }
 
       const frontUrl = proxySanMarImageUrl(color.image_url || '');
       const rearUrl = proxySanMarImageUrl(color.rear_image_url || '');
@@ -1406,11 +1722,19 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       hasImagesData: !!garmentImages.garment_images_data,
     });
 
+    const wholesalePrice = freshPrice !== null ? freshPrice : (color?.pricing?.wholesale || 0);
+
+    // Calculate unit price immediately with garment markup
+    const garmentMarkup = companySettings?.default_garment_markup || 0;
+    const garmentCostWithMarkup = wholesalePrice * (1 + garmentMarkup / 100);
+
     // Get any existing imprint prices for this group
     const group = itemGroups.find(g => g.id === groupId);
     const groupImprints = group ? getGroupImprints(group.label) : [];
     const totalImprintPrice = groupImprints.reduce((sum, imp) => sum + (parseFloat(imp.price) || 0), 0);
 
+    // Unit price = garment with markup + imprints (if any)
+    const calculatedUnitPrice = garmentCostWithMarkup + totalImprintPrice;
     const currentItem = group?.items[itemIdx];
     const totalQuantity = currentItem?.total_quantity || 0;
 
@@ -1422,12 +1746,22 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
           item_number: product.style.trim(),
           color: color?.name?.trim() || '',
           description: `${product.brand} ${product.description}`.trim(),
-          unit_price: totalImprintPrice,
-          total_price: totalQuantity * totalImprintPrice,
+          wholesale_price: wholesalePrice,
+          unit_price: calculatedUnitPrice,
+          total_price: totalQuantity * calculatedUnitPrice,
           supplier_name: product.supplier === 'sanmar' ? 'SANMAR' : product.supplier === 'ssactivewear' ? 'SSACTIVEWEAR' : null,
           ...garmentImages,
         };
 
+        console.log('💰 Wholesale price set:', {
+          freshPrice,
+          cachedPrice: color?.pricing?.wholesale,
+          wholesalePrice,
+          garmentMarkup,
+          garmentCostWithMarkup,
+          totalImprintPrice,
+          calculatedUnitPrice,
+        });
         console.log('📝 Updated item:', newItems[itemIdx]);
         return { ...grp, items: newItems };
       }
@@ -1647,6 +1981,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
             garment_images_data: item.garment_images_data || null,
             supplier_partid: item.supplier_partid || null,
             supplier_name: item.supplier_name || null,
+            wholesale_price: item.wholesale_price ?? 0,
           };
         })
         );
@@ -2298,25 +2633,32 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                       <td className="p-1 border border-gray-300 dark:border-slate-800 text-center text-base text-blue-600 dark:text-blue-400 font-bold">
                         {calculateItemsTotal(item)}
                       </td>
-                      <td className="p-0 border border-gray-300 dark:border-slate-800 relative group/price">
+                      <td className={`p-0 border border-gray-300 dark:border-slate-800 relative group/price ${!item.wholesale_price || item.wholesale_price === 0 ? 'bg-amber-50 dark:bg-amber-900/20' : ''}`}>
                         <input
                           type="number"
                           step="0.01"
                           min="0"
                           value={item.unit_price}
                           onChange={(e) => updateItem(group.id, itemIdx, 'unit_price', parseFloat(e.target.value) || 0)}
-                          className="w-full px-2 py-2 border-0 text-gray-900 dark:text-white text-base text-right bg-white dark:bg-slate-900 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          className={`w-full px-2 py-2 border-0 text-gray-900 dark:text-white text-base text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${!item.wholesale_price || item.wholesale_price === 0 ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-white dark:bg-slate-900'}`}
                         />
-                        {getGroupImprints(group.label).length > 0 && (
-                          <div className="absolute top-0 right-0 p-0.5 opacity-0 group-hover/price:opacity-100 transition-opacity z-10">
-                            <div className="relative group/tip">
-                              <Info className="w-3 h-3 text-gray-400 dark:text-slate-500 cursor-help" />
-                              <UnitPriceTooltip
-                                item={item}
-                                groupImprints={getGroupImprints(group.label)}
-                              />
-                            </div>
+                        {!item.wholesale_price || item.wholesale_price === 0 ? (
+                          <div className="absolute top-0 right-0 p-0.5" title="Wholesale pricing unavailable - enter manually">
+                            <Info className="w-3 h-3 text-amber-500 dark:text-amber-400" />
                           </div>
+                        ) : (
+                          (item.wholesale_price || getGroupImprints(group.label).length > 0) && (
+                            <div className="absolute top-0 right-0 p-0.5 opacity-0 group-hover/price:opacity-100 transition-opacity z-10">
+                              <div className="relative group/tip">
+                                <Info className="w-3 h-3 text-gray-400 dark:text-slate-500 cursor-help" />
+                                <UnitPriceTooltip
+                                  item={item}
+                                  groupImprints={getGroupImprints(group.label)}
+                                  garmentMarkup={companySettings?.default_garment_markup || 0}
+                                />
+                              </div>
+                            </div>
+                          )
                         )}
                       </td>
                       <td className="p-1 border border-gray-300 dark:border-slate-800 text-right text-base font-semibold text-gray-900 dark:text-white">
