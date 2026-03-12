@@ -441,6 +441,95 @@ export async function getUnifiedProductData(
       throw new Error('Unified product data fetch failed: ' + JSON.stringify(result));
     }
 
+    // Pricing is no longer included in promostandards-unified
+    // Fetch pricing separately from ssactivewear-api
+    if (result.pricingAvailable === false) {
+      console.log('💰 Fetching pricing separately from ssactivewear-api...');
+      try {
+        const pricingResponse = await fetch(
+          `${EDGE_FUNCTION_URL}?action=pricing&productId=${encodeURIComponent(styleNumber)}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+              'X-User-Token': token,
+            },
+          }
+        );
+
+        if (pricingResponse.ok) {
+          const pricingResult = await pricingResponse.json();
+          console.log('💰 Separate pricing API response:', pricingResult);
+
+          if (pricingResult.success && pricingResult.data) {
+            const pricingData = pricingResult.data;
+
+            // Build pricing structure from ssactivewear-api response
+            const pricesByPartId: Record<string, number> = {};
+            const pricingParts: Array<{ partId: string; prices: Array<{ minQuantity: number; price: number }> }> = [];
+
+            if (pricingData.priceArray && Array.isArray(pricingData.priceArray)) {
+              // Single part pricing - use the partId or styleNumber as key
+              const effectivePartId = partId || styleNumber;
+              pricesByPartId[effectivePartId] = pricingData.priceArray[0]?.price || 0;
+              pricingParts.push({
+                partId: effectivePartId,
+                prices: pricingData.priceArray.map((p: any) => ({
+                  minQuantity: p.minQuantity || 1,
+                  price: p.price || 0,
+                })),
+              });
+
+              // Also add entries for all parts from product data
+              if (result.product?.parts) {
+                for (const part of result.product.parts) {
+                  if (!pricesByPartId[part.partId]) {
+                    pricesByPartId[part.partId] = pricingData.priceArray[0]?.price || 0;
+                  }
+                }
+              }
+            } else if (pricingData.parts && Array.isArray(pricingData.parts)) {
+              // Multi-part pricing
+              for (const part of pricingData.parts) {
+                if (part.partId && part.prices?.length > 0) {
+                  pricesByPartId[part.partId] = part.prices[0]?.price || 0;
+                  pricingParts.push({
+                    partId: part.partId,
+                    prices: part.prices.map((p: any) => ({
+                      minQuantity: p.minQuantity || 1,
+                      price: p.price || 0,
+                    })),
+                  });
+                }
+              }
+            }
+
+            // Update result with pricing data
+            result.pricing = {
+              parts: pricingParts,
+              pricesByPartId,
+              warehouseCount: pricingData.warehouseCount || 0,
+              error: null,
+              basePrice: Object.values(pricesByPartId)[0] || 0,
+              usedPricingSource: 'ssactivewear-api',
+            };
+            result.pricingAvailable = pricingParts.length > 0;
+            result.pricingUnavailableReason = pricingParts.length > 0 ? null : 'No pricing data available';
+
+            console.log('💰 Pricing merged into result:', {
+              partsCount: pricingParts.length,
+              pricesByPartIdCount: Object.keys(pricesByPartId).length,
+              basePrice: result.pricing.basePrice,
+            });
+          }
+        } else {
+          console.warn('💰 Pricing API request failed:', pricingResponse.status);
+        }
+      } catch (pricingError) {
+        console.error('💰 Error fetching separate pricing:', pricingError);
+      }
+    }
+
     return result;
   } catch (error: any) {
     console.error('Error fetching unified product data:', {
