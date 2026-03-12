@@ -720,6 +720,14 @@ Deno.serve(async (req: Request) => {
     // Convert pricing map to array for response
     const pricingData = Array.from(partPricingMap.values());
 
+    // Create pricesByPartId map for backward compatibility with QuoteBuilder
+    const pricesByPartId: Record<string, number> = {};
+    for (const partData of pricingData) {
+      if (partData.prices && partData.prices.length > 0) {
+        pricesByPartId[partData.partId] = partData.prices[0].price; // Use lowest tier price
+      }
+    }
+
     // Parse Media Content from PromoStandards API only
     const mediaData: any = {};
     console.log('📸 Media Response Status:', initialMediaResponse.status);
@@ -898,6 +906,7 @@ Deno.serve(async (req: Request) => {
             partCount: partPricingMap.size,
             warehouseCount: ALL_SS_FOB_IDS.length,
             pricingData,
+            pricesByPartId,
             pricingError,
             hasPricing,
           },
@@ -922,6 +931,7 @@ Deno.serve(async (req: Request) => {
         inventory: inventoryData,
         pricing: {
           parts: pricingData,
+          pricesByPartId,
           warehouseCount: ALL_SS_FOB_IDS.length,
           error: pricingError,
         },

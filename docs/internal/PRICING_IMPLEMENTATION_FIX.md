@@ -121,6 +121,11 @@ for (const warehouseData of warehouseResults) {
         ]
       }
     ],
+    "pricesByPartId": {
+      "B22035001": 12.50,
+      "B22035002": 12.50,
+      "B22035003": 12.50
+    },
     "warehouseCount": 7,
     "error": null
   },
@@ -176,18 +181,22 @@ Expected result:
 
 ✅ Deployed via `mcp__supabase__deploy_edge_function`
 
-## Next Steps
+## Backward Compatibility
 
-The QuoteBuilder frontend may need updates to consume the new pricing format:
+Added `pricesByPartId` map to maintain compatibility with existing QuoteBuilder code:
 
 ```typescript
-// OLD: pricing.price
-const price = response.pricing?.price;
+// QuoteBuilder already supports this (lines 1388-1411)
+const price = unifiedData.pricing?.pricesByPartId[color.code];
 
-// NEW: pricing.parts[partId].prices[0].price
-const partPricing = response.pricing?.parts?.find(p => p.partId === selectedPartId);
-const price = partPricing?.prices[0]?.price;
+// Also supports the new parts array format (lines 1412-1416)
+const firstPart = unifiedData.pricing?.parts[0];
+const price = firstPart?.prices[0]?.price;
 ```
+
+The edge function now returns BOTH formats:
+- `pricing.pricesByPartId` - Map of partId → lowest price (for backward compatibility)
+- `pricing.parts` - Array with full pricing tiers and warehouse info (new comprehensive format)
 
 ## Related Documentation
 
