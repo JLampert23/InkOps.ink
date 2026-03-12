@@ -503,10 +503,13 @@ Deno.serve(async (req: Request) => {
   <shar:localizationLanguage>en</shar:localizationLanguage>
   <shar:configurationType>Blank</shar:configurationType>
 </ns2:GetConfigurationAndPricingRequest>`;
-          const xmlResponse = await makePromoStandardsRequest(
-            PROMOSTANDARDS_ENDPOINTS.pricing,
-            "getConfigurationAndPricing",
-            soapBody
+          
+        const xmlResponse = await makePromoStandardsRequest(
+           PROMOSTANDARDS_ENDPOINTS.pricing,
+           "getConfigurationAndPricing",
+            soapBody,
+            credentials.accountNumber,
+            decryptedApiKey
           );
 
           // Check for errors in response
