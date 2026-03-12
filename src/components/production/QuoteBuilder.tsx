@@ -1452,14 +1452,6 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
             }
           }
 
-          // Fall back to cached pricing if available
-          if (color.pricing?.wholesale) {
-            freshPrice = color.pricing.wholesale;
-            console.log('💰 Using cached pricing from search results:', freshPrice);
-          } else {
-            console.error('❌ NO PRICING AVAILABLE for style:', product.style, 'color:', color.code);
-            console.error('❌ Pricing attempts made:', unifiedData.debug?.pricingAttempts);
-          }
         }
 
         console.log('🐛 Complete debug info from API:', unifiedData.debug);
