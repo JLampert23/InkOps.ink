@@ -11,8 +11,11 @@ const PROMOSTANDARDS_ENDPOINTS = {
   productData: "https://promostandards.ssactivewear.com/productdata/v2/productdataservicev2.svc",
   inventory: "https://promostandards.ssactivewear.com/inventory/v2/inventoryservice.svc",
   media: "https://promostandards.ssactivewear.com/mediacontent/v1/mediacontentservice.svc",
-  pricingAndConfiguration: "https://promostandards.ssactivewear.com/PricingAndConfiguration/v1/PricingAndConfigurationService.svc",
+  pricing: "https://promostandards.ssactivewear.com/pricingandconfiguration/v1/pricingandconfigurationservice.svc",
 };
+
+// All SSActivewear warehouse FOB IDs
+const ALL_SS_FOB_IDS = ['IL', 'KS', 'NJ', 'TX', 'GA', 'NV', 'DS'];
 
 async function makePromoStandardsRequest(
   endpoint: string,
@@ -242,20 +245,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Default to 'all' as recommended by SSActivewear (query all warehouses for best pricing)
-    const normalizedFobId = 'all';
-
-    console.log('🏭 FOB ID set to "all" for multi-warehouse pricing');
-
-    // Per S&S IT Department: priceType should be "Customer" (confirmed via official SOAP examples)
-    const rawPriceType = settings.ssactivewear_price_type || 'Customer';
-    const validPriceTypes = ['Net', 'Customer', 'Blank', 'EQP', 'List'];
-    const priceType = validPriceTypes.includes(rawPriceType) ? rawPriceType : 'Customer';
-
-    if (!validPriceTypes.includes(rawPriceType)) {
-      console.warn(`⚠️ Invalid price type "${rawPriceType}", defaulting to "Customer" (S&S recommended)`);
-    }
-
     const credentials = {
       accountNumber: settings.ssactivewear_username,
       apiKey: settings.ssactivewear_api_key_encrypted
@@ -477,108 +466,130 @@ Deno.serve(async (req: Request) => {
       console.warn('📦 WARNING: Could not extract internal productId from Product Data partId values');
     }
 
-    // STEP 1.5: Fetch Pricing & Configuration (Customer/EQP pricing)
-    let ppcPrice: number | null = null;
-    let ppcTiers: { minQuantity: number; price: number }[] = [];
-    let ppcError: string | null = null;
+    // STEP 1.5: Fetch Multi-Warehouse Pricing for ALL parts
+    console.log('💰 Step 1.5: Fetching Multi-Warehouse Pricing...');
 
-    // ALWAYS use discoveredPartId from API - NEVER prioritize user-provided partId
-    // PPC requires both productId (first 6 chars) and full partId
-    const ppcProductId = discoveredPartId?.substring(0, 6) || null;
-    const ppcPartId = discoveredPartId; // Always use API-discovered partId
-    const isValidPpcProductId = ppcProductId !== null && ppcProductId.length === 6;
-    const isValidPpcPartId = ppcPartId !== null && ppcPartId.length > 0;
+    // Extract the 6-character product ID for pricing queries
+    const pricingProductId = internalProductId || (discoveredPartId ? discoveredPartId.substring(0, 6) : null);
 
-    if (isValidPpcProductId && isValidPpcPartId && normalizedFobId) {
-      console.log('💰 Step 1.5: Fetching PPC Customer Pricing...');
-      console.log('💰 Using priceType:', priceType);
+    // Pricing data structure: Map<partId, { prices, warehouse, allWarehousePrices }>
+    const partPricingMap = new Map<string, any>();
+    let pricingError: string | null = null;
 
-      console.log('💰 PPC Request params (from API discovery):', {
-        ppcProductId,
-        ppcPartId,
-        discoveredPartId,
-        userProvidedPartId: partId || 'none',
-        fobId: normalizedFobId,
-        priceType
-      });
+    if (pricingProductId && pricingProductId.length >= 5) {
+      console.log(`💰 Using pricing productId: "${pricingProductId}"`);
+      console.log(`💰 Querying ALL warehouses: ${ALL_SS_FOB_IDS.join(', ')}`);
 
-      // Type assertions after validation
-      const validPpcProductId = ppcProductId as string;
-      const validPpcPartId = ppcPartId as string;
-
-      // Use 'ns' prefix instead of 'ns2' to match working SoapUI example
-      const ppcSoap = `<ns:GetConfigurationAndPricingRequest xmlns:ns="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
+      // Query all warehouses in parallel
+      const warehousePricingPromises = ALL_SS_FOB_IDS.map(async (fobId) => {
+        try {
+          const soapBody = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${escapedAccountNumber}</shar:id>
   <shar:password>${escapedApiKey}</shar:password>
-  <shar:productId>${escapeXml(validPpcProductId)}</shar:productId>
-  <shar:partId>${escapeXml(validPpcPartId)}</shar:partId>
+  <shar:productId>${escapeXml(pricingProductId)}</shar:productId>
   <shar:currency>USD</shar:currency>
-  <shar:fobId>${escapeXml(normalizedFobId)}</shar:fobId>
-  <shar:priceType>${escapeXml(priceType)}</shar:priceType>
+  <shar:fobId>${escapeXml(fobId)}</shar:fobId>
+  <shar:priceType>Customer</shar:priceType>
   <shar:localizationCountry>US</shar:localizationCountry>
   <shar:localizationLanguage>en</shar:localizationLanguage>
   <shar:configurationType>Blank</shar:configurationType>
-</ns:GetConfigurationAndPricingRequest>`;
+</ns2:GetConfigurationAndPricingRequest>`;
 
-      console.log('💰 PPC SOAP Request (full):', ppcSoap);
-      console.log('💰 PPC Endpoint:', PROMOSTANDARDS_ENDPOINTS.pricingAndConfiguration);
-      console.log('💰 PPC SOAPAction:', "getConfigurationAndPricing");
+          const xmlResponse = await makePromoStandardsRequest(
+            PROMOSTANDARDS_ENDPOINTS.pricing,
+            "getConfigurationAndPricing",
+            soapBody
+          );
 
-      try {
-        const ppcResponse = await makePromoStandardsRequest(
-          PROMOSTANDARDS_ENDPOINTS.pricingAndConfiguration,
-          "getConfigurationAndPricing",
-          ppcSoap
-        );
-
-        console.log('💰 PPC Response received (first 1000 chars):', ppcResponse.substring(0, 1000));
-        console.log('💰 Parsing PartPrice blocks...');
-
-        const partPricePattern = /<(?:[a-zA-Z0-9]+:)?PartPrice[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?PartPrice>/gi;
-        const partPriceMatches = getAllXmlMatches(ppcResponse, partPricePattern);
-
-        console.log('💰 Found', partPriceMatches.length, 'PartPrice entries');
-
-        partPriceMatches.forEach(match => {
-          const priceXml = match[1];
-          const minQuantity = parseInt(getXmlValue(priceXml, "minQuantity") || "1");
-          const price = parseFloat(getXmlValue(priceXml, "price") || "0");
-
-          if (price > 0) {
-            ppcTiers.push({ minQuantity, price });
-          }
-        });
-
-        ppcTiers.sort((a, b) => a.minQuantity - b.minQuantity);
-
-        if (ppcTiers.length > 0) {
-          ppcPrice = ppcTiers[0].price;
-          console.log('💰 PPC Customer pricing extracted:', { ppcPrice, tierCount: ppcTiers.length, allTiers: ppcTiers });
-        } else {
-          console.warn('💰 No PartPrice entries found in PPC response');
-          const errorCode = getXmlValue(ppcResponse, "code");
-          const errorDesc = getXmlValue(ppcResponse, "description");
+          // Check for errors in response
+          const errorCode = getXmlValue(xmlResponse, "code");
+          const errorDesc = getXmlValue(xmlResponse, "description");
           if (errorCode || errorDesc) {
-            ppcError = `PPC Error ${errorCode || 'unknown'}: ${errorDesc || 'No pricing data returned'}`;
-            console.error('💰 PPC API returned error:', ppcError);
+            console.warn(`💰 Pricing error for warehouse ${fobId}: ${errorDesc || errorCode}`);
+            return { fobId, parts: [] };
+          }
+
+          // Parse all Part blocks
+          const partPattern = /<(?:[a-zA-Z0-9]+:)?Part[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?Part>/gi;
+          const partMatches = getAllXmlMatches(xmlResponse, partPattern);
+          const parts: any[] = [];
+
+          partMatches.forEach(partMatch => {
+            const partXml = partMatch[1];
+            const partId = getXmlValue(partXml, "partId");
+
+            // Parse all PartPrice blocks within this Part
+            const pricePattern = /<(?:[a-zA-Z0-9]+:)?PartPrice[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9]+:)?PartPrice>/gi;
+            const priceMatches = getAllXmlMatches(partXml, pricePattern);
+            const prices: any[] = [];
+
+            priceMatches.forEach(priceMatch => {
+              const priceXml = priceMatch[1];
+              const quantity = parseInt(getXmlValue(priceXml, "minQuantity") || "1");
+              const price = parseFloat(getXmlValue(priceXml, "price") || "0");
+
+              if (price > 0) {
+                prices.push({ quantity, price });
+              }
+            });
+
+            if (partId && prices.length > 0) {
+              prices.sort((a, b) => a.quantity - b.quantity);
+              parts.push({ partId, prices });
+            }
+          });
+
+          console.log(`💰 Warehouse ${fobId}: ${parts.length} parts with pricing`);
+          return { fobId, parts };
+        } catch (err: any) {
+          console.error(`💰 Error querying warehouse ${fobId}:`, err.message);
+          return { fobId, parts: [] };
+        }
+      });
+
+      const warehouseResults = await Promise.all(warehousePricingPromises);
+
+      // Find lowest price across all warehouses for each part
+      for (const warehouseData of warehouseResults) {
+        for (const part of warehouseData.parts) {
+          if (!partPricingMap.has(part.partId)) {
+            partPricingMap.set(part.partId, {
+              partId: part.partId,
+              prices: part.prices,
+              warehouse: warehouseData.fobId,
+              allWarehousePrices: [{ warehouse: warehouseData.fobId, prices: part.prices }]
+            });
+          } else {
+            const existing = partPricingMap.get(part.partId);
+            existing.allWarehousePrices.push({ warehouse: warehouseData.fobId, prices: part.prices });
+
+            // Compare lowest price (first tier)
+            const existingLowestPrice = existing.prices[0]?.price || Infinity;
+            const newLowestPrice = part.prices[0]?.price || Infinity;
+
+            if (newLowestPrice < existingLowestPrice) {
+              existing.prices = part.prices;
+              existing.warehouse = warehouseData.fobId;
+            }
           }
         }
-      } catch (err: any) {
-        ppcError = err.message || 'Unknown PPC error';
-        console.error('💰 PPC request failed:', ppcError);
-        console.error('💰 PPC error details:', err);
+      }
+
+      const successfulWarehouses = warehouseResults.filter(w => w.parts.length > 0);
+      console.log(`💰 Pricing SUCCESS: ${partPricingMap.size} unique parts with pricing from ${successfulWarehouses.length} warehouses`);
+      console.log(`💰 Successful warehouses: ${successfulWarehouses.map(w => w.fobId).join(', ')}`);
+
+      if (partPricingMap.size === 0) {
+        pricingError = "No pricing data returned from any warehouse";
+        console.warn('💰 WARNING: No pricing data available from any warehouse');
       }
     } else {
-      if (!normalizedFobId) {
-        console.log("💰 Skipping PPC: Invalid or missing FOB ID in company settings");
-      }
-      console.log('💰 Skipping PPC call - missing required params:', {
-        ppcProductId,
-        isValidPpcProductId,
-        discoveredPartId,
-        normalizedFobId,
-        reason: !discoveredPartId ? 'No discoveredPartId from inventory' : !normalizedFobId ? 'Invalid or missing FOB ID' : 'ppcProductId not exactly 6 characters'
+      pricingError = "Could not determine pricing productId";
+      console.warn('💰 Skipping pricing - no valid productId:', {
+        pricingProductId,
+        internalProductId,
+        discoveredPartId
       });
     }
 
@@ -706,19 +717,8 @@ Deno.serve(async (req: Request) => {
       console.log('⚠️ No inventory data available');
     }
 
-    // Use ONLY Customer NET Pricing (PPC) - no base pricing fallback
-    let finalPrice: number | null = null;
-    let pricingSource: string | null = null;
-
-    if (ppcPrice) {
-      finalPrice = ppcPrice;
-      pricingSource = "customer-net-pricing";
-      console.log('💰 Using Customer NET Pricing (PPC):', finalPrice);
-    } else {
-      finalPrice = null;
-      pricingSource = "none";
-      console.log('💰 No customer NET pricing available');
-    }
+    // Convert pricing map to array for response
+    const pricingData = Array.from(partPricingMap.values());
 
     // Parse Media Content from PromoStandards API only
     const mediaData: any = {};
@@ -876,12 +876,12 @@ Deno.serve(async (req: Request) => {
     }
 
     // Determine pricing availability
-    const hasPricing = finalPrice !== null && finalPrice > 0;
+    const hasPricing = partPricingMap.size > 0;
     const pricingUnavailableReason = !hasPricing
-      ? "Pricing not available. Please enter pricing manually."
+      ? (pricingError || "Pricing not available. Please enter pricing manually.")
       : null;
 
-    // PPC Test Harness - return early with test data INCLUDING product object for magnifying glass
+    // Test Harness - return early with test data INCLUDING product object for magnifying glass
     if (testPpc) {
       return new Response(
         JSON.stringify({
@@ -891,25 +891,21 @@ Deno.serve(async (req: Request) => {
           partId,
           internalProductId,
           discoveredPartId,
-          product: productData, // Include full product data for magnifying glass dropdown
+          product: productData,
           count: productData?.parts?.length || 0,
           pricingTest: {
-            priceType,
-            fobId: normalizedFobId,
-            ppcPrice,
-            ppcTiers,
-            ppcError,
-            finalPrice,
-            pricingSource,
-            ppcProductId: discoveredPartId?.substring(0, 6) || null,
-            ppcPartId: discoveredPartId,
+            pricingProductId,
+            partCount: partPricingMap.size,
+            warehouseCount: ALL_SS_FOB_IDS.length,
+            pricingData,
+            pricingError,
+            hasPricing,
           },
           debug: {
             internalProductId,
             internalIdSource,
             discoveredPartId,
-            ppcProductId: discoveredPartId?.substring(0, 6) || null,
-            ppcPartId: discoveredPartId,
+            pricingProductId,
           }
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -925,10 +921,9 @@ Deno.serve(async (req: Request) => {
         product: productData,
         inventory: inventoryData,
         pricing: {
-          price: finalPrice,
-          source: pricingSource,
-          ppcTiers,
-          ppcError,
+          parts: pricingData,
+          warehouseCount: ALL_SS_FOB_IDS.length,
+          error: pricingError,
         },
         media: mediaData,
         pricingAvailable: hasPricing,
@@ -937,22 +932,19 @@ Deno.serve(async (req: Request) => {
           internalProductId,
           internalIdSource,
           discoveredPartId,
-          priceType,
-          fobId: normalizedFobId,
+          pricingProductId,
+          warehousesQueried: ALL_SS_FOB_IDS,
+          partsWithPricing: partPricingMap.size,
           mediaResponseStatus: initialMediaResponse.status,
           mediaXmlFull: verbose && initialMediaResponse.status === 'fulfilled' && initialMediaResponse.value
             ? initialMediaResponse.value
             : null,
           mediaError: initialMediaResponse.status === 'rejected' ? initialMediaResponse.reason?.toString() : null,
           mediaAuthError,
-          ppcPrice,
-          ppcTiers,
-          ppcError,
-          finalPrice,
-          pricingSource,
+          pricingError,
           soapRequests: verbose ? {
             productDataRequest: productSoap,
-            mediaRequest: mediaSoap,
+            mediaSoap,
           } : undefined,
           credentials: verbose ? {
             accountNumber: credentials.accountNumber,
