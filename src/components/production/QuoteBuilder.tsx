@@ -1241,68 +1241,106 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
 
     const garmentImages: Record<string, any> = {};
 
-    if (product.supplier === 'ssactivewear' && color?.code) {
-      // Try to get cached images for SSActivewear products
-      try {
-        console.log('🎨 Loading SSActivewear images from database cache...');
-        const { data: cachedPart } = await supabase
-          .from('parts')
-          .select(`
-            id,
-            images (
-              url,
-              class_type
-            )
-          `)
-          .eq('part_id', color.code)
-          .maybeSingle();
+    if (product.supplier === 'ssactivewear' && color) {
+      const hasSearchResultImages = color.image_url || color.rear_image_url || color.side_image_url;
 
-        if (cachedPart?.images && cachedPart.images.length > 0) {
-          console.log(`✅ Found ${cachedPart.images.length} cached images for ${color.code}`);
+      if (hasSearchResultImages) {
+        console.log('🎨 Using SSActivewear images from search results:', {
+          style: product.style,
+          color: color.name,
+          hasImageUrl: !!color.image_url,
+          hasRearImage: !!color.rear_image_url,
+          hasSideImage: !!color.side_image_url,
+        });
 
-          const frontImg = cachedPart.images.find((img: any) =>
-            (img.class_type || '').toLowerCase().includes('front')
-          );
-          const rearImg = cachedPart.images.find((img: any) =>
-            (img.class_type || '').toLowerCase().includes('rear') ||
-            (img.class_type || '').toLowerCase().includes('back')
-          );
-          const sideImg = cachedPart.images.find((img: any) =>
-            (img.class_type || '').toLowerCase().includes('side') ||
-            (img.class_type || '').toLowerCase().includes('sleeve')
-          );
-          const lifestyleImg = cachedPart.images.find((img: any) =>
-            (img.class_type || '').toLowerCase().includes('lifestyle')
-          );
-
-          if (frontImg) {
-            garmentImages.garment_front_image_url = frontImg.url;
-            garmentImages.garment_back_image_url = frontImg.url;
-          }
-          if (rearImg) {
-            garmentImages.garment_rear_image_url = rearImg.url;
-          }
-          if (sideImg) {
-            garmentImages.garment_side_image_url = sideImg.url;
-            garmentImages.garment_sleeve_image_url = sideImg.url;
-          }
-          if (lifestyleImg) {
-            garmentImages.garment_lifestyle_image_url = lifestyleImg.url;
-          }
-
-          garmentImages.garment_images_data = {
-            frontImages: frontImg ? [frontImg.url] : [],
-            rearImages: rearImg ? [rearImg.url] : [],
-            sideImages: sideImg ? [sideImg.url] : [],
-            lifestyleImages: lifestyleImg ? [lifestyleImg.url] : [],
-            otherImages: [],
-            allImages: cachedPart.images.map((img: any) => img.url),
-          };
-        } else {
-          console.warn('⚠️ No cached images found for this color');
+        if (color.image_url) {
+          garmentImages.garment_front_image_url = color.image_url;
+          garmentImages.garment_back_image_url = color.image_url;
         }
-      } catch (cacheError) {
-        console.error('Failed to load cached images:', cacheError);
+        if (color.rear_image_url) {
+          garmentImages.garment_rear_image_url = color.rear_image_url;
+          garmentImages.garment_back_image_url = color.rear_image_url;
+        }
+        if (color.side_image_url) {
+          garmentImages.garment_side_image_url = color.side_image_url;
+          garmentImages.garment_sleeve_image_url = color.side_image_url;
+        }
+
+        const allImages: string[] = [];
+        if (color.image_url) allImages.push(color.image_url);
+        if (color.rear_image_url) allImages.push(color.rear_image_url);
+        if (color.side_image_url) allImages.push(color.side_image_url);
+
+        garmentImages.garment_images_data = {
+          frontImages: color.image_url ? [color.image_url] : [],
+          rearImages: color.rear_image_url ? [color.rear_image_url] : [],
+          sideImages: color.side_image_url ? [color.side_image_url] : [],
+          lifestyleImages: [],
+          otherImages: [],
+          allImages,
+        };
+      } else if (color.code) {
+        try {
+          console.log('🎨 Falling back to database cache for SSActivewear images...');
+          const { data: cachedPart } = await supabase
+            .from('parts')
+            .select(`
+              id,
+              images (
+                url,
+                class_type
+              )
+            `)
+            .eq('part_id', color.code)
+            .maybeSingle();
+
+          if (cachedPart?.images && cachedPart.images.length > 0) {
+            console.log(`✅ Found ${cachedPart.images.length} cached images for ${color.code}`);
+
+            const frontImg = cachedPart.images.find((img: any) =>
+              (img.class_type || '').toLowerCase().includes('front')
+            );
+            const rearImg = cachedPart.images.find((img: any) =>
+              (img.class_type || '').toLowerCase().includes('rear') ||
+              (img.class_type || '').toLowerCase().includes('back')
+            );
+            const sideImg = cachedPart.images.find((img: any) =>
+              (img.class_type || '').toLowerCase().includes('side') ||
+              (img.class_type || '').toLowerCase().includes('sleeve')
+            );
+            const lifestyleImg = cachedPart.images.find((img: any) =>
+              (img.class_type || '').toLowerCase().includes('lifestyle')
+            );
+
+            if (frontImg) {
+              garmentImages.garment_front_image_url = frontImg.url;
+              garmentImages.garment_back_image_url = frontImg.url;
+            }
+            if (rearImg) {
+              garmentImages.garment_rear_image_url = rearImg.url;
+            }
+            if (sideImg) {
+              garmentImages.garment_side_image_url = sideImg.url;
+              garmentImages.garment_sleeve_image_url = sideImg.url;
+            }
+            if (lifestyleImg) {
+              garmentImages.garment_lifestyle_image_url = lifestyleImg.url;
+            }
+
+            garmentImages.garment_images_data = {
+              frontImages: frontImg ? [frontImg.url] : [],
+              rearImages: rearImg ? [rearImg.url] : [],
+              sideImages: sideImg ? [sideImg.url] : [],
+              lifestyleImages: lifestyleImg ? [lifestyleImg.url] : [],
+              otherImages: [],
+              allImages: cachedPart.images.map((img: any) => img.url),
+            };
+          } else {
+            console.warn('⚠️ No cached images found for this color');
+          }
+        } catch (cacheError) {
+          console.error('Failed to load cached images:', cacheError);
+        }
       }
     } else if (product.supplier === 'sanmar' && color) {
       // Use images from product-search results for SanMar
