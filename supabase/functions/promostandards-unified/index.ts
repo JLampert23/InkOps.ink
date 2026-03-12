@@ -472,22 +472,30 @@ Deno.serve(async (req: Request) => {
     // Extract the 6-character product ID for pricing queries
     const pricingProductId = internalProductId || (discoveredPartId ? discoveredPartId.substring(0, 6) : null);
 
+    // Use the partId parameter from URL if provided, otherwise use discoveredPartId
+    const pricingPartId = partId || discoveredPartId;
+
     // Pricing data structure: Map<partId, { prices, warehouse, allWarehousePrices }>
     const partPricingMap = new Map<string, any>();
     let pricingError: string | null = null;
 
     if (pricingProductId && pricingProductId.length >= 5) {
       console.log(`💰 Using pricing productId: "${pricingProductId}"`);
+      if (pricingPartId) {
+        console.log(`💰 Using pricing partId: "${pricingPartId}" for customer-specific pricing`);
+      }
       console.log(`💰 Querying ALL warehouses: ${ALL_SS_FOB_IDS.join(', ')}`);
 
       // Query all warehouses in parallel
       const warehousePricingPromises = ALL_SS_FOB_IDS.map(async (fobId) => {
         try {
+          // Build SOAP body - include partId if available for customer-specific pricing
+          const partIdElement = pricingPartId ? `\n  <shar:partId>${escapeXml(pricingPartId)}</shar:partId>` : '';
           const soapBody = `<ns2:GetConfigurationAndPricingRequest xmlns:ns2="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/" xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
   <shar:wsVersion>1.0.0</shar:wsVersion>
   <shar:id>${escapedAccountNumber}</shar:id>
   <shar:password>${escapedApiKey}</shar:password>
-  <shar:productId>${escapeXml(pricingProductId)}</shar:productId>
+  <shar:productId>${escapeXml(pricingProductId)}</shar:productId>${partIdElement}
   <shar:currency>USD</shar:currency>
   <shar:fobId>${escapeXml(fobId)}</shar:fobId>
   <shar:priceType>Customer</shar:priceType>
