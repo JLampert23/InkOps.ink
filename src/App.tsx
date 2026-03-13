@@ -366,7 +366,7 @@ function AppContent() {
         <div className="h-20 border-b border-gray-200 dark:border-slate-700 flex items-center justify-center px-4 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-slate-800 dark:to-slate-700">
           <div className="flex items-center justify-center w-full h-full py-1.5">
             <img
-              src={darkMode ? "/inkops_logo-01.png" : "/headerlogo.png"}
+              src={darkMode ? "/headerlogo.png" : "/inkops_logo-01.png"}
               alt="InkOps"
               className="max-h-full max-w-full object-contain"
             />
