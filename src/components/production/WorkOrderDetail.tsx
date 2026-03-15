@@ -292,6 +292,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           box_label_show_imprint_types,
           box_label_show_job_nickname,
           box_label_show_qr_code,
+          box_label_layout,
           company_logo_primary_url,
           company_logo_secondary_url
         `)
@@ -303,6 +304,9 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           ? settings.company_logo_secondary_url
           : settings.company_logo_primary_url;
 
+        const layoutRaw = settings.box_label_layout;
+        const layout = Array.isArray(layoutRaw) && layoutRaw.length > 0 ? layoutRaw : undefined;
+
         setBoxLabelConfig({
           logoUrl,
           showWorkOrderNumber: settings.box_label_show_work_order_number ?? true,
@@ -311,6 +315,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           showDueDate: settings.box_label_show_due_date ?? true,
           showImprintTypes: settings.box_label_show_imprint_types ?? true,
           showQrCode: settings.box_label_show_qr_code ?? true,
+          layout,
         });
       }
     } catch (error) {
