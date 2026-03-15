@@ -4494,7 +4494,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                 <div className="border-b border-gray-200 dark:border-slate-700 pb-6">
                   <h3 className="text-md font-semibold text-gray-800 dark:text-gray-100 mb-4">Company Branding</h3>
-                  <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                         Primary Logo
@@ -4504,7 +4504,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       </p>
                       {primaryLogoPreview ? (
                         <div className="space-y-3">
-                          <div className="w-64 h-48 border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-white dark:bg-slate-700 flex items-center justify-center p-4">
+                          <div className="w-full h-48 border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-white dark:bg-slate-700 flex items-center justify-center p-4">
                             <img
                               src={primaryLogoPreview}
                               alt="Primary logo"
@@ -4534,7 +4534,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           )}
                         </div>
                       ) : (
-                        <label className={`flex flex-col items-center justify-center gap-3 px-6 py-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg transition-colors ${isAdmin ? 'hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer' : 'bg-gray-50 dark:bg-slate-800 cursor-not-allowed'}`}>
+                        <label className={`flex flex-col items-center justify-center gap-3 px-6 py-8 h-48 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg transition-colors ${isAdmin ? 'hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer' : 'bg-gray-50 dark:bg-slate-800 cursor-not-allowed'}`}>
                           <Upload className="w-8 h-8 text-gray-400 dark:text-gray-500" />
                           <div className="text-center">
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -4565,7 +4565,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       </p>
                       {secondaryLogoPreview ? (
                         <div className="space-y-3">
-                          <div className="w-64 h-48 border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-white dark:bg-slate-700 flex items-center justify-center p-4">
+                          <div className="w-full h-48 border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-white dark:bg-slate-700 flex items-center justify-center p-4">
                             <img
                               src={secondaryLogoPreview}
                               alt="Secondary logo"
@@ -4595,7 +4595,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           )}
                         </div>
                       ) : (
-                        <label className={`flex flex-col items-center justify-center gap-3 px-6 py-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg transition-colors ${isAdmin ? 'hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer' : 'bg-gray-50 dark:bg-slate-800 cursor-not-allowed'}`}>
+                        <label className={`flex flex-col items-center justify-center gap-3 px-6 py-8 h-48 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg transition-colors ${isAdmin ? 'hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer' : 'bg-gray-50 dark:bg-slate-800 cursor-not-allowed'}`}>
                           <Upload className="w-8 h-8 text-gray-400 dark:text-gray-500" />
                           <div className="text-center">
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
