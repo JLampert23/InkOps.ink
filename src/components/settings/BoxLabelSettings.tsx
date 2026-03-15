@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Save, Loader2, Tag, Image, GripVertical, Eye, EyeOff, RotateCcw, QrCode } from 'lucide-react';
+import { Save, Loader2, Tag, Image, GripVertical, Eye, EyeOff, RotateCcw } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { BoxLabelElement, BoxLabelElementId, DEFAULT_BOX_LABEL_LAYOUT } from '../production/BoxLabel';
 
@@ -16,32 +16,16 @@ interface LegacyConfig {
   box_label_show_due_date: boolean;
   box_label_show_imprint_types: boolean;
   box_label_show_job_nickname: boolean;
-  box_label_show_qr_code: boolean;
 }
 
 const ELEMENT_LABELS: Record<BoxLabelElementId, string> = {
   logo: 'Company Logo',
-  qr_code: 'QR Code',
   work_order_number: 'Work Order Number',
   customer_name: 'Customer Name',
   job_nickname: 'Job Nickname',
   due_date: 'Due Date',
   imprint_types: 'Imprint Types',
 };
-
-const ELEMENT_DESCRIPTIONS: Partial<Record<BoxLabelElementId, string>> = {
-  logo: 'Width & height in inches',
-  qr_code: 'Size in inches (square)',
-  work_order_number: 'Font size in pt',
-  customer_name: 'Font size in pt',
-  job_nickname: 'Font size in pt',
-  due_date: 'Font size in pt',
-  imprint_types: 'Font size in pt',
-};
-
-function isImageElement(id: BoxLabelElementId) {
-  return id === 'logo' || id === 'qr_code';
-}
 
 export default function BoxLabelSettings({ companyId, primaryLogoUrl, secondaryLogoUrl }: BoxLabelSettingsProps) {
   const [loading, setLoading] = useState(true);
@@ -69,7 +53,6 @@ export default function BoxLabelSettings({ companyId, primaryLogoUrl, secondaryL
           box_label_show_due_date,
           box_label_show_imprint_types,
           box_label_show_job_nickname,
-          box_label_show_qr_code,
           box_label_layout
         `)
         .eq('id', companyId)
@@ -81,7 +64,9 @@ export default function BoxLabelSettings({ companyId, primaryLogoUrl, secondaryL
         setLogoChoice(data.box_label_logo_choice || 'primary');
 
         if (data.box_label_layout && Array.isArray(data.box_label_layout) && data.box_label_layout.length > 0) {
-          const savedLayout = data.box_label_layout as BoxLabelElement[];
+          const savedLayout = (data.box_label_layout as BoxLabelElement[]).filter(
+            el => el.id !== 'qr_code'
+          );
           const merged = DEFAULT_BOX_LABEL_LAYOUT.map(def => {
             const saved = savedLayout.find(el => el.id === def.id);
             return saved ? { ...def, ...saved } : def;
@@ -97,7 +82,6 @@ export default function BoxLabelSettings({ companyId, primaryLogoUrl, secondaryL
             else if (el.id === 'job_nickname') visible = legacy.box_label_show_job_nickname ?? true;
             else if (el.id === 'due_date') visible = legacy.box_label_show_due_date ?? true;
             else if (el.id === 'imprint_types') visible = legacy.box_label_show_imprint_types ?? true;
-            else if (el.id === 'qr_code') visible = legacy.box_label_show_qr_code ?? true;
             return { ...el, visible };
           });
           setLayout(legacyLayout);
@@ -126,7 +110,6 @@ export default function BoxLabelSettings({ companyId, primaryLogoUrl, secondaryL
           box_label_show_due_date: layoutWithOrder.find(el => el.id === 'due_date')?.visible ?? true,
           box_label_show_imprint_types: layoutWithOrder.find(el => el.id === 'imprint_types')?.visible ?? true,
           box_label_show_job_nickname: layoutWithOrder.find(el => el.id === 'job_nickname')?.visible ?? true,
-          box_label_show_qr_code: layoutWithOrder.find(el => el.id === 'qr_code')?.visible ?? true,
           box_label_layout: layoutWithOrder,
         })
         .eq('id', companyId);
@@ -180,51 +163,44 @@ export default function BoxLabelSettings({ companyId, primaryLogoUrl, secondaryL
     if (!el.visible) return null;
 
     switch (el.id) {
-      case 'logo':
+      case 'logo': {
+        const logoEl = layout.find(e => e.id === 'logo')!;
         return selectedLogoUrl ? (
-          <img
-            key="logo"
-            src={selectedLogoUrl}
-            alt="Logo"
-            style={{
-              maxWidth: `${(el.width ?? 1.5) * previewScale}in`,
-              maxHeight: `${(el.height ?? 1.25) * previewScale}in`,
-              objectFit: 'contain',
-            }}
-          />
+          <div key="logo" style={{
+            display: 'flex',
+            justifyContent: 'center',
+            width: '100%',
+            marginBottom: `${0.1 * previewScale}in`,
+          }}>
+            <img
+              src={selectedLogoUrl}
+              alt="Logo"
+              style={{
+                width: `${(logoEl.width ?? 3.5) * previewScale}in`,
+                height: `${(logoEl.height ?? 1.5) * previewScale}in`,
+                objectFit: 'contain',
+              }}
+            />
+          </div>
         ) : (
           <div
             key="logo"
             style={{
-              width: `${(el.width ?? 1.5) * previewScale}in`,
-              height: `${(el.height ?? 1.25) * previewScale}in`,
+              width: `${(logoEl.width ?? 3.5) * previewScale}in`,
+              height: `${(logoEl.height ?? 1.5) * previewScale}in`,
               background: '#f3f4f6',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               borderRadius: 4,
+              margin: '0 auto',
+              marginBottom: `${0.1 * previewScale}in`,
             }}
           >
-            <span style={{ fontSize: '7pt', color: '#9ca3af' }}>Logo</span>
+            <span style={{ fontSize: '8pt', color: '#9ca3af' }}>Logo</span>
           </div>
         );
-      case 'qr_code':
-        return (
-          <div
-            key="qr_code"
-            style={{
-              width: `${(el.width ?? 1.25) * previewScale}in`,
-              height: `${(el.height ?? 1.25) * previewScale}in`,
-              background: '#111',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: 2,
-            }}
-          >
-            <QrCode style={{ color: 'white', width: '60%', height: '60%' }} />
-          </div>
-        );
+      }
       case 'work_order_number':
         return (
           <div key="work_order_number" style={{ fontSize: `${(el.fontSize ?? 22) * previewScale}pt`, fontWeight: 'bold', letterSpacing: '1px', textAlign: 'center', lineHeight: 1.2 }}>
@@ -261,14 +237,6 @@ export default function BoxLabelSettings({ companyId, primaryLogoUrl, secondaryL
         return null;
     }
   };
-
-  const logoEl = layout.find(el => el.id === 'logo')!;
-  const qrEl = layout.find(el => el.id === 'qr_code')!;
-  const textEls = layout.filter(el => el.id !== 'logo' && el.id !== 'qr_code');
-  const showLogoInPreview = logoEl.visible;
-  const showQrInPreview = qrEl.visible;
-  const hasHeaderInPreview = showLogoInPreview || showQrInPreview;
-  const logoBeforeQr = logoEl.order <= qrEl.order;
 
   if (loading) {
     return (
@@ -396,53 +364,33 @@ export default function BoxLabelSettings({ companyId, primaryLogoUrl, secondaryL
 
                   {el.visible && (
                     <div className="pl-7">
-                      {isImageElement(el.id) ? (
+                      {el.id === 'logo' ? (
                         <div className="flex items-center gap-3">
-                          {el.id === 'logo' ? (
-                            <>
-                              <div className="flex items-center gap-1.5">
-                                <label className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">W (in)</label>
-                                <input
-                                  type="number"
-                                  min={0.25}
-                                  max={3.5}
-                                  step={0.25}
-                                  value={el.width ?? 1.5}
-                                  onChange={e => updateElement(el.id, { width: parseFloat(e.target.value) || 1.5 })}
-                                  className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                />
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <label className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">H (in)</label>
-                                <input
-                                  type="number"
-                                  min={0.25}
-                                  max={3.5}
-                                  step={0.25}
-                                  value={el.height ?? 1.25}
-                                  onChange={e => updateElement(el.id, { height: parseFloat(e.target.value) || 1.25 })}
-                                  className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                />
-                              </div>
-                            </>
-                          ) : (
-                            <div className="flex items-center gap-1.5">
-                              <label className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">Size (in)</label>
-                              <input
-                                type="number"
-                                min={0.25}
-                                max={2.5}
-                                step={0.25}
-                                value={el.width ?? 1.25}
-                                onChange={e => {
-                                  const v = parseFloat(e.target.value) || 1.25;
-                                  updateElement(el.id, { width: v, height: v });
-                                }}
-                                className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                              />
-                            </div>
-                          )}
-                          <span className="text-xs text-gray-400 dark:text-gray-500">{ELEMENT_DESCRIPTIONS[el.id]}</span>
+                          <div className="flex items-center gap-1.5">
+                            <label className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">W (in)</label>
+                            <input
+                              type="number"
+                              min={0.5}
+                              max={3.7}
+                              step={0.1}
+                              value={el.width ?? 3.5}
+                              onChange={e => updateElement(el.id, { width: parseFloat(e.target.value) || 3.5 })}
+                              className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <label className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">H (in)</label>
+                            <input
+                              type="number"
+                              min={0.25}
+                              max={3}
+                              step={0.1}
+                              value={el.height ?? 1.5}
+                              onChange={e => updateElement(el.id, { height: parseFloat(e.target.value) || 1.5 })}
+                              className="w-16 px-2 py-1 text-xs border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                          </div>
+                          <span className="text-xs text-gray-400 dark:text-gray-500">Logo scales to fit within this area</span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-3">
@@ -504,30 +452,6 @@ export default function BoxLabelSettings({ companyId, primaryLogoUrl, secondaryL
                 borderRadius: 2,
               }}
             >
-              {hasHeaderInPreview && (
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  width: '100%',
-                  marginBottom: `${0.12 * previewScale}in`,
-                  minHeight: `${Math.max((logoEl.height ?? 1.25), (qrEl.width ?? 1.25)) * previewScale}in`,
-                }}>
-                  <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'flex-start' }}>
-                    {logoBeforeQr
-                      ? (showLogoInPreview ? renderPreviewElement(logoEl) : null)
-                      : (showQrInPreview ? renderPreviewElement(qrEl) : null)
-                    }
-                  </div>
-                  <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'flex-start' }}>
-                    {logoBeforeQr
-                      ? (showQrInPreview ? renderPreviewElement(qrEl) : null)
-                      : (showLogoInPreview ? renderPreviewElement(logoEl) : null)
-                    }
-                  </div>
-                </div>
-              )}
-
               <div style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -536,7 +460,7 @@ export default function BoxLabelSettings({ companyId, primaryLogoUrl, secondaryL
                 flex: 1,
                 justifyContent: 'center',
               }}>
-                {textEls.map(el => renderPreviewElement(el))}
+                {layout.map(el => renderPreviewElement(el))}
               </div>
             </div>
           </div>
