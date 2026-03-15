@@ -186,11 +186,9 @@ export default function BoxLabelEditor({ layout, logoUrl, onLayoutChange }: BoxL
             src={logoUrl}
             alt="Logo"
             style={{
-              width: `${el.width ?? 3.5}in`,
-              height: `${el.height ?? 0.8}in`,
+              width: inchesToPx(el.width ?? 3.5),
+              height: inchesToPx(el.height ?? 0.8),
               objectFit: 'contain',
-              transform: `scale(${zoom})`,
-              transformOrigin: 'top left',
             }}
             draggable={false}
           />
