@@ -180,6 +180,8 @@ export const BoxLabel: React.FC<BoxLabelProps> = ({
     }
   };
 
+  const nonLogoElements = layout.filter(el => el.id !== 'logo');
+
   return (
     <div
       className="box-label"
@@ -196,6 +198,26 @@ export const BoxLabel: React.FC<BoxLabelProps> = ({
         boxSizing: 'border-box',
       }}
     >
+      {showLogo && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'flex-start',
+          width: '100%',
+          marginBottom: '0.2in',
+        }}>
+          <img
+            src={mergedConfig.logoUrl!}
+            alt="Company Logo"
+            style={{
+              width: `${logoWidthIn}in`,
+              height: `${logoHeightIn}in`,
+              objectFit: 'contain',
+            }}
+          />
+        </div>
+      )}
+
       <div style={{
         textAlign: 'center',
         width: '100%',
@@ -205,7 +227,7 @@ export const BoxLabel: React.FC<BoxLabelProps> = ({
         flex: 1,
         justifyContent: 'center',
       }}>
-        {layout.map(el => renderElement(el))}
+        {nonLogoElements.map(el => renderElement(el))}
       </div>
     </div>
   );

@@ -163,44 +163,8 @@ export default function BoxLabelSettings({ companyId, primaryLogoUrl, secondaryL
     if (!el.visible) return null;
 
     switch (el.id) {
-      case 'logo': {
-        const logoEl = layout.find(e => e.id === 'logo')!;
-        return selectedLogoUrl ? (
-          <div key="logo" style={{
-            display: 'flex',
-            justifyContent: 'center',
-            width: '100%',
-            marginBottom: `${0.1 * previewScale}in`,
-          }}>
-            <img
-              src={selectedLogoUrl}
-              alt="Logo"
-              style={{
-                width: `${(logoEl.width ?? 3.5) * previewScale}in`,
-                height: `${(logoEl.height ?? 1.5) * previewScale}in`,
-                objectFit: 'contain',
-              }}
-            />
-          </div>
-        ) : (
-          <div
-            key="logo"
-            style={{
-              width: `${(logoEl.width ?? 3.5) * previewScale}in`,
-              height: `${(logoEl.height ?? 1.5) * previewScale}in`,
-              background: '#f3f4f6',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: 4,
-              margin: '0 auto',
-              marginBottom: `${0.1 * previewScale}in`,
-            }}
-          >
-            <span style={{ fontSize: '8pt', color: '#9ca3af' }}>Logo</span>
-          </div>
-        );
-      }
+      case 'logo':
+        return null;
       case 'work_order_number':
         return (
           <div key="work_order_number" style={{ fontSize: `${(el.fontSize ?? 22) * previewScale}pt`, fontWeight: 'bold', letterSpacing: '1px', textAlign: 'center', lineHeight: 1.2 }}>
@@ -452,6 +416,42 @@ export default function BoxLabelSettings({ companyId, primaryLogoUrl, secondaryL
                 borderRadius: 2,
               }}
             >
+              {layout.find(el => el.id === 'logo')?.visible && (
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'flex-start',
+                  width: '100%',
+                  marginBottom: `${0.15 * previewScale}in`,
+                }}>
+                  {selectedLogoUrl ? (
+                    <img
+                      src={selectedLogoUrl}
+                      alt="Logo"
+                      style={{
+                        width: `${(layout.find(el => el.id === 'logo')?.width ?? 3.5) * previewScale}in`,
+                        height: `${(layout.find(el => el.id === 'logo')?.height ?? 1.5) * previewScale}in`,
+                        objectFit: 'contain',
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: `${(layout.find(el => el.id === 'logo')?.width ?? 3.5) * previewScale}in`,
+                        height: `${(layout.find(el => el.id === 'logo')?.height ?? 1.5) * previewScale}in`,
+                        background: '#f3f4f6',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: 4,
+                      }}
+                    >
+                      <span style={{ fontSize: '8pt', color: '#9ca3af' }}>Logo</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -460,7 +460,7 @@ export default function BoxLabelSettings({ companyId, primaryLogoUrl, secondaryL
                 flex: 1,
                 justifyContent: 'center',
               }}>
-                {layout.map(el => renderPreviewElement(el))}
+                {layout.filter(el => el.id !== 'logo').map(el => renderPreviewElement(el))}
               </div>
             </div>
           </div>
