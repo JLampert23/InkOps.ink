@@ -6,24 +6,34 @@ export type BoxLabelElementId =
   | 'customer_name'
   | 'job_nickname'
   | 'due_date'
-  | 'imprint_types';
+  | 'imprint_types'
+  | 'custom_text';
 
 export interface BoxLabelElement {
-  id: BoxLabelElementId;
+  id: BoxLabelElementId | string;
   order: number;
   visible: boolean;
   fontSize?: number;
   width?: number;
   height?: number;
+  x?: number;
+  y?: number;
+  textAlign?: 'left' | 'center' | 'right';
+  fontWeight?: 'normal' | 'bold' | '500' | '600';
+  content?: string;
 }
 
+export const LABEL_WIDTH_INCHES = 4;
+export const LABEL_HEIGHT_INCHES = 6;
+export const LABEL_PADDING_INCHES = 0.15;
+
 export const DEFAULT_BOX_LABEL_LAYOUT: BoxLabelElement[] = [
-  { id: 'logo', order: 0, visible: true, width: 3.5, height: 1.5 },
-  { id: 'work_order_number', order: 1, visible: true, fontSize: 22 },
-  { id: 'customer_name', order: 2, visible: true, fontSize: 26 },
-  { id: 'job_nickname', order: 3, visible: true, fontSize: 18 },
-  { id: 'due_date', order: 4, visible: true, fontSize: 14 },
-  { id: 'imprint_types', order: 5, visible: true, fontSize: 12 },
+  { id: 'logo', order: 0, visible: true, width: 3.5, height: 0.8, x: 0.25, y: 0.15, textAlign: 'center' },
+  { id: 'work_order_number', order: 1, visible: true, fontSize: 22, x: 0.15, y: 1.1, textAlign: 'center', fontWeight: 'bold' },
+  { id: 'customer_name', order: 2, visible: true, fontSize: 26, x: 0.15, y: 1.5, textAlign: 'center', fontWeight: 'bold' },
+  { id: 'job_nickname', order: 3, visible: true, fontSize: 18, x: 0.15, y: 2.0, textAlign: 'center', fontWeight: '600' },
+  { id: 'due_date', order: 4, visible: true, fontSize: 14, x: 0.15, y: 2.4, textAlign: 'center', fontWeight: '500' },
+  { id: 'imprint_types', order: 5, visible: true, fontSize: 12, x: 0.15, y: 2.8, textAlign: 'center', fontWeight: 'normal' },
 ];
 
 export interface BoxLabelConfig {
@@ -34,6 +44,7 @@ export interface BoxLabelConfig {
   showDueDate: boolean;
   showImprintTypes: boolean;
   layout?: BoxLabelElement[];
+  useAbsolutePositioning?: boolean;
 }
 
 export interface BoxLabelProps {
@@ -43,6 +54,7 @@ export interface BoxLabelProps {
   dueDate?: string;
   imprintTypes?: string[];
   config?: BoxLabelConfig;
+  customTextValues?: Record<string, string>;
 }
 
 const defaultConfig: BoxLabelConfig = {
@@ -52,10 +64,11 @@ const defaultConfig: BoxLabelConfig = {
   showJobNickname: true,
   showDueDate: true,
   showImprintTypes: true,
+  useAbsolutePositioning: true,
 };
 
-function getElement(layout: BoxLabelElement[], id: BoxLabelElementId): BoxLabelElement {
-  return layout.find(el => el.id === id) ?? DEFAULT_BOX_LABEL_LAYOUT.find(el => el.id === id)!;
+function getElement(layout: BoxLabelElement[], id: string): BoxLabelElement | undefined {
+  return layout.find(el => el.id === id);
 }
 
 export const BoxLabel: React.FC<BoxLabelProps> = ({
@@ -65,6 +78,7 @@ export const BoxLabel: React.FC<BoxLabelProps> = ({
   dueDate,
   imprintTypes = [],
   config = defaultConfig,
+  customTextValues = {},
 }) => {
   const mergedConfig = { ...defaultConfig, ...config };
   const uniqueImprintTypes = Array.from(new Set(imprintTypes.filter(Boolean)));
@@ -73,113 +87,113 @@ export const BoxLabel: React.FC<BoxLabelProps> = ({
     ? [...mergedConfig.layout].sort((a, b) => a.order - b.order)
     : DEFAULT_BOX_LABEL_LAYOUT;
 
-  const logoEl = getElement(layout, 'logo');
-  const woEl = getElement(layout, 'work_order_number');
-  const custEl = getElement(layout, 'customer_name');
-  const nickEl = getElement(layout, 'job_nickname');
-  const dateEl = getElement(layout, 'due_date');
-  const imprintEl = getElement(layout, 'imprint_types');
+  const useAbsolute = mergedConfig.useAbsolutePositioning !== false && layout.some(el => el.x !== undefined);
 
-  const showLogo = logoEl.visible && !!mergedConfig.logoUrl;
+  const renderElementContent = (el: BoxLabelElement) => {
+    const baseId = el.id.startsWith('custom_text') ? 'custom_text' : el.id;
 
-  const logoWidthIn = logoEl.width ?? 3.5;
-  const logoHeightIn = logoEl.height ?? 1.5;
-
-  const renderElement = (el: BoxLabelElement) => {
-    if (!el.visible) return null;
-
-    switch (el.id) {
+    switch (baseId) {
       case 'logo':
-        return showLogo ? (
-          <div key="logo" style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            width: '100%',
-            marginBottom: '0.15in',
-          }}>
-            <img
-              src={mergedConfig.logoUrl!}
-              alt="Company Logo"
-              style={{
-                width: `${logoWidthIn}in`,
-                height: `${logoHeightIn}in`,
-                objectFit: 'contain',
-              }}
-            />
-          </div>
-        ) : null;
+        if (!el.visible || !mergedConfig.logoUrl) return null;
+        return (
+          <img
+            src={mergedConfig.logoUrl}
+            alt="Company Logo"
+            style={{
+              width: `${el.width ?? 3.5}in`,
+              height: `${el.height ?? 0.8}in`,
+              objectFit: 'contain',
+            }}
+          />
+        );
 
       case 'work_order_number':
-        return (woEl.visible && mergedConfig.showWorkOrderNumber) ? (
-          <div key="work_order_number" style={{
-            fontSize: `${woEl.fontSize ?? 22}pt`,
-            fontWeight: 'bold',
-            letterSpacing: '1px',
-            textAlign: 'center',
-          }}>
-            WO #{workOrderNumber}
-          </div>
-        ) : null;
+        if (!el.visible || !mergedConfig.showWorkOrderNumber) return null;
+        return `WO #${workOrderNumber}`;
 
       case 'customer_name':
-        return (custEl.visible && mergedConfig.showCustomerName) ? (
-          <div key="customer_name" style={{
-            fontSize: `${custEl.fontSize ?? 26}pt`,
-            fontWeight: 'bold',
-            wordWrap: 'break-word',
-            lineHeight: '1.2',
-            textAlign: 'center',
-          }}>
-            {customerName}
-          </div>
-        ) : null;
+        if (!el.visible || !mergedConfig.showCustomerName) return null;
+        return customerName;
 
       case 'job_nickname':
-        return (nickEl.visible && mergedConfig.showJobNickname && jobNickname) ? (
-          <div key="job_nickname" style={{
-            fontSize: `${nickEl.fontSize ?? 18}pt`,
-            fontWeight: '600',
-            wordWrap: 'break-word',
-            lineHeight: '1.2',
-            textAlign: 'center',
-          }}>
-            {jobNickname}
-          </div>
-        ) : null;
+        if (!el.visible || !mergedConfig.showJobNickname || !jobNickname) return null;
+        return jobNickname;
 
       case 'due_date':
-        return (dateEl.visible && mergedConfig.showDueDate && dueDate) ? (
-          <div key="due_date" style={{
-            fontSize: `${dateEl.fontSize ?? 14}pt`,
-            fontWeight: '500',
-            color: '#374151',
-            textAlign: 'center',
-          }}>
-            Due: {dueDate}
-          </div>
-        ) : null;
+        if (!el.visible || !mergedConfig.showDueDate || !dueDate) return null;
+        return `Due: ${dueDate}`;
 
       case 'imprint_types':
-        return (imprintEl.visible && mergedConfig.showImprintTypes && uniqueImprintTypes.length > 0) ? (
-          <div key="imprint_types" style={{
-            marginTop: '0.1in',
-            fontSize: `${imprintEl.fontSize ?? 12}pt`,
-            lineHeight: '1.4',
-            textAlign: 'center',
-          }}>
+        if (!el.visible || !mergedConfig.showImprintTypes || uniqueImprintTypes.length === 0) return null;
+        return (
+          <div style={{ lineHeight: '1.4' }}>
             <div style={{ fontWeight: 'bold', marginBottom: '0.05in' }}>Imprints:</div>
             {uniqueImprintTypes.map((imprint, idx) => (
-              <div key={idx} style={{ fontSize: `${Math.max((imprintEl.fontSize ?? 12) - 1, 8)}pt` }}>{imprint}</div>
+              <div key={idx} style={{ fontSize: `${Math.max((el.fontSize ?? 12) - 1, 8)}pt` }}>{imprint}</div>
             ))}
           </div>
-        ) : null;
+        );
+
+      case 'custom_text':
+        if (!el.visible) return null;
+        const customValue = customTextValues[el.id] || el.content || '';
+        return customValue;
 
       default:
         return null;
     }
   };
 
+  if (useAbsolute) {
+    return (
+      <div
+        className="box-label"
+        style={{
+          width: `${LABEL_WIDTH_INCHES}in`,
+          height: `${LABEL_HEIGHT_INCHES}in`,
+          border: '1px solid black',
+          fontFamily: 'system-ui, sans-serif',
+          position: 'relative',
+          backgroundColor: 'white',
+          color: 'black',
+          boxSizing: 'border-box',
+          overflow: 'hidden',
+        }}
+      >
+        {layout.map(el => {
+          const content = renderElementContent(el);
+          if (content === null) return null;
+
+          const isLogo = el.id === 'logo';
+          const contentWidth = LABEL_WIDTH_INCHES - (el.x ?? 0.15) * 2;
+
+          return (
+            <div
+              key={el.id}
+              style={{
+                position: 'absolute',
+                left: `${el.x ?? 0.15}in`,
+                top: `${el.y ?? 0}in`,
+                width: isLogo ? 'auto' : `${contentWidth}in`,
+                fontSize: isLogo ? undefined : `${el.fontSize ?? 14}pt`,
+                fontWeight: el.fontWeight ?? 'normal',
+                textAlign: el.textAlign ?? 'center',
+                lineHeight: isLogo ? undefined : '1.2',
+                wordWrap: 'break-word',
+              }}
+            >
+              {content}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  const logoEl = getElement(layout, 'logo');
+  const showLogo = logoEl?.visible && !!mergedConfig.logoUrl;
+  const logoWidthIn = logoEl?.width ?? 3.5;
+  const logoHeightIn = logoEl?.height ?? 0.8;
   const nonLogoElements = layout.filter(el => el.id !== 'logo');
 
   return (
@@ -225,9 +239,25 @@ export const BoxLabel: React.FC<BoxLabelProps> = ({
         flexDirection: 'column',
         gap: '0.12in',
         flex: 1,
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
       }}>
-        {nonLogoElements.map(el => renderElement(el))}
+        {nonLogoElements.map(el => {
+          const content = renderElementContent(el);
+          if (content === null) return null;
+          return (
+            <div
+              key={el.id}
+              style={{
+                fontSize: `${el.fontSize ?? 14}pt`,
+                fontWeight: el.fontWeight ?? 'normal',
+                textAlign: el.textAlign ?? 'center',
+                lineHeight: '1.2',
+              }}
+            >
+              {content}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
