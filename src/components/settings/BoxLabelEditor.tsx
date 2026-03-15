@@ -418,30 +418,52 @@ export default function BoxLabelEditor({ layout, logoUrl, onLayoutChange }: BoxL
               </div>
 
               {selectedElement.id === 'logo' ? (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-4">
                   <div>
                     <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Width (in)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0.5"
-                      max={LABEL_WIDTH_INCHES}
-                      value={selectedElement.width ?? 3.5}
-                      onChange={(e) => updateElement(selectedElement.id, { width: parseFloat(e.target.value) || 3.5 })}
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
-                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min="0.5"
+                        max={LABEL_WIDTH_INCHES}
+                        step="0.1"
+                        value={selectedElement.width ?? 3.5}
+                        onChange={(e) => updateElement(selectedElement.id, { width: parseFloat(e.target.value) })}
+                        className="flex-1"
+                      />
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0.5"
+                        max={LABEL_WIDTH_INCHES}
+                        value={selectedElement.width ?? 3.5}
+                        onChange={(e) => updateElement(selectedElement.id, { width: parseFloat(e.target.value) || 3.5 })}
+                        className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Height (in)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0.25"
-                      max={3}
-                      value={selectedElement.height ?? 0.8}
-                      onChange={(e) => updateElement(selectedElement.id, { height: parseFloat(e.target.value) || 0.8 })}
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
-                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="range"
+                        min="0.25"
+                        max="3"
+                        step="0.1"
+                        value={selectedElement.height ?? 0.8}
+                        onChange={(e) => updateElement(selectedElement.id, { height: parseFloat(e.target.value) })}
+                        className="flex-1"
+                      />
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0.25"
+                        max="3"
+                        value={selectedElement.height ?? 0.8}
+                        onChange={(e) => updateElement(selectedElement.id, { height: parseFloat(e.target.value) || 0.8 })}
+                        className="w-16 px-2 py-1 text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
                   </div>
                 </div>
               ) : (
