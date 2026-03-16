@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase-client';
 import { proxySanMarImageUrl } from '../../utils/sanmar-image-proxy';
+import { sanitizeImageUrl, isPlaceholderUrl } from '../../utils/image-validator';
 import {
   X,
   Upload,
@@ -527,8 +528,9 @@ export default function MockupGenerator({
           setGarmentStyles(styles);
 
           // Set the initial garment image from the first item
-          if (lineItems[0].garment_front_image_url) {
-            setGarmentImageUrl(proxySanMarImageUrl(lineItems[0].garment_front_image_url));
+          const sanitizedUrl = sanitizeImageUrl(lineItems[0].garment_front_image_url);
+          if (sanitizedUrl) {
+            setGarmentImageUrl(proxySanMarImageUrl(sanitizedUrl));
             setGarmentDescription(lineItems[0].description || '');
           }
         }
@@ -768,8 +770,9 @@ export default function MockupGenerator({
               .eq('id', lineItemId)
               .maybeSingle();
 
-            if (lineItemData && lineItemData.garment_front_image_url) {
-              setGarmentImageUrl(lineItemData.garment_front_image_url);
+            const sanitizedUrl = sanitizeImageUrl(lineItemData?.garment_front_image_url);
+            if (sanitizedUrl) {
+              setGarmentImageUrl(sanitizedUrl);
             } else {
               await fetchGarmentImage();
             }
@@ -786,9 +789,10 @@ export default function MockupGenerator({
             .eq('id', lineItemId)
             .maybeSingle();
 
-          if (lineItemData && lineItemData.garment_front_image_url) {
+          const sanitizedUrl = sanitizeImageUrl(lineItemData?.garment_front_image_url);
+          if (sanitizedUrl) {
             // Use stored garment images
-            setGarmentImageUrl(lineItemData.garment_front_image_url);
+            setGarmentImageUrl(sanitizedUrl);
             setGarmentBrand('');
             setGarmentDescription(lineItemData.description || '');
           } else {
@@ -908,8 +912,9 @@ export default function MockupGenerator({
             }
           }
 
-          if (matchingColor?.image_url) {
-            setGarmentImageUrl(matchingColor.image_url);
+          const sanitizedUrl = sanitizeImageUrl(matchingColor?.image_url);
+          if (sanitizedUrl) {
+            setGarmentImageUrl(sanitizedUrl);
             setGarmentBrand(product.brand || product.supplier);
             setGarmentDescription(product.description);
 
@@ -2346,8 +2351,9 @@ export default function MockupGenerator({
                           className="p-2 cursor-pointer"
                           onClick={() => {
                             setActiveGarmentIndex(index);
-                            if (garmentStyle.frontImage) {
-                              setGarmentImageUrl(proxySanMarImageUrl(garmentStyle.frontImage));
+                            const sanitizedUrl = sanitizeImageUrl(garmentStyle.frontImage);
+                            if (sanitizedUrl) {
+                              setGarmentImageUrl(proxySanMarImageUrl(sanitizedUrl));
                               setGarmentDescription(garmentStyle.description);
                             }
                           }}
@@ -2378,19 +2384,23 @@ export default function MockupGenerator({
                                 let lifestyleImages = [...(imagesData.lifestyleImages || [])];
                                 let otherImages = [...(imagesData.otherImages || [])];
 
-                                // Fallback to single URLs if no organized data - but only push valid URLs
+                                // Fallback to single URLs if no organized data - but only push valid, non-placeholder URLs
                                 if (frontImages.length === 0 && rearImages.length === 0 && sideImages.length === 0 && lifestyleImages.length === 0) {
-                                  if (garmentStyle.frontImage && garmentStyle.frontImage.trim()) {
-                                    frontImages.push(garmentStyle.frontImage);
+                                  const sanitizedFront = sanitizeImageUrl(garmentStyle.frontImage);
+                                  if (sanitizedFront) {
+                                    frontImages.push(sanitizedFront);
                                   }
-                                  if (garmentStyle.rearImage && garmentStyle.rearImage.trim()) {
-                                    rearImages.push(garmentStyle.rearImage);
+                                  const sanitizedRear = sanitizeImageUrl(garmentStyle.rearImage);
+                                  if (sanitizedRear) {
+                                    rearImages.push(sanitizedRear);
                                   }
-                                  if (garmentStyle.sideImage && garmentStyle.sideImage.trim()) {
-                                    sideImages.push(garmentStyle.sideImage);
+                                  const sanitizedSide = sanitizeImageUrl(garmentStyle.sideImage);
+                                  if (sanitizedSide) {
+                                    sideImages.push(sanitizedSide);
                                   }
-                                  if (garmentStyle.lifestyleImage && garmentStyle.lifestyleImage.trim()) {
-                                    lifestyleImages.push(garmentStyle.lifestyleImage);
+                                  const sanitizedLifestyle = sanitizeImageUrl(garmentStyle.lifestyleImage);
+                                  if (sanitizedLifestyle) {
+                                    lifestyleImages.push(sanitizedLifestyle);
                                   }
                                 }
 
@@ -2435,7 +2445,10 @@ export default function MockupGenerator({
                                         key={idx}
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          setGarmentImageUrl(imageUrl);
+                                          const sanitizedUrl = sanitizeImageUrl(imageUrl);
+                                          if (sanitizedUrl) {
+                                            setGarmentImageUrl(sanitizedUrl);
+                                          }
                                         }}
                                         className={`relative w-14 h-14 rounded border overflow-hidden transition-all hover:scale-105 flex-shrink-0 ${
                                           garmentImageUrl === imageUrl

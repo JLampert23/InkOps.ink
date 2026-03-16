@@ -10,6 +10,7 @@ import {
   fetchSanMarMedia,
   type SanMarCredentials,
 } from "../_shared/sanmar-promostandards-client.ts";
+import { isPlaceholderUrl } from "../_shared/image-validator.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,18 +19,6 @@ const corsHeaders = {
 };
 
 const STORAGE_BUCKET = "sanmar-images";
-
-const PLACEHOLDER_INDICATORS = [
-  "imagenotavailable",
-  "image404errorhandler",
-  "image_not_available",
-  "notavailable",
-];
-
-function isPlaceholderUrl(url: string): boolean {
-  const lower = url.toLowerCase();
-  return PLACEHOLDER_INDICATORS.some((ind) => lower.includes(ind));
-}
 
 function getFileExtension(url: string, contentType: string): string {
   const urlPath = new URL(url).pathname;

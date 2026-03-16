@@ -10,6 +10,7 @@ import {
   sanMarImagesFresh,
   type ResolvedColorImages,
 } from "../_shared/sanmar-image-resolver.ts";
+import { filterValidImages as sharedFilterValidImages } from "../_shared/image-validator.ts";
 
 export interface ColorOption {
   name: string;
@@ -53,65 +54,8 @@ function extractColorCode(partId: string, style: string): string {
   return stripped;
 }
 
-async function validateSanMarImageUrl(url: string): Promise<boolean> {
-  try {
-    const response = await fetch(url, {
-      method: "HEAD",
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; InkOps/1.0)",
-        Accept: "image/*",
-      },
-      redirect: "manual",
-    });
-
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get("Location") || "";
-      const lower = location.toLowerCase();
-      if (lower.includes("imagenotavailable") || lower.includes("image404errorhandler") || lower.includes("notavailable")) {
-        return false;
-      }
-    }
-
-    return response.ok;
-  } catch {
-    return false;
-  }
-}
-
-async function filterValidImages(
-  images: any[]
-): Promise<any[]> {
-  if (!images || images.length === 0) return [];
-
-  const uniqueUrls = [...new Set(images.map((img: any) => img.url).filter(Boolean))];
-  if (uniqueUrls.length === 0) return [];
-
-  const samplesToCheck = uniqueUrls.slice(0, 3);
-  const results = await Promise.allSettled(
-    samplesToCheck.map(url => validateSanMarImageUrl(url))
-  );
-
-  const validUrls = new Set<string>();
-  const invalidUrls = new Set<string>();
-  results.forEach((result, i) => {
-    if (result.status === "fulfilled" && result.value) {
-      validUrls.add(samplesToCheck[i]);
-    } else {
-      invalidUrls.add(samplesToCheck[i]);
-    }
-  });
-
-  if (validUrls.size === 0) {
-    console.log(`[SanMar] All ${samplesToCheck.length} sample URLs failed validation - discarding all images`);
-    return [];
-  }
-
-  if (invalidUrls.size > 0) {
-    console.log(`[SanMar] ${invalidUrls.size}/${samplesToCheck.length} sample URLs invalid, filtering out bad URLs`);
-    return images.filter((img: any) => !invalidUrls.has(img.url));
-  }
-
-  return images;
+async function filterValidImages(images: any[]): Promise<any[]> {
+  return sharedFilterValidImages(images);
 }
 
 export async function searchSanMarCatalog(
