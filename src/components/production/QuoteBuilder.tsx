@@ -8,7 +8,6 @@ import { ManageImprintsModal } from './ManageImprintsModal';
 import MockupGenerator from './MockupGenerator';
 import { SendQuoteModal } from './SendQuoteModal';
 import { getUnifiedProductData, fetchLiveSSActivewearPricing } from '../../services/ssactivewear-promostandards-service';
-import { getUnifiedSanMarData } from '../../services/sanmar-service';
 import { proxySanMarImageUrl } from '../../utils/sanmar-image-proxy';
 import { recalculateImprintPricesForGroup } from '../../utils/price-matrix-utils';
 
@@ -1718,171 +1717,62 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         });
         showNotification('error', `Failed to load images: ${error.message}`);
       }
-    } else if (product.supplier === 'sanmar' && color?.code) {
-      try {
-        console.log('🎨 Fetching SanMar garment images & pricing for:', { style: product.style, partId: color.code });
-        const unifiedData = await getUnifiedSanMarData(product.style, color.code);
-        console.log('📦 SanMar Unified data response:', {
-          success: unifiedData.success,
-          hasMedia: !!unifiedData.media,
-          hasViews: !!unifiedData.media?.views,
-          hasImages: !!unifiedData.media?.images,
-          imageCount: unifiedData.media?.images?.length,
-          viewsKeys: unifiedData.media?.views ? Object.keys(unifiedData.media.views) : [],
-          hasPricing: !!unifiedData.pricing,
-          basePrice: unifiedData.pricing?.basePrice,
+    } else if (product.supplier === 'sanmar' && color) {
+      // Use images and pricing directly from product-search results (already fetched)
+      // This avoids extra API calls to the garments endpoint
+      console.log('🔷 Using SanMar data from search results:', {
+        style: product.style,
+        color: color.name,
+        hasImageUrl: !!color.image_url,
+        hasRearImage: !!color.rear_image_url,
+        hasSideImage: !!color.side_image_url,
+        hasPricing: !!color.pricing?.wholesale,
+      });
+
+      // Use pricing from search results
+      if (color.pricing?.wholesale) {
+        freshPrice = color.pricing.wholesale;
+        console.log('💰 SanMar pricing from search results:', freshPrice);
+      }
+
+      const frontUrl = proxySanMarImageUrl(color.image_url || '');
+      const rearUrl = proxySanMarImageUrl(color.rear_image_url || '');
+      const sideUrl = proxySanMarImageUrl(color.side_image_url || '');
+
+      if (frontUrl) {
+        garmentImages.garment_front_image_url = frontUrl;
+      }
+
+      if (rearUrl) {
+        garmentImages.garment_back_image_url = rearUrl;
+        garmentImages.garment_rear_image_url = rearUrl;
+      }
+
+      if (sideUrl) {
+        garmentImages.garment_side_image_url = sideUrl;
+      }
+
+      // Build images data structure
+      const allImages = [frontUrl, rearUrl, sideUrl].filter(Boolean);
+
+      if (allImages.length > 0) {
+        garmentImages.garment_images_data = {
+          frontImages: frontUrl ? [frontUrl] : [],
+          rearImages: rearUrl ? [rearUrl] : [],
+          sideImages: sideUrl ? [sideUrl] : [],
+          lifestyleImages: [],
+          otherImages: [],
+          allImages,
+        };
+
+        console.log('✅ Loaded SanMar images from search results:', {
+          front: !!color.image_url,
+          rear: !!color.rear_image_url,
+          side: !!color.side_image_url,
+          totalImages: allImages.length,
         });
-
-        // Extract fresh pricing
-        if (unifiedData.pricing?.basePrice && unifiedData.pricing.basePrice > 0) {
-          freshPrice = unifiedData.pricing.basePrice;
-          console.log('💰 Fresh SanMar pricing found from basePrice:', {
-            partId: color.code,
-            price: freshPrice,
-          });
-        } else if (unifiedData.pricing?.parts && unifiedData.pricing.parts.length > 0) {
-          const matchingPart = unifiedData.pricing.parts.find(p => p.partId === color.code);
-          if (matchingPart?.prices && matchingPart.prices.length > 0) {
-            freshPrice = matchingPart.prices[0].price;
-            console.log('💰 Fresh SanMar pricing from matching part:', { partId: color.code, price: freshPrice });
-          } else {
-            const firstPart = unifiedData.pricing.parts[0];
-            if (firstPart?.prices && firstPart.prices.length > 0) {
-              freshPrice = firstPart.prices[0].price;
-              console.log('💰 Using first available SanMar price:', { partId: firstPart.partId, price: freshPrice });
-            }
-          }
-        } else if (color.pricing?.wholesale) {
-          freshPrice = color.pricing.wholesale;
-          console.log('💰 Using cached SanMar pricing from search results:', freshPrice);
-        }
-
-        // Check if we have live media data from the API
-        const hasLiveMediaData = unifiedData.success && unifiedData.media?.views &&
-          (unifiedData.media.views.front || unifiedData.media.views.rear || unifiedData.media.views.side ||
-           (unifiedData.media.views.frontImages && unifiedData.media.views.frontImages.length > 0) ||
-           (unifiedData.media.views.rearImages && unifiedData.media.views.rearImages.length > 0) ||
-           (unifiedData.media.views.sideImages && unifiedData.media.views.sideImages.length > 0) ||
-           (unifiedData.media.views.lifestyleImages && unifiedData.media.views.lifestyleImages.length > 0) ||
-           (unifiedData.media.images && unifiedData.media.images.length > 0));
-
-        if (hasLiveMediaData) {
-          // Proxy SanMar image URLs through our proxy
-          const proxyUrl = (url: string | null) => url ? proxySanMarImageUrl(url) : null;
-
-          if (unifiedData.media.views.front) {
-            garmentImages.garment_front_image_url = proxyUrl(unifiedData.media.views.front);
-            garmentImages.garment_back_image_url = proxyUrl(unifiedData.media.views.front);
-            console.log('✅ Set SanMar front image:', unifiedData.media.views.front);
-          }
-          if (unifiedData.media.views.rear) {
-            garmentImages.garment_rear_image_url = proxyUrl(unifiedData.media.views.rear);
-            console.log('✅ Set SanMar rear image:', unifiedData.media.views.rear);
-          }
-          if (unifiedData.media.views.side) {
-            garmentImages.garment_side_image_url = proxyUrl(unifiedData.media.views.side);
-            garmentImages.garment_sleeve_image_url = proxyUrl(unifiedData.media.views.side);
-            console.log('✅ Set SanMar side image:', unifiedData.media.views.side);
-          }
-          if (unifiedData.media.views.lifestyle) {
-            garmentImages.garment_lifestyle_image_url = proxyUrl(unifiedData.media.views.lifestyle);
-            console.log('✅ Set SanMar lifestyle image:', unifiedData.media.views.lifestyle);
-          }
-
-          garmentImages.garment_images_data = {
-            frontImages: (unifiedData.media.views.frontImages || []).map(proxyUrl).filter(Boolean) as string[],
-            rearImages: (unifiedData.media.views.rearImages || []).map(proxyUrl).filter(Boolean) as string[],
-            sideImages: (unifiedData.media.views.sideImages || []).map(proxyUrl).filter(Boolean) as string[],
-            lifestyleImages: (unifiedData.media.views.lifestyleImages || []).map(proxyUrl).filter(Boolean) as string[],
-            otherImages: (unifiedData.media.views.otherImages || []).map(proxyUrl).filter(Boolean) as string[],
-            allImages: (unifiedData.media.images || []).map((img: any) => proxyUrl(typeof img === 'string' ? img : img?.url)).filter(Boolean) as string[],
-          };
-
-          console.log('✅ Loaded SanMar images from PromoStandards API:', {
-            front: !!garmentImages.garment_front_image_url,
-            rear: !!garmentImages.garment_rear_image_url,
-            side: !!garmentImages.garment_side_image_url,
-            lifestyle: !!garmentImages.garment_lifestyle_image_url,
-            frontImages: garmentImages.garment_images_data.frontImages.length,
-            rearImages: garmentImages.garment_images_data.rearImages.length,
-            sideImages: garmentImages.garment_images_data.sideImages.length,
-            lifestyleImages: garmentImages.garment_images_data.lifestyleImages.length,
-            otherImages: garmentImages.garment_images_data.otherImages.length,
-            allImages: garmentImages.garment_images_data.allImages.length,
-          });
-        } else {
-          // Fallback to cached images from search results
-          console.log('⚠️ No live SanMar media data, using cached images from search results');
-
-          const frontUrl = proxySanMarImageUrl(color.image_url || '');
-          const rearUrl = proxySanMarImageUrl(color.rear_image_url || '');
-          const sideUrl = proxySanMarImageUrl(color.side_image_url || '');
-
-          if (frontUrl) {
-            garmentImages.garment_front_image_url = frontUrl;
-            garmentImages.garment_back_image_url = frontUrl;
-          }
-          if (rearUrl) {
-            garmentImages.garment_rear_image_url = rearUrl;
-          }
-          if (sideUrl) {
-            garmentImages.garment_side_image_url = sideUrl;
-          }
-
-          const allImages = [frontUrl, rearUrl, sideUrl].filter(Boolean);
-          if (allImages.length > 0) {
-            garmentImages.garment_images_data = {
-              frontImages: frontUrl ? [frontUrl] : [],
-              rearImages: rearUrl ? [rearUrl] : [],
-              sideImages: sideUrl ? [sideUrl] : [],
-              lifestyleImages: [],
-              otherImages: [],
-              allImages,
-            };
-
-            console.log('✅ Loaded cached SanMar images from search results:', {
-              front: !!frontUrl,
-              rear: !!rearUrl,
-              side: !!sideUrl,
-              totalImages: allImages.length,
-            });
-          }
-        }
-      } catch (error: any) {
-        console.error('❌ Failed to fetch SanMar garment images:', {
-          message: error.message,
-          stack: error.stack,
-          error,
-        });
-
-        // Fallback to cached images from search results
-        console.log('⚠️ Error fetching live data, falling back to cached images');
-        const frontUrl = proxySanMarImageUrl(color.image_url || '');
-        const rearUrl = proxySanMarImageUrl(color.rear_image_url || '');
-        const sideUrl = proxySanMarImageUrl(color.side_image_url || '');
-
-        if (frontUrl) {
-          garmentImages.garment_front_image_url = frontUrl;
-          garmentImages.garment_back_image_url = frontUrl;
-        }
-        if (rearUrl) {
-          garmentImages.garment_rear_image_url = rearUrl;
-        }
-        if (sideUrl) {
-          garmentImages.garment_side_image_url = sideUrl;
-        }
-
-        const allImages = [frontUrl, rearUrl, sideUrl].filter(Boolean);
-        if (allImages.length > 0) {
-          garmentImages.garment_images_data = {
-            frontImages: frontUrl ? [frontUrl] : [],
-            rearImages: rearUrl ? [rearUrl] : [],
-            sideImages: sideUrl ? [sideUrl] : [],
-            lifestyleImages: [],
-            otherImages: [],
-            allImages,
-          };
-        }
+      } else {
+        console.warn('⚠️ No SanMar images in search results');
       }
     }
 

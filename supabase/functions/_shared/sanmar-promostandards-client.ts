@@ -120,8 +120,18 @@ export interface SanMarUnifiedResponse {
 const SANMAR_CATALOG_CDN = "https://cdnm.sanmar.com/catalog/images";
 
 function rewriteSanMarImageUrl(url: string): string {
-  // Return the URL as-is from PromoStandards API
-  // The imglib URLs are the correct format: https://cdnm.sanmar.com/imglib/...
+  if (!url) return url;
+  try {
+    const parsed = new URL(url);
+    if (parsed.pathname.startsWith("/imglib/")) {
+      const filename = parsed.pathname.split("/").pop() || "";
+      if (filename) {
+        return `${SANMAR_CATALOG_CDN}/${filename}`;
+      }
+    }
+  } catch {
+    // not a valid URL
+  }
   return url;
 }
 
@@ -575,15 +585,14 @@ export async function fetchSanMarMedia(
   xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
   <soapenv:Header/>
   <soapenv:Body>
-    <ns:GetMediaContentRequest>
+    <ns:getMediaContentRequest>
       <shar:wsVersion>1.1.0</shar:wsVersion>
       <shar:id>${escapeXml(credentials.id)}</shar:id>
       <shar:password>${escapeXml(credentials.password)}</shar:password>
       <shar:cultureName>en-US</shar:cultureName>
       <shar:mediaType>Image</shar:mediaType>
-      <shar:productId>${escapeXml(normalizedStyle)}</shar:productId>${partId ? `
-      <shar:partId>${escapeXml(partId)}</shar:partId>` : ''}
-    </ns:GetMediaContentRequest>
+      <shar:productId>${escapeXml(normalizedStyle)}</shar:productId>
+    </ns:getMediaContentRequest>
   </soapenv:Body>
 </soapenv:Envelope>`;
 
