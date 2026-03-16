@@ -519,29 +519,29 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
             {/* Line Items Table */}
             {lineItems.filter(item => item.line_type === 'item' || !item.line_type).length > 0 && (
               <div className="mb-3 overflow-x-auto">
-                <table className="w-full border-collapse border border-gray-400" style={{ fontSize: '8pt' }}>
+                <table className="w-full border-collapse border-2 border-gray-500" style={{ fontSize: '8pt' }}>
                   <thead>
                     <tr className="bg-gray-100">
-                      <th className="border border-gray-400 px-1 py-0.5 text-left font-semibold">Item #</th>
-                      <th className="border border-gray-400 px-1 py-0.5 text-left font-semibold">Color</th>
-                      <th className="border border-gray-400 px-1 py-0.5 text-left font-semibold">Description</th>
-                      <th className="border border-gray-400 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>YXS</th>
-                      <th className="border border-gray-400 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>YS</th>
-                      <th className="border border-gray-400 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>YM</th>
-                      <th className="border border-gray-400 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>YL</th>
-                      <th className="border border-gray-400 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>YXL</th>
-                      <th className="border border-gray-400 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>XS</th>
-                      <th className="border border-gray-400 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>S</th>
-                      <th className="border border-gray-400 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>M</th>
-                      <th className="border border-gray-400 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>L</th>
-                      <th className="border border-gray-400 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>XL</th>
-                      <th className="border border-gray-400 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>2XL</th>
-                      <th className="border border-gray-400 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>3XL</th>
-                      <th className="border border-gray-400 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>4XL</th>
-                      <th className="border border-gray-400 px-1 py-0.5 text-center font-semibold">Qty</th>
-                      <th className="border border-gray-400 px-1 py-0.5 text-center font-semibold">Items</th>
-                      <th className="border border-gray-400 px-1 py-0.5 text-right font-semibold">Unit Price</th>
-                      <th className="border border-gray-400 px-1 py-0.5 text-right font-semibold">Total</th>
+                      <th className="border border-gray-500 px-1 py-0.5 text-left font-semibold">Item #</th>
+                      <th className="border border-gray-500 px-1 py-0.5 text-left font-semibold">Color</th>
+                      <th className="border border-gray-500 px-1 py-0.5 text-left font-semibold">Description</th>
+                      <th className="border border-gray-500 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>YXS</th>
+                      <th className="border border-gray-500 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>YS</th>
+                      <th className="border border-gray-500 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>YM</th>
+                      <th className="border border-gray-500 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>YL</th>
+                      <th className="border border-gray-500 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>YXL</th>
+                      <th className="border border-gray-500 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>XS</th>
+                      <th className="border border-gray-500 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>S</th>
+                      <th className="border border-gray-500 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>M</th>
+                      <th className="border border-gray-500 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>L</th>
+                      <th className="border border-gray-500 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>XL</th>
+                      <th className="border border-gray-500 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>2XL</th>
+                      <th className="border border-gray-500 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>3XL</th>
+                      <th className="border border-gray-500 px-0.5 py-0.5 text-center font-semibold" style={{ width: '24px' }}>4XL</th>
+                      <th className="border border-gray-500 px-1 py-0.5 text-center font-semibold">Qty</th>
+                      <th className="border border-gray-500 px-1 py-0.5 text-center font-semibold">Items</th>
+                      <th className="border border-gray-500 px-1 py-0.5 text-right font-semibold">Unit Price</th>
+                      <th className="border border-gray-500 px-1 py-0.5 text-right font-semibold">Total</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -561,7 +561,7 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
                         <>
                           {groupLabel && (
                             <tr key={`group-${groupIdx}`} className="bg-gray-200">
-                              <td colSpan={20} className="border border-gray-400 px-2 py-1 font-bold text-gray-900">
+                              <td colSpan={20} className="border border-gray-500 px-2 py-1 font-bold text-gray-900">
                                 {groupLabel}
                               </td>
                             </tr>
@@ -575,26 +575,26 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
                             const totalItems = sizeQty + (item.quantity || 0);
                             return (
                               <tr key={`${groupIdx}-${idx}`}>
-                                <td className="border border-gray-400 px-1 py-0.5">{item.item_number || ''}</td>
-                                <td className="border border-gray-400 px-1 py-0.5">{item.color || ''}</td>
-                                <td className="border border-gray-400 px-1 py-0.5">{item.description}</td>
-                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_yxs || ''}</td>
-                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_ys || ''}</td>
-                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_ym || ''}</td>
-                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_yl || ''}</td>
-                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_yxl || ''}</td>
-                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_xs || ''}</td>
-                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_s || ''}</td>
-                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_m || ''}</td>
-                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_l || ''}</td>
-                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_xl || ''}</td>
-                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_2xl || ''}</td>
-                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_3xl || ''}</td>
-                                <td className="border border-gray-400 px-0.5 py-0.5 text-center">{item.qty_4xl || ''}</td>
-                                <td className="border border-gray-400 px-1 py-0.5 text-center">{item.quantity || ''}</td>
-                                <td className="border border-gray-400 px-1 py-0.5 text-center font-semibold text-blue-600">{totalItems}</td>
-                                <td className="border border-gray-400 px-1 py-0.5 text-right">${(item.unit_price || 0).toFixed(2)}</td>
-                                <td className="border border-gray-400 px-1 py-0.5 text-right">${(item.total_price || 0).toFixed(2)}</td>
+                                <td className="border border-gray-500 px-1 py-0.5">{item.item_number || ''}</td>
+                                <td className="border border-gray-500 px-1 py-0.5">{item.color || ''}</td>
+                                <td className="border border-gray-500 px-1 py-0.5">{item.description}</td>
+                                <td className="border border-gray-500 px-0.5 py-0.5 text-center">{item.qty_yxs || ''}</td>
+                                <td className="border border-gray-500 px-0.5 py-0.5 text-center">{item.qty_ys || ''}</td>
+                                <td className="border border-gray-500 px-0.5 py-0.5 text-center">{item.qty_ym || ''}</td>
+                                <td className="border border-gray-500 px-0.5 py-0.5 text-center">{item.qty_yl || ''}</td>
+                                <td className="border border-gray-500 px-0.5 py-0.5 text-center">{item.qty_yxl || ''}</td>
+                                <td className="border border-gray-500 px-0.5 py-0.5 text-center">{item.qty_xs || ''}</td>
+                                <td className="border border-gray-500 px-0.5 py-0.5 text-center">{item.qty_s || ''}</td>
+                                <td className="border border-gray-500 px-0.5 py-0.5 text-center">{item.qty_m || ''}</td>
+                                <td className="border border-gray-500 px-0.5 py-0.5 text-center">{item.qty_l || ''}</td>
+                                <td className="border border-gray-500 px-0.5 py-0.5 text-center">{item.qty_xl || ''}</td>
+                                <td className="border border-gray-500 px-0.5 py-0.5 text-center">{item.qty_2xl || ''}</td>
+                                <td className="border border-gray-500 px-0.5 py-0.5 text-center">{item.qty_3xl || ''}</td>
+                                <td className="border border-gray-500 px-0.5 py-0.5 text-center">{item.qty_4xl || ''}</td>
+                                <td className="border border-gray-500 px-1 py-0.5 text-center">{item.quantity || ''}</td>
+                                <td className="border border-gray-500 px-1 py-0.5 text-center font-semibold text-blue-600">{totalItems}</td>
+                                <td className="border border-gray-500 px-1 py-0.5 text-right">${(item.unit_price || 0).toFixed(2)}</td>
+                                <td className="border border-gray-500 px-1 py-0.5 text-right">${(item.total_price || 0).toFixed(2)}</td>
                               </tr>
                             );
                           })}
@@ -653,24 +653,24 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
             {/* Fees Table */}
             {lineItems.filter(item => item.line_type === 'fee').length > 0 && (
               <div className="mb-3">
-                <table className="w-full border-collapse border border-gray-400" style={{ fontSize: '9pt' }}>
+                <table className="w-full border-collapse border-2 border-gray-500" style={{ fontSize: '9pt' }}>
                   <thead>
                     <tr className="bg-gray-100">
-                      <th className="border border-gray-400 px-2 py-0.5 text-left font-semibold">Fee</th>
-                      <th className="border border-gray-400 px-2 py-0.5 text-left font-semibold">Description</th>
-                      <th className="border border-gray-400 px-2 py-0.5 text-center font-semibold">Qty</th>
-                      <th className="border border-gray-400 px-2 py-0.5 text-right font-semibold">Amount</th>
-                      <th className="border border-gray-400 px-2 py-0.5 text-right font-semibold">Total</th>
+                      <th className="border border-gray-500 px-2 py-0.5 text-left font-semibold">Fee</th>
+                      <th className="border border-gray-500 px-2 py-0.5 text-left font-semibold">Description</th>
+                      <th className="border border-gray-500 px-2 py-0.5 text-center font-semibold">Qty</th>
+                      <th className="border border-gray-500 px-2 py-0.5 text-right font-semibold">Amount</th>
+                      <th className="border border-gray-500 px-2 py-0.5 text-right font-semibold">Total</th>
                     </tr>
                   </thead>
                   <tbody>
                     {lineItems.filter(item => item.line_type === 'fee').map((fee, idx) => (
                       <tr key={idx}>
-                        <td className="border border-gray-400 px-2 py-0.5">{fee.description}</td>
-                        <td className="border border-gray-400 px-2 py-0.5">{fee.notes || ''}</td>
-                        <td className="border border-gray-400 px-2 py-0.5 text-center">{fee.quantity || 1}</td>
-                        <td className="border border-gray-400 px-2 py-0.5 text-right">${(fee.unit_price || 0).toFixed(2)}</td>
-                        <td className="border border-gray-400 px-2 py-0.5 text-right">${(fee.total_price || 0).toFixed(2)}</td>
+                        <td className="border border-gray-500 px-2 py-0.5">{fee.description}</td>
+                        <td className="border border-gray-500 px-2 py-0.5">{fee.notes || ''}</td>
+                        <td className="border border-gray-500 px-2 py-0.5 text-center">{fee.quantity || 1}</td>
+                        <td className="border border-gray-500 px-2 py-0.5 text-right">${(fee.unit_price || 0).toFixed(2)}</td>
+                        <td className="border border-gray-500 px-2 py-0.5 text-right">${(fee.total_price || 0).toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>
