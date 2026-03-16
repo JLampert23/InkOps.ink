@@ -120,18 +120,8 @@ export interface SanMarUnifiedResponse {
 const SANMAR_CATALOG_CDN = "https://cdnm.sanmar.com/catalog/images";
 
 function rewriteSanMarImageUrl(url: string): string {
-  if (!url) return url;
-  try {
-    const parsed = new URL(url);
-    if (parsed.pathname.startsWith("/imglib/")) {
-      const filename = parsed.pathname.split("/").pop() || "";
-      if (filename) {
-        return `${SANMAR_CATALOG_CDN}/${filename}`;
-      }
-    }
-  } catch {
-    // not a valid URL
-  }
+  // Return the URL as-is from PromoStandards API
+  // The imglib URLs are the correct format: https://cdnm.sanmar.com/imglib/...
   return url;
 }
 
