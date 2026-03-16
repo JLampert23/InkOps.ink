@@ -154,44 +154,25 @@ export function SendQuoteModal({
 
     setSending(true);
     try {
-      // Get current session
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      console.log('Session check:', { hasSession: !!session, hasToken: !!session?.access_token, error: sessionError });
+      console.log('Calling edge function via Supabase client (auth handled automatically)');
 
-      if (sessionError || !session) {
-        throw new Error('You must be logged in to send quotes. Please refresh and try again.');
+      const { data, error } = await supabase.functions.invoke(`quote-actions/${quoteId}/send`, {
+        body: {
+          template_id: selectedTemplateId,
+          custom_message: customMessage,
+          expires_in_days: expiresInDays,
+          single_use: false,
+          auto_approve_after_days: null,
+          auto_convert_on_approval: false,
+        },
+      });
+
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error(error.message || 'Failed to send quote');
       }
 
-      console.log('Calling edge function (auth will be handled automatically by Supabase client)');
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quote-actions/${quoteId}/send`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            template_id: selectedTemplateId,
-            custom_message: customMessage,
-            expires_in_days: expiresInDays,
-            single_use: false,
-            auto_approve_after_days: null,
-            auto_convert_on_approval: false,
-          }),
-        }
-      );
-
-      console.log('Edge function response status:', response.status);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        console.error('Edge function error:', errorData);
-        throw new Error(errorData.error || `Failed to send quote (${response.status})`);
-      }
-
-      const data = await response.json();
+      console.log('Quote sent successfully:', data);
 
       alert(`Quote sent successfully to ${customerEmail}`);
       onSuccess();
