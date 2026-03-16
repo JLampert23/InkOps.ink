@@ -7,7 +7,7 @@ import CreateCustomerModal from '../accounting/CreateCustomerModal';
 import { ManageImprintsModal } from './ManageImprintsModal';
 import MockupGenerator from './MockupGenerator';
 import { SendQuoteModal } from './SendQuoteModal';
-import { getUnifiedProductData, fetchLiveSSActivewearPricing, fetchLiveSanMarPricing } from '../../services/ssactivewear-promostandards-service';
+import { getUnifiedProductData, fetchLiveSSActivewearPricing } from '../../services/ssactivewear-promostandards-service';
 import { proxySanMarImageUrl } from '../../utils/sanmar-image-proxy';
 import { recalculateImprintPricesForGroup } from '../../utils/price-matrix-utils';
 
@@ -1718,40 +1718,21 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         showNotification('error', `Failed to load images: ${error.message}`);
       }
     } else if (product.supplier === 'sanmar' && color) {
-      console.log('🔷 Fetching SanMar data for:', {
+      // Use images and pricing directly from product-search results (already fetched)
+      // This avoids extra API calls to the garments endpoint
+      console.log('🔷 Using SanMar data from search results:', {
         style: product.style,
         color: color.name,
-        partId: color.code,
         hasImageUrl: !!color.image_url,
         hasRearImage: !!color.rear_image_url,
         hasSideImage: !!color.side_image_url,
-        cachedPricing: color.pricing?.wholesale,
+        hasPricing: !!color.pricing?.wholesale,
       });
 
-      // Fetch fresh pricing for the selected part from SanMar API
-      if (color.code) {
-        try {
-          const livePricing = await fetchLiveSanMarPricing(color.code, companySettings?.id);
-          if (livePricing?.price) {
-            freshPrice = livePricing.price;
-            console.log('💰 SanMar LIVE pricing fetched:', {
-              partId: color.code,
-              price: freshPrice,
-              priceTiers: livePricing.priceTiers?.length || 0,
-            });
-          } else if (color.pricing?.wholesale) {
-            freshPrice = color.pricing.wholesale;
-            console.log('💰 SanMar using cached pricing (live unavailable):', freshPrice);
-          }
-        } catch (pricingError) {
-          console.warn('⚠️ SanMar pricing fetch failed, using cached:', pricingError);
-          if (color.pricing?.wholesale) {
-            freshPrice = color.pricing.wholesale;
-          }
-        }
-      } else if (color.pricing?.wholesale) {
+      // Use pricing from search results
+      if (color.pricing?.wholesale) {
         freshPrice = color.pricing.wholesale;
-        console.log('💰 SanMar using cached pricing (no partId):', freshPrice);
+        console.log('💰 SanMar pricing from search results:', freshPrice);
       }
 
       const frontUrl = proxySanMarImageUrl(color.image_url || '');

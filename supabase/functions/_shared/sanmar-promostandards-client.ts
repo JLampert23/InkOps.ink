@@ -93,7 +93,6 @@ export interface SanMarMediaData {
     classTypeName: string;
     color: string;
     singlePart: boolean;
-    mediaCriteria?: string;
   }>;
   views: {
     front: string | null;
@@ -637,40 +636,16 @@ export async function fetchSanMarMedia(
   const mediaPattern = nsElementPattern("MediaContent");
   const mediaMatches = getAllXmlMatches(responseXml, mediaPattern);
 
-  mediaData.images = mediaMatches.map((match, idx) => {
+  mediaData.images = mediaMatches.map(match => {
     const mediaXml = match[1];
-    const rawUrl = getXmlValue(mediaXml, "fileUrl") || getXmlValue(mediaXml, "url") || getXmlValue(mediaXml, "Url") || "";
-    const mediaCriteria = getXmlValue(mediaXml, "mediaCriteria") || "";
-
-    let classType = getXmlValue(mediaXml, "classType") || getXmlValue(mediaXml, "classTypeName") || "";
-
-    if (!classType) {
-      const classTypeArrayMatch = mediaXml.match(/<(?:[^:>]*:)?ClassTypeArray(?:\s[^>]*)?>[\s\S]*?<\/(?:[^:>]*:)?ClassTypeArray>/i);
-      if (classTypeArrayMatch) {
-        const classTypeMatch = classTypeArrayMatch[0].match(/<(?:[^:>]*:)?ClassType(?:\s[^>]*)?>[\s\S]*?<\/(?:[^:>]*:)?ClassType>/i);
-        if (classTypeMatch) {
-          classType = getXmlValue(classTypeMatch[0], "classTypeName") || "";
-        }
-      }
-    }
-
-    if (!classType) {
-      classType = getXmlValue(mediaXml, "view") || "";
-    }
-
-    if (idx < 3) {
-      console.log(`[SanMar Media] Image ${idx}: classType="${classType}", url="${rawUrl.substring(0, 80)}..."`);
-      console.log(`[SanMar Media] Image ${idx} XML sample: ${mediaXml.substring(0, 400)}`);
-    }
-
+    const rawUrl = getXmlValue(mediaXml, "url") || "";
     return {
       url: rewriteSanMarImageUrl(rawUrl),
       productId: getXmlValue(mediaXml, "productId") || "",
       partId: getXmlValue(mediaXml, "partId") || "",
-      classTypeName: classType,
+      classTypeName: getXmlValue(mediaXml, "classTypeName") || getXmlValue(mediaXml, "view") || "",
       color: getXmlValue(mediaXml, "color") || "",
       singlePart: getXmlValue(mediaXml, "singlePart") === "true",
-      mediaCriteria,
     };
   });
 
@@ -680,22 +655,20 @@ export async function fetchSanMarMedia(
   const lifestyleImages: string[] = [];
   const otherImages: string[] = [];
 
-  function classifyView(mediaCriteria: string, classTypeName: string, url: string): string {
-    const criteria = mediaCriteria.toLowerCase();
+  function classifyView(classTypeName: string, url: string): string {
     const label = classTypeName.toLowerCase();
     const urlLower = url.toLowerCase();
-
-    if (criteria === 'front' || /front|fm/.test(label) || /_fm[._]/.test(urlLower)) return 'front';
-    if (criteria === 'back' || /rear|back|bk/.test(label) || /_bk[._]/.test(urlLower)) return 'back';
-    if (criteria === 'side' || /side|right|left|profile|sleeve/.test(label) || /_sd[._]/.test(urlLower)) return 'side';
-    if (criteria === 'swatch' || /swatch/.test(label)) return 'swatch';
-    if (criteria === 'model' || /lifestyle|casual|model/.test(label)) return 'lifestyle';
+    if (/front|fm/.test(label) || /_fm[._]/.test(urlLower)) return 'front';
+    if (/rear|back|bk/.test(label) || /_bk[._]/.test(urlLower)) return 'back';
+    if (/side|profile|sleeve/.test(label) || /_sd[._]/.test(urlLower)) return 'side';
+    if (/lifestyle|casual/.test(label)) return 'lifestyle';
+    if (/swatch/.test(label)) return 'swatch';
     return 'other';
   }
 
   mediaData.images.forEach((img) => {
     if (!img.url) return;
-    const category = classifyView(img.mediaCriteria || '', img.classTypeName, img.url);
+    const category = classifyView(img.classTypeName, img.url);
     if (category === 'front') frontImages.push(img.url);
     else if (category === 'back') rearImages.push(img.url);
     else if (category === 'side') sideImages.push(img.url);
