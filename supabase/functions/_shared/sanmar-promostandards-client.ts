@@ -93,6 +93,7 @@ export interface SanMarMediaData {
     classTypeName: string;
     color: string;
     singlePart: boolean;
+    mediaCriteria?: string;
   }>;
   views: {
     front: string | null;
@@ -638,14 +639,18 @@ export async function fetchSanMarMedia(
 
   mediaData.images = mediaMatches.map(match => {
     const mediaXml = match[1];
-    const rawUrl = getXmlValue(mediaXml, "url") || "";
+    const rawUrl = getXmlValue(mediaXml, "fileUrl") || getXmlValue(mediaXml, "url") || getXmlValue(mediaXml, "Url") || "";
+    const mediaCriteria = getXmlValue(mediaXml, "mediaCriteria") || "";
+    const classType = getXmlValue(mediaXml, "classType") || getXmlValue(mediaXml, "classTypeName") || getXmlValue(mediaXml, "view") || "";
+
     return {
       url: rewriteSanMarImageUrl(rawUrl),
       productId: getXmlValue(mediaXml, "productId") || "",
       partId: getXmlValue(mediaXml, "partId") || "",
-      classTypeName: getXmlValue(mediaXml, "classTypeName") || getXmlValue(mediaXml, "view") || "",
+      classTypeName: classType,
       color: getXmlValue(mediaXml, "color") || "",
       singlePart: getXmlValue(mediaXml, "singlePart") === "true",
+      mediaCriteria,
     };
   });
 
@@ -655,20 +660,22 @@ export async function fetchSanMarMedia(
   const lifestyleImages: string[] = [];
   const otherImages: string[] = [];
 
-  function classifyView(classTypeName: string, url: string): string {
+  function classifyView(mediaCriteria: string, classTypeName: string, url: string): string {
+    const criteria = mediaCriteria.toLowerCase();
     const label = classTypeName.toLowerCase();
     const urlLower = url.toLowerCase();
-    if (/front|fm/.test(label) || /_fm[._]/.test(urlLower)) return 'front';
-    if (/rear|back|bk/.test(label) || /_bk[._]/.test(urlLower)) return 'back';
-    if (/side|profile|sleeve/.test(label) || /_sd[._]/.test(urlLower)) return 'side';
-    if (/lifestyle|casual/.test(label)) return 'lifestyle';
-    if (/swatch/.test(label)) return 'swatch';
+
+    if (criteria === 'front' || /front|fm/.test(label) || /_fm[._]/.test(urlLower)) return 'front';
+    if (criteria === 'back' || /rear|back|bk/.test(label) || /_bk[._]/.test(urlLower)) return 'back';
+    if (criteria === 'side' || /side|profile|sleeve/.test(label) || /_sd[._]/.test(urlLower)) return 'side';
+    if (criteria === 'swatch' || /swatch/.test(label)) return 'swatch';
+    if (criteria === 'model' || /lifestyle|casual|model/.test(label)) return 'lifestyle';
     return 'other';
   }
 
   mediaData.images.forEach((img) => {
     if (!img.url) return;
-    const category = classifyView(img.classTypeName, img.url);
+    const category = classifyView(img.mediaCriteria || '', img.classTypeName, img.url);
     if (category === 'front') frontImages.push(img.url);
     else if (category === 'back') rearImages.push(img.url);
     else if (category === 'side') sideImages.push(img.url);

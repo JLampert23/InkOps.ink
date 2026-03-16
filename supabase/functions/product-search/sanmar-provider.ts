@@ -489,6 +489,9 @@ function colorWordsMatch(productColor: string, imageColor: string): boolean {
 }
 
 function findFrontImage(images: any[]): any {
+  const byMediaCriteria = images.find((img: any) => (img.mediaCriteria || "").toLowerCase() === "front");
+  if (byMediaCriteria) return byMediaCriteria;
+
   return images.find((img: any) => {
     const cls = (img.classTypeName || "").toLowerCase();
     const url = (img.url || "").toLowerCase();
@@ -497,6 +500,9 @@ function findFrontImage(images: any[]): any {
 }
 
 function findRearImage(images: any[]): any {
+  const byMediaCriteria = images.find((img: any) => (img.mediaCriteria || "").toLowerCase() === "back");
+  if (byMediaCriteria) return byMediaCriteria;
+
   return images.find((img: any) => {
     const cls = (img.classTypeName || "").toLowerCase();
     const url = (img.url || "").toLowerCase();
@@ -505,6 +511,9 @@ function findRearImage(images: any[]): any {
 }
 
 function findSideImage(images: any[]): any {
+  const byMediaCriteria = images.find((img: any) => (img.mediaCriteria || "").toLowerCase() === "side");
+  if (byMediaCriteria) return byMediaCriteria;
+
   return images.find((img: any) => {
     const cls = (img.classTypeName || "").toLowerCase();
     const url = (img.url || "").toLowerCase();
