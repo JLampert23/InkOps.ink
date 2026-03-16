@@ -1,0 +1,225 @@
+PromoStandards getMediaContent Service
+This service returns media content based off the media type in the request. SanMar Only Supports Image or
+Document Media Types, we do not support Audio or Video Media Types.
+PromoStandards getMediaContent Service Request Parameters
+Field Description Example Required Type Max
+Chars
+wsVersion PromoStandards Version 1.1.0 Yes STRING 64
+id SanMar.com Username SanMarUsername Yes STRING 64
+password SanMar.com Password SanMarPassword Yes STRING 64
+cultureName The language culture name. i.e. (language,
+units
+of measure, etc.) Null assumes en-US.
+en-us No STRING 64
+mediaType The type of media to return: Image or
+Document.
+Image or
+Document
+Yes STRING
+productId SanMar Style # PC61 Yes STRING 64
+partId SanMar Unique_Key 179603 No STRING 64
+classType
+1004 Swatch,1006 Primary,1007 Front,
+1008 Rear,2001 High
+1007
+No
+INT
+
+PromoStandards getMediaContent Service XML Request
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+xmlns:ns="http://www.promostandards.org/WSDL/MediaService/1.0.0/" xmlns:
+shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
+<soapenv:Header />
+<soapenv:Body>
+<ns:GetMediaContentRequest>
+<shar:wsVersion>1.1.0</shar:wsVersion>
+<shar:id>SanMarUsername</shar:id>
+<shar:password>SanMarPassword</shar:password>
+<shar:cultureName />
+<shar:mediaType>Image</shar:mediaType>
+<shar:productId>K420</shar:productId>
+<shar:partId>92032</shar:partId>
+<ns:classType>?</ns:classType>
+</ns:GetMediaContentRequest>
+</soapenv:Body>
+</soapenv:Envelope>
+
+
+PromoStandards getMediaContent Service Response Parameters
+Field Description Example Type Max
+Chars
+productId SanMar Style# PC61 STRING 64
+partId SanMar Unique
+Key
+175762 STRING 64
+url The URL to the
+media
+location.
+https://cdnl.sanmar.com/catalog/images/K420.jpg STRING 1024
+mediaType The type of media
+(i.e. Image,
+Document, etc.)
+Image 64
+classTypeId
+An array of
+ClassType objects
+that classify of the
+media
+1006 STRING 64
+classTypeName Primary
+color Color Name Black STRING 256
+singlePart
+Identifies
+whether the
+partId one to
+one corresponds
+with
+the image.
+True
+BOOLEAN
+
+
+<S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/">
+<S:Body>
+<ns2:GetMediaContentResponse xmlns:ns2="http://www.promostandards.
+org/WSDL/MediaService/1.0.0/" xmlns="http://www.promostandards.
+org/WSDL/MediaService/1.0.0/SharedObjects/">
+<ns2:MediaContentArray>
+<ns2:MediaContent>
+<productId>K420</productId>
+<partId>92032</partId>
+<ns2:url>https://cdnm.sanmar.com/imglib/mresjpg/
+K420_Black_back_FS06.jpg</ns2:url>
+<mediaType>Image</mediaType>
+<ns2:ClassTypeArray>
+<ns2:ClassType>
+<ns2:classTypeId>1008</ns2:classTypeId>
+<ns2:classTypeName>Rear</ns2:classTypeName>
+</ns2:ClassType>
+</ns2:ClassTypeArray>
+<ns2:color>Black</ns2:color>
+<ns2:singlePart>true</ns2:singlePart>
+</ns2:MediaContent>
+<ns2:MediaContent>
+<productId>K420</productId>
+<partId>92032</partId>
+<ns2:url>https://cdnm.sanmar.com/imglib/mresjpg/
+K420_Black_front_FS06.jpg</ns2:url>
+<mediaType>Image</mediaType>
+<ns2:ClassTypeArray>
+<ns2:ClassType>
+<ns2:classTypeId>1007</ns2:classTypeId>
+<ns2:classTypeName>Front</ns2:classTypeName>
+</ns2:ClassType>
+</ns2:ClassTypeArray>
+<ns2:color>Black</ns2:color>
+<ns2:singlePart>true</ns2:singlePart>
+</ns2:MediaContent>
+<ns2:MediaContent>
+<productId>K420</productId>
+<partId>92032</partId>
+<ns2:url>https://cdnm.sanmar.com/catalog/images/K420.jpg</ns2:url>
+<mediaType>Image</mediaType>
+<ns2:ClassTypeArray>
+<ns2:ClassType>
+<ns2:classTypeId>1006</ns2:classTypeId>
+<ns2:classTypeName>Primary</ns2:classTypeName>
+</ns2:ClassType>
+</ns2:ClassTypeArray>
+<ns2:color>Black</ns2:color>
+<ns2:singlePart>true</ns2:singlePart>
+</ns2:MediaContent>
+
+<ns2:MediaContent>
+<productId>K420</productId>
+<partId>92032</partId>
+<ns2:url>https://cdnm.sanmar.com/catalog/images/K420sw.jpg</ns2:url>
+<mediaType>Image</mediaType>
+<ns2:ClassTypeArray>
+<ns2:ClassType>
+<ns2:classTypeId>1004</ns2:classTypeId>
+<ns2:classTypeName>Swatch</ns2:classTypeName>
+</ns2:ClassType>
+</ns2:ClassTypeArray>
+<ns2:color>Black</ns2:color>
+<ns2:singlePart>true</ns2:singlePart>
+</ns2:MediaContent>
+<ns2:MediaContent>
+<productId>K420</productId>
+<partId>92032</partId>
+<ns2:url>https://cdnm.sanmar.com/imglib/mresjpg/2014/f13/
+K420_black_model_side_072014.jpg</ns2:url>
+<mediaType>Image</mediaType>
+<ns2:ClassTypeArray>
+<ns2:ClassType>
+<ns2:classTypeId>500</ns2:classTypeId>
+<ns2:classTypeName>Custom</ns2:classTypeName>
+</ns2:ClassType>
+</ns2:ClassTypeArray>
+<ns2:color>Black</ns2:color>
+<ns2:singlePart>true</ns2:singlePart>
+</ns2:MediaContent>
+<ns2:MediaContent>
+<productId>K420</productId>
+<partId>92032</partId>
+<ns2:url>https://cdnm.sanmar.com/imglib/mresjpg/2014/f13/
+K420_black_model_back_072014.jpg</ns2:url>
+<mediaType>Image</mediaType>
+<ns2:ClassTypeArray>
+<ns2:ClassType>
+<ns2:classTypeId>502</ns2:classTypeId>
+<ns2:classTypeName>Custom</ns2:classTypeName>
+</ns2:ClassType>
+</ns2:ClassTypeArray>
+<ns2:color>Black</ns2:color>
+<ns2:singlePart>true</ns2:singlePart>
+</ns2:MediaContent>
+<ns2:MediaContent>
+<productId>K420</productId>
+<partId>92032</partId>
+<ns2:url>https://cdnm.sanmar.com/imglib/mresjpg/2015/f18/
+K420_L420_Y420_model_GA16.jpg</ns2:url>
+<mediaType>Image</mediaType>
+<ns2:ClassTypeArray>
+
+<ns2:ClassType>
+<ns2:classTypeId>503</ns2:classTypeId>
+<ns2:classTypeName>Custom</ns2:classTypeName>
+</ns2:ClassType>
+</ns2:ClassTypeArray>
+<ns2:color>Black</ns2:color>
+<ns2:singlePart>true</ns2:singlePart>
+</ns2:MediaContent>
+<ns2:MediaContent>
+<productId>K420</productId>
+<partId>92032</partId>
+<ns2:url>https://cdnm.sanmar.com/swatch/gifs/port_black.gif</ns2:url>
+<mediaType>Image</mediaType>
+<ns2:ClassTypeArray>
+<ns2:ClassType>
+<ns2:classTypeId>504</ns2:classTypeId>
+<ns2:classTypeName>Custom</ns2:classTypeName>
+</ns2:ClassType>
+</ns2:ClassTypeArray>
+<ns2:color>Black</ns2:color>
+<ns2:singlePart>true</ns2:singlePart>
+</ns2:MediaContent>
+<ns2:MediaContent>
+<productId>K420</productId>
+<partId>92032</partId>
+<ns2:url>https://cdnm.sanmar.com/imglib/mresjpg/2014/f17/
+K420_black_model_front_072014.jpg</ns2:url>
+<mediaType>Image</mediaType>
+<ns2:ClassTypeArray>
+<ns2:ClassType>
+<ns2:classTypeId>2001</ns2:classTypeId>
+<ns2:classTypeName>High</ns2:classTypeName>
+</ns2:ClassType>
+</ns2:ClassTypeArray>
+<ns2:color>Black</ns2:color>
+<ns2:singlePart>true</ns2:singlePart>
+</ns2:MediaContent>
+</ns2:MediaContentArray>
+</ns2:GetMediaContentResponse>
+</S:Body>
+</S:Envelope>
