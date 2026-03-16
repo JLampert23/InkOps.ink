@@ -73,10 +73,19 @@ Deno.serve(async (req: Request) => {
     } = await supabase.auth.getUser();
 
     if (userError || !user) {
+      console.error('Auth error in quote-actions:', {
+        userError,
+        hasUser: !!user,
+        authHeader: authHeader?.substring(0, 20) + '...',
+      });
       return new Response(
         JSON.stringify({
           error: "Invalid or expired token",
-          details: userError?.message
+          details: userError?.message,
+          debugInfo: {
+            hasAuthHeader: !!authHeader,
+            errorMessage: userError?.message,
+          }
         }),
         {
           status: 401,
