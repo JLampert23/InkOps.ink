@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { renderTemplate, type ShortCodeData } from "../_shared/shortcode-engine.ts";
 
 function extractSubdomainFromUrl(customerUrl: string | null): string | null {
   if (!customerUrl) return null;
@@ -234,21 +235,8 @@ Deno.serve(async (req: Request) => {
         })
         .eq("id", quoteId);
 
-      // Get company settings to get inkops_subdomain and company_name
-      const { data: companySettings } = await supabase
-        .from("company_settings")
-        .select("inkops_subdomain, company_name")
-        .eq("id", profile.company_id)
-        .maybeSingle();
-
-      // Generate public approval URL using inkops.ink subdomain (ALWAYS use inkops.ink subdomain)
-      let subdomain = companySettings?.inkops_subdomain;
-      if (!subdomain && companySettings?.company_name) {
-        subdomain = companySettings.company_name.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 30);
-      }
-      const approvalUrl = subdomain
-        ? `https://${subdomain}.inkops.ink/quote-approval/${approvalToken}`
-        : `https://inkops.ink/quote-approval/${approvalToken}`;
+      // Generate public approval URL (use base domain - token provides security and isolation)
+      const approvalUrl = `https://inkops.ink/quote-approval/${approvalToken}`;
 
       // Send email with template or default
       try {
@@ -276,37 +264,28 @@ Deno.serve(async (req: Request) => {
             .maybeSingle();
 
           if (template) {
-            // Build context for shortcode processing
-            const context = {
-              quote: {
-                ...quote,
-                approval_url: approvalUrl,
-                expires_at: expiresAt,
-              },
-              custom_message: body.custom_message || '',
+            // Build shortcode data for template processing
+            const shortcodeData: ShortCodeData = {
+              customer_first_name: quote.customer_name?.split(' ')[0] || '',
+              customer_last_name: quote.customer_name?.split(' ').slice(1).join(' ') || '',
+              customer_full_name: quote.customer_name || '',
+              customer_company: quote.customer_company || '',
+              customer_email: quote.customer_email || '',
+              customer_phone: quote.customer_phone || '',
+              quote_number: quote.quote_number || '',
+              quote_total: quote.total?.toFixed(2) || '0.00',
+              quote_subtotal: quote.subtotal?.toFixed(2) || '0.00',
+              quote_tax: quote.tax_amount?.toFixed(2) || '0.00',
+              quote_link: approvalUrl,
+              quote_date: quote.created_at ? new Date(quote.created_at).toLocaleDateString() : '',
+              quote_expiry_date: expiresAt ? new Date(expiresAt).toLocaleDateString() : '',
+              current_date: new Date().toLocaleDateString(),
+              current_year: new Date().getFullYear().toString(),
             };
 
-            // Process shortcodes via communication-templates edge function
-            const shortcodeResponse = await fetch(
-              `${supabaseUrl}/functions/v1/communication-templates/process`,
-              {
-                method: "POST",
-                headers: {
-                  Authorization: `Bearer ${supabaseServiceKey}`,
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  template_id: template.id,
-                  context,
-                }),
-              }
-            );
-
-            if (shortcodeResponse.ok) {
-              const processed = await shortcodeResponse.json();
-              subject = processed.subject || subject;
-              html = processed.body_html || html;
-            }
+            // Process shortcodes in subject and body
+            subject = renderTemplate(template.subject_template, shortcodeData);
+            html = renderTemplate(template.body_template, shortcodeData);
           }
         }
 
