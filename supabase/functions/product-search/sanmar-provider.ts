@@ -212,22 +212,21 @@ export async function searchSanMarCatalog(
       }
     }
 
-    // Fetch pricing for the first part to get wholesale price
-    const firstPartId = productData.data.parts?.[0]?.partId;
-    if (firstPartId) {
-      try {
-        const pricingUrl = `${supabaseUrl}/functions/v1/sanmar-api?action=pricing&partId=${encodeURIComponent(firstPartId)}&companyId=${encodeURIComponent(companyId)}`;
-        const pricingResponse = await fetch(pricingUrl, {
-          headers: { "Authorization": `Bearer ${supabaseServiceKey}` },
-        });
-        if (pricingResponse.ok) {
-          const pricingJson = await pricingResponse.json();
-          pricingData = pricingJson.data || null;
-          console.log(`Fetched pricing for part ${firstPartId}:`, pricingData?.parts?.[0]?.prices?.[0]?.price);
-        }
-      } catch (pricingError: any) {
-        console.warn(`Pricing fetch failed (non-critical): ${pricingError.message}`);
+    // Fetch pricing using style number (pricing API requires style, not partId)
+    try {
+      const pricingUrl = `${supabaseUrl}/functions/v1/sanmar-api?action=pricing&style=${encodeURIComponent(style)}&companyId=${encodeURIComponent(companyId)}`;
+      const pricingResponse = await fetch(pricingUrl, {
+        headers: { "Authorization": `Bearer ${supabaseServiceKey}` },
+      });
+      if (pricingResponse.ok) {
+        const pricingJson = await pricingResponse.json();
+        pricingData = pricingJson.data || null;
+        console.log(`[SanMar] ✅ Fetched pricing for style ${style}:`, pricingData?.parts?.length || 0, 'parts');
+      } else {
+        console.warn(`[SanMar] ⚠️ Pricing unavailable for ${style} (status: ${pricingResponse.status}) - continuing without pricing`);
       }
+    } catch (pricingError: any) {
+      console.warn(`[SanMar] ⚠️ Pricing fetch failed (non-critical): ${pricingError.message}`);
     }
 
     let cdnImages: ResolvedColorImages = {};
