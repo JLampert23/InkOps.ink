@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Search, ChevronRight, Mail, Phone, DollarSign, Loader2, FileText, CreditCard, FileSpreadsheet, Gift, Plus, Save, X, CreditCard as Edit2, Trash2, Upload, Image, ExternalLink } from 'lucide-react';
+import { Users, Search, ChevronRight, Mail, Phone, DollarSign, Loader2, FileText, CreditCard, FileSpreadsheet, Gift, Plus, Save, X, Edit2, Trash2, Upload, Image, ExternalLink } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format } from 'date-fns';
 import { InvoiceDetail } from '../billing/InvoiceDetail';
@@ -526,49 +526,16 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
                 </button>
                 {onCreateQuote && (
                   <div className="mt-2 pl-2 flex flex-wrap gap-2">
-                    {customerContacts[customer.id] && customerContacts[customer.id].length > 0 ? (
-                      <div className="flex flex-col gap-1.5 w-full">
-                        <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Create Quote For:</span>
-                        <div className="flex flex-wrap gap-1.5">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onCreateQuote(customer.id);
-                            }}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors border border-blue-200 dark:border-blue-800"
-                            title="Create quote using default customer contact"
-                          >
-                            <FileText className="w-3.5 h-3.5" />
-                            Customer (Default)
-                          </button>
-                          {customerContacts[customer.id].map((contact: any) => (
-                            <button
-                              key={contact.id}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onCreateQuote(customer.id, contact.id);
-                              }}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors border border-blue-200 dark:border-blue-800"
-                              title={`Create quote for ${contact.name}${contact.email ? ` (${contact.email})` : ''}`}
-                            >
-                              <FileText className="w-3.5 h-3.5" />
-                              {contact.name}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onCreateQuote(customer.id);
-                        }}
-                        className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors border border-blue-200 dark:border-blue-800"
-                      >
-                        <FileText className="w-4 h-4" />
-                        Create Quote
-                      </button>
-                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onCreateQuote(customer.id);
+                      }}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors border border-blue-200 dark:border-blue-800"
+                    >
+                      <FileText className="w-4 h-4" />
+                      Create Quote
+                    </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
