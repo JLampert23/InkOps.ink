@@ -864,6 +864,18 @@ export default function MockupGenerator({
     }
 
     try {
+      // Get supplier_partid from line item if available for more accurate matching
+      let supplierPartId: string | null = null;
+      if (lineItemId && lineItemId.trim()) {
+        const { data: lineItemData } = await supabase
+          .from('quote_line_items')
+          .select('supplier_partid')
+          .eq('id', lineItemId)
+          .maybeSingle();
+
+        supplierPartId = lineItemData?.supplier_partid || null;
+        console.log('MockupGenerator: Found supplier_partid:', supplierPartId);
+      }
 
       // Try to refresh session first to ensure we have a valid token
       const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
@@ -896,19 +908,34 @@ export default function MockupGenerator({
         if (data.results && data.results.length > 0) {
           const product = data.results[0];
 
-          // Find matching color or use first color
+          // Find matching color using partId first, then color name
           let matchingColor = null;
           if (product.colors && product.colors.length > 0) {
-            if (garmentColor) {
-              // Try to find matching color
+            // PRIORITY 1: Match by partId if we have one
+            if (supplierPartId) {
+              matchingColor = product.colors.find((c: any) =>
+                c.partIds?.includes(supplierPartId) || c.code === supplierPartId
+              );
+              if (matchingColor) {
+                console.log('MockupGenerator: Matched by partId:', supplierPartId);
+              }
+            }
+
+            // PRIORITY 2: Match by color name
+            if (!matchingColor && garmentColor) {
               matchingColor = product.colors.find((c: any) =>
                 c.name?.toLowerCase().includes(garmentColor.toLowerCase()) ||
                 garmentColor.toLowerCase().includes(c.name?.toLowerCase())
               );
+              if (matchingColor) {
+                console.log('MockupGenerator: Matched by color name:', garmentColor);
+              }
             }
-            // Fall back to first color if no match
+
+            // PRIORITY 3: Fall back to first color
             if (!matchingColor) {
               matchingColor = product.colors[0];
+              console.log('MockupGenerator: Using first color as fallback');
             }
           }
 
@@ -918,14 +945,30 @@ export default function MockupGenerator({
             setGarmentBrand(product.brand || product.supplier);
             setGarmentDescription(product.description);
 
-            // Save the fetched image to the database for future use
+            // Save the fetched images to the database for future use
             if (lineItemId && lineItemId.trim()) {
+              const updateData: any = {
+                garment_front_image_url: matchingColor.image_url,
+                brand: product.brand || null,
+              };
+
+              // Also save rear and side images if available
+              if (matchingColor.rear_image_url) {
+                updateData.garment_rear_image_url = matchingColor.rear_image_url;
+              }
+              if (matchingColor.side_image_url) {
+                updateData.garment_side_image_url = matchingColor.side_image_url;
+              }
+
+              // Save the partId for future accurate image matching
+              if (matchingColor.partIds && matchingColor.partIds.length > 0 && !supplierPartId) {
+                updateData.supplier_partid = matchingColor.partIds[0];
+                console.log('MockupGenerator: Saving supplier_partid:', matchingColor.partIds[0]);
+              }
+
               await supabase
                 .from('quote_line_items')
-                .update({
-                  garment_front_image_url: matchingColor.image_url,
-                  brand: product.brand || null,
-                })
+                .update(updateData)
                 .eq('id', lineItemId);
             }
 
