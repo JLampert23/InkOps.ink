@@ -98,7 +98,7 @@ Deno.serve(async (req: Request) => {
     // Get SanMar PromoStandards credentials from company_settings
     const { data: settings } = await supabaseAdmin
       .from("company_settings")
-      .select("sanmar_promo_username, sanmar_promo_password_encrypted")
+      .select("sanmar_promo_username, sanmar_promo_password_encrypted, ssactivewear_fob_id")
       .eq("id", companyId)
       .maybeSingle();
 
@@ -137,7 +137,8 @@ Deno.serve(async (req: Request) => {
 
     const credentials: SanMarCredentials = {
       id: settings.sanmar_promo_username,
-      password: decryptedPassword
+      password: decryptedPassword,
+      fobId: settings.ssactivewear_fob_id || undefined
     };
 
     console.log(`🔑 SanMar credentials loaded for company ${companyId}`);
