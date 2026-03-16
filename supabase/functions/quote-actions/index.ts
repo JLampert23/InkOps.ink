@@ -310,6 +310,14 @@ Deno.serve(async (req: Request) => {
           }
         }
 
+        console.log('Attempting to send email to:', quote.customer_email);
+        console.log('Email payload:', {
+          to: quote.customer_email,
+          subject,
+          hasHtml: !!html,
+          company_id: profile.company_id,
+        });
+
         const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
           method: 'POST',
           headers: {
@@ -325,11 +333,16 @@ Deno.serve(async (req: Request) => {
         });
 
         if (!emailResponse.ok) {
-          console.error('Failed to send email:', await emailResponse.text());
+          const errorText = await emailResponse.text();
+          console.error('Failed to send email:', errorText);
+          throw new Error(`Email sending failed: ${errorText}`);
         }
+
+        const emailResult = await emailResponse.json();
+        console.log('Email sent successfully:', emailResult);
       } catch (emailError) {
         console.error('Error sending email:', emailError);
-        // Don't fail the whole request if email fails
+        throw new Error(`Failed to send quote email: ${emailError.message || 'Unknown error'}`);
       }
 
       return new Response(
