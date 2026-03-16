@@ -637,11 +637,31 @@ export async function fetchSanMarMedia(
   const mediaPattern = nsElementPattern("MediaContent");
   const mediaMatches = getAllXmlMatches(responseXml, mediaPattern);
 
-  mediaData.images = mediaMatches.map(match => {
+  mediaData.images = mediaMatches.map((match, idx) => {
     const mediaXml = match[1];
     const rawUrl = getXmlValue(mediaXml, "fileUrl") || getXmlValue(mediaXml, "url") || getXmlValue(mediaXml, "Url") || "";
     const mediaCriteria = getXmlValue(mediaXml, "mediaCriteria") || "";
-    const classType = getXmlValue(mediaXml, "classType") || getXmlValue(mediaXml, "classTypeName") || getXmlValue(mediaXml, "view") || "";
+
+    let classType = getXmlValue(mediaXml, "classType") || getXmlValue(mediaXml, "classTypeName") || "";
+
+    if (!classType) {
+      const classTypeArrayMatch = mediaXml.match(/<(?:[^:>]*:)?ClassTypeArray(?:\s[^>]*)?>[\s\S]*?<\/(?:[^:>]*:)?ClassTypeArray>/i);
+      if (classTypeArrayMatch) {
+        const classTypeMatch = classTypeArrayMatch[0].match(/<(?:[^:>]*:)?ClassType(?:\s[^>]*)?>[\s\S]*?<\/(?:[^:>]*:)?ClassType>/i);
+        if (classTypeMatch) {
+          classType = getXmlValue(classTypeMatch[0], "classTypeName") || "";
+        }
+      }
+    }
+
+    if (!classType) {
+      classType = getXmlValue(mediaXml, "view") || "";
+    }
+
+    if (idx < 3) {
+      console.log(`[SanMar Media] Image ${idx}: classType="${classType}", url="${rawUrl.substring(0, 80)}..."`);
+      console.log(`[SanMar Media] Image ${idx} XML sample: ${mediaXml.substring(0, 400)}`);
+    }
 
     return {
       url: rewriteSanMarImageUrl(rawUrl),
@@ -667,7 +687,7 @@ export async function fetchSanMarMedia(
 
     if (criteria === 'front' || /front|fm/.test(label) || /_fm[._]/.test(urlLower)) return 'front';
     if (criteria === 'back' || /rear|back|bk/.test(label) || /_bk[._]/.test(urlLower)) return 'back';
-    if (criteria === 'side' || /side|profile|sleeve/.test(label) || /_sd[._]/.test(urlLower)) return 'side';
+    if (criteria === 'side' || /side|right|left|profile|sleeve/.test(label) || /_sd[._]/.test(urlLower)) return 'side';
     if (criteria === 'swatch' || /swatch/.test(label)) return 'swatch';
     if (criteria === 'model' || /lifestyle|casual|model/.test(label)) return 'lifestyle';
     return 'other';

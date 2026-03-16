@@ -517,7 +517,7 @@ function findSideImage(images: any[]): any {
   return images.find((img: any) => {
     const cls = (img.classTypeName || "").toLowerCase();
     const url = (img.url || "").toLowerCase();
-    return /side|sleeve|profile/.test(cls) || /_sd[._]/.test(url);
+    return /side|right|left|sleeve|profile/.test(cls) || /_sd[._]/.test(url);
   });
 }
 
