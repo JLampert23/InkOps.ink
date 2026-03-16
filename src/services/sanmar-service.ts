@@ -91,9 +91,8 @@ export async function getUnifiedSanMarData(
 
     const response = await fetch(url, {
       headers: {
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Authorization': `Bearer ${token}`,
         'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-        'X-User-Token': token,
         'Content-Type': 'application/json',
       },
     });
