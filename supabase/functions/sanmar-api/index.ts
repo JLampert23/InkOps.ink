@@ -252,33 +252,20 @@ Deno.serve(async (req: Request) => {
         break;
 
       case "pricing":
-        // Fetch pricing for a style (pricing API uses style numbers, not partIds)
-        if (!style) {
+        // Fetch pricing for a specific part
+        if (!partId) {
           return new Response(
-            JSON.stringify({ error: "Style number required for pricing lookup" }),
+            JSON.stringify({ error: "Part ID required for pricing lookup" }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-        try {
-          const pricingData = await fetchSanMarPricing(credentials, style);
-          responseData = {
-            success: true,
-            supplier: "sanmar",
-            action: "pricing",
-            data: pricingData
-          };
-          console.log(`✅ Pricing fetch successful for ${style}: ${pricingData.parts.length} parts`);
-        } catch (pricingError: any) {
-          console.warn(`⚠️ Pricing unavailable for ${style}:`, pricingError.message);
-          // Return empty pricing data instead of failing
-          responseData = {
-            success: true,
-            supplier: "sanmar",
-            action: "pricing",
-            data: { parts: [] },
-            warning: `Pricing unavailable: ${pricingError.message}`
-          };
-        }
+        const pricingData = await fetchSanMarPricing(credentials, partId);
+        responseData = {
+          success: true,
+          supplier: "sanmar",
+          action: "pricing",
+          data: pricingData
+        };
         break;
 
       case "media":
