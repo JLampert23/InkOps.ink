@@ -581,6 +581,7 @@ Deno.serve(async (req: Request) => {
 
         if (partIds.length === 0) {
           console.warn(`[SS Product] No parts returned for ${normalizedProductId}`);
+          console.log(`[SS Product] XML Response preview (first 1000 chars):`, xmlDoc.substring(0, 1000));
           return new Response(
             JSON.stringify({
               success: false,

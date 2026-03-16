@@ -33,9 +33,18 @@ Deno.serve(async (req: Request) => {
 
     const userToken = req.headers.get("X-User-Token") || "";
     const authHeader = req.headers.get("Authorization");
-    const bearerToken = authHeader?.replace('Bearer ', '') || "";
+    const bearerToken = authHeader?.replace('Bearer ', '').trim() || "";
     const isServiceRoleKey = bearerToken === supabaseServiceRoleKey;
     const token = isServiceRoleKey ? bearerToken : (userToken || bearerToken);
+
+    console.log('🔐 Auth debugging:', {
+      hasUserToken: !!userToken,
+      hasAuthHeader: !!authHeader,
+      hasBearerToken: !!bearerToken,
+      isServiceRoleKey,
+      tokenLength: token.length,
+      serviceKeyLength: supabaseServiceRoleKey.length
+    });
 
     if (!token) {
       return new Response(
