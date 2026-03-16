@@ -110,6 +110,7 @@ interface LineItemGroup {
 interface QuoteBuilderProps {
   quoteId?: string;
   initialCustomerId?: string;
+  initialContactId?: string;
   onSave?: () => void;
   onCancel?: () => void;
 }
@@ -182,7 +183,7 @@ function UnitPriceTooltip({ item, groupImprints, garmentMarkup }: {
   );
 }
 
-export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSave, onCancel }: QuoteBuilderProps) {
+export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initialContactId, onSave, onCancel }: QuoteBuilderProps) {
   const { user, session } = useAuth();
   const { showNotification } = useNotification();
   const [quoteId, setQuoteId] = useState<string | undefined>(initialQuoteId);
@@ -190,6 +191,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
   const [saving, setSaving] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(initialCustomerId || '');
+  const [selectedContactId, setSelectedContactId] = useState<string>(initialContactId || '');
+  const [customerContacts, setCustomerContacts] = useState<any[]>([]);
   const [availableFees, setAvailableFees] = useState<any[]>([]);
   const [companySettings, setCompanySettings] = useState<any>(null);
   const draftCreatedRef = useRef(false);
@@ -473,7 +476,28 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
     }
   };
 
-  const loadCustomerDetails = async (customerId: string) => {
+  const loadCustomerContacts = async (customerId: string) => {
+    if (!customerId) {
+      setCustomerContacts([]);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('customer_contacts')
+        .select('*')
+        .eq('customer_id', customerId)
+        .order('name');
+
+      if (error) throw error;
+      setCustomerContacts(data || []);
+    } catch (err) {
+      console.error('Error loading customer contacts:', err);
+      setCustomerContacts([]);
+    }
+  };
+
+  const loadCustomerDetails = async (customerId: string, contactId?: string) => {
     try {
       const { data: customer, error } = await supabase
         .from('customers')
@@ -484,8 +508,26 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       if (error) throw error;
 
       if (customer) {
+        let contactName = customer.contact_name || '';
+        let contactEmail = customer.email || '';
+        let contactPhone = customer.phone || '';
+
+        if (contactId) {
+          const { data: contact } = await supabase
+            .from('customer_contacts')
+            .select('*')
+            .eq('id', contactId)
+            .maybeSingle();
+
+          if (contact) {
+            contactName = contact.name || '';
+            contactEmail = contact.email || '';
+            contactPhone = contact.phone || '';
+          }
+        }
+
         setBillCompany(customer.company_name || '');
-        setBillName(customer.contact_name || '');
+        setBillName(contactName);
         setBillAddress1(customer.billing_address_line1 || '');
         setBillAddress2(customer.billing_address_line2 || '');
         setBillCity(customer.billing_city || '');
@@ -493,7 +535,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         setBillZip(customer.billing_zip || '');
 
         setShipCompany(customer.company_name || '');
-        setShipName(customer.contact_name || '');
+        setShipName(contactName);
         setShipAddress1(customer.shipping_address_line1 || '');
         setShipAddress2(customer.shipping_address_line2 || '');
         setShipCity(customer.shipping_city || '');
@@ -600,6 +642,10 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
     if (quote) {
       setQuoteNumber(quote.quote_number || '');
       setSelectedCustomerId(quote.customer_id || '');
+      setSelectedContactId(quote.contact_id || '');
+      if (quote.customer_id) {
+        loadCustomerContacts(quote.customer_id);
+      }
       setCreatedDate(quote.created_date || '');
       setProductionDueDate(quote.production_due_date || '');
       setCustomerDueDate(quote.customer_due_date || '');
@@ -1952,6 +1998,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       const quoteData = {
         company_id: userProfile.company_id,
         customer_id: selectedCustomerId || null,
+        contact_id: selectedContactId || null,
         customer_name: customerData?.company_name || 'Draft Quote',
         customer_email: customerData?.email || null,
         customer_phone: customerData?.phone || null,
@@ -2212,8 +2259,12 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                   onChange={(e) => {
                     const newCustomerId = e.target.value;
                     setSelectedCustomerId(newCustomerId);
+                    setSelectedContactId('');
                     if (newCustomerId) {
                       loadCustomerDetails(newCustomerId);
+                      loadCustomerContacts(newCustomerId);
+                    } else {
+                      setCustomerContacts([]);
                     }
                   }}
                   className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -2224,6 +2275,35 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                   ))}
                 </select>
               </div>
+
+              {/* Contact Selector - Only show if customer has multiple contacts */}
+              {selectedCustomerId && customerContacts.length > 0 && (
+                <div>
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 block">
+                    Contact Person {customerContacts.length > 1 && '(Optional)'}
+                  </label>
+                  <select
+                    value={selectedContactId}
+                    onChange={(e) => {
+                      const contactId = e.target.value;
+                      setSelectedContactId(contactId);
+                      if (contactId) {
+                        loadCustomerDetails(selectedCustomerId, contactId);
+                      } else {
+                        loadCustomerDetails(selectedCustomerId);
+                      }
+                    }}
+                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  >
+                    <option value="">Use Default Customer Contact</option>
+                    {customerContacts.map(contact => (
+                      <option key={contact.id} value={contact.id}>
+                        {contact.name} {contact.email && `(${contact.email})`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Billing and Shipping */}
               <div className="grid grid-cols-2 gap-6">

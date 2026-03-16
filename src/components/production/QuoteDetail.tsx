@@ -1,21 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase-client';
-import {
-  ArrowLeft,
-  Edit,
-  Send,
-  CheckCircle,
-  XCircle,
-  Copy,
-  Clock,
-  FileText,
-  Loader2,
-  RefreshCw,
-  Download,
-  Plus,
-  Pencil,
-  X,
-} from 'lucide-react';
+import { ArrowLeft, CreditCard as Edit, Send, CheckCircle, XCircle, Copy, Clock, FileText, Loader2, RefreshCw, Download, Plus, Pencil, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ManageImprintsModal } from './ManageImprintsModal';
 import { SendQuoteModal } from './SendQuoteModal';
@@ -41,6 +26,10 @@ interface Quote {
   nickname?: string;
   company_id?: string;
   customer_id?: string;
+  contact_id?: string;
+  contact_name?: string;
+  contact_email?: string;
+  contact_phone?: string;
   customer_name: string;
   customer_email: string;
   customer_company: string;
@@ -183,6 +172,22 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         .single();
 
       if (quoteError) throw quoteError;
+
+      // If quote has contact_id, fetch contact details
+      if (quoteData.contact_id) {
+        const { data: contactData } = await supabase
+          .from('customer_contacts')
+          .select('*')
+          .eq('id', quoteData.contact_id)
+          .maybeSingle();
+
+        if (contactData) {
+          // Add contact info to quote data for display
+          quoteData.contact_name = contactData.name;
+          quoteData.contact_email = contactData.email;
+          quoteData.contact_phone = contactData.phone;
+        }
+      }
 
       // If quote has customer_id, fetch customer details if billing info is missing
       if (quoteData.customer_id) {
@@ -564,6 +569,9 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             <div className="text-sm space-y-0.5">
               {quote.bill_company && <p className="font-semibold text-gray-900 dark:text-white">{quote.bill_company}</p>}
               {quote.bill_name && <p className="text-gray-700 dark:text-gray-300">{quote.bill_name}</p>}
+              {quote.contact_name && quote.contact_name !== quote.bill_name && (
+                <p className="text-gray-600 dark:text-gray-400 text-xs italic">Contact: {quote.contact_name}</p>
+              )}
               {quote.bill_address_1 && <p className="text-gray-700 dark:text-gray-300">{quote.bill_address_1}</p>}
               {quote.bill_address_2 && <p className="text-gray-700 dark:text-gray-300">{quote.bill_address_2}</p>}
               {quote.bill_city && (
@@ -571,15 +579,15 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                   {quote.bill_city}, {quote.bill_state} {quote.bill_zip}
                 </p>
               )}
-              {(quote.bill_email || quote.customer_email) && (
+              {(quote.contact_email || quote.bill_email || quote.customer_email) && (
                 <p className="text-blue-600 dark:text-blue-400 mt-1">
-                  <a href={`mailto:${quote.bill_email || quote.customer_email}`} className="hover:underline">
-                    {quote.bill_email || quote.customer_email}
+                  <a href={`mailto:${quote.contact_email || quote.bill_email || quote.customer_email}`} className="hover:underline">
+                    {quote.contact_email || quote.bill_email || quote.customer_email}
                   </a>
                 </p>
               )}
-              {(quote.bill_phone || quote.customer_phone) && (
-                <p className="text-gray-700 dark:text-gray-300">{quote.bill_phone || quote.customer_phone}</p>
+              {(quote.contact_phone || quote.bill_phone || quote.customer_phone) && (
+                <p className="text-gray-700 dark:text-gray-300">{quote.contact_phone || quote.bill_phone || quote.customer_phone}</p>
               )}
               {!quote.bill_company && !quote.bill_name && !quote.bill_address_1 && (
                 <p className="text-gray-500 dark:text-gray-400 italic">No billing address provided</p>
