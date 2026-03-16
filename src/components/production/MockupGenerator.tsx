@@ -486,16 +486,35 @@ export default function MockupGenerator({
               if (trimmed === '' || trimmed === 'null' || trimmed === 'undefined') return false;
 
               // Check if URL points to an actual image file
-              const lowerUrl = trimmed.toLowerCase();
+              // Decode the URL to handle proxy URLs with encoded parameters
+              let urlToCheck = trimmed.toLowerCase();
+              try {
+                // If it's a proxy URL, decode the encoded URL parameter
+                if (urlToCheck.includes('sanmar-image-proxy')) {
+                  const urlObj = new URL(trimmed);
+                  const originalUrl = urlObj.searchParams.get('url');
+                  if (originalUrl) {
+                    urlToCheck = originalUrl.toLowerCase();
+                  }
+                }
+              } catch {
+                // URL parsing failed, use original
+              }
+
               const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'];
-              const hasImageExtension = imageExtensions.some(ext => lowerUrl.includes(ext));
+              const hasImageExtension = imageExtensions.some(ext => urlToCheck.includes(ext));
+
+              // Allow SanMar CDN URLs even without visible extension (they serve images)
+              const isSanMarCdn = urlToCheck.includes('cdnm.sanmar.com') ||
+                                  urlToCheck.includes('cdn.sanmar.com') ||
+                                  urlToCheck.includes('sanmar-image-proxy');
 
               // Exclude non-image URLs like PDFs, spec sheets, etc.
-              if (lowerUrl.includes('.pdf') || lowerUrl.includes('itemspecs.aspx') || lowerUrl.includes('itemspecsheet.aspx')) {
+              if (urlToCheck.includes('.pdf') || urlToCheck.includes('itemspecs.aspx') || urlToCheck.includes('itemspecsheet.aspx')) {
                 return false;
               }
 
-              return hasImageExtension;
+              return hasImageExtension || isSanMarCdn;
             });
           };
 
@@ -1759,22 +1778,28 @@ export default function MockupGenerator({
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
+      console.log('[MockupGenerator] Garment image loaded successfully:', proxiedUrl.substring(0, 100));
       garmentImageCache.current = img;
       drawCanvas();
     };
-    img.onerror = () => {
+    img.onerror = (e) => {
+      console.warn('[MockupGenerator] Failed to load garment image:', proxiedUrl.substring(0, 100), e);
       const activeStyle = garmentStyles[activeGarmentIndex];
-      const itemNumber = activeStyle?.description?.match(/\b([A-Z0-9]{2,10})\s*$/)?.[1] || '';
+      const itemNumber = activeStyle?.itemNumber || activeStyle?.description?.match(/\b([A-Z0-9]{2,10})\s*$/)?.[1] || '';
+      console.log('[MockupGenerator] Attempting fallback with itemNumber:', itemNumber);
       if (itemNumber && !proxiedUrl.includes('/catalog/images/' + itemNumber)) {
         const fallbackCdnUrl = `https://cdnm.sanmar.com/catalog/images/${itemNumber.toUpperCase()}.jpg`;
         const fallbackProxied = proxySanMarImageUrl(fallbackCdnUrl);
+        console.log('[MockupGenerator] Trying fallback URL:', fallbackProxied.substring(0, 100));
         const fallbackImg = new Image();
         fallbackImg.crossOrigin = 'anonymous';
         fallbackImg.onload = () => {
+          console.log('[MockupGenerator] Fallback image loaded successfully');
           garmentImageCache.current = fallbackImg;
           drawCanvas();
         };
         fallbackImg.onerror = () => {
+          console.warn('[MockupGenerator] Fallback image also failed');
           garmentImageCache.current = null;
           drawCanvas();
         };

@@ -263,6 +263,14 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [lookingUpParts, setLookingUpParts] = useState(false);
   const [availableParts, setAvailableParts] = useState<any[]>([]);
 
+  const [sanmarDiagnosticsExpanded, setSanmarDiagnosticsExpanded] = useState(false);
+  const [sanmarTestStyleNumber, setSanmarTestStyleNumber] = useState('PC54');
+  const [sanmarTestPartId, setSanmarTestPartId] = useState('');
+  const [testingSanmarPricing, setTestingSanmarPricing] = useState(false);
+  const [sanmarPricingTestResult, setSanmarPricingTestResult] = useState<any>(null);
+  const [lookingUpSanmarParts, setLookingUpSanmarParts] = useState(false);
+  const [sanmarAvailableParts, setSanmarAvailableParts] = useState<any[]>([]);
+
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserName, setNewUserName] = useState('');
@@ -2393,6 +2401,167 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
       showNotification(err instanceof Error ? err.message : 'Failed to lookup parts', 'error');
     } finally {
       setLookingUpParts(false);
+    }
+  };
+
+  const testSanmarPricing = async () => {
+    if (!sanmarTestStyleNumber.trim()) {
+      setSanmarPricingTestResult({
+        success: false,
+        error: 'Please enter a style number to test',
+      });
+      return;
+    }
+
+    try {
+      setTestingSanmarPricing(true);
+      setSanmarPricingTestResult(null);
+
+      if (!companySettings?.id) {
+        setSanmarPricingTestResult({
+          success: false,
+          error: 'Company settings not loaded. Please refresh the page.',
+        });
+        return;
+      }
+
+      const sanmarHasCreds = !!(companySettings.sanmar_promo_username && companySettings.sanmar_promo_password_encrypted);
+      if (!sanmarHasCreds) {
+        setSanmarPricingTestResult({
+          success: false,
+          error: 'SanMar credentials not saved. Please save your credentials first.',
+        });
+        return;
+      }
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
+      if (!token) {
+        setSanmarPricingTestResult({
+          success: false,
+          error: 'No authentication token available. Please sign in again.',
+        });
+        return;
+      }
+
+      let testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sanmar-api?action=pricing&partId=${encodeURIComponent(sanmarTestPartId.trim() || sanmarTestStyleNumber.trim())}&companyId=${encodeURIComponent(companySettings?.id || '')}`;
+      console.log('[SanMar Pricing Test] Calling SanMar API:', testUrl);
+
+      const response = await fetch(testUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'X-User-Token': token,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      console.log('[SanMar Pricing Test] Response:', data);
+
+      if (response.ok && data.success && data.data && data.data.parts && data.data.parts.length > 0) {
+        const pricingData = data.data.parts;
+        const firstPart = pricingData[0];
+        const firstPrice = firstPart?.prices?.[0];
+
+        const partsList = pricingData.map((part: any) => ({
+          partId: part.partId,
+          prices: part.prices || []
+        }));
+
+        setSanmarPricingTestResult({
+          success: true,
+          productName: sanmarTestStyleNumber.trim(),
+          partIdProvided: !!sanmarTestPartId.trim(),
+          supplier: 'SanMar',
+          partsCount: pricingData.length,
+          parts: partsList,
+          firstPrice: firstPrice?.price,
+          firstQuantity: firstPrice?.minQuantity,
+          message: firstPrice
+            ? `Found pricing for ${pricingData.length} part(s). Base price: $${firstPrice.price.toFixed(2)} (min qty: ${firstPrice.minQuantity})`
+            : `Found ${pricingData.length} part(s) but no pricing available`,
+          rawData: data,
+        });
+      } else if (response.ok && data.success && (!data.data?.parts || data.data.parts.length === 0)) {
+        setSanmarPricingTestResult({
+          success: false,
+          error: `No pricing data returned for part ${sanmarTestPartId.trim() || sanmarTestStyleNumber.trim()}`,
+          details: 'Make sure you have selected a valid Part ID from the lookup',
+        });
+      } else {
+        setSanmarPricingTestResult({
+          success: false,
+          error: data.error || `Request failed (${response.status})`,
+          details: data.message || data.details,
+        });
+      }
+    } catch (err) {
+      console.error('[SanMar Pricing Test] Exception:', err);
+      setSanmarPricingTestResult({
+        success: false,
+        error: err instanceof Error ? err.message : 'Test failed',
+      });
+    } finally {
+      setTestingSanmarPricing(false);
+    }
+  };
+
+  const lookupSanmarParts = async () => {
+    if (!sanmarTestStyleNumber.trim()) {
+      showNotification('Please enter a style number', 'error');
+      return;
+    }
+
+    try {
+      setLookingUpSanmarParts(true);
+      setSanmarAvailableParts([]);
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
+      if (!token) {
+        showNotification('Session expired. Please refresh the page.', 'error');
+        return;
+      }
+
+      console.log('[SanMar Part Lookup] Fetching parts for style:', sanmarTestStyleNumber.trim());
+      const testUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sanmar-api?action=product&style=${encodeURIComponent(sanmarTestStyleNumber.trim())}&companyId=${encodeURIComponent(companySettings?.id || '')}`;
+
+      const response = await fetch(testUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'X-User-Token': token,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      console.log('[SanMar Part Lookup] Response:', data);
+
+      if (response.ok && data.success && data.data && data.data.parts && data.data.parts.length > 0) {
+        const productInfo = data.data;
+        const uniqueParts = productInfo.parts.slice(0, 30).map((part: any) => ({
+          partId: part.partId,
+          colorName: part.colorName,
+          size: part.labelSize,
+        }));
+        setSanmarAvailableParts(uniqueParts);
+        showNotification(`Found ${uniqueParts.length} parts for ${productInfo.productBrand || ''} ${productInfo.productName || sanmarTestStyleNumber.trim()}`, 'success');
+      } else if (response.ok && data.success && (!data.data?.parts || data.data.parts.length === 0)) {
+        showNotification(`Style ${sanmarTestStyleNumber.trim()} not found in SanMar catalog`, 'error');
+      } else {
+        showNotification(data.error || 'Failed to lookup parts from SanMar', 'error');
+      }
+    } catch (err) {
+      console.error('[SanMar Part Lookup] Exception:', err);
+      showNotification(err instanceof Error ? err.message : 'Failed to lookup parts', 'error');
+    } finally {
+      setLookingUpSanmarParts(false);
     }
   };
 
@@ -6201,6 +6370,166 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                         </div>
                       </div>
                     )}
+
+                    {/* Collapsible SanMar Pricing Diagnostics */}
+                    <div className="mt-4 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                      <button
+                        onClick={() => setSanmarDiagnosticsExpanded(!sanmarDiagnosticsExpanded)}
+                        className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Wrench className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">SanMar Pricing API Diagnostics</span>
+                        </div>
+                        {sanmarDiagnosticsExpanded ? (
+                          <ChevronUp className="w-4 h-4 text-gray-500" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-gray-500" />
+                        )}
+                      </button>
+
+                      {sanmarDiagnosticsExpanded && (
+                        <div className="p-4 space-y-4 border-t border-gray-200 dark:border-gray-700">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+                            <p>Test the SanMar PromoStandards Pricing & Configuration API.</p>
+                            <p className="text-amber-600 dark:text-amber-400">Note: Click the magnifying glass to lookup available parts, then select one to test pricing.</p>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                Style Number
+                              </label>
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  value={sanmarTestStyleNumber}
+                                  onChange={(e) => {
+                                    setSanmarTestStyleNumber(e.target.value);
+                                    setSanmarAvailableParts([]);
+                                    setSanmarTestPartId('');
+                                  }}
+                                  placeholder="e.g., PC54, ST850, K500"
+                                  className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                                <button
+                                  onClick={lookupSanmarParts}
+                                  disabled={lookingUpSanmarParts || !sanmarTestStyleNumber.trim()}
+                                  className="px-3 py-2 bg-gray-100 dark:bg-slate-600 text-gray-700 dark:text-gray-200 text-sm rounded-lg hover:bg-gray-200 dark:hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                  title="Lookup available parts"
+                                >
+                                  {lookingUpSanmarParts ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Search className="w-4 h-4" />
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                Part ID <span className="text-amber-500">(required for pricing)</span>
+                              </label>
+                              {sanmarAvailableParts.length > 0 ? (
+                                <select
+                                  value={sanmarTestPartId}
+                                  onChange={(e) => setSanmarTestPartId(e.target.value)}
+                                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                >
+                                  <option value="">Select a part...</option>
+                                  {sanmarAvailableParts.map((part, idx) => (
+                                    <option key={idx} value={part.partId}>
+                                      {part.partId} - {part.colorName} / {part.size}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <input
+                                  type="text"
+                                  value={sanmarTestPartId}
+                                  onChange={(e) => setSanmarTestPartId(e.target.value)}
+                                  placeholder="e.g., PC54-Athletic Heather-S"
+                                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex justify-end">
+                            <button
+                              onClick={testSanmarPricing}
+                              disabled={testingSanmarPricing || !sanmarTestPartId.trim()}
+                              className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                            >
+                              {testingSanmarPricing ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  Testing...
+                                </>
+                              ) : (
+                                <>
+                                  <Zap className="w-4 h-4" />
+                                  Test Pricing
+                                </>
+                              )}
+                            </button>
+                          </div>
+
+                          {sanmarPricingTestResult && (
+                            <div className={`p-4 rounded-lg border ${sanmarPricingTestResult.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'}`}>
+                              <div className="flex items-start gap-3">
+                                <div className={`flex-shrink-0 w-6 h-6 rounded-full ${sanmarPricingTestResult.success ? 'bg-green-500' : 'bg-amber-500'} flex items-center justify-center text-white text-sm font-bold`}>
+                                  {sanmarPricingTestResult.success ? '✓' : '!'}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className={`font-medium ${sanmarPricingTestResult.success ? 'text-green-900 dark:text-green-100' : 'text-amber-900 dark:text-amber-100'}`}>
+                                    {sanmarPricingTestResult.success ? 'Pricing Retrieved Successfully' : sanmarPricingTestResult.error ? 'Test Failed' : 'No Pricing Data Found'}
+                                  </h4>
+                                  <p className={`text-sm mt-1 ${sanmarPricingTestResult.success ? 'text-green-800 dark:text-green-200' : 'text-amber-800 dark:text-amber-200'}`}>
+                                    {sanmarPricingTestResult.message || sanmarPricingTestResult.error}
+                                  </p>
+
+                                  {sanmarPricingTestResult.success && sanmarPricingTestResult.parts && sanmarPricingTestResult.parts.length > 0 && (
+                                    <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+                                      <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-2">Price Tiers:</p>
+                                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                                        {sanmarPricingTestResult.parts.slice(0, 5).map((part: any, idx: number) => (
+                                          <div key={idx} className="p-2 bg-white dark:bg-slate-800 rounded border border-blue-200 dark:border-blue-700">
+                                            <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">{part.partId}</p>
+                                            {part.prices && part.prices.length > 0 && (
+                                              <div className="flex flex-wrap gap-2 text-xs">
+                                                {part.prices.map((price: any, pidx: number) => (
+                                                  <span key={pidx} className="px-2 py-0.5 bg-blue-100 dark:bg-blue-800 rounded text-blue-900 dark:text-blue-100">
+                                                    {price.minQuantity}+ @ ${price.price?.toFixed(2)}
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {sanmarPricingTestResult.details && (
+                                    <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded border border-amber-200 dark:border-amber-800">
+                                      <p className="text-xs font-medium text-amber-700 dark:text-amber-300 mb-1">Details:</p>
+                                      <p className="text-sm text-amber-600 dark:text-amber-400">{sanmarPricingTestResult.details}</p>
+                                    </div>
+                                  )}
+
+                                  {sanmarPricingTestResult.success && sanmarPricingTestResult.supplier && (
+                                    <div className="mt-2 text-xs text-green-700 dark:text-green-300">
+                                      <p>Supplier: <span className="font-medium">{sanmarPricingTestResult.supplier}</span></p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
