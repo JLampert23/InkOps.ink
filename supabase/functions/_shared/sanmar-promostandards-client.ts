@@ -508,15 +508,19 @@ export async function fetchSanMarInventory(
 
 /**
  * Fetches pricing using PromoStandards Pricing & Configuration Service V1.0.0
+ *
+ * CRITICAL: SanMar's Pricing API expects STYLE NUMBERS (e.g., "PC147"), NOT partIds (e.g., "637711")
+ * Using partIds will result in 404 errors.
  */
 export async function fetchSanMarPricing(
   credentials: SanMarCredentials,
-  partId: string
+  styleNumber: string
 ): Promise<SanMarPricingData> {
-  console.log('💰 Fetching SanMar pricing:', partId);
+  const normalizedStyle = styleNumber.toUpperCase().trim();
+  console.log('💰 Fetching SanMar pricing for style:', normalizedStyle);
 
   const fobId = credentials.fobId || 'all';
-  const payload = `<shar:productId>${partId}</shar:productId>
+  const payload = `<shar:productId>${normalizedStyle}</shar:productId>
       <shar:currency>USD</shar:currency>
       <shar:fobId>${fobId}</shar:fobId>
       <shar:priceType>Customer</shar:priceType>
@@ -738,28 +742,32 @@ export async function fetchUnifiedSanMarData(
   let inventory: SanMarInventoryData = { items: [] };
   let pricing: SanMarPricingData = { parts: [] };
 
-  if (partId) {
-    const [inventoryResult, pricingResult] = await Promise.allSettled([
-      fetchSanMarInventory(credentials, partId),
-      fetchSanMarPricing(credentials, partId),
-    ]);
-    inventory = inventoryResult.status === 'fulfilled' ? inventoryResult.value : { items: [] };
-    pricing = pricingResult.status === 'fulfilled' ? pricingResult.value : { parts: [] };
+  // Fetch pricing for the style (pricing uses style number, not partIds)
+  // Pricing failures should not block the rest of the data
+  const pricingResult = await Promise.allSettled([
+    fetchSanMarPricing(credentials, styleNumber)
+  ]);
+
+  if (pricingResult[0].status === 'fulfilled') {
+    pricing = pricingResult[0].value;
+    console.log(`✅ Pricing loaded successfully: ${pricing.parts.length} parts`);
   } else {
-    const uniquePartIds = [...new Set(style.parts.map(p => p.partId))].slice(0, 20);
-    console.log(`💰 Fetching pricing for ${uniquePartIds.length} parts`);
+    console.warn(`⚠️ Pricing unavailable for ${styleNumber}:`, pricingResult[0].reason?.message);
+    console.log('📦 Continuing without pricing data - images and product info still available');
+  }
 
-    const pricingResults = await Promise.allSettled(
-      uniquePartIds.map(pid => fetchSanMarPricing(credentials, pid))
-    );
+  // Fetch inventory only if a specific partId was requested
+  if (partId) {
+    const inventoryResult = await Promise.allSettled([
+      fetchSanMarInventory(credentials, partId)
+    ]);
 
-    pricing = { parts: [] };
-    for (const result of pricingResults) {
-      if (result.status === 'fulfilled' && result.value.parts) {
-        pricing.parts.push(...result.value.parts);
-      }
+    if (inventoryResult[0].status === 'fulfilled') {
+      inventory = inventoryResult[0].value;
+      console.log(`✅ Inventory loaded: ${inventory.items.length} items`);
+    } else {
+      console.warn(`⚠️ Inventory unavailable for ${partId}:`, inventoryResult[0].reason?.message);
     }
-    console.log(`💰 Got pricing for ${pricing.parts.length} parts`);
   }
 
   const media = mediaResult.status === 'fulfilled'
