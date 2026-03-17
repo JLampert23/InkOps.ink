@@ -35,7 +35,7 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
               </button>
               <button
                 onClick={onLoginClick}
-                className="px-6 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg transition-all duration-200 shadow-lg hover:shadow-orange-500/50"
+                className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all duration-200 shadow-lg hover:shadow-blue-500/50"
               >
                 Log In
               </button>
@@ -50,7 +50,7 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
           <div className="text-center max-w-4xl mx-auto">
             <h1 className="text-5xl md:text-7xl font-bold text-gray-900 dark:text-white mb-6 leading-tight transition-colors">
               The Operating System for<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-orange-600">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-600">
                 Screen Printing & Embroidery Shops
               </span>
             </h1>
@@ -60,7 +60,7 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button
                 onClick={onLoginClick}
-                className="px-8 py-4 bg-orange-600 hover:bg-orange-700 text-white font-bold text-lg rounded-lg transition-all duration-200 shadow-xl hover:shadow-orange-500/50 flex items-center justify-center gap-2"
+                className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg rounded-lg transition-all duration-200 shadow-xl hover:shadow-blue-500/50 flex items-center justify-center gap-2"
               >
                 Log In
                 <ArrowRight className="w-5 h-5" />
@@ -90,9 +90,9 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
 
           <div className="grid md:grid-cols-2 gap-8">
             {/* Feature 1 */}
-            <div className="bg-white dark:bg-gradient-to-br dark:from-slate-800 dark:to-slate-900 p-8 rounded-2xl border border-gray-200 dark:border-slate-700 hover:border-orange-400 dark:hover:border-orange-500/50 transition-all duration-300 shadow-xl">
-              <div className="w-14 h-14 bg-orange-600/10 rounded-xl flex items-center justify-center mb-6">
-                <Package className="w-7 h-7 text-orange-500" />
+            <div className="bg-white dark:bg-gradient-to-br dark:from-slate-800 dark:to-slate-900 p-8 rounded-2xl border border-gray-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500/50 transition-all duration-300 shadow-xl">
+              <div className="w-14 h-14 bg-blue-600/10 rounded-xl flex items-center justify-center mb-6">
+                <Package className="w-7 h-7 text-blue-500" />
               </div>
               <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4 transition-colors">Quotes & Mockups</h3>
               <p className="text-gray-600 dark:text-slate-400 text-lg leading-relaxed transition-colors">
@@ -101,9 +101,9 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
             </div>
 
             {/* Feature 2 */}
-            <div className="bg-white dark:bg-gradient-to-br dark:from-slate-800 dark:to-slate-900 p-8 rounded-2xl border border-gray-200 dark:border-slate-700 hover:border-orange-400 dark:hover:border-orange-500/50 transition-all duration-300 shadow-xl">
-              <div className="w-14 h-14 bg-orange-600/10 rounded-xl flex items-center justify-center mb-6">
-                <TrendingUp className="w-7 h-7 text-orange-500" />
+            <div className="bg-white dark:bg-gradient-to-br dark:from-slate-800 dark:to-slate-900 p-8 rounded-2xl border border-gray-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500/50 transition-all duration-300 shadow-xl">
+              <div className="w-14 h-14 bg-blue-600/10 rounded-xl flex items-center justify-center mb-6">
+                <TrendingUp className="w-7 h-7 text-blue-500" />
               </div>
               <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4 transition-colors">Production Tracking</h3>
               <p className="text-gray-600 dark:text-slate-400 text-lg leading-relaxed transition-colors">
@@ -112,9 +112,9 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
             </div>
 
             {/* Feature 3 */}
-            <div className="bg-white dark:bg-gradient-to-br dark:from-slate-800 dark:to-slate-900 p-8 rounded-2xl border border-gray-200 dark:border-slate-700 hover:border-orange-400 dark:hover:border-orange-500/50 transition-all duration-300 shadow-xl">
-              <div className="w-14 h-14 bg-orange-600/10 rounded-xl flex items-center justify-center mb-6">
-                <ShoppingCart className="w-7 h-7 text-orange-500" />
+            <div className="bg-white dark:bg-gradient-to-br dark:from-slate-800 dark:to-slate-900 p-8 rounded-2xl border border-gray-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500/50 transition-all duration-300 shadow-xl">
+              <div className="w-14 h-14 bg-blue-600/10 rounded-xl flex items-center justify-center mb-6">
+                <ShoppingCart className="w-7 h-7 text-blue-500" />
               </div>
               <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4 transition-colors">Vendor Pricing & Inventory</h3>
               <p className="text-gray-600 dark:text-slate-400 text-lg leading-relaxed transition-colors">
@@ -123,9 +123,9 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
             </div>
 
             {/* Feature 4 */}
-            <div className="bg-white dark:bg-gradient-to-br dark:from-slate-800 dark:to-slate-900 p-8 rounded-2xl border border-gray-200 dark:border-slate-700 hover:border-orange-400 dark:hover:border-orange-500/50 transition-all duration-300 shadow-xl">
-              <div className="w-14 h-14 bg-orange-600/10 rounded-xl flex items-center justify-center mb-6">
-                <Calendar className="w-7 h-7 text-orange-500" />
+            <div className="bg-white dark:bg-gradient-to-br dark:from-slate-800 dark:to-slate-900 p-8 rounded-2xl border border-gray-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500/50 transition-all duration-300 shadow-xl">
+              <div className="w-14 h-14 bg-blue-600/10 rounded-xl flex items-center justify-center mb-6">
+                <Calendar className="w-7 h-7 text-blue-500" />
               </div>
               <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4 transition-colors">Work Orders & Scheduling</h3>
               <p className="text-gray-600 dark:text-slate-400 text-lg leading-relaxed transition-colors">
@@ -151,7 +151,7 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
           <div className="grid md:grid-cols-3 gap-8">
             <div className="bg-white dark:bg-slate-800/50 rounded-2xl p-8 border border-gray-200 dark:border-slate-700 transition-colors">
               <div className="flex items-center gap-3 mb-4">
-                <CheckCircle className="w-6 h-6 text-orange-500" />
+                <CheckCircle className="w-6 h-6 text-blue-500" />
                 <h3 className="text-xl font-bold text-gray-900 dark:text-white transition-colors">Smart Quoting</h3>
               </div>
               <p className="text-gray-600 dark:text-slate-400 transition-colors">
@@ -161,7 +161,7 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
 
             <div className="bg-white dark:bg-slate-800/50 rounded-2xl p-8 border border-gray-200 dark:border-slate-700 transition-colors">
               <div className="flex items-center gap-3 mb-4">
-                <CheckCircle className="w-6 h-6 text-orange-500" />
+                <CheckCircle className="w-6 h-6 text-blue-500" />
                 <h3 className="text-xl font-bold text-gray-900 dark:text-white transition-colors">Complete Accounting</h3>
               </div>
               <p className="text-gray-600 dark:text-slate-400 transition-colors">
@@ -171,7 +171,7 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
 
             <div className="bg-white dark:bg-slate-800/50 rounded-2xl p-8 border border-gray-200 dark:border-slate-700 transition-colors">
               <div className="flex items-center gap-3 mb-4">
-                <CheckCircle className="w-6 h-6 text-orange-500" />
+                <CheckCircle className="w-6 h-6 text-blue-500" />
                 <h3 className="text-xl font-bold text-gray-900 dark:text-white transition-colors">Workflow Automation</h3>
               </div>
               <p className="text-gray-600 dark:text-slate-400 transition-colors">
@@ -183,17 +183,17 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-6 lg:px-8 bg-gradient-to-r from-orange-600 to-orange-700">
+      <section className="py-20 px-6 lg:px-8 bg-gradient-to-r from-blue-600 to-blue-700">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
             Ready to Transform Your Shop?
           </h2>
-          <p className="text-xl text-orange-100 mb-8">
+          <p className="text-xl text-blue-100 mb-8">
             Join shops already using INKOPS to streamline their operations
           </p>
           <button
             onClick={onLoginClick}
-            className="px-10 py-5 bg-white text-orange-600 hover:bg-slate-100 font-bold text-lg rounded-lg transition-all duration-200 shadow-xl hover:shadow-2xl inline-flex items-center gap-3"
+            className="px-10 py-5 bg-white text-blue-600 hover:bg-slate-100 font-bold text-lg rounded-lg transition-all duration-200 shadow-xl hover:shadow-2xl inline-flex items-center gap-3"
           >
             Get Started
             <ArrowRight className="w-5 h-5" />
