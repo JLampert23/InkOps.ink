@@ -67,24 +67,40 @@ Deno.serve(async (req: Request) => {
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     // Verify the user's JWT and get user details
+    console.log('Attempting to verify user with auth header:', authHeader?.substring(0, 30) + '...');
+
     const {
       data: { user },
       error: userError,
     } = await supabase.auth.getUser();
+
+    console.log('User verification result:', {
+      hasUser: !!user,
+      userId: user?.id,
+      userEmail: user?.email,
+      errorCode: userError?.code,
+      errorMessage: userError?.message,
+      errorStatus: userError?.status,
+    });
 
     if (userError || !user) {
       console.error('Auth error in quote-actions:', {
         userError,
         hasUser: !!user,
         authHeader: authHeader?.substring(0, 20) + '...',
+        fullError: JSON.stringify(userError),
       });
       return new Response(
         JSON.stringify({
           error: "Invalid or expired token",
           details: userError?.message,
+          code: userError?.code,
+          status: userError?.status,
           debugInfo: {
             hasAuthHeader: !!authHeader,
             errorMessage: userError?.message,
+            errorCode: userError?.code,
+            errorStatus: userError?.status,
           }
         }),
         {
