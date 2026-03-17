@@ -108,12 +108,6 @@ interface LineItem {
   qty_2xl: number | null;
   qty_3xl: number | null;
   qty_4xl: number | null;
-  group_label?: string | null;
-  garment_image_url?: string | null;
-  garment_back_image_url?: string | null;
-  garment_side_image_url?: string | null;
-  garment_lifestyle_image_url?: string | null;
-  garment_rear_image_url?: string | null;
 }
 
 interface QuoteImprint {
@@ -886,65 +880,31 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                     )}
 
                                     {(() => {
-                                      // Collect garment images from line items in this group
-                                      const garmentImages: { url: string; label: string }[] = [];
-                                      groupItems.forEach(item => {
-                                        if (item.garment_image_url) {
-                                          garmentImages.push({ url: item.garment_image_url, label: 'Front' });
-                                        }
-                                        if (item.garment_back_image_url) {
-                                          garmentImages.push({ url: item.garment_back_image_url, label: 'Back' });
-                                        }
-                                        if (item.garment_rear_image_url) {
-                                          garmentImages.push({ url: item.garment_rear_image_url, label: 'Rear' });
-                                        }
-                                        if (item.garment_side_image_url) {
-                                          garmentImages.push({ url: item.garment_side_image_url, label: 'Side' });
-                                        }
-                                        if (item.garment_lifestyle_image_url) {
-                                          garmentImages.push({ url: item.garment_lifestyle_image_url, label: 'Lifestyle' });
-                                        }
-                                      });
-
-                                      // Remove duplicates
-                                      const uniqueGarmentImages = garmentImages.filter((img, index, self) =>
-                                        index === self.findIndex((t) => t.url === img.url)
-                                      );
-
-                                      // Collect artwork images
                                       const artworkImages = imprint.artwork_images && Array.isArray(imprint.artwork_images)
                                         ? imprint.artwork_images
                                         : imprint.artwork_url
                                           ? [imprint.artwork_url]
                                           : [];
 
-                                      // Combine all images
-                                      const allImages = [
-                                        ...uniqueGarmentImages.map(img => ({ url: img.url, type: 'garment', label: img.label })),
-                                        ...artworkImages.map((url: string, idx: number) => ({ url, type: 'artwork', label: `Art ${idx + 1}` }))
-                                      ];
-
-                                      if (allImages.length === 0) return null;
+                                      if (artworkImages.length === 0) return null;
 
                                       return (
                                         <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
+                                          <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                            Art Files {artworkImages.length > 1 && `(${artworkImages.length} variations)`}:
+                                          </div>
                                           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                                            {allImages.map((img, imgIdx) => (
-                                              <div key={imgIdx} className="flex flex-col">
-                                                <div className="aspect-square">
-                                                  <img
-                                                    src={img.url}
-                                                    alt={img.label}
-                                                    className="w-full h-full object-contain rounded border-2 border-gray-300 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800 shadow-sm"
-                                                    onClick={() => {
-                                                      setSelectedProofImage(img.url);
-                                                      setShowProofModal(true);
-                                                    }}
-                                                  />
-                                                </div>
-                                                <div className="text-center text-xs text-gray-600 dark:text-gray-400 mt-1">
-                                                  {img.label}
-                                                </div>
+                                            {artworkImages.map((url: string, imgIdx: number) => (
+                                              <div key={imgIdx} className="aspect-square">
+                                                <img
+                                                  src={url}
+                                                  alt={`Artwork ${imgIdx + 1}`}
+                                                  className="w-full h-full object-contain rounded border-2 border-gray-300 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800 shadow-sm"
+                                                  onClick={() => {
+                                                    setSelectedProofImage(url);
+                                                    setShowProofModal(true);
+                                                  }}
+                                                />
                                               </div>
                                             ))}
                                           </div>
