@@ -127,6 +127,7 @@ interface QuoteImprint {
   artwork_description?: string;
   artwork_url?: string;
   artwork_images?: string[];
+  garment_images?: Array<{ url: string; view: string }>;
 }
 
 interface CompanySettings {
@@ -911,6 +912,38 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                         </div>
                                       );
                                     })()}
+
+                                    {imprint.garment_images && imprint.garment_images.length > 0 && (
+                                      <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
+                                        <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                          Garment Images:
+                                        </div>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                                          {imprint.garment_images
+                                            .filter((img) => img?.url)
+                                            .map((img, imgIdx) => (
+                                              <div key={`garment-${imgIdx}`} className="aspect-square">
+                                                <div className="relative w-full h-full">
+                                                  <img
+                                                    src={img.url}
+                                                    alt={`Garment ${img.view || 'view'}`}
+                                                    className="w-full h-full object-contain rounded border-2 border-gray-300 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800 shadow-sm"
+                                                    onClick={() => {
+                                                      setSelectedProofImage(img.url);
+                                                      setShowProofModal(true);
+                                                    }}
+                                                  />
+                                                  {img.view && (
+                                                    <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 text-white text-xs py-1 px-2 text-center rounded-b capitalize">
+                                                      {img.view}
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            ))}
+                                        </div>
+                                      </div>
+                                    )}
 
                                     {hasMockups && (
                                       <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
