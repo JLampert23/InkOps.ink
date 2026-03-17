@@ -911,20 +911,30 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                         index === self.findIndex((t) => t.url === img.url)
                                       );
 
-                                      if (uniqueGarmentImages.length === 0) return null;
+                                      // Collect artwork images
+                                      const artworkImages = imprint.artwork_images && Array.isArray(imprint.artwork_images)
+                                        ? imprint.artwork_images
+                                        : imprint.artwork_url
+                                          ? [imprint.artwork_url]
+                                          : [];
+
+                                      // Combine all images
+                                      const allImages = [
+                                        ...uniqueGarmentImages.map(img => ({ url: img.url, type: 'garment', label: img.label })),
+                                        ...artworkImages.map((url: string, idx: number) => ({ url, type: 'artwork', label: `Art ${idx + 1}` }))
+                                      ];
+
+                                      if (allImages.length === 0) return null;
 
                                       return (
                                         <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
-                                          <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                                            Garment Images:
-                                          </div>
                                           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                                            {uniqueGarmentImages.map((img, imgIdx) => (
+                                            {allImages.map((img, imgIdx) => (
                                               <div key={imgIdx} className="flex flex-col">
                                                 <div className="aspect-square">
                                                   <img
                                                     src={img.url}
-                                                    alt={`Garment ${img.label}`}
+                                                    alt={img.label}
                                                     className="w-full h-full object-contain rounded border-2 border-gray-300 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800 shadow-sm"
                                                     onClick={() => {
                                                       setSelectedProofImage(img.url);
@@ -935,39 +945,6 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                                 <div className="text-center text-xs text-gray-600 dark:text-gray-400 mt-1">
                                                   {img.label}
                                                 </div>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      );
-                                    })()}
-
-                                    {(() => {
-                                      const artworkImages = imprint.artwork_images && Array.isArray(imprint.artwork_images)
-                                        ? imprint.artwork_images
-                                        : imprint.artwork_url
-                                          ? [imprint.artwork_url]
-                                          : [];
-
-                                      if (artworkImages.length === 0) return null;
-
-                                      return (
-                                        <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
-                                          <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                                            Art Files {artworkImages.length > 1 && `(${artworkImages.length} variations)`}:
-                                          </div>
-                                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                                            {artworkImages.map((url: string, imgIdx: number) => (
-                                              <div key={imgIdx} className="aspect-square">
-                                                <img
-                                                  src={url}
-                                                  alt={`Artwork ${imgIdx + 1}`}
-                                                  className="w-full h-full object-contain rounded border-2 border-gray-300 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800 shadow-sm"
-                                                  onClick={() => {
-                                                    setSelectedProofImage(url);
-                                                    setShowProofModal(true);
-                                                  }}
-                                                />
                                               </div>
                                             ))}
                                           </div>
