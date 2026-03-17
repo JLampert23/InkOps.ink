@@ -264,7 +264,7 @@ Deno.serve(async (req: Request) => {
       const { data: companySettings } = await supabaseAdmin
         .from("company_settings")
         .select("inkops_subdomain")
-        .eq("company_id", profile.company_id)
+        .eq("id", profile.company_id)
         .maybeSingle();
 
       // Generate public approval URL using company subdomain
