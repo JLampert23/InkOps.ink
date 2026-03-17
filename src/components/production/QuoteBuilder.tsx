@@ -2945,6 +2945,34 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
                                             </div>
                                           );
                                         })()}
+                                        {/* Display garment images (from Chipply imports) */}
+                                        {(() => {
+                                          const garmentImages = imprint.garment_images && Array.isArray(imprint.garment_images)
+                                            ? imprint.garment_images.filter((img: any) => img?.url)
+                                            : [];
+
+                                          if (garmentImages.length === 0) return null;
+
+                                          return (
+                                            <div className="mt-2 pt-2 border-t border-gray-200 dark:border-slate-700">
+                                              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1.5 font-medium">
+                                                Garment Images {garmentImages.length > 1 && `(${garmentImages.length})`}:
+                                              </div>
+                                              <div className="flex flex-wrap gap-1.5">
+                                                {garmentImages.map((imgObj: any, garmentIdx: number) => (
+                                                  <img
+                                                    key={garmentIdx}
+                                                    src={imgObj.url}
+                                                    alt={`Garment ${imgObj.view || garmentIdx + 1}`}
+                                                    className="w-16 h-16 object-contain rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 cursor-pointer hover:border-blue-500 transition-all"
+                                                    onClick={() => window.open(imgObj.url, '_blank')}
+                                                    title={`Click to view full size - ${imgObj.view || 'view'}`}
+                                                  />
+                                                ))}
+                                              </div>
+                                            </div>
+                                          );
+                                        })()}
                                         {/* Display mockup thumbnails */}
                                         {imprint.mockups && imprint.mockups.length > 0 && (
                                           <div className="mt-2 pt-2 border-t border-gray-200 dark:border-slate-700">
