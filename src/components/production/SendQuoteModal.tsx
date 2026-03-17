@@ -156,13 +156,19 @@ export function SendQuoteModal({
     try {
       console.log('Sending quote via Supabase functions.invoke');
 
-      // Get current session info for debugging
-      const { data: { session } } = await supabase.auth.getSession();
+      // Get current session and ensure it's fresh
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !session) {
+        throw new Error('No active session. Please log in again.');
+      }
+
       console.log('Current session:', {
         hasSession: !!session,
         userId: session?.user?.id,
         email: session?.user?.email,
         expiresAt: session?.expires_at,
+        accessToken: session?.access_token?.substring(0, 20) + '...',
       });
 
       // Use Supabase's built-in functions.invoke which handles auth automatically

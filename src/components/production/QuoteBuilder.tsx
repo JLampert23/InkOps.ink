@@ -487,7 +487,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
         .from('customer_contacts')
         .select('*')
         .eq('customer_id', customerId)
-        .order('name');
+        .order('full_name');
 
       if (error) throw error;
       setCustomerContacts(data || []);

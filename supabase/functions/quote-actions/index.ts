@@ -47,7 +47,15 @@ Deno.serve(async (req: Request) => {
 
     // Extract the JWT token from the Authorization header
     const authHeader = req.headers.get("Authorization");
+
+    console.log('Auth header check:', {
+      hasAuthHeader: !!authHeader,
+      authHeaderPrefix: authHeader?.substring(0, 20),
+      allHeaders: Object.fromEntries(req.headers.entries()),
+    });
+
     if (!authHeader) {
+      console.error('Missing Authorization header');
       return new Response(
         JSON.stringify({ error: "Missing Authorization header" }),
         {
