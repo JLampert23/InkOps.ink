@@ -154,23 +154,43 @@ export function SendQuoteModal({
 
     setSending(true);
     try {
-      console.log('Calling edge function via Supabase client (auth handled automatically)');
+      console.log('Calling edge function via Supabase client');
 
-      const { data, error } = await supabase.functions.invoke(`quote-actions/${quoteId}/send`, {
-        body: {
+      // Get the current session to ensure we have a valid auth token
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        throw new Error('You must be logged in to send quotes');
+      }
+
+      console.log('Session found, calling edge function with fetch');
+
+      // Use fetch directly to call the edge function with the proper path
+      const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quote-actions/${quoteId}/send`;
+
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           template_id: selectedTemplateId,
           custom_message: customMessage,
           expires_in_days: expiresInDays,
           single_use: false,
           auto_approve_after_days: null,
           auto_convert_on_approval: false,
-        },
+        }),
       });
 
-      if (error) {
-        console.error('Edge function error:', error);
-        throw new Error(error.message || 'Failed to send quote');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('Edge function returned error:', errorData);
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
+
+      const data = await response.json();
 
       console.log('Quote sent successfully:', data);
 
