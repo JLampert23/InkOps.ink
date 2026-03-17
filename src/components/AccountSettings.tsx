@@ -161,15 +161,13 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [productionExpanded, setProductionExpanded] = useState(false);
   const [accountingExpanded, setAccountingExpanded] = useState(false);
   const [companySettingsExpanded, setCompanySettingsExpanded] = useState(false);
-  const [communicationsExpanded, setCommunicationsExpanded] = useState(false);
   const [manageGoodsExpanded, setManageGoodsExpanded] = useState(false);
 
-  const collapseAllExcept = (section: 'integrations' | 'production' | 'accounting' | 'company' | 'communications' | 'manageGoods') => {
+  const collapseAllExcept = (section: 'integrations' | 'production' | 'accounting' | 'company' | 'manageGoods') => {
     if (section !== 'integrations') setIntegrationsExpanded(false);
     if (section !== 'production') setProductionExpanded(false);
     if (section !== 'accounting') setAccountingExpanded(false);
     if (section !== 'company') setCompanySettingsExpanded(false);
-    if (section !== 'communications') setCommunicationsExpanded(false);
     if (section !== 'manageGoods') setManageGoodsExpanded(false);
   };
 
@@ -3958,6 +3956,42 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   </div>
                   {activeTab === 'box-label' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
                 </button>
+
+                <button
+                  onClick={() => setActiveTab('email-templates')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'email-templates'
+                      ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                  style={{ animationDelay: '80ms' }}
+                >
+                  <Mail className={`w-4 h-4 flex-shrink-0 ${activeTab === 'email-templates' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'email-templates' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      Email Templates
+                    </div>
+                  </div>
+                  {activeTab === 'email-templates' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('urls')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'urls'
+                      ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                  style={{ animationDelay: '100ms' }}
+                >
+                  <LinkIcon className={`w-4 h-4 flex-shrink-0 ${activeTab === 'urls' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'urls' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      URLs
+                    </div>
+                  </div>
+                  {activeTab === 'urls' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                </button>
               </div>
             )}
           </div>
@@ -4346,64 +4380,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                     </div>
                   </div>
                   {activeTab === 'price-matrices' && <div className="w-1 h-6 bg-green-600 rounded-full absolute right-0" />}
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Communications Section - Collapsible */}
-          <div className="mb-2">
-            <button
-              onClick={() => { collapseAllExcept('communications'); setCommunicationsExpanded(!communicationsExpanded); }}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-slate-700/50"
-            >
-              <Mail className="w-4 h-4 flex-shrink-0 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
-              <div className="flex-1 text-left">
-                <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
-                  Communications
-                </div>
-              </div>
-              {communicationsExpanded ? (
-                <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200" />
-              ) : (
-                <ChevronUp className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200 rotate-180" />
-              )}
-            </button>
-
-            {communicationsExpanded && (
-              <div className="mt-1 ml-2 space-y-1 collapsible-section collapsible-section-enter">
-                <button
-                  onClick={() => setActiveTab('email-templates')}
-                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
-                    activeTab === 'email-templates'
-                      ? 'bg-purple-50 dark:bg-purple-600/20 text-purple-700 dark:text-purple-400 shadow-sm'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                >
-                  <Mail className={`w-4 h-4 flex-shrink-0 ${activeTab === 'email-templates' ? 'text-purple-600 dark:text-purple-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
-                  <div className="flex-1 text-left">
-                    <div className={`font-medium text-sm ${activeTab === 'email-templates' ? 'text-purple-700 dark:text-purple-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                      Email Templates
-                    </div>
-                  </div>
-                  {activeTab === 'email-templates' && <div className="w-1 h-6 bg-purple-600 dark:bg-purple-500 rounded-full absolute right-0" />}
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('urls')}
-                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
-                    activeTab === 'urls'
-                      ? 'bg-purple-50 dark:bg-purple-600/20 text-purple-700 dark:text-purple-400 shadow-sm'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                >
-                  <LinkIcon className={`w-4 h-4 flex-shrink-0 ${activeTab === 'urls' ? 'text-purple-600 dark:text-purple-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
-                  <div className="flex-1 text-left">
-                    <div className={`font-medium text-sm ${activeTab === 'urls' ? 'text-purple-700 dark:text-purple-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                      URLs
-                    </div>
-                  </div>
-                  {activeTab === 'urls' && <div className="w-1 h-6 bg-purple-600 dark:bg-purple-500 rounded-full absolute right-0" />}
                 </button>
               </div>
             )}
