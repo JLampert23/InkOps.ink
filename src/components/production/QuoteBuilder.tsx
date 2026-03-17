@@ -690,16 +690,6 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
         const groupMap = new Map<string, QuoteItem[]>();
 
         lineItems.forEach(item => {
-          console.log('📦 Loading line item with images:', {
-            item_number: item.item_number,
-            color: item.color,
-            garment_front_image_url: item.garment_front_image_url,
-            garment_back_image_url: item.garment_back_image_url,
-            garment_rear_image_url: item.garment_rear_image_url,
-            garment_side_image_url: item.garment_side_image_url,
-            garment_sleeve_image_url: item.garment_sleeve_image_url,
-            garment_lifestyle_image_url: item.garment_lifestyle_image_url,
-          });
           const groupLabel = item.group_label || '';
           if (!groupMap.has(groupLabel)) {
             groupMap.set(groupLabel, []);
@@ -2668,8 +2658,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
                       )}
                       {/* Group Items */}
                       {group.items.map((item, itemIdx) => (
-                        <React.Fragment key={`${group.id}-${itemIdx}`}>
-                        <tr className="bg-white/80 dark:bg-slate-900/50 hover:bg-blue-50/50 dark:hover:bg-slate-800/50 transition-colors">
+                        <tr key={`${group.id}-${itemIdx}`} className="bg-white/80 dark:bg-slate-900/50 hover:bg-blue-50/50 dark:hover:bg-slate-800/50 transition-colors">
                           <td className="p-0.5 border border-gray-300 dark:border-slate-800 text-center">
                             <GripVertical className="w-3 h-3 text-gray-600 mx-auto" />
                           </td>
@@ -2834,107 +2823,6 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
                             </div>
                           </td>
                         </tr>
-                        {/* Garment Images Row - Show if any garment images exist */}
-                        {(() => {
-                          const hasImages = !!(item.garment_front_image_url || item.garment_back_image_url || item.garment_side_image_url ||
-                          item.garment_rear_image_url || item.garment_sleeve_image_url || item.garment_lifestyle_image_url);
-                          console.log('🖼️ Rendering item - has images?', hasImages, {
-                            item_number: item.item_number,
-                            color: item.color,
-                            front: item.garment_front_image_url,
-                            back: item.garment_back_image_url,
-                            rear: item.garment_rear_image_url,
-                            side: item.garment_side_image_url,
-                            sleeve: item.garment_sleeve_image_url,
-                            lifestyle: item.garment_lifestyle_image_url,
-                          });
-                          return hasImages;
-                        })() && (
-                          <tr key={`${group.id}-${itemIdx}-images`} className="bg-blue-50/30 dark:bg-slate-800/30">
-                            <td colSpan={getSizeColumns(group).length + 10} className="p-3 border-x border-b border-gray-300 dark:border-slate-800">
-                              <div className="flex items-start gap-3">
-                                <div className="text-xs font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap pt-1">
-                                  Garment Images:
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                  {item.garment_front_image_url && (
-                                    <div className="flex flex-col items-center gap-1">
-                                      <img
-                                        src={item.garment_front_image_url}
-                                        alt="Front"
-                                        className="w-20 h-20 object-contain rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 cursor-pointer hover:border-blue-500 transition-all shadow-sm"
-                                        onClick={() => window.open(item.garment_front_image_url, '_blank')}
-                                        title="Click to view full size"
-                                      />
-                                      <span className="text-[10px] text-gray-500 dark:text-gray-400">Front</span>
-                                    </div>
-                                  )}
-                                  {item.garment_back_image_url && item.garment_back_image_url !== item.garment_front_image_url && (
-                                    <div className="flex flex-col items-center gap-1">
-                                      <img
-                                        src={item.garment_back_image_url}
-                                        alt="Back"
-                                        className="w-20 h-20 object-contain rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 cursor-pointer hover:border-blue-500 transition-all shadow-sm"
-                                        onClick={() => window.open(item.garment_back_image_url, '_blank')}
-                                        title="Click to view full size"
-                                      />
-                                      <span className="text-[10px] text-gray-500 dark:text-gray-400">Back</span>
-                                    </div>
-                                  )}
-                                  {item.garment_rear_image_url && (
-                                    <div className="flex flex-col items-center gap-1">
-                                      <img
-                                        src={item.garment_rear_image_url}
-                                        alt="Rear"
-                                        className="w-20 h-20 object-contain rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 cursor-pointer hover:border-blue-500 transition-all shadow-sm"
-                                        onClick={() => window.open(item.garment_rear_image_url, '_blank')}
-                                        title="Click to view full size"
-                                      />
-                                      <span className="text-[10px] text-gray-500 dark:text-gray-400">Rear</span>
-                                    </div>
-                                  )}
-                                  {item.garment_side_image_url && (
-                                    <div className="flex flex-col items-center gap-1">
-                                      <img
-                                        src={item.garment_side_image_url}
-                                        alt="Side"
-                                        className="w-20 h-20 object-contain rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 cursor-pointer hover:border-blue-500 transition-all shadow-sm"
-                                        onClick={() => window.open(item.garment_side_image_url, '_blank')}
-                                        title="Click to view full size"
-                                      />
-                                      <span className="text-[10px] text-gray-500 dark:text-gray-400">Side</span>
-                                    </div>
-                                  )}
-                                  {item.garment_sleeve_image_url && (
-                                    <div className="flex flex-col items-center gap-1">
-                                      <img
-                                        src={item.garment_sleeve_image_url}
-                                        alt="Sleeve"
-                                        className="w-20 h-20 object-contain rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 cursor-pointer hover:border-blue-500 transition-all shadow-sm"
-                                        onClick={() => window.open(item.garment_sleeve_image_url, '_blank')}
-                                        title="Click to view full size"
-                                      />
-                                      <span className="text-[10px] text-gray-500 dark:text-gray-400">Sleeve</span>
-                                    </div>
-                                  )}
-                                  {item.garment_lifestyle_image_url && (
-                                    <div className="flex flex-col items-center gap-1">
-                                      <img
-                                        src={item.garment_lifestyle_image_url}
-                                        alt="Lifestyle"
-                                        className="w-20 h-20 object-contain rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 cursor-pointer hover:border-blue-500 transition-all shadow-sm"
-                                        onClick={() => window.open(item.garment_lifestyle_image_url, '_blank')}
-                                        title="Click to view full size"
-                                      />
-                                      <span className="text-[10px] text-gray-500 dark:text-gray-400">Lifestyle</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                        </React.Fragment>
                       ))}
                       {/* Group Actions Row */}
                       <tr key={`actions-${group.id}`}>
