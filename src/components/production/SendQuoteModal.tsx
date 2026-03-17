@@ -156,6 +156,15 @@ export function SendQuoteModal({
     try {
       console.log('Sending quote via Supabase functions.invoke');
 
+      // Get current session info for debugging
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('Current session:', {
+        hasSession: !!session,
+        userId: session?.user?.id,
+        email: session?.user?.email,
+        expiresAt: session?.expires_at,
+      });
+
       // Use Supabase's built-in functions.invoke which handles auth automatically
       const { data, error } = await supabase.functions.invoke(`quote-actions/${quoteId}/send`, {
         body: {
@@ -169,7 +178,13 @@ export function SendQuoteModal({
       });
 
       if (error) {
-        console.error('Edge function error:', error);
+        console.error('Edge function error details:', {
+          error,
+          message: error.message,
+          context: error.context,
+          status: error.context?.status,
+          body: error.context?.body,
+        });
         throw new Error(error.message || 'Failed to send quote');
       }
 
