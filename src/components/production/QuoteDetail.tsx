@@ -690,8 +690,8 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                   <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">4XL</th>
                   <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Qty</th>
                   <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Items</th>
-                  <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[100px]">Unit Price</th>
-                  <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[100px]">Total</th>
+                  <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[120px] bg-blue-50 dark:bg-blue-900/20">Unit Price</th>
+                  <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[120px] bg-green-50 dark:bg-green-900/20">Line Total</th>
                 </tr>
               </thead>
             )}
@@ -735,8 +735,8 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                       <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">4XL</th>
                       <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Qty</th>
                       <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Items</th>
-                      <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[100px]">Unit Price</th>
-                      <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[100px]">Total</th>
+                      <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[120px] bg-blue-50 dark:bg-blue-900/20">Unit Price</th>
+                      <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[120px] bg-green-50 dark:bg-green-900/20">Line Total</th>
                     </tr>
                   )}
                   {/* Group items */}
@@ -808,10 +808,10 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                       <td className="px-4 py-4 text-center text-gray-900 dark:text-white font-bold text-base text-blue-600 dark:text-blue-400">
                         {totalItems}
                       </td>
-                      <td className="px-4 py-4 text-right text-gray-700 dark:text-gray-300 text-base">
+                      <td className="px-4 py-4 text-right text-gray-900 dark:text-white font-semibold text-base bg-blue-50/50 dark:bg-blue-900/10">
                         ${item.unit_price.toFixed(2)}
                       </td>
-                      <td className="px-4 py-4 text-right text-gray-900 dark:text-white font-semibold text-base">
+                      <td className="px-4 py-4 text-right text-green-700 dark:text-green-400 font-bold text-base bg-green-50/50 dark:bg-green-900/10">
                         ${item.total_price.toFixed(2)}
                       </td>
                     </tr>

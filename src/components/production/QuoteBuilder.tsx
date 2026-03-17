@@ -2651,8 +2651,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
                           ))}
                           <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-14">Qty</th>
                           <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-14">Items</th>
-                          <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-24">Unit Price</th>
-                          <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-24">Total</th>
+                          <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-32 bg-blue-50 dark:bg-blue-900/20">Unit Price</th>
+                          <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-32 bg-green-50 dark:bg-green-900/20">Line Total</th>
                           <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-20">Actions</th>
                         </tr>
                       )}
@@ -2780,14 +2780,14 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
                       <td className="p-1 border border-gray-300 dark:border-slate-800 text-center text-base text-blue-600 dark:text-blue-400 font-bold">
                         {calculateItemsTotal(item)}
                       </td>
-                      <td className={`p-0 border border-gray-300 dark:border-slate-800 relative group/price ${!item.wholesale_price || item.wholesale_price === 0 ? 'bg-amber-50 dark:bg-amber-900/20' : ''}`}>
+                      <td className={`p-0 border border-gray-300 dark:border-slate-800 relative group/price bg-blue-50/50 dark:bg-blue-900/10 ${!item.wholesale_price || item.wholesale_price === 0 ? 'bg-amber-50 dark:bg-amber-900/20' : ''}`}>
                         <input
                           type="number"
                           step="0.01"
                           min="0"
                           value={item.unit_price}
                           onChange={(e) => updateItem(group.id, itemIdx, 'unit_price', parseFloat(e.target.value) || 0)}
-                          className={`w-full px-2 py-2 border-0 text-gray-900 dark:text-white text-base text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${!item.wholesale_price || item.wholesale_price === 0 ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-white dark:bg-slate-900'}`}
+                          className={`w-full px-3 py-2 border-0 text-gray-900 dark:text-white text-base text-right font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${!item.wholesale_price || item.wholesale_price === 0 ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-blue-50/50 dark:bg-blue-900/10'}`}
                         />
                         {!item.wholesale_price || item.wholesale_price === 0 ? (
                           <div className="absolute top-0 right-0 p-0.5" title="Wholesale pricing unavailable - enter manually">
@@ -2808,7 +2808,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
                           )
                         )}
                       </td>
-                      <td className="p-1 border border-gray-300 dark:border-slate-800 text-right text-base font-semibold text-gray-900 dark:text-white">
+                      <td className="p-2 border border-gray-300 dark:border-slate-800 text-right text-base font-bold text-green-700 dark:text-green-400 bg-green-50/50 dark:bg-green-900/10">
                         ${item.total_price.toFixed(2)}
                       </td>
                       <td className="p-0.5 border border-gray-300 dark:border-slate-800">
