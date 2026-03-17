@@ -690,6 +690,16 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
         const groupMap = new Map<string, QuoteItem[]>();
 
         lineItems.forEach(item => {
+          console.log('📦 Loading line item with images:', {
+            item_number: item.item_number,
+            color: item.color,
+            garment_front_image_url: item.garment_front_image_url,
+            garment_back_image_url: item.garment_back_image_url,
+            garment_rear_image_url: item.garment_rear_image_url,
+            garment_side_image_url: item.garment_side_image_url,
+            garment_sleeve_image_url: item.garment_sleeve_image_url,
+            garment_lifestyle_image_url: item.garment_lifestyle_image_url,
+          });
           const groupLabel = item.group_label || '';
           if (!groupMap.has(groupLabel)) {
             groupMap.set(groupLabel, []);
@@ -2825,8 +2835,21 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
                           </td>
                         </tr>
                         {/* Garment Images Row - Show if any garment images exist */}
-                        {(item.garment_front_image_url || item.garment_back_image_url || item.garment_side_image_url ||
-                          item.garment_rear_image_url || item.garment_sleeve_image_url || item.garment_lifestyle_image_url) && (
+                        {(() => {
+                          const hasImages = !!(item.garment_front_image_url || item.garment_back_image_url || item.garment_side_image_url ||
+                          item.garment_rear_image_url || item.garment_sleeve_image_url || item.garment_lifestyle_image_url);
+                          console.log('🖼️ Rendering item - has images?', hasImages, {
+                            item_number: item.item_number,
+                            color: item.color,
+                            front: item.garment_front_image_url,
+                            back: item.garment_back_image_url,
+                            rear: item.garment_rear_image_url,
+                            side: item.garment_side_image_url,
+                            sleeve: item.garment_sleeve_image_url,
+                            lifestyle: item.garment_lifestyle_image_url,
+                          });
+                          return hasImages;
+                        })() && (
                           <tr key={`${group.id}-${itemIdx}-images`} className="bg-blue-50/30 dark:bg-slate-800/30">
                             <td colSpan={getSizeColumns(group).length + 10} className="p-3 border-x border-b border-gray-300 dark:border-slate-800">
                               <div className="flex items-start gap-3">
