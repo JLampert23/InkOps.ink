@@ -244,8 +244,8 @@ Deno.serve(async (req: Request) => {
         })
         .eq("id", quoteId);
 
-      // Get company settings to retrieve the inkops subdomain
-      const { data: companySettings } = await supabase
+      // Get company settings to retrieve the inkops subdomain (use admin client to bypass RLS)
+      const { data: companySettings } = await supabaseAdmin
         .from("company_settings")
         .select("inkops_subdomain")
         .eq("company_id", profile.company_id)
