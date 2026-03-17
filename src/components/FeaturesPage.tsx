@@ -272,7 +272,7 @@ export function FeaturesPage({ onLoginClick, onBackToHome }: FeaturesPageProps) 
               { name: 'SSActivewear', icon: Package, description: 'Apparel Supplier' },
               { name: 'Resend', icon: Mail, description: 'Email Service' },
               { name: 'Twilio', icon: Smartphone, description: 'SMS Messaging' },
-              { name: 'Chipply', icon: Image, description: 'Design Platform' },
+              { name: 'Chipply', icon: Image, description: 'Webstore Integration' },
             ].map((integration, idx) => {
               const Icon = integration.icon;
               return (
