@@ -8,8 +8,8 @@ interface LandingPageProps {
 export function LandingPage({ onLoginClick }: LandingPageProps) {
   const { darkMode, toggleDarkMode } = useTheme();
 
-  const scrollToFeatures = () => {
-    document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
+  const navigateToFeatures = () => {
+    window.location.href = '/features';
   };
 
   return (
@@ -66,7 +66,7 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
                 <ArrowRight className="w-5 h-5" />
               </button>
               <button
-                onClick={scrollToFeatures}
+                onClick={navigateToFeatures}
                 className="px-8 py-4 bg-gray-200 hover:bg-gray-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-900 dark:text-white font-bold text-lg rounded-lg transition-all duration-200 border-2 border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500"
               >
                 See Features

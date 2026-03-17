@@ -6,6 +6,7 @@ import { NotificationProvider, useNotification } from './contexts/NotificationCo
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { EnhancedAuthScreen } from './components/EnhancedAuthScreen';
 import { LandingPage } from './components/LandingPage';
+import { FeaturesPage } from './components/FeaturesPage';
 import { supabase } from './lib/supabase-client';
 import { billingService } from './services/billing-service';
 import { useRBAC } from './hooks/useRBAC';
@@ -729,6 +730,19 @@ function App() {
   const isQuoteApprovalPage = path.startsWith('/quote-approval/');
   const isPortalPage = path.startsWith('/portal');
   const isDirectCustomerPage = path.match(/^\/customer\/([^/]+)/);
+  const isFeaturesPage = path === '/features' || path === '/features/';
+
+  if (isFeaturesPage) {
+    hideInitialLoader();
+    return (
+      <ThemeProvider>
+        <FeaturesPage
+          onLoginClick={() => window.location.href = '/login'}
+          onBackToHome={() => window.location.href = '/'}
+        />
+      </ThemeProvider>
+    );
+  }
 
   if (isQuoteApprovalPage) {
     hideInitialLoader();
