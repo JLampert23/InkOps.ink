@@ -244,8 +244,16 @@ Deno.serve(async (req: Request) => {
         })
         .eq("id", quoteId);
 
-      // Generate public approval URL (use base domain - token provides security and isolation)
-      const approvalUrl = `https://inkops.ink/quote-approval/${approvalToken}`;
+      // Get company settings to retrieve the inkops subdomain
+      const { data: companySettings } = await supabase
+        .from("company_settings")
+        .select("inkops_subdomain")
+        .eq("company_id", profile.company_id)
+        .maybeSingle();
+
+      // Generate public approval URL using company subdomain
+      const subdomain = companySettings?.inkops_subdomain || 'app';
+      const approvalUrl = `https://${subdomain}.inkops.ink/quote-approval/${approvalToken}`;
 
       // Send email with template or default
       try {
