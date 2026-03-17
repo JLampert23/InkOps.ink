@@ -154,25 +154,35 @@ export function SendQuoteModal({
 
     setSending(true);
     try {
-      console.log('Calling edge function via Supabase client');
+      console.log('Refreshing session and preparing to send quote');
 
-      // Get the current session to ensure we have a valid auth token
-      const { data: { session } } = await supabase.auth.getSession();
+      // Refresh the session to ensure we have a valid, up-to-date auth token
+      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
 
-      if (!session) {
-        throw new Error('You must be logged in to send quotes');
+      if (sessionError || !session) {
+        console.error('Session refresh error:', sessionError);
+        throw new Error('Your session has expired. Please log in again.');
       }
 
-      console.log('Session found, calling edge function with fetch');
+      console.log('Session refreshed successfully, calling edge function');
+      console.log('Token info:', {
+        tokenPrefix: session.access_token.substring(0, 20) + '...',
+        tokenLength: session.access_token.length,
+        expiresAt: session.expires_at,
+        user: session.user?.email,
+      });
 
       // Use fetch directly to call the edge function with the proper path
       const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quote-actions/${quoteId}/send`;
+
+      console.log('Calling URL:', functionUrl);
 
       const response = await fetch(functionUrl, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({
           template_id: selectedTemplateId,
