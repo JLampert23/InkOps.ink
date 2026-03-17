@@ -1,0 +1,851 @@
+openapi: 3.0.3
+info:
+  title: InkOps API
+  version: 1.0.0
+  description: |
+    Complete API for InkOps print shop management system.
+
+    ## Authentication
+    All endpoints require JWT authentication via Bearer token in the Authorization header.
+
+    ## Rate Limiting
+    - Authenticated endpoints: 100 requests per minute
+    - Public endpoints: 10 requests per minute per IP
+
+    ## Support
+    - Email: api-support@inkops.com
+    - Documentation: https://docs.inkops.com
+  contact:
+    name: InkOps API Support
+    email: api-support@inkops.com
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://{project}.supabase.co/functions/v1
+    description: Supabase Edge Functions
+    variables:
+      project:
+        default: your-project
+        description: Your Supabase project ID
+
+tags:
+  - name: Quotes
+    description: Quote management endpoints
+  - name: Portal
+    description: Customer portal endpoints
+  - name: Products
+    description: Product catalog and search
+  - name: Email
+    description: Email notification endpoints
+  - name: Payments
+    description: Stripe payment integration
+  - name: Webhooks
+    description: Webhook receivers
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token from Supabase Auth
+
+    customerToken:
+      type: apiKey
+      in: header
+      name: X-Customer-Token
+      description: Magic link token for customer portal access
+
+  schemas:
+    Error:
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: "Error message description"
+        code:
+          type: string
+          example: "ERROR_CODE"
+        details:
+          type: object
+          additionalProperties: true
+
+    Quote:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        quote_number:
+          type: string
+          example: "Q-2024-001"
+        customer_name:
+          type: string
+          example: "Acme Corporation"
+        customer_email:
+          type: string
+          format: email
+          example: "contact@acme.com"
+        status:
+          type: string
+          enum: [draft, sent, approved, declined, converted]
+          example: "sent"
+        subtotal:
+          type: number
+          format: float
+          example: 1500.00
+        tax_rate:
+          type: number
+          format: float
+          example: 0.08
+        tax_amount:
+          type: number
+          format: float
+          example: 120.00
+        total:
+          type: number
+          format: float
+          example: 1620.00
+        valid_until:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    QuoteLineItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        line_number:
+          type: integer
+          example: 1
+        sku:
+          type: string
+          nullable: true
+          example: "TSH-BLK-M"
+        description:
+          type: string
+          example: "Black T-Shirt - Medium"
+        quantity:
+          type: integer
+          example: 100
+        unit_price:
+          type: number
+          format: float
+          example: 15.00
+        total_price:
+          type: number
+          format: float
+          example: 1500.00
+        decoration_method:
+          type: string
+          nullable: true
+          example: "Screen Print"
+        decoration_location:
+          type: string
+          nullable: true
+          example: "Front"
+
+    ProductResult:
+      type: object
+      properties:
+        supplier:
+          type: string
+          enum: [sanmar, ssactivewear]
+          example: "ssactivewear"
+        style:
+          type: string
+          example: "PC54"
+        brand:
+          type: string
+          example: "Port & Company"
+        description:
+          type: string
+          example: "Core Cotton Tee"
+        category:
+          type: string
+          example: "T-Shirts"
+        colors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ColorOption'
+        cached:
+          type: boolean
+          example: true
+        last_synced:
+          type: string
+          format: date-time
+
+    ColorOption:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "Black"
+        code:
+          type: string
+          example: "BLK"
+        partIds:
+          type: array
+          items:
+            type: string
+        image_url:
+          type: string
+          format: uri
+        rear_image_url:
+          type: string
+          format: uri
+        side_image_url:
+          type: string
+          format: uri
+        pricing:
+          type: object
+          properties:
+            wholesale:
+              type: number
+              format: float
+            retail:
+              type: number
+              format: float
+        sizes:
+          type: array
+          items:
+            type: string
+        stock:
+          type: object
+          additionalProperties:
+            type: integer
+
+  responses:
+    UnauthorizedError:
+      description: Authentication information is missing or invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error: "Invalid or expired token"
+            code: "INVALID_JWT"
+
+    ForbiddenError:
+      description: Insufficient permissions to access resource
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error: "Insufficient permissions"
+            code: "INSUFFICIENT_PERMISSIONS"
+
+    NotFoundError:
+      description: The specified resource was not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error: "Resource not found"
+            code: "RESOURCE_NOT_FOUND"
+
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            success: false
+            error: "Validation failed"
+            code: "VALIDATION_ERROR"
+            details:
+              field1: "Field is required"
+
+paths:
+  /quotes-api:
+    get:
+      tags:
+        - Quotes
+      summary: List quotes
+      description: Retrieve a paginated list of quotes with optional filtering
+      operationId: listQuotes
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          description: Filter by quote status
+          schema:
+            type: string
+            enum: [draft, sent, approved, declined, converted]
+        - name: customer_id
+          in: query
+          description: Filter by customer UUID
+          schema:
+            type: string
+            format: uuid
+        - name: search
+          in: query
+          description: Search in quote number, customer name, or email
+          schema:
+            type: string
+        - name: date_from
+          in: query
+          description: Filter quotes created after this date
+          schema:
+            type: string
+            format: date-time
+        - name: date_to
+          in: query
+          description: Filter quotes created before this date
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          description: Number of results per page (max 100)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          description: Pagination offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  quotes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Quote'
+                  count:
+                    type: integer
+                    description: Total number of quotes matching filters
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          description: Internal server error
+
+    post:
+      tags:
+        - Quotes
+      summary: Create quote
+      description: Create a new quote with optional line items
+      operationId: createQuote
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - customer_name
+              properties:
+                customer_id:
+                  type: string
+                  format: uuid
+                  nullable: true
+                customer_name:
+                  type: string
+                customer_email:
+                  type: string
+                  format: email
+                  nullable: true
+                customer_phone:
+                  type: string
+                  nullable: true
+                tax_rate:
+                  type: number
+                  format: float
+                  default: 0
+                valid_until:
+                  type: string
+                  format: date-time
+                  nullable: true
+                notes:
+                  type: string
+                  nullable: true
+                line_items:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - description
+                    properties:
+                      sku:
+                        type: string
+                      description:
+                        type: string
+                      quantity:
+                        type: integer
+                        default: 1
+                      unit_price:
+                        type: number
+                        format: float
+                        default: 0
+                      decoration_method:
+                        type: string
+                      decoration_location:
+                        type: string
+      responses:
+        '201':
+          description: Quote created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  quote:
+                    $ref: '#/components/schemas/Quote'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /quotes-api/draft:
+    post:
+      tags:
+        - Quotes
+      summary: Create draft quote
+      description: Create a minimal draft quote for building
+      operationId: createDraftQuote
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Draft quote created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  quote:
+                    $ref: '#/components/schemas/Quote'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /quotes-api/{quoteId}:
+    get:
+      tags:
+        - Quotes
+      summary: Get quote details
+      description: Retrieve a single quote with all related data
+      operationId: getQuote
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: quoteId
+          in: path
+          required: true
+          description: Quote UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  quote:
+                    $ref: '#/components/schemas/Quote'
+                  lineItems:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/QuoteLineItem'
+                  activityLog:
+                    type: array
+                    items:
+                      type: object
+                  approvals:
+                    type: array
+                    items:
+                      type: object
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    put:
+      tags:
+        - Quotes
+      summary: Update quote
+      description: Update an existing quote
+      operationId: updateQuote
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: quoteId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                customer_name:
+                  type: string
+                customer_email:
+                  type: string
+                  format: email
+                tax_rate:
+                  type: number
+                  format: float
+                status:
+                  type: string
+                  enum: [draft, sent]
+                line_items:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        '200':
+          description: Quote updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  quote:
+                    $ref: '#/components/schemas/Quote'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    delete:
+      tags:
+        - Quotes
+      summary: Delete quote
+      description: Delete a quote (Admin only)
+      operationId: deleteQuote
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: quoteId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Quote deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /portal-data:
+    get:
+      tags:
+        - Portal
+      summary: Get customer portal data
+      description: Retrieve customer-specific data for portal display
+      operationId: getPortalData
+      security:
+        - customerToken: []
+      parameters:
+        - name: type
+          in: query
+          required: true
+          description: Type of data to retrieve
+          schema:
+            type: string
+            enum: [quotes, invoices, proofs, work_orders]
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      type: object
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /product-search:
+    get:
+      tags:
+        - Products
+      summary: Search products
+      description: Search for products from integrated suppliers
+      operationId: searchProducts
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: style
+          in: query
+          required: true
+          description: Product style number to search
+          schema:
+            type: string
+        - name: companyId
+          in: query
+          required: false
+          description: Company ID (auto-detected from JWT if not provided)
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Successful search
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  style:
+                    type: string
+                    example: "PC54"
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProductResult'
+                  count:
+                    type: integer
+                  diagnostics:
+                    type: object
+                    properties:
+                      companyId:
+                        type: string
+                      sanmarEnabled:
+                        type: boolean
+                      ssaEnabled:
+                        type: boolean
+                      errors:
+                        type: array
+                        items:
+                          type: string
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /send-email:
+    post:
+      tags:
+        - Email
+      summary: Send email
+      description: Send transactional email using templates or custom HTML
+      operationId: sendEmail
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - to
+                - subject
+                - template
+              properties:
+                to:
+                  oneOf:
+                    - type: string
+                      format: email
+                    - type: array
+                      items:
+                        type: string
+                        format: email
+                subject:
+                  type: string
+                template:
+                  type: string
+                  enum: [invoice-reminder, payment-received, overdue-notice, welcome, custom]
+                html:
+                  type: string
+                  description: Custom HTML (required if template is 'custom')
+                data:
+                  type: object
+                  additionalProperties: true
+                  description: Template data for shortcode replacement
+                shortCodeData:
+                  type: object
+                  additionalProperties: true
+                attachments:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - filename
+                      - content
+                    properties:
+                      filename:
+                        type: string
+                      content:
+                        type: string
+                        description: Base64-encoded file content
+                      type:
+                        type: string
+                        example: "application/pdf"
+      responses:
+        '200':
+          description: Email sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      from:
+                        type: string
+                      to:
+                        type: array
+                        items:
+                          type: string
+                      created_at:
+                        type: string
+                        format: date-time
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /stripe-proxy:
+    post:
+      tags:
+        - Payments
+      summary: Stripe proxy
+      description: Proxy requests to Stripe API with various actions
+      operationId: stripeProxy
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - action
+              properties:
+                action:
+                  type: string
+                  enum: [testConnection, createPaymentLink, getBalance, createRefund, createInvoiceWithMinimumDue, getInvoice, voidInvoice]
+                data:
+                  type: object
+                  description: Action-specific data
+      responses:
+        '200':
+          description: Action completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /stripe-webhook:
+    post:
+      tags:
+        - Webhooks
+      summary: Stripe webhook handler
+      description: Handle incoming Stripe webhook events
+      operationId: handleStripeWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Stripe webhook event payload
+      responses:
+        '200':
+          description: Webhook processed successfully
+        '400':
+          description: Invalid webhook payload
+
+  /shipstation-webhook:
+    post:
+      tags:
+        - Webhooks
+      summary: ShipStation webhook handler
+      description: Handle incoming ShipStation webhook events
+      operationId: handleShipStationWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: ShipStation webhook event payload
+      responses:
+        '200':
+          description: Webhook processed successfully
+        '400':
+          description: Invalid webhook payload
