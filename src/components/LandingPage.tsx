@@ -215,7 +215,7 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
               <a href="#" className="text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white transition-colors">
                 Privacy
               </a>
-              <a href="#" className="text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white transition-colors">
+              <a href="mailto:info@inkops.ink" className="text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white transition-colors">
                 Contact
               </a>
             </div>
