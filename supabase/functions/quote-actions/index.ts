@@ -51,7 +51,6 @@ Deno.serve(async (req: Request) => {
     console.log('Auth header check:', {
       hasAuthHeader: !!authHeader,
       authHeaderPrefix: authHeader?.substring(0, 20),
-      allHeaders: Object.fromEntries(req.headers.entries()),
     });
 
     if (!authHeader) {
@@ -65,7 +64,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Create authenticated Supabase client
+    // Create authenticated Supabase client with the user's JWT
+    // Since verify_jwt is enabled, the JWT is already verified by Supabase
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
         headers: { Authorization: authHeader },
@@ -74,9 +74,7 @@ Deno.serve(async (req: Request) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify the user's JWT and get user details
-    console.log('Attempting to verify user with auth header:', authHeader?.substring(0, 30) + '...');
-
+    // Get the user from the JWT (already verified by Supabase gateway)
     const {
       data: { user },
       error: userError,
@@ -86,30 +84,15 @@ Deno.serve(async (req: Request) => {
       hasUser: !!user,
       userId: user?.id,
       userEmail: user?.email,
-      errorCode: userError?.code,
-      errorMessage: userError?.message,
-      errorStatus: userError?.status,
+      error: userError?.message,
     });
 
     if (userError || !user) {
-      console.error('Auth error in quote-actions:', {
-        userError,
-        hasUser: !!user,
-        authHeader: authHeader?.substring(0, 20) + '...',
-        fullError: JSON.stringify(userError),
-      });
+      console.error('Failed to get user from JWT:', userError);
       return new Response(
         JSON.stringify({
-          error: "Invalid or expired token",
-          details: userError?.message,
-          code: userError?.code,
-          status: userError?.status,
-          debugInfo: {
-            hasAuthHeader: !!authHeader,
-            errorMessage: userError?.message,
-            errorCode: userError?.code,
-            errorStatus: userError?.status,
-          }
+          error: "Authentication failed",
+          details: userError?.message || "Unable to verify user",
         }),
         {
           status: 401,
