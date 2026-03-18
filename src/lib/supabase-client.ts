@@ -39,9 +39,11 @@ function createSupabaseClient(): SupabaseClient {
           existingSignal.addEventListener('abort', () => controller.abort());
         }
 
+        // Preserve all headers when creating the new options object
         return fetch(url, {
           ...options,
           signal: controller.signal,
+          headers: options.headers, // Ensure headers are preserved
         }).finally(() => {
           clearTimeout(timeoutId);
         });

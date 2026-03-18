@@ -392,6 +392,12 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
     setApproving(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      console.log('[APPROVE] Session check:', {
+        hasSession: !!session,
+        userId: session?.user?.id,
+        hasAccessToken: !!session?.access_token,
+        tokenPrefix: session?.access_token?.substring(0, 20)
+      });
       if (!session) throw new Error('Not authenticated');
 
       const response = await fetch(
