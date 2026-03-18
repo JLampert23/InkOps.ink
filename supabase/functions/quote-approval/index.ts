@@ -283,24 +283,65 @@ function renderQuotePage(
   <script>
     var SUBMIT_URL = '${supabaseUrl}/functions/v1/quote-approval/${token}/respond';
 
+    function showError(message) {
+      var errorEl = document.getElementById('form-error');
+      if (!errorEl) {
+        errorEl = document.createElement('div');
+        errorEl.id = 'form-error';
+        errorEl.style.cssText = 'margin-bottom:16px;padding:12px 16px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;color:#991b1b;font-size:14px;display:flex;align-items:center;gap:8px;';
+        document.getElementById('approval-form').insertBefore(errorEl, document.getElementById('approval-form').firstChild);
+      }
+      errorEl.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' + message;
+      errorEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function showConfirm(message, onConfirm) {
+      var overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;';
+
+      var modal = document.createElement('div');
+      modal.style.cssText = 'background:#fff;border-radius:12px;box-shadow:0 20px 50px -12px rgba(0,0,0,0.25);max-width:420px;width:100%;padding:24px;';
+
+      modal.innerHTML = '<div style="display:flex;align-items:start;gap:16px;margin-bottom:24px;"><div style="flex-shrink:0;width:48px;height:48px;border-radius:50%;background:#eff6ff;display:flex;align-items:center;justify-content:center;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></div><div style="flex:1;min-width:0;"><h3 style="font-size:18px;font-weight:700;color:#111827;margin:0 0 8px;">Confirm Action</h3><p style="color:#6b7280;font-size:14px;margin:0;">' + message + '</p></div></div><div style="display:flex;gap:12px;justify-content:flex-end;"><button id="confirm-cancel" style="padding:10px 20px;border:1px solid #d1d5db;background:#fff;color:#374151;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">Cancel</button><button id="confirm-ok" style="padding:10px 20px;border:none;background:#3b82f6;color:#fff;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">Confirm</button></div>';
+
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+
+      document.getElementById('confirm-ok').onclick = function() {
+        document.body.removeChild(overlay);
+        onConfirm();
+      };
+      document.getElementById('confirm-cancel').onclick = function() {
+        document.body.removeChild(overlay);
+      };
+      overlay.onclick = function(e) {
+        if (e.target === overlay) document.body.removeChild(overlay);
+      };
+    }
+
     function submitResponse(isApproved) {
       var name = document.getElementById('approver-name').value.trim();
       var email = document.getElementById('approver-email').value.trim();
       var notes = document.getElementById('approver-notes').value.trim();
 
       if (!name || !email) {
-        alert('Please enter your name and email.');
+        showError('Please enter your name and email.');
         return;
       }
 
       var emailPattern = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
       if (!emailPattern.test(email)) {
-        alert('Please enter a valid email address.');
+        showError('Please enter a valid email address.');
         return;
       }
 
       var action = isApproved ? 'approve' : 'reject';
-      if (!confirm('Are you sure you want to ' + action + ' this quote?')) return;
+      showConfirm('Are you sure you want to ' + action + ' this quote?', function() {
+        executeSubmit(isApproved, name, email, notes);
+      });
+    }
+
+    function executeSubmit(isApproved, name, email, notes) {
 
       var overlay = document.getElementById('loading-overlay');
       overlay.classList.add('active');
@@ -347,7 +388,7 @@ function renderQuotePage(
       .catch(function(err) {
         overlay.classList.remove('active');
         for (var i = 0; i < buttons.length; i++) buttons[i].disabled = false;
-        alert(err.message || 'Something went wrong. Please try again.');
+        showError(err.message || 'Something went wrong. Please try again.');
       });
     }
   </script>

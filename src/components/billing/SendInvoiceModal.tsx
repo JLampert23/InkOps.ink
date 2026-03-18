@@ -3,6 +3,7 @@ import { X, Send, Copy, Loader2, CheckCircle, Mail, MessageSquare } from 'lucide
 import { BillingQueueItem, billingService } from '../../services/billing-service';
 import { twilioService } from '../../services/twilio-service';
 import { supabase } from '../../lib/supabase-client';
+import { useNotification } from '../../contexts/NotificationContext';
 
 interface SendInvoiceModalProps {
   item: BillingQueueItem;
@@ -13,6 +14,7 @@ interface SendInvoiceModalProps {
 type SendMethod = 'email' | 'sms' | 'both';
 
 export function SendInvoiceModal({ item, onClose, onSuccess }: SendInvoiceModalProps) {
+  const { showNotification } = useNotification();
   const [customMessage, setCustomMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [paymentLink, setPaymentLink] = useState('');
@@ -67,7 +69,7 @@ export function SendInvoiceModal({ item, onClose, onSuccess }: SendInvoiceModalP
       const link = await billingService.generatePaymentLink(item.id);
       setPaymentLink(link);
     } catch (error: any) {
-      alert(error.message || 'Failed to generate payment link');
+      showNotification('error', 'Failed to generate payment link', error.message);
     } finally {
       setGeneratingLink(false);
     }
@@ -85,7 +87,7 @@ export function SendInvoiceModal({ item, onClose, onSuccess }: SendInvoiceModalP
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
     } catch (error: any) {
-      alert(error.message || 'Failed to copy link');
+      showNotification('error', 'Failed to copy link', error.message);
     }
   };
 
@@ -127,11 +129,11 @@ export function SendInvoiceModal({ item, onClose, onSuccess }: SendInvoiceModalP
 
       await billingService.moveToAccountsReceivable(item.id);
 
-      alert(`Invoice sent successfully! ${results.join(' and ')}`);
+      showNotification('success', 'Invoice sent successfully!', results.length > 0 ? results.join(' and ') : undefined);
       onSuccess();
       onClose();
     } catch (error: any) {
-      alert(error.message || 'Failed to send invoice');
+      showNotification('error', 'Failed to send invoice', error.message);
     } finally {
       setSending(false);
     }

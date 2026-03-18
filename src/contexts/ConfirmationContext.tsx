@@ -1,8 +1,10 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { ConfirmationModal, ConfirmationOptions } from '../components/common/ConfirmationModal';
+import { PromptModal, PromptOptions } from '../components/common/PromptModal';
 
 interface ConfirmationContextValue {
   confirm: (options: ConfirmationOptions) => Promise<boolean>;
+  prompt: (options: PromptOptions) => Promise<string | null>;
 }
 
 const ConfirmationContext = createContext<ConfirmationContextValue | undefined>(undefined);
@@ -10,6 +12,11 @@ const ConfirmationContext = createContext<ConfirmationContextValue | undefined>(
 interface ConfirmationState extends ConfirmationOptions {
   isOpen: boolean;
   resolve: (value: boolean) => void;
+}
+
+interface PromptState extends PromptOptions {
+  isOpen: boolean;
+  resolve: (value: string | null) => void;
 }
 
 export function ConfirmationProvider({ children }: { children: ReactNode }) {
@@ -20,9 +27,26 @@ export function ConfirmationProvider({ children }: { children: ReactNode }) {
     resolve: () => {},
   });
 
+  const [promptState, setPromptState] = useState<PromptState>({
+    isOpen: false,
+    title: '',
+    message: '',
+    resolve: () => {},
+  });
+
   const confirm = useCallback((options: ConfirmationOptions): Promise<boolean> => {
     return new Promise((resolve) => {
       setState({
+        ...options,
+        isOpen: true,
+        resolve,
+      });
+    });
+  }, []);
+
+  const prompt = useCallback((options: PromptOptions): Promise<string | null> => {
+    return new Promise((resolve) => {
+      setPromptState({
         ...options,
         isOpen: true,
         resolve,
@@ -40,8 +64,18 @@ export function ConfirmationProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, isOpen: false }));
   }, [state.resolve]);
 
+  const handlePromptConfirm = useCallback((value: string) => {
+    promptState.resolve(value);
+    setPromptState((prev) => ({ ...prev, isOpen: false }));
+  }, [promptState.resolve]);
+
+  const handlePromptCancel = useCallback(() => {
+    promptState.resolve(null);
+    setPromptState((prev) => ({ ...prev, isOpen: false }));
+  }, [promptState.resolve]);
+
   return (
-    <ConfirmationContext.Provider value={{ confirm }}>
+    <ConfirmationContext.Provider value={{ confirm, prompt }}>
       {children}
       <ConfirmationModal
         isOpen={state.isOpen}
@@ -53,6 +87,20 @@ export function ConfirmationProvider({ children }: { children: ReactNode }) {
         icon={state.icon}
         onConfirm={handleConfirm}
         onCancel={handleCancel}
+      />
+      <PromptModal
+        isOpen={promptState.isOpen}
+        title={promptState.title}
+        message={promptState.message}
+        placeholder={promptState.placeholder}
+        defaultValue={promptState.defaultValue}
+        confirmLabel={promptState.confirmLabel}
+        cancelLabel={promptState.cancelLabel}
+        inputType={promptState.inputType}
+        required={promptState.required}
+        validator={promptState.validator}
+        onConfirm={handlePromptConfirm}
+        onCancel={handlePromptCancel}
       />
     </ConfirmationContext.Provider>
   );

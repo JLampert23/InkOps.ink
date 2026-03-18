@@ -3,6 +3,7 @@ import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, C
 import { supabase } from '../lib/supabase-client';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
+import { useConfirmation } from '../contexts/ConfirmationContext';
 import { domainVerificationService } from '../services/domain-verification-service';
 import AutomatedReports from './automation/AutomatedReports';
 import WorkflowBuilder from './production/WorkflowBuilder';
@@ -150,7 +151,8 @@ interface AccountSettingsProps {
 
 export function AccountSettings({ initialTab, canAccessIntegrations = true }: AccountSettingsProps = {}) {
   const { user } = useAuth();
-  const { showNotification, confirm } = useNotification();
+  const { showNotification } = useNotification();
+  const { confirm, prompt } = useConfirmation();
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab || 'company-info');
   const [loading, setLoading] = useState(true);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
@@ -1522,7 +1524,19 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
-      const testPhone = prompt('Enter a phone number to send a test SMS (E.164 format, e.g., +14155551234):');
+      const testPhone = await prompt({
+        title: 'Test SMS',
+        message: 'Enter a phone number to send a test SMS',
+        placeholder: '+14155551234',
+        inputType: 'tel',
+        required: true,
+        validator: (value) => {
+          if (!value.startsWith('+')) {
+            return 'Phone number must be in E.164 format (e.g., +14155551234)';
+          }
+          return null;
+        },
+      });
       if (!testPhone) {
         setTwilioTestResult({
           success: false,

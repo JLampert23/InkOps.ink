@@ -39,6 +39,7 @@ import { generateInvoicePDF } from '../../utils/invoice-pdf-export';
 import { supabase } from '../../lib/supabase-client';
 import { ManualPaymentModal } from './ManualPaymentModal';
 import { useConfirmation } from '../../contexts/ConfirmationContext';
+import { useNotification } from '../../contexts/NotificationContext';
 
 interface InvoiceDetailProps {
   invoiceId: string;
@@ -66,7 +67,8 @@ function getCarrierTrackingUrl(carrier: string | null, trackingNumber: string | 
 }
 
 export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: InvoiceDetailProps) {
-  const { confirm } = useConfirmation();
+  const { confirm, prompt } = useConfirmation();
+  const { showNotification } = useNotification();
   const [invoice, setInvoice] = useState<InvoiceDetailType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -245,10 +247,10 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
       console.log(`Invoice ${invoice.invoiceNumber} locked by ${user.email}`);
 
       await loadInvoice();
-      alert('Invoice locked successfully!');
+      showNotification('success', 'Invoice locked successfully!');
     } catch (err) {
       console.error('Error locking invoice:', err);
-      alert(err instanceof Error ? err.message : 'Failed to lock invoice');
+      showNotification('error', 'Failed to lock invoice', err instanceof Error ? err.message : undefined);
     } finally {
       setUnlocking(false);
     }
@@ -257,7 +259,13 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
   const handleUnlockInvoice = async () => {
     if (!invoice || !invoice.isFinanciallyLocked) return;
 
-    const pin = prompt('Please enter your unlock PIN:');
+    const pin = await prompt({
+      title: 'Unlock Invoice',
+      message: 'Please enter your unlock PIN:',
+      placeholder: 'Enter PIN',
+      inputType: 'password',
+      required: true,
+    });
     if (!pin) return;
 
     setUnlocking(true);
@@ -288,10 +296,10 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
       }
 
       await loadInvoice();
-      alert('Invoice unlocked successfully!');
+      showNotification('success', 'Invoice unlocked successfully!');
     } catch (err) {
       console.error('Error unlocking invoice:', err);
-      alert(err instanceof Error ? err.message : 'Failed to unlock invoice');
+      showNotification('error', 'Failed to unlock invoice', err instanceof Error ? err.message : undefined);
     } finally {
       setUnlocking(false);
     }
@@ -304,9 +312,9 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
       const url = await billingService.generatePaymentLink(invoice.billingQueueId);
       await navigator.clipboard.writeText(url);
       await loadInvoice();
-      alert('Payment link generated and copied to clipboard!');
+      showNotification('success', 'Payment link generated and copied to clipboard!');
     } catch (err: any) {
-      alert(err.message || 'Failed to generate payment link');
+      showNotification('error', 'Failed to generate payment link', err.message);
     } finally {
       setGeneratingLink(false);
     }
@@ -319,9 +327,9 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
       const url = await billingService.createStripeInvoice(invoice.billingQueueId);
       setStripeInvoiceUrl(url);
       await loadInvoice();
-      alert('Stripe invoice created successfully!');
+      showNotification('success', 'Stripe invoice created successfully!');
     } catch (err: any) {
-      alert(err.message || 'Failed to create Stripe invoice');
+      showNotification('error', 'Failed to create Stripe invoice', err.message);
     } finally {
       setCreatingStripeInvoice(false);
     }
@@ -342,9 +350,9 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
       if (result.emailSent) results.push('Email sent');
       if (result.smsSent) results.push('Text message sent');
 
-      alert(`Invoice sent successfully! ${results.join(' and ')}`);
+      showNotification('success', 'Invoice sent successfully!', results.length > 0 ? results.join(' and ') : undefined);
     } catch (err: any) {
-      alert(err.message || 'Failed to send invoice');
+      showNotification('error', 'Failed to send invoice', err.message);
     } finally {
       setSendingInvoice(false);
     }
@@ -358,13 +366,13 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
   const handlePaymentSuccess = async () => {
     setShowPaymentModal(false);
     await loadInvoice();
-    alert('Payment recorded successfully!');
+    showNotification('success', 'Payment recorded successfully!');
   };
 
   const handleCopyLink = async () => {
     if (!invoice?.stripePaymentLink?.url) return;
     await navigator.clipboard.writeText(invoice.stripePaymentLink.url);
-    alert('Payment link copied to clipboard!');
+    showNotification('success', 'Payment link copied to clipboard!');
   };
 
   const handleRevertInvoice = async () => {
@@ -383,10 +391,10 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
     setReverting(true);
     try {
       await billingService.revertInvoiceToUnsent(invoice.billingQueueId);
-      alert('Invoice reverted successfully! You can now create a new payment link or invoice.');
+      showNotification('success', 'Invoice reverted successfully!', 'You can now create a new payment link or invoice.');
       await loadInvoice();
     } catch (err: any) {
-      alert(err.message || 'Failed to revert invoice');
+      showNotification('error', 'Failed to revert invoice', err.message);
     } finally {
       setReverting(false);
     }
@@ -452,16 +460,16 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
         setLabelUrls(result.labels);
         setShowShippingAddressModal(false);
         await loadInvoice();
-        alert('Shipping label(s) created successfully');
+        showNotification('success', 'Shipping label(s) created successfully');
       } else if (result.label_url) {
         setLabelUrls([{ label_data: result.label_url, tracking_number: result.tracking_number, package_index: 0 }]);
         setShowShippingAddressModal(false);
         await loadInvoice();
-        alert('Shipping label(s) created successfully');
+        showNotification('success', 'Shipping label(s) created successfully');
       }
     } catch (err: any) {
       console.error('Error fetching shipping rates:', err);
-      alert(err.message || 'Failed to fetch shipping rates');
+      showNotification('error', 'Failed to fetch shipping rates', err.message);
     } finally {
       setSavingAddress(false);
     }
@@ -540,7 +548,7 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
       alert('Shipping label(s) created successfully');
     } catch (err: any) {
       console.error('Error creating shipping label:', err);
-      alert(err.message || 'Failed to create shipping label');
+      showNotification('error', 'Failed to create shipping label', err.message);
     } finally {
       setBuyingLabelWithRate(false);
     }
@@ -646,7 +654,7 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
       }
     } catch (err: any) {
       console.error('ShipStation error:', err);
-      alert(err.message || 'Failed to fetch shipping rates');
+      showNotification('error', 'Failed to fetch shipping rates', err.message);
     } finally {
       setShippingWithShipStation(false);
     }
