@@ -374,9 +374,6 @@ Deno.serve(async (req: Request) => {
 
       if (fetchError) throw fetchError;
       if (!quote) throw new Error("Quote not found");
-      if (quote.status === "approved") {
-        throw new Error("Quote is already approved");
-      }
 
       const body = await req.json();
       const approverName = body.approver_name || profile.full_name || profile.email;
@@ -414,26 +411,42 @@ Deno.serve(async (req: Request) => {
       const garmentItems = lineItems?.filter((item: any) => item.line_type === "item" || !item.line_type) || [];
       const totalQuantity = garmentItems.reduce((sum: number, item: any) => sum + (sumQty(item) || item.quantity || 0), 0);
 
-      const { data: workOrder, error: woError } = await supabaseAdmin
+      // Check if work order already exists
+      let workOrder;
+      const { data: existingWorkOrder } = await supabaseAdmin
         .from("work_orders")
-        .insert([{
-          work_order_number: workOrderNumber,
-          company_id: profile.company_id,
-          quote_id: quoteId,
-          customer_name: quote.customer_name,
-          status: "Pending Scheduling",
-          priority: "medium",
-          production_due_date: quote.production_due_date,
-          customer_due_date: quote.customer_due_date,
-          total_quantity: totalQuantity,
-          notes: quote.production_notes || quote.notes,
-        }])
-        .select()
-        .single();
+        .select("*")
+        .eq("quote_id", quoteId)
+        .eq("company_id", profile.company_id)
+        .maybeSingle();
 
-      if (woError) throw new Error("Failed to create work order: " + woError.message);
+      if (existingWorkOrder) {
+        console.log("Work order already exists, using existing:", existingWorkOrder.id);
+        workOrder = existingWorkOrder;
+      } else {
+        const { data: newWorkOrder, error: woError } = await supabaseAdmin
+          .from("work_orders")
+          .insert([{
+            work_order_number: workOrderNumber,
+            company_id: profile.company_id,
+            quote_id: quoteId,
+            customer_name: quote.customer_name,
+            status: "Pending Scheduling",
+            priority: "medium",
+            production_due_date: quote.production_due_date,
+            customer_due_date: quote.customer_due_date,
+            total_quantity: totalQuantity,
+            notes: quote.production_notes || quote.notes,
+          }])
+          .select()
+          .single();
 
-      if (lineItems && lineItems.length > 0) {
+        if (woError) throw new Error("Failed to create work order: " + woError.message);
+        workOrder = newWorkOrder;
+      }
+
+      // Only insert work order line items if they don't already exist
+      if (!existingWorkOrder && lineItems && lineItems.length > 0) {
         const woLineItems = lineItems
           .filter((item: any) => item.line_type === "item" || !item.line_type)
           .map((item: any) => ({
@@ -453,10 +466,23 @@ Deno.serve(async (req: Request) => {
         if (woliError) console.error("WO line items error:", woliError.message);
       }
 
+      // Check if invoice already exists
       const invoiceId = invoiceNumber;
-      const { data: invoice, error: invError } = await supabaseAdmin
+      let invoice;
+      const { data: existingInvoice } = await supabaseAdmin
         .from("printavo_invoices")
-        .insert([{
+        .select("*")
+        .eq("id", invoiceId)
+        .eq("company_id", profile.company_id)
+        .maybeSingle();
+
+      if (existingInvoice) {
+        console.log("Invoice already exists, using existing:", existingInvoice.id);
+        invoice = existingInvoice;
+      } else {
+        const { data: newInvoice, error: invError } = await supabaseAdmin
+          .from("printavo_invoices")
+          .insert([{
           id: invoiceId,
           invoice_number: invoiceNumber,
           company_id: profile.company_id,
@@ -498,9 +524,12 @@ Deno.serve(async (req: Request) => {
         .select()
         .single();
 
-      if (invError) throw new Error("Failed to create invoice: " + invError.message);
+        if (invError) throw new Error("Failed to create invoice: " + invError.message);
+        invoice = newInvoice;
+      }
 
-      if (lineItems && lineItems.length > 0) {
+      // Only insert invoice line items if invoice was just created
+      if (!existingInvoice && lineItems && lineItems.length > 0) {
         const invLineItems = lineItems.map((item: any) => ({
           invoice_id: invoiceId,
           company_id: profile.company_id,
@@ -525,9 +554,11 @@ Deno.serve(async (req: Request) => {
         item.line_type === "item" || !item.line_type
       ) || [];
 
-      for (const garment of garmentLineItems) {
-        const totalQty = sumQty(garment) || garment.quantity || 0;
-        await supabaseAdmin.from("garment_requirements_staging").insert([{
+      // Only insert garment requirements if work order was just created
+      if (!existingWorkOrder) {
+        for (const garment of garmentLineItems) {
+          const totalQty = sumQty(garment) || garment.quantity || 0;
+          await supabaseAdmin.from("garment_requirements_staging").insert([{
           company_id: profile.company_id,
           quote_id: quoteId,
           work_order_id: workOrder.id,
@@ -540,9 +571,11 @@ Deno.serve(async (req: Request) => {
           supplier_name: garment.supplier_name,
           supplier_type: garment.supplier_name ? "distributor" : null,
         }]);
+        }
       }
 
-      if (imprints && imprints.length > 0) {
+      // Only insert schedule entries if work order was just created
+      if (!existingWorkOrder && imprints && imprints.length > 0) {
         const today = new Date().toISOString().split('T')[0];
         const quoteDueDate = quote.production_due_date || quote.customer_due_date || today;
         const dueDate = quoteDueDate >= today ? quoteDueDate : today;
@@ -582,7 +615,16 @@ Deno.serve(async (req: Request) => {
         console.log(`Successfully created ${insertedSchedule?.length || 0} schedule entries`);
       }
 
-      await supabaseAdmin.from("billing_queue").insert([{
+      // Check if billing queue entry already exists
+      const { data: existingBillingQueue } = await supabaseAdmin
+        .from("billing_queue")
+        .select("*")
+        .eq("printavo_invoice_id", invoiceId)
+        .eq("company_id", profile.company_id)
+        .maybeSingle();
+
+      if (!existingBillingQueue) {
+        await supabaseAdmin.from("billing_queue").insert([{
         company_id: profile.company_id,
         printavo_invoice_id: invoiceId,
         printavo_visual_id: invoiceNumber,
@@ -593,6 +635,7 @@ Deno.serve(async (req: Request) => {
         invoice_date: new Date().toISOString(),
         payment_status: "pending",
       }]);
+      }
 
       await supabaseAdmin
         .from("quotes")
