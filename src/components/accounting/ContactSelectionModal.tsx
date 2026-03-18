@@ -3,13 +3,14 @@ import { X, User, Mail, Phone, Star, FileText, Loader2, Plus } from 'lucide-reac
 import { supabase } from '../../lib/supabase-client';
 
 interface Contact {
-  id: string;
+  id: string | null;
   full_name: string;
   title: string | null;
   email: string | null;
   phone: string | null;
   mobile: string | null;
   is_primary: boolean;
+  is_customer_primary?: boolean;
 }
 
 interface ContactSelectionModalProps {
@@ -41,15 +42,55 @@ export default function ContactSelectionModal({
   const loadContacts = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      // Load customer primary contact
+      const { data: customer, error: customerError } = await supabase
+        .from('customers')
+        .select('contact_name, primary_contact_first_name, primary_contact_last_name, email, phone')
+        .eq('id', customerId)
+        .maybeSingle();
+
+      if (customerError) throw customerError;
+
+      // Load additional contacts from customer_contacts
+      const { data: additionalContacts, error: contactsError } = await supabase
         .from('customer_contacts')
         .select('id, full_name, title, email, phone, mobile, is_primary')
         .eq('customer_id', customerId)
         .order('is_primary', { ascending: false })
         .order('full_name', { ascending: true });
 
-      if (error) throw error;
-      setContacts(data || []);
+      if (contactsError) throw contactsError;
+
+      // Build full contact list
+      const allContacts: Contact[] = [];
+
+      // Add primary contact from customer (with null id to indicate it's the default)
+      if (customer) {
+        const primaryName = customer.primary_contact_first_name && customer.primary_contact_last_name
+          ? `${customer.primary_contact_first_name} ${customer.primary_contact_last_name}`.trim()
+          : customer.contact_name || 'Primary Contact';
+
+        allContacts.push({
+          id: null,
+          full_name: primaryName,
+          title: null,
+          email: customer.email,
+          phone: customer.phone,
+          mobile: null,
+          is_primary: true,
+          is_customer_primary: true
+        });
+      }
+
+      // Add additional contacts
+      if (additionalContacts && additionalContacts.length > 0) {
+        allContacts.push(...additionalContacts.map(c => ({
+          ...c,
+          is_customer_primary: false
+        })));
+      }
+
+      setContacts(allContacts);
     } catch (error) {
       console.error('Error loading contacts:', error);
     } finally {
@@ -57,8 +98,8 @@ export default function ContactSelectionModal({
     }
   };
 
-  const handleCreateQuote = (contactId?: string) => {
-    onCreateQuote(customerId, contactId);
+  const handleCreateQuote = (contactId?: string | null) => {
+    onCreateQuote(customerId, contactId || undefined);
     onClose();
   };
 
@@ -116,11 +157,11 @@ export default function ContactSelectionModal({
             </div>
           ) : (
             <div className="space-y-3">
-              {contacts.map((contact) => (
+              {contacts.map((contact, index) => (
                 <div
-                  key={contact.id}
+                  key={contact.id || `customer-primary-${index}`}
                   className={`p-4 rounded-lg border-2 transition-all ${
-                    contact.is_primary
+                    contact.is_customer_primary || contact.is_primary
                       ? 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20'
                       : 'border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50'
                   }`}
@@ -131,8 +172,14 @@ export default function ContactSelectionModal({
                         <h3 className="font-semibold text-gray-900 dark:text-white">
                           {contact.full_name}
                         </h3>
-                        {contact.is_primary && (
+                        {contact.is_customer_primary && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300">
+                            <Star className="w-3 h-3 fill-current" />
+                            Primary Contact
+                          </span>
+                        )}
+                        {contact.is_primary && !contact.is_customer_primary && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300">
                             <Star className="w-3 h-3 fill-current" />
                             Primary
                           </span>

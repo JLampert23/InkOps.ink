@@ -346,27 +346,9 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
   const handleCreateQuoteClick = async (customer: Customer) => {
     if (!onCreateQuote) return;
 
-    // Check if customer has multiple contacts
-    const { data: contacts, error } = await supabase
-      .from('customer_contacts')
-      .select('id')
-      .eq('customer_id', customer.id);
-
-    if (error) {
-      console.error('Error loading contacts:', error);
-      onCreateQuote(customer.id);
-      return;
-    }
-
-    // If no contacts or only one contact, proceed directly
-    if (!contacts || contacts.length <= 1) {
-      const contactId = contacts && contacts.length === 1 ? contacts[0].id : undefined;
-      onCreateQuote(customer.id, contactId);
-    } else {
-      // Multiple contacts - show selection modal
-      setSelectedCustomerForQuote(customer);
-      setShowContactSelection(true);
-    }
+    // Always show contact selection modal
+    setSelectedCustomerForQuote(customer);
+    setShowContactSelection(true);
   };
 
   const handleContactSelected = (customerId: string, contactId?: string) => {
