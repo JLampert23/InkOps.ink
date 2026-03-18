@@ -6,10 +6,11 @@ const ProductionDashboard = lazy(() => import('./production/ProductionDashboard'
 interface ProductionManagementProps {
   onNavigateToCustomers: () => void;
   initialCustomerId?: string;
+  initialContactId?: string;
   onCustomerIdConsumed?: () => void;
 }
 
-export function ProductionManagement({ onNavigateToCustomers, initialCustomerId, onCustomerIdConsumed }: ProductionManagementProps) {
+export function ProductionManagement({ onNavigateToCustomers, initialCustomerId, initialContactId, onCustomerIdConsumed }: ProductionManagementProps) {
   const LoadingFallback = () => (
     <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 p-12 text-center">
       <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
@@ -24,6 +25,7 @@ export function ProductionManagement({ onNavigateToCustomers, initialCustomerId,
         <ProductionDashboard
           onNavigateToCustomers={onNavigateToCustomers}
           initialCustomerId={initialCustomerId}
+          initialContactId={initialContactId}
           onCustomerIdConsumed={onCustomerIdConsumed}
         />
       </Suspense>

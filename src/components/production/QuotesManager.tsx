@@ -5,23 +5,26 @@ import { QuoteBuilder } from './QuoteBuilder';
 
 interface QuotesManagerProps {
   initialCustomerId?: string;
+  initialContactId?: string;
   onCustomerIdConsumed?: () => void;
 }
 
-export function QuotesManager({ initialCustomerId, onCustomerIdConsumed }: QuotesManagerProps = {}) {
+export function QuotesManager({ initialCustomerId, initialContactId, onCustomerIdConsumed }: QuotesManagerProps = {}) {
   const [view, setView] = useState<'list' | 'detail' | 'edit' | 'create'>('list');
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
   const [preselectedCustomerId, setPreselectedCustomerId] = useState<string | undefined>(initialCustomerId);
+  const [preselectedContactId, setPreselectedContactId] = useState<string | undefined>(initialContactId);
 
   useEffect(() => {
     if (initialCustomerId) {
       setView('create');
       setPreselectedCustomerId(initialCustomerId);
+      setPreselectedContactId(initialContactId);
       if (onCustomerIdConsumed) {
         onCustomerIdConsumed();
       }
     }
-  }, [initialCustomerId, onCustomerIdConsumed]);
+  }, [initialCustomerId, initialContactId, onCustomerIdConsumed]);
 
   const handleSelectQuote = (quoteId: string) => {
     setSelectedQuoteId(quoteId);
@@ -36,12 +39,14 @@ export function QuotesManager({ initialCustomerId, onCustomerIdConsumed }: Quote
   const handleCreateQuote = () => {
     setSelectedQuoteId(null);
     setPreselectedCustomerId(undefined);
+    setPreselectedContactId(undefined);
     setView('create');
   };
 
   const handleBack = () => {
     setSelectedQuoteId(null);
     setPreselectedCustomerId(undefined);
+    setPreselectedContactId(undefined);
     setView('list');
   };
 
@@ -60,6 +65,7 @@ export function QuotesManager({ initialCustomerId, onCustomerIdConsumed }: Quote
       <QuoteBuilder
         quoteId={selectedQuoteId || undefined}
         initialCustomerId={preselectedCustomerId}
+        initialContactId={preselectedContactId}
         onSave={() => {
           if (view === 'edit' && selectedQuoteId) {
             setView('detail');

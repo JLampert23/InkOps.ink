@@ -208,6 +208,7 @@ function AppContent() {
   const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false);
   const [customersKey, setCustomersKey] = useState(0);
   const [quoteCustomerId, setQuoteCustomerId] = useState<string | undefined>(undefined);
+  const [quoteContactId, setQuoteContactId] = useState<string | undefined>(undefined);
   const previousTabRef = useRef<Tab | null>(null);
   const isNavigatingRef = useRef(false);
   const { signOut, user } = useAuth();
@@ -354,8 +355,9 @@ function AppContent() {
     setAccountingExpanded(true);
   };
 
-  const handleCreateQuoteForCustomer = (customerId: string) => {
+  const handleCreateQuoteForCustomer = (customerId: string, contactId?: string) => {
     setQuoteCustomerId(customerId);
+    setQuoteContactId(contactId);
     setActiveTab('production');
   };
 
@@ -696,7 +698,11 @@ function AppContent() {
                   setAccountingExpanded(true);
                 }}
                 initialCustomerId={quoteCustomerId}
-                onCustomerIdConsumed={() => setQuoteCustomerId(undefined)}
+                initialContactId={quoteContactId}
+                onCustomerIdConsumed={() => {
+                  setQuoteCustomerId(undefined);
+                  setQuoteContactId(undefined);
+                }}
               />
             </Suspense>
           )}
