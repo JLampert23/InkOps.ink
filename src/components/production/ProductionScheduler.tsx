@@ -661,10 +661,10 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
                             onClick={() => onNavigateToWorkOrder(entry.work_order_id!)}
                             className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline transition-colors"
                           >
-                            {entry.imprint_number}
+                            {entry.imprint_number.replace(/^QTE-/, '')}
                           </button>
                         ) : (
-                          <span className="text-gray-900 dark:text-white">{entry.imprint_number}</span>
+                          <span className="text-gray-900 dark:text-white">{entry.imprint_number.replace(/^QTE-/, '')}</span>
                         )
                       ) : '-'}
                     </td>

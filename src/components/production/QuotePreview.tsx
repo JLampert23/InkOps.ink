@@ -245,7 +245,7 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
       imprints.forEach((imprint) => {
         doc.setFontSize(9);
         doc.setFont('helvetica', 'bold');
-        doc.text(`IMPRINT #${imprint.imprint_number || ''}`, 14, yPos);
+        doc.text(`IMPRINT #${(imprint.imprint_number || '').replace(/^QTE-/, '')}`, 14, yPos);
         yPos += 5;
 
         doc.setFontSize(8);
@@ -619,7 +619,7 @@ export function QuotePreview({ quoteId, onClose }: QuotePreviewProps) {
                   return (
                     <div key={idx} className="mb-3 border border-gray-300 p-2 bg-gray-50">
                       <h4 className="font-bold text-xs text-gray-900 mb-1">
-                        IMPRINT #{imprint.imprint_number || `${idx + 1}`}
+                        IMPRINT #{(imprint.imprint_number || `${idx + 1}`).replace(/^QTE-/, '')}
                       </h4>
                       {imprint.location && (
                         <p className="text-xs text-gray-700 mb-1">

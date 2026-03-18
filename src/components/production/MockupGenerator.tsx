@@ -2009,7 +2009,7 @@ export default function MockupGenerator({
             )}
             {selectedImprintId && imprints.find(i => i.id === selectedImprintId) && (
               <span className="text-xs px-2 py-1 bg-blue-600 text-white rounded font-mono">
-                #{imprints.find(i => i.id === selectedImprintId)?.imprint_number}
+                #{imprints.find(i => i.id === selectedImprintId)?.imprint_number?.replace(/^QTE-/, '')}
               </span>
             )}
           </div>
@@ -2109,7 +2109,7 @@ export default function MockupGenerator({
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-2">
                               <div className="flex-shrink-0 px-3 py-1 flex items-center justify-center bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-sm font-bold">
-                                {imprint.imprint_number || `#${index + 1}`}
+                                {(imprint.imprint_number || `#${index + 1}`).replace(/^QTE-/, '')}
                               </div>
                             </div>
                             <div className="text-xs font-medium text-gray-900 dark:text-white mb-1">

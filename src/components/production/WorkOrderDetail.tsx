@@ -807,7 +807,7 @@ function GroupImprintsSection({ groupLabel, itemGroups, quoteImprints, quoteNumb
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {grpImprints.map((imprint, idx) => {
         const hasMockups = imprint.mockups && imprint.mockups.length > 0;
-        const label = imprint.imprint_number || `${quoteNumber}-${String(idx + 1).padStart(2, '0')}`;
+        const label = (imprint.imprint_number || `${quoteNumber}-${String(idx + 1).padStart(2, '0')}`).replace(/^QTE-/, '');
         return (
           <div key={imprint.id} className="bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2 flex-wrap">

@@ -865,7 +865,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                   >
                                     <div className="flex items-center gap-2 mb-2 flex-wrap">
                                       <span className="text-sm font-extrabold text-gray-900 dark:text-white">
-                                        {quote.quote_number}-{String(idx + 1).padStart(2, '0')}
+                                        {quote.quote_number.replace(/^QTE-/, '')}-{String(idx + 1).padStart(2, '0')}
                                       </span>
                                       <span className="text-sm font-bold px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded">
                                         {imprint.type_of_work}

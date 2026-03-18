@@ -2890,7 +2890,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
                                         <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                                           {imprint.imprint_number && (
                                             <span className="text-xs px-2 py-1 bg-gray-800 dark:bg-slate-600 text-white rounded font-mono font-semibold">
-                                              #{imprint.imprint_number}
+                                              #{imprint.imprint_number.replace(/^QTE-/, '')}
                                             </span>
                                           )}
                                           <span className="text-gray-900 dark:text-white font-medium text-sm truncate">
