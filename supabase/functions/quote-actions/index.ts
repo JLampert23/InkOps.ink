@@ -547,6 +547,9 @@ Deno.serve(async (req: Request) => {
         const quoteDueDate = quote.production_due_date || quote.customer_due_date || today;
         const dueDate = quoteDueDate >= today ? quoteDueDate : today;
         const totalQtyAll = lineItems?.reduce((sum: number, li: any) => sum + (sumQty(li) || li.quantity || 0), 0) || 0;
+
+        console.log(`Creating ${imprints.length} schedule entries for quote ${quote.quote_number}`);
+
         const scheduleEntries = imprints.map((imp: any, idx: number) => ({
           company_id: profile.company_id,
           quote_id: quoteId,
@@ -564,8 +567,19 @@ Deno.serve(async (req: Request) => {
           priority_order: idx,
         }));
 
-        const { error: schedError } = await supabaseAdmin.from("production_schedule_entries").insert(scheduleEntries);
-        if (schedError) console.error("Schedule entries error:", schedError.message);
+        console.log("Schedule entries to insert:", JSON.stringify(scheduleEntries, null, 2));
+
+        const { data: insertedSchedule, error: schedError } = await supabaseAdmin
+          .from("production_schedule_entries")
+          .insert(scheduleEntries)
+          .select();
+
+        if (schedError) {
+          console.error("CRITICAL: Failed to create schedule entries:", schedError);
+          throw new Error(`Failed to create schedule entries: ${schedError.message}`);
+        }
+
+        console.log(`Successfully created ${insertedSchedule?.length || 0} schedule entries`);
       }
 
       await supabaseAdmin.from("billing_queue").insert([{
