@@ -71,9 +71,12 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
 
     setDuplicating(quoteId);
     try {
+      console.log('[DUPLICATE] Getting session...');
       const { data: { session } } = await supabase.auth.getSession();
+      console.log('[DUPLICATE] Session check:', { hasSession: !!session, userId: session?.user?.id });
       if (!session) throw new Error('Not authenticated');
 
+      console.log('[DUPLICATE] Making fetch request with auth header');
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quote-actions/${quoteId}/duplicate`,
         {
@@ -85,8 +88,10 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
         }
       );
 
+      console.log('[DUPLICATE] Response status:', response.status);
       if (!response.ok) {
         const error = await response.json();
+        console.error('[DUPLICATE] Error response:', error);
         throw new Error(error.error || 'Failed to duplicate quote');
       }
 
