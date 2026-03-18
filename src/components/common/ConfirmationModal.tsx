@@ -64,7 +64,7 @@ export function ConfirmationModal({
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
 
   const styles = variantStyles[variant];
-  const IconComponent = icon || styles.icon;
+  const IconComponent = styles.icon;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -111,10 +111,10 @@ export function ConfirmationModal({
           <div className="p-6">
             <div className="flex items-start gap-4">
               <div className={`flex-shrink-0 w-12 h-12 rounded-full ${styles.iconBg} flex items-center justify-center`}>
-                {typeof IconComponent === 'function' ? (
-                  <IconComponent className={`w-6 h-6 ${styles.iconColor}`} />
+                {icon ? (
+                  <div className={`w-6 h-6 ${styles.iconColor}`}>{icon}</div>
                 ) : (
-                  IconComponent
+                  <IconComponent className={`w-6 h-6 ${styles.iconColor}`} />
                 )}
               </div>
 
