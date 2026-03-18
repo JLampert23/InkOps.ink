@@ -6,6 +6,7 @@ import { ManageImprintsModal } from './ManageImprintsModal';
 import { SendQuoteModal } from './SendQuoteModal';
 import { generateQuotePDF, QuotePDFData } from '../../utils/quote-pdf-export';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useConfirmation } from '../../contexts/ConfirmationContext';
 
 function decodeHtmlEntities(text: string): string {
   if (!text) return text;
@@ -145,6 +146,7 @@ interface CompanySettings {
 
 export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProps) {
   const { showNotification } = useNotification();
+  const { confirm } = useConfirmation();
   const [quote, setQuote] = useState<Quote | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [quoteImprints, setQuoteImprints] = useState<QuoteImprint[]>([]);
@@ -377,9 +379,15 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
   const handleApproveQuote = async () => {
     if (!quote) return;
 
-    if (!confirm(`Are you sure you want to approve ${quote.quote_number}?\n\nThis will:\n- Create a Work Order\n- Create an Invoice\n- Push garment requirements to the purchase report\n- Trigger all approval automations`)) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: `Approve ${quote.quote_number}?`,
+      message: `This will:\n- Create a Work Order\n- Create an Invoice\n- Push garment requirements to the purchase report\n- Trigger all approval automations`,
+      confirmLabel: 'Approve Quote',
+      cancelLabel: 'Cancel',
+      variant: 'success',
+    });
+
+    if (!confirmed) return;
 
     setApproving(true);
     try {

@@ -4,6 +4,7 @@ import { AccountSettings } from './components/AccountSettings';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { NotificationProvider, useNotification } from './contexts/NotificationContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { ConfirmationProvider } from './contexts/ConfirmationContext';
 import { EnhancedAuthScreen } from './components/EnhancedAuthScreen';
 import { LandingPage } from './components/LandingPage';
 import { FeaturesPage } from './components/FeaturesPage';
@@ -752,7 +753,11 @@ function App() {
 
   if (isQuoteApprovalPage) {
     hideInitialLoader();
-    return <PublicQuoteApprovalPage />;
+    return (
+      <ConfirmationProvider>
+        <PublicQuoteApprovalPage />
+      </ConfirmationProvider>
+    );
   }
 
   if (isDirectCustomerPage) {
@@ -762,7 +767,9 @@ function App() {
       <CustomerPortalProvider>
         <ThemeProvider>
           <NotificationProvider>
-            <DomainAwareCustomerPortal customerId={customerId} />
+            <ConfirmationProvider>
+              <DomainAwareCustomerPortal customerId={customerId} />
+            </ConfirmationProvider>
           </NotificationProvider>
         </ThemeProvider>
       </CustomerPortalProvider>
@@ -777,25 +784,27 @@ function App() {
       <CustomerPortalProvider>
         <ThemeProvider>
           <NotificationProvider>
-            {customerMatch ? (
-              <DomainAwareCustomerPortal customerId={customerMatch[1]} />
-            ) : path === '/portal' || path === '/portal/' || path === '/portal/login' ? (
-              <PortalLogin />
-            ) : path.startsWith('/portal/dashboard') ? (
-              <PortalDashboard />
-            ) : path.startsWith('/portal/invoices') ? (
-              <PortalInvoices />
-            ) : path.startsWith('/portal/quotes') ? (
-              <PortalQuotes />
-            ) : path.startsWith('/portal/proofs') ? (
-              <PortalProofs />
-            ) : path.startsWith('/portal/orders') ? (
-              <PortalOrderHistory />
-            ) : path.startsWith('/portal/payment-methods') ? (
-              <PortalPaymentMethods />
-            ) : (
-              <PortalLogin />
-            )}
+            <ConfirmationProvider>
+              {customerMatch ? (
+                <DomainAwareCustomerPortal customerId={customerMatch[1]} />
+              ) : path === '/portal' || path === '/portal/' || path === '/portal/login' ? (
+                <PortalLogin />
+              ) : path.startsWith('/portal/dashboard') ? (
+                <PortalDashboard />
+              ) : path.startsWith('/portal/invoices') ? (
+                <PortalInvoices />
+              ) : path.startsWith('/portal/quotes') ? (
+                <PortalQuotes />
+              ) : path.startsWith('/portal/proofs') ? (
+                <PortalProofs />
+              ) : path.startsWith('/portal/orders') ? (
+                <PortalOrderHistory />
+              ) : path.startsWith('/portal/payment-methods') ? (
+                <PortalPaymentMethods />
+              ) : (
+                <PortalLogin />
+              )}
+            </ConfirmationProvider>
           </NotificationProvider>
         </ThemeProvider>
       </CustomerPortalProvider>
@@ -806,7 +815,9 @@ function App() {
     <AuthProvider>
       <ThemeProvider>
         <NotificationProvider>
-          <AuthenticatedApp />
+          <ConfirmationProvider>
+            <AuthenticatedApp />
+          </ConfirmationProvider>
         </NotificationProvider>
       </ThemeProvider>
     </AuthProvider>
