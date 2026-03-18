@@ -393,7 +393,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
 
   useEffect(() => {
     if (selectedCustomerId && !quoteId) {
-      loadCustomerDetails(selectedCustomerId);
+      loadCustomerDetails(selectedCustomerId, selectedContactId);
+      loadCustomerContacts(selectedCustomerId);
     }
   }, [selectedCustomerId, quoteId]);
 
@@ -520,9 +521,9 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
             .maybeSingle();
 
           if (contact) {
-            contactName = contact.name || '';
+            contactName = contact.full_name || '';
             contactEmail = contact.email || '';
-            contactPhone = contact.phone || '';
+            contactPhone = contact.phone || contact.mobile || '';
           }
         }
 
@@ -2298,7 +2299,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
                     <option value="">Use Default Customer Contact</option>
                     {customerContacts.map(contact => (
                       <option key={contact.id} value={contact.id}>
-                        {contact.name} {contact.email && `(${contact.email})`}
+                        {contact.full_name} {contact.email && `(${contact.email})`}
                       </option>
                     ))}
                   </select>
