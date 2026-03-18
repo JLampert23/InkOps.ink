@@ -7,6 +7,7 @@ import { POValidationModal } from './POValidationModal';
 import { generatePurchaseOrderPDF } from '../../utils/po-pdf-export';
 import { ProductSearchModal } from './ProductSearchModal';
 import { POAutoCreationService } from '../../services/po-auto-creation-service';
+import { useConfirmation } from '../../contexts/ConfirmationContext';
 
 interface PurchaseOrder {
   id: string;
@@ -90,6 +91,7 @@ interface PurchaseOrderDetailProps {
 }
 
 export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods, onNavigateToWorkOrder }: PurchaseOrderDetailProps) {
+  const { confirm } = useConfirmation();
   const [po, setPo] = useState<PurchaseOrder | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -355,9 +357,15 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods, onNavigateTo
     const totalQty = itemsToDelete.reduce((sum, item) => sum + item.quantity_ordered, 0);
     const productName = itemsToDelete[0].product_name;
 
-    if (!confirm(`Delete ${styleNumber || productName} - ${color}?\n\nThis will remove ${totalQty} units across ${itemsToDelete.length} size(s).\n\nThis action cannot be undone.`)) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: `Delete ${styleNumber || productName} - ${color}?`,
+      message: `This will remove ${totalQty} units across ${itemsToDelete.length} size(s).\n\nThis action cannot be undone.`,
+      confirmLabel: 'Delete Line Item',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    });
+
+    if (!confirmed) return;
 
     try {
       setUpdating(true);
@@ -415,9 +423,15 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods, onNavigateTo
       return;
     }
 
-    if (!confirm(`Delete purchase order ${po.po_number}?\n\nThis will permanently remove:\n- PO details\n- All line items (${po.vendor.vendor_name})\n- Attachments\n- Activity log\n- Receiving records\n\nGarment requirements will be unlinked (not deleted).\n\nThis action cannot be undone.`)) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: `Delete ${po.po_number}?`,
+      message: `This will permanently remove:\n- PO details\n- All line items (${po.vendor.vendor_name})\n- Attachments\n- Activity log\n- Receiving records\n\nGarment requirements will be unlinked (not deleted).\n\nThis action cannot be undone.`,
+      confirmLabel: 'Delete PO',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    });
+
+    if (!confirmed) return;
 
     try {
       const { error } = await POAutoCreationService.deletePurchaseOrder(po.id);
@@ -537,7 +551,15 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods, onNavigateTo
   };
 
   const handleDeleteAttachment = async (attachment: Attachment) => {
-    if (!confirm('Are you sure you want to delete this attachment?')) return;
+    const confirmed = await confirm({
+      title: 'Delete Attachment?',
+      message: 'This will permanently remove this file from the purchase order.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    });
+
+    if (!confirmed) return;
 
     try {
       const { error: dbError } = await supabase

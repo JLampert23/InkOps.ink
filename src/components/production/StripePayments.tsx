@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { CreditCard, DollarSign, RefreshCw, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { Payment } from '../../types/production';
 import { stripeService } from '../../services/stripe-service';
+import { useConfirmation } from '../../contexts/ConfirmationContext';
 
 export function StripePayments() {
+  const { confirm } = useConfirmation();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [balance, setBalance] = useState<{ available: number; pending: number }>({ available: 0, pending: 0 });
   const [loading, setLoading] = useState(true);
@@ -58,7 +60,15 @@ export function StripePayments() {
   };
 
   const handleRefund = async (paymentId: string) => {
-    if (!confirm('Are you sure you want to refund this payment?')) return;
+    const confirmed = await confirm({
+      title: 'Refund Payment?',
+      message: 'This will process a refund for this payment through Stripe. This action cannot be undone.',
+      confirmLabel: 'Refund',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    });
+
+    if (!confirmed) return;
 
     try {
       await stripeService.initiateRefund({ paymentId });

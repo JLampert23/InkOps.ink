@@ -38,6 +38,7 @@ import { stripeService } from '../../services/stripe-service';
 import { generateInvoicePDF } from '../../utils/invoice-pdf-export';
 import { supabase } from '../../lib/supabase-client';
 import { ManualPaymentModal } from './ManualPaymentModal';
+import { useConfirmation } from '../../contexts/ConfirmationContext';
 
 interface InvoiceDetailProps {
   invoiceId: string;
@@ -65,6 +66,7 @@ function getCarrierTrackingUrl(carrier: string | null, trackingNumber: string | 
 }
 
 export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: InvoiceDetailProps) {
+  const { confirm } = useConfirmation();
   const [invoice, setInvoice] = useState<InvoiceDetailType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -214,9 +216,15 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
   const handleLockInvoice = async () => {
     if (!invoice || invoice.isFinanciallyLocked) return;
 
-    if (!confirm('Are you sure you want to lock this invoice? Locked invoices cannot be modified without unlocking them first.')) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Lock Invoice?',
+      message: 'Locked invoices cannot be modified without unlocking them first. This protects financial data integrity.',
+      confirmLabel: 'Lock Invoice',
+      cancelLabel: 'Cancel',
+      variant: 'warning',
+    });
+
+    if (!confirmed) return;
 
     setUnlocking(true);
     try {
@@ -362,15 +370,13 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
   const handleRevertInvoice = async () => {
     if (!invoice?.billingQueueId) return;
 
-    const confirmed = confirm(
-      'Are you sure you want to revert this invoice?\n\n' +
-      'This will:\n' +
-      '- Void the Stripe invoice (if exists)\n' +
-      '- Clear the payment link\n' +
-      '- Allow you to create a new invoice or payment link\n' +
-      '- Reset the sent status\n\n' +
-      'This action cannot be undone.'
-    );
+    const confirmed = await confirm({
+      title: 'Revert Invoice?',
+      message: 'This will:\n- Void the Stripe invoice (if exists)\n- Clear the payment link\n- Allow you to create a new invoice or payment link\n- Reset the sent status\n\nThis action cannot be undone.',
+      confirmLabel: 'Revert Invoice',
+      cancelLabel: 'Cancel',
+      variant: 'warning',
+    });
 
     if (!confirmed) return;
 
