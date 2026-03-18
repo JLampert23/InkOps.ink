@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase-client';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useConfirmation } from '../../contexts/ConfirmationContext';
 import { FileText, Search, Plus, Clock, Send, CheckCircle, XCircle, AlertCircle, Loader2, CreditCard as Edit, Eye, Copy, RefreshCw, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -26,6 +27,7 @@ interface Quote {
 
 export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }: QuotesListProps) {
   const { showNotification } = useNotification();
+  const { confirm } = useConfirmation();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -59,7 +61,13 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
   };
 
   const handleDuplicate = async (quoteId: string) => {
-    if (!confirm('Create a copy of this quote?')) return;
+    const confirmed = await confirm({
+      title: 'Duplicate Quote',
+      message: 'Create a copy of this quote?',
+      confirmLabel: 'Duplicate',
+      variant: 'info',
+    });
+    if (!confirmed) return;
 
     setDuplicating(quoteId);
     try {
@@ -83,7 +91,14 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
   };
 
   const handleDelete = async (quoteId: string, quoteNumber: string) => {
-    if (!confirm(`Are you sure you want to delete quote ${quoteNumber}? This action cannot be undone.`)) return;
+    const confirmed = await confirm({
+      title: 'Delete Quote',
+      message: `Are you sure you want to delete quote ${quoteNumber}? This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
 
     setDeleting(quoteId);
     try {
