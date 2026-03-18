@@ -6,6 +6,7 @@ import {
   Loader2,
   RefreshCw,
   Eye,
+  Trash2,
 } from 'lucide-react';
 import { WorkOrderService, WorkOrderWithImprints } from '../../services/work-order-service';
 
@@ -34,6 +35,29 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
       console.error('Error loading work orders:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteWorkOrder = async (wo: WorkOrderWithImprints, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (!confirm(`Delete work order ${wo.work_order_number}?\n\nThis will permanently remove:\n- Work order details\n- All line items\n- Schedule entries\n- Production notes\n\nThis action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await WorkOrderService.deleteWorkOrder(wo.id);
+
+      if (error) {
+        console.error('Error deleting work order:', error);
+        alert('Failed to delete work order. Please try again.');
+        return;
+      }
+
+      await loadWorkOrders();
+    } catch (error) {
+      console.error('Error deleting work order:', error);
+      alert('Failed to delete work order. Please try again.');
     }
   };
 
@@ -235,13 +259,20 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => onSelectWorkOrder(wo.id)}
                             className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
                             title="View Details"
                           >
                             <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={(e) => handleDeleteWorkOrder(wo, e)}
+                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                            title="Delete Work Order"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>

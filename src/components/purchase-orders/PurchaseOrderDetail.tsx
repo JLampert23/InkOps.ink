@@ -1,33 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase-client';
-import {
-  ArrowLeft,
-  Send,
-  CheckCircle,
-  Truck,
-  Package,
-  XCircle,
-  Download,
-  Loader2,
-  Building2,
-  Calendar,
-  DollarSign,
-  FileText,
-  Clock,
-  User,
-  Upload,
-  File,
-  X,
-  Printer,
-  Edit,
-  Plus,
-  Eye,
-} from 'lucide-react';
+import { ArrowLeft, Send, CheckCircle, Truck, Package, XCircle, Download, Loader2, Building2, Calendar, DollarSign, FileText, Clock, User, Upload, File, X, Printer, CreditCard as Edit, Plus, Eye, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { POSettingsService } from '../../services/po-settings-service';
 import { POValidationModal } from './POValidationModal';
 import { generatePurchaseOrderPDF } from '../../utils/po-pdf-export';
 import { ProductSearchModal } from './ProductSearchModal';
+import { POAutoCreationService } from '../../services/po-auto-creation-service';
 
 interface PurchaseOrder {
   id: string;
@@ -357,6 +336,36 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods, onNavigateTo
       .single();
 
     return profile?.company_id || null;
+  };
+
+  const handleDeletePO = async () => {
+    if (!po) return;
+
+    const validation = await POSettingsService.canDeletePO({ status: po.status });
+
+    if (!validation.allowed) {
+      alert(validation.reason || 'This purchase order cannot be deleted.');
+      return;
+    }
+
+    if (!confirm(`Delete purchase order ${po.po_number}?\n\nThis will permanently remove:\n- PO details\n- All line items (${po.vendor.vendor_name})\n- Attachments\n- Activity log\n- Receiving records\n\nGarment requirements will be unlinked (not deleted).\n\nThis action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await POAutoCreationService.deletePurchaseOrder(po.id);
+
+      if (error) {
+        console.error('Error deleting purchase order:', error);
+        alert('Failed to delete purchase order. Please try again.');
+        return;
+      }
+
+      onBack();
+    } catch (error) {
+      console.error('Error deleting purchase order:', error);
+      alert('Failed to delete purchase order. Please try again.');
+    }
   };
 
   const handleEditClick = async () => {
@@ -872,6 +881,14 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods, onNavigateTo
         >
           <Printer className="w-4 h-4" />
           Print PO PDF
+        </button>
+        <button
+          onClick={handleDeletePO}
+          className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all"
+          title="Delete Purchase Order"
+        >
+          <Trash2 className="w-4 h-4" />
+          Delete PO
         </button>
       </div>
 

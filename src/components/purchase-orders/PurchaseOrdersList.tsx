@@ -1,25 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase-client';
-import {
-  Plus,
-  Search,
-  Filter,
-  Download,
-  Send,
-  Package,
-  Eye,
-  Edit,
-  Loader2,
-  Calendar,
-  DollarSign,
-  Building2,
-  ChevronDown,
-  X,
-  Archive,
-  FileText,
-  Trash2,
-} from 'lucide-react';
+import { Plus, Search, Filter, Download, Send, Package, Eye, CreditCard as Edit, Loader2, Calendar, DollarSign, Building2, ChevronDown, X, Archive, FileText, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { POAutoCreationService } from '../../services/po-auto-creation-service';
+import { POSettingsService } from '../../services/po-settings-service';
 
 interface PurchaseOrder {
   id: string;
@@ -270,31 +254,36 @@ export function PurchaseOrdersList({ onCreateNew, onViewDetail }: PurchaseOrders
   };
 
   const handleDeletePO = async (po: PurchaseOrder) => {
-    if (!confirm(`Delete purchase order ${po.po_number}? This will also remove all associated records and cannot be undone.`)) return;
+    const validation = await POSettingsService.canDeletePO({ status: po.status });
+
+    if (!validation.allowed) {
+      alert(validation.reason || 'This purchase order cannot be deleted.');
+      return;
+    }
+
+    if (!confirm(`Delete purchase order ${po.po_number}?\n\nThis will permanently remove:\n- PO details\n- All line items (${po.vendor.vendor_name})\n- Attachments\n- Activity log\n- Receiving records\n\nGarment requirements will be unlinked (not deleted).\n\nThis action cannot be undone.`)) {
+      return;
+    }
 
     try {
-      await supabase.from('purchase_order_attachments').delete().eq('po_id', po.id);
-      await supabase.from('purchase_order_line_items').delete().eq('po_id', po.id);
-      await supabase.from('purchase_order_activity_log').delete().eq('po_id', po.id);
-      await supabase.from('receiving_logs').delete().eq('po_id', po.id);
-      await supabase.from('garment_requirements_staging').delete().eq('po_id', po.id);
+      const { error } = await POAutoCreationService.deletePurchaseOrder(po.id);
 
-      const { error: poError } = await supabase
-        .from('purchase_orders')
-        .delete()
-        .eq('id', po.id);
-
-      if (poError) throw poError;
+      if (error) {
+        console.error('Error deleting purchase order:', error);
+        alert('Failed to delete purchase order. Please try again.');
+        return;
+      }
 
       setSelectedPos((prev) => {
         const next = new Set(prev);
         next.delete(po.id);
         return next;
       });
-      loadPurchaseOrders();
+
+      await loadPurchaseOrders();
     } catch (error) {
       console.error('Error deleting purchase order:', error);
-      alert('Failed to delete purchase order');
+      alert('Failed to delete purchase order. Please try again.');
     }
   };
 

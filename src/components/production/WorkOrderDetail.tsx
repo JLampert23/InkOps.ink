@@ -9,6 +9,7 @@ import {
   Tag,
   Printer,
   Download,
+  Trash2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { WorkOrderService, WorkOrderLineItem } from '../../services/work-order-service';
@@ -332,6 +333,29 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
     await loadData();
   };
 
+  const handleDeleteWorkOrder = async () => {
+    if (!workOrder) return;
+
+    if (!confirm(`Delete work order ${workOrder.work_order_number}?\n\nThis will permanently remove:\n- Work order details\n- All line items\n- Schedule entries\n- Production notes\n\nThis action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await WorkOrderService.deleteWorkOrder(workOrder.id);
+
+      if (error) {
+        console.error('Error deleting work order:', error);
+        alert('Failed to delete work order. Please try again.');
+        return;
+      }
+
+      onBack();
+    } catch (error) {
+      console.error('Error deleting work order:', error);
+      alert('Failed to delete work order. Please try again.');
+    }
+  };
+
   const handleDownloadPDF = async () => {
     if (!workOrder) return;
 
@@ -520,6 +544,14 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           <button onClick={() => setShowLabelModal(true)} className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-teal-600 text-white rounded hover:bg-teal-700 transition-colors">
             <Printer className="w-3 h-3" />
             Print Box Label
+          </button>
+          <button
+            onClick={handleDeleteWorkOrder}
+            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+            title="Delete Work Order"
+          >
+            <Trash2 className="w-3 h-3" />
+            Delete
           </button>
         </div>
       </div>

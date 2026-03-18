@@ -404,4 +404,13 @@ export class WorkOrderService {
       .eq('work_order_id', workOrderId)
       .order('line_number');
   }
+
+  static async deleteWorkOrder(
+    workOrderId: string
+  ): Promise<{ error: any }> {
+    return await supabase
+      .from('work_orders')
+      .delete()
+      .eq('id', workOrderId);
+  }
 }
