@@ -86,6 +86,9 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
 
       const { data, error } = await supabase.functions.invoke(`quote-actions/${quoteId}/duplicate`, {
         method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
       console.log('Duplicate response:', { data, error });
