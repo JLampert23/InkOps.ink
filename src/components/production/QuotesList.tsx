@@ -71,33 +71,16 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
 
     setDuplicating(quoteId);
     try {
-      console.log('[DUPLICATE] Getting session...');
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log('[DUPLICATE] Session check:', { hasSession: !!session, userId: session?.user?.id });
-      if (!session) throw new Error('Not authenticated');
+      const { data, error } = await supabase.functions.invoke(`quote-actions/${quoteId}/duplicate`, {
+        method: 'POST',
+      });
 
-      console.log('[DUPLICATE] Making fetch request with auth header');
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quote-actions/${quoteId}/duplicate`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      console.log('[DUPLICATE] Response status:', response.status);
-      if (!response.ok) {
-        const error = await response.json();
-        console.error('[DUPLICATE] Error response:', error);
-        throw new Error(error.error || 'Failed to duplicate quote');
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error(error.message || 'Failed to duplicate quote');
       }
 
-      const result = await response.json();
-      showNotification(`Quote duplicated as ${result.quote.quote_number}`, 'success');
+      showNotification(`Quote duplicated as ${data.quote.quote_number}`, 'success');
       loadQuotes();
     } catch (error: any) {
       console.error('Error duplicating quote:', error);
