@@ -64,13 +64,21 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Create Supabase clients
+    // Create authenticated Supabase client with the user's JWT
+    // Since verify_jwt is enabled, the JWT is already verified by Supabase
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: { Authorization: authHeader },
+      },
+    });
+
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Use service role key to verify the JWT manually since verify_jwt is false
-    const token = authHeader.replace('Bearer ', '');
-
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+    // Get the user from the JWT (already verified by Supabase gateway)
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
     console.log('User verification result:', {
       hasUser: !!user,
@@ -92,13 +100,6 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
-
-    // Create authenticated client for user-scoped operations
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: { Authorization: authHeader },
-      },
-    });
 
     // Get user profile
     const { data: profile } = await supabase
@@ -168,224 +169,26 @@ Deno.serve(async (req: Request) => {
 
       if (createError) throw createError;
 
-      // Duplicate line items with ALL fields
+      // Duplicate line items
       if (originalLineItems && originalLineItems.length > 0) {
-        console.log(`[DUPLICATE] Found ${originalLineItems.length} line items to duplicate`);
-
         const newLineItems = originalLineItems.map((item: any) => ({
           quote_id: newQuote.id,
           company_id: profile.company_id,
           line_number: item.line_number,
-          line_type: item.line_type,
-          group_label: item.group_label,
-          item_number: item.item_number,
           sku: item.sku,
           description: item.description,
-          color: item.color,
-          size_mode: item.size_mode,
           quantity: item.quantity,
-          // All size columns
-          qty_yxs: item.qty_yxs,
-          qty_ys: item.qty_ys,
-          qty_ym: item.qty_ym,
-          qty_yl: item.qty_yl,
-          qty_yxl: item.qty_yxl,
-          qty_xs: item.qty_xs,
-          qty_s: item.qty_s,
-          qty_m: item.qty_m,
-          qty_l: item.qty_l,
-          qty_xl: item.qty_xl,
-          qty_2xl: item.qty_2xl,
-          qty_3xl: item.qty_3xl,
-          qty_4xl: item.qty_4xl,
-          // Pricing
           unit_price: item.unit_price,
           total_price: item.total_price,
-          wholesale_price: item.wholesale_price,
-          retail_price: item.retail_price,
-          garment_unit_price: item.garment_unit_price,
-          // Supplier info
-          supplier_name: item.supplier_name,
-          brand: item.brand,
-          color_code: item.color_code,
-          supplier_metadata: item.supplier_metadata,
-          stock_availability: item.stock_availability,
-          supplier_partid: item.supplier_partid,
-          // Images
-          garment_image_url: item.garment_image_url,
-          garment_front_image_url: item.garment_front_image_url,
-          garment_back_image_url: item.garment_back_image_url,
-          garment_side_image_url: item.garment_side_image_url,
-          garment_rear_image_url: item.garment_rear_image_url,
-          garment_lifestyle_image_url: item.garment_lifestyle_image_url,
-          garment_sleeve_image_url: item.garment_sleeve_image_url,
-          garment_image_lifestyle_url: item.garment_image_lifestyle_url,
-          garment_image_rear_url: item.garment_image_rear_url,
-          garment_image_side_url: item.garment_image_side_url,
-          garment_images_data: item.garment_images_data,
-          // Decoration
           decoration_method: item.decoration_method,
           decoration_location: item.decoration_location,
           artwork_url: item.artwork_url,
           notes: item.notes,
         }));
 
-        const { data: insertedLineItems, error: lineItemsError } = await supabaseAdmin
+        await supabase
           .from("quote_line_items")
-          .insert(newLineItems)
-          .select();
-
-        if (lineItemsError) {
-          console.error('[DUPLICATE] Error inserting line items:', lineItemsError);
-          throw new Error(`Failed to duplicate line items: ${lineItemsError.message}`);
-        }
-
-        console.log(`[DUPLICATE] Successfully inserted ${insertedLineItems?.length || 0} line items`);
-
-        // Create a mapping of old line item IDs to new line item IDs
-        const lineItemIdMap = new Map();
-        if (insertedLineItems) {
-          originalLineItems.forEach((oldItem: any, index: number) => {
-            lineItemIdMap.set(oldItem.id, insertedLineItems[index].id);
-          });
-        }
-
-        // Duplicate imprints
-        const { data: originalImprints } = await supabaseAdmin
-          .from("quote_imprints")
-          .select("*")
-          .eq("quote_id", quoteId)
-          .order("sort_order");
-
-        if (originalImprints && originalImprints.length > 0) {
-          console.log(`[DUPLICATE] Found ${originalImprints.length} imprints to duplicate`);
-
-          const newImprints = originalImprints.map((imprint: any) => ({
-            quote_id: newQuote.id,
-            company_id: profile.company_id,
-            type_of_work: imprint.type_of_work,
-            imprint_number: imprint.imprint_number,
-            location: imprint.location,
-            group_label: imprint.group_label,
-            thread_ink_color: imprint.thread_ink_color,
-            num_colors: imprint.num_colors,
-            artwork_url: imprint.artwork_url,
-            artwork_images: imprint.artwork_images,
-            garment_images: imprint.garment_images,
-            price_matrix_id: imprint.price_matrix_id,
-            price: imprint.price,
-            details: imprint.details,
-            mockups: imprint.mockups,
-            sort_order: imprint.sort_order,
-            matrix: imprint.matrix,
-            column_number: imprint.column_number,
-            pricing_matrix_column: imprint.pricing_matrix_column,
-          }));
-
-          const { data: insertedImprints, error: imprintsError } = await supabaseAdmin
-            .from("quote_imprints")
-            .insert(newImprints)
-            .select();
-
-          if (imprintsError) {
-            console.error('[DUPLICATE] Error inserting imprints:', imprintsError);
-            throw new Error(`Failed to duplicate imprints: ${imprintsError.message}`);
-          }
-
-          console.log(`[DUPLICATE] Successfully inserted ${insertedImprints?.length || 0} imprints`);
-
-          // Duplicate proofs if any (non-critical - don't fail duplication if proofs fail)
-          try {
-            const { data: originalProofs } = await supabaseAdmin
-              .from("proofs")
-              .select("*")
-              .eq("quote_id", quoteId);
-
-            if (originalProofs && originalProofs.length > 0 && insertedImprints) {
-              console.log(`[DUPLICATE] Found ${originalProofs.length} proofs to duplicate`);
-
-              const imprintIdMap = new Map();
-              originalImprints.forEach((oldImprint: any, index: number) => {
-                imprintIdMap.set(oldImprint.id, insertedImprints[index].id);
-              });
-
-              const newProofs = originalProofs.map((proof: any) => ({
-                quote_id: newQuote.id,
-                company_id: profile.company_id,
-                customer_id: proof.customer_id,
-                line_item_id: lineItemIdMap.get(proof.line_item_id) || null,
-                imprint_id: imprintIdMap.get(proof.imprint_id) || null,
-                proof_number: proof.proof_number,
-                proof_version: proof.proof_version,
-                garment_image_url: proof.garment_image_url,
-                garment_name: proof.garment_name,
-                garment_brand: proof.garment_brand,
-                garment_description: proof.garment_description,
-                composite_image_url: proof.composite_image_url,
-                print_width: proof.print_width,
-                print_height: proof.print_height,
-                print_depth: proof.print_depth,
-                print_unit: proof.print_unit,
-                status: "draft",
-                notes: proof.notes,
-                type_of_work: proof.type_of_work,
-                decoration_location_id: proof.decoration_location_id,
-                pricing_matrix_id: proof.pricing_matrix_id,
-                pricing_matrix_column: proof.pricing_matrix_column,
-                imprint_unit_price: proof.imprint_unit_price,
-                imprint_setup_fee: proof.imprint_setup_fee,
-                group_label: proof.group_label,
-                selected_colors: proof.selected_colors,
-                created_by: user.id,
-              }));
-
-              const { error: proofsError } = await supabaseAdmin
-                .from("proofs")
-                .insert(newProofs);
-
-              if (proofsError) {
-                console.error('[DUPLICATE] Error inserting proofs (non-critical):', proofsError);
-              } else {
-                console.log(`[DUPLICATE] Successfully inserted ${newProofs.length} proofs`);
-              }
-            }
-          } catch (proofsError: any) {
-            console.error('[DUPLICATE] Non-critical error duplicating proofs:', proofsError.message);
-          }
-        }
-      }
-
-      // Duplicate fees
-      const { data: originalFees } = await supabaseAdmin
-        .from("quote_fees")
-        .select("*")
-        .eq("quote_id", quoteId)
-        .order("line_number");
-
-      if (originalFees && originalFees.length > 0) {
-        console.log(`[DUPLICATE] Found ${originalFees.length} fees to duplicate`);
-
-        const newFees = originalFees.map((fee: any) => ({
-          quote_id: newQuote.id,
-          company_id: profile.company_id,
-          line_number: fee.line_number,
-          fee_type: fee.fee_type,
-          description: fee.description,
-          amount: fee.amount,
-          is_taxable: fee.is_taxable,
-          notes: fee.notes,
-        }));
-
-        const { error: feesError } = await supabaseAdmin
-          .from("quote_fees")
-          .insert(newFees);
-
-        if (feesError) {
-          console.error('[DUPLICATE] Error inserting fees:', feesError);
-          throw new Error(`Failed to duplicate fees: ${feesError.message}`);
-        }
-
-        console.log(`[DUPLICATE] Successfully inserted ${newFees.length} fees`);
+          .insert(newLineItems);
       }
 
       return new Response(
