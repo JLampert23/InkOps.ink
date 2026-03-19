@@ -9,12 +9,14 @@ import {
   Trash2,
 } from 'lucide-react';
 import { WorkOrderService, WorkOrderWithImprints } from '../../services/work-order-service';
+import { useConfirmation } from '../../contexts/ConfirmationContext';
 
 interface WorkOrdersListProps {
   onSelectWorkOrder: (workOrderId: string) => void;
 }
 
 export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
+  const { confirm } = useConfirmation();
   const [workOrders, setWorkOrders] = useState<WorkOrderWithImprints[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -41,23 +43,38 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
   const handleDeleteWorkOrder = async (wo: WorkOrderWithImprints, e: React.MouseEvent) => {
     e.stopPropagation();
 
-    if (!confirm(`Delete work order ${wo.work_order_number}?\n\nThis will permanently remove:\n- Work order details\n- All line items\n- Schedule entries\n- Production notes\n\nThis action cannot be undone.`)) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Delete Work Order',
+      message: `Delete work order ${wo.work_order_number}?\n\nThis will permanently remove:\n• Work order details\n• All line items\n• Schedule entries\n• Production notes\n\nThis action cannot be undone.`,
+      confirmLabel: 'Delete Work Order',
+      confirmVariant: 'danger',
+    });
+
+    if (!confirmed) return;
 
     try {
       const { error } = await WorkOrderService.deleteWorkOrder(wo.id);
 
       if (error) {
         console.error('Error deleting work order:', error);
-        alert('Failed to delete work order. Please try again.');
+        await confirm({
+          title: 'Delete Failed',
+          message: 'Failed to delete work order. Please try again.',
+          confirmLabel: 'OK',
+          showCancel: false,
+        });
         return;
       }
 
       await loadWorkOrders();
     } catch (error) {
       console.error('Error deleting work order:', error);
-      alert('Failed to delete work order. Please try again.');
+      await confirm({
+        title: 'Delete Failed',
+        message: 'Failed to delete work order. Please try again.',
+        confirmLabel: 'OK',
+        showCancel: false,
+      });
     }
   };
 

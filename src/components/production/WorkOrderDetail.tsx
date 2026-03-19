@@ -16,6 +16,7 @@ import { WorkOrderService, WorkOrderLineItem } from '../../services/work-order-s
 import { LabelPreviewModal, LabelData } from './LabelPreviewModal';
 import { BoxLabelConfig } from './BoxLabel';
 import { generateWorkOrderPDF, WorkOrderPDFData } from '../../utils/work-order-pdf-export';
+import { useConfirmation } from '../../contexts/ConfirmationContext';
 
 function decodeHtmlEntities(text: string): string {
   if (!text) return text;
@@ -129,6 +130,7 @@ const getSizeValues = (item: QuoteLineItem) => [
 ];
 
 export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
+  const { confirm } = useConfirmation();
   const [workOrder, setWorkOrder] = useState<WorkOrderRecord | null>(null);
   const [quote, setQuote] = useState<QuoteData | null>(null);
   const [quoteLineItems, setQuoteLineItems] = useState<QuoteLineItem[]>([]);
@@ -336,23 +338,38 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const handleDeleteWorkOrder = async () => {
     if (!workOrder) return;
 
-    if (!confirm(`Delete work order ${workOrder.work_order_number}?\n\nThis will permanently remove:\n- Work order details\n- All line items\n- Schedule entries\n- Production notes\n\nThis action cannot be undone.`)) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Delete Work Order',
+      message: `Delete work order ${workOrder.work_order_number}?\n\nThis will permanently remove:\n• Work order details\n• All line items\n• Schedule entries\n• Production notes\n\nThis action cannot be undone.`,
+      confirmLabel: 'Delete Work Order',
+      confirmVariant: 'danger',
+    });
+
+    if (!confirmed) return;
 
     try {
       const { error } = await WorkOrderService.deleteWorkOrder(workOrder.id);
 
       if (error) {
         console.error('Error deleting work order:', error);
-        alert('Failed to delete work order. Please try again.');
+        await confirm({
+          title: 'Delete Failed',
+          message: 'Failed to delete work order. Please try again.',
+          confirmLabel: 'OK',
+          showCancel: false,
+        });
         return;
       }
 
       onBack();
     } catch (error) {
       console.error('Error deleting work order:', error);
-      alert('Failed to delete work order. Please try again.');
+      await confirm({
+        title: 'Delete Failed',
+        message: 'Failed to delete work order. Please try again.',
+        confirmLabel: 'OK',
+        showCancel: false,
+      });
     }
   };
 
