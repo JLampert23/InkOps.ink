@@ -68,6 +68,7 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
   const [loading, setLoading] = useState(true);
   const [draggedEntry, setDraggedEntry] = useState<string | null>(null);
   const [editingCell, setEditingCell] = useState<{ entryId: string; field: string } | null>(null);
+  const [previewArtwork, setPreviewArtwork] = useState<string | null>(null);
 
   // Tab management
   const [activeTab, setActiveTab] = useState<SchedulerTab | null>(null);
@@ -643,11 +644,17 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
                     </td>
                     <td className="px-3 py-3">
                       {entry.artwork_thumb_url ? (
-                        <img
-                          src={entry.artwork_thumb_url}
-                          alt="Artwork"
-                          className="w-10 h-10 object-cover rounded border border-gray-200 dark:border-slate-600"
-                        />
+                        <button
+                          onClick={() => setPreviewArtwork(entry.artwork_thumb_url)}
+                          className="block hover:opacity-75 transition-opacity"
+                          title="Click to preview artwork"
+                        >
+                          <img
+                            src={entry.artwork_thumb_url}
+                            alt="Artwork"
+                            className="w-10 h-10 object-cover rounded border border-gray-200 dark:border-slate-600 cursor-pointer"
+                          />
+                        </button>
                       ) : (
                         <div className="w-10 h-10 bg-gray-100 dark:bg-slate-700 rounded border border-gray-200 dark:border-slate-600 flex items-center justify-center">
                           <span className="text-xs text-gray-400">No img</span>
@@ -772,6 +779,30 @@ export default function ProductionScheduler({ typeOfWork, onNavigateToWorkOrder 
       <div className="text-sm text-gray-600 dark:text-gray-400">
         Showing {entries.length} scheduled {entries.length === 1 ? 'job' : 'jobs'}
       </div>
+
+      {/* Artwork Preview Modal */}
+      {previewArtwork && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+          onClick={() => setPreviewArtwork(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh] bg-white dark:bg-slate-800 rounded-lg p-4">
+            <button
+              onClick={() => setPreviewArtwork(null)}
+              className="absolute top-2 right-2 p-2 bg-gray-900 bg-opacity-50 hover:bg-opacity-75 text-white rounded-full transition-colors"
+              title="Close preview"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <img
+              src={previewArtwork}
+              alt="Artwork Preview"
+              className="max-w-full max-h-[calc(90vh-2rem)] object-contain rounded"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
