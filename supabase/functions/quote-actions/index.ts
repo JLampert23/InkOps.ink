@@ -2,6 +2,258 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { renderTemplate, type ShortCodeData } from "../_shared/shortcode-engine.ts";
 
+interface PriceMatrixData {
+  id: string;
+  name: string;
+  rows: string[];
+  columns: string[];
+  cells: Record<string, number>;
+}
+
+function findRowIndexForQuantity(rows: string[], quantity: number): number {
+  if (!rows || rows.length === 0 || quantity <= 0) return 0;
+
+  let selectedRowIndex = 0;
+
+  for (let i = 0; i < rows.length; i++) {
+    const rowThreshold = parseInt(rows[i], 10);
+    if (isNaN(rowThreshold)) continue;
+
+    if (quantity >= rowThreshold) {
+      selectedRowIndex = i;
+    } else {
+      break;
+    }
+  }
+
+  return selectedRowIndex;
+}
+
+function findColumnIndexByName(columns: string[], columnName: string): number {
+  if (!columns || !columnName) return 0;
+
+  const index = columns.findIndex(col =>
+    col.toLowerCase() === columnName.toLowerCase()
+  );
+
+  return index >= 0 ? index : 0;
+}
+
+function lookupPriceFromMatrix(
+  matrix: PriceMatrixData,
+  quantity: number,
+  columnNameOrIndex: string | number
+): number | null {
+  if (!matrix || !matrix.cells || !matrix.rows || !matrix.columns) {
+    return null;
+  }
+
+  const rowIndex = findRowIndexForQuantity(matrix.rows, quantity);
+
+  let columnIndex: number;
+  if (typeof columnNameOrIndex === 'number') {
+    columnIndex = columnNameOrIndex;
+  } else {
+    columnIndex = findColumnIndexByName(matrix.columns, columnNameOrIndex);
+  }
+
+  const cellKeyDash = `${rowIndex}-${columnIndex}`;
+  const cellKeyComma = `${rowIndex},${columnIndex}`;
+
+  if (matrix.cells[cellKeyDash] !== undefined) {
+    return matrix.cells[cellKeyDash];
+  }
+  if (matrix.cells[cellKeyComma] !== undefined) {
+    return matrix.cells[cellKeyComma];
+  }
+
+  return null;
+}
+
+function calculateImprintPriceFromMatrix(
+  imprint: {
+    price_matrix_id?: string | null;
+    pricing_matrix_column?: string;
+    num_colors?: number;
+  },
+  quantity: number,
+  priceMatrices: Map<string, PriceMatrixData>
+): number | null {
+  if (!imprint.price_matrix_id || quantity <= 0) {
+    return null;
+  }
+
+  const matrix = priceMatrices.get(imprint.price_matrix_id);
+  if (!matrix) {
+    return null;
+  }
+
+  let columnIdentifier: string | number = 0;
+
+  if (imprint.pricing_matrix_column) {
+    columnIdentifier = imprint.pricing_matrix_column;
+  } else if (imprint.num_colors !== undefined && imprint.num_colors > 0) {
+    columnIdentifier = imprint.num_colors - 1;
+  }
+
+  return lookupPriceFromMatrix(matrix, quantity, columnIdentifier);
+}
+
+async function recalculateImprintPricesForDuplicatedQuote(
+  supabase: any,
+  quoteId: string,
+  companyId: string
+): Promise<void> {
+  console.log('Starting price recalculation for duplicated quote:', quoteId);
+
+  // Fetch company settings for default garment markup
+  const { data: companySettings } = await supabase
+    .from("company_settings")
+    .select("default_garment_markup")
+    .eq("id", companyId)
+    .maybeSingle();
+
+  const defaultMarkup = companySettings?.default_garment_markup || 0;
+  console.log('Using default garment markup:', defaultMarkup);
+
+  // Fetch all line items for the duplicated quote
+  const { data: lineItems } = await supabase
+    .from("quote_line_items")
+    .select("*")
+    .eq("quote_id", quoteId)
+    .order("line_number");
+
+  if (!lineItems || lineItems.length === 0) {
+    console.log('No line items found, skipping price recalculation');
+    return;
+  }
+
+  // Fetch all imprints for the duplicated quote
+  const { data: imprints } = await supabase
+    .from("quote_imprints")
+    .select("*")
+    .eq("quote_id", quoteId);
+
+  if (!imprints || imprints.length === 0) {
+    console.log('No imprints found, skipping price recalculation');
+    return;
+  }
+
+  // Fetch all unique price matrices referenced by imprints
+  const priceMatrixIds = [...new Set(
+    imprints
+      .filter((imp: any) => imp.price_matrix_id)
+      .map((imp: any) => imp.price_matrix_id)
+  )];
+
+  const priceMatrices = new Map<string, PriceMatrixData>();
+
+  if (priceMatrixIds.length > 0) {
+    const { data: matrices } = await supabase
+      .from("price_matrices")
+      .select("*")
+      .in("id", priceMatrixIds);
+
+    if (matrices) {
+      matrices.forEach((matrix: any) => {
+        priceMatrices.set(matrix.id, matrix);
+      });
+    }
+  }
+
+  console.log('Loaded price matrices:', priceMatrices.size);
+
+  // Group line items by group_label
+  const groupedLineItems = new Map<string, any[]>();
+
+  lineItems.forEach((item: any) => {
+    const groupLabel = item.group_label || 'default';
+    if (!groupedLineItems.has(groupLabel)) {
+      groupedLineItems.set(groupLabel, []);
+    }
+    groupedLineItems.get(groupLabel)!.push(item);
+  });
+
+  console.log('Grouped line items into', groupedLineItems.size, 'groups');
+
+  // For each group, calculate total imprint cost and update line items
+  for (const [groupLabel, items] of groupedLineItems.entries()) {
+    // Calculate total quantity for this group
+    const totalQuantity = items.reduce((sum: number, item: any) => {
+      return sum + (item.total_quantity || item.quantity || 0);
+    }, 0);
+
+    console.log(`Group "${groupLabel}": ${items.length} items, total quantity: ${totalQuantity}`);
+
+    // Find all imprints for this group
+    const groupImprints = imprints.filter((imp: any) =>
+      (imp.group_label || 'default') === groupLabel
+    );
+
+    console.log(`Group "${groupLabel}" has ${groupImprints.length} imprints`);
+
+    // Calculate total imprint price for this group
+    let totalImprintPrice = 0;
+
+    for (const imprint of groupImprints) {
+      let imprintPrice = 0;
+
+      if (imprint.price_matrix_id && totalQuantity > 0) {
+        const calculatedPrice = calculateImprintPriceFromMatrix(
+          imprint,
+          totalQuantity,
+          priceMatrices
+        );
+
+        if (calculatedPrice !== null) {
+          imprintPrice = calculatedPrice;
+          console.log(`  Imprint ${imprint.id}: calculated price = $${imprintPrice}`);
+        } else if (imprint.price !== null && imprint.price !== undefined) {
+          imprintPrice = imprint.price;
+          console.log(`  Imprint ${imprint.id}: using stored price = $${imprintPrice}`);
+        }
+      } else if (imprint.price !== null && imprint.price !== undefined) {
+        imprintPrice = imprint.price;
+        console.log(`  Imprint ${imprint.id}: using stored price = $${imprintPrice}`);
+      }
+
+      totalImprintPrice += imprintPrice;
+    }
+
+    console.log(`Group "${groupLabel}" total imprint price: $${totalImprintPrice}`);
+
+    // Update each line item in this group with the correct unit_price
+    for (const item of items) {
+      const wholesalePrice = item.wholesale_price || 0;
+      const garmentCostWithMarkup = wholesalePrice * (1 + defaultMarkup / 100);
+      const newUnitPrice = garmentCostWithMarkup + totalImprintPrice;
+      const newTotalPrice = newUnitPrice * (item.total_quantity || item.quantity || 1);
+
+      console.log(`  Line item ${item.id}:`);
+      console.log(`    Wholesale: $${wholesalePrice}`);
+      console.log(`    Garment w/ markup: $${garmentCostWithMarkup}`);
+      console.log(`    Imprint cost: $${totalImprintPrice}`);
+      console.log(`    New unit price: $${newUnitPrice}`);
+      console.log(`    New total price: $${newTotalPrice}`);
+
+      // Update the line item
+      const { error: updateError } = await supabase
+        .from("quote_line_items")
+        .update({
+          unit_price: newUnitPrice,
+          total_price: newTotalPrice,
+        })
+        .eq("id", item.id);
+
+      if (updateError) {
+        console.error(`Failed to update line item ${item.id}:`, updateError);
+      }
+    }
+  }
+
+  console.log('Price recalculation completed for quote:', quoteId);
+}
+
 function extractSubdomainFromUrl(customerUrl: string | null): string | null {
   if (!customerUrl) return null;
 
@@ -410,6 +662,16 @@ Deno.serve(async (req: Request) => {
             }
           }
         }
+      }
+
+      // Recalculate prices to include imprint costs
+      try {
+        await recalculateImprintPricesForDuplicatedQuote(supabase, newQuote.id, profile.company_id);
+        console.log('Successfully recalculated prices for duplicated quote');
+      } catch (recalcError) {
+        console.error('Failed to recalculate prices:', recalcError);
+        // Don't fail the entire duplication if price recalculation fails
+        // The user can manually update prices if needed
       }
 
       return new Response(
