@@ -155,12 +155,11 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   useEffect(() => {
     loadData();
     loadBoxLabelSettings();
-    loadCustomInvoiceStatuses();
   }, [workOrderId]);
 
-  const loadCustomInvoiceStatuses = async () => {
+  const loadCustomInvoiceStatuses = async (companyId: string) => {
     try {
-      const statuses = await CustomInvoiceStatusService.getCustomStatuses();
+      const statuses = await CustomInvoiceStatusService.getCustomStatuses(companyId);
       setCustomInvoiceStatuses(statuses);
     } catch (error) {
       console.error('Error loading custom invoice statuses:', error);
@@ -214,6 +213,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
 
       if (woData.company_id) {
         loadCompanySettings(woData.company_id);
+        loadCustomInvoiceStatuses(woData.company_id);
       }
 
       const { data: woItems } = await supabase

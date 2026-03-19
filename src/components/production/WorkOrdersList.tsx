@@ -13,6 +13,7 @@ import { WorkOrderService, WorkOrderWithImprints, CustomInvoiceStatus } from '..
 import { useConfirmation } from '../../contexts/ConfirmationContext';
 import { CustomInvoiceStatusService } from '../../services/custom-invoice-status-service';
 import { supabase } from '../../lib/supabase-client';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface WorkOrdersListProps {
   onSelectWorkOrder: (workOrderId: string) => void;
@@ -20,6 +21,7 @@ interface WorkOrdersListProps {
 
 export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
   const { confirm } = useConfirmation();
+  const { userProfile } = useAuth();
   const [workOrders, setWorkOrders] = useState<WorkOrderWithImprints[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -29,12 +31,16 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
 
   useEffect(() => {
     loadWorkOrders();
-    loadCustomInvoiceStatuses();
-  }, []);
+    if (userProfile?.company_id) {
+      loadCustomInvoiceStatuses();
+    }
+  }, [userProfile?.company_id]);
 
   const loadCustomInvoiceStatuses = async () => {
+    if (!userProfile?.company_id) return;
+
     try {
-      const statuses = await CustomInvoiceStatusService.getCustomStatuses();
+      const statuses = await CustomInvoiceStatusService.getCustomStatuses(userProfile.company_id);
       setCustomInvoiceStatuses(statuses);
 
       const statusMap: Record<string, CustomInvoiceStatus> = {};
