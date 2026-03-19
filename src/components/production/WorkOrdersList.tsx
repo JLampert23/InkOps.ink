@@ -99,6 +99,26 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
     }
   };
 
+  const handleInvoiceStatusChange = async (workOrderId: string, statusId: string | null, e: React.ChangeEvent<HTMLSelectElement>) => {
+    e.stopPropagation();
+
+    try {
+      const { error } = await WorkOrderService.updateWorkOrderInvoiceStatus(
+        workOrderId,
+        statusId || null
+      );
+
+      if (error) {
+        console.error('Error updating invoice status:', error);
+        return;
+      }
+
+      await loadWorkOrders();
+    } catch (error) {
+      console.error('Error updating invoice status:', error);
+    }
+  };
+
   const isOverdue = (dateString: string | null) => {
     if (!dateString) return false;
     return new Date(dateString) < new Date();
@@ -279,18 +299,29 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
                           <span className="text-sm text-gray-400 dark:text-gray-500">--</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {wo.custom_invoice_status_id && invoiceStatusesMap[wo.custom_invoice_status_id] ? (
-                          <span
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-white"
-                            style={{ backgroundColor: invoiceStatusesMap[wo.custom_invoice_status_id].color }}
-                          >
-                            <DollarSign className="w-3 h-3" />
-                            {invoiceStatusesMap[wo.custom_invoice_status_id].name}
-                          </span>
-                        ) : (
-                          <span className="text-sm text-gray-400 dark:text-gray-500">--</span>
-                        )}
+                      <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                        <select
+                          value={wo.custom_invoice_status_id || ''}
+                          onChange={(e) => handleInvoiceStatusChange(wo.id, e.target.value || null, e)}
+                          className="w-full px-2.5 py-1.5 text-xs border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                          style={
+                            wo.custom_invoice_status_id && invoiceStatusesMap[wo.custom_invoice_status_id]
+                              ? {
+                                  backgroundColor: invoiceStatusesMap[wo.custom_invoice_status_id].color,
+                                  color: 'white',
+                                  borderColor: invoiceStatusesMap[wo.custom_invoice_status_id].color,
+                                }
+                              : {}
+                          }
+                        >
+                          <option value="">-- No Status --</option>
+                          {customInvoiceStatuses.map((status) => (
+                            <option key={status.id} value={status.id}>
+                              {status.name}
+                              {status.category ? ` (${status.category})` : ''}
+                            </option>
+                          ))}
+                        </select>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
