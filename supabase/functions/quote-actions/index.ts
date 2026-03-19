@@ -170,6 +170,8 @@ Deno.serve(async (req: Request) => {
 
       // Duplicate line items with ALL fields
       if (originalLineItems && originalLineItems.length > 0) {
+        console.log(`[DUPLICATE] Found ${originalLineItems.length} line items to duplicate`);
+
         const newLineItems = originalLineItems.map((item: any) => ({
           quote_id: newQuote.id,
           company_id: profile.company_id,
@@ -219,10 +221,17 @@ Deno.serve(async (req: Request) => {
           notes: item.notes,
         }));
 
-        const { data: insertedLineItems } = await supabase
+        const { data: insertedLineItems, error: lineItemsError } = await supabaseAdmin
           .from("quote_line_items")
           .insert(newLineItems)
           .select();
+
+        if (lineItemsError) {
+          console.error('[DUPLICATE] Error inserting line items:', lineItemsError);
+          throw new Error(`Failed to duplicate line items: ${lineItemsError.message}`);
+        }
+
+        console.log(`[DUPLICATE] Successfully inserted ${insertedLineItems?.length || 0} line items`);
 
         // Create a mapping of old line item IDs to new line item IDs
         const lineItemIdMap = new Map();
@@ -233,13 +242,15 @@ Deno.serve(async (req: Request) => {
         }
 
         // Duplicate imprints
-        const { data: originalImprints } = await supabase
+        const { data: originalImprints } = await supabaseAdmin
           .from("quote_imprints")
           .select("*")
           .eq("quote_id", quoteId)
           .order("sort_order");
 
         if (originalImprints && originalImprints.length > 0) {
+          console.log(`[DUPLICATE] Found ${originalImprints.length} imprints to duplicate`);
+
           const newImprints = originalImprints.map((imprint: any) => ({
             quote_id: newQuote.id,
             company_id: profile.company_id,
@@ -266,18 +277,27 @@ Deno.serve(async (req: Request) => {
             garment_lifestyle_image: imprint.garment_lifestyle_image,
           }));
 
-          const { data: insertedImprints } = await supabase
+          const { data: insertedImprints, error: imprintsError } = await supabaseAdmin
             .from("quote_imprints")
             .insert(newImprints)
             .select();
 
+          if (imprintsError) {
+            console.error('[DUPLICATE] Error inserting imprints:', imprintsError);
+            throw new Error(`Failed to duplicate imprints: ${imprintsError.message}`);
+          }
+
+          console.log(`[DUPLICATE] Successfully inserted ${insertedImprints?.length || 0} imprints`);
+
           // Duplicate proofs if any
-          const { data: originalProofs } = await supabase
+          const { data: originalProofs } = await supabaseAdmin
             .from("proofs")
             .select("*")
             .eq("quote_id", quoteId);
 
           if (originalProofs && originalProofs.length > 0 && insertedImprints) {
+            console.log(`[DUPLICATE] Found ${originalProofs.length} proofs to duplicate`);
+
             const imprintIdMap = new Map();
             originalImprints.forEach((oldImprint: any, index: number) => {
               imprintIdMap.set(oldImprint.id, insertedImprints[index].id);
@@ -299,21 +319,30 @@ Deno.serve(async (req: Request) => {
               colors_used: proof.colors_used,
             }));
 
-            await supabase
+            const { error: proofsError } = await supabaseAdmin
               .from("proofs")
               .insert(newProofs);
+
+            if (proofsError) {
+              console.error('[DUPLICATE] Error inserting proofs:', proofsError);
+              throw new Error(`Failed to duplicate proofs: ${proofsError.message}`);
+            }
+
+            console.log(`[DUPLICATE] Successfully inserted ${newProofs.length} proofs`);
           }
         }
       }
 
       // Duplicate fees
-      const { data: originalFees } = await supabase
+      const { data: originalFees } = await supabaseAdmin
         .from("quote_fees")
         .select("*")
         .eq("quote_id", quoteId)
         .order("line_number");
 
       if (originalFees && originalFees.length > 0) {
+        console.log(`[DUPLICATE] Found ${originalFees.length} fees to duplicate`);
+
         const newFees = originalFees.map((fee: any) => ({
           quote_id: newQuote.id,
           company_id: profile.company_id,
@@ -325,9 +354,16 @@ Deno.serve(async (req: Request) => {
           notes: fee.notes,
         }));
 
-        await supabase
+        const { error: feesError } = await supabaseAdmin
           .from("quote_fees")
           .insert(newFees);
+
+        if (feesError) {
+          console.error('[DUPLICATE] Error inserting fees:', feesError);
+          throw new Error(`Failed to duplicate fees: ${feesError.message}`);
+        }
+
+        console.log(`[DUPLICATE] Successfully inserted ${newFees.length} fees`);
       }
 
       return new Response(
