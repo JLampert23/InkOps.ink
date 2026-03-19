@@ -226,7 +226,7 @@ Deno.serve(async (req: Request) => {
 
       if (createError) throw createError;
 
-      // Duplicate line items with ALL fields
+      // Duplicate line items with ALL fields including price_locked flag
       if (originalLineItems && originalLineItems.length > 0) {
         const newLineItems = originalLineItems.map((item: any) => ({
           quote_id: newQuote.id,
@@ -293,6 +293,7 @@ Deno.serve(async (req: Request) => {
           double_sizes: item.double_sizes,
           youth_sizes: item.youth_sizes,
           adult_sizes: item.adult_sizes,
+          price_locked: true, // Lock prices to prevent auto-recalculation
         }));
 
         await supabase

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Save, Plus, Trash2, GripVertical, X, Loader2, DollarSign, Settings, Search, Image as ImageIcon, Check, Info, RefreshCw } from 'lucide-react';
+import { Save, Plus, Trash2, GripVertical, X, Loader2, DollarSign, Settings, Search, Image as ImageIcon, Check, Info, RefreshCw, Lock, Unlock } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -702,6 +702,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
             description: decodeHtmlEntities(item.description || ''),
             notes: item.notes || '',
             taxed: item.taxed || false,
+            price_locked: item.price_locked || false,
           });
         });
 
@@ -862,6 +863,44 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
     return sizeTotal + quantityValue;
   };
 
+  const togglePriceLock = async (groupId: string) => {
+    const group = itemGroups.find(g => g.id === groupId);
+    if (!group || group.items.length === 0) return;
+
+    // Check if any item has price_locked = true
+    const anyLocked = group.items.some(item => item.price_locked);
+    const newLockState = !anyLocked;
+
+    const newGroups = itemGroups.map(g => {
+      if (g.id === groupId) {
+        return {
+          ...g,
+          items: g.items.map(item => ({
+            ...item,
+            price_locked: newLockState
+          }))
+        };
+      }
+      return g;
+    });
+
+    setItemGroups(newGroups);
+
+    // Update database if quote is saved
+    if (quoteId && !quoteId.startsWith('temp-')) {
+      for (const item of group.items) {
+        if (item.id) {
+          await supabase
+            .from('quote_line_items')
+            .update({ price_locked: newLockState })
+            .eq('id', item.id);
+        }
+      }
+    }
+
+    showNotification(newLockState ? 'Prices locked - won\'t auto-update' : 'Prices unlocked - will auto-update', 'success');
+  };
+
   const updateItem = async (groupId: string, itemIndex: number, field: keyof QuoteItem, value: any) => {
     let updatedGroups: any[] = [];
 
@@ -901,9 +940,13 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
       }
     }
 
-    // Auto-update price from matrix when quantity changes
+    // Auto-update price from matrix when quantity changes (unless prices are locked)
     if (field.startsWith('qty_')) {
-      await updatePriceFromMatrixWithGroups(updatedGroups, groupId, itemIndex, true);
+      const group = updatedGroups.find(g => g.id === groupId);
+      const item = group?.items[itemIndex];
+      if (item && !item.price_locked) {
+        await updatePriceFromMatrixWithGroups(updatedGroups, groupId, itemIndex, true);
+      }
     }
   };
 
@@ -918,6 +961,14 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
       const item = group.items[itemIndex];
       if (!item) {
         if (!silent) showNotification('error', 'Item not found');
+        return;
+      }
+
+      // Skip price update if prices are locked (e.g., in duplicated quotes)
+      if (item.price_locked) {
+        if (!silent) {
+          console.log('Price update skipped - prices are locked for this item');
+        }
         return;
       }
 
@@ -2781,16 +2832,32 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
                       <td className="p-1 border border-gray-300 dark:border-slate-800 text-center text-base text-blue-600 dark:text-blue-400 font-bold">
                         {calculateItemsTotal(item)}
                       </td>
-                      <td className={`p-0 border border-gray-300 dark:border-slate-800 relative group/price bg-blue-50/50 dark:bg-blue-900/10 ${!item.wholesale_price || item.wholesale_price === 0 ? 'bg-amber-50 dark:bg-amber-900/20' : ''}`}>
+                      <td className={`p-0 border border-gray-300 dark:border-slate-800 relative group/price ${
+                        item.price_locked
+                          ? 'bg-amber-100 dark:bg-amber-900/30'
+                          : !item.wholesale_price || item.wholesale_price === 0
+                            ? 'bg-amber-50 dark:bg-amber-900/20'
+                            : 'bg-blue-50/50 dark:bg-blue-900/10'
+                      }`}>
                         <input
                           type="number"
                           step="0.01"
                           min="0"
                           value={item.unit_price}
                           onChange={(e) => updateItem(group.id, itemIdx, 'unit_price', parseFloat(e.target.value) || 0)}
-                          className={`w-full px-3 py-2 border-0 text-gray-900 dark:text-white text-base text-right font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${!item.wholesale_price || item.wholesale_price === 0 ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-blue-50/50 dark:bg-blue-900/10'}`}
+                          className={`w-full px-3 py-2 border-0 text-gray-900 dark:text-white text-base text-right font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                            item.price_locked
+                              ? 'bg-amber-100 dark:bg-amber-900/30 border-l-4 border-amber-500'
+                              : !item.wholesale_price || item.wholesale_price === 0
+                                ? 'bg-amber-50 dark:bg-amber-900/20'
+                                : 'bg-blue-50/50 dark:bg-blue-900/10'
+                          }`}
                         />
-                        {!item.wholesale_price || item.wholesale_price === 0 ? (
+                        {item.price_locked ? (
+                          <div className="absolute top-0 left-0 p-0.5" title="Price locked - won't auto-update">
+                            <Lock className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                          </div>
+                        ) : !item.wholesale_price || item.wholesale_price === 0 ? (
                           <div className="absolute top-0 right-0 p-0.5" title="Wholesale pricing unavailable - enter manually">
                             <Info className="w-3 h-3 text-amber-500 dark:text-amber-400" />
                           </div>
@@ -2855,9 +2922,33 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
                                   Mockup
                                 </button>
                                 <button
+                                  onClick={() => togglePriceLock(group.id)}
+                                  className={`px-3 py-2 rounded text-sm flex items-center gap-2 shadow-sm ${
+                                    group.items.some(item => item.price_locked)
+                                      ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                                      : 'bg-gray-600 hover:bg-gray-700 text-white'
+                                  }`}
+                                  title={group.items.some(item => item.price_locked)
+                                    ? 'Prices are locked - Click to unlock and allow auto-updates'
+                                    : 'Prices will auto-update - Click to lock prices'}
+                                >
+                                  {group.items.some(item => item.price_locked) ? (
+                                    <>
+                                      <Lock className="w-4 h-4" />
+                                      Unlock Prices
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Unlock className="w-4 h-4" />
+                                      Lock Prices
+                                    </>
+                                  )}
+                                </button>
+                                <button
                                   onClick={() => updatePriceFromMatrix(group.id, 0)}
-                                  disabled={updatingPriceForGroup === group.id}
-                                  className="px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-wait text-white rounded text-sm flex items-center gap-2 shadow-sm"
+                                  disabled={updatingPriceForGroup === group.id || group.items.some(item => item.price_locked)}
+                                  className="px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white rounded text-sm flex items-center gap-2 shadow-sm"
+                                  title={group.items.some(item => item.price_locked) ? 'Unlock prices first to update' : 'Update pricing from matrix'}
                                 >
                                   {updatingPriceForGroup === group.id ? (
                                     <Loader2 className="w-4 h-4 animate-spin" />
