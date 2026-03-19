@@ -64,21 +64,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Create authenticated Supabase client with the user's JWT
-    // Since verify_jwt is enabled, the JWT is already verified by Supabase
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: { Authorization: authHeader },
-      },
-    });
-
+    // Create Supabase clients
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get the user from the JWT (already verified by Supabase gateway)
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    // Use service role key to verify the JWT manually since verify_jwt is false
+    const token = authHeader.replace('Bearer ', '');
+
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
 
     console.log('User verification result:', {
       hasUser: !!user,
@@ -100,6 +92,13 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
+
+    // Create authenticated client for user-scoped operations
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: { Authorization: authHeader },
+      },
+    });
 
     // Get user profile
     const { data: profile } = await supabase
