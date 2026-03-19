@@ -294,60 +294,63 @@ Deno.serve(async (req: Request) => {
 
           console.log(`[DUPLICATE] Successfully inserted ${insertedImprints?.length || 0} imprints`);
 
-          // Duplicate proofs if any
-          const { data: originalProofs } = await supabaseAdmin
-            .from("proofs")
-            .select("*")
-            .eq("quote_id", quoteId);
-
-          if (originalProofs && originalProofs.length > 0 && insertedImprints) {
-            console.log(`[DUPLICATE] Found ${originalProofs.length} proofs to duplicate`);
-
-            const imprintIdMap = new Map();
-            originalImprints.forEach((oldImprint: any, index: number) => {
-              imprintIdMap.set(oldImprint.id, insertedImprints[index].id);
-            });
-
-            const newProofs = originalProofs.map((proof: any) => ({
-              quote_id: newQuote.id,
-              company_id: profile.company_id,
-              customer_id: proof.customer_id,
-              line_item_id: lineItemIdMap.get(proof.line_item_id) || null,
-              imprint_id: imprintIdMap.get(proof.imprint_id) || null,
-              proof_number: proof.proof_number,
-              proof_version: proof.proof_version,
-              garment_image_url: proof.garment_image_url,
-              garment_name: proof.garment_name,
-              garment_brand: proof.garment_brand,
-              garment_description: proof.garment_description,
-              composite_image_url: proof.composite_image_url,
-              print_width: proof.print_width,
-              print_height: proof.print_height,
-              print_depth: proof.print_depth,
-              print_unit: proof.print_unit,
-              status: "pending",
-              notes: proof.notes,
-              type_of_work: proof.type_of_work,
-              decoration_location_id: proof.decoration_location_id,
-              pricing_matrix_id: proof.pricing_matrix_id,
-              pricing_matrix_column: proof.pricing_matrix_column,
-              imprint_unit_price: proof.imprint_unit_price,
-              imprint_setup_fee: proof.imprint_setup_fee,
-              group_label: proof.group_label,
-              selected_colors: proof.selected_colors,
-              created_by: user.id,
-            }));
-
-            const { error: proofsError } = await supabaseAdmin
+          // Duplicate proofs if any (non-critical - don't fail duplication if proofs fail)
+          try {
+            const { data: originalProofs } = await supabaseAdmin
               .from("proofs")
-              .insert(newProofs);
+              .select("*")
+              .eq("quote_id", quoteId);
 
-            if (proofsError) {
-              console.error('[DUPLICATE] Error inserting proofs:', proofsError);
-              throw new Error(`Failed to duplicate proofs: ${proofsError.message}`);
+            if (originalProofs && originalProofs.length > 0 && insertedImprints) {
+              console.log(`[DUPLICATE] Found ${originalProofs.length} proofs to duplicate`);
+
+              const imprintIdMap = new Map();
+              originalImprints.forEach((oldImprint: any, index: number) => {
+                imprintIdMap.set(oldImprint.id, insertedImprints[index].id);
+              });
+
+              const newProofs = originalProofs.map((proof: any) => ({
+                quote_id: newQuote.id,
+                company_id: profile.company_id,
+                customer_id: proof.customer_id,
+                line_item_id: lineItemIdMap.get(proof.line_item_id) || null,
+                imprint_id: imprintIdMap.get(proof.imprint_id) || null,
+                proof_number: proof.proof_number,
+                proof_version: proof.proof_version,
+                garment_image_url: proof.garment_image_url,
+                garment_name: proof.garment_name,
+                garment_brand: proof.garment_brand,
+                garment_description: proof.garment_description,
+                composite_image_url: proof.composite_image_url,
+                print_width: proof.print_width,
+                print_height: proof.print_height,
+                print_depth: proof.print_depth,
+                print_unit: proof.print_unit,
+                status: "draft",
+                notes: proof.notes,
+                type_of_work: proof.type_of_work,
+                decoration_location_id: proof.decoration_location_id,
+                pricing_matrix_id: proof.pricing_matrix_id,
+                pricing_matrix_column: proof.pricing_matrix_column,
+                imprint_unit_price: proof.imprint_unit_price,
+                imprint_setup_fee: proof.imprint_setup_fee,
+                group_label: proof.group_label,
+                selected_colors: proof.selected_colors,
+                created_by: user.id,
+              }));
+
+              const { error: proofsError } = await supabaseAdmin
+                .from("proofs")
+                .insert(newProofs);
+
+              if (proofsError) {
+                console.error('[DUPLICATE] Error inserting proofs (non-critical):', proofsError);
+              } else {
+                console.log(`[DUPLICATE] Successfully inserted ${newProofs.length} proofs`);
+              }
             }
-
-            console.log(`[DUPLICATE] Successfully inserted ${newProofs.length} proofs`);
+          } catch (proofsError: any) {
+            console.error('[DUPLICATE] Non-critical error duplicating proofs:', proofsError.message);
           }
         }
       }

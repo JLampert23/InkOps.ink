@@ -97,7 +97,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
 
       const result = await response.json();
       showNotification(`Quote duplicated as ${result.quote.quote_number}`, 'success');
-      loadQuotes();
+      await loadQuotes();
     } catch (error: any) {
       console.error('Error duplicating quote:', error);
       showNotification(error.message || 'Failed to duplicate quote', 'error');
