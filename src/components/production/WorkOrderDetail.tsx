@@ -869,17 +869,18 @@ function WorkOrderDetailsSection({
         )}
 
         <div className="mt-4 pt-4 border-t border-gray-200 dark:border-slate-600">
-          <label className="block text-gray-600 dark:text-gray-400 mb-2 flex items-center gap-1.5">
+          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-1.5">
             <DollarSign className="w-4 h-4" />
             <span>Invoice Status</span>
           </label>
+
           {updatingInvoiceStatus ? (
-            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-3">
               <Loader2 className="w-4 h-4 animate-spin" />
               <span className="text-sm">Updating...</span>
             </div>
           ) : currentStatus ? (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 mb-3">
               <span
                 className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium text-white"
                 style={{ backgroundColor: currentStatus.color }}
@@ -897,15 +898,15 @@ function WorkOrderDetailsSection({
               </button>
             </div>
           ) : (
-            <div className="text-gray-500 dark:text-gray-400 text-sm">No invoice status set</div>
+            <div className="text-gray-500 dark:text-gray-400 text-sm mb-3">No invoice status set</div>
           )}
 
-          {customInvoiceStatuses.length > 0 && (
+          {customInvoiceStatuses.length > 0 ? (
             <select
               value={selectedInvoiceStatus || ''}
               onChange={(e) => onInvoiceStatusChange(e.target.value || null)}
               disabled={updatingInvoiceStatus}
-              className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">-- Select Invoice Status --</option>
               {customInvoiceStatuses.map((status) => (
@@ -915,6 +916,10 @@ function WorkOrderDetailsSection({
                 </option>
               ))}
             </select>
+          ) : (
+            <div className="text-sm text-gray-500 dark:text-gray-400 italic bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700 rounded-lg p-3">
+              No custom invoice statuses available. Create them in Settings → Custom Invoice Statuses.
+            </div>
           )}
         </div>
       </div>
