@@ -71,9 +71,24 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
 
     setDuplicating(quoteId);
     try {
+      // Check if user is authenticated
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('Session check before duplicate:', {
+        hasSession: !!session,
+        hasAccessToken: !!session?.access_token,
+      });
+
+      if (!session) {
+        throw new Error('You must be logged in to duplicate quotes');
+      }
+
+      console.log('Invoking duplicate function for quote:', quoteId);
+
       const { data, error } = await supabase.functions.invoke(`quote-actions/${quoteId}/duplicate`, {
         method: 'POST',
       });
+
+      console.log('Duplicate response:', { data, error });
 
       if (error) {
         console.error('Edge function error:', error);
