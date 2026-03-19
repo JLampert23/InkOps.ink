@@ -664,9 +664,9 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      // Recalculate prices to include imprint costs
+      // Recalculate prices to include imprint costs using admin client
       try {
-        await recalculateImprintPricesForDuplicatedQuote(supabase, newQuote.id, profile.company_id);
+        await recalculateImprintPricesForDuplicatedQuote(supabaseAdmin, newQuote.id, profile.company_id);
         console.log('Successfully recalculated prices for duplicated quote');
       } catch (recalcError) {
         console.error('Failed to recalculate prices:', recalcError);
