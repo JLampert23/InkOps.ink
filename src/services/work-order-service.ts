@@ -1,5 +1,17 @@
 import { supabase } from '../lib/supabase-client';
 
+export interface CustomInvoiceStatus {
+  id: string;
+  company_id: string;
+  name: string;
+  color: string;
+  category: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface WorkOrder {
   id: string;
   work_order_number: string;
@@ -14,6 +26,7 @@ export interface WorkOrder {
   assigned_to: string | null;
   total_quantity: number;
   notes: string | null;
+  custom_invoice_status_id: string | null;
   created_at: string;
   updated_at: string;
   started_at: string | null;
@@ -64,6 +77,7 @@ export interface WorkOrderWithDetails extends WorkOrder {
   line_items?: WorkOrderLineItem[];
   imprints?: any[];
   schedule_entries?: any[];
+  custom_invoice_status?: CustomInvoiceStatus | null;
 }
 
 export class WorkOrderService {
@@ -165,12 +179,23 @@ export class WorkOrderService {
       .select('*')
       .eq('quote_id', workOrder.quote_id || '');
 
+    let customInvoiceStatus = null;
+    if (workOrder.custom_invoice_status_id) {
+      const { data: statusData } = await supabase
+        .from('custom_invoice_statuses')
+        .select('*')
+        .eq('id', workOrder.custom_invoice_status_id)
+        .maybeSingle();
+      customInvoiceStatus = statusData;
+    }
+
     return {
       data: {
         ...workOrder,
         line_items: lineItems || [],
         imprints: imprints || [],
         schedule_entries: scheduleEntries || [],
+        custom_invoice_status: customInvoiceStatus,
       },
       error: null,
     };
@@ -412,5 +437,21 @@ export class WorkOrderService {
       .from('work_orders')
       .delete()
       .eq('id', workOrderId);
+  }
+
+  static async updateWorkOrderInvoiceStatus(
+    workOrderId: string,
+    customInvoiceStatusId: string | null
+  ): Promise<{ data: WorkOrderWithDetails | null; error: any }> {
+    const { error: updateError } = await supabase
+      .from('work_orders')
+      .update({ custom_invoice_status_id: customInvoiceStatusId })
+      .eq('id', workOrderId);
+
+    if (updateError) {
+      return { data: null, error: updateError };
+    }
+
+    return await this.getWorkOrderById(workOrderId);
   }
 }

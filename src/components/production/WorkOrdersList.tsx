@@ -7,9 +7,12 @@ import {
   RefreshCw,
   Eye,
   Trash2,
+  DollarSign,
 } from 'lucide-react';
-import { WorkOrderService, WorkOrderWithImprints } from '../../services/work-order-service';
+import { WorkOrderService, WorkOrderWithImprints, CustomInvoiceStatus } from '../../services/work-order-service';
 import { useConfirmation } from '../../contexts/ConfirmationContext';
+import { CustomInvoiceStatusService } from '../../services/custom-invoice-status-service';
+import { supabase } from '../../lib/supabase-client';
 
 interface WorkOrdersListProps {
   onSelectWorkOrder: (workOrderId: string) => void;
@@ -21,10 +24,28 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [customInvoiceStatuses, setCustomInvoiceStatuses] = useState<CustomInvoiceStatus[]>([]);
+  const [invoiceStatusesMap, setInvoiceStatusesMap] = useState<Record<string, CustomInvoiceStatus>>({});
 
   useEffect(() => {
     loadWorkOrders();
+    loadCustomInvoiceStatuses();
   }, []);
+
+  const loadCustomInvoiceStatuses = async () => {
+    try {
+      const statuses = await CustomInvoiceStatusService.getCustomStatuses();
+      setCustomInvoiceStatuses(statuses);
+
+      const statusMap: Record<string, CustomInvoiceStatus> = {};
+      statuses.forEach(status => {
+        statusMap[status.id] = status;
+      });
+      setInvoiceStatusesMap(statusMap);
+    } catch (error) {
+      console.error('Error loading custom invoice statuses:', error);
+    }
+  };
 
   const loadWorkOrders = async () => {
     setLoading(true);
@@ -206,6 +227,9 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
                     Types of Work
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                    Invoice Status
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                     Due Date
                   </th>
                   <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
@@ -251,6 +275,19 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
                               </span>
                             ))}
                           </div>
+                        ) : (
+                          <span className="text-sm text-gray-400 dark:text-gray-500">--</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {wo.custom_invoice_status_id && invoiceStatusesMap[wo.custom_invoice_status_id] ? (
+                          <span
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-white"
+                            style={{ backgroundColor: invoiceStatusesMap[wo.custom_invoice_status_id].color }}
+                          >
+                            <DollarSign className="w-3 h-3" />
+                            {invoiceStatusesMap[wo.custom_invoice_status_id].name}
+                          </span>
                         ) : (
                           <span className="text-sm text-gray-400 dark:text-gray-500">--</span>
                         )}

@@ -10,13 +10,16 @@ import {
   Printer,
   Download,
   Trash2,
+  DollarSign,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { WorkOrderService, WorkOrderLineItem } from '../../services/work-order-service';
+import { WorkOrderService, WorkOrderLineItem, CustomInvoiceStatus } from '../../services/work-order-service';
 import { LabelPreviewModal, LabelData } from './LabelPreviewModal';
 import { BoxLabelConfig } from './BoxLabel';
 import { generateWorkOrderPDF, WorkOrderPDFData } from '../../utils/work-order-pdf-export';
 import { useConfirmation } from '../../contexts/ConfirmationContext';
+import { CustomInvoiceStatusService } from '../../services/custom-invoice-status-service';
+import { useNotification } from '../../contexts/NotificationContext';
 
 function decodeHtmlEntities(text: string): string {
   if (!text) return text;
@@ -112,6 +115,7 @@ interface WorkOrderRecord {
   assigned_to: string | null;
   total_quantity: number;
   notes: string | null;
+  custom_invoice_status_id: string | null;
   created_at: string;
 }
 
@@ -131,6 +135,7 @@ const getSizeValues = (item: QuoteLineItem) => [
 
 export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const { confirm } = useConfirmation();
+  const { addNotification } = useNotification();
   const [workOrder, setWorkOrder] = useState<WorkOrderRecord | null>(null);
   const [quote, setQuote] = useState<QuoteData | null>(null);
   const [quoteLineItems, setQuoteLineItems] = useState<QuoteLineItem[]>([]);
@@ -143,11 +148,24 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const [boxLabelConfig, setBoxLabelConfig] = useState<BoxLabelConfig | undefined>(undefined);
   const [downloading, setDownloading] = useState(false);
   const [companySettings, setCompanySettings] = useState<any>(null);
+  const [customInvoiceStatuses, setCustomInvoiceStatuses] = useState<CustomInvoiceStatus[]>([]);
+  const [selectedInvoiceStatus, setSelectedInvoiceStatus] = useState<string | null>(null);
+  const [updatingInvoiceStatus, setUpdatingInvoiceStatus] = useState(false);
 
   useEffect(() => {
     loadData();
     loadBoxLabelSettings();
+    loadCustomInvoiceStatuses();
   }, [workOrderId]);
+
+  const loadCustomInvoiceStatuses = async () => {
+    try {
+      const statuses = await CustomInvoiceStatusService.getCustomStatuses();
+      setCustomInvoiceStatuses(statuses);
+    } catch (error) {
+      console.error('Error loading custom invoice statuses:', error);
+    }
+  };
 
   const loadCompanySettings = async (companyId: string) => {
     try {
@@ -192,6 +210,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         return;
       }
       setWorkOrder(woData);
+      setSelectedInvoiceStatus(woData.custom_invoice_status_id || null);
 
       if (woData.company_id) {
         loadCompanySettings(woData.company_id);
@@ -333,6 +352,35 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       await WorkOrderService.completeLineItem(woLineItem.id);
     }
     await loadData();
+  };
+
+  const handleInvoiceStatusChange = async (statusId: string | null) => {
+    if (!workOrder) return;
+
+    setUpdatingInvoiceStatus(true);
+    try {
+      const { error } = await WorkOrderService.updateWorkOrderInvoiceStatus(
+        workOrder.id,
+        statusId || null
+      );
+
+      if (error) {
+        console.error('Error updating invoice status:', error);
+        addNotification('error', 'Failed to update invoice status');
+        return;
+      }
+
+      setSelectedInvoiceStatus(statusId);
+      const statusName = statusId
+        ? customInvoiceStatuses.find(s => s.id === statusId)?.name || 'Unknown'
+        : 'None';
+      addNotification('success', `Invoice status updated to: ${statusName}`);
+    } catch (error) {
+      console.error('Error updating invoice status:', error);
+      addNotification('error', 'Failed to update invoice status');
+    } finally {
+      setUpdatingInvoiceStatus(false);
+    }
   };
 
   const handleDeleteWorkOrder = async () => {
@@ -590,7 +638,14 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           <div className="grid grid-cols-3 gap-6 p-8 border-b border-gray-300 dark:border-slate-600">
             <CustomerBillingSection quote={quote} />
             <CustomerShippingSection quote={quote} />
-            <WorkOrderDetailsSection workOrder={workOrder} quote={quote} />
+            <WorkOrderDetailsSection
+              workOrder={workOrder}
+              quote={quote}
+              customInvoiceStatuses={customInvoiceStatuses}
+              selectedInvoiceStatus={selectedInvoiceStatus}
+              onInvoiceStatusChange={handleInvoiceStatusChange}
+              updatingInvoiceStatus={updatingInvoiceStatus}
+            />
           </div>
         ) : (
           <div className="p-8 border-b border-gray-300 dark:border-slate-600">
@@ -776,7 +831,23 @@ function CustomerShippingSection({ quote }: { quote: QuoteData }) {
   );
 }
 
-function WorkOrderDetailsSection({ workOrder, quote }: { workOrder: WorkOrderRecord; quote: QuoteData }) {
+function WorkOrderDetailsSection({
+  workOrder,
+  quote,
+  customInvoiceStatuses,
+  selectedInvoiceStatus,
+  onInvoiceStatusChange,
+  updatingInvoiceStatus
+}: {
+  workOrder: WorkOrderRecord;
+  quote: QuoteData;
+  customInvoiceStatuses: CustomInvoiceStatus[];
+  selectedInvoiceStatus: string | null;
+  onInvoiceStatusChange: (statusId: string | null) => void;
+  updatingInvoiceStatus: boolean;
+}) {
+  const currentStatus = customInvoiceStatuses.find(s => s.id === selectedInvoiceStatus);
+
   return (
     <div>
       <h3 className="font-bold text-gray-900 dark:text-white mb-3 text-sm">Work Order Details</h3>
@@ -796,6 +867,56 @@ function WorkOrderDetailsSection({ workOrder, quote }: { workOrder: WorkOrderRec
         {quote.terms && (
           <div><span className="text-gray-600 dark:text-gray-400">Terms: </span><span className="text-gray-900 dark:text-white font-medium">{quote.terms}</span></div>
         )}
+
+        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-slate-600">
+          <label className="block text-gray-600 dark:text-gray-400 mb-2 flex items-center gap-1.5">
+            <DollarSign className="w-4 h-4" />
+            <span>Invoice Status</span>
+          </label>
+          {updatingInvoiceStatus ? (
+            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-sm">Updating...</span>
+            </div>
+          ) : currentStatus ? (
+            <div className="flex items-center gap-2">
+              <span
+                className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium text-white"
+                style={{ backgroundColor: currentStatus.color }}
+              >
+                {currentStatus.name}
+                {currentStatus.category && (
+                  <span className="ml-2 text-xs opacity-80">({currentStatus.category})</span>
+                )}
+              </span>
+              <button
+                onClick={() => onInvoiceStatusChange(null)}
+                className="text-xs text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 underline"
+              >
+                Clear
+              </button>
+            </div>
+          ) : (
+            <div className="text-gray-500 dark:text-gray-400 text-sm">No invoice status set</div>
+          )}
+
+          {customInvoiceStatuses.length > 0 && (
+            <select
+              value={selectedInvoiceStatus || ''}
+              onChange={(e) => onInvoiceStatusChange(e.target.value || null)}
+              disabled={updatingInvoiceStatus}
+              className="mt-2 w-full px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <option value="">-- Select Invoice Status --</option>
+              {customInvoiceStatuses.map((status) => (
+                <option key={status.id} value={status.id}>
+                  {status.name}
+                  {status.category ? ` (${status.category})` : ''}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
       </div>
     </div>
   );
