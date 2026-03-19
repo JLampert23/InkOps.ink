@@ -137,26 +137,61 @@ Deno.serve(async (req: Request) => {
         .eq("quote_id", quoteId)
         .order("line_number");
 
+      // Get imprints
+      const { data: originalImprints } = await supabase
+        .from("quote_imprints")
+        .select("*")
+        .eq("quote_id", quoteId)
+        .order("sort_order");
+
+      // Get proofs
+      const { data: originalProofs } = await supabase
+        .from("proofs")
+        .select("*")
+        .eq("quote_id", quoteId);
+
       // Generate new quote number
       const { data: quoteNumber } = await supabase.rpc("generate_quote_number", {
         p_company_id: profile.company_id
       });
 
-      // Create duplicate
+      // Create duplicate quote with all fields
       const duplicateData = {
         quote_number: quoteNumber,
         company_id: profile.company_id,
         customer_id: original.customer_id,
+        contact_id: original.contact_id,
         customer_name: original.customer_name,
         customer_email: original.customer_email,
         customer_phone: original.customer_phone,
         customer_company: original.customer_company,
         billing_address: original.billing_address,
         shipping_address: original.shipping_address,
+        bill_address_1: original.bill_address_1,
+        bill_address_2: original.bill_address_2,
+        bill_city: original.bill_city,
+        bill_state: original.bill_state,
+        bill_zip: original.bill_zip,
+        ship_address_1: original.ship_address_1,
+        ship_address_2: original.ship_address_2,
+        ship_city: original.ship_city,
+        ship_state: original.ship_state,
+        ship_zip: original.ship_zip,
+        subtotal: original.subtotal,
         tax_rate: original.tax_rate,
+        tax_amount: original.tax_amount,
+        total: original.total,
+        discount_amount: original.discount_amount,
+        discount_percent: original.discount_percent,
         pricing_reference: original.pricing_reference,
         notes: original.notes,
         customer_notes: original.customer_notes,
+        production_notes: original.production_notes,
+        terms: original.terms,
+        production_due_date: original.production_due_date,
+        customer_due_date: original.customer_due_date,
+        payment_due_date: original.payment_due_date,
+        nickname: original.nickname,
         status: "draft",
         created_by: user.id,
       };
@@ -169,13 +204,16 @@ Deno.serve(async (req: Request) => {
 
       if (createError) throw createError;
 
-      // Duplicate line items
+      // Duplicate line items with ALL fields
       if (originalLineItems && originalLineItems.length > 0) {
         const newLineItems = originalLineItems.map((item: any) => ({
           quote_id: newQuote.id,
           company_id: profile.company_id,
           line_number: item.line_number,
+          line_type: item.line_type,
           sku: item.sku,
+          item_number: item.item_number,
+          color: item.color,
           description: item.description,
           quantity: item.quantity,
           unit_price: item.unit_price,
@@ -184,11 +222,172 @@ Deno.serve(async (req: Request) => {
           decoration_location: item.decoration_location,
           artwork_url: item.artwork_url,
           notes: item.notes,
+          qty_yxs: item.qty_yxs,
+          qty_ys: item.qty_ys,
+          qty_ym: item.qty_ym,
+          qty_yl: item.qty_yl,
+          qty_yxl: item.qty_yxl,
+          qty_xs: item.qty_xs,
+          qty_s: item.qty_s,
+          qty_m: item.qty_m,
+          qty_l: item.qty_l,
+          qty_xl: item.qty_xl,
+          qty_2xl: item.qty_2xl,
+          qty_3xl: item.qty_3xl,
+          qty_4xl: item.qty_4xl,
+          qty_5xl: item.qty_5xl,
+          qty_sm: item.qty_sm,
+          qty_lxl: item.qty_lxl,
+          qty_ysym: item.qty_ysym,
+          qty_ylyxl: item.qty_ylyxl,
+          imprint_number: item.imprint_number,
+          num_colors: item.num_colors,
+          taxed: item.taxed,
+          sort_order: item.sort_order,
+          total_quantity: item.total_quantity,
+          group_label: item.group_label,
+          supplier_name: item.supplier_name,
+          supplier_partid: item.supplier_partid,
+          brand: item.brand,
+          color_code: item.color_code,
+          garment_image_url: item.garment_image_url,
+          garment_front_image_url: item.garment_front_image_url,
+          garment_back_image_url: item.garment_back_image_url,
+          garment_sleeve_image_url: item.garment_sleeve_image_url,
+          garment_rear_image_url: item.garment_rear_image_url,
+          garment_side_image_url: item.garment_side_image_url,
+          garment_lifestyle_image_url: item.garment_lifestyle_image_url,
+          garment_image_rear_url: item.garment_image_rear_url,
+          garment_image_side_url: item.garment_image_side_url,
+          garment_image_lifestyle_url: item.garment_image_lifestyle_url,
+          garment_images_data: item.garment_images_data,
+          wholesale_price: item.wholesale_price,
+          retail_price: item.retail_price,
+          garment_unit_price: item.garment_unit_price,
+          supplier_metadata: item.supplier_metadata,
+          stock_availability: item.stock_availability,
+          size_mode: item.size_mode,
+          regular_sizes: item.regular_sizes,
+          double_sizes: item.double_sizes,
+          youth_sizes: item.youth_sizes,
+          adult_sizes: item.adult_sizes,
         }));
 
         await supabase
           .from("quote_line_items")
           .insert(newLineItems);
+      }
+
+      // Duplicate imprints with ALL fields
+      if (originalImprints && originalImprints.length > 0) {
+        const imprintIdMap = new Map();
+
+        for (const imprint of originalImprints) {
+          const { data: newImprint, error: imprintError } = await supabase
+            .from("quote_imprints")
+            .insert([{
+              quote_id: newQuote.id,
+              company_id: profile.company_id,
+              matrix: imprint.matrix,
+              column_number: imprint.column_number,
+              type_of_work: imprint.type_of_work,
+              details: imprint.details,
+              mockups: imprint.mockups,
+              sort_order: imprint.sort_order,
+              location: imprint.location,
+              price_matrix_id: imprint.price_matrix_id,
+              thread_ink_color: imprint.thread_ink_color,
+              pricing_matrix_column: imprint.pricing_matrix_column,
+              group_label: imprint.group_label,
+              imprint_number: imprint.imprint_number,
+              price: imprint.price,
+              num_colors: imprint.num_colors,
+              artwork_url: imprint.artwork_url,
+              artwork_images: imprint.artwork_images,
+              garment_images: imprint.garment_images,
+            }])
+            .select()
+            .single();
+
+          if (!imprintError && newImprint) {
+            imprintIdMap.set(imprint.id, newImprint.id);
+          }
+        }
+
+        // Duplicate proofs with ALL fields
+        if (originalProofs && originalProofs.length > 0) {
+          for (const proof of originalProofs) {
+            const newImprintId = proof.imprint_id ? imprintIdMap.get(proof.imprint_id) : null;
+
+            const { data: newProof, error: proofError } = await supabase
+              .from("proofs")
+              .insert([{
+                company_id: profile.company_id,
+                quote_id: newQuote.id,
+                line_item_id: proof.line_item_id,
+                customer_id: proof.customer_id,
+                imprint_id: newImprintId,
+                proof_number: proof.proof_number,
+                proof_version: proof.proof_version,
+                garment_image_url: proof.garment_image_url,
+                garment_name: proof.garment_name,
+                garment_brand: proof.garment_brand,
+                garment_description: proof.garment_description,
+                print_width: proof.print_width,
+                print_height: proof.print_height,
+                print_depth: proof.print_depth,
+                print_unit: proof.print_unit,
+                status: "pending",
+                notes: proof.notes,
+                created_by: user.id,
+                composite_image_url: proof.composite_image_url,
+                type_of_work: proof.type_of_work,
+                decoration_location_id: proof.decoration_location_id,
+                pricing_matrix_id: proof.pricing_matrix_id,
+                pricing_matrix_column: proof.pricing_matrix_column,
+                imprint_unit_price: proof.imprint_unit_price,
+                imprint_setup_fee: proof.imprint_setup_fee,
+                group_label: proof.group_label,
+                selected_colors: proof.selected_colors,
+              }])
+              .select()
+              .single();
+
+            if (!proofError && newProof && proof.id) {
+              // Duplicate proof artwork
+              const { data: originalArtwork } = await supabase
+                .from("proof_artwork")
+                .select("*")
+                .eq("proof_id", proof.id);
+
+              if (originalArtwork && originalArtwork.length > 0) {
+                const newArtwork = originalArtwork.map((art: any) => ({
+                  proof_id: newProof.id,
+                  company_id: profile.company_id,
+                  imprint_id: newImprintId,
+                  artwork_url: art.artwork_url,
+                  artwork_name: art.artwork_name,
+                  artwork_version: art.artwork_version,
+                  file_type: art.file_type,
+                  file_size: art.file_size,
+                  position_x: art.position_x,
+                  position_y: art.position_y,
+                  scale: art.scale,
+                  rotation: art.rotation,
+                  customer_artwork_id: art.customer_artwork_id,
+                  print_location: art.print_location,
+                  width_inches: art.width_inches,
+                  height_inches: art.height_inches,
+                  sort_order: art.sort_order,
+                }));
+
+                await supabase
+                  .from("proof_artwork")
+                  .insert(newArtwork);
+              }
+            }
+          }
+        }
       }
 
       return new Response(
