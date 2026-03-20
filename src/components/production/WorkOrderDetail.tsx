@@ -365,8 +365,8 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       );
 
       if (error) {
-        console.error('Error updating invoice status:', error);
-        addNotification('error', 'Failed to update invoice status');
+        console.error('Error updating work order status:', error);
+        addNotification('error', 'Failed to update work order status');
         return;
       }
 
@@ -374,10 +374,10 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       const statusName = statusId
         ? customInvoiceStatuses.find(s => s.id === statusId)?.name || 'Unknown'
         : 'None';
-      addNotification('success', `Invoice status updated to: ${statusName}`);
+      addNotification('success', `Work order status updated to: ${statusName}`);
     } catch (error) {
-      console.error('Error updating invoice status:', error);
-      addNotification('error', 'Failed to update invoice status');
+      console.error('Error updating work order status:', error);
+      addNotification('error', 'Failed to update work order status');
     } finally {
       setUpdatingInvoiceStatus(false);
     }
