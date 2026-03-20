@@ -51,7 +51,6 @@ Deno.serve(async (req: Request) => {
       .from('automation_queue')
       .select('*')
       .eq('status', 'pending')
-      .lte('scheduled_for', new Date().toISOString())
       .order('created_at', { ascending: true })
       .limit(50);
 
@@ -110,7 +109,7 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-async function processQueueItem(supabase: any, queueItem: AutomationQueue) {
+async function processQueueItem(supabase: any, queueItem: any) {
   try {
     // Mark as processing
     await supabase
@@ -118,115 +117,93 @@ async function processQueueItem(supabase: any, queueItem: AutomationQueue) {
       .update({ status: 'processing' })
       .eq('id', queueItem.id);
 
-    // Get automation details
-    const { data: automation, error: autoError } = await supabase
+    // Get all automations that match this trigger type
+    const { data: automations, error: autoError } = await supabase
       .from('automations')
       .select('*')
-      .eq('id', queueItem.automation_id)
-      .maybeSingle();
+      .eq('trigger_type', queueItem.trigger_type)
+      .eq('company_id', queueItem.company_id)
+      .eq('is_enabled', true);
 
-    if (autoError || !automation) {
-      throw new Error(`Automation not found: ${queueItem.automation_id}`);
+    if (autoError) {
+      throw new Error(`Failed to fetch automations: ${autoError.message}`);
     }
 
-    if (!automation.is_enabled) {
-      throw new Error('Automation is disabled');
-    }
-
-    // Validate conditions
-    const conditionsMet = await validateConditions(
-      supabase,
-      automation.conditions,
-      queueItem.trigger_data,
-      queueItem.company_id
-    );
-
-    if (!conditionsMet) {
-      // Mark as cancelled if conditions not met
+    if (!automations || automations.length === 0) {
+      // No automations found for this trigger, mark as completed
       await supabase
         .from('automation_queue')
         .update({
-          status: 'cancelled',
+          status: 'completed',
           processed_at: new Date().toISOString(),
-          error_message: 'Conditions not met'
         })
         .eq('id', queueItem.id);
 
-      return { success: true, skipped: true, reason: 'Conditions not met' };
+      return { success: true, skipped: true, reason: 'No matching automations' };
     }
 
-    // Execute actions sequentially (not in parallel) to support wait actions
-    const startStep = queueItem.current_step || 0;
-    let currentStep = startStep;
+    // Process each automation
+    for (const automation of automations) {
+      if (!automation.is_enabled) {
+        continue;
+      }
 
-    for (let i = startStep; i < automation.actions.length; i++) {
-      const action = automation.actions[i];
-      currentStep = i;
-
-      const actionResult = await executeAction(
+      // Validate conditions
+      const conditionsMet = await validateConditions(
         supabase,
-        action,
-        queueItem.trigger_data,
+        automation.conditions,
+        queueItem.event_data,
         queueItem.company_id
       );
 
-      if (!actionResult.success) {
-        throw new Error(`Action ${i} failed: ${actionResult.error}`);
+      if (!conditionsMet) {
+        console.log(`Conditions not met for automation ${automation.id}`);
+        continue;
       }
 
-      // Check if action requires rescheduling (wait_duration or wait_until)
-      if (actionResult.reschedule && actionResult.delay_ms) {
-        const resumeAfter = new Date(Date.now() + actionResult.delay_ms).toISOString();
+      // Execute actions sequentially
+      for (let i = 0; i < automation.actions.length; i++) {
+        const action = automation.actions[i];
 
-        // Update queue item to pause and resume later
-        await supabase
-          .from('automation_queue')
-          .update({
-            status: 'pending',
-            current_step: i + 1, // Resume from next step
-            pause_reason: action.type,
-            resume_after: resumeAfter,
-          })
-          .eq('id', queueItem.id);
+        const actionResult = await executeAction(
+          supabase,
+          action,
+          queueItem.event_data,
+          queueItem.company_id
+        );
 
-        console.log(`Pausing automation ${queueItem.id} at step ${i}, will resume after ${resumeAfter}`);
-
-        return {
-          success: true,
-          paused: true,
-          resume_after: resumeAfter,
-          current_step: i + 1
-        };
+        if (!actionResult.success) {
+          throw new Error(`Action ${i} failed: ${actionResult.error}`);
+        }
       }
+
+      // Log successful execution
+      await supabase
+        .from('automation_logs')
+        .insert({
+          company_id: queueItem.company_id,
+          automation_id: automation.id,
+          trigger_type: queueItem.trigger_type,
+          trigger_event: queueItem.event_data,
+          status: 'success',
+          executed_actions: automation.actions,
+          execution_time_ms: 0,
+          executed_at: new Date().toISOString()
+        });
     }
 
-    // All actions completed successfully
+    // All automations processed successfully
     await supabase
       .from('automation_queue')
       .update({
         status: 'completed',
         processed_at: new Date().toISOString(),
-        current_step: automation.actions.length
       })
       .eq('id', queueItem.id);
 
-    // Log successful execution
-    await supabase
-      .from('automation_logs')
-      .insert({
-        company_id: queueItem.company_id,
-        automation_id: automation.id,
-        trigger_type: queueItem.trigger_type,
-        trigger_data: queueItem.trigger_data,
-        status: 'success',
-        actions_executed: automation.actions.length,
-        executed_at: new Date().toISOString()
-      });
-
     return {
       success: true,
-      automation_id: automation.id,
-      actions_executed: automation.actions.length
+      automations_processed: automations.length
     };
 
   } catch (error) {
