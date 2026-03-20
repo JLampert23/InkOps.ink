@@ -26,7 +26,7 @@ export function useInvoiceStatuses(companyId: string | undefined) {
 
   useEffect(() => {
     if (!companyId) {
-      setStatuses(SYSTEM_STATUSES);
+      setStatuses([]);
       setLoading(false);
       return;
     }
@@ -50,13 +50,13 @@ export function useInvoiceStatuses(companyId: string | undefined) {
         category: cs.category,
       }));
 
-      // Combine system statuses with custom statuses
-      setStatuses([...SYSTEM_STATUSES, ...customStatusObjects]);
+      // Only use custom statuses
+      setStatuses(customStatusObjects);
     } catch (err) {
       console.error('Error loading statuses:', err);
       setError(err as Error);
-      // Fall back to system statuses only
-      setStatuses(SYSTEM_STATUSES);
+      // Fall back to empty array
+      setStatuses([]);
     } finally {
       setLoading(false);
     }
