@@ -63,8 +63,8 @@ export const TRIGGER_OPTIONS: TriggerOption[] = [
   },
   {
     value: 'work_order_invoice_status_changed',
-    label: 'If work order invoice status changed to _____',
-    description: 'Triggers when work order invoice status changes',
+    label: 'If work order status changed to _____',
+    description: 'Triggers when work order status changes',
     icon: 'DollarSign',
   },
 ];
