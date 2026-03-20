@@ -24,13 +24,34 @@ export class AutomationEngineService {
   }
 
   static async createAutomation(automation: Partial<Automation>): Promise<Automation> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('company_id')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile?.company_id) throw new Error('User company not found');
+
+    const automationData = {
+      ...automation,
+      company_id: profile.company_id,
+      created_by: user.id,
+    };
+
     const { data, error } = await supabase
       .from('automations')
-      .insert([automation])
+      .insert([automationData])
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Failed to save automation:', error);
+      console.error('Supabase request failed', error);
+      throw error;
+    }
     return data;
   }
 
@@ -77,9 +98,25 @@ export class AutomationEngineService {
   }
 
   static async createLog(log: Partial<AutomationLog>): Promise<AutomationLog> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('company_id')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile?.company_id) throw new Error('User company not found');
+
+    const logData = {
+      ...log,
+      company_id: profile.company_id,
+    };
+
     const { data, error } = await supabase
       .from('automation_logs')
-      .insert([log])
+      .insert([logData])
       .select()
       .single();
 
