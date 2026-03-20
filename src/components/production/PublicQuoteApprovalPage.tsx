@@ -399,7 +399,7 @@ export default function PublicQuoteApprovalPage() {
                 {imprintLineItems.map((imp, idx) => (
                   <div key={idx} className="mb-3 pb-3 border-b border-gray-200 last:border-0">
                     <p className="font-bold text-xs text-gray-900 mb-0.5">
-                      IMPRINT #{imp.imprint_number || `${quote.quote_number}-${idx + 1}`}
+                      IMPRINT #{(imp.imprint_number || `${quote.quote_number}-${idx + 1}`).replace(/^QTE-/, '')}
                     </p>
                     {imp.decoration_method && (
                       <p className="text-xs text-gray-700 font-medium uppercase mb-1">{imp.decoration_method}</p>
@@ -648,7 +648,7 @@ function ImprintCards({
             <div className="flex items-start justify-between mb-1.5">
               <div>
                 <p className="font-bold text-xs text-gray-900">
-                  {imp.imprint_number ? `IMPRINT #${imp.imprint_number}` : `Imprint ${idx + 1}`}
+                  {imp.imprint_number ? `IMPRINT #${imp.imprint_number.replace(/^QTE-/, '')}` : `Imprint ${idx + 1}`}
                 </p>
                 {imp.type_of_work && (
                   <p className="text-xs text-blue-700 font-medium">{imp.type_of_work}</p>

@@ -1,26 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase-client';
-import {
-  ArrowLeft,
-  Edit,
-  Send,
-  CheckCircle,
-  XCircle,
-  Copy,
-  Clock,
-  FileText,
-  Loader2,
-  RefreshCw,
-  Download,
-  Plus,
-  Pencil,
-  X,
-} from 'lucide-react';
+import { ArrowLeft, CreditCard as Edit, Send, CheckCircle, XCircle, Copy, Clock, FileText, Loader2, RefreshCw, Download, Plus, Pencil, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ManageImprintsModal } from './ManageImprintsModal';
 import { SendQuoteModal } from './SendQuoteModal';
 import { generateQuotePDF, QuotePDFData } from '../../utils/quote-pdf-export';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useConfirmation } from '../../contexts/ConfirmationContext';
 
 function decodeHtmlEntities(text: string): string {
   if (!text) return text;
@@ -41,6 +27,10 @@ interface Quote {
   nickname?: string;
   company_id?: string;
   customer_id?: string;
+  contact_id?: string;
+  contact_name?: string;
+  contact_email?: string;
+  contact_phone?: string;
   customer_name: string;
   customer_email: string;
   customer_company: string;
@@ -138,6 +128,7 @@ interface QuoteImprint {
   artwork_description?: string;
   artwork_url?: string;
   artwork_images?: string[];
+  garment_images?: Array<{ url: string; view: string }>;
 }
 
 interface CompanySettings {
@@ -155,6 +146,7 @@ interface CompanySettings {
 
 export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProps) {
   const { showNotification } = useNotification();
+  const { confirm } = useConfirmation();
   const [quote, setQuote] = useState<Quote | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [quoteImprints, setQuoteImprints] = useState<QuoteImprint[]>([]);
@@ -183,6 +175,22 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
         .single();
 
       if (quoteError) throw quoteError;
+
+      // If quote has contact_id, fetch contact details
+      if (quoteData.contact_id) {
+        const { data: contactData } = await supabase
+          .from('customer_contacts')
+          .select('*')
+          .eq('id', quoteData.contact_id)
+          .maybeSingle();
+
+        if (contactData) {
+          // Add contact info to quote data for display
+          quoteData.contact_name = contactData.name;
+          quoteData.contact_email = contactData.email;
+          quoteData.contact_phone = contactData.phone;
+        }
+      }
 
       // If quote has customer_id, fetch customer details if billing info is missing
       if (quoteData.customer_id) {
@@ -371,13 +379,25 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
   const handleApproveQuote = async () => {
     if (!quote) return;
 
-    if (!confirm(`Are you sure you want to approve ${quote.quote_number}?\n\nThis will:\n- Create a Work Order\n- Create an Invoice\n- Push garment requirements to the purchase report\n- Trigger all approval automations`)) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: `Approve ${quote.quote_number}?`,
+      message: `This will:\n- Create a Work Order\n- Create an Invoice\n- Push garment requirements to the purchase report\n- Trigger all approval automations`,
+      confirmLabel: 'Approve Quote',
+      cancelLabel: 'Cancel',
+      variant: 'success',
+    });
+
+    if (!confirmed) return;
 
     setApproving(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      console.log('[APPROVE] Session check:', {
+        hasSession: !!session,
+        userId: session?.user?.id,
+        hasAccessToken: !!session?.access_token,
+        tokenPrefix: session?.access_token?.substring(0, 20)
+      });
       if (!session) throw new Error('Not authenticated');
 
       const response = await fetch(
@@ -564,6 +584,9 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
             <div className="text-sm space-y-0.5">
               {quote.bill_company && <p className="font-semibold text-gray-900 dark:text-white">{quote.bill_company}</p>}
               {quote.bill_name && <p className="text-gray-700 dark:text-gray-300">{quote.bill_name}</p>}
+              {quote.contact_name && quote.contact_name !== quote.bill_name && (
+                <p className="text-gray-600 dark:text-gray-400 text-xs italic">Contact: {quote.contact_name}</p>
+              )}
               {quote.bill_address_1 && <p className="text-gray-700 dark:text-gray-300">{quote.bill_address_1}</p>}
               {quote.bill_address_2 && <p className="text-gray-700 dark:text-gray-300">{quote.bill_address_2}</p>}
               {quote.bill_city && (
@@ -571,15 +594,15 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                   {quote.bill_city}, {quote.bill_state} {quote.bill_zip}
                 </p>
               )}
-              {(quote.bill_email || quote.customer_email) && (
+              {(quote.contact_email || quote.bill_email || quote.customer_email) && (
                 <p className="text-blue-600 dark:text-blue-400 mt-1">
-                  <a href={`mailto:${quote.bill_email || quote.customer_email}`} className="hover:underline">
-                    {quote.bill_email || quote.customer_email}
+                  <a href={`mailto:${quote.contact_email || quote.bill_email || quote.customer_email}`} className="hover:underline">
+                    {quote.contact_email || quote.bill_email || quote.customer_email}
                   </a>
                 </p>
               )}
-              {(quote.bill_phone || quote.customer_phone) && (
-                <p className="text-gray-700 dark:text-gray-300">{quote.bill_phone || quote.customer_phone}</p>
+              {(quote.contact_phone || quote.bill_phone || quote.customer_phone) && (
+                <p className="text-gray-700 dark:text-gray-300">{quote.contact_phone || quote.bill_phone || quote.customer_phone}</p>
               )}
               {!quote.bill_company && !quote.bill_name && !quote.bill_address_1 && (
                 <p className="text-gray-500 dark:text-gray-400 italic">No billing address provided</p>
@@ -681,8 +704,8 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                   <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">4XL</th>
                   <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Qty</th>
                   <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Items</th>
-                  <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[100px]">Unit Price</th>
-                  <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[100px]">Total</th>
+                  <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[120px] bg-blue-50 dark:bg-blue-900/20">Unit Price</th>
+                  <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[120px] bg-green-50 dark:bg-green-900/20">Line Total</th>
                 </tr>
               </thead>
             )}
@@ -726,8 +749,8 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                       <th className="px-2 py-3 text-center font-semibold text-gray-900 dark:text-white text-sm">4XL</th>
                       <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Qty</th>
                       <th className="px-4 py-3 text-center font-semibold text-gray-900 dark:text-white">Items</th>
-                      <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[100px]">Unit Price</th>
-                      <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[100px]">Total</th>
+                      <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[120px] bg-blue-50 dark:bg-blue-900/20">Unit Price</th>
+                      <th className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white min-w-[120px] bg-green-50 dark:bg-green-900/20">Line Total</th>
                     </tr>
                   )}
                   {/* Group items */}
@@ -737,7 +760,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                    (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) +
                                    (item.qty_xl || 0) + (item.qty_2xl || 0) + (item.qty_3xl || 0) +
                                    (item.qty_4xl || 0);
-                    const totalItems = sizeQty + ((item as any).quantity || 0);
+                    const totalItems = sizeQty > 0 ? sizeQty : ((item as any).quantity || 0);
 
                     return (
                       <React.Fragment key={item.id}>
@@ -794,15 +817,15 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                         {item.qty_4xl || ''}
                       </td>
                       <td className="px-4 py-4 text-center text-gray-700 dark:text-gray-300 text-base">
-                        {(item as any).quantity || ''}
+                        {sizeQty === 0 ? ((item as any).quantity || '') : ''}
                       </td>
                       <td className="px-4 py-4 text-center text-gray-900 dark:text-white font-bold text-base text-blue-600 dark:text-blue-400">
                         {totalItems}
                       </td>
-                      <td className="px-4 py-4 text-right text-gray-700 dark:text-gray-300 text-base">
+                      <td className="px-4 py-4 text-right text-gray-900 dark:text-white font-semibold text-base bg-blue-50/50 dark:bg-blue-900/10">
                         ${item.unit_price.toFixed(2)}
                       </td>
-                      <td className="px-4 py-4 text-right text-gray-900 dark:text-white font-semibold text-base">
+                      <td className="px-4 py-4 text-right text-green-700 dark:text-green-400 font-bold text-base bg-green-50/50 dark:bg-green-900/10">
                         ${item.total_price.toFixed(2)}
                       </td>
                     </tr>
@@ -856,7 +879,7 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                   >
                                     <div className="flex items-center gap-2 mb-2 flex-wrap">
                                       <span className="text-sm font-extrabold text-gray-900 dark:text-white">
-                                        {quote.quote_number}-{String(idx + 1).padStart(2, '0')}
+                                        {quote.quote_number.replace(/^QTE-/, '')}-{String(idx + 1).padStart(2, '0')}
                                       </span>
                                       <span className="text-sm font-bold px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded">
                                         {imprint.type_of_work}
@@ -903,6 +926,38 @@ export default function QuoteDetail({ quoteId, onBack, onEdit }: QuoteDetailProp
                                         </div>
                                       );
                                     })()}
+
+                                    {imprint.garment_images && imprint.garment_images.length > 0 && (
+                                      <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">
+                                        <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                          Garment Images:
+                                        </div>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                                          {imprint.garment_images
+                                            .filter((img) => img?.url)
+                                            .map((img, imgIdx) => (
+                                              <div key={`garment-${imgIdx}`} className="aspect-square">
+                                                <div className="relative w-full h-full">
+                                                  <img
+                                                    src={img.url}
+                                                    alt={`Garment ${img.view || 'view'}`}
+                                                    className="w-full h-full object-contain rounded border-2 border-gray-300 dark:border-slate-600 cursor-pointer hover:border-blue-500 transition-all bg-white dark:bg-slate-800 shadow-sm"
+                                                    onClick={() => {
+                                                      setSelectedProofImage(img.url);
+                                                      setShowProofModal(true);
+                                                    }}
+                                                  />
+                                                  {img.view && (
+                                                    <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 text-white text-xs py-1 px-2 text-center rounded-b capitalize">
+                                                      {img.view}
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            ))}
+                                        </div>
+                                      </div>
+                                    )}
 
                                     {hasMockups && (
                                       <div className="mt-3 pt-3 border-t border-gray-200 dark:border-slate-600">

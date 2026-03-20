@@ -61,6 +61,12 @@ export const TRIGGER_OPTIONS: TriggerOption[] = [
     description: 'Triggers on a recurring schedule',
     icon: 'CalendarDays',
   },
+  {
+    value: 'work_order_invoice_status_changed',
+    label: 'If work order status changed to _____',
+    description: 'Triggers when work order status changes',
+    icon: 'DollarSign',
+  },
 ];
 
 export const CONDITION_OPTIONS: ConditionOption[] = [
@@ -142,6 +148,30 @@ export const CONDITION_OPTIONS: ConditionOption[] = [
       { value: 'dtg', label: 'DTG' },
       { value: 'heat_transfer', label: 'Heat Transfer' },
       { value: 'sublimation', label: 'Sublimation' },
+    ],
+  },
+  {
+    value: 'work_order_invoice_status',
+    label: 'Work Order Invoice Status',
+    operators: ['equals', 'not_equals'],
+    valueType: 'text',
+  },
+  {
+    value: 'work_order_status',
+    label: 'Work Order Status',
+    operators: ['equals', 'not_equals'],
+    valueType: 'text',
+  },
+  {
+    value: 'work_order_priority',
+    label: 'Work Order Priority',
+    operators: ['equals', 'not_equals'],
+    valueType: 'select',
+    options: [
+      { value: 'low', label: 'Low' },
+      { value: 'medium', label: 'Medium' },
+      { value: 'high', label: 'High' },
+      { value: 'urgent', label: 'Urgent' },
     ],
   },
 ];
@@ -323,5 +353,9 @@ export const TRIGGER_CONDITION_OPTIONS: Record<string, { label: string; options:
       { value: 'on_hold', label: 'On Hold' },
       { value: 'cancelled', label: 'Cancelled' },
     ],
+  },
+  work_order_invoice_status_changed: {
+    label: 'Work Order Status',
+    options: [],
   },
 };

@@ -21,6 +21,7 @@ interface ConfirmOptions {
 
 interface NotificationContextType {
   showNotification: (type: NotificationType, title: string, message?: string, duration?: number) => void;
+  addNotification: (type: NotificationType, title: string, message?: string, duration?: number) => void;
   confirm: (options: ConfirmOptions) => Promise<boolean>;
 }
 
@@ -96,7 +97,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <NotificationContext.Provider value={{ showNotification, confirm }}>
+    <NotificationContext.Provider value={{ showNotification, addNotification: showNotification, confirm }}>
       {children}
 
       {/* Notification Toasts */}

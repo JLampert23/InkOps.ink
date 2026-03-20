@@ -10,6 +10,7 @@ import {
   sanMarImagesFresh,
   type ResolvedColorImages,
 } from "../_shared/sanmar-image-resolver.ts";
+import { filterValidImages as sharedFilterValidImages } from "../_shared/image-validator.ts";
 
 export interface ColorOption {
   name: string;
@@ -53,65 +54,8 @@ function extractColorCode(partId: string, style: string): string {
   return stripped;
 }
 
-async function validateSanMarImageUrl(url: string): Promise<boolean> {
-  try {
-    const response = await fetch(url, {
-      method: "HEAD",
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; InkOps/1.0)",
-        Accept: "image/*",
-      },
-      redirect: "manual",
-    });
-
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get("Location") || "";
-      const lower = location.toLowerCase();
-      if (lower.includes("imagenotavailable") || lower.includes("image404errorhandler") || lower.includes("notavailable")) {
-        return false;
-      }
-    }
-
-    return response.ok;
-  } catch {
-    return false;
-  }
-}
-
-async function filterValidImages(
-  images: any[]
-): Promise<any[]> {
-  if (!images || images.length === 0) return [];
-
-  const uniqueUrls = [...new Set(images.map((img: any) => img.url).filter(Boolean))];
-  if (uniqueUrls.length === 0) return [];
-
-  const samplesToCheck = uniqueUrls.slice(0, 3);
-  const results = await Promise.allSettled(
-    samplesToCheck.map(url => validateSanMarImageUrl(url))
-  );
-
-  const validUrls = new Set<string>();
-  const invalidUrls = new Set<string>();
-  results.forEach((result, i) => {
-    if (result.status === "fulfilled" && result.value) {
-      validUrls.add(samplesToCheck[i]);
-    } else {
-      invalidUrls.add(samplesToCheck[i]);
-    }
-  });
-
-  if (validUrls.size === 0) {
-    console.log(`[SanMar] All ${samplesToCheck.length} sample URLs failed validation - discarding all images`);
-    return [];
-  }
-
-  if (invalidUrls.size > 0) {
-    console.log(`[SanMar] ${invalidUrls.size}/${samplesToCheck.length} sample URLs invalid, filtering out bad URLs`);
-    return images.filter((img: any) => !invalidUrls.has(img.url));
-  }
-
-  return images;
+async function filterValidImages(images: any[]): Promise<any[]> {
+  return sharedFilterValidImages(images);
 }
 
 export async function searchSanMarCatalog(
@@ -268,22 +212,21 @@ export async function searchSanMarCatalog(
       }
     }
 
-    // Fetch pricing for the first part to get wholesale price
-    const firstPartId = productData.data.parts?.[0]?.partId;
-    if (firstPartId) {
-      try {
-        const pricingUrl = `${supabaseUrl}/functions/v1/sanmar-api?action=pricing&partId=${encodeURIComponent(firstPartId)}&companyId=${encodeURIComponent(companyId)}`;
-        const pricingResponse = await fetch(pricingUrl, {
-          headers: { "Authorization": `Bearer ${supabaseServiceKey}` },
-        });
-        if (pricingResponse.ok) {
-          const pricingJson = await pricingResponse.json();
-          pricingData = pricingJson.data || null;
-          console.log(`Fetched pricing for part ${firstPartId}:`, pricingData?.parts?.[0]?.prices?.[0]?.price);
-        }
-      } catch (pricingError: any) {
-        console.warn(`Pricing fetch failed (non-critical): ${pricingError.message}`);
+    // Fetch pricing using style number (pricing API requires style, not partId)
+    try {
+      const pricingUrl = `${supabaseUrl}/functions/v1/sanmar-api?action=pricing&style=${encodeURIComponent(style)}&companyId=${encodeURIComponent(companyId)}`;
+      const pricingResponse = await fetch(pricingUrl, {
+        headers: { "Authorization": `Bearer ${supabaseServiceKey}` },
+      });
+      if (pricingResponse.ok) {
+        const pricingJson = await pricingResponse.json();
+        pricingData = pricingJson.data || null;
+        console.log(`[SanMar] ✅ Fetched pricing for style ${style}:`, pricingData?.parts?.length || 0, 'parts');
+      } else {
+        console.warn(`[SanMar] ⚠️ Pricing unavailable for ${style} (status: ${pricingResponse.status}) - continuing without pricing`);
       }
+    } catch (pricingError: any) {
+      console.warn(`[SanMar] ⚠️ Pricing fetch failed (non-critical): ${pricingError.message}`);
     }
 
     let cdnImages: ResolvedColorImages = {};
@@ -312,7 +255,7 @@ export async function searchSanMarCatalog(
       },
     };
 
-    const product = transformSanMarData(apiDataForTransform, supabaseUrl, cdnImages);
+    const product = await transformSanMarData(apiDataForTransform, supabaseUrl, supabaseAdmin, cdnImages);
     if (productData.data?._debug) {
       product.raw_data = { _debug: productData.data._debug };
     }
@@ -409,7 +352,7 @@ async function getCachedProduct(
       cdnImages = await resolveSanMarImages(supabaseAdmin, style);
     }
 
-    const product = transformSanMarData(apiData, supabaseUrl, cdnImages);
+    const product = await transformSanMarData(apiData, supabaseUrl, supabaseAdmin, cdnImages);
     product.cached = true;
     product.last_synced = productCache.expires_at;
     return product;
@@ -512,11 +455,12 @@ function findSideImage(images: any[]): any {
   });
 }
 
-function transformSanMarData(
+async function transformSanMarData(
   apiData: any,
   supabaseUrl: string,
+  supabaseAdmin: any,
   cdnImages?: ResolvedColorImages
-): ProductResult {
+): Promise<ProductResult> {
   const style = apiData.style;
   const colors: ColorOption[] = [];
 
@@ -563,26 +507,62 @@ function transformSanMarData(
 
       const colorName = color.colorName?.toLowerCase().trim() || "";
       const colorKey = normalizeColorKey(color.colorName);
+      const firstPartId = partIds[0]; // Use first partId as the primary identifier
 
-      if (hasCdn) {
+      // PRIORITY 1: Use CDN images matched by partId (most accurate)
+      if (hasCdn && firstPartId) {
+        const cdnByPartId = await resolveSanMarImages(supabaseAdmin, style.styleNumber, undefined, firstPartId);
+        const partIdColors = Object.keys(cdnByPartId);
+        if (partIdColors.length > 0) {
+          const cdnEntry = cdnByPartId[partIdColors[0]];
+          if (cdnEntry) {
+            imageUrl = cdnEntry.front || cdnEntry.all?.[0] || "";
+            rearImageUrl = cdnEntry.back || "";
+            sideImageUrl = cdnEntry.side || "";
+            console.log(`[SanMar] CDN matched by partId ${firstPartId}: front=${!!imageUrl}, rear=${!!rearImageUrl}, side=${!!sideImageUrl}`);
+          }
+        }
+      }
+
+      // PRIORITY 2: Fall back to CDN color name matching
+      if (!imageUrl && hasCdn) {
         const cdnEntry = cdnImages![colorKey];
         if (cdnEntry) {
           imageUrl = cdnEntry.front || cdnEntry.all?.[0] || "";
           rearImageUrl = cdnEntry.back || "";
           sideImageUrl = cdnEntry.side || "";
+          console.log(`[SanMar] CDN matched by color "${colorKey}": front=${!!imageUrl}, rear=${!!rearImageUrl}, side=${!!sideImageUrl}`);
         }
       }
 
+      // PRIORITY 3: Use media images matched by partId (from API response)
       if (!imageUrl) {
-        let colorImages = mediaImages.filter((img: any) => {
-          if (img.partId && partIds.includes(img.partId)) return true;
-          const imgColor = (img.color || "").toLowerCase().trim();
-          if (!imgColor || !colorName) return false;
-          if (imgColor === colorName) return true;
-          if (normalizeColorKey(img.color) === colorKey) return true;
-          return false;
-        });
+        let colorImages: any[] = [];
 
+        // First try exact partId match
+        if (partIds.length > 0) {
+          for (const pid of partIds) {
+            const partImgs = imagesByPartId.get(pid);
+            if (partImgs && partImgs.length > 0) {
+              colorImages = partImgs;
+              console.log(`[SanMar] Found ${partImgs.length} images for partId ${pid}`);
+              break;
+            }
+          }
+        }
+
+        // Then try color name matching
+        if (colorImages.length === 0) {
+          colorImages = mediaImages.filter((img: any) => {
+            const imgColor = (img.color || "").toLowerCase().trim();
+            if (!imgColor || !colorName) return false;
+            if (imgColor === colorName) return true;
+            if (normalizeColorKey(img.color) === colorKey) return true;
+            return false;
+          });
+        }
+
+        // Then try fuzzy color matching
         if (colorImages.length === 0 && colorName) {
           colorImages = mediaImages.filter((img: any) => {
             const imgColor = (img.color || "").trim();
@@ -594,33 +574,17 @@ function transformSanMarData(
           }
         }
 
-        if (colorImages.length === 0 && partIds.length > 0) {
-          for (const pid of partIds) {
-            const partImgs = imagesByPartId.get(pid);
-            if (partImgs && partImgs.length > 0) {
-              colorImages = partImgs;
-              break;
-            }
-          }
-        }
+        if (colorImages.length > 0) {
+          const frontImg = findFrontImage(colorImages);
+          const rearImg = findRearImage(colorImages);
+          const sideImg = findSideImage(colorImages);
 
-        const colorSpecificImages = colorImages.filter((img: any) => {
-          const url = (img.url || "");
-          return img.partId && url.includes(`_${img.partId}`);
-        });
-
-        const imagesToUse = colorSpecificImages.length > 0 ? colorSpecificImages : colorImages;
-
-        if (imagesToUse.length > 0) {
-          const frontImg = findFrontImage(imagesToUse);
-          const rearImg = findRearImage(imagesToUse);
-          const sideImg = findSideImage(imagesToUse);
-
-          imageUrl = frontImg?.url || imagesToUse[0]?.url || "";
+          imageUrl = frontImg?.url || colorImages[0]?.url || "";
           rearImageUrl = rearImg?.url || "";
           sideImageUrl = sideImg?.url || "";
         }
 
+        // Fill in missing rear/side images from mediaViews if available
         if (!rearImageUrl && mediaViews.rearImages?.length > 0) {
           const colorPartUrl = mediaViews.rearImages.find((u: string) =>
             partIds.some((pid: string) => u.includes(pid))
@@ -635,6 +599,7 @@ function transformSanMarData(
           sideImageUrl = colorPartUrl || "";
         }
 
+        // Last resort: use fallback CDN URL
         if (!imageUrl && style.styleNumber) {
           const fallbacks = buildSanMarCdnFallbackUrl(style.styleNumber);
           if (fallbacks.length > 0) {

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Users, Search, ChevronRight, Mail, Phone, DollarSign, Loader2, FileText, CreditCard, FileSpreadsheet, Gift, Plus, Save, X, Edit2, Trash2, Upload, Image, ExternalLink } from 'lucide-react';
+import { Users, Search, ChevronRight, Mail, Phone, DollarSign, Loader2, FileText, CreditCard, FileSpreadsheet, Gift, Plus, Save, X, CreditCard as Edit2, Trash2, Upload, Image, ExternalLink } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { format } from 'date-fns';
 import { InvoiceDetail } from '../billing/InvoiceDetail';
 import { useNotification } from '../../contexts/NotificationContext';
 import EditCustomerModal from './EditCustomerModal';
+import ContactSelectionModal from './ContactSelectionModal';
 import { CustomerArtworkLibrary } from './CustomerArtworkLibrary';
 import {
   exportCustomerListToPDF,
@@ -51,7 +52,7 @@ interface FundraisingCredit {
 
 interface CustomersReportProps {
   initialSearchTerm?: string;
-  onCreateQuote?: (customerId: string) => void;
+  onCreateQuote?: (customerId: string, contactId?: string) => void;
 }
 
 export default function CustomersReport({ initialSearchTerm, onCreateQuote }: CustomersReportProps = {}) {
@@ -82,6 +83,8 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
   const [artworkCustomerId, setArtworkCustomerId] = useState<string | null>(null);
   const [portalEnabled, setPortalEnabled] = useState(false);
   const [inkopsSubdomain, setInkopsSubdomain] = useState<string | null>(null);
+  const [showContactSelection, setShowContactSelection] = useState(false);
+  const [selectedCustomerForQuote, setSelectedCustomerForQuote] = useState<Customer | null>(null);
 
   useEffect(() => {
     loadCustomers();
@@ -340,6 +343,22 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
     }
   };
 
+  const handleCreateQuoteClick = async (customer: Customer) => {
+    if (!onCreateQuote) return;
+
+    // Always show contact selection modal
+    setSelectedCustomerForQuote(customer);
+    setShowContactSelection(true);
+  };
+
+  const handleContactSelected = (customerId: string, contactId?: string) => {
+    if (onCreateQuote) {
+      onCreateQuote(customerId, contactId);
+    }
+    setShowContactSelection(false);
+    setSelectedCustomerForQuote(null);
+  };
+
   const handleEditSuccess = () => {
     loadCustomers();
     if (selectedCustomer) {
@@ -529,7 +548,7 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onCreateQuote(customer.id);
+                        handleCreateQuoteClick(customer);
                       }}
                       className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors border border-blue-200 dark:border-blue-800"
                     >
@@ -853,6 +872,20 @@ export default function CustomersReport({ initialSearchTerm, onCreateQuote }: Cu
             setShowArtworkLibrary(false);
             setArtworkCustomerId(null);
           }}
+        />
+      )}
+
+      {/* Contact Selection Modal */}
+      {showContactSelection && selectedCustomerForQuote && (
+        <ContactSelectionModal
+          isOpen={showContactSelection}
+          onClose={() => {
+            setShowContactSelection(false);
+            setSelectedCustomerForQuote(null);
+          }}
+          customerId={selectedCustomerForQuote.id}
+          customerName={selectedCustomerForQuote.company_name}
+          onCreateQuote={handleContactSelected}
         />
       )}
     </div>

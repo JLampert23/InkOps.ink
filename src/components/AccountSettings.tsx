@@ -3,6 +3,7 @@ import { Building2, User, Shield, Save, Loader2, Plus, Trash2, Filter, Upload, C
 import { supabase } from '../lib/supabase-client';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
+import { useConfirmation } from '../contexts/ConfirmationContext';
 import { domainVerificationService } from '../services/domain-verification-service';
 import AutomatedReports from './automation/AutomatedReports';
 import WorkflowBuilder from './production/WorkflowBuilder';
@@ -150,7 +151,8 @@ interface AccountSettingsProps {
 
 export function AccountSettings({ initialTab, canAccessIntegrations = true }: AccountSettingsProps = {}) {
   const { user } = useAuth();
-  const { showNotification, confirm } = useNotification();
+  const { showNotification } = useNotification();
+  const { confirm, prompt } = useConfirmation();
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab || 'company-info');
   const [loading, setLoading] = useState(true);
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
@@ -161,15 +163,13 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
   const [productionExpanded, setProductionExpanded] = useState(false);
   const [accountingExpanded, setAccountingExpanded] = useState(false);
   const [companySettingsExpanded, setCompanySettingsExpanded] = useState(false);
-  const [communicationsExpanded, setCommunicationsExpanded] = useState(false);
   const [manageGoodsExpanded, setManageGoodsExpanded] = useState(false);
 
-  const collapseAllExcept = (section: 'integrations' | 'production' | 'accounting' | 'company' | 'communications' | 'manageGoods') => {
+  const collapseAllExcept = (section: 'integrations' | 'production' | 'accounting' | 'company' | 'manageGoods') => {
     if (section !== 'integrations') setIntegrationsExpanded(false);
     if (section !== 'production') setProductionExpanded(false);
     if (section !== 'accounting') setAccountingExpanded(false);
     if (section !== 'company') setCompanySettingsExpanded(false);
-    if (section !== 'communications') setCommunicationsExpanded(false);
     if (section !== 'manageGoods') setManageGoodsExpanded(false);
   };
 
@@ -1524,7 +1524,19 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
         return;
       }
 
-      const testPhone = prompt('Enter a phone number to send a test SMS (E.164 format, e.g., +14155551234):');
+      const testPhone = await prompt({
+        title: 'Test SMS',
+        message: 'Enter a phone number to send a test SMS',
+        placeholder: '+14155551234',
+        inputType: 'tel',
+        required: true,
+        validator: (value) => {
+          if (!value.startsWith('+')) {
+            return 'Phone number must be in E.164 format (e.g., +14155551234)';
+          }
+          return null;
+        },
+      });
       if (!testPhone) {
         setTwilioTestResult({
           success: false,
@@ -3958,6 +3970,42 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                   </div>
                   {activeTab === 'box-label' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
                 </button>
+
+                <button
+                  onClick={() => setActiveTab('email-templates')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'email-templates'
+                      ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                  style={{ animationDelay: '80ms' }}
+                >
+                  <Mail className={`w-4 h-4 flex-shrink-0 ${activeTab === 'email-templates' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'email-templates' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      Email Templates
+                    </div>
+                  </div>
+                  {activeTab === 'email-templates' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('urls')}
+                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    activeTab === 'urls'
+                      ? 'bg-blue-50 dark:bg-blue-600/20 text-blue-700 dark:text-blue-400 shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                  style={{ animationDelay: '100ms' }}
+                >
+                  <LinkIcon className={`w-4 h-4 flex-shrink-0 ${activeTab === 'urls' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
+                  <div className="flex-1 text-left">
+                    <div className={`font-medium text-sm ${activeTab === 'urls' ? 'text-blue-700 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      URLs
+                    </div>
+                  </div>
+                  {activeTab === 'urls' && <div className="w-1 h-6 bg-blue-600 dark:bg-blue-500 rounded-full absolute right-0" />}
+                </button>
               </div>
             )}
           </div>
@@ -4351,64 +4399,6 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
             )}
           </div>
 
-          {/* Communications Section - Collapsible */}
-          <div className="mb-2">
-            <button
-              onClick={() => { collapseAllExcept('communications'); setCommunicationsExpanded(!communicationsExpanded); }}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-slate-700/50"
-            >
-              <Mail className="w-4 h-4 flex-shrink-0 text-gray-600 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white" />
-              <div className="flex-1 text-left">
-                <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
-                  Communications
-                </div>
-              </div>
-              {communicationsExpanded ? (
-                <ChevronDown className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200" />
-              ) : (
-                <ChevronUp className="w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform duration-200 rotate-180" />
-              )}
-            </button>
-
-            {communicationsExpanded && (
-              <div className="mt-1 ml-2 space-y-1 collapsible-section collapsible-section-enter">
-                <button
-                  onClick={() => setActiveTab('email-templates')}
-                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
-                    activeTab === 'email-templates'
-                      ? 'bg-purple-50 dark:bg-purple-600/20 text-purple-700 dark:text-purple-400 shadow-sm'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                >
-                  <Mail className={`w-4 h-4 flex-shrink-0 ${activeTab === 'email-templates' ? 'text-purple-600 dark:text-purple-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
-                  <div className="flex-1 text-left">
-                    <div className={`font-medium text-sm ${activeTab === 'email-templates' ? 'text-purple-700 dark:text-purple-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                      Email Templates
-                    </div>
-                  </div>
-                  {activeTab === 'email-templates' && <div className="w-1 h-6 bg-purple-600 dark:bg-purple-500 rounded-full absolute right-0" />}
-                </button>
-
-                <button
-                  onClick={() => setActiveTab('urls')}
-                  className={`collapsible-item w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
-                    activeTab === 'urls'
-                      ? 'bg-purple-50 dark:bg-purple-600/20 text-purple-700 dark:text-purple-400 shadow-sm'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700/50 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                >
-                  <LinkIcon className={`w-4 h-4 flex-shrink-0 ${activeTab === 'urls' ? 'text-purple-600 dark:text-purple-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300'}`} />
-                  <div className="flex-1 text-left">
-                    <div className={`font-medium text-sm ${activeTab === 'urls' ? 'text-purple-700 dark:text-purple-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                      URLs
-                    </div>
-                  </div>
-                  {activeTab === 'urls' && <div className="w-1 h-6 bg-purple-600 dark:bg-purple-500 rounded-full absolute right-0" />}
-                </button>
-              </div>
-            )}
-          </div>
-
         </nav>
       </div>
 
@@ -4494,7 +4484,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
 
                 <div className="border-b border-gray-200 dark:border-slate-700 pb-6">
                   <h3 className="text-md font-semibold text-gray-800 dark:text-gray-100 mb-4">Company Branding</h3>
-                  <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                         Primary Logo
@@ -4504,7 +4494,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       </p>
                       {primaryLogoPreview ? (
                         <div className="space-y-3">
-                          <div className="w-64 h-48 border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-white dark:bg-slate-700 flex items-center justify-center p-4">
+                          <div className="w-full h-48 border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-white dark:bg-slate-700 flex items-center justify-center p-4">
                             <img
                               src={primaryLogoPreview}
                               alt="Primary logo"
@@ -4534,7 +4524,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           )}
                         </div>
                       ) : (
-                        <label className={`flex flex-col items-center justify-center gap-3 px-6 py-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg transition-colors ${isAdmin ? 'hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer' : 'bg-gray-50 dark:bg-slate-800 cursor-not-allowed'}`}>
+                        <label className={`flex flex-col items-center justify-center gap-3 px-6 py-8 h-48 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg transition-colors ${isAdmin ? 'hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer' : 'bg-gray-50 dark:bg-slate-800 cursor-not-allowed'}`}>
                           <Upload className="w-8 h-8 text-gray-400 dark:text-gray-500" />
                           <div className="text-center">
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -4565,7 +4555,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                       </p>
                       {secondaryLogoPreview ? (
                         <div className="space-y-3">
-                          <div className="w-64 h-48 border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-white dark:bg-slate-700 flex items-center justify-center p-4">
+                          <div className="w-full h-48 border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-white dark:bg-slate-700 flex items-center justify-center p-4">
                             <img
                               src={secondaryLogoPreview}
                               alt="Secondary logo"
@@ -4595,7 +4585,7 @@ export function AccountSettings({ initialTab, canAccessIntegrations = true }: Ac
                           )}
                         </div>
                       ) : (
-                        <label className={`flex flex-col items-center justify-center gap-3 px-6 py-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg transition-colors ${isAdmin ? 'hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer' : 'bg-gray-50 dark:bg-slate-800 cursor-not-allowed'}`}>
+                        <label className={`flex flex-col items-center justify-center gap-3 px-6 py-8 h-48 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg transition-colors ${isAdmin ? 'hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer' : 'bg-gray-50 dark:bg-slate-800 cursor-not-allowed'}`}>
                           <Upload className="w-8 h-8 text-gray-400 dark:text-gray-500" />
                           <div className="text-center">
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">

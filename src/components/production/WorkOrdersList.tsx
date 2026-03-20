@@ -6,22 +6,52 @@ import {
   Loader2,
   RefreshCw,
   Eye,
+  Trash2,
+  DollarSign,
 } from 'lucide-react';
-import { WorkOrderService, WorkOrderWithImprints } from '../../services/work-order-service';
+import { WorkOrderService, WorkOrderWithImprints, CustomInvoiceStatus } from '../../services/work-order-service';
+import { useConfirmation } from '../../contexts/ConfirmationContext';
+import { CustomInvoiceStatusService } from '../../services/custom-invoice-status-service';
+import { supabase } from '../../lib/supabase-client';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface WorkOrdersListProps {
   onSelectWorkOrder: (workOrderId: string) => void;
 }
 
 export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProps) {
+  const { confirm } = useConfirmation();
+  const { userProfile } = useAuth();
   const [workOrders, setWorkOrders] = useState<WorkOrderWithImprints[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [customInvoiceStatuses, setCustomInvoiceStatuses] = useState<CustomInvoiceStatus[]>([]);
+  const [invoiceStatusesMap, setInvoiceStatusesMap] = useState<Record<string, CustomInvoiceStatus>>({});
 
   useEffect(() => {
     loadWorkOrders();
-  }, []);
+    if (userProfile?.company_id) {
+      loadCustomInvoiceStatuses();
+    }
+  }, [userProfile?.company_id]);
+
+  const loadCustomInvoiceStatuses = async () => {
+    if (!userProfile?.company_id) return;
+
+    try {
+      const statuses = await CustomInvoiceStatusService.getCustomStatuses(userProfile.company_id);
+      setCustomInvoiceStatuses(statuses);
+
+      const statusMap: Record<string, CustomInvoiceStatus> = {};
+      statuses.forEach(status => {
+        statusMap[status.id] = status;
+      });
+      setInvoiceStatusesMap(statusMap);
+    } catch (error) {
+      console.error('Error loading custom invoice statuses:', error);
+    }
+  };
 
   const loadWorkOrders = async () => {
     setLoading(true);
@@ -34,6 +64,44 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
       console.error('Error loading work orders:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteWorkOrder = async (wo: WorkOrderWithImprints, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    const confirmed = await confirm({
+      title: 'Delete Work Order',
+      message: `Delete work order ${wo.work_order_number}?\n\nThis will permanently remove:\n• Work order details\n• All line items\n• Schedule entries\n• Production notes\n\nThis action cannot be undone.`,
+      confirmLabel: 'Delete Work Order',
+      confirmVariant: 'danger',
+    });
+
+    if (!confirmed) return;
+
+    try {
+      const { error } = await WorkOrderService.deleteWorkOrder(wo.id);
+
+      if (error) {
+        console.error('Error deleting work order:', error);
+        await confirm({
+          title: 'Delete Failed',
+          message: 'Failed to delete work order. Please try again.',
+          confirmLabel: 'OK',
+          showCancel: false,
+        });
+        return;
+      }
+
+      await loadWorkOrders();
+    } catch (error) {
+      console.error('Error deleting work order:', error);
+      await confirm({
+        title: 'Delete Failed',
+        message: 'Failed to delete work order. Please try again.',
+        confirmLabel: 'OK',
+        showCancel: false,
+      });
     }
   };
 
@@ -165,6 +233,9 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
                     Types of Work
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                    Invoice Status
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
                     Due Date
                   </th>
                   <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
@@ -215,6 +286,19 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
+                        {wo.custom_invoice_status_id && invoiceStatusesMap[wo.custom_invoice_status_id] ? (
+                          <span
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-white"
+                            style={{ backgroundColor: invoiceStatusesMap[wo.custom_invoice_status_id].color }}
+                          >
+                            <DollarSign className="w-3 h-3" />
+                            {invoiceStatusesMap[wo.custom_invoice_status_id].name}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-gray-400 dark:text-gray-500">--</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <span className={`text-sm ${overdue ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-gray-600 dark:text-gray-400'}`}>
                             {formatDate(wo.production_due_date)}
@@ -235,13 +319,20 @@ export default function WorkOrdersList({ onSelectWorkOrder }: WorkOrdersListProp
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => onSelectWorkOrder(wo.id)}
                             className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
                             title="View Details"
                           >
                             <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={(e) => handleDeleteWorkOrder(wo, e)}
+                            className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                            title="Delete Work Order"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>

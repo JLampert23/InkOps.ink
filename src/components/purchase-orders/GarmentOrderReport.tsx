@@ -696,18 +696,18 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Needed', value: stats.totalNeeded, color: 'text-white', icon: <Package className="w-8 h-8 text-blue-400" /> },
-          { label: 'On PO', value: stats.onPO, color: 'text-blue-400', icon: <FileText className="w-8 h-8 text-blue-400" /> },
-          { label: 'Received', value: stats.received, color: 'text-green-400', icon: <Package className="w-8 h-8 text-green-400" /> },
-          { label: 'Remaining to Order', value: stats.remaining, color: 'text-orange-400', icon: <AlertCircle className="w-8 h-8 text-orange-400" /> },
+          { label: 'Total Needed', value: stats.totalNeeded, color: 'text-gray-900 dark:text-white', icon: <Package className="w-8 h-8 text-blue-500 dark:text-blue-400" /> },
+          { label: 'On PO', value: stats.onPO, color: 'text-blue-600 dark:text-blue-400', icon: <FileText className="w-8 h-8 text-blue-500 dark:text-blue-400" /> },
+          { label: 'Received', value: stats.received, color: 'text-green-600 dark:text-green-400', icon: <Package className="w-8 h-8 text-green-500 dark:text-green-400" /> },
+          { label: 'Remaining to Order', value: stats.remaining, color: 'text-orange-600 dark:text-orange-400', icon: <AlertCircle className="w-8 h-8 text-orange-500 dark:text-orange-400" /> },
         ].map((stat) => (
           <div
             key={stat.label}
-            className="bg-slate-900 dark:bg-slate-900 rounded-lg border border-slate-700 p-4"
+            className="bg-white dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-700 p-4"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-400">{stat.label}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{stat.label}</p>
                 <p className={`text-2xl font-bold ${stat.color} mt-1`}>
                   {stat.value.toLocaleString()}
                 </p>
@@ -718,7 +718,7 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
         ))}
       </div>
 
-      <div className="bg-slate-900 dark:bg-slate-800 rounded-lg border border-slate-700 p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 p-4">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -727,12 +727,12 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
               placeholder="Search by style, product, or color..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-800 dark:bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-white placeholder-gray-400"
+              className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white placeholder-gray-400"
             />
           </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-800 dark:bg-slate-700 border border-slate-600 rounded-lg hover:bg-slate-700 dark:hover:bg-slate-600 text-white transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-700 dark:text-white transition-colors"
           >
             <Filter className="w-4 h-4" />
             Filters
@@ -741,13 +741,13 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
         </div>
 
         {showFilters && (
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-4 pt-4 border-t border-slate-700">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Group By</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Group By</label>
               <select
                 value={groupBy}
                 onChange={(e) => setGroupBy(e.target.value as any)}
-                className="w-full px-3 py-2 bg-slate-800 dark:bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-white"
+                className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
               >
                 <option value="style">Style</option>
                 <option value="vendor">Vendor</option>
@@ -756,11 +756,11 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Vendor</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Vendor</label>
               <select
                 value={selectedVendor}
                 onChange={(e) => setSelectedVendor(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-800 dark:bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-white"
+                className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
               >
                 <option value="all">All Vendors</option>
                 {vendors.map((v) => (
@@ -769,11 +769,11 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Customer</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Customer</label>
               <select
                 value={selectedCustomer}
                 onChange={(e) => setSelectedCustomer(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-800 dark:bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-white"
+                className="w-full px-3 py-2 bg-gray-50 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-white"
               >
                 <option value="all">All Customers</option>
                 {customers.map((c) => (
@@ -782,49 +782,49 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Options</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Options</label>
               <div className="space-y-2">
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     checked={hideFullyOnPO}
                     onChange={(e) => setHideFullyOnPO(e.target.checked)}
-                    className="rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-blue-500"
+                    className="rounded border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="text-sm text-gray-300">Hide items fully on PO</span>
+                  <span className="text-sm text-gray-700 dark:text-gray-300">Hide items fully on PO</span>
                 </label>
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     checked={showMissingOnly}
                     onChange={(e) => setShowMissingOnly(e.target.checked)}
-                    className="rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-blue-500"
+                    className="rounded border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="text-sm text-gray-300">Show missing items only</span>
+                  <span className="text-sm text-gray-700 dark:text-gray-300">Show missing items only</span>
                 </label>
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     checked={showReviewOnly}
                     onChange={(e) => setShowReviewOnly(e.target.checked)}
-                    className="rounded border-slate-600 bg-slate-700 text-orange-600 focus:ring-orange-500"
+                    className="rounded border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-orange-600 focus:ring-orange-500"
                   />
-                  <span className="text-sm text-orange-300 font-medium">Show items requiring review</span>
+                  <span className="text-sm text-orange-600 dark:text-orange-300 font-medium">Show items requiring review</span>
                 </label>
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     checked={showItemsOnPO}
                     onChange={(e) => setShowItemsOnPO(e.target.checked)}
-                    className="rounded border-slate-600 bg-slate-700 text-blue-600 focus:ring-blue-500"
+                    className="rounded border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="text-sm text-gray-300">Show items already on PO</span>
+                  <span className="text-sm text-gray-700 dark:text-gray-300">Show items already on PO</span>
                 </label>
               </div>
             </div>
             {(searchTerm || selectedVendor !== 'all' || selectedCustomer !== 'all' || showMissingOnly || showReviewOnly || showItemsOnPO) && (
               <div className="col-span-full">
-                <button onClick={clearFilters} className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300">
+                <button onClick={clearFilters} className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
                   <X className="w-4 h-4" />
                   Clear all filters
                 </button>
@@ -834,46 +834,46 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
         )}
       </div>
 
-      <div className="bg-slate-900 dark:bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-slate-950 dark:bg-slate-900 sticky top-0 z-10">
+            <thead className="bg-gray-50 dark:bg-slate-900 sticky top-0 z-10">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                   Style
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                   Color
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                   Work Order
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                   Vendor
                 </th>
                 {activeSizes.map((size) => (
                   <th
                     key={size}
-                    className="px-2 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider whitespace-nowrap"
+                    className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap"
                   >
                     {size}
                   </th>
                 ))}
-                <th className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                   Total
                 </th>
-                <th className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                   On PO
                 </th>
-                <th className="px-3 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                   Remaining
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider whitespace-nowrap">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700">
+            <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
               {filteredGarments.length === 0 ? (
                 <tr>
                   <td colSpan={activeSizes.length + 8} className="px-4 py-12 text-center">
@@ -901,15 +901,15 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
               ) : (
                 groupedData.map(([groupKey, items]) => (
                   <React.Fragment key={groupKey}>
-                    <tr className="bg-slate-800 dark:bg-slate-900">
+                    <tr className="bg-gray-100 dark:bg-slate-900">
                       <td colSpan={activeSizes.length + 8} className="px-4 py-2">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white">
                           {groupBy === 'style' && <Layers className="w-4 h-4" />}
                           {groupBy === 'vendor' && <ShoppingCart className="w-4 h-4" />}
                           {groupBy === 'customer' && <Users className="w-4 h-4" />}
                           {groupBy === 'job' && <FileText className="w-4 h-4" />}
                           <span>{groupKey}</span>
-                          <span className="text-xs text-gray-400">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
                             ({items.length} {items.length === 1 ? 'line' : 'lines'})
                           </span>
                         </div>
@@ -920,17 +920,17 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
                       return (
                         <tr
                           key={`${groupKey}-${index}`}
-                          className={`hover:bg-slate-800 dark:hover:bg-slate-700 transition-colors ${
+                          className={`hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors ${
                             garment.requires_review
-                              ? 'bg-orange-900/20 border-l-4 border-orange-500'
+                              ? 'bg-orange-50 dark:bg-orange-900/20 border-l-4 border-orange-500'
                               : garment.is_po_created
-                              ? 'bg-green-900/10 border-l-4 border-green-500'
+                              ? 'bg-green-50 dark:bg-green-900/10 border-l-4 border-green-500'
                               : hasRemaining
-                              ? 'bg-yellow-900/10'
+                              ? 'bg-yellow-50 dark:bg-yellow-900/10'
                               : ''
                           }`}
                         >
-                          <td className="px-4 py-3 text-sm font-medium text-white whitespace-nowrap">
+                          <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
                             <div className="flex items-center gap-2">
                               {garment.requires_review && (
                                 <AlertCircle
@@ -947,12 +947,12 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
                               <span>{garment.style_number}</span>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-300 whitespace-nowrap">
+                          <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
                             <div className="flex items-center gap-2">
                               <span>{garment.color}</span>
                               {garment.requires_review && (
                                 <span
-                                  className="text-xs text-orange-400 font-medium"
+                                  className="text-xs text-orange-600 dark:text-orange-400 font-medium"
                                   title={garment.change_reason}
                                 >
                                   (Review Required)
@@ -964,15 +964,15 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
                             {garment.jobs.length > 0 && garment.jobs[0].work_order_number ? (
                               <button
                                 onClick={() => onNavigate?.('work-orders', 'detail', garment.jobs[0].work_order_id)}
-                                className="text-blue-400 hover:text-blue-300 hover:underline font-medium"
+                                className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline font-medium"
                               >
                                 {garment.jobs[0].work_order_number}
                               </button>
                             ) : (
-                              <span className="text-gray-500">-</span>
+                              <span className="text-gray-400 dark:text-gray-500">-</span>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-300 whitespace-nowrap">
+                          <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
                             {garment.supplier}
                           </td>
                           {activeSizes.map((size) => {
@@ -984,25 +984,25 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
                                 className="px-2 py-3 text-center text-sm tabular-nums"
                               >
                                 {qty > 0 ? (
-                                  <span className="text-white font-medium">{qty}</span>
+                                  <span className="text-gray-900 dark:text-white font-medium">{qty}</span>
                                 ) : (
-                                  <span className="text-gray-600">-</span>
+                                  <span className="text-gray-400 dark:text-gray-600">-</span>
                                 )}
                               </td>
                             );
                           })}
-                          <td className="px-3 py-3 text-sm text-right font-semibold text-white tabular-nums whitespace-nowrap">
+                          <td className="px-3 py-3 text-sm text-right font-semibold text-gray-900 dark:text-white tabular-nums whitespace-nowrap">
                             {garment.total_needed}
                           </td>
-                          <td className="px-3 py-3 text-sm text-right text-blue-400 tabular-nums whitespace-nowrap">
+                          <td className="px-3 py-3 text-sm text-right text-blue-600 dark:text-blue-400 tabular-nums whitespace-nowrap">
                             {garment.total_on_po}
                           </td>
                           <td className="px-3 py-3 text-sm text-right tabular-nums whitespace-nowrap">
                             <span
                               className={`font-semibold ${
                                 garment.total_remaining === 0
-                                  ? 'text-gray-500'
-                                  : 'text-orange-400'
+                                  ? 'text-gray-400 dark:text-gray-500'
+                                  : 'text-orange-600 dark:text-orange-400'
                               }`}
                             >
                               {garment.total_remaining}
@@ -1013,7 +1013,7 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
                               {hasRemaining && (
                                 <button
                                   onClick={() => handleAddToPO(garment)}
-                                  className="flex items-center gap-1 px-3 py-1.5 text-sm text-green-400 hover:bg-green-900/30 rounded transition-colors font-medium"
+                                  className="flex items-center gap-1 px-3 py-1.5 text-sm text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 rounded transition-colors font-medium"
                                   title="Add remaining garments to a Purchase Order"
                                 >
                                   <Plus className="w-4 h-4" />
@@ -1025,7 +1025,7 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
                                   setSelectedGarment(garment);
                                   setShowDrillDown(true);
                                 }}
-                                className="flex items-center gap-1 px-3 py-1.5 text-sm text-blue-400 hover:bg-blue-900/30 rounded transition-colors"
+                                className="flex items-center gap-1 px-3 py-1.5 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors"
                               >
                                 <Eye className="w-4 h-4" />
                                 Details
@@ -1044,7 +1044,7 @@ export function GarmentOrderReport({ onCreatePO, onNavigate }: GarmentOrderRepor
       </div>
 
       {filteredGarments.length > 0 && (
-        <div className="text-sm text-gray-400">
+        <div className="text-sm text-gray-500 dark:text-gray-400">
           Showing {filteredGarments.length} garment lines
         </div>
       )}
@@ -1090,19 +1090,19 @@ function DrillDownModal({
   onNavigate?: (tab: string, view?: string, id?: string) => void;
 }) {
   return (
-    <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 rounded-lg max-w-5xl w-full max-h-[80vh] overflow-hidden border border-slate-700">
-        <div className="p-6 border-b border-slate-700">
+    <div className="fixed inset-0 bg-black/50 dark:bg-black/75 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-slate-900 rounded-lg max-w-5xl w-full max-h-[80vh] overflow-hidden border border-gray-200 dark:border-slate-700">
+        <div className="p-6 border-b border-gray-200 dark:border-slate-700">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-xl font-semibold text-white">Garment Details</h3>
-              <p className="text-sm text-gray-400 mt-1">
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Garment Details</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 {garment.style_number} - {garment.color} - {garment.supplier}
               </p>
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+              className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
             >
               <X className="w-5 h-5 text-gray-400" />
             </button>
@@ -1110,29 +1110,29 @@ function DrillDownModal({
         </div>
 
         <div className="p-6 overflow-y-auto max-h-[calc(80vh-140px)] space-y-6">
-          <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+          <div className="bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-slate-900">
+              <thead className="bg-gray-100 dark:bg-slate-900">
                 <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-400 uppercase">Size</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-400 uppercase">Needed</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-400 uppercase">On PO</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-400 uppercase">Received</th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-400 uppercase">Remaining</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Size</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Needed</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">On PO</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Received</th>
+                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Remaining</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700">
+              <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
                 {activeSizes
                   .filter((s) => garment.sizes[s])
                   .map((size) => {
                     const sd = garment.sizes[size];
                     return (
                       <tr key={size}>
-                        <td className="px-3 py-2 font-medium text-white">{size}</td>
-                        <td className="px-3 py-2 text-right text-white">{sd.needed}</td>
-                        <td className="px-3 py-2 text-right text-blue-400">{sd.on_po}</td>
-                        <td className="px-3 py-2 text-right text-green-400">{sd.received}</td>
-                        <td className={`px-3 py-2 text-right font-semibold ${sd.remaining > 0 ? 'text-orange-400' : 'text-gray-500'}`}>
+                        <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">{size}</td>
+                        <td className="px-3 py-2 text-right text-gray-900 dark:text-white">{sd.needed}</td>
+                        <td className="px-3 py-2 text-right text-blue-600 dark:text-blue-400">{sd.on_po}</td>
+                        <td className="px-3 py-2 text-right text-green-600 dark:text-green-400">{sd.received}</td>
+                        <td className={`px-3 py-2 text-right font-semibold ${sd.remaining > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-gray-400 dark:text-gray-500'}`}>
                           {sd.remaining}
                         </td>
                       </tr>
@@ -1144,29 +1144,29 @@ function DrillDownModal({
 
           <div className="grid grid-cols-2 gap-6">
             <div>
-              <h4 className="text-lg font-semibold text-white mb-4">
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                 Jobs Requiring This Garment
               </h4>
               <div className="space-y-3">
                 {garment.jobs.map((job, idx) => (
                   <div
                     key={idx}
-                    className="border border-slate-700 rounded-lg p-3 bg-slate-800"
+                    className="border border-gray-200 dark:border-slate-700 rounded-lg p-3 bg-gray-50 dark:bg-slate-800"
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
-                        <p className="font-medium text-white">{job.quote_number}</p>
-                        <p className="text-sm text-gray-400">{job.customer_name}</p>
+                        <p className="font-medium text-gray-900 dark:text-white">{job.quote_number}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{job.customer_name}</p>
                         {job.work_order_number && (
                           <button
                             onClick={() => onNavigate?.('work-orders', 'detail', job.work_order_id)}
-                            className="text-sm text-blue-400 hover:text-blue-300 hover:underline mt-1"
+                            className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline mt-1"
                           >
                             WO: {job.work_order_number}
                           </button>
                         )}
                       </div>
-                      <span className="px-2 py-1 bg-blue-900/40 text-blue-400 text-xs font-medium rounded">
+                      <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400 text-xs font-medium rounded">
                         {job.quantity} units
                       </span>
                     </div>
@@ -1176,29 +1176,29 @@ function DrillDownModal({
             </div>
 
             <div>
-              <h4 className="text-lg font-semibold text-white mb-4">
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                 Purchase Orders
               </h4>
               {garment.pos.length === 0 ? (
-                <div className="border border-slate-700 rounded-lg p-6 text-center bg-slate-800">
-                  <Package className="w-8 h-8 mx-auto mb-2 text-gray-500" />
-                  <p className="text-sm text-gray-400">No purchase orders yet</p>
+                <div className="border border-gray-200 dark:border-slate-700 rounded-lg p-6 text-center bg-gray-50 dark:bg-slate-800">
+                  <Package className="w-8 h-8 mx-auto mb-2 text-gray-400 dark:text-gray-500" />
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No purchase orders yet</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {garment.pos.map((po, idx) => (
                     <div
                       key={idx}
-                      className="border border-slate-700 rounded-lg p-3 bg-slate-800"
+                      className="border border-gray-200 dark:border-slate-700 rounded-lg p-3 bg-gray-50 dark:bg-slate-800"
                     >
                       <div className="flex justify-between items-start mb-2">
                         <div className="flex-1">
-                          <p className="font-medium text-white">{po.po_number}</p>
-                          <p className="text-sm text-gray-400">
+                          <p className="font-medium text-gray-900 dark:text-white">{po.po_number}</p>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
                             {po.vendor_name} &middot; Size {po.size}
                           </p>
                           {po.work_order_number && (
-                            <p className="text-xs text-blue-400 mt-1">
+                            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
                               WO: {po.work_order_number}
                             </p>
                           )}
@@ -1206,7 +1206,7 @@ function DrillDownModal({
                         {po.work_order_id && po.work_order_number && (
                           <button
                             onClick={() => onNavigate?.('work-orders', 'detail', po.work_order_id)}
-                            className="flex items-center gap-1 px-2 py-1 text-xs text-blue-400 hover:bg-blue-900/30 rounded transition-colors"
+                            className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors"
                           >
                             <Eye className="w-3 h-3" />
                             View
@@ -1215,12 +1215,12 @@ function DrillDownModal({
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         <div>
-                          <span className="text-gray-400">Ordered:</span>
-                          <span className="ml-2 font-medium text-white">{po.quantity_ordered}</span>
+                          <span className="text-gray-500 dark:text-gray-400">Ordered:</span>
+                          <span className="ml-2 font-medium text-gray-900 dark:text-white">{po.quantity_ordered}</span>
                         </div>
                         <div>
-                          <span className="text-gray-400">Received:</span>
-                          <span className="ml-2 font-medium text-green-400">{po.quantity_received}</span>
+                          <span className="text-gray-500 dark:text-gray-400">Received:</span>
+                          <span className="ml-2 font-medium text-green-600 dark:text-green-400">{po.quantity_received}</span>
                         </div>
                       </div>
                     </div>
@@ -1230,29 +1230,29 @@ function DrillDownModal({
             </div>
           </div>
 
-          <div className="pt-6 border-t border-slate-700">
+          <div className="pt-6 border-t border-gray-200 dark:border-slate-700">
             <div className="grid grid-cols-4 gap-4 text-center">
               <div>
-                <p className="text-sm text-gray-400">Total Needed</p>
-                <p className="text-2xl font-bold text-white mt-1">
+                <p className="text-sm text-gray-500 dark:text-gray-400">Total Needed</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
                   {garment.total_needed}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-gray-400">On PO</p>
-                <p className="text-2xl font-bold text-blue-400 mt-1">
+                <p className="text-sm text-gray-500 dark:text-gray-400">On PO</p>
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">
                   {garment.total_on_po}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-gray-400">Received</p>
-                <p className="text-2xl font-bold text-green-400 mt-1">
+                <p className="text-sm text-gray-500 dark:text-gray-400">Received</p>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
                   {garment.total_received}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-gray-400">Remaining</p>
-                <p className="text-2xl font-bold text-orange-400 mt-1">
+                <p className="text-sm text-gray-500 dark:text-gray-400">Remaining</p>
+                <p className="text-2xl font-bold text-orange-600 dark:text-orange-400 mt-1">
                   {garment.total_remaining}
                 </p>
               </div>
@@ -1260,7 +1260,7 @@ function DrillDownModal({
           </div>
         </div>
 
-        <div className="p-6 border-t border-slate-700 flex gap-3 justify-end">
+        <div className="p-6 border-t border-gray-200 dark:border-slate-700 flex gap-3 justify-end">
           {garment.total_remaining > 0 && (
             <button
               onClick={onAddToPO}
@@ -1272,7 +1272,7 @@ function DrillDownModal({
           )}
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors"
+            className="px-4 py-2 bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-slate-600 transition-colors"
           >
             Close
           </button>

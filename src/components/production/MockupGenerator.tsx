@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase-client';
 import { proxySanMarImageUrl } from '../../utils/sanmar-image-proxy';
+import { sanitizeImageUrl, isPlaceholderUrl } from '../../utils/image-validator';
 import {
   X,
   Upload,
@@ -527,8 +528,9 @@ export default function MockupGenerator({
           setGarmentStyles(styles);
 
           // Set the initial garment image from the first item
-          if (lineItems[0].garment_front_image_url) {
-            setGarmentImageUrl(proxySanMarImageUrl(lineItems[0].garment_front_image_url));
+          const sanitizedUrl = sanitizeImageUrl(lineItems[0].garment_front_image_url);
+          if (sanitizedUrl) {
+            setGarmentImageUrl(proxySanMarImageUrl(sanitizedUrl));
             setGarmentDescription(lineItems[0].description || '');
           }
         }
@@ -768,8 +770,9 @@ export default function MockupGenerator({
               .eq('id', lineItemId)
               .maybeSingle();
 
-            if (lineItemData && lineItemData.garment_front_image_url) {
-              setGarmentImageUrl(lineItemData.garment_front_image_url);
+            const sanitizedUrl = sanitizeImageUrl(lineItemData?.garment_front_image_url);
+            if (sanitizedUrl) {
+              setGarmentImageUrl(sanitizedUrl);
             } else {
               await fetchGarmentImage();
             }
@@ -786,9 +789,10 @@ export default function MockupGenerator({
             .eq('id', lineItemId)
             .maybeSingle();
 
-          if (lineItemData && lineItemData.garment_front_image_url) {
+          const sanitizedUrl = sanitizeImageUrl(lineItemData?.garment_front_image_url);
+          if (sanitizedUrl) {
             // Use stored garment images
-            setGarmentImageUrl(lineItemData.garment_front_image_url);
+            setGarmentImageUrl(sanitizedUrl);
             setGarmentBrand('');
             setGarmentDescription(lineItemData.description || '');
           } else {
@@ -860,6 +864,18 @@ export default function MockupGenerator({
     }
 
     try {
+      // Get supplier_partid from line item if available for more accurate matching
+      let supplierPartId: string | null = null;
+      if (lineItemId && lineItemId.trim()) {
+        const { data: lineItemData } = await supabase
+          .from('quote_line_items')
+          .select('supplier_partid')
+          .eq('id', lineItemId)
+          .maybeSingle();
+
+        supplierPartId = lineItemData?.supplier_partid || null;
+        console.log('MockupGenerator: Found supplier_partid:', supplierPartId);
+      }
 
       // Try to refresh session first to ensure we have a valid token
       const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
@@ -892,35 +908,67 @@ export default function MockupGenerator({
         if (data.results && data.results.length > 0) {
           const product = data.results[0];
 
-          // Find matching color or use first color
+          // Find matching color using partId first, then color name
           let matchingColor = null;
           if (product.colors && product.colors.length > 0) {
-            if (garmentColor) {
-              // Try to find matching color
+            // PRIORITY 1: Match by partId if we have one
+            if (supplierPartId) {
+              matchingColor = product.colors.find((c: any) =>
+                c.partIds?.includes(supplierPartId) || c.code === supplierPartId
+              );
+              if (matchingColor) {
+                console.log('MockupGenerator: Matched by partId:', supplierPartId);
+              }
+            }
+
+            // PRIORITY 2: Match by color name
+            if (!matchingColor && garmentColor) {
               matchingColor = product.colors.find((c: any) =>
                 c.name?.toLowerCase().includes(garmentColor.toLowerCase()) ||
                 garmentColor.toLowerCase().includes(c.name?.toLowerCase())
               );
+              if (matchingColor) {
+                console.log('MockupGenerator: Matched by color name:', garmentColor);
+              }
             }
-            // Fall back to first color if no match
+
+            // PRIORITY 3: Fall back to first color
             if (!matchingColor) {
               matchingColor = product.colors[0];
+              console.log('MockupGenerator: Using first color as fallback');
             }
           }
 
-          if (matchingColor?.image_url) {
-            setGarmentImageUrl(matchingColor.image_url);
+          const sanitizedUrl = sanitizeImageUrl(matchingColor?.image_url);
+          if (sanitizedUrl) {
+            setGarmentImageUrl(sanitizedUrl);
             setGarmentBrand(product.brand || product.supplier);
             setGarmentDescription(product.description);
 
-            // Save the fetched image to the database for future use
+            // Save the fetched images to the database for future use
             if (lineItemId && lineItemId.trim()) {
+              const updateData: any = {
+                garment_front_image_url: matchingColor.image_url,
+                brand: product.brand || null,
+              };
+
+              // Also save rear and side images if available
+              if (matchingColor.rear_image_url) {
+                updateData.garment_rear_image_url = matchingColor.rear_image_url;
+              }
+              if (matchingColor.side_image_url) {
+                updateData.garment_side_image_url = matchingColor.side_image_url;
+              }
+
+              // Save the partId for future accurate image matching
+              if (matchingColor.partIds && matchingColor.partIds.length > 0 && !supplierPartId) {
+                updateData.supplier_partid = matchingColor.partIds[0];
+                console.log('MockupGenerator: Saving supplier_partid:', matchingColor.partIds[0]);
+              }
+
               await supabase
                 .from('quote_line_items')
-                .update({
-                  garment_front_image_url: matchingColor.image_url,
-                  brand: product.brand || null,
-                })
+                .update(updateData)
                 .eq('id', lineItemId);
             }
 
@@ -1961,7 +2009,7 @@ export default function MockupGenerator({
             )}
             {selectedImprintId && imprints.find(i => i.id === selectedImprintId) && (
               <span className="text-xs px-2 py-1 bg-blue-600 text-white rounded font-mono">
-                #{imprints.find(i => i.id === selectedImprintId)?.imprint_number}
+                #{imprints.find(i => i.id === selectedImprintId)?.imprint_number?.replace(/^QTE-/, '')}
               </span>
             )}
           </div>
@@ -2061,7 +2109,7 @@ export default function MockupGenerator({
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-2">
                               <div className="flex-shrink-0 px-3 py-1 flex items-center justify-center bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-sm font-bold">
-                                {imprint.imprint_number || `#${index + 1}`}
+                                {(imprint.imprint_number || `#${index + 1}`).replace(/^QTE-/, '')}
                               </div>
                             </div>
                             <div className="text-xs font-medium text-gray-900 dark:text-white mb-1">
@@ -2346,8 +2394,9 @@ export default function MockupGenerator({
                           className="p-2 cursor-pointer"
                           onClick={() => {
                             setActiveGarmentIndex(index);
-                            if (garmentStyle.frontImage) {
-                              setGarmentImageUrl(proxySanMarImageUrl(garmentStyle.frontImage));
+                            const sanitizedUrl = sanitizeImageUrl(garmentStyle.frontImage);
+                            if (sanitizedUrl) {
+                              setGarmentImageUrl(proxySanMarImageUrl(sanitizedUrl));
                               setGarmentDescription(garmentStyle.description);
                             }
                           }}
@@ -2378,19 +2427,23 @@ export default function MockupGenerator({
                                 let lifestyleImages = [...(imagesData.lifestyleImages || [])];
                                 let otherImages = [...(imagesData.otherImages || [])];
 
-                                // Fallback to single URLs if no organized data - but only push valid URLs
+                                // Fallback to single URLs if no organized data - but only push valid, non-placeholder URLs
                                 if (frontImages.length === 0 && rearImages.length === 0 && sideImages.length === 0 && lifestyleImages.length === 0) {
-                                  if (garmentStyle.frontImage && garmentStyle.frontImage.trim()) {
-                                    frontImages.push(garmentStyle.frontImage);
+                                  const sanitizedFront = sanitizeImageUrl(garmentStyle.frontImage);
+                                  if (sanitizedFront) {
+                                    frontImages.push(sanitizedFront);
                                   }
-                                  if (garmentStyle.rearImage && garmentStyle.rearImage.trim()) {
-                                    rearImages.push(garmentStyle.rearImage);
+                                  const sanitizedRear = sanitizeImageUrl(garmentStyle.rearImage);
+                                  if (sanitizedRear) {
+                                    rearImages.push(sanitizedRear);
                                   }
-                                  if (garmentStyle.sideImage && garmentStyle.sideImage.trim()) {
-                                    sideImages.push(garmentStyle.sideImage);
+                                  const sanitizedSide = sanitizeImageUrl(garmentStyle.sideImage);
+                                  if (sanitizedSide) {
+                                    sideImages.push(sanitizedSide);
                                   }
-                                  if (garmentStyle.lifestyleImage && garmentStyle.lifestyleImage.trim()) {
-                                    lifestyleImages.push(garmentStyle.lifestyleImage);
+                                  const sanitizedLifestyle = sanitizeImageUrl(garmentStyle.lifestyleImage);
+                                  if (sanitizedLifestyle) {
+                                    lifestyleImages.push(sanitizedLifestyle);
                                   }
                                 }
 
@@ -2435,7 +2488,10 @@ export default function MockupGenerator({
                                         key={idx}
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          setGarmentImageUrl(imageUrl);
+                                          const sanitizedUrl = sanitizeImageUrl(imageUrl);
+                                          if (sanitizedUrl) {
+                                            setGarmentImageUrl(sanitizedUrl);
+                                          }
                                         }}
                                         className={`relative w-14 h-14 rounded border overflow-hidden transition-all hover:scale-105 flex-shrink-0 ${
                                           garmentImageUrl === imageUrl

@@ -8,7 +8,8 @@ export type TriggerType =
   | 'task_status_changed'
   | 'quote_approved'
   | 'artwork_uploaded'
-  | 'customer_created';
+  | 'customer_created'
+  | 'work_order_invoice_status_changed';
 
 export type ConditionOperator = 'equals' | 'not_equals' | 'greater_than' | 'less_than' | 'contains' | 'not_contains' | 'within_days';
 
@@ -20,7 +21,10 @@ export type ConditionField =
   | 'task_type'
   | 'customer_email'
   | 'order_total'
-  | 'decoration_type';
+  | 'decoration_type'
+  | 'work_order_invoice_status'
+  | 'work_order_status'
+  | 'work_order_priority';
 
 export type ActionType =
   | 'send_email'

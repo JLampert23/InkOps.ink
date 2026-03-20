@@ -199,7 +199,7 @@ export function SchedulerWorkflowBoard() {
                     </div>
                     {task.imprint_number && (
                       <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
-                        #{task.imprint_number}
+                        #{task.imprint_number.replace(/^QTE-/, '')}
                       </span>
                     )}
                   </div>
@@ -307,7 +307,7 @@ export function SchedulerWorkflowBoard() {
                     Imprint Number
                   </label>
                   <p className="text-gray-900">
-                    #{selectedTask.imprint_number}
+                    #{selectedTask.imprint_number.replace(/^QTE-/, '')}
                   </p>
                 </div>
               )}

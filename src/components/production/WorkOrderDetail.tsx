@@ -9,12 +9,17 @@ import {
   Tag,
   Printer,
   Download,
+  Trash2,
+  DollarSign,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { WorkOrderService, WorkOrderLineItem } from '../../services/work-order-service';
+import { WorkOrderService, WorkOrderLineItem, CustomInvoiceStatus } from '../../services/work-order-service';
 import { LabelPreviewModal, LabelData } from './LabelPreviewModal';
 import { BoxLabelConfig } from './BoxLabel';
 import { generateWorkOrderPDF, WorkOrderPDFData } from '../../utils/work-order-pdf-export';
+import { useConfirmation } from '../../contexts/ConfirmationContext';
+import { CustomInvoiceStatusService } from '../../services/custom-invoice-status-service';
+import { useNotification } from '../../contexts/NotificationContext';
 
 function decodeHtmlEntities(text: string): string {
   if (!text) return text;
@@ -110,6 +115,7 @@ interface WorkOrderRecord {
   assigned_to: string | null;
   total_quantity: number;
   notes: string | null;
+  custom_invoice_status_id: string | null;
   created_at: string;
 }
 
@@ -128,6 +134,8 @@ const getSizeValues = (item: QuoteLineItem) => [
 ];
 
 export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
+  const { confirm } = useConfirmation();
+  const { addNotification } = useNotification();
   const [workOrder, setWorkOrder] = useState<WorkOrderRecord | null>(null);
   const [quote, setQuote] = useState<QuoteData | null>(null);
   const [quoteLineItems, setQuoteLineItems] = useState<QuoteLineItem[]>([]);
@@ -140,11 +148,23 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
   const [boxLabelConfig, setBoxLabelConfig] = useState<BoxLabelConfig | undefined>(undefined);
   const [downloading, setDownloading] = useState(false);
   const [companySettings, setCompanySettings] = useState<any>(null);
+  const [customInvoiceStatuses, setCustomInvoiceStatuses] = useState<CustomInvoiceStatus[]>([]);
+  const [selectedInvoiceStatus, setSelectedInvoiceStatus] = useState<string | null>(null);
+  const [updatingInvoiceStatus, setUpdatingInvoiceStatus] = useState(false);
 
   useEffect(() => {
     loadData();
     loadBoxLabelSettings();
   }, [workOrderId]);
+
+  const loadCustomInvoiceStatuses = async (companyId: string) => {
+    try {
+      const statuses = await CustomInvoiceStatusService.getCustomStatuses(companyId);
+      setCustomInvoiceStatuses(statuses);
+    } catch (error) {
+      console.error('Error loading custom invoice statuses:', error);
+    }
+  };
 
   const loadCompanySettings = async (companyId: string) => {
     try {
@@ -189,9 +209,11 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
         return;
       }
       setWorkOrder(woData);
+      setSelectedInvoiceStatus(woData.custom_invoice_status_id || null);
 
       if (woData.company_id) {
         loadCompanySettings(woData.company_id);
+        loadCustomInvoiceStatuses(woData.company_id);
       }
 
       const { data: woItems } = await supabase
@@ -291,7 +313,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           box_label_show_due_date,
           box_label_show_imprint_types,
           box_label_show_job_nickname,
-          box_label_show_qr_code,
+          box_label_layout,
           company_logo_primary_url,
           company_logo_secondary_url
         `)
@@ -303,6 +325,11 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           ? settings.company_logo_secondary_url
           : settings.company_logo_primary_url;
 
+        const layoutRaw = settings.box_label_layout;
+        const savedLayout = Array.isArray(layoutRaw) && layoutRaw.length > 0
+          ? layoutRaw.filter((el: { id: string }) => el.id !== 'qr_code')
+          : undefined;
+
         setBoxLabelConfig({
           logoUrl,
           showWorkOrderNumber: settings.box_label_show_work_order_number ?? true,
@@ -310,7 +337,7 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           showJobNickname: settings.box_label_show_job_nickname ?? true,
           showDueDate: settings.box_label_show_due_date ?? true,
           showImprintTypes: settings.box_label_show_imprint_types ?? true,
-          showQrCode: settings.box_label_show_qr_code ?? true,
+          layout: savedLayout,
         });
       }
     } catch (error) {
@@ -325,6 +352,73 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
       await WorkOrderService.completeLineItem(woLineItem.id);
     }
     await loadData();
+  };
+
+  const handleInvoiceStatusChange = async (statusId: string | null) => {
+    if (!workOrder) return;
+
+    setUpdatingInvoiceStatus(true);
+    try {
+      const { error } = await WorkOrderService.updateWorkOrderInvoiceStatus(
+        workOrder.id,
+        statusId || null
+      );
+
+      if (error) {
+        console.error('Error updating invoice status:', error);
+        addNotification('error', 'Failed to update invoice status');
+        return;
+      }
+
+      setSelectedInvoiceStatus(statusId);
+      const statusName = statusId
+        ? customInvoiceStatuses.find(s => s.id === statusId)?.name || 'Unknown'
+        : 'None';
+      addNotification('success', `Invoice status updated to: ${statusName}`);
+    } catch (error) {
+      console.error('Error updating invoice status:', error);
+      addNotification('error', 'Failed to update invoice status');
+    } finally {
+      setUpdatingInvoiceStatus(false);
+    }
+  };
+
+  const handleDeleteWorkOrder = async () => {
+    if (!workOrder) return;
+
+    const confirmed = await confirm({
+      title: 'Delete Work Order',
+      message: `Delete work order ${workOrder.work_order_number}?\n\nThis will permanently remove:\n• Work order details\n• All line items\n• Schedule entries\n• Production notes\n\nThis action cannot be undone.`,
+      confirmLabel: 'Delete Work Order',
+      confirmVariant: 'danger',
+    });
+
+    if (!confirmed) return;
+
+    try {
+      const { error } = await WorkOrderService.deleteWorkOrder(workOrder.id);
+
+      if (error) {
+        console.error('Error deleting work order:', error);
+        await confirm({
+          title: 'Delete Failed',
+          message: 'Failed to delete work order. Please try again.',
+          confirmLabel: 'OK',
+          showCancel: false,
+        });
+        return;
+      }
+
+      onBack();
+    } catch (error) {
+      console.error('Error deleting work order:', error);
+      await confirm({
+        title: 'Delete Failed',
+        message: 'Failed to delete work order. Please try again.',
+        confirmLabel: 'OK',
+        showCancel: false,
+      });
+    }
   };
 
   const handleDownloadPDF = async () => {
@@ -516,6 +610,14 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
             <Printer className="w-3 h-3" />
             Print Box Label
           </button>
+          <button
+            onClick={handleDeleteWorkOrder}
+            className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+            title="Delete Work Order"
+          >
+            <Trash2 className="w-3 h-3" />
+            Delete
+          </button>
         </div>
       </div>
 
@@ -536,7 +638,14 @@ export function WorkOrderDetail({ workOrderId, onBack }: WorkOrderDetailProps) {
           <div className="grid grid-cols-3 gap-6 p-8 border-b border-gray-300 dark:border-slate-600">
             <CustomerBillingSection quote={quote} />
             <CustomerShippingSection quote={quote} />
-            <WorkOrderDetailsSection workOrder={workOrder} quote={quote} />
+            <WorkOrderDetailsSection
+              workOrder={workOrder}
+              quote={quote}
+              customInvoiceStatuses={customInvoiceStatuses}
+              selectedInvoiceStatus={selectedInvoiceStatus}
+              onInvoiceStatusChange={handleInvoiceStatusChange}
+              updatingInvoiceStatus={updatingInvoiceStatus}
+            />
           </div>
         ) : (
           <div className="p-8 border-b border-gray-300 dark:border-slate-600">
@@ -722,7 +831,23 @@ function CustomerShippingSection({ quote }: { quote: QuoteData }) {
   );
 }
 
-function WorkOrderDetailsSection({ workOrder, quote }: { workOrder: WorkOrderRecord; quote: QuoteData }) {
+function WorkOrderDetailsSection({
+  workOrder,
+  quote,
+  customInvoiceStatuses,
+  selectedInvoiceStatus,
+  onInvoiceStatusChange,
+  updatingInvoiceStatus
+}: {
+  workOrder: WorkOrderRecord;
+  quote: QuoteData;
+  customInvoiceStatuses: CustomInvoiceStatus[];
+  selectedInvoiceStatus: string | null;
+  onInvoiceStatusChange: (statusId: string | null) => void;
+  updatingInvoiceStatus: boolean;
+}) {
+  const currentStatus = customInvoiceStatuses.find(s => s.id === selectedInvoiceStatus);
+
   return (
     <div>
       <h3 className="font-bold text-gray-900 dark:text-white mb-3 text-sm">Work Order Details</h3>
@@ -742,6 +867,61 @@ function WorkOrderDetailsSection({ workOrder, quote }: { workOrder: WorkOrderRec
         {quote.terms && (
           <div><span className="text-gray-600 dark:text-gray-400">Terms: </span><span className="text-gray-900 dark:text-white font-medium">{quote.terms}</span></div>
         )}
+
+        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-slate-600">
+          <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-1.5">
+            <DollarSign className="w-4 h-4" />
+            <span>Invoice Status</span>
+          </label>
+
+          {updatingInvoiceStatus ? (
+            <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400 mb-3">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-sm">Updating...</span>
+            </div>
+          ) : currentStatus ? (
+            <div className="flex items-center gap-2 mb-3">
+              <span
+                className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium text-white"
+                style={{ backgroundColor: currentStatus.color }}
+              >
+                {currentStatus.name}
+                {currentStatus.category && (
+                  <span className="ml-2 text-xs opacity-80">({currentStatus.category})</span>
+                )}
+              </span>
+              <button
+                onClick={() => onInvoiceStatusChange(null)}
+                className="text-xs text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 underline"
+              >
+                Clear
+              </button>
+            </div>
+          ) : (
+            <div className="text-gray-500 dark:text-gray-400 text-sm mb-3">No invoice status set</div>
+          )}
+
+          {customInvoiceStatuses.length > 0 ? (
+            <select
+              value={selectedInvoiceStatus || ''}
+              onChange={(e) => onInvoiceStatusChange(e.target.value || null)}
+              disabled={updatingInvoiceStatus}
+              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <option value="">-- Select Invoice Status --</option>
+              {customInvoiceStatuses.map((status) => (
+                <option key={status.id} value={status.id}>
+                  {status.name}
+                  {status.category ? ` (${status.category})` : ''}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className="text-sm text-gray-500 dark:text-gray-400 italic bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700 rounded-lg p-3">
+              No custom invoice statuses available. Create them in Settings → Custom Invoice Statuses.
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -770,7 +950,7 @@ function GroupImprintsSection({ groupLabel, itemGroups, quoteImprints, quoteNumb
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {grpImprints.map((imprint, idx) => {
         const hasMockups = imprint.mockups && imprint.mockups.length > 0;
-        const label = imprint.imprint_number || `${quoteNumber}-${String(idx + 1).padStart(2, '0')}`;
+        const label = (imprint.imprint_number || `${quoteNumber}-${String(idx + 1).padStart(2, '0')}`).replace(/^QTE-/, '');
         return (
           <div key={imprint.id} className="bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2 flex-wrap">

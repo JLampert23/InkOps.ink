@@ -1,33 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase-client';
-import {
-  ArrowLeft,
-  Send,
-  CheckCircle,
-  Truck,
-  Package,
-  XCircle,
-  Download,
-  Loader2,
-  Building2,
-  Calendar,
-  DollarSign,
-  FileText,
-  Clock,
-  User,
-  Upload,
-  File,
-  X,
-  Printer,
-  Edit,
-  Plus,
-  Eye,
-} from 'lucide-react';
+import { ArrowLeft, Send, CheckCircle, Truck, Package, XCircle, Download, Loader2, Building2, Calendar, DollarSign, FileText, Clock, User, Upload, File, X, Printer, CreditCard as Edit, Plus, Eye, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { POSettingsService } from '../../services/po-settings-service';
 import { POValidationModal } from './POValidationModal';
 import { generatePurchaseOrderPDF } from '../../utils/po-pdf-export';
 import { ProductSearchModal } from './ProductSearchModal';
+import { POAutoCreationService } from '../../services/po-auto-creation-service';
+import { useConfirmation } from '../../contexts/ConfirmationContext';
 
 interface PurchaseOrder {
   id: string;
@@ -111,6 +91,7 @@ interface PurchaseOrderDetailProps {
 }
 
 export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods, onNavigateToWorkOrder }: PurchaseOrderDetailProps) {
+  const { confirm } = useConfirmation();
   const [po, setPo] = useState<PurchaseOrder | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -359,6 +340,115 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods, onNavigateTo
     return profile?.company_id || null;
   };
 
+  const handleDeleteLineItem = async (styleNumber: string | null, color: string | null) => {
+    if (!po) return;
+
+    if (po.status !== 'draft') {
+      alert('Cannot delete line items from a PO that has been sent. Only draft POs can be modified.');
+      return;
+    }
+
+    const itemsToDelete = lineItems.filter(
+      item => (item.style_number || item.product_name) === styleNumber && item.color === color
+    );
+
+    if (itemsToDelete.length === 0) return;
+
+    const totalQty = itemsToDelete.reduce((sum, item) => sum + item.quantity_ordered, 0);
+    const productName = itemsToDelete[0].product_name;
+
+    const confirmed = await confirm({
+      title: `Delete ${styleNumber || productName} - ${color}?`,
+      message: `This will remove ${totalQty} units across ${itemsToDelete.length} size(s).\n\nThis action cannot be undone.`,
+      confirmLabel: 'Delete Line Item',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    });
+
+    if (!confirmed) return;
+
+    try {
+      setUpdating(true);
+
+      const lineItemIds = itemsToDelete.map(item => item.id);
+
+      const { error: deleteError } = await supabase
+        .from('purchase_order_line_items')
+        .delete()
+        .in('id', lineItemIds);
+
+      if (deleteError) throw deleteError;
+
+      const remainingItems = lineItems.filter(item => !lineItemIds.includes(item.id));
+      const newSubtotal = remainingItems.reduce((sum, item) => sum + item.extended_cost, 0);
+      const newTotal = newSubtotal + (po.tax_amount || 0) + (po.shipping_cost || 0);
+
+      await supabase
+        .from('purchase_orders')
+        .update({
+          subtotal: newSubtotal,
+          total_cost: newTotal,
+        })
+        .eq('id', po.id);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from('purchase_order_activity_log').insert([
+        {
+          company_id: await getUserCompanyId(),
+          po_id: po.id,
+          action: 'line_item_deleted',
+          performed_by: user?.id,
+          performed_by_name: user?.email || 'Unknown',
+          notes: `Deleted ${styleNumber || productName} - ${color} (${totalQty} units)`,
+        },
+      ]);
+
+      alert(`Successfully deleted ${styleNumber || productName} - ${color}`);
+      loadPurchaseOrder();
+    } catch (error) {
+      console.error('Error deleting line item:', error);
+      alert('Failed to delete line item');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleDeletePO = async () => {
+    if (!po) return;
+
+    const validation = await POSettingsService.canDeletePO({ status: po.status });
+
+    if (!validation.allowed) {
+      alert(validation.reason || 'This purchase order cannot be deleted.');
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: `Delete ${po.po_number}?`,
+      message: `This will permanently remove:\n- PO details\n- All line items (${po.vendor.vendor_name})\n- Attachments\n- Activity log\n- Receiving records\n\nGarment requirements will be unlinked (not deleted).\n\nThis action cannot be undone.`,
+      confirmLabel: 'Delete PO',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    });
+
+    if (!confirmed) return;
+
+    try {
+      const { error } = await POAutoCreationService.deletePurchaseOrder(po.id);
+
+      if (error) {
+        console.error('Error deleting purchase order:', error);
+        alert('Failed to delete purchase order. Please try again.');
+        return;
+      }
+
+      onBack();
+    } catch (error) {
+      console.error('Error deleting purchase order:', error);
+      alert('Failed to delete purchase order. Please try again.');
+    }
+  };
+
   const handleEditClick = async () => {
     if (!po) return;
 
@@ -461,7 +551,15 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods, onNavigateTo
   };
 
   const handleDeleteAttachment = async (attachment: Attachment) => {
-    if (!confirm('Are you sure you want to delete this attachment?')) return;
+    const confirmed = await confirm({
+      title: 'Delete Attachment?',
+      message: 'This will permanently remove this file from the purchase order.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    });
+
+    if (!confirmed) return;
 
     try {
       const { error: dbError } = await supabase
@@ -873,6 +971,14 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods, onNavigateTo
           <Printer className="w-4 h-4" />
           Print PO PDF
         </button>
+        <button
+          onClick={handleDeletePO}
+          className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all"
+          title="Delete Purchase Order"
+        >
+          <Trash2 className="w-4 h-4" />
+          Delete PO
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -922,7 +1028,7 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods, onNavigateTo
                     <th className="px-4 py-3 text-right text-xs font-bold text-[#EDEDED] uppercase tracking-wider">
                       Total
                     </th>
-                    {['sent', 'confirmed', 'in_transit', 'partially_received'].includes(po.status) && (
+                    {(po.status === 'draft' || ['sent', 'confirmed', 'in_transit', 'partially_received'].includes(po.status)) && (
                       <th className="px-4 py-3 text-center text-xs font-bold text-[#EDEDED] uppercase tracking-wider">
                         Actions
                       </th>
@@ -1045,6 +1151,19 @@ export function PurchaseOrderDetail({ poId, onBack, onReceiveGoods, onNavigateTo
                           <td className="px-4 py-4 text-sm text-right font-bold text-gray-900 dark:text-[#EDEDED]">
                             ${totalCost.toFixed(2)}
                           </td>
+                          {po.status === 'draft' && (
+                            <td className="px-4 py-4 text-center">
+                              <button
+                                onClick={() => handleDeleteLineItem(group.style_number, group.color)}
+                                disabled={updating}
+                                className="px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700 text-sm font-medium transition-all disabled:opacity-50 flex items-center gap-1 mx-auto"
+                                title="Delete this line item"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                Delete
+                              </button>
+                            </td>
+                          )}
                           {['sent', 'confirmed', 'in_transit', 'partially_received'].includes(po.status) && (
                             <td className="px-4 py-4 text-center">
                               {remaining > 0 && (

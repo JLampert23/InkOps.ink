@@ -1,5 +1,8 @@
+import { useEffect, useState } from 'react';
 import { TRIGGER_OPTIONS, TRIGGER_CONDITION_OPTIONS } from './automation-config';
 import * as Icons from 'lucide-react';
+import { useInvoiceStatuses } from '../../hooks/useInvoiceStatuses';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface TriggerSelectorProps {
   value: string;
@@ -9,8 +12,28 @@ interface TriggerSelectorProps {
 }
 
 export function TriggerSelector({ value, triggerConfig, onChange, onConfigChange }: TriggerSelectorProps) {
+  const { userProfile } = useAuth();
+  const { statuses } = useInvoiceStatuses(userProfile?.company_id);
+  const [dynamicConditionConfig, setDynamicConditionConfig] = useState<{ label: string; options: Array<{ value: string; label: string }> } | null>(null);
+
   const selectedTrigger = TRIGGER_OPTIONS.find(t => t.value === value);
-  const conditionConfig = value ? TRIGGER_CONDITION_OPTIONS[value] : null;
+
+  // Handle dynamic loading of custom statuses for work_order_invoice_status_changed
+  useEffect(() => {
+    if (value === 'work_order_invoice_status_changed' && statuses.length > 0) {
+      setDynamicConditionConfig({
+        label: 'Work Order Status',
+        options: statuses.map(status => ({
+          value: status.name,
+          label: status.name,
+        })),
+      });
+    } else {
+      setDynamicConditionConfig(null);
+    }
+  }, [value, statuses]);
+
+  const conditionConfig = dynamicConditionConfig || (value ? TRIGGER_CONDITION_OPTIONS[value] : null);
 
   const handleConditionChange = (selectedValue: string) => {
     onConfigChange({

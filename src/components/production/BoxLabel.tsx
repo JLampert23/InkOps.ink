@@ -1,5 +1,41 @@
 import React from 'react';
 
+export type BoxLabelElementId =
+  | 'logo'
+  | 'work_order_number'
+  | 'customer_name'
+  | 'job_nickname'
+  | 'due_date'
+  | 'imprint_types'
+  | 'custom_text';
+
+export interface BoxLabelElement {
+  id: BoxLabelElementId | string;
+  order: number;
+  visible: boolean;
+  fontSize?: number;
+  width?: number;
+  height?: number;
+  x?: number;
+  y?: number;
+  textAlign?: 'left' | 'center' | 'right';
+  fontWeight?: 'normal' | 'bold' | '500' | '600';
+  content?: string;
+}
+
+export const LABEL_WIDTH_INCHES = 4;
+export const LABEL_HEIGHT_INCHES = 6;
+export const LABEL_PADDING_INCHES = 0.15;
+
+export const DEFAULT_BOX_LABEL_LAYOUT: BoxLabelElement[] = [
+  { id: 'logo', order: 0, visible: true, width: 3.5, height: 0.8, x: 0.25, y: 0.15, textAlign: 'center' },
+  { id: 'work_order_number', order: 1, visible: true, fontSize: 22, x: 0.15, y: 1.1, textAlign: 'center', fontWeight: 'bold' },
+  { id: 'customer_name', order: 2, visible: true, fontSize: 26, x: 0.15, y: 1.5, textAlign: 'center', fontWeight: 'bold' },
+  { id: 'job_nickname', order: 3, visible: true, fontSize: 18, x: 0.15, y: 2.0, textAlign: 'center', fontWeight: '600' },
+  { id: 'due_date', order: 4, visible: true, fontSize: 14, x: 0.15, y: 2.4, textAlign: 'center', fontWeight: '500' },
+  { id: 'imprint_types', order: 5, visible: true, fontSize: 12, x: 0.15, y: 2.8, textAlign: 'center', fontWeight: 'normal' },
+];
+
 export interface BoxLabelConfig {
   logoUrl?: string | null;
   showWorkOrderNumber: boolean;
@@ -7,7 +43,8 @@ export interface BoxLabelConfig {
   showJobNickname: boolean;
   showDueDate: boolean;
   showImprintTypes: boolean;
-  showQrCode?: boolean;
+  layout?: BoxLabelElement[];
+  useAbsolutePositioning?: boolean;
 }
 
 export interface BoxLabelProps {
@@ -17,7 +54,7 @@ export interface BoxLabelProps {
   dueDate?: string;
   imprintTypes?: string[];
   config?: BoxLabelConfig;
-  qrCodeUrl?: string;
+  customTextValues?: Record<string, string>;
 }
 
 const defaultConfig: BoxLabelConfig = {
@@ -27,70 +64,12 @@ const defaultConfig: BoxLabelConfig = {
   showJobNickname: true,
   showDueDate: true,
   showImprintTypes: true,
-  showQrCode: true,
+  useAbsolutePositioning: true,
 };
 
-const generateQrCodeDataUrl = (data: string, size: number = 120): string => {
-  const qrSize = 21;
-  const moduleSize = Math.floor(size / (qrSize + 8));
-  const actualSize = moduleSize * (qrSize + 8);
-  const canvas = document.createElement('canvas');
-  canvas.width = actualSize;
-  canvas.height = actualSize;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return '';
-
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, actualSize, actualSize);
-
-  ctx.fillStyle = '#000000';
-  const padding = moduleSize * 4;
-
-  const drawFinderPattern = (x: number, y: number) => {
-    for (let i = 0; i < 7; i++) {
-      for (let j = 0; j < 7; j++) {
-        const isOuter = i === 0 || i === 6 || j === 0 || j === 6;
-        const isInner = i >= 2 && i <= 4 && j >= 2 && j <= 4;
-        if (isOuter || isInner) {
-          ctx.fillRect(
-            padding + (x + i) * moduleSize,
-            padding + (y + j) * moduleSize,
-            moduleSize,
-            moduleSize
-          );
-        }
-      }
-    }
-  };
-
-  drawFinderPattern(0, 0);
-  drawFinderPattern(qrSize - 7, 0);
-  drawFinderPattern(0, qrSize - 7);
-
-  for (let i = 8; i < qrSize - 8; i++) {
-    if (i % 2 === 0) {
-      ctx.fillRect(padding + i * moduleSize, padding + 6 * moduleSize, moduleSize, moduleSize);
-      ctx.fillRect(padding + 6 * moduleSize, padding + i * moduleSize, moduleSize, moduleSize);
-    }
-  }
-
-  const dataHash = data.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  for (let y = 0; y < qrSize; y++) {
-    for (let x = 0; x < qrSize; x++) {
-      if (x < 9 && y < 9) continue;
-      if (x >= qrSize - 8 && y < 9) continue;
-      if (x < 9 && y >= qrSize - 8) continue;
-      if (x === 6 || y === 6) continue;
-
-      const seed = (x * qrSize + y + dataHash) % 100;
-      if (seed < 45) {
-        ctx.fillRect(padding + x * moduleSize, padding + y * moduleSize, moduleSize, moduleSize);
-      }
-    }
-  }
-
-  return canvas.toDataURL('image/png');
-};
+function getElement(layout: BoxLabelElement[], id: string): BoxLabelElement | undefined {
+  return layout.find(el => el.id === id);
+}
 
 export const BoxLabel: React.FC<BoxLabelProps> = ({
   workOrderNumber,
@@ -99,17 +78,123 @@ export const BoxLabel: React.FC<BoxLabelProps> = ({
   dueDate,
   imprintTypes = [],
   config = defaultConfig,
-  qrCodeUrl,
+  customTextValues = {},
 }) => {
   const mergedConfig = { ...defaultConfig, ...config };
   const uniqueImprintTypes = Array.from(new Set(imprintTypes.filter(Boolean)));
 
-  const qrData = qrCodeUrl || `WO:${workOrderNumber}`;
-  const qrCodeDataUrl = (mergedConfig.showQrCode ?? true) ? generateQrCodeDataUrl(qrData, 120) : '';
+  const layout: BoxLabelElement[] = mergedConfig.layout
+    ? [...mergedConfig.layout].sort((a, b) => a.order - b.order)
+    : DEFAULT_BOX_LABEL_LAYOUT;
 
-  const hasLogo = !!mergedConfig.logoUrl;
-  const hasQrCode = (mergedConfig.showQrCode ?? true) && qrCodeDataUrl;
-  const showHeader = hasLogo || hasQrCode;
+  const useAbsolute = mergedConfig.useAbsolutePositioning !== false && layout.some(el => el.x !== undefined);
+
+  const renderElementContent = (el: BoxLabelElement) => {
+    const baseId = el.id.startsWith('custom_text') ? 'custom_text' : el.id;
+
+    switch (baseId) {
+      case 'logo':
+        if (!el.visible || !mergedConfig.logoUrl) return null;
+        return (
+          <img
+            src={mergedConfig.logoUrl}
+            alt="Company Logo"
+            style={{
+              width: `${el.width ?? 3.5}in`,
+              height: `${el.height ?? 0.8}in`,
+              objectFit: 'contain',
+            }}
+          />
+        );
+
+      case 'work_order_number':
+        if (!el.visible || !mergedConfig.showWorkOrderNumber) return null;
+        return `WO #${workOrderNumber}`;
+
+      case 'customer_name':
+        if (!el.visible || !mergedConfig.showCustomerName) return null;
+        return customerName;
+
+      case 'job_nickname':
+        if (!el.visible || !mergedConfig.showJobNickname || !jobNickname) return null;
+        return jobNickname;
+
+      case 'due_date':
+        if (!el.visible || !mergedConfig.showDueDate || !dueDate) return null;
+        return `Due: ${dueDate}`;
+
+      case 'imprint_types':
+        if (!el.visible || !mergedConfig.showImprintTypes || uniqueImprintTypes.length === 0) return null;
+        return (
+          <div style={{ lineHeight: '1.4' }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '0.05in' }}>Imprints:</div>
+            {uniqueImprintTypes.map((imprint, idx) => (
+              <div key={idx} style={{ fontSize: `${Math.max((el.fontSize ?? 12) - 1, 8)}pt` }}>{imprint}</div>
+            ))}
+          </div>
+        );
+
+      case 'custom_text':
+        if (!el.visible) return null;
+        const customValue = customTextValues[el.id] || el.content || '';
+        return customValue;
+
+      default:
+        return null;
+    }
+  };
+
+  if (useAbsolute) {
+    return (
+      <div
+        className="box-label"
+        style={{
+          width: `${LABEL_WIDTH_INCHES}in`,
+          height: `${LABEL_HEIGHT_INCHES}in`,
+          border: '1px solid black',
+          fontFamily: 'system-ui, sans-serif',
+          position: 'relative',
+          backgroundColor: 'white',
+          color: 'black',
+          boxSizing: 'border-box',
+          overflow: 'hidden',
+        }}
+      >
+        {layout.map(el => {
+          const content = renderElementContent(el);
+          if (content === null) return null;
+
+          const isLogo = el.id === 'logo';
+          const contentWidth = LABEL_WIDTH_INCHES - (el.x ?? 0.15) * 2;
+
+          return (
+            <div
+              key={el.id}
+              style={{
+                position: 'absolute',
+                left: `${el.x ?? 0.15}in`,
+                top: `${el.y ?? 0}in`,
+                width: isLogo ? 'auto' : `${contentWidth}in`,
+                fontSize: isLogo ? undefined : `${el.fontSize ?? 14}pt`,
+                fontWeight: el.fontWeight ?? 'normal',
+                textAlign: el.textAlign ?? 'center',
+                lineHeight: isLogo ? undefined : '1.2',
+                wordWrap: 'break-word',
+              }}
+            >
+              {content}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  const logoEl = getElement(layout, 'logo');
+  const showLogo = logoEl?.visible && !!mergedConfig.logoUrl;
+  const logoWidthIn = logoEl?.width ?? 3.5;
+  const logoHeightIn = logoEl?.height ?? 0.8;
+  const nonLogoElements = layout.filter(el => el.id !== 'logo');
 
   return (
     <div
@@ -127,54 +212,23 @@ export const BoxLabel: React.FC<BoxLabelProps> = ({
         boxSizing: 'border-box',
       }}
     >
-      {showHeader && (
+      {showLogo && (
         <div style={{
           display: 'flex',
-          justifyContent: 'space-between',
+          justifyContent: 'center',
           alignItems: 'flex-start',
           width: '100%',
-          marginBottom: '0.15in',
-          minHeight: '1.25in',
+          marginBottom: '0.2in',
         }}>
-          <div style={{
-            flex: '0 0 auto',
-            display: 'flex',
-            alignItems: 'flex-start',
-            justifyContent: 'flex-start',
-            padding: '0.1in',
-          }}>
-            {hasLogo && (
-              <img
-                src={mergedConfig.logoUrl!}
-                alt="Company Logo"
-                style={{
-                  maxHeight: '1.25in',
-                  maxWidth: '1.5in',
-                  objectFit: 'contain',
-                }}
-              />
-            )}
-          </div>
-
-          <div style={{
-            flex: '0 0 auto',
-            display: 'flex',
-            alignItems: 'flex-start',
-            justifyContent: 'flex-end',
-            padding: '0.1in',
-          }}>
-            {hasQrCode && (
-              <img
-                src={qrCodeDataUrl}
-                alt="QR Code"
-                style={{
-                  width: '1.25in',
-                  height: '1.25in',
-                  objectFit: 'contain',
-                }}
-              />
-            )}
-          </div>
+          <img
+            src={mergedConfig.logoUrl!}
+            alt="Company Logo"
+            style={{
+              width: `${logoWidthIn}in`,
+              height: `${logoHeightIn}in`,
+              objectFit: 'contain',
+            }}
+          />
         </div>
       )}
 
@@ -183,64 +237,27 @@ export const BoxLabel: React.FC<BoxLabelProps> = ({
         width: '100%',
         display: 'flex',
         flexDirection: 'column',
-        gap: '0.15in',
+        gap: '0.12in',
         flex: 1,
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
       }}>
-        {mergedConfig.showWorkOrderNumber && (
-          <div style={{
-            fontSize: '22pt',
-            fontWeight: 'bold',
-            letterSpacing: '1px'
-          }}>
-            WO #{workOrderNumber}
-          </div>
-        )}
-
-        {mergedConfig.showCustomerName && (
-          <div style={{
-            fontSize: '26pt',
-            fontWeight: 'bold',
-            wordWrap: 'break-word',
-            lineHeight: '1.2'
-          }}>
-            {customerName}
-          </div>
-        )}
-
-        {mergedConfig.showJobNickname && jobNickname && (
-          <div style={{
-            fontSize: '18pt',
-            fontWeight: '600',
-            wordWrap: 'break-word',
-            lineHeight: '1.2'
-          }}>
-            {jobNickname}
-          </div>
-        )}
-
-        {mergedConfig.showDueDate && dueDate && (
-          <div style={{
-            fontSize: '14pt',
-            fontWeight: '500',
-            color: '#374151'
-          }}>
-            Due: {dueDate}
-          </div>
-        )}
-
-        {mergedConfig.showImprintTypes && uniqueImprintTypes.length > 0 && (
-          <div style={{
-            marginTop: '0.1in',
-            fontSize: '12pt',
-            lineHeight: '1.4'
-          }}>
-            <div style={{ fontWeight: 'bold', marginBottom: '0.05in' }}>Imprints:</div>
-            {uniqueImprintTypes.map((imprint, idx) => (
-              <div key={idx} style={{ fontSize: '11pt' }}>{imprint}</div>
-            ))}
-          </div>
-        )}
+        {nonLogoElements.map(el => {
+          const content = renderElementContent(el);
+          if (content === null) return null;
+          return (
+            <div
+              key={el.id}
+              style={{
+                fontSize: `${el.fontSize ?? 14}pt`,
+                fontWeight: el.fontWeight ?? 'normal',
+                textAlign: el.textAlign ?? 'center',
+                lineHeight: '1.2',
+              }}
+            >
+              {content}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

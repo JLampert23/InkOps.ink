@@ -154,36 +154,47 @@ export function SendQuoteModal({
 
     setSending(true);
     try {
-      // Get current session
+      console.log('Sending quote via Supabase functions.invoke');
+
+      // Get current session and ensure it's fresh
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      console.log('Session check:', { hasSession: !!session, hasToken: !!session?.access_token, error: sessionError });
 
       if (sessionError || !session) {
-        throw new Error('You must be logged in to send quotes. Please refresh and try again.');
+        throw new Error('No active session. Please log in again.');
       }
 
-      console.log('Calling edge function (auth will be handled automatically by Supabase client)');
+      console.log('Current session:', {
+        hasSession: !!session,
+        userId: session?.user?.id,
+        email: session?.user?.email,
+        expiresAt: session?.expires_at,
+        accessToken: session?.access_token?.substring(0, 20) + '...',
+      });
 
-      const { data, error } = await supabase.functions.invoke(
-        `quote-actions/${quoteId}/send`,
-        {
-          body: {
-            template_id: selectedTemplateId,
-            custom_message: customMessage,
-            expires_in_days: expiresInDays,
-            single_use: false,
-            auto_approve_after_days: null,
-            auto_convert_on_approval: false,
-          },
-        }
-      );
-
-      console.log('Edge function response:', { data, error, hasData: !!data, hasError: !!error });
+      // Use Supabase's built-in functions.invoke which handles auth automatically
+      const { data, error } = await supabase.functions.invoke(`quote-actions/${quoteId}/send`, {
+        body: {
+          template_id: selectedTemplateId,
+          custom_message: customMessage,
+          expires_in_days: expiresInDays,
+          single_use: false,
+          auto_approve_after_days: null,
+          auto_convert_on_approval: false,
+        },
+      });
 
       if (error) {
-        console.error('Edge function error details:', JSON.stringify(error, null, 2));
+        console.error('Edge function error details:', {
+          error,
+          message: error.message,
+          context: error.context,
+          status: error.context?.status,
+          body: error.context?.body,
+        });
         throw new Error(error.message || 'Failed to send quote');
       }
+
+      console.log('Quote sent successfully:', data);
 
       alert(`Quote sent successfully to ${customerEmail}`);
       onSuccess();

@@ -381,4 +381,13 @@ export class POAutoCreationService {
 
     return { data: summary, error: null };
   }
+
+  static async deletePurchaseOrder(
+    poId: string
+  ): Promise<{ error: any }> {
+    return await supabase
+      .from('purchase_orders')
+      .delete()
+      .eq('id', poId);
+  }
 }

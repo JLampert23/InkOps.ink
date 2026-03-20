@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Save, Plus, Trash2, GripVertical, X, Loader2, DollarSign, Settings, Search, Image as ImageIcon, Check, Info, RefreshCw } from 'lucide-react';
+import { Save, Plus, Trash2, GripVertical, X, Loader2, DollarSign, Settings, Search, Image as ImageIcon, Check, Info, RefreshCw, Lock, Unlock } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -110,6 +110,7 @@ interface LineItemGroup {
 interface QuoteBuilderProps {
   quoteId?: string;
   initialCustomerId?: string;
+  initialContactId?: string;
   onSave?: () => void;
   onCancel?: () => void;
 }
@@ -182,7 +183,7 @@ function UnitPriceTooltip({ item, groupImprints, garmentMarkup }: {
   );
 }
 
-export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSave, onCancel }: QuoteBuilderProps) {
+export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initialContactId, onSave, onCancel }: QuoteBuilderProps) {
   const { user, session } = useAuth();
   const { showNotification } = useNotification();
   const [quoteId, setQuoteId] = useState<string | undefined>(initialQuoteId);
@@ -190,6 +191,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
   const [saving, setSaving] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(initialCustomerId || '');
+  const [selectedContactId, setSelectedContactId] = useState<string>(initialContactId || '');
+  const [customerContacts, setCustomerContacts] = useState<any[]>([]);
   const [availableFees, setAvailableFees] = useState<any[]>([]);
   const [companySettings, setCompanySettings] = useState<any>(null);
   const draftCreatedRef = useRef(false);
@@ -390,7 +393,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
 
   useEffect(() => {
     if (selectedCustomerId && !quoteId) {
-      loadCustomerDetails(selectedCustomerId);
+      loadCustomerDetails(selectedCustomerId, selectedContactId);
+      loadCustomerContacts(selectedCustomerId);
     }
   }, [selectedCustomerId, quoteId]);
 
@@ -473,7 +477,28 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
     }
   };
 
-  const loadCustomerDetails = async (customerId: string) => {
+  const loadCustomerContacts = async (customerId: string) => {
+    if (!customerId) {
+      setCustomerContacts([]);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('customer_contacts')
+        .select('*')
+        .eq('customer_id', customerId)
+        .order('full_name');
+
+      if (error) throw error;
+      setCustomerContacts(data || []);
+    } catch (err) {
+      console.error('Error loading customer contacts:', err);
+      setCustomerContacts([]);
+    }
+  };
+
+  const loadCustomerDetails = async (customerId: string, contactId?: string) => {
     try {
       const { data: customer, error } = await supabase
         .from('customers')
@@ -484,8 +509,26 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       if (error) throw error;
 
       if (customer) {
+        let contactName = customer.contact_name || '';
+        let contactEmail = customer.email || '';
+        let contactPhone = customer.phone || '';
+
+        if (contactId) {
+          const { data: contact } = await supabase
+            .from('customer_contacts')
+            .select('*')
+            .eq('id', contactId)
+            .maybeSingle();
+
+          if (contact) {
+            contactName = contact.full_name || '';
+            contactEmail = contact.email || '';
+            contactPhone = contact.phone || contact.mobile || '';
+          }
+        }
+
         setBillCompany(customer.company_name || '');
-        setBillName(customer.contact_name || '');
+        setBillName(contactName);
         setBillAddress1(customer.billing_address_line1 || '');
         setBillAddress2(customer.billing_address_line2 || '');
         setBillCity(customer.billing_city || '');
@@ -493,7 +536,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
         setBillZip(customer.billing_zip || '');
 
         setShipCompany(customer.company_name || '');
-        setShipName(customer.contact_name || '');
+        setShipName(contactName);
         setShipAddress1(customer.shipping_address_line1 || '');
         setShipAddress2(customer.shipping_address_line2 || '');
         setShipCity(customer.shipping_city || '');
@@ -600,6 +643,10 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
     if (quote) {
       setQuoteNumber(quote.quote_number || '');
       setSelectedCustomerId(quote.customer_id || '');
+      setSelectedContactId(quote.contact_id || '');
+      if (quote.customer_id) {
+        loadCustomerContacts(quote.customer_id);
+      }
       setCreatedDate(quote.created_date || '');
       setProductionDueDate(quote.production_due_date || '');
       setCustomerDueDate(quote.customer_due_date || '');
@@ -655,6 +702,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
             description: decodeHtmlEntities(item.description || ''),
             notes: item.notes || '',
             taxed: item.taxed || false,
+            price_locked: item.price_locked || false,
           });
         });
 
@@ -815,6 +863,44 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
     return sizeTotal + quantityValue;
   };
 
+  const togglePriceLock = async (groupId: string) => {
+    const group = itemGroups.find(g => g.id === groupId);
+    if (!group || group.items.length === 0) return;
+
+    // Check if any item has price_locked = true
+    const anyLocked = group.items.some(item => item.price_locked);
+    const newLockState = !anyLocked;
+
+    const newGroups = itemGroups.map(g => {
+      if (g.id === groupId) {
+        return {
+          ...g,
+          items: g.items.map(item => ({
+            ...item,
+            price_locked: newLockState
+          }))
+        };
+      }
+      return g;
+    });
+
+    setItemGroups(newGroups);
+
+    // Update database if quote is saved
+    if (quoteId && !quoteId.startsWith('temp-')) {
+      for (const item of group.items) {
+        if (item.id) {
+          await supabase
+            .from('quote_line_items')
+            .update({ price_locked: newLockState })
+            .eq('id', item.id);
+        }
+      }
+    }
+
+    showNotification(newLockState ? 'Prices locked - won\'t auto-update' : 'Prices unlocked - will auto-update', 'success');
+  };
+
   const updateItem = async (groupId: string, itemIndex: number, field: keyof QuoteItem, value: any) => {
     let updatedGroups: any[] = [];
 
@@ -854,9 +940,13 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       }
     }
 
-    // Auto-update price from matrix when quantity changes
+    // Auto-update price from matrix when quantity changes (unless prices are locked)
     if (field.startsWith('qty_')) {
-      await updatePriceFromMatrixWithGroups(updatedGroups, groupId, itemIndex, true);
+      const group = updatedGroups.find(g => g.id === groupId);
+      const item = group?.items[itemIndex];
+      if (item && !item.price_locked) {
+        await updatePriceFromMatrixWithGroups(updatedGroups, groupId, itemIndex, true);
+      }
     }
   };
 
@@ -871,6 +961,14 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       const item = group.items[itemIndex];
       if (!item) {
         if (!silent) showNotification('error', 'Item not found');
+        return;
+      }
+
+      // Skip price update if prices are locked (e.g., in duplicated quotes)
+      if (item.price_locked) {
+        if (!silent) {
+          console.log('Price update skipped - prices are locked for this item');
+        }
         return;
       }
 
@@ -1952,6 +2050,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
       const quoteData = {
         company_id: userProfile.company_id,
         customer_id: selectedCustomerId || null,
+        contact_id: selectedContactId || null,
         customer_name: customerData?.company_name || 'Draft Quote',
         customer_email: customerData?.email || null,
         customer_phone: customerData?.phone || null,
@@ -2212,8 +2311,12 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                   onChange={(e) => {
                     const newCustomerId = e.target.value;
                     setSelectedCustomerId(newCustomerId);
+                    setSelectedContactId('');
                     if (newCustomerId) {
                       loadCustomerDetails(newCustomerId);
+                      loadCustomerContacts(newCustomerId);
+                    } else {
+                      setCustomerContacts([]);
                     }
                   }}
                   className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
@@ -2224,6 +2327,35 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                   ))}
                 </select>
               </div>
+
+              {/* Contact Selector - Only show if customer has multiple contacts */}
+              {selectedCustomerId && customerContacts.length > 0 && (
+                <div>
+                  <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 block">
+                    Contact Person {customerContacts.length > 1 && '(Optional)'}
+                  </label>
+                  <select
+                    value={selectedContactId}
+                    onChange={(e) => {
+                      const contactId = e.target.value;
+                      setSelectedContactId(contactId);
+                      if (contactId) {
+                        loadCustomerDetails(selectedCustomerId, contactId);
+                      } else {
+                        loadCustomerDetails(selectedCustomerId);
+                      }
+                    }}
+                    className="w-full px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  >
+                    <option value="">Use Default Customer Contact</option>
+                    {customerContacts.map(contact => (
+                      <option key={contact.id} value={contact.id}>
+                        {contact.full_name} {contact.email && `(${contact.email})`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Billing and Shipping */}
               <div className="grid grid-cols-2 gap-6">
@@ -2571,8 +2703,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                           ))}
                           <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-14">Qty</th>
                           <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-14">Items</th>
-                          <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-24">Unit Price</th>
-                          <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-24">Total</th>
+                          <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-32 bg-blue-50 dark:bg-blue-900/20">Unit Price</th>
+                          <th className="p-2 text-right border border-gray-300 dark:border-slate-800 w-32 bg-green-50 dark:bg-green-900/20">Line Total</th>
                           <th className="p-2 text-center border border-gray-300 dark:border-slate-800 w-20">Actions</th>
                         </tr>
                       )}
@@ -2700,16 +2832,32 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                       <td className="p-1 border border-gray-300 dark:border-slate-800 text-center text-base text-blue-600 dark:text-blue-400 font-bold">
                         {calculateItemsTotal(item)}
                       </td>
-                      <td className={`p-0 border border-gray-300 dark:border-slate-800 relative group/price ${!item.wholesale_price || item.wholesale_price === 0 ? 'bg-amber-50 dark:bg-amber-900/20' : ''}`}>
+                      <td className={`p-0 border border-gray-300 dark:border-slate-800 relative group/price ${
+                        item.price_locked
+                          ? 'bg-amber-100 dark:bg-amber-900/30'
+                          : !item.wholesale_price || item.wholesale_price === 0
+                            ? 'bg-amber-50 dark:bg-amber-900/20'
+                            : 'bg-blue-50/50 dark:bg-blue-900/10'
+                      }`}>
                         <input
                           type="number"
                           step="0.01"
                           min="0"
                           value={item.unit_price}
                           onChange={(e) => updateItem(group.id, itemIdx, 'unit_price', parseFloat(e.target.value) || 0)}
-                          className={`w-full px-2 py-2 border-0 text-gray-900 dark:text-white text-base text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${!item.wholesale_price || item.wholesale_price === 0 ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-white dark:bg-slate-900'}`}
+                          className={`w-full px-3 py-2 border-0 text-gray-900 dark:text-white text-base text-right font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                            item.price_locked
+                              ? 'bg-amber-100 dark:bg-amber-900/30 border-l-4 border-amber-500'
+                              : !item.wholesale_price || item.wholesale_price === 0
+                                ? 'bg-amber-50 dark:bg-amber-900/20'
+                                : 'bg-blue-50/50 dark:bg-blue-900/10'
+                          }`}
                         />
-                        {!item.wholesale_price || item.wholesale_price === 0 ? (
+                        {item.price_locked ? (
+                          <div className="absolute top-0 left-0 p-0.5" title="Price locked - won't auto-update">
+                            <Lock className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                          </div>
+                        ) : !item.wholesale_price || item.wholesale_price === 0 ? (
                           <div className="absolute top-0 right-0 p-0.5" title="Wholesale pricing unavailable - enter manually">
                             <Info className="w-3 h-3 text-amber-500 dark:text-amber-400" />
                           </div>
@@ -2728,7 +2876,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                           )
                         )}
                       </td>
-                      <td className="p-1 border border-gray-300 dark:border-slate-800 text-right text-base font-semibold text-gray-900 dark:text-white">
+                      <td className="p-2 border border-gray-300 dark:border-slate-800 text-right text-base font-bold text-green-700 dark:text-green-400 bg-green-50/50 dark:bg-green-900/10">
                         ${item.total_price.toFixed(2)}
                       </td>
                       <td className="p-0.5 border border-gray-300 dark:border-slate-800">
@@ -2774,9 +2922,33 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                                   Mockup
                                 </button>
                                 <button
+                                  onClick={() => togglePriceLock(group.id)}
+                                  className={`px-3 py-2 rounded text-sm flex items-center gap-2 shadow-sm ${
+                                    group.items.some(item => item.price_locked)
+                                      ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                                      : 'bg-gray-600 hover:bg-gray-700 text-white'
+                                  }`}
+                                  title={group.items.some(item => item.price_locked)
+                                    ? 'Prices are locked - Click to unlock and allow auto-updates'
+                                    : 'Prices will auto-update - Click to lock prices'}
+                                >
+                                  {group.items.some(item => item.price_locked) ? (
+                                    <>
+                                      <Lock className="w-4 h-4" />
+                                      Unlock Prices
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Unlock className="w-4 h-4" />
+                                      Lock Prices
+                                    </>
+                                  )}
+                                </button>
+                                <button
                                   onClick={() => updatePriceFromMatrix(group.id, 0)}
-                                  disabled={updatingPriceForGroup === group.id}
-                                  className="px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-wait text-white rounded text-sm flex items-center gap-2 shadow-sm"
+                                  disabled={updatingPriceForGroup === group.id || group.items.some(item => item.price_locked)}
+                                  className="px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white rounded text-sm flex items-center gap-2 shadow-sm"
+                                  title={group.items.some(item => item.price_locked) ? 'Unlock prices first to update' : 'Update pricing from matrix'}
                                 >
                                   {updatingPriceForGroup === group.id ? (
                                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -2810,7 +2982,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                                         <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                                           {imprint.imprint_number && (
                                             <span className="text-xs px-2 py-1 bg-gray-800 dark:bg-slate-600 text-white rounded font-mono font-semibold">
-                                              #{imprint.imprint_number}
+                                              #{imprint.imprint_number.replace(/^QTE-/, '')}
                                             </span>
                                           )}
                                           <span className="text-gray-900 dark:text-white font-medium text-sm truncate">
@@ -2859,6 +3031,34 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, onSav
                                                     className="w-16 h-16 object-contain rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 cursor-pointer hover:border-blue-500 transition-all"
                                                     onClick={() => window.open(url, '_blank')}
                                                     title="Click to view full size"
+                                                  />
+                                                ))}
+                                              </div>
+                                            </div>
+                                          );
+                                        })()}
+                                        {/* Display garment images (from Chipply imports) */}
+                                        {(() => {
+                                          const garmentImages = imprint.garment_images && Array.isArray(imprint.garment_images)
+                                            ? imprint.garment_images.filter((img: any) => img?.url)
+                                            : [];
+
+                                          if (garmentImages.length === 0) return null;
+
+                                          return (
+                                            <div className="mt-2 pt-2 border-t border-gray-200 dark:border-slate-700">
+                                              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1.5 font-medium">
+                                                Garment Images {garmentImages.length > 1 && `(${garmentImages.length})`}:
+                                              </div>
+                                              <div className="flex flex-wrap gap-1.5">
+                                                {garmentImages.map((imgObj: any, garmentIdx: number) => (
+                                                  <img
+                                                    key={garmentIdx}
+                                                    src={imgObj.url}
+                                                    alt={`Garment ${imgObj.view || garmentIdx + 1}`}
+                                                    className="w-16 h-16 object-contain rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 cursor-pointer hover:border-blue-500 transition-all"
+                                                    onClick={() => window.open(imgObj.url, '_blank')}
+                                                    title={`Click to view full size - ${imgObj.view || 'view'}`}
                                                   />
                                                 ))}
                                               </div>

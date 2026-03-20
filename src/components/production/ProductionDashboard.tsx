@@ -12,12 +12,14 @@ type ProductionTab = 'quotes' | 'work-orders' | 'scheduling' | 'kanban' | 'manag
 interface ProductionDashboardProps {
   onNavigateToCustomers: () => void;
   initialCustomerId?: string;
+  initialContactId?: string;
   onCustomerIdConsumed?: () => void;
 }
 
-export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, onCustomerIdConsumed }: ProductionDashboardProps) {
+export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, initialContactId, onCustomerIdConsumed }: ProductionDashboardProps) {
   const [activeTab, setActiveTab] = useState<ProductionTab>('quotes');
   const [customerIdForQuote, setCustomerIdForQuote] = useState<string | undefined>(initialCustomerId);
+  const [contactIdForQuote, setContactIdForQuote] = useState<string | undefined>(initialContactId);
   const [typesOfWork, setTypesOfWork] = useState<Array<{ id: string; work_type_name: string }>>([]);
   const [selectedScheduleType, setSelectedScheduleType] = useState<string>('');
   const [navigateToWorkOrderId, setNavigateToWorkOrderId] = useState<string | null>(null);
@@ -26,8 +28,9 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
     if (initialCustomerId) {
       setActiveTab('quotes');
       setCustomerIdForQuote(initialCustomerId);
+      setContactIdForQuote(initialContactId);
     }
-  }, [initialCustomerId]);
+  }, [initialCustomerId, initialContactId]);
 
   useEffect(() => {
     loadTypesOfWork();
@@ -79,6 +82,7 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
 
   const handleQuoteCustomerConsumed = () => {
     setCustomerIdForQuote(undefined);
+    setContactIdForQuote(undefined);
     if (onCustomerIdConsumed) {
       onCustomerIdConsumed();
     }
@@ -90,6 +94,7 @@ export function ProductionDashboard({ onNavigateToCustomers, initialCustomerId, 
         return (
           <QuotesManager
             initialCustomerId={customerIdForQuote}
+            initialContactId={contactIdForQuote}
             onCustomerIdConsumed={handleQuoteCustomerConsumed}
           />
         );

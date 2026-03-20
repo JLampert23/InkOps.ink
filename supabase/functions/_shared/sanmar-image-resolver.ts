@@ -26,25 +26,35 @@ export interface ResolvedColorImages {
 export async function resolveSanMarImages(
   supabaseAdmin: any,
   style: string,
-  colorName?: string
+  colorName?: string,
+  partId?: string
 ): Promise<ResolvedColorImages> {
   const normalizedStyle = style.toUpperCase().trim();
 
   try {
     let query = supabaseAdmin
       .from("sanmar_image_map")
-      .select("color_name, image_type, cdn_url")
+      .select("color_name, image_type, cdn_url, part_id")
       .eq("style", normalizedStyle);
 
-    if (colorName) {
+    // If partId is provided, use it for exact matching (highest priority)
+    if (partId && partId.trim()) {
+      query = query.eq("part_id", partId.trim());
+      console.log(`[SanMar Resolver] Using partId filter: ${partId}`);
+    } else if (colorName) {
+      // Otherwise fall back to color name matching
       query = query.eq("color_name", colorName.toLowerCase().trim());
+      console.log(`[SanMar Resolver] Using color filter: ${colorName}`);
     }
 
     const { data, error } = await query;
 
     if (error || !data || data.length === 0) {
+      console.log(`[SanMar Resolver] No images found for ${normalizedStyle}, partId=${partId || 'none'}, color=${colorName || 'none'}`);
       return {};
     }
+
+    console.log(`[SanMar Resolver] Found ${data.length} images for ${normalizedStyle}`);
 
     const result: ResolvedColorImages = {};
 
@@ -86,9 +96,10 @@ export async function resolveSanMarImages(
 export async function getSanMarFrontImage(
   supabaseAdmin: any,
   style: string,
-  colorName?: string
+  colorName?: string,
+  partId?: string
 ): Promise<string | null> {
-  const images = await resolveSanMarImages(supabaseAdmin, style, colorName);
+  const images = await resolveSanMarImages(supabaseAdmin, style, colorName, partId);
   const colors = Object.keys(images);
   if (colors.length === 0) return null;
 

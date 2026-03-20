@@ -5,6 +5,16 @@ export function generateSubdomainFromCompanyName(companyName: string): string {
     .substring(0, 30);
 }
 
+/**
+ * Gets the base URL for portal-related pages (quotes, customer portal, etc.)
+ *
+ * Priority order:
+ * 1. If subdomain is provided and DNS is configured, use: https://{subdomain}.inkops.ink
+ * 2. If VITE_MAIN_DOMAIN is set, use that (for when subdomains aren't configured)
+ * 3. Otherwise, use current window.location.origin as fallback
+ *
+ * This allows the app to work even when custom subdomains aren't set up in DNS.
+ */
 export function getPortalBaseUrl(subdomain: string | null, companyName?: string | null): string {
   let effectiveSubdomain = subdomain;
 
@@ -12,10 +22,20 @@ export function getPortalBaseUrl(subdomain: string | null, companyName?: string 
     effectiveSubdomain = generateSubdomainFromCompanyName(companyName);
   }
 
+  // If we have a main domain configured (e.g., Vercel deployment URL), use that
+  // This allows quote approval and portal links to work without DNS setup
+  const mainDomain = import.meta.env.VITE_MAIN_DOMAIN;
+  if (mainDomain) {
+    // Remove trailing slash if present
+    return mainDomain.replace(/\/$/, '');
+  }
+
+  // If no subdomain and no main domain, use current origin
   if (!effectiveSubdomain) {
     return window.location.origin;
   }
 
+  // Use subdomain URL (requires DNS to be configured)
   return `https://${effectiveSubdomain}.inkops.ink`;
 }
 

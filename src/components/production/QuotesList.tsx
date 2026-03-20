@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase-client';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useConfirmation } from '../../contexts/ConfirmationContext';
 import { FileText, Search, Plus, Clock, Send, CheckCircle, XCircle, AlertCircle, Loader2, CreditCard as Edit, Eye, Copy, RefreshCw, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -26,6 +27,7 @@ interface Quote {
 
 export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }: QuotesListProps) {
   const { showNotification } = useNotification();
+  const { confirm } = useConfirmation();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -35,6 +37,25 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
 
   useEffect(() => {
     loadQuotes();
+
+    const channel = supabase
+      .channel('quotes-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'quotes',
+        },
+        () => {
+          loadQuotes();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const loadQuotes = async () => {
@@ -59,31 +80,60 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
   };
 
   const handleDuplicate = async (quoteId: string) => {
-    if (!confirm('Create a copy of this quote?')) return;
+    const confirmed = await confirm({
+      title: 'Duplicate Quote',
+      message: 'Create a copy of this quote?',
+      confirmLabel: 'Duplicate',
+      variant: 'info',
+    });
+    if (!confirmed) return;
 
     setDuplicating(quoteId);
     try {
-      const { data, error } = await supabase.functions.invoke(
-        `quote-actions/${quoteId}/duplicate`,
-        { method: 'POST' }
-      );
+      // Check if user is authenticated
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('Session check before duplicate:', {
+        hasSession: !!session,
+        hasAccessToken: !!session?.access_token,
+      });
+
+      if (!session) {
+        throw new Error('You must be logged in to duplicate quotes');
+      }
+
+      console.log('Invoking duplicate function for quote:', quoteId);
+      console.log('Token preview:', session.access_token.substring(0, 50) + '...');
+
+      const { data, error } = await supabase.functions.invoke(`quote-actions/${quoteId}/duplicate`, {
+        method: 'POST',
+      });
+
+      console.log('Duplicate response:', { data, error });
 
       if (error) {
-        throw error;
+        console.error('Edge function error:', error);
+        throw new Error(error.message || 'Failed to duplicate quote');
       }
 
       showNotification(`Quote duplicated as ${data.quote.quote_number}`, 'success');
       loadQuotes();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error duplicating quote:', error);
-      showNotification('Failed to duplicate quote', 'error');
+      showNotification(error.message || 'Failed to duplicate quote', 'error');
     } finally {
       setDuplicating(null);
     }
   };
 
   const handleDelete = async (quoteId: string, quoteNumber: string) => {
-    if (!confirm(`Are you sure you want to delete quote ${quoteNumber}? This action cannot be undone.`)) return;
+    const confirmed = await confirm({
+      title: 'Delete Quote',
+      message: `Are you sure you want to delete quote ${quoteNumber}? This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    });
+    if (!confirmed) return;
 
     setDeleting(quoteId);
     try {

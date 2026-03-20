@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { renderTemplate, type ShortCodeData } from "../_shared/shortcode-engine.ts";
 
 function extractSubdomainFromUrl(customerUrl: string | null): string | null {
   if (!customerUrl) return null;
@@ -46,7 +47,14 @@ Deno.serve(async (req: Request) => {
 
     // Extract the JWT token from the Authorization header
     const authHeader = req.headers.get("Authorization");
+
+    console.log('Auth header check:', {
+      hasAuthHeader: !!authHeader,
+      authHeaderPrefix: authHeader?.substring(0, 20),
+    });
+
     if (!authHeader) {
+      console.error('Missing Authorization header');
       return new Response(
         JSON.stringify({ error: "Missing Authorization header" }),
         {
@@ -56,7 +64,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Create authenticated Supabase client
+    // Create authenticated Supabase client with the user's JWT
+    // Since verify_jwt is enabled, the JWT is already verified by Supabase
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
         headers: { Authorization: authHeader },
@@ -65,17 +74,25 @@ Deno.serve(async (req: Request) => {
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify the user's JWT and get user details
+    // Get the user from the JWT (already verified by Supabase gateway)
     const {
       data: { user },
       error: userError,
     } = await supabase.auth.getUser();
 
+    console.log('User verification result:', {
+      hasUser: !!user,
+      userId: user?.id,
+      userEmail: user?.email,
+      error: userError?.message,
+    });
+
     if (userError || !user) {
+      console.error('Failed to get user from JWT:', userError);
       return new Response(
         JSON.stringify({
-          error: "Invalid or expired token",
-          details: userError?.message
+          error: "Authentication failed",
+          details: userError?.message || "Unable to verify user",
         }),
         {
           status: 401,
@@ -120,26 +137,83 @@ Deno.serve(async (req: Request) => {
         .eq("quote_id", quoteId)
         .order("line_number");
 
+      // Get imprints
+      const { data: originalImprints } = await supabase
+        .from("quote_imprints")
+        .select("*")
+        .eq("quote_id", quoteId)
+        .order("sort_order");
+
+      // Get proofs
+      const { data: originalProofs } = await supabase
+        .from("proofs")
+        .select("*")
+        .eq("quote_id", quoteId);
+
       // Generate new quote number
       const { data: quoteNumber } = await supabase.rpc("generate_quote_number", {
         p_company_id: profile.company_id
       });
 
-      // Create duplicate
+      // Create duplicate quote with all fields
       const duplicateData = {
         quote_number: quoteNumber,
         company_id: profile.company_id,
         customer_id: original.customer_id,
+        contact_id: original.contact_id,
         customer_name: original.customer_name,
         customer_email: original.customer_email,
         customer_phone: original.customer_phone,
         customer_company: original.customer_company,
         billing_address: original.billing_address,
         shipping_address: original.shipping_address,
+        bill_company: original.bill_company,
+        bill_name: original.bill_name,
+        bill_address_1: original.bill_address_1,
+        bill_address_2: original.bill_address_2,
+        bill_city: original.bill_city,
+        bill_state: original.bill_state,
+        bill_zip: original.bill_zip,
+        ship_company: original.ship_company,
+        ship_name: original.ship_name,
+        ship_address_1: original.ship_address_1,
+        ship_address_2: original.ship_address_2,
+        ship_city: original.ship_city,
+        ship_state: original.ship_state,
+        ship_zip: original.ship_zip,
+        subtotal: original.subtotal,
         tax_rate: original.tax_rate,
+        tax_amount: original.tax_amount,
+        sales_tax_rate: original.sales_tax_rate,
+        sales_tax: original.sales_tax,
+        total: original.total,
+        discount: original.discount,
+        discount_type: original.discount_type,
+        discount_amount: original.discount_amount,
+        discount_percent: original.discount_percent,
         pricing_reference: original.pricing_reference,
         notes: original.notes,
         customer_notes: original.customer_notes,
+        production_notes: original.production_notes,
+        terms: original.terms,
+        po_number: original.po_number,
+        delivery_method: original.delivery_method,
+        production_due_date: original.production_due_date,
+        customer_due_date: original.customer_due_date,
+        payment_due_date: original.payment_due_date,
+        nickname: original.nickname,
+        custom_size_option: original.custom_size_option,
+        line_items: original.line_items,
+        artwork_refs: original.artwork_refs,
+        company_name: original.company_name,
+        company_address: original.company_address,
+        company_city: original.company_city,
+        company_state: original.company_state,
+        company_zip: original.company_zip,
+        company_phone: original.company_phone,
+        company_email: original.company_email,
+        company_website: original.company_website,
+        company_logo_url: original.company_logo_url,
         status: "draft",
         created_by: user.id,
       };
@@ -152,13 +226,16 @@ Deno.serve(async (req: Request) => {
 
       if (createError) throw createError;
 
-      // Duplicate line items
+      // Duplicate line items with ALL fields including price_locked flag
       if (originalLineItems && originalLineItems.length > 0) {
         const newLineItems = originalLineItems.map((item: any) => ({
           quote_id: newQuote.id,
           company_id: profile.company_id,
           line_number: item.line_number,
+          line_type: item.line_type,
           sku: item.sku,
+          item_number: item.item_number,
+          color: item.color,
           description: item.description,
           quantity: item.quantity,
           unit_price: item.unit_price,
@@ -167,11 +244,173 @@ Deno.serve(async (req: Request) => {
           decoration_location: item.decoration_location,
           artwork_url: item.artwork_url,
           notes: item.notes,
+          qty_yxs: item.qty_yxs,
+          qty_ys: item.qty_ys,
+          qty_ym: item.qty_ym,
+          qty_yl: item.qty_yl,
+          qty_yxl: item.qty_yxl,
+          qty_xs: item.qty_xs,
+          qty_s: item.qty_s,
+          qty_m: item.qty_m,
+          qty_l: item.qty_l,
+          qty_xl: item.qty_xl,
+          qty_2xl: item.qty_2xl,
+          qty_3xl: item.qty_3xl,
+          qty_4xl: item.qty_4xl,
+          qty_5xl: item.qty_5xl,
+          qty_sm: item.qty_sm,
+          qty_lxl: item.qty_lxl,
+          qty_ysym: item.qty_ysym,
+          qty_ylyxl: item.qty_ylyxl,
+          imprint_number: item.imprint_number,
+          num_colors: item.num_colors,
+          taxed: item.taxed,
+          sort_order: item.sort_order,
+          total_quantity: item.total_quantity,
+          group_label: item.group_label,
+          supplier_name: item.supplier_name,
+          supplier_partid: item.supplier_partid,
+          brand: item.brand,
+          color_code: item.color_code,
+          garment_image_url: item.garment_image_url,
+          garment_front_image_url: item.garment_front_image_url,
+          garment_back_image_url: item.garment_back_image_url,
+          garment_sleeve_image_url: item.garment_sleeve_image_url,
+          garment_rear_image_url: item.garment_rear_image_url,
+          garment_side_image_url: item.garment_side_image_url,
+          garment_lifestyle_image_url: item.garment_lifestyle_image_url,
+          garment_image_rear_url: item.garment_image_rear_url,
+          garment_image_side_url: item.garment_image_side_url,
+          garment_image_lifestyle_url: item.garment_image_lifestyle_url,
+          garment_images_data: item.garment_images_data,
+          wholesale_price: item.wholesale_price,
+          retail_price: item.retail_price,
+          garment_unit_price: item.garment_unit_price,
+          supplier_metadata: item.supplier_metadata,
+          stock_availability: item.stock_availability,
+          size_mode: item.size_mode,
+          regular_sizes: item.regular_sizes,
+          double_sizes: item.double_sizes,
+          youth_sizes: item.youth_sizes,
+          adult_sizes: item.adult_sizes,
+          price_locked: true, // Lock prices to prevent auto-recalculation
         }));
 
         await supabase
           .from("quote_line_items")
           .insert(newLineItems);
+      }
+
+      // Duplicate imprints with ALL fields
+      if (originalImprints && originalImprints.length > 0) {
+        const imprintIdMap = new Map();
+
+        for (const imprint of originalImprints) {
+          const { data: newImprint, error: imprintError } = await supabase
+            .from("quote_imprints")
+            .insert([{
+              quote_id: newQuote.id,
+              company_id: profile.company_id,
+              matrix: imprint.matrix,
+              column_number: imprint.column_number,
+              type_of_work: imprint.type_of_work,
+              details: imprint.details,
+              mockups: imprint.mockups,
+              sort_order: imprint.sort_order,
+              location: imprint.location,
+              price_matrix_id: imprint.price_matrix_id,
+              thread_ink_color: imprint.thread_ink_color,
+              pricing_matrix_column: imprint.pricing_matrix_column,
+              group_label: imprint.group_label,
+              imprint_number: imprint.imprint_number,
+              price: imprint.price,
+              num_colors: imprint.num_colors,
+              artwork_url: imprint.artwork_url,
+              artwork_images: imprint.artwork_images,
+              garment_images: imprint.garment_images,
+            }])
+            .select()
+            .single();
+
+          if (!imprintError && newImprint) {
+            imprintIdMap.set(imprint.id, newImprint.id);
+          }
+        }
+
+        // Duplicate proofs with ALL fields
+        if (originalProofs && originalProofs.length > 0) {
+          for (const proof of originalProofs) {
+            const newImprintId = proof.imprint_id ? imprintIdMap.get(proof.imprint_id) : null;
+
+            const { data: newProof, error: proofError } = await supabase
+              .from("proofs")
+              .insert([{
+                company_id: profile.company_id,
+                quote_id: newQuote.id,
+                line_item_id: proof.line_item_id,
+                customer_id: proof.customer_id,
+                imprint_id: newImprintId,
+                proof_number: proof.proof_number,
+                proof_version: proof.proof_version,
+                garment_image_url: proof.garment_image_url,
+                garment_name: proof.garment_name,
+                garment_brand: proof.garment_brand,
+                garment_description: proof.garment_description,
+                print_width: proof.print_width,
+                print_height: proof.print_height,
+                print_depth: proof.print_depth,
+                print_unit: proof.print_unit,
+                status: "pending",
+                notes: proof.notes,
+                created_by: user.id,
+                composite_image_url: proof.composite_image_url,
+                type_of_work: proof.type_of_work,
+                decoration_location_id: proof.decoration_location_id,
+                pricing_matrix_id: proof.pricing_matrix_id,
+                pricing_matrix_column: proof.pricing_matrix_column,
+                imprint_unit_price: proof.imprint_unit_price,
+                imprint_setup_fee: proof.imprint_setup_fee,
+                group_label: proof.group_label,
+                selected_colors: proof.selected_colors,
+              }])
+              .select()
+              .single();
+
+            if (!proofError && newProof && proof.id) {
+              // Duplicate proof artwork
+              const { data: originalArtwork } = await supabase
+                .from("proof_artwork")
+                .select("*")
+                .eq("proof_id", proof.id);
+
+              if (originalArtwork && originalArtwork.length > 0) {
+                const newArtwork = originalArtwork.map((art: any) => ({
+                  proof_id: newProof.id,
+                  company_id: profile.company_id,
+                  imprint_id: newImprintId,
+                  artwork_url: art.artwork_url,
+                  artwork_name: art.artwork_name,
+                  artwork_version: art.artwork_version,
+                  file_type: art.file_type,
+                  file_size: art.file_size,
+                  position_x: art.position_x,
+                  position_y: art.position_y,
+                  scale: art.scale,
+                  rotation: art.rotation,
+                  customer_artwork_id: art.customer_artwork_id,
+                  print_location: art.print_location,
+                  width_inches: art.width_inches,
+                  height_inches: art.height_inches,
+                  sort_order: art.sort_order,
+                }));
+
+                await supabase
+                  .from("proof_artwork")
+                  .insert(newArtwork);
+              }
+            }
+          }
+        }
       }
 
       return new Response(
@@ -234,21 +473,16 @@ Deno.serve(async (req: Request) => {
         })
         .eq("id", quoteId);
 
-      // Get company settings to get inkops_subdomain and company_name
-      const { data: companySettings } = await supabase
+      // Get company settings to retrieve the inkops subdomain (use admin client to bypass RLS)
+      const { data: companySettings } = await supabaseAdmin
         .from("company_settings")
-        .select("inkops_subdomain, company_name")
+        .select("inkops_subdomain")
         .eq("id", profile.company_id)
         .maybeSingle();
 
-      // Generate public approval URL using inkops.ink subdomain (ALWAYS use inkops.ink subdomain)
-      let subdomain = companySettings?.inkops_subdomain;
-      if (!subdomain && companySettings?.company_name) {
-        subdomain = companySettings.company_name.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 30);
-      }
-      const approvalUrl = subdomain
-        ? `https://${subdomain}.inkops.ink/quote-approval/${approvalToken}`
-        : `https://inkops.ink/quote-approval/${approvalToken}`;
+      // Generate public approval URL using company subdomain
+      const subdomain = companySettings?.inkops_subdomain || 'app';
+      const approvalUrl = `https://${subdomain}.inkops.ink/quote-approval/${approvalToken}`;
 
       // Send email with template or default
       try {
@@ -276,39 +510,38 @@ Deno.serve(async (req: Request) => {
             .maybeSingle();
 
           if (template) {
-            // Build context for shortcode processing
-            const context = {
-              quote: {
-                ...quote,
-                approval_url: approvalUrl,
-                expires_at: expiresAt,
-              },
-              custom_message: body.custom_message || '',
+            // Build shortcode data for template processing
+            const shortcodeData: ShortCodeData = {
+              customer_first_name: quote.customer_name?.split(' ')[0] || '',
+              customer_last_name: quote.customer_name?.split(' ').slice(1).join(' ') || '',
+              customer_full_name: quote.customer_name || '',
+              customer_company: quote.customer_company || '',
+              customer_email: quote.customer_email || '',
+              customer_phone: quote.customer_phone || '',
+              quote_number: quote.quote_number || '',
+              quote_total: quote.total?.toFixed(2) || '0.00',
+              quote_subtotal: quote.subtotal?.toFixed(2) || '0.00',
+              quote_tax: quote.tax_amount?.toFixed(2) || '0.00',
+              quote_link: approvalUrl,
+              quote_date: quote.created_at ? new Date(quote.created_at).toLocaleDateString() : '',
+              quote_expiry_date: expiresAt ? new Date(expiresAt).toLocaleDateString() : '',
+              current_date: new Date().toLocaleDateString(),
+              current_year: new Date().getFullYear().toString(),
             };
 
-            // Process shortcodes via communication-templates edge function
-            const shortcodeResponse = await fetch(
-              `${supabaseUrl}/functions/v1/communication-templates/process`,
-              {
-                method: "POST",
-                headers: {
-                  Authorization: `Bearer ${supabaseServiceKey}`,
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  template_id: template.id,
-                  context,
-                }),
-              }
-            );
-
-            if (shortcodeResponse.ok) {
-              const processed = await shortcodeResponse.json();
-              subject = processed.subject || subject;
-              html = processed.body_html || html;
-            }
+            // Process shortcodes in subject and body
+            subject = renderTemplate(template.subject_template, shortcodeData);
+            html = renderTemplate(template.body_template, shortcodeData);
           }
         }
+
+        console.log('Attempting to send email to:', quote.customer_email);
+        console.log('Email payload:', {
+          to: quote.customer_email,
+          subject,
+          hasHtml: !!html,
+          company_id: profile.company_id,
+        });
 
         const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
           method: 'POST',
@@ -325,11 +558,16 @@ Deno.serve(async (req: Request) => {
         });
 
         if (!emailResponse.ok) {
-          console.error('Failed to send email:', await emailResponse.text());
+          const errorText = await emailResponse.text();
+          console.error('Failed to send email:', errorText);
+          throw new Error(`Email sending failed: ${errorText}`);
         }
+
+        const emailResult = await emailResponse.json();
+        console.log('Email sent successfully:', emailResult);
       } catch (emailError) {
         console.error('Error sending email:', emailError);
-        // Don't fail the whole request if email fails
+        throw new Error(`Failed to send quote email: ${emailError.message || 'Unknown error'}`);
       }
 
       return new Response(
@@ -358,9 +596,6 @@ Deno.serve(async (req: Request) => {
 
       if (fetchError) throw fetchError;
       if (!quote) throw new Error("Quote not found");
-      if (quote.status === "approved") {
-        throw new Error("Quote is already approved");
-      }
 
       const body = await req.json();
       const approverName = body.approver_name || profile.full_name || profile.email;
@@ -398,26 +633,42 @@ Deno.serve(async (req: Request) => {
       const garmentItems = lineItems?.filter((item: any) => item.line_type === "item" || !item.line_type) || [];
       const totalQuantity = garmentItems.reduce((sum: number, item: any) => sum + (sumQty(item) || item.quantity || 0), 0);
 
-      const { data: workOrder, error: woError } = await supabaseAdmin
+      // Check if work order already exists
+      let workOrder;
+      const { data: existingWorkOrder } = await supabaseAdmin
         .from("work_orders")
-        .insert([{
-          work_order_number: workOrderNumber,
-          company_id: profile.company_id,
-          quote_id: quoteId,
-          customer_name: quote.customer_name,
-          status: "Pending Scheduling",
-          priority: "medium",
-          production_due_date: quote.production_due_date,
-          customer_due_date: quote.customer_due_date,
-          total_quantity: totalQuantity,
-          notes: quote.production_notes || quote.notes,
-        }])
-        .select()
-        .single();
+        .select("*")
+        .eq("quote_id", quoteId)
+        .eq("company_id", profile.company_id)
+        .maybeSingle();
 
-      if (woError) throw new Error("Failed to create work order: " + woError.message);
+      if (existingWorkOrder) {
+        console.log("Work order already exists, using existing:", existingWorkOrder.id);
+        workOrder = existingWorkOrder;
+      } else {
+        const { data: newWorkOrder, error: woError } = await supabaseAdmin
+          .from("work_orders")
+          .insert([{
+            work_order_number: workOrderNumber,
+            company_id: profile.company_id,
+            quote_id: quoteId,
+            customer_name: quote.customer_name,
+            status: "Pending Scheduling",
+            priority: "medium",
+            production_due_date: quote.production_due_date,
+            customer_due_date: quote.customer_due_date,
+            total_quantity: totalQuantity,
+            notes: quote.production_notes || quote.notes,
+          }])
+          .select()
+          .single();
 
-      if (lineItems && lineItems.length > 0) {
+        if (woError) throw new Error("Failed to create work order: " + woError.message);
+        workOrder = newWorkOrder;
+      }
+
+      // Only insert work order line items if they don't already exist
+      if (!existingWorkOrder && lineItems && lineItems.length > 0) {
         const woLineItems = lineItems
           .filter((item: any) => item.line_type === "item" || !item.line_type)
           .map((item: any) => ({
@@ -437,10 +688,23 @@ Deno.serve(async (req: Request) => {
         if (woliError) console.error("WO line items error:", woliError.message);
       }
 
+      // Check if invoice already exists
       const invoiceId = invoiceNumber;
-      const { data: invoice, error: invError } = await supabaseAdmin
+      let invoice;
+      const { data: existingInvoice } = await supabaseAdmin
         .from("printavo_invoices")
-        .insert([{
+        .select("*")
+        .eq("id", invoiceId)
+        .eq("company_id", profile.company_id)
+        .maybeSingle();
+
+      if (existingInvoice) {
+        console.log("Invoice already exists, using existing:", existingInvoice.id);
+        invoice = existingInvoice;
+      } else {
+        const { data: newInvoice, error: invError } = await supabaseAdmin
+          .from("printavo_invoices")
+          .insert([{
           id: invoiceId,
           invoice_number: invoiceNumber,
           company_id: profile.company_id,
@@ -482,9 +746,12 @@ Deno.serve(async (req: Request) => {
         .select()
         .single();
 
-      if (invError) throw new Error("Failed to create invoice: " + invError.message);
+        if (invError) throw new Error("Failed to create invoice: " + invError.message);
+        invoice = newInvoice;
+      }
 
-      if (lineItems && lineItems.length > 0) {
+      // Only insert invoice line items if invoice was just created
+      if (!existingInvoice && lineItems && lineItems.length > 0) {
         const invLineItems = lineItems.map((item: any) => ({
           invoice_id: invoiceId,
           company_id: profile.company_id,
@@ -509,9 +776,11 @@ Deno.serve(async (req: Request) => {
         item.line_type === "item" || !item.line_type
       ) || [];
 
-      for (const garment of garmentLineItems) {
-        const totalQty = sumQty(garment) || garment.quantity || 0;
-        await supabaseAdmin.from("garment_requirements_staging").insert([{
+      // Only insert garment requirements if work order was just created
+      if (!existingWorkOrder) {
+        for (const garment of garmentLineItems) {
+          const totalQty = sumQty(garment) || garment.quantity || 0;
+          await supabaseAdmin.from("garment_requirements_staging").insert([{
           company_id: profile.company_id,
           quote_id: quoteId,
           work_order_id: workOrder.id,
@@ -524,13 +793,18 @@ Deno.serve(async (req: Request) => {
           supplier_name: garment.supplier_name,
           supplier_type: garment.supplier_name ? "distributor" : null,
         }]);
+        }
       }
 
-      if (imprints && imprints.length > 0) {
+      // Only insert schedule entries if work order was just created
+      if (!existingWorkOrder && imprints && imprints.length > 0) {
         const today = new Date().toISOString().split('T')[0];
         const quoteDueDate = quote.production_due_date || quote.customer_due_date || today;
         const dueDate = quoteDueDate >= today ? quoteDueDate : today;
         const totalQtyAll = lineItems?.reduce((sum: number, li: any) => sum + (sumQty(li) || li.quantity || 0), 0) || 0;
+
+        console.log(`Creating ${imprints.length} schedule entries for quote ${quote.quote_number}`);
+
         const scheduleEntries = imprints.map((imp: any, idx: number) => ({
           company_id: profile.company_id,
           quote_id: quoteId,
@@ -548,11 +822,31 @@ Deno.serve(async (req: Request) => {
           priority_order: idx,
         }));
 
-        const { error: schedError } = await supabaseAdmin.from("production_schedule_entries").insert(scheduleEntries);
-        if (schedError) console.error("Schedule entries error:", schedError.message);
+        console.log("Schedule entries to insert:", JSON.stringify(scheduleEntries, null, 2));
+
+        const { data: insertedSchedule, error: schedError } = await supabaseAdmin
+          .from("production_schedule_entries")
+          .insert(scheduleEntries)
+          .select();
+
+        if (schedError) {
+          console.error("CRITICAL: Failed to create schedule entries:", schedError);
+          throw new Error(`Failed to create schedule entries: ${schedError.message}`);
+        }
+
+        console.log(`Successfully created ${insertedSchedule?.length || 0} schedule entries`);
       }
 
-      await supabaseAdmin.from("billing_queue").insert([{
+      // Check if billing queue entry already exists
+      const { data: existingBillingQueue } = await supabaseAdmin
+        .from("billing_queue")
+        .select("*")
+        .eq("printavo_invoice_id", invoiceId)
+        .eq("company_id", profile.company_id)
+        .maybeSingle();
+
+      if (!existingBillingQueue) {
+        await supabaseAdmin.from("billing_queue").insert([{
         company_id: profile.company_id,
         printavo_invoice_id: invoiceId,
         printavo_visual_id: invoiceNumber,
@@ -563,6 +857,7 @@ Deno.serve(async (req: Request) => {
         invoice_date: new Date().toISOString(),
         payment_status: "pending",
       }]);
+      }
 
       await supabaseAdmin
         .from("quotes")

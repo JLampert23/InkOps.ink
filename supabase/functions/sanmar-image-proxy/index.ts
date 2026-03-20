@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { isPlaceholderUrl } from "../_shared/image-validator.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,18 +9,6 @@ const corsHeaders = {
 };
 
 const ALLOWED_HOSTS = ["cdn.sanmar.com", "cdnm.sanmar.com", "www.sanmar.com", "sanmar.com"];
-
-const PLACEHOLDER_INDICATORS = [
-  "imagenotavailable",
-  "image404errorhandler",
-  "image_not_available",
-  "notavailable",
-];
-
-function isPlaceholderUrl(url: string): boolean {
-  const lower = url.toLowerCase();
-  return PLACEHOLDER_INDICATORS.some(indicator => lower.includes(indicator));
-}
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {

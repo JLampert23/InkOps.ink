@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, GripVertical, Loader2, X, Check } from 'lucide-react';
+import { Plus, CreditCard as Edit, Trash2, GripVertical, Loader2, X, Check } from 'lucide-react';
 import {
   CustomInvoiceStatusService,
   CustomInvoiceStatus,
@@ -177,10 +177,10 @@ export function CustomInvoiceStatusManager({ companyId }: CustomInvoiceStatusMan
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Custom Invoice Statuses
+            Work Order Statuses
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Create and manage custom status labels for your invoices
+            Create and manage custom status labels for your work orders
           </p>
         </div>
         <button

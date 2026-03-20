@@ -54,6 +54,14 @@ Deno.serve(async (req: Request) => {
     const isServiceCall = bearerToken === supabaseServiceKey;
     const token = isServiceCall ? bearerToken : (userToken || bearerToken);
 
+    console.log('send-email: Auth check:', {
+      hasAuthHeader: !!authHeader,
+      bearerTokenLength: bearerToken.length,
+      serviceKeyLength: supabaseServiceKey.length,
+      isServiceCall,
+      hasUserToken: !!userToken,
+    });
+
     if (!token) {
       throw new Error('Missing authorization');
     }
@@ -63,12 +71,15 @@ Deno.serve(async (req: Request) => {
     let companyId: string;
 
     if (isServiceCall) {
+      console.log('send-email: Recognized as service-to-service call');
       const body = await req.clone().json();
       if (!body.company_id) {
         throw new Error('company_id is required for service-to-service calls');
       }
       companyId = body.company_id;
+      console.log('send-email: Using company_id from request body:', companyId);
     } else {
+      console.log('send-email: Treating as user call, verifying JWT');
       const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
         auth: { autoRefreshToken: false, persistSession: false }
       });

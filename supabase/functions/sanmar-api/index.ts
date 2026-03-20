@@ -33,9 +33,19 @@ Deno.serve(async (req: Request) => {
 
     const userToken = req.headers.get("X-User-Token") || "";
     const authHeader = req.headers.get("Authorization");
-    const bearerToken = authHeader?.replace('Bearer ', '') || "";
-    const isServiceRoleKey = bearerToken === supabaseServiceRoleKey;
+    const bearerToken = authHeader?.replace('Bearer ', '').trim() || "";
+    const isServiceRoleKey = bearerToken === supabaseServiceRoleKey.trim();
     const token = isServiceRoleKey ? bearerToken : (userToken || bearerToken);
+
+    console.log('🔐 Auth Debug:', {
+      hasAuthHeader: !!authHeader,
+      bearerTokenLength: bearerToken.length,
+      serviceKeyLength: supabaseServiceRoleKey.length,
+      isServiceRoleKey,
+      bearerPrefix: bearerToken.substring(0, 20),
+      servicePrefix: supabaseServiceRoleKey.substring(0, 20),
+      match: bearerToken === supabaseServiceRoleKey.trim()
+    });
 
     if (!token) {
       return new Response(
@@ -98,7 +108,7 @@ Deno.serve(async (req: Request) => {
     // Get SanMar PromoStandards credentials from company_settings
     const { data: settings } = await supabaseAdmin
       .from("company_settings")
-      .select("sanmar_promo_username, sanmar_promo_password_encrypted")
+      .select("sanmar_promo_username, sanmar_promo_password_encrypted, ssactivewear_fob_id")
       .eq("id", companyId)
       .maybeSingle();
 
@@ -137,7 +147,8 @@ Deno.serve(async (req: Request) => {
 
     const credentials: SanMarCredentials = {
       id: settings.sanmar_promo_username,
-      password: decryptedPassword
+      password: decryptedPassword,
+      fobId: settings.ssactivewear_fob_id || undefined
     };
 
     console.log(`🔑 SanMar credentials loaded for company ${companyId}`);
@@ -251,20 +262,33 @@ Deno.serve(async (req: Request) => {
         break;
 
       case "pricing":
-        // Fetch pricing for a specific part
-        if (!partId) {
+        // Fetch pricing for a style (pricing API uses style numbers, not partIds)
+        if (!style) {
           return new Response(
-            JSON.stringify({ error: "Part ID required for pricing lookup" }),
+            JSON.stringify({ error: "Style number required for pricing lookup" }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-        const pricingData = await fetchSanMarPricing(credentials, partId);
-        responseData = {
-          success: true,
-          supplier: "sanmar",
-          action: "pricing",
-          data: pricingData
-        };
+        try {
+          const pricingData = await fetchSanMarPricing(credentials, style);
+          responseData = {
+            success: true,
+            supplier: "sanmar",
+            action: "pricing",
+            data: pricingData
+          };
+          console.log(`✅ Pricing fetch successful for ${style}: ${pricingData.parts.length} parts`);
+        } catch (pricingError: any) {
+          console.warn(`⚠️ Pricing unavailable for ${style}:`, pricingError.message);
+          // Return empty pricing data instead of failing
+          responseData = {
+            success: true,
+            supplier: "sanmar",
+            action: "pricing",
+            data: { parts: [] },
+            warning: `Pricing unavailable: ${pricingError.message}`
+          };
+        }
         break;
 
       case "media":

@@ -16,9 +16,11 @@ import {
   GarmentRequirement,
 } from '../../services/po-auto-creation-service';
 import { useNotification } from '../../contexts/NotificationContext';
+import { useConfirmation } from '../../contexts/ConfirmationContext';
 
 export function AutoPODashboard() {
   const { showNotification } = useNotification();
+  const { confirm } = useConfirmation();
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [stats, setStats] = useState<any>(null);
@@ -73,11 +75,15 @@ export function AutoPODashboard() {
   };
 
   const handleAutoCreatePOs = async () => {
-    if (
-      !confirm(
-        'This will create draft POs for all pending garment requirements. Continue?'
-      )
-    ) {
+    const confirmed = await confirm({
+      title: 'Auto-Create Purchase Orders?',
+      message: 'This will create draft POs for all pending garment requirements.',
+      confirmLabel: 'Create POs',
+      cancelLabel: 'Cancel',
+      variant: 'info',
+    });
+
+    if (!confirmed) {
       return;
     }
 
