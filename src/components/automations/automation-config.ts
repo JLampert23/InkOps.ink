@@ -355,7 +355,7 @@ export const TRIGGER_CONDITION_OPTIONS: Record<string, { label: string; options:
     ],
   },
   work_order_invoice_status_changed: {
-    label: 'Invoice Status',
+    label: 'Work Order Status',
     options: [],
   },
 };
