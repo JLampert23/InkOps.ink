@@ -7,7 +7,7 @@ import CreateCustomerModal from '../accounting/CreateCustomerModal';
 import { ManageImprintsModal } from './ManageImprintsModal';
 import MockupGenerator from './MockupGenerator';
 import { SendQuoteModal } from './SendQuoteModal';
-import { getUnifiedProductData, fetchLiveSSActivewearPricing } from '../../services/ssactivewear-promostandards-service';
+import { getUnifiedProductData, fetchLiveSSActivewearPricing, fetchLiveSanMarPricing } from '../../services/ssactivewear-promostandards-service';
 import { proxySanMarImageUrl } from '../../utils/sanmar-image-proxy';
 import { recalculateImprintPricesForGroup } from '../../utils/price-matrix-utils';
 
@@ -1061,6 +1061,34 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
         }
       }
 
+      // Fetch live pricing for SanMar items (mirrors SSA fetch above)
+      const sanmarItems = group.items.filter((itm: any) =>
+        itm.supplier_name?.toUpperCase() === 'SANMAR' && itm.item_number
+      );
+      const uniqueSanMarStyles = [...new Set(sanmarItems.map((itm: any) => itm.item_number))];
+
+      if (uniqueSanMarStyles.length > 0 && !silent) {
+        console.log(`[Update Price] Fetching live pricing for ${uniqueSanMarStyles.length} SanMar style(s):`, uniqueSanMarStyles);
+        const smResults = await Promise.all(
+          uniqueSanMarStyles.map(async (style) => {
+            const r = await fetchLiveSanMarPricing(style as string, companySettings?.id);
+            return { style, result: r };
+          })
+        );
+        for (const { style, result } of smResults) {
+          if (result.success && result.parts.length > 0) {
+            for (const part of result.parts) {
+              priceLookup.set(part.partId, part.price);
+            }
+            priceLookup.set(`style:${style}`, result.parts[0].price);
+            console.log(`[Update Price] SanMar ${style}: ${result.parts.length} parts, first price: $${result.parts[0].price}`);
+          } else {
+            failedStyles.push(style as string);
+            console.warn(`[Update Price] Failed to fetch SanMar pricing for ${style}: ${result.error}`);
+          }
+        }
+      }
+
       const newGroups = groups.map(g => {
         if (g.id === groupId) {
           const newItems = g.items.map((itm: any) => {
@@ -1068,6 +1096,16 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
             let priceSource = 'existing';
 
             if (itm.supplier_name?.toUpperCase() === 'SSACTIVEWEAR') {
+              if (itm.supplier_partid && priceLookup.has(itm.supplier_partid)) {
+                wholesalePrice = priceLookup.get(itm.supplier_partid)!;
+                priceSource = 'live-partid';
+              } else if (itm.item_number && priceLookup.has(`style:${itm.item_number}`)) {
+                wholesalePrice = priceLookup.get(`style:${itm.item_number}`)!;
+                priceSource = 'live-style';
+              }
+            }
+
+            if (itm.supplier_name?.toUpperCase() === 'SANMAR') {
               if (itm.supplier_partid && priceLookup.has(itm.supplier_partid)) {
                 wholesalePrice = priceLookup.get(itm.supplier_partid)!;
                 priceSource = 'live-partid';
@@ -1327,6 +1365,13 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
 
         console.log('Found results after filtering:', filteredResults.length, 'from', data.results.length);
         setProductSearchResults(filteredResults);
+        if (filteredResults.length === 0) {
+          const sanmarEnabled = data.diagnostics?.sanmarEnabled;
+          const ssaEnabled = data.diagnostics?.ssaEnabled;
+          if (!sanmarEnabled && !ssaEnabled) {
+            showNotification('warning', 'No Suppliers Enabled', 'No product found. Go to Account Settings → Supplier Integrations to enable SanMar or SSActivewear.');
+          }
+        }
         setShowProductDropdown(filteredResults.length > 0);
       } else if (data.error) {
         console.log('Product search error:', data.error);
