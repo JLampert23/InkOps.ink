@@ -546,6 +546,91 @@ export async function fetchLiveSSActivewearPricing(
   }
 }
 
+export async function fetchLiveSanMarPricing(
+  styleNumber: string,
+  companyId?: string
+): Promise<StylePricingResult> {
+  const SANMAR_EDGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sanmar-api`;
+
+  try {
+    const token = await getAuthToken();
+
+    let url = `${SANMAR_EDGE_URL}?action=pricing&style=${encodeURIComponent(styleNumber)}`;
+    if (companyId) {
+      url += `&companyId=${encodeURIComponent(companyId)}`;
+    }
+
+    console.log(`[SanMar Live Pricing] Fetching pricing for style: ${styleNumber}`);
+
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        'X-User-Token': token,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+      console.error(`[SanMar Live Pricing] API error for ${styleNumber}:`, errorData);
+      return {
+        success: false,
+        styleNumber,
+        parts: [],
+        error: errorData.error || `HTTP ${response.status}`
+      };
+    }
+
+    const result = await response.json();
+
+    const pricingParts: any[] = result.data?.parts || result.parts || [];
+
+    if (!result.success || pricingParts.length === 0) {
+      console.warn(`[SanMar Live Pricing] No pricing data for ${styleNumber}:`, result.error || 'No parts returned');
+      return {
+        success: false,
+        styleNumber,
+        parts: [],
+        error: result.error || 'No pricing data available'
+      };
+    }
+
+    const parts: PartPricing[] = pricingParts.map((part: any) => {
+      const lowestTier = part.prices && part.prices.length > 0
+        ? part.prices.reduce((lowest: any, current: any) => {
+            const lq = current.minQuantity ?? current.quantity ?? 999999;
+            const ll = lowest.minQuantity ?? lowest.quantity ?? 999999;
+            return lq < ll ? current : lowest;
+          }, part.prices[0])
+        : { price: part.price || 0 };
+
+      return {
+        partId: part.partId || part.part_id || '',
+        price: lowestTier.price || part.price || 0,
+        warehouse: part.warehouse || 'sanmar'
+      };
+    });
+
+    console.log(`[SanMar Live Pricing] Found ${parts.length} parts for ${styleNumber}:`,
+      parts.slice(0, 3).map(p => `${p.partId}: $${p.price}`).join(', ') + (parts.length > 3 ? '...' : '')
+    );
+
+    return {
+      success: true,
+      styleNumber,
+      parts
+    };
+  } catch (error: any) {
+    console.error(`[SanMar Live Pricing] Exception for ${styleNumber}:`, error);
+    return {
+      success: false,
+      styleNumber,
+      parts: [],
+      error: error.message || 'Network error'
+    };
+  }
+}
+
 export async function getSanMarWholesalePrice(
   style: string,
   color: string,
