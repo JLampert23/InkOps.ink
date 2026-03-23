@@ -152,7 +152,7 @@ async function processQueueItem(supabase: any, queueItem: any) {
       const conditionsMet = await validateConditions(
         supabase,
         automation.conditions,
-        queueItem.event_data,
+        queueItem.trigger_data,
         queueItem.company_id
       );
 
@@ -168,7 +168,7 @@ async function processQueueItem(supabase: any, queueItem: any) {
         const actionResult = await executeAction(
           supabase,
           action,
-          queueItem.event_data,
+          queueItem.trigger_data,
           queueItem.company_id
         );
 
@@ -178,18 +178,22 @@ async function processQueueItem(supabase: any, queueItem: any) {
       }
 
       // Log successful execution
-      await supabase
+      const { error: logError } = await supabase
         .from('automation_logs')
         .insert({
           company_id: queueItem.company_id,
           automation_id: automation.id,
-          trigger_type: queueItem.trigger_type,
-          trigger_event: queueItem.event_data,
+          trigger_event: queueItem.trigger_data,
           status: 'success',
           executed_actions: automation.actions,
           execution_time_ms: 0,
+          execution_method: 'automatic',
           executed_at: new Date().toISOString()
         });
+
+      if (logError) {
+        console.error('Failed to insert automation log:', logError);
+      }
     }
 
     // All automations processed successfully
@@ -233,10 +237,10 @@ async function processQueueItem(supabase: any, queueItem: any) {
       .insert({
         company_id: queueItem.company_id,
         automation_id: queueItem.automation_id,
-        trigger_type: queueItem.trigger_type,
-        trigger_data: queueItem.trigger_data,
+        trigger_event: queueItem.trigger_data,
         status: 'error',
         error_message: errorMessage,
+        execution_method: 'automatic',
         executed_at: new Date().toISOString()
       });
 
