@@ -276,13 +276,14 @@ export function validateTemplate(
   }
 
   // Check for required short codes if template type is provided
+  // NOTE: Required shortcodes are now treated as warnings only, not errors
   if (templateType) {
     const requiredCodes = getRequiredShortCodes(templateType);
 
     for (const required of requiredCodes) {
       if (!allCodes.includes(required.code)) {
         missingRequiredCodes.push(required);
-        warnings.push(`Missing required short code: {{${required.code}}} - ${required.reason}`);
+        warnings.push(`Recommended short code: {{${required.code}}} - ${required.reason}`);
       }
     }
   }
@@ -294,7 +295,7 @@ export function validateTemplate(
     usedShortCodes: allCodes,
     missingShortCodes: [],
     missingRequiredCodes,
-    hasRequiredCodeViolations: missingRequiredCodes.length > 0,
+    hasRequiredCodeViolations: false, // No longer block saves for missing required codes
   };
 }
 
