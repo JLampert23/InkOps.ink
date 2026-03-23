@@ -1,6 +1,29 @@
 import { formatCurrency, formatDate, type ShortCodeData } from './shortcode-engine.ts';
 
 /**
+ * Formats a document number for friendly display in emails
+ * Strips the prefix and adds a friendly label
+ * Examples:
+ *   QTE-1234 → Quote 1234
+ *   INV-1234 → Invoice 1234
+ *   WO-1234 → Work Order 1234
+ */
+function formatFriendlyNumber(number: string, type: 'quote' | 'invoice' | 'work_order'): string {
+  if (!number) return '';
+
+  const labels = {
+    quote: 'Quote',
+    invoice: 'Invoice',
+    work_order: 'Work Order'
+  };
+
+  // Strip common prefixes (QTE-, INV-, WO-)
+  const numericPart = number.replace(/^(QTE-|INV-|WO-)/i, '');
+
+  return `${labels[type]} ${numericPart}`;
+}
+
+/**
  * Builds shortcode data from a quote record
  */
 export function buildQuoteShortCodes(
@@ -30,7 +53,7 @@ export function buildQuoteShortCodes(
     customer_zip: quote?.bill_zip || '',
 
     // Quote data
-    quote_number: quote?.quote_number || '',
+    quote_number: formatFriendlyNumber(quote?.quote_number || '', 'quote'),
     quote_total: formatCurrency(quote?.total_amount || 0),
     quote_subtotal: formatCurrency(quote?.subtotal || 0),
     quote_tax: formatCurrency(quote?.sales_tax || 0),
@@ -93,7 +116,7 @@ export function buildInvoiceShortCodes(
     customer_zip: invoice?.bill_zip || '',
 
     // Invoice data
-    invoice_number: invoice?.invoice_number || '',
+    invoice_number: formatFriendlyNumber(invoice?.invoice_number || '', 'invoice'),
     invoice_total: formatCurrency(invoice?.total || 0),
     invoice_subtotal: formatCurrency(invoice?.subtotal || 0),
     invoice_tax: formatCurrency(invoice?.tax || 0),
@@ -148,7 +171,7 @@ export function buildPaymentShortCodes(
     customer_phone: customer?.customer_phone || invoice?.customer_phone || '',
 
     // Invoice data
-    invoice_number: invoice?.invoice_number || '',
+    invoice_number: formatFriendlyNumber(invoice?.invoice_number || '', 'invoice'),
     invoice_total: formatCurrency(invoice?.total || 0),
     invoice_balance: formatCurrency(invoice?.balance || 0),
     invoice_date: invoice?.date ? formatDate(invoice.date) : '',

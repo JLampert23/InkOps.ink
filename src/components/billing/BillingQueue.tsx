@@ -421,7 +421,7 @@ export function BillingQueue({ onSendInvoice, onViewInvoice }: BillingQueueProps
                         onClick={() => onViewInvoice?.(item.printavoInvoiceId)}
                         className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline cursor-pointer"
                       >
-                        {item.printavoVisualId}
+                        {item.printavoInvoiceId}
                       </button>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
                         {item.printavoStatus}
