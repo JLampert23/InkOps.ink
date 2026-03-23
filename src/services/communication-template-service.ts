@@ -19,25 +19,82 @@ import { ShortCodeEngine, type ShortCodeData } from './shortcode-service';
 const EDGE_FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/communication-templates`;
 
 /**
- * Get headers for API requests
+ * Make a fetch request with automatic retry on 401 errors
+ */
+async function fetchWithAuth(
+  url: string,
+  options: RequestInit = {},
+  retryCount: number = 0
+): Promise<Response> {
+  const MAX_RETRIES = 2;
+
+  try {
+    const headers = await getHeaders();
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        ...headers,
+        ...options.headers,
+      },
+    });
+
+    // If we get a 401 and haven't exhausted retries, try again with fresh token
+    if (response.status === 401 && retryCount < MAX_RETRIES) {
+      console.warn(`Authentication failed (attempt ${retryCount + 1}/${MAX_RETRIES}), retrying with fresh token...`);
+
+      // Wait a bit before retrying
+      await new Promise(resolve => setTimeout(resolve, 500 * (retryCount + 1)));
+
+      // Retry with fresh token
+      return fetchWithAuth(url, options, retryCount + 1);
+    }
+
+    return response;
+  } catch (error) {
+    console.error('Fetch error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get headers for API requests with automatic token refresh
  */
 async function getHeaders(): Promise<HeadersInit> {
-  const { data: { session }, error } = await supabase.auth.getSession();
+  try {
+    // First, try to refresh the session to ensure we have a valid token
+    const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
 
-  if (error) {
-    console.error('Session error:', error);
-    throw new Error(`Authentication error: ${error.message}`);
+    if (refreshError) {
+      console.warn('Session refresh failed, trying to get existing session:', refreshError.message);
+
+      // If refresh fails, try to get the existing session
+      const { data: { session: existingSession }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !existingSession?.access_token) {
+        console.error('Session error:', sessionError);
+        throw new Error('Your session has expired. Please refresh the page and sign in again.');
+      }
+
+      return {
+        'Authorization': `Bearer ${existingSession.access_token}`,
+        'Content-Type': 'application/json',
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+      };
+    }
+
+    if (!session?.access_token) {
+      throw new Error('Not authenticated. Please refresh the page and sign in again.');
+    }
+
+    return {
+      'Authorization': `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
+      'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+    };
+  } catch (error) {
+    console.error('Error getting authentication headers:', error);
+    throw error;
   }
-
-  if (!session?.access_token) {
-    throw new Error('Not authenticated. Please sign in again.');
-  }
-
-  return {
-    'Authorization': `Bearer ${session.access_token}`,
-    'Content-Type': 'application/json',
-    'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-  };
 }
 
 /**
@@ -48,7 +105,6 @@ export async function listTemplates(
   activeOnly: boolean = false
 ): Promise<CommunicationTemplate[]> {
   try {
-    const headers = await getHeaders();
     const params = new URLSearchParams();
 
     if (templateType) {
@@ -62,8 +118,7 @@ export async function listTemplates(
       ? `${EDGE_FUNCTION_URL}?${params.toString()}`
       : EDGE_FUNCTION_URL;
 
-    console.log('Fetching templates with headers:', { url, hasAuth: !!headers.Authorization });
-    const response = await fetch(url, { headers });
+    const response = await fetchWithAuth(url);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -74,6 +129,12 @@ export async function listTemplates(
       } catch {
         errorData = { error: errorText };
       }
+
+      // Provide user-friendly error messages
+      if (response.status === 401) {
+        throw new Error('Session expired. Please refresh the page and sign in again.');
+      }
+
       throw new Error(errorData.error || errorData.details || `Failed to fetch templates (${response.status})`);
     }
 
@@ -89,10 +150,13 @@ export async function listTemplates(
  */
 export async function getTemplate(templateId: string): Promise<CommunicationTemplate> {
   try {
-    const headers = await getHeaders();
-    const response = await fetch(`${EDGE_FUNCTION_URL}/${templateId}`, { headers });
+    const response = await fetchWithAuth(`${EDGE_FUNCTION_URL}/${templateId}`);
 
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Session expired. Please refresh the page and sign in again.');
+      }
+
       const error = await response.json();
       throw new Error(error.error || 'Failed to fetch template');
     }
@@ -124,14 +188,16 @@ export async function createTemplate(
   request: CreateTemplateRequest
 ): Promise<CommunicationTemplate> {
   try {
-    const headers = await getHeaders();
-    const response = await fetch(EDGE_FUNCTION_URL, {
+    const response = await fetchWithAuth(EDGE_FUNCTION_URL, {
       method: 'POST',
-      headers,
       body: JSON.stringify(request),
     });
 
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Session expired. Please refresh the page and sign in again.');
+      }
+
       const error = await response.json();
       throw new Error(error.error || 'Failed to create template');
     }
@@ -151,14 +217,16 @@ export async function updateTemplate(
   request: UpdateTemplateRequest
 ): Promise<CommunicationTemplate> {
   try {
-    const headers = await getHeaders();
-    const response = await fetch(`${EDGE_FUNCTION_URL}/${templateId}`, {
+    const response = await fetchWithAuth(`${EDGE_FUNCTION_URL}/${templateId}`, {
       method: 'PUT',
-      headers,
       body: JSON.stringify(request),
     });
 
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Session expired. Please refresh the page and sign in again.');
+      }
+
       const error = await response.json();
       throw new Error(error.error || 'Failed to update template');
     }
@@ -175,13 +243,15 @@ export async function updateTemplate(
  */
 export async function deleteTemplate(templateId: string): Promise<void> {
   try {
-    const headers = await getHeaders();
-    const response = await fetch(`${EDGE_FUNCTION_URL}/${templateId}`, {
+    const response = await fetchWithAuth(`${EDGE_FUNCTION_URL}/${templateId}`, {
       method: 'DELETE',
-      headers,
     });
 
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Session expired. Please refresh the page and sign in again.');
+      }
+
       const error = await response.json();
       throw new Error(error.error || 'Failed to delete template');
     }
