@@ -359,14 +359,13 @@ export function validateTemplate(
   }
 
   // Check for recommended short codes if template type is provided
-  // These are now just suggestions, not requirements
+  // These are just suggestions, not requirements
   if (templateType) {
     const recommendedCodes = getRequiredShortCodes(templateType);
 
     for (const recommended of recommendedCodes) {
       if (!allCodes.includes(recommended.code)) {
-        missingRequiredCodes.push(recommended);
-        warnings.push(`Recommended short code: {{${recommended.code}}} - ${recommended.reason}`);
+        warnings.push(`Suggested short code: {{${recommended.code}}} - ${recommended.reason}`);
       }
     }
   }
@@ -377,7 +376,7 @@ export function validateTemplate(
     warnings,
     usedShortCodes: allCodes,
     missingShortCodes: [],
-    missingRequiredCodes,
+    missingRequiredCodes: [],
     hasRequiredCodeViolations: false,
   };
 }
