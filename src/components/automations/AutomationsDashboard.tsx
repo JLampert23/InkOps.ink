@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Power, PowerOff, Edit, Trash2, Clock, Zap, Loader2, Eye } from 'lucide-react';
+import { Plus, Search, Power, PowerOff, CreditCard as Edit, Trash2, Clock, Zap, Loader2, Eye, PlayCircle } from 'lucide-react';
 import { Automation } from '../../types/automation';
 import { AutomationEngineService } from '../../services/automation-engine-service';
 import { AutomationBuilder } from './AutomationBuilder';
 import { AutomationLogs } from './AutomationLogs';
 import { TRIGGER_OPTIONS } from './automation-config';
+import { supabase } from '../../lib/supabase-client';
 
 type View = 'dashboard' | 'builder' | 'logs' | 'edit';
 
@@ -15,10 +16,33 @@ export function AutomationsDashboard() {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [editingAutomation, setEditingAutomation] = useState<Automation | null>(null);
   const [selectedAutomationId, setSelectedAutomationId] = useState<string | null>(null);
+  const [processingQueue, setProcessingQueue] = useState(false);
+  const [queueStats, setQueueStats] = useState<{ pending: number; completed: number; failed: number } | null>(null);
 
   useEffect(() => {
     loadAutomations();
+    loadQueueStats();
   }, []);
+
+  const loadQueueStats = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('automation_queue')
+        .select('status');
+
+      if (error) throw error;
+
+      const stats = {
+        pending: data.filter(q => q.status === 'pending').length,
+        completed: data.filter(q => q.status === 'completed').length,
+        failed: data.filter(q => q.status === 'failed').length,
+      };
+
+      setQueueStats(stats);
+    } catch (error) {
+      console.error('Failed to load queue stats:', error);
+    }
+  };
 
   const loadAutomations = async () => {
     setLoading(true);
@@ -75,6 +99,26 @@ export function AutomationsDashboard() {
     setCurrentView('logs');
   };
 
+  const handleProcessQueue = async () => {
+    setProcessingQueue(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('process-automation-queue', {
+        body: {}
+      });
+
+      if (error) throw error;
+
+      alert(data.message || `Successfully processed ${data.successful || 0} automation(s)`);
+      await loadQueueStats();
+      await loadAutomations();
+    } catch (error) {
+      console.error('Failed to process queue:', error);
+      alert('Failed to process automation queue. Please try again.');
+    } finally {
+      setProcessingQueue(false);
+    }
+  };
+
   const getTriggerLabel = (triggerType: string) => {
     const trigger = TRIGGER_OPTIONS.find(t => t.value === triggerType);
     return trigger?.label || triggerType;
@@ -116,8 +160,38 @@ export function AutomationsDashboard() {
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Automations</h2>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Create and manage workflow automations</p>
+          {queueStats && (
+            <div className="flex items-center gap-3 mt-2 text-xs">
+              <span className="text-gray-500 dark:text-gray-400">Queue:</span>
+              <span className="px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 rounded">
+                {queueStats.pending} pending
+              </span>
+              <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 rounded">
+                {queueStats.completed} completed
+              </span>
+              {queueStats.failed > 0 && (
+                <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 rounded">
+                  {queueStats.failed} failed
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
+          {queueStats && queueStats.pending > 0 && (
+            <button
+              onClick={handleProcessQueue}
+              disabled={processingQueue}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {processingQueue ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <PlayCircle className="w-4 h-4" />
+              )}
+              {processingQueue ? 'Processing...' : `Process Queue (${queueStats.pending})`}
+            </button>
+          )}
           <button
             onClick={() => setCurrentView('logs')}
             className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700"

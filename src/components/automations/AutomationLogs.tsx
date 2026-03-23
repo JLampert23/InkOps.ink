@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, CheckCircle, XCircle, AlertCircle, Clock, Loader2, Filter } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, AlertCircle, Clock, Loader2, Filter, Zap } from 'lucide-react';
 import { AutomationLog, Automation } from '../../types/automation';
 import { AutomationEngineService } from '../../services/automation-engine-service';
 import { format } from 'date-fns';
@@ -42,7 +42,11 @@ export function AutomationLogs({ automationId, onBack }: AutomationLogsProps) {
     }
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: string, executionMethod?: string) => {
+    if (executionMethod === 'queued_async') {
+      return <Zap className="w-5 h-5 text-blue-600 dark:text-blue-400" />;
+    }
+
     switch (status) {
       case 'success':
         return <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />;
@@ -55,16 +59,24 @@ export function AutomationLogs({ automationId, onBack }: AutomationLogsProps) {
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, executionMethod?: string, processingNote?: string) => {
     const styles = {
       success: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300',
       failure: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300',
       partial: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300',
     };
 
+    let displayText = status.charAt(0).toUpperCase() + status.slice(1);
+    let badgeStyle = styles[status as keyof typeof styles] || 'bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-gray-300';
+
+    if (executionMethod === 'queued_async' && status === 'success') {
+      displayText = 'Queued';
+      badgeStyle = 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300';
+    }
+
     return (
-      <span className={`px-2 py-1 text-xs font-medium rounded-full ${styles[status as keyof typeof styles] || 'bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-gray-300'}`}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+      <span className={`px-2 py-1 text-xs font-medium rounded-full ${badgeStyle}`}>
+        {displayText}
       </span>
     );
   };
@@ -149,8 +161,8 @@ export function AutomationLogs({ automationId, onBack }: AutomationLogsProps) {
                   <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        {getStatusIcon(log.status)}
-                        {getStatusBadge(log.status)}
+                        {getStatusIcon(log.status, (log as any).execution_method)}
+                        {getStatusBadge(log.status, (log as any).execution_method, (log as any).processing_note)}
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -216,8 +228,29 @@ export function AutomationLogs({ automationId, onBack }: AutomationLogsProps) {
             <div className="p-6 space-y-4">
               <div>
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
-                <div className="mt-1">{getStatusBadge(selectedLog.status)}</div>
+                <div className="mt-1">{getStatusBadge(selectedLog.status, (selectedLog as any).execution_method, (selectedLog as any).processing_note)}</div>
               </div>
+
+              {(selectedLog as any).execution_method && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Execution Method</label>
+                  <div className="mt-1 text-sm text-gray-900 dark:text-white">
+                    {(selectedLog as any).execution_method === 'queued_async' ? 'Asynchronous Queue' :
+                     (selectedLog as any).execution_method === 'direct' ? 'Direct Execution' :
+                     (selectedLog as any).execution_method === 'manual' ? 'Manual Trigger' :
+                     (selectedLog as any).execution_method}
+                  </div>
+                </div>
+              )}
+
+              {(selectedLog as any).processing_note && (
+                <div>
+                  <label className="text-sm font-medium text-blue-700 dark:text-blue-400">Processing Note</label>
+                  <div className="mt-1 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm text-blue-900 dark:text-blue-300">
+                    {(selectedLog as any).processing_note}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Automation</label>
