@@ -109,7 +109,7 @@ function validateTemplate(
   for (const required of requiredCodes) {
     if (!allCodes.includes(required.code)) {
       missingRequiredCodes.push(required);
-      warnings.push(`Missing required short code: {{${required.code}}} - ${required.reason}`);
+      warnings.push(`Recommended short code: {{${required.code}}} - ${required.reason}`);
     }
   }
 
@@ -118,7 +118,7 @@ function validateTemplate(
     errors,
     warnings,
     missingRequiredCodes,
-    hasRequiredCodeViolations: missingRequiredCodes.length > 0,
+    hasRequiredCodeViolations: false, // No longer block saves for missing recommended codes
   };
 }
 
