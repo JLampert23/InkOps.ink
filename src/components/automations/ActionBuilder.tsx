@@ -1,7 +1,8 @@
-import { X, GripVertical } from 'lucide-react';
+import { X, GripVertical, Info } from 'lucide-react';
 import { Action } from '../../types/automation';
 import { ACTION_OPTIONS } from './automation-config';
 import * as Icons from 'lucide-react';
+import { ShortCodeReference } from './ShortCodeReference';
 
 interface ActionBuilderProps {
   actions: Action[];
@@ -16,6 +17,7 @@ export function ActionBuilder({ actions, onUpdate, onRemove }: ActionBuilderProp
 
   const renderConfigField = (action: Action, field: any) => {
     const value = action.config[field.name] || '';
+    const isMessageField = field.name === 'message' || field.name === 'subject';
 
     switch (field.type) {
       case 'select':
@@ -38,15 +40,25 @@ export function ActionBuilder({ actions, onUpdate, onRemove }: ActionBuilderProp
 
       case 'textarea':
         return (
-          <textarea
-            value={value}
-            onChange={(e) => onUpdate(action.id, {
-              config: { ...action.config, [field.name]: e.target.value }
-            })}
-            rows={3}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-            placeholder={`Enter ${field.label.toLowerCase()}...`}
-          />
+          <div className="space-y-2">
+            <textarea
+              value={value}
+              onChange={(e) => onUpdate(action.id, {
+                config: { ...action.config, [field.name]: e.target.value }
+              })}
+              rows={4}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 font-mono text-sm"
+              placeholder={`Enter ${field.label.toLowerCase()}...`}
+            />
+            {isMessageField && (
+              <div className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
+                <Info className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
+                <span>
+                  You can use short codes like <code className="text-blue-600 dark:text-blue-400">{'{{customer_name}}'}</code> or <code className="text-blue-600 dark:text-blue-400">{'{{invoice_total}}'}</code> in your message. Click below to see all available codes.
+                </span>
+              </div>
+            )}
+          </div>
         );
 
       case 'number':
@@ -64,15 +76,25 @@ export function ActionBuilder({ actions, onUpdate, onRemove }: ActionBuilderProp
 
       default:
         return (
-          <input
-            type="text"
-            value={value}
-            onChange={(e) => onUpdate(action.id, {
-              config: { ...action.config, [field.name]: e.target.value }
-            })}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-            placeholder={`Enter ${field.label.toLowerCase()}...`}
-          />
+          <div className="space-y-2">
+            <input
+              type="text"
+              value={value}
+              onChange={(e) => onUpdate(action.id, {
+                config: { ...action.config, [field.name]: e.target.value }
+              })}
+              className={`w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 ${isMessageField ? 'font-mono text-sm' : ''}`}
+              placeholder={`Enter ${field.label.toLowerCase()}...`}
+            />
+            {isMessageField && (
+              <div className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
+                <Info className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
+                <span>
+                  You can use short codes like <code className="text-blue-600 dark:text-blue-400">{'{{customer_name}}'}</code> or <code className="text-blue-600 dark:text-blue-400">{'{{invoice_total}}'}</code>. Click below to see all available codes.
+                </span>
+              </div>
+            )}
+          </div>
         );
     }
   };
@@ -82,6 +104,7 @@ export function ActionBuilder({ actions, onUpdate, onRemove }: ActionBuilderProp
       {actions.map((action, index) => {
         const option = getActionOption(action.type);
         const IconComponent = option ? (Icons[option.icon as keyof typeof Icons] as any) : null;
+        const showShortCodes = action.type === 'send_message' || action.type === 'request_approval';
 
         return (
           <div key={action.id} className="bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700 rounded-lg p-4">
@@ -128,6 +151,12 @@ export function ActionBuilder({ actions, onUpdate, onRemove }: ActionBuilderProp
                   {renderConfigField(action, field)}
                 </div>
               ))}
+
+              {showShortCodes && (
+                <div className="mt-4">
+                  <ShortCodeReference />
+                </div>
+              )}
             </div>
           </div>
         );
