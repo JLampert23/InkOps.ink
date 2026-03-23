@@ -154,9 +154,9 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
       terms: true,
     },
     requiredShortCodes: [
-      { code: 'quote_link', reason: 'Recommended for customers to access and approve their quote' },
-      { code: 'quote_number', reason: 'Recommended for quote identification and tracking' },
-      { code: 'customer_first_name', reason: 'Recommended for personalized communication' },
+      { code: 'quote_link', reason: 'Required for customers to access and approve their quote' },
+      { code: 'quote_number', reason: 'Required for quote identification and tracking' },
+      { code: 'customer_first_name', reason: 'Required for personalized communication' },
     ],
   },
   invoice_email_default: {
@@ -172,8 +172,8 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
       terms: true,
     },
     requiredShortCodes: [
-      { code: 'invoice_link', reason: 'Recommended for customers to view and pay their invoice online' },
-      { code: 'invoice_number', reason: 'Recommended for invoice identification and payment reference' },
+      { code: 'invoice_link', reason: 'Required for customers to view and pay their invoice online' },
+      { code: 'invoice_number', reason: 'Required for invoice identification and payment reference' },
     ],
   },
   invoice_reminder: {
@@ -189,9 +189,9 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
       terms: true,
     },
     requiredShortCodes: [
-      { code: 'invoice_link', reason: 'Recommended for customers to view and pay their invoice' },
-      { code: 'invoice_number', reason: 'Recommended for invoice identification' },
-      { code: 'invoice_balance', reason: 'Recommended to show the amount due' },
+      { code: 'invoice_link', reason: 'Required for customers to view and pay their invoice' },
+      { code: 'invoice_number', reason: 'Required for invoice identification' },
+      { code: 'invoice_balance', reason: 'Required to show the amount due' },
     ],
   },
   payment_confirmation: {
@@ -207,8 +207,8 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
       terms: false,
     },
     requiredShortCodes: [
-      { code: 'payment_amount', reason: 'Recommended to show the amount paid' },
-      { code: 'invoice_number', reason: 'Recommended for payment reference' },
+      { code: 'payment_amount', reason: 'Required to show the amount paid' },
+      { code: 'invoice_number', reason: 'Required for payment reference' },
     ],
   },
   approval_email: {
@@ -224,8 +224,8 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
       terms: false,
     },
     requiredShortCodes: [
-      { code: 'quote_link', reason: 'Recommended for customers to review and approve' },
-      { code: 'quote_number', reason: 'Recommended for quote identification' },
+      { code: 'quote_link', reason: 'Required for customers to review and approve' },
+      { code: 'quote_number', reason: 'Required for quote identification' },
     ],
   },
   internal_notification: {
@@ -255,7 +255,7 @@ export const TEMPLATE_TYPE_METADATA: Record<TemplateType, TemplateTypeInfo> = {
       terms: false,
     },
     requiredShortCodes: [
-      { code: 'current_date', reason: 'Recommended for report identification' },
+      { code: 'current_date', reason: 'Required for report identification' },
     ],
   },
   custom: {

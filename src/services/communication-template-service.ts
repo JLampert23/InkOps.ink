@@ -125,7 +125,6 @@ export async function createTemplate(
 ): Promise<CommunicationTemplate> {
   try {
     const headers = await getHeaders();
-    console.log('Creating template with request:', request);
     const response = await fetch(EDGE_FUNCTION_URL, {
       method: 'POST',
       headers,
@@ -133,20 +132,8 @@ export async function createTemplate(
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Response error:', response.status, errorText);
-      let error;
-      try {
-        error = JSON.parse(errorText);
-      } catch {
-        error = { error: errorText };
-      }
-
-      if (response.status === 401) {
-        throw new Error('Authentication failed. Please refresh the page and try again.');
-      }
-
-      throw new Error(error.error || error.message || 'Failed to create template');
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create template');
     }
 
     return await response.json();
@@ -289,14 +276,13 @@ export function validateTemplate(
   }
 
   // Check for required short codes if template type is provided
-  // NOTE: Required shortcodes are now treated as warnings only, not errors
   if (templateType) {
     const requiredCodes = getRequiredShortCodes(templateType);
 
     for (const required of requiredCodes) {
       if (!allCodes.includes(required.code)) {
         missingRequiredCodes.push(required);
-        warnings.push(`Recommended short code: {{${required.code}}} - ${required.reason}`);
+        warnings.push(`Missing required short code: {{${required.code}}} - ${required.reason}`);
       }
     }
   }
@@ -308,7 +294,7 @@ export function validateTemplate(
     usedShortCodes: allCodes,
     missingShortCodes: [],
     missingRequiredCodes,
-    hasRequiredCodeViolations: false, // No longer block saves for missing required codes
+    hasRequiredCodeViolations: missingRequiredCodes.length > 0,
   };
 }
 
