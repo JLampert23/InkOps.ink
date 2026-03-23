@@ -125,6 +125,7 @@ export async function createTemplate(
 ): Promise<CommunicationTemplate> {
   try {
     const headers = await getHeaders();
+    console.log('Creating template with request:', request);
     const response = await fetch(EDGE_FUNCTION_URL, {
       method: 'POST',
       headers,
@@ -132,8 +133,20 @@ export async function createTemplate(
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to create template');
+      const errorText = await response.text();
+      console.error('Response error:', response.status, errorText);
+      let error;
+      try {
+        error = JSON.parse(errorText);
+      } catch {
+        error = { error: errorText };
+      }
+
+      if (response.status === 401) {
+        throw new Error('Authentication failed. Please refresh the page and try again.');
+      }
+
+      throw new Error(error.error || error.message || 'Failed to create template');
     }
 
     return await response.json();
