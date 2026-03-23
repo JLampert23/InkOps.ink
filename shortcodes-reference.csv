@@ -1,0 +1,50 @@
+Category,Shortcode,Description,Example Value,Usage
+Customer,{{customer_first_name}},Customer's first name,John,Use in greetings and personalized messages
+Customer,{{customer_last_name}},Customer's last name,Doe,Use in formal communications
+Customer,{{customer_full_name}},Customer's full name,John Doe,Use in salutations and formal correspondence
+Customer,{{customer_company}},Customer's company name,Acme Corp,Use when addressing business customers
+Customer,{{customer_email}},Customer's email address,john.doe@acme.com,Use for confirmation or contact information
+Customer,{{customer_phone}},Customer's phone number,(555) 123-4567,Use for contact information
+Customer,{{customer_address}},Customer's street address,123 Main St,Use in shipping and billing information
+Customer,{{customer_city}},Customer's city,Springfield,Use in address formatting
+Customer,{{customer_state}},Customer's state,IL,Use in address formatting
+Customer,{{customer_zip}},Customer's ZIP code,62701,Use in address formatting
+Quote,{{quote_number}},Quote reference number,Q-2024-001,Use to reference specific quotes
+Quote,{{quote_total}},Total quote amount including tax,"$1,250.00",Use in quote summaries and confirmations
+Quote,{{quote_subtotal}},Quote subtotal before tax,"$1,000.00",Use in detailed breakdowns
+Quote,{{quote_tax}},Tax amount for quote,$62.50,Use in tax breakdowns
+Quote,{{quote_discount}},Discount amount applied to quote,$50.00,Use when discounts are applied
+Quote,{{quote_date}},Date quote was created,January 15 2024,Use in quote headers
+Quote,{{quote_expiry_date}},Date quote expires,January 30 2024,Use in expiration reminders
+Quote,{{quote_link}},Link to approve/view quote,https://example.com/quotes/approve/abc123,Use in quote approval emails
+Quote,{{quote_status}},Current status of quote,Sent,Use in status updates
+Quote,{{art_approval_link}},Link to approve artwork,https://example.com/art/approve/xyz789,Use in artwork approval requests
+Invoice,{{invoice_number}},Invoice reference number,INV-2024-001,Use to reference specific invoices
+Invoice,{{invoice_total}},Total invoice amount,"$1,250.00",Use in invoice summaries
+Invoice,{{invoice_subtotal}},Invoice subtotal before tax,"$1,000.00",Use in detailed breakdowns
+Invoice,{{invoice_tax}},Tax amount for invoice,$62.50,Use in tax breakdowns
+Invoice,{{invoice_balance}},Outstanding balance due,$625.00,Use in payment reminders
+Invoice,{{invoice_date}},Date invoice was created,January 15 2024,Use in invoice headers
+Invoice,{{invoice_due_date}},Date payment is due,February 15 2024,Use in payment reminders
+Invoice,{{invoice_link}},Link to pay/view invoice,https://example.com/invoices/pay/xyz789,Use in payment request emails
+Invoice,{{invoice_status}},Current status of invoice,Unpaid,Use in status updates
+Company,{{company_name}},Your company name,Your Company Name,Use in email signatures and headers
+Company,{{company_address}},Your company street address,456 Business Blvd,Use in company contact information
+Company,{{company_city}},Your company city,Chicago,Use in company contact information
+Company,{{company_state}},Your company state,IL,Use in company contact information
+Company,{{company_zip}},Your company ZIP code,60601,Use in company contact information
+Company,{{company_phone}},Your company phone number,(555) 987-6543,Use in contact information
+Company,{{company_email}},Your company email address,info@yourcompany.com,Use in contact information
+Company,{{company_website}},Your company website,www.yourcompany.com,Use in email footers and signatures
+User,{{user_name}},Full name of sending user,Jane Smith,Use in email signatures
+User,{{user_first_name}},First name of sending user,Jane,Use in personalized signatures
+User,{{user_last_name}},Last name of sending user,Smith,Use in formal signatures
+User,{{user_email}},Email of sending user,jane.smith@yourcompany.com,Use in contact information
+User,{{user_phone}},Phone number of sending user,(555) 555-5555,Use in contact information
+Payment,{{payment_amount}},Amount of payment received,$625.00,Use in payment confirmations
+Payment,{{payment_method}},Method of payment,Credit Card,Use in payment receipts
+Payment,{{payment_date}},Date payment was received,January 20 2024,Use in payment confirmations
+Payment,{{payment_link}},Link to make payment,https://example.com/pay/xyz789,Use in payment request emails
+General,{{current_date}},Today's date,March 23 2026,Use for current date references
+General,{{current_year}},Current year,2026,Use in copyright notices and date references
+General,{{custom_message}},Custom message field,Custom content here,Use for flexible custom content
