@@ -508,6 +508,11 @@ Deno.serve(async (req: Request) => {
             .maybeSingle();
 
           if (template) {
+            // Format quote number: "QTE-0038" -> "Quote 0038"
+            const formattedQuoteNumber = quote.quote_number
+              ? quote.quote_number.replace(/^QTE-/, 'Quote ').replace(/^INV-/, 'Invoice ')
+              : '';
+
             // Build shortcode data for template processing
             const shortcodeData: ShortCodeData = {
               customer_first_name: quote.customer_name?.split(' ')[0] || '',
@@ -520,7 +525,7 @@ Deno.serve(async (req: Request) => {
               customer_city: quote.bill_city || '',
               customer_state: quote.bill_state || '',
               customer_zip: quote.bill_zip || '',
-              quote_number: quote.quote_number || '',
+              quote_number: formattedQuoteNumber,
               quote_total: `$${quote.total?.toFixed(2) || '0.00'}`,
               quote_subtotal: `$${quote.subtotal?.toFixed(2) || '0.00'}`,
               quote_tax: `$${quote.tax_amount?.toFixed(2) || '0.00'}`,
