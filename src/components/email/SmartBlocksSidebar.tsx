@@ -27,7 +27,7 @@ export default function SmartBlocksSidebar({ onBlockSelect, onShortCodeClick }: 
   const [draggedBlock, setDraggedBlock] = useState<SmartBlock | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
-    new Set(['customer', 'quote', 'invoice'])
+    new Set()
   );
 
   const handleDragStart = (e: React.DragEvent, block: SmartBlock) => {
