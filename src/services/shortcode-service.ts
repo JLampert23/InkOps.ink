@@ -197,7 +197,7 @@ export class ShortCodeEngine {
       customer_state: 'IL',
       customer_zip: '62701',
 
-      quote_number: 'Q-2024-001',
+      quote_number: 'Quote 1234',
       quote_total: '$1,250.00',
       quote_subtotal: '$1,000.00',
       quote_tax: '$62.50',
@@ -208,7 +208,7 @@ export class ShortCodeEngine {
       quote_status: 'Sent',
       art_approval_link: 'https://example.com/art/approve/xyz789',
 
-      invoice_number: 'INV-2024-001',
+      invoice_number: 'Invoice 1234',
       invoice_total: '$1,250.00',
       invoice_subtotal: '$1,000.00',
       invoice_tax: '$62.50',
