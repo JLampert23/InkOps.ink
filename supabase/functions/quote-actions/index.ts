@@ -53,63 +53,61 @@ Deno.serve(async (req: Request) => {
       authHeaderPrefix: authHeader?.substring(0, 20),
     });
 
-    if (!authHeader) {
-      console.error('Missing Authorization header');
-      return new Response(
-        JSON.stringify({ error: "Missing Authorization header" }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    // Create authenticated Supabase client with the user's JWT
-    // Since verify_jwt is enabled, the JWT is already verified by Supabase
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: { Authorization: authHeader },
-      },
-    });
+    // Create Supabase clients
+    const supabase = authHeader
+      ? createClient(supabaseUrl, supabaseAnonKey, {
+          global: {
+            headers: { Authorization: authHeader },
+          },
+        })
+      : createClient(supabaseUrl, supabaseAnonKey);
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get the user from the JWT (already verified by Supabase gateway)
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    // Try to get the user from the JWT if auth header is present
+    let user = null;
+    let profile = null;
 
-    console.log('User verification result:', {
-      hasUser: !!user,
-      userId: user?.id,
-      userEmail: user?.email,
-      error: userError?.message,
-    });
+    if (authHeader) {
+      const {
+        data: { user: authenticatedUser },
+        error: userError,
+      } = await supabase.auth.getUser();
 
-    if (userError || !user) {
-      console.error('Failed to get user from JWT:', userError);
+      console.log('User verification result:', {
+        hasUser: !!authenticatedUser,
+        userId: authenticatedUser?.id,
+        userEmail: authenticatedUser?.email,
+        error: userError?.message,
+      });
+
+      if (authenticatedUser) {
+        user = authenticatedUser;
+
+        // Get user profile
+        const { data: userProfile } = await supabase
+          .from("user_profiles")
+          .select("company_id, role, full_name, email")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (!userProfile || !userProfile.company_id) {
+          throw new Error("User profile not found");
+        }
+
+        profile = userProfile;
+      }
+    }
+
+    if (!profile) {
+      console.error('No authenticated user found');
       return new Response(
-        JSON.stringify({
-          error: "Authentication failed",
-          details: userError?.message || "Unable to verify user",
-        }),
+        JSON.stringify({ error: "Authentication required" }),
         {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
-    }
-
-    // Get user profile
-    const { data: profile } = await supabase
-      .from("user_profiles")
-      .select("company_id, role, full_name, email")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (!profile || !profile.company_id) {
-      throw new Error("User profile not found");
     }
 
     const url = new URL(req.url);
