@@ -58,34 +58,47 @@ async function fetchWithAuth(
 
 /**
  * Get headers for API requests with automatic token refresh
+ * This function ensures we always have a valid, fresh token before making API calls
  */
 async function getHeaders(): Promise<HeadersInit> {
   try {
-    // First, try to refresh the session to ensure we have a valid token
-    const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+    // Always get the latest session from storage
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-    if (refreshError) {
-      console.warn('Session refresh failed, trying to get existing session:', refreshError.message);
+    if (sessionError) {
+      console.error('Error getting session:', sessionError);
+      throw new Error('Authentication error. Please refresh the page and sign in again.');
+    }
 
-      // If refresh fails, try to get the existing session
-      const { data: { session: existingSession }, error: sessionError } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error('No active session. Please sign in again.');
+    }
 
-      if (sessionError || !existingSession?.access_token) {
-        console.error('Session error:', sessionError);
+    // Check if the token is expired or about to expire (within 1 minute)
+    const expiresAt = session.expires_at || 0;
+    const now = Math.floor(Date.now() / 1000);
+    const isExpired = expiresAt < now + 60;
+
+    if (isExpired) {
+      console.log('Token expired or expiring soon, refreshing...');
+
+      // Try to refresh the session
+      const { data: { session: newSession }, error: refreshError } = await supabase.auth.refreshSession();
+
+      if (refreshError || !newSession) {
+        console.error('Failed to refresh session:', refreshError);
         throw new Error('Your session has expired. Please refresh the page and sign in again.');
       }
 
+      // Use the new session
       return {
-        'Authorization': `Bearer ${existingSession.access_token}`,
+        'Authorization': `Bearer ${newSession.access_token}`,
         'Content-Type': 'application/json',
         'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
       };
     }
 
-    if (!session?.access_token) {
-      throw new Error('Not authenticated. Please refresh the page and sign in again.');
-    }
-
+    // Session is still valid, use it
     return {
       'Authorization': `Bearer ${session.access_token}`,
       'Content-Type': 'application/json',
