@@ -75,7 +75,7 @@ export async function searchSanMarCatalog(
     console.log(`[SanMar] ========== SEARCH START ==========`);
     console.log(`[SanMar] Style: ${style}, Company: ${companyId}`);
 
-    const cachedData = await getCachedProduct(supabaseAdmin, companyId, style, supabaseUrl);
+    const cachedData = await getCachedProduct(supabaseAdmin, companyId, style, supabaseUrl, supabaseServiceKey);
     if (cachedData) {
       console.log(`[SanMar] CACHE HIT for ${style}`);
       results.push(cachedData);
@@ -276,7 +276,8 @@ async function getCachedProduct(
   supabaseAdmin: any,
   companyId: string,
   style: string,
-  supabaseUrl: string
+  supabaseUrl: string,
+  supabaseServiceKey: string
 ): Promise<ProductResult | null> {
   try {
     const cacheKey = `style:${style.toUpperCase()}`;
@@ -329,13 +330,31 @@ async function getCachedProduct(
 
     const productData = productCache.data;
 
+    // Fetch live pricing even on cache hit so wholesale prices are available
+    let pricingData = null;
+    try {
+      const pricingUrl = `${supabaseUrl}/functions/v1/sanmar-api?action=pricing&style=${encodeURIComponent(style)}&companyId=${encodeURIComponent(companyId)}`;
+      const pricingResponse = await fetch(pricingUrl, {
+        headers: { "Authorization": `Bearer ${supabaseServiceKey}` },
+      });
+      if (pricingResponse.ok) {
+        const pricingJson = await pricingResponse.json();
+        pricingData = pricingJson.data || null;
+        console.log(`[SanMar] ✅ Fetched pricing for cached style ${style}:`, pricingData?.parts?.length || 0, 'parts');
+      } else {
+        console.warn(`[SanMar] ⚠️ Pricing unavailable for cached ${style} (status: ${pricingResponse.status})`);
+      }
+    } catch (pricingError: any) {
+      console.warn(`[SanMar] ⚠️ Pricing fetch failed for cached ${style}: ${pricingError.message}`);
+    }
+
     const apiData = {
       success: true,
       styleNumber: style,
       partId: null,
       style: productData,
       inventory: { items: [] },
-      pricing: { parts: [] },
+      pricing: pricingData || { parts: [] },
       media: mediaData || {
         images: [],
         views: {

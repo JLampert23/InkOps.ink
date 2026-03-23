@@ -38,6 +38,8 @@ interface ProductSearchResult {
     name: string;
     code: string;
     image_url?: string;
+    rear_image_url?: string;
+    side_image_url?: string;
     pricing?: { wholesale?: number; retail?: number };
     stock?: Record<string, number>;
     sizes?: string[];
