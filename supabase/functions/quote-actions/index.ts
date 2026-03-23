@@ -455,7 +455,7 @@ Deno.serve(async (req: Request) => {
           single_use: body.single_use !== false,
           auto_approve_after_days: body.auto_approve_after_days || null,
           auto_convert_on_approval: body.auto_convert_on_approval || false,
-          created_by: user.id,
+          created_by: user?.id || null,
         }])
         .select()
         .single();

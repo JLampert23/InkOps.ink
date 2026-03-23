@@ -191,6 +191,20 @@ export function SendQuoteModal({
           status: error.context?.status,
           body: error.context?.body,
         });
+
+        // Try to read the error body
+        if (error.context?.body) {
+          try {
+            const reader = error.context.body.getReader();
+            const { value } = await reader.read();
+            const errorText = new TextDecoder().decode(value);
+            console.error('Error response body:', errorText);
+            throw new Error(errorText || error.message || 'Failed to send quote');
+          } catch (readError) {
+            console.error('Could not read error body:', readError);
+          }
+        }
+
         throw new Error(error.message || 'Failed to send quote');
       }
 
