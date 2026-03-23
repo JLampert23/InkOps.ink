@@ -471,10 +471,10 @@ Deno.serve(async (req: Request) => {
         })
         .eq("id", quoteId);
 
-      // Get company settings to retrieve the inkops subdomain (use admin client to bypass RLS)
+      // Get company settings to retrieve the inkops subdomain and company info (use admin client to bypass RLS)
       const { data: companySettings } = await supabaseAdmin
         .from("company_settings")
-        .select("inkops_subdomain")
+        .select("inkops_subdomain, company_name, company_address, company_city, company_state, company_zip, company_phone, email_from_address, company_website")
         .eq("id", profile.company_id)
         .maybeSingle();
 
@@ -529,14 +529,14 @@ Deno.serve(async (req: Request) => {
               quote_date: quote.created_at ? new Date(quote.created_at).toLocaleDateString() : '',
               quote_expiry_date: expiresAt ? new Date(expiresAt).toLocaleDateString() : '',
               quote_status: quote.status || 'sent',
-              company_name: quote.company_name || '',
-              company_address: quote.company_address || '',
-              company_city: quote.company_city || '',
-              company_state: quote.company_state || '',
-              company_zip: quote.company_zip || '',
-              company_phone: quote.company_phone || '',
-              company_email: quote.company_email || '',
-              company_website: quote.company_website || '',
+              company_name: companySettings?.company_name || '',
+              company_address: companySettings?.company_address || '',
+              company_city: companySettings?.company_city || '',
+              company_state: companySettings?.company_state || '',
+              company_zip: companySettings?.company_zip || '',
+              company_phone: companySettings?.company_phone || '',
+              company_email: companySettings?.email_from_address || '',
+              company_website: companySettings?.company_website || '',
               user_name: profile.full_name || '',
               user_first_name: profile.full_name?.split(' ')[0] || '',
               user_last_name: profile.full_name?.split(' ').slice(1).join(' ') || '',
