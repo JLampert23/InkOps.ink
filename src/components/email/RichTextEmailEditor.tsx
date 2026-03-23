@@ -37,6 +37,7 @@ export default function RichTextEmailEditor({
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [showBlocksSidebar, setShowBlocksSidebar] = useState(showSmartBlocks);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [activeField, setActiveField] = useState<'subject' | 'body'>('body');
 
   const quillRef = useRef<ReactQuill>(null);
   const subjectRef = useRef<HTMLInputElement>(null);
@@ -156,18 +157,11 @@ export default function RichTextEmailEditor({
   // Insert variable into editor
   const insertVariable = (key: string) => {
     const shortCode = `{{${key}}}`;
-    const quill = quillRef.current?.getEditor();
 
-    if (quill) {
-      const range = quill.getSelection();
-      const position = range ? range.index : quill.getLength();
-      quill.insertText(position, shortCode);
-      quill.setSelection(position + shortCode.length, 0);
-      quill.focus();
-    } else {
-      // If quill is not available, try inserting into subject
+    // Use activeField to determine where to insert
+    if (activeField === 'subject') {
       const input = subjectRef.current;
-      if (input && document.activeElement === input) {
+      if (input) {
         const start = input.selectionStart || 0;
         const end = input.selectionEnd || 0;
         const newSubject = subject.substring(0, start) + shortCode + subject.substring(end);
@@ -176,12 +170,22 @@ export default function RichTextEmailEditor({
           input.focus();
           input.setSelectionRange(start + shortCode.length, start + shortCode.length);
         }, 0);
+        showNotification('success', 'Variable Inserted', `${shortCode} added to subject`);
+      }
+    } else {
+      const quill = quillRef.current?.getEditor();
+      if (quill) {
+        const range = quill.getSelection();
+        const position = range ? range.index : quill.getLength();
+        quill.insertText(position, shortCode);
+        quill.setSelection(position + shortCode.length, 0);
+        quill.focus();
+        showNotification('success', 'Variable Inserted', `${shortCode} added to template`);
       }
     }
 
     setShowVariableDropdown(false);
     setVariableSearch('');
-    showNotification('success', 'Variable Inserted', `${shortCode} added to template`);
   };
 
   // Insert variable into subject
@@ -398,6 +402,7 @@ export default function RichTextEmailEditor({
             type="text"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
+            onFocus={() => setActiveField('subject')}
             placeholder="Enter email subject..."
             className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
             disabled={viewMode === 'preview'}
@@ -490,6 +495,7 @@ export default function RichTextEmailEditor({
                 theme="snow"
                 value={body}
                 onChange={setBody}
+                onFocus={() => setActiveField('body')}
                 modules={modules}
                 formats={formats}
                 placeholder="Start typing your email content..."

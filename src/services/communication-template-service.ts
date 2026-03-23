@@ -358,14 +358,15 @@ export function validateTemplate(
     warnings.push('No short codes detected. Consider using dynamic data placeholders.');
   }
 
-  // Check for required short codes if template type is provided
+  // Check for recommended short codes if template type is provided
+  // These are now just suggestions, not requirements
   if (templateType) {
-    const requiredCodes = getRequiredShortCodes(templateType);
+    const recommendedCodes = getRequiredShortCodes(templateType);
 
-    for (const required of requiredCodes) {
-      if (!allCodes.includes(required.code)) {
-        missingRequiredCodes.push(required);
-        warnings.push(`Missing required short code: {{${required.code}}} - ${required.reason}`);
+    for (const recommended of recommendedCodes) {
+      if (!allCodes.includes(recommended.code)) {
+        missingRequiredCodes.push(recommended);
+        warnings.push(`Recommended short code: {{${recommended.code}}} - ${recommended.reason}`);
       }
     }
   }
@@ -377,7 +378,7 @@ export function validateTemplate(
     usedShortCodes: allCodes,
     missingShortCodes: [],
     missingRequiredCodes,
-    hasRequiredCodeViolations: missingRequiredCodes.length > 0,
+    hasRequiredCodeViolations: false,
   };
 }
 
