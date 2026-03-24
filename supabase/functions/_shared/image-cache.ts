@@ -63,9 +63,27 @@ export function proxySanMarUrl(url: string, supabaseUrl: string): string {
   return url;
 }
 
-export function buildSanMarCdnFallbackUrl(style: string, _colorCode?: string): string[] {
+export function buildSanMarCdnFallbackUrl(style: string, colorCode?: string): string[] {
   const normalizedStyle = style.toUpperCase().trim();
-  return [`${SANMAR_CDN_BASE}/${normalizedStyle}.jpg`];
+  const urls: string[] = [];
+
+  if (colorCode) {
+    // SanMar CDN uses vendor color codes in URLs for color-specific images
+    // Pattern: {STYLE}_{VendorColorCode}_FM.jpg (front model)
+    const cleanColor = colorCode.replace(/\s+/g, '');
+    urls.push(`${SANMAR_CDN_BASE}/imglib/mresize/catl/${normalizedStyle}_${cleanColor}_FM.jpg`);
+  }
+
+  // Generic style image as final fallback
+  urls.push(`${SANMAR_CDN_BASE}/${normalizedStyle}.jpg`);
+  return urls;
+}
+
+export function buildSanMarCdnBackUrl(style: string, colorCode?: string): string {
+  if (!colorCode) return '';
+  const normalizedStyle = style.toUpperCase().trim();
+  const cleanColor = colorCode.replace(/\s+/g, '');
+  return `${SANMAR_CDN_BASE}/imglib/mresize/catl/${normalizedStyle}_${cleanColor}_BK.jpg`;
 }
 
 export function buildSSActivewearCdnFallbackUrl(styleId: string, colorCode?: string): string[] {

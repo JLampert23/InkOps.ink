@@ -4,6 +4,7 @@ import {
   logImageOperation,
   proxySanMarUrl,
   buildSanMarCdnFallbackUrl,
+  buildSanMarCdnBackUrl,
 } from "../_shared/image-cache.ts";
 import {
   resolveSanMarImages,
@@ -618,11 +619,22 @@ async function transformSanMarData(
           sideImageUrl = colorPartUrl || "";
         }
 
-        // Last resort: use fallback CDN URL
+        // Last resort: use fallback CDN URL with vendor color code for color-specific images
         if (!imageUrl && style.styleNumber) {
-          const fallbacks = buildSanMarCdnFallbackUrl(style.styleNumber);
+          const vendorCode = color.vendorColorCode || '';
+          const fallbacks = buildSanMarCdnFallbackUrl(style.styleNumber, vendorCode);
           if (fallbacks.length > 0) {
             imageUrl = fallbacks[0];
+            console.log(`[SanMar] CDN fallback for "${color.colorName}" (vendor: "${vendorCode}"): ${imageUrl}`);
+          }
+        }
+
+        // Build rear image CDN fallback if no rear image found
+        if (!rearImageUrl && style.styleNumber) {
+          const vendorCode = color.vendorColorCode || '';
+          const backUrl = buildSanMarCdnBackUrl(style.styleNumber, vendorCode);
+          if (backUrl) {
+            rearImageUrl = backUrl;
           }
         }
 
