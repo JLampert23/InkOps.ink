@@ -49,12 +49,14 @@ export interface SanMarStyleData {
   parts: Array<{
     partId: string;
     colorName: string;
+    vendorColorCode: string;
     labelSize: string;
     hex: string;
     approximatePmsColor: string;
   }>;
   colors: Array<{
     colorName: string;
+    vendorColorCode: string;
     hex: string;
     approximatePmsColor: string;
     partIds: Array<{
@@ -405,17 +407,19 @@ export async function fetchSanMarProductData(
     return {
       partId: getXmlValue(partXml, "partId") || "",
       colorName: standardColor || vendorColor || getXmlValue(partXml, "colorName") || "",
+      vendorColorCode: vendorColor || standardColor || "",
       labelSize: getXmlValue(partXml, "labelSize") || "",
       hex: getXmlValue(partXml, "hex") || "",
       approximatePmsColor: getXmlValue(partXml, "approximatePms") || getXmlValue(partXml, "approximatePmsColor") || "",
     };
   });
 
-  const colorMap = new Map<string, { colorName: string; hex: string; approximatePmsColor: string; partIds: { partId: string; size: string }[] }>();
+  const colorMap = new Map<string, { colorName: string; vendorColorCode: string; hex: string; approximatePmsColor: string; partIds: { partId: string; size: string }[] }>();
   styleData.parts.forEach((part) => {
     if (!colorMap.has(part.colorName)) {
       colorMap.set(part.colorName, {
         colorName: part.colorName,
+        vendorColorCode: part.vendorColorCode,
         hex: part.hex,
         approximatePmsColor: part.approximatePmsColor,
         partIds: []
