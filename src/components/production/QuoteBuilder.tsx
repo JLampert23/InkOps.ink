@@ -3326,12 +3326,16 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
       />
 
       {/* Mockup Generator Modal */}
-      {showMockupForGroup !== null && (
+      {showMockupForGroup !== null && (() => {
+        const mockupGroup = itemGroups.find(g => g.label === showMockupForGroup);
+        const firstItem = mockupGroup?.items?.[0];
+        return (
         <MockupGenerator
           quoteId={quoteId}
           customerId={selectedCustomerId}
-          garmentStyle=""
-          garmentColor=""
+          garmentStyle={firstItem?.item_number || ''}
+          garmentColor={firstItem?.color || ''}
+          garmentFrontImageUrl={firstItem?.garment_front_image_url || ''}
           groupLabel={showMockupForGroup}
           onClose={() => setShowMockupForGroup(null)}
           onSave={async () => {
@@ -3346,7 +3350,8 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
             }
           }}
         />
-      )}
+        );
+      })()}
 
       {/* Line Item Options Modal */}
       {editingGroupIdForOptions && (() => {

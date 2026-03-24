@@ -143,16 +143,30 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { result: decryptedPassword } = await decryptResponse.json();
+    const decryptJson = await decryptResponse.json();
+    const decryptedPassword = decryptJson.result;
+
+    if (!decryptedPassword || typeof decryptedPassword !== 'string' || decryptedPassword.trim().length === 0) {
+      console.error('❌ Decryption returned empty or invalid password', {
+        hasResult: 'result' in decryptJson,
+        resultType: typeof decryptedPassword,
+        resultLength: decryptedPassword?.length ?? 0,
+      });
+      return new Response(
+        JSON.stringify({ error: "Failed to decrypt credentials — password is empty after decryption" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const credentials: SanMarCredentials = {
-      id: settings.sanmar_promo_username,
-      password: decryptedPassword,
+      id: settings.sanmar_promo_username.trim(),
+      password: decryptedPassword.trim(),
       fobId: settings.ssactivewear_fob_id || undefined
     };
 
     console.log(`🔑 SanMar credentials loaded for company ${companyId}`);
-    console.log(`👤 Username: ${credentials.id}`);
+    console.log(`👤 Username: ${credentials.id} (length: ${credentials.id.length})`);
+    console.log(`🔒 Password length: ${credentials.password.length}`);
 
     const action = url.searchParams.get("action") || "unified";
     const style = url.searchParams.get("style");
@@ -231,15 +245,19 @@ Deno.serve(async (req: Request) => {
           };
         } catch (productError: any) {
           console.error(`Product fetch failed for ${style}:`, productError.message);
+          const isAuthError = productError.name === 'PromoStandardsError' &&
+            [100, 104, 105, 110].includes(productError.code);
+          const statusCode = isAuthError ? 401 : 200;
           return new Response(
             JSON.stringify({
               success: false,
               supplier: "sanmar",
               action: "product",
               error: productError.message || "Product not found",
+              code: productError.code || undefined,
               style: style
             }),
-            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            { status: statusCode, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
         break;

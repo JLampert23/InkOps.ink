@@ -27,6 +27,7 @@ interface MockupGeneratorProps {
   customerId?: string;
   garmentStyle?: string;
   garmentColor?: string;
+  garmentFrontImageUrl?: string;
   groupLabel?: string;
   imprintId?: string;
   imprintLocation?: string;
@@ -81,6 +82,7 @@ export default function MockupGenerator({
   customerId,
   garmentStyle,
   garmentColor,
+  garmentFrontImageUrl,
   groupLabel,
   imprintId,
   imprintLocation,
@@ -851,6 +853,12 @@ export default function MockupGenerator({
       }
 
       console.log('MockupGenerator: Final loaded type_of_work:', loadedTypeOfWork);
+
+      // Final fallback: if no garment image was loaded from any source, use the prop
+      if (!garmentImageUrl && garmentFrontImageUrl) {
+        console.log('MockupGenerator: Final fallback - using garmentFrontImageUrl prop:', garmentFrontImageUrl);
+        setGarmentImageUrl(garmentFrontImageUrl);
+      }
     } catch (error) {
       console.error('MockupGenerator: Failed to load proof data:', error);
     } finally {
@@ -860,6 +868,11 @@ export default function MockupGenerator({
 
   const fetchGarmentImage = async () => {
     if (!garmentStyle) {
+      // No style to search - use the direct image URL prop if available
+      if (garmentFrontImageUrl) {
+        console.log('MockupGenerator: Using garmentFrontImageUrl prop directly:', garmentFrontImageUrl);
+        setGarmentImageUrl(garmentFrontImageUrl);
+      }
       return;
     }
 
