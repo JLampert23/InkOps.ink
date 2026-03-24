@@ -474,13 +474,21 @@ Deno.serve(async (req: Request) => {
       // Get company settings to retrieve the inkops subdomain and company info (use admin client to bypass RLS)
       const { data: companySettings } = await supabaseAdmin
         .from("company_settings")
-        .select("inkops_subdomain, company_name, company_address, company_city, company_state, company_zip, company_phone, email_from_address, company_website")
+        .select("customer_url, inkops_subdomain, company_name, company_address, company_city, company_state, company_zip, company_phone, email_from_address, company_website")
         .eq("id", profile.company_id)
         .maybeSingle();
 
-      // Generate public approval URL using company subdomain
-      const subdomain = companySettings?.inkops_subdomain || 'app';
-      const approvalUrl = `https://${subdomain}.inkops.ink/quote-approval/${approvalToken}`;
+      // Generate public approval URL with priority: custom domain > subdomain
+      let approvalUrl: string;
+      if (companySettings?.customer_url) {
+        // Use verified custom domain (highest priority)
+        const baseUrl = companySettings.customer_url.replace(/\/$/, '');
+        approvalUrl = `${baseUrl}/quote-approval/${approvalToken}`;
+      } else {
+        // Fall back to inkops subdomain
+        const subdomain = companySettings?.inkops_subdomain || 'app';
+        approvalUrl = `https://${subdomain}.inkops.ink/quote-approval/${approvalToken}`;
+      }
 
       // Send email with template or default
       try {
