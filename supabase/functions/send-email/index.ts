@@ -157,7 +157,14 @@ Deno.serve(async (req: Request) => {
 
     const { result: decryptedApiKey } = await decryptResponse.json();
 
-    const RESEND_API_KEY = decryptedApiKey;
+    // Trim any whitespace from the API key
+    const RESEND_API_KEY = decryptedApiKey?.trim() || decryptedApiKey;
+
+    console.log('Resend API key check:', {
+      hasKey: !!RESEND_API_KEY,
+      keyLength: RESEND_API_KEY?.length,
+      startsWithRe: RESEND_API_KEY?.startsWith('re_'),
+    });
     const fromEmail = companySettings.email_from_address;
     const fromName = companySettings.company_name || '';
 

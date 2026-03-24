@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Send, Mail, Loader2, Eye, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotification } from '../../contexts/NotificationContext';
 import { ShortCodeEngine } from '../../services/shortcode-service';
 import DOMPurify from 'dompurify';
 import { getQuoteApprovalUrl } from '../../utils/portal-url';
@@ -35,6 +36,7 @@ export function SendQuoteModal({
   onSuccess,
 }: SendQuoteModalProps) {
   const { user } = useAuth();
+  const { showNotification } = useNotification();
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [customMessage, setCustomMessage] = useState('');
@@ -148,7 +150,7 @@ export function SendQuoteModal({
 
   const handleSend = async () => {
     if (!selectedTemplateId) {
-      alert('Please select an email template');
+      showNotification('error', 'Template Required', 'Please select an email template');
       return;
     }
 
@@ -191,17 +193,31 @@ export function SendQuoteModal({
           status: error.context?.status,
           body: error.context?.body,
         });
+
+        // Try to read the error body
+        if (error.context?.body) {
+          try {
+            const reader = error.context.body.getReader();
+            const { value } = await reader.read();
+            const errorText = new TextDecoder().decode(value);
+            console.error('Error response body:', errorText);
+            throw new Error(errorText || error.message || 'Failed to send quote');
+          } catch (readError) {
+            console.error('Could not read error body:', readError);
+          }
+        }
+
         throw new Error(error.message || 'Failed to send quote');
       }
 
       console.log('Quote sent successfully:', data);
 
-      alert(`Quote sent successfully to ${customerEmail}`);
+      showNotification('success', 'Quote Sent', `Quote sent successfully to ${customerEmail}`);
       onSuccess();
       onClose();
     } catch (error) {
       console.error('Error sending quote:', error);
-      alert(error instanceof Error ? error.message : 'Failed to send quote');
+      showNotification('error', 'Send Failed', error instanceof Error ? error.message : 'Failed to send quote');
     } finally {
       setSending(false);
     }

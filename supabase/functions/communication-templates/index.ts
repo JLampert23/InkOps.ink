@@ -105,11 +105,10 @@ function validateTemplate(
     errors.push('Template contains nested short codes (not supported)');
   }
 
-  const requiredCodes = REQUIRED_SHORT_CODES[templateType] || [];
-  for (const required of requiredCodes) {
-    if (!allCodes.includes(required.code)) {
-      missingRequiredCodes.push(required);
-      warnings.push(`Missing required short code: {{${required.code}}} - ${required.reason}`);
+  const recommendedCodes = REQUIRED_SHORT_CODES[templateType] || [];
+  for (const recommended of recommendedCodes) {
+    if (!allCodes.includes(recommended.code)) {
+      warnings.push(`Suggested short code: {{${recommended.code}}} - ${recommended.reason}`);
     }
   }
 
@@ -117,8 +116,8 @@ function validateTemplate(
     isValid: errors.length === 0,
     errors,
     warnings,
-    missingRequiredCodes,
-    hasRequiredCodeViolations: missingRequiredCodes.length > 0,
+    missingRequiredCodes: [],
+    hasRequiredCodeViolations: false,
   };
 }
 
@@ -327,20 +326,8 @@ Deno.serve(async (req: Request) => {
           );
         }
 
-        // If template has missing required codes and is being set as active without override
-        if (validation.hasRequiredCodeViolations && body.is_active !== false && !body.override_required_validation) {
-          return new Response(
-            JSON.stringify({
-              error: "Template is missing required short codes and cannot be activated",
-              validation,
-              message: "Add the required short codes or save as inactive template",
-            }),
-            {
-              status: 400,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            }
-          );
-        }
+        // No longer blocking templates with missing recommended codes
+        // All shortcodes are now optional suggestions
 
         // Log validation event
         const validationStatus = validation.hasRequiredCodeViolations && body.override_required_validation
@@ -510,21 +497,8 @@ Deno.serve(async (req: Request) => {
             );
           }
 
-          // Check if activating with missing required codes
-          const isActivating = body.is_active === true || (body.is_active !== false && currentTemplate.is_active);
-          if (validation.hasRequiredCodeViolations && isActivating && !body.override_required_validation) {
-            return new Response(
-              JSON.stringify({
-                error: "Template is missing required short codes and cannot be activated",
-                validation,
-                message: "Add the required short codes or save as inactive template",
-              }),
-              {
-                status: 400,
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-              }
-            );
-          }
+          // No longer blocking templates with missing recommended codes
+          // All shortcodes are now optional suggestions
 
           // Log validation event
           const validationStatus = validation.hasRequiredCodeViolations && body.override_required_validation

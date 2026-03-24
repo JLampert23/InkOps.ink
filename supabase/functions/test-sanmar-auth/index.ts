@@ -172,6 +172,139 @@ Deno.serve(async (req: Request) => {
       };
     }
 
+    // Step 7: Direct pricing SOAP call to see raw response
+    try {
+      const supabaseUrl7 = Deno.env.get("SUPABASE_URL")!;
+      const serviceKey7 = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const supabase7 = createClient(supabaseUrl7, serviceKey7);
+
+      const { data: creds7 } = await supabase7
+        .from("company_settings")
+        .select("sanmar_promo_username, sanmar_promo_password_encrypted")
+        .eq("id", companyId)
+        .maybeSingle();
+
+      if (creds7?.sanmar_promo_password_encrypted) {
+        const decResp7 = await fetch(`${supabaseUrl7}/functions/v1/crypto-service`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${serviceKey7}` },
+          body: JSON.stringify({ action: "decrypt", token: creds7.sanmar_promo_password_encrypted }),
+        });
+        const decBody7 = await decResp7.json();
+        const pw7 = decBody7.result;
+        const un7 = creds7.sanmar_promo_username;
+
+        const escXml = (s: string) => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+
+        const pricingSoap = `<?xml version="1.0" encoding="utf-8"?>
+<soapenv:Envelope
+  xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+  xmlns:ns="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/"
+  xmlns:shar="http://www.promostandards.org/WSDL/PricingAndConfiguration/1.0.0/SharedObjects/">
+  <soapenv:Header/>
+  <soapenv:Body>
+    <ns:GetConfigurationAndPricingRequest>
+      <shar:wsVersion>1.0.0</shar:wsVersion>
+      <shar:id>${escXml(un7)}</shar:id>
+      <shar:password>${escXml(pw7)}</shar:password>
+      <shar:productId>PC54</shar:productId>
+      <shar:currency>USD</shar:currency>
+      <shar:fobId>1</shar:fobId>
+      <shar:priceType>Net</shar:priceType>
+      <shar:localizationCountry>US</shar:localizationCountry>
+      <shar:localizationLanguage>en</shar:localizationLanguage>
+      <shar:configurationType>Blank</shar:configurationType>
+    </ns:GetConfigurationAndPricingRequest>
+  </soapenv:Body>
+</soapenv:Envelope>`;
+
+        const pricingUrl = "https://ws.sanmar.com:8080/promostandards/PricingAndConfigurationServiceBinding";
+        const pricingResp = await fetch(pricingUrl, {
+          method: "POST",
+          headers: { "Content-Type": "text/xml; charset=utf-8", "SOAPAction": "getConfigurationAndPricing" },
+          body: pricingSoap,
+        });
+        const pricingText = await pricingResp.text();
+
+        const partPriceCount = (pricingText.match(/<(?:[^:>]*:)?PartPrice/gi) || []).length;
+        const partCount = (pricingText.match(/<(?:[^:>]*:)?Part>/gi) || []).length;
+        const priceValues = pricingText.match(/<(?:[^:>]*:)?price>([^<]+)<\/(?:[^:>]*:)?price>/gi) || [];
+
+        diagnostics.step7_pricing_direct = {
+          status: pricingResp.status,
+          ok: pricingResp.ok,
+          response_length: pricingText.length,
+          response_preview: pricingText.substring(0, 3000),
+          partCount,
+          partPriceCount,
+          samplePrices: priceValues.slice(0, 10).map((p: string) => p.replace(/<[^>]+>/g, '')),
+          hasError: pricingText.includes('<errorCode>') || pricingText.includes('<faultcode>'),
+        };
+      }
+    } catch (step7Error: any) {
+      diagnostics.step7_pricing_direct = { error: step7Error.message };
+    }
+
+    // Step 6: Call through sanmar-api (same way product-search does)
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const sanmarApiUrl = `${supabaseUrl}/functions/v1/sanmar-api?action=product&style=PC54&companyId=${companyId}`;
+      
+      const apiCallStart = Date.now();
+      const sanmarApiResponse = await fetch(sanmarApiUrl, {
+        headers: { "Authorization": `Bearer ${supabaseServiceRoleKey}` },
+      });
+      const apiCallDuration = Date.now() - apiCallStart;
+      const sanmarApiBody = await sanmarApiResponse.text();
+      
+      diagnostics.step6_via_sanmar_api = {
+        url: sanmarApiUrl,
+        status: sanmarApiResponse.status,
+        ok: sanmarApiResponse.ok,
+        duration_ms: apiCallDuration,
+        response_length: sanmarApiBody.length,
+        response_preview: sanmarApiBody.substring(0, 2000),
+      };
+    } catch (step6Error: any) {
+      diagnostics.step6_via_sanmar_api = {
+        error: step6Error.message,
+        stack: step6Error.stack,
+      };
+    }
+
+    // Step 8: Call sanmar-api PRICING route (same way product-search does)
+    try {
+      const supabaseUrl8 = Deno.env.get("SUPABASE_URL")!;
+      const serviceKey8 = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const pricingApiUrl = `${supabaseUrl8}/functions/v1/sanmar-api?action=pricing&style=PC54&companyId=${companyId}`;
+      
+      const pricingStart = Date.now();
+      const pricingApiResp = await fetch(pricingApiUrl, {
+        headers: { "Authorization": `Bearer ${serviceKey8}` },
+      });
+      const pricingDuration = Date.now() - pricingStart;
+      const pricingApiBody = await pricingApiResp.text();
+      
+      let parsedPricing = null;
+      try { parsedPricing = JSON.parse(pricingApiBody); } catch {}
+      
+      diagnostics.step8_pricing_via_sanmar_api = {
+        url: pricingApiUrl,
+        status: pricingApiResp.status,
+        ok: pricingApiResp.ok,
+        duration_ms: pricingDuration,
+        response_length: pricingApiBody.length,
+        partsCount: parsedPricing?.data?.parts?.length || 0,
+        samplePart: parsedPricing?.data?.parts?.[0] || null,
+        warning: parsedPricing?.warning || null,
+        error: parsedPricing?.error || null,
+        response_preview: pricingApiBody.substring(0, 1000),
+      };
+    } catch (step8Error: any) {
+      diagnostics.step8_pricing_via_sanmar_api = { error: step8Error.message };
+    }
+
     return new Response(
       JSON.stringify(diagnostics, null, 2),
       {

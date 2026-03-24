@@ -206,7 +206,11 @@ BEGIN
   <p style="margin: 4px 0;">Valid Until: {{quote_expiry_date}}</p>
 </div>
 
-<p>Please review and approve your quote at your convenience.</p>
+<p>Please review and approve your quote by clicking the button below:</p>
+
+<p style="text-align: center; margin: 24px 0;">
+  <a href="{{quote_link}}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">View and Approve Quote</a>
+</p>
 
 <p>If you have any questions or need modifications, please don''t hesitate to reach out.</p>
 

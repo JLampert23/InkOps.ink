@@ -53,63 +53,63 @@ Deno.serve(async (req: Request) => {
       authHeaderPrefix: authHeader?.substring(0, 20),
     });
 
-    if (!authHeader) {
-      console.error('Missing Authorization header');
-      return new Response(
-        JSON.stringify({ error: "Missing Authorization header" }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    // Create authenticated Supabase client with the user's JWT
-    // Since verify_jwt is enabled, the JWT is already verified by Supabase
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: { Authorization: authHeader },
-      },
-    });
+    // Create Supabase clients
+    const supabase = authHeader
+      ? createClient(supabaseUrl, supabaseAnonKey, {
+          global: {
+            headers: { Authorization: authHeader },
+          },
+        })
+      : createClient(supabaseUrl, supabaseAnonKey);
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get the user from the JWT (already verified by Supabase gateway)
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    // Try to get the user from the JWT if auth header is present
+    let user = null;
+    let profile = null;
 
-    console.log('User verification result:', {
-      hasUser: !!user,
-      userId: user?.id,
-      userEmail: user?.email,
-      error: userError?.message,
-    });
+    if (authHeader) {
+      // When verify_jwt = false, we need to use the service role client to get the user
+      // The auth header contains a valid JWT, but we need to decode it manually
+      const token = authHeader.replace('Bearer ', '');
 
-    if (userError || !user) {
-      console.error('Failed to get user from JWT:', userError);
+      // Use the admin client to get user by JWT
+      const { data: { user: authenticatedUser }, error: userError } = await supabaseAdmin.auth.getUser(token);
+
+      console.log('User verification result:', {
+        hasUser: !!authenticatedUser,
+        userId: authenticatedUser?.id,
+        userEmail: authenticatedUser?.email,
+        error: userError?.message,
+      });
+
+      if (authenticatedUser) {
+        user = authenticatedUser;
+
+        // Get user profile using admin client
+        const { data: userProfile } = await supabaseAdmin
+          .from("user_profiles")
+          .select("company_id, role, full_name, email")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (!userProfile || !userProfile.company_id) {
+          throw new Error("User profile not found");
+        }
+
+        profile = userProfile;
+      }
+    }
+
+    if (!profile) {
+      console.error('No authenticated user found');
       return new Response(
-        JSON.stringify({
-          error: "Authentication failed",
-          details: userError?.message || "Unable to verify user",
-        }),
+        JSON.stringify({ code: 401, message: "Invalid JWT" }),
         {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
-    }
-
-    // Get user profile
-    const { data: profile } = await supabase
-      .from("user_profiles")
-      .select("company_id, role, full_name, email")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (!profile || !profile.company_id) {
-      throw new Error("User profile not found");
     }
 
     const url = new URL(req.url);
@@ -457,7 +457,7 @@ Deno.serve(async (req: Request) => {
           single_use: body.single_use !== false,
           auto_approve_after_days: body.auto_approve_after_days || null,
           auto_convert_on_approval: body.auto_convert_on_approval || false,
-          created_by: user.id,
+          created_by: user?.id || null,
         }])
         .select()
         .single();
@@ -473,16 +473,24 @@ Deno.serve(async (req: Request) => {
         })
         .eq("id", quoteId);
 
-      // Get company settings to retrieve the inkops subdomain (use admin client to bypass RLS)
+      // Get company settings to retrieve the inkops subdomain and company info (use admin client to bypass RLS)
       const { data: companySettings } = await supabaseAdmin
         .from("company_settings")
-        .select("inkops_subdomain")
+        .select("customer_url, inkops_subdomain, company_name, company_address, company_city, company_state, company_zip, company_phone, email_from_address, company_website")
         .eq("id", profile.company_id)
         .maybeSingle();
 
-      // Generate public approval URL using company subdomain
-      const subdomain = companySettings?.inkops_subdomain || 'app';
-      const approvalUrl = `https://${subdomain}.inkops.ink/quote-approval/${approvalToken}`;
+      // Generate public approval URL with priority: custom domain > subdomain
+      let approvalUrl: string;
+      if (companySettings?.customer_url) {
+        // Use verified custom domain (highest priority)
+        const baseUrl = companySettings.customer_url.replace(/\/$/, '');
+        approvalUrl = `${baseUrl}/quote-approval/${approvalToken}`;
+      } else {
+        // Fall back to inkops subdomain
+        const subdomain = companySettings?.inkops_subdomain || 'app';
+        approvalUrl = `https://${subdomain}.inkops.ink/quote-approval/${approvalToken}`;
+      }
 
       // Send email with template or default
       try {
@@ -510,6 +518,11 @@ Deno.serve(async (req: Request) => {
             .maybeSingle();
 
           if (template) {
+            // Format quote number: "QTE-0038" -> "Quote 0038"
+            const formattedQuoteNumber = quote.quote_number
+              ? quote.quote_number.replace(/^QTE-/, 'Quote ').replace(/^INV-/, 'Invoice ')
+              : '';
+
             // Build shortcode data for template processing
             const shortcodeData: ShortCodeData = {
               customer_first_name: quote.customer_name?.split(' ')[0] || '',
@@ -522,7 +535,7 @@ Deno.serve(async (req: Request) => {
               customer_city: quote.bill_city || '',
               customer_state: quote.bill_state || '',
               customer_zip: quote.bill_zip || '',
-              quote_number: quote.quote_number || '',
+              quote_number: formattedQuoteNumber,
               quote_total: `$${quote.total?.toFixed(2) || '0.00'}`,
               quote_subtotal: `$${quote.subtotal?.toFixed(2) || '0.00'}`,
               quote_tax: `$${quote.tax_amount?.toFixed(2) || '0.00'}`,
@@ -531,14 +544,14 @@ Deno.serve(async (req: Request) => {
               quote_date: quote.created_at ? new Date(quote.created_at).toLocaleDateString() : '',
               quote_expiry_date: expiresAt ? new Date(expiresAt).toLocaleDateString() : '',
               quote_status: quote.status || 'sent',
-              company_name: quote.company_name || '',
-              company_address: quote.company_address || '',
-              company_city: quote.company_city || '',
-              company_state: quote.company_state || '',
-              company_zip: quote.company_zip || '',
-              company_phone: quote.company_phone || '',
-              company_email: quote.company_email || '',
-              company_website: quote.company_website || '',
+              company_name: companySettings?.company_name || '',
+              company_address: companySettings?.company_address || '',
+              company_city: companySettings?.company_city || '',
+              company_state: companySettings?.company_state || '',
+              company_zip: companySettings?.company_zip || '',
+              company_phone: companySettings?.company_phone || '',
+              company_email: companySettings?.email_from_address || '',
+              company_website: companySettings?.company_website || '',
               user_name: profile.full_name || '',
               user_first_name: profile.full_name?.split(' ')[0] || '',
               user_last_name: profile.full_name?.split(' ').slice(1).join(' ') || '',

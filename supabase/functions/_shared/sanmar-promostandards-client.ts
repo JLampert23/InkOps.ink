@@ -21,12 +21,12 @@
  */
 
 const SANMAR_PROMOSTANDARDS_ENDPOINTS = {
-  productData: "https://ws.sanmar.com:8080/promostandards/ProductDataServiceBindingV2?WSDL",
-  media: "https://ws.sanmar.com:8080/promostandards/MediaContentServiceBinding?wsdl",
-  inventory: "https://ws.sanmar.com:8080/promostandards/InventoryServiceBindingV2?WSDL",
-  pricing: "https://ws.sanmar.com:8080/promostandards/PricingAndConfigurationServiceBindingV1?WSDL",
-  orderStatus: "https://ws.sanmar.com:8080/promostandards/OrderStatusServiceBindingV2?WSDL",
-  shipment: "https://ws.sanmar.com:8080/promostandards/ShipmentNotificationServiceBindingV1?WSDL",
+  productData: "https://ws.sanmar.com:8080/promostandards/ProductDataServiceBindingV2",
+  media: "https://ws.sanmar.com:8080/promostandards/MediaContentServiceBinding",
+  inventory: "https://ws.sanmar.com:8080/promostandards/InventoryServiceBindingV2",
+  pricing: "https://ws.sanmar.com:8080/promostandards/PricingAndConfigurationServiceBinding",
+  orderStatus: "https://ws.sanmar.com:8080/promostandards/OrderStatusServiceBindingV2",
+  shipment: "https://ws.sanmar.com:8080/promostandards/ShipmentNotificationServiceBindingV1",
 };
 
 export interface SanMarCredentials {
@@ -180,8 +180,6 @@ function buildSOAPEnvelope(
       <shar:wsVersion>${version}</shar:wsVersion>
       <shar:id>${escapeXml(credentials.id)}</shar:id>
       <shar:password>${escapeXml(credentials.password)}</shar:password>
-      <shar:localizationCountry>US</shar:localizationCountry>
-      <shar:localizationLanguage>en</shar:localizationLanguage>
       ${payload}
     </ns:${operation}Request>
   </soapenv:Body>
@@ -199,6 +197,8 @@ function handlePromoStandardsError(xml: string): void {
     const code = parseInt(errorCodeMatch[1]);
     const message = errorMessageMatch ? errorMessageMatch[1] : 'Unknown error';
 
+    console.error(`🚨 PromoStandards error code=${code}, message="${message}"`);
+
     switch (code) {
       case 100:
         throw new PromoStandardsError(100, 'User not found');
@@ -209,6 +209,7 @@ function handlePromoStandardsError(xml: string): void {
       case 110:
         throw new PromoStandardsError(110, 'Authentication required');
       default:
+        console.error(`🚨 Non-standard PromoStandards error code ${code}: "${message}"`);
         throw new PromoStandardsError(code, message);
     }
   }
@@ -256,6 +257,7 @@ async function callPromoStandardsService(
 
       if (!skipErrorCheck && (responseText.includes('<faultcode>') || responseText.includes('<errorCode>'))) {
         console.log(`🚨 SOAP Fault detected in response`);
+        console.log(`🚨 Response body (first 1000 chars): ${responseText.substring(0, 1000)}`);
         handlePromoStandardsError(responseText);
       }
 
@@ -302,10 +304,19 @@ async function callPromoStandardsService(
   throw lastError || new Error('PromoStandards request failed');
 }
 
+function decodeXmlEntities(str: string): string {
+  return str
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
+}
+
 function getXmlValue(xmlText: string, tagName: string): string | null {
   const regex = new RegExp(`<(?:[^:>]*:)?${tagName}(?:\\s[^>]*)?>([^<]*)<\\/(?:[^:>]*:)?${tagName}>`, 'i');
   const match = xmlText.match(regex);
-  return match ? match[1].trim() : null;
+  return match ? decodeXmlEntities(match[1].trim()) : null;
 }
 
 function nsElementPattern(tagName: string): RegExp {
@@ -332,7 +343,9 @@ export async function fetchSanMarProductData(
   const normalizedStyle = styleNumber.toUpperCase().trim();
   console.log('🔍 Fetching SanMar product data:', normalizedStyle);
 
-  const payload = `<shar:productId>${normalizedStyle}</shar:productId>`;
+  const payload = `<shar:localizationCountry>US</shar:localizationCountry>
+      <shar:localizationLanguage>en</shar:localizationLanguage>
+      <shar:productId>${normalizedStyle}</shar:productId>`;
 
   const soapEnvelope = buildSOAPEnvelope(
     'ProductDataService',
@@ -469,7 +482,9 @@ export async function fetchSanMarInventory(
 ): Promise<SanMarInventoryData> {
   console.log('📦 Fetching SanMar inventory:', partId);
 
-  const payload = `<shar:productId>${partId}</shar:productId>`;
+  const payload = `<shar:productId>${partId}</shar:productId>
+      <shar:localizationCountry>US</shar:localizationCountry>
+      <shar:localizationLanguage>en</shar:localizationLanguage>`;
 
   const soapEnvelope = buildSOAPEnvelope(
     'InventoryService',
@@ -519,11 +534,13 @@ export async function fetchSanMarPricing(
   const normalizedStyle = styleNumber.toUpperCase().trim();
   console.log('💰 Fetching SanMar pricing for style:', normalizedStyle);
 
-  const fobId = credentials.fobId || 'all';
+  const fobId = credentials.fobId || '1';
   const payload = `<shar:productId>${normalizedStyle}</shar:productId>
       <shar:currency>USD</shar:currency>
       <shar:fobId>${fobId}</shar:fobId>
-      <shar:priceType>Customer</shar:priceType>
+      <shar:priceType>Net</shar:priceType>
+      <shar:localizationCountry>US</shar:localizationCountry>
+      <shar:localizationLanguage>en</shar:localizationLanguage>
       <shar:configurationType>Blank</shar:configurationType>`;
 
   const soapEnvelope = buildSOAPEnvelope(
@@ -547,8 +564,12 @@ export async function fetchSanMarPricing(
 
   pricingData.parts = partMatches.map(match => {
     const partXml = match[1];
-    const pricePattern = nsElementPattern("Price");
-    const priceMatches = getAllXmlMatches(partXml, pricePattern);
+    const pricePattern = nsElementPattern("PartPrice");
+    let priceMatches = getAllXmlMatches(partXml, pricePattern);
+    if (priceMatches.length === 0) {
+      const fallbackPattern = nsElementPattern("Price");
+      priceMatches = getAllXmlMatches(partXml, fallbackPattern);
+    }
 
     return {
       partId: getXmlValue(partXml, "partId") || "",
@@ -564,6 +585,22 @@ export async function fetchSanMarPricing(
   });
 
   console.log(`✅ Found pricing for ${pricingData.parts.length} parts`);
+  console.log(`💰 Pricing response XML length: ${responseXml.length}`);
+  console.log(`💰 Pricing response preview (2000 chars): ${responseXml.substring(0, 2000)}`);
+  if (pricingData.parts.length > 0) {
+    console.log(`💰 Sample pricing part: ${JSON.stringify(pricingData.parts[0])}`);
+  } else {
+    console.log(`💰 No pricing parts parsed. Checking for alternative XML structures...`);
+    const partArrayPattern = nsElementPattern("PartArray");
+    const partArrayMatches = getAllXmlMatches(responseXml, partArrayPattern);
+    console.log(`💰 PartArray matches: ${partArrayMatches.length}`);
+    const configPattern = nsElementPattern("Configuration");
+    const configMatches = getAllXmlMatches(responseXml, configPattern);
+    console.log(`💰 Configuration matches: ${configMatches.length}`);
+    if (configMatches.length > 0) {
+      console.log(`💰 First Configuration preview (500 chars): ${configMatches[0][1].substring(0, 500)}`);
+    }
+  }
 
   return pricingData;
 }
@@ -809,7 +846,9 @@ export async function testSanMarConnection(credentials: SanMarCredentials): Prom
     console.log('🧪 Testing SanMar PromoStandards connection...');
     const startTime = Date.now();
 
-    const payload = `<shar:productId>PC54</shar:productId>`;
+    const payload = `<shar:localizationCountry>US</shar:localizationCountry>
+      <shar:localizationLanguage>en</shar:localizationLanguage>
+      <shar:productId>PC54</shar:productId>`;
 
     const soapEnvelope = buildSOAPEnvelope(
       'ProductDataService',
