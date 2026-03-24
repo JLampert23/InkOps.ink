@@ -150,11 +150,7 @@ export function SendQuoteModal({
 
   const handleSend = async () => {
     if (!selectedTemplateId) {
-      showNotification({
-        type: 'error',
-        title: 'Template Required',
-        message: 'Please select an email template',
-      });
+      showNotification('error', 'Template Required', 'Please select an email template');
       return;
     }
 
@@ -216,20 +212,12 @@ export function SendQuoteModal({
 
       console.log('Quote sent successfully:', data);
 
-      showNotification({
-        type: 'success',
-        title: 'Quote Sent',
-        message: `Quote sent successfully to ${customerEmail}`,
-      });
+      showNotification('success', 'Quote Sent', `Quote sent successfully to ${customerEmail}`);
       onSuccess();
       onClose();
     } catch (error) {
       console.error('Error sending quote:', error);
-      showNotification({
-        type: 'error',
-        title: 'Send Failed',
-        message: error instanceof Error ? error.message : 'Failed to send quote',
-      });
+      showNotification('error', 'Send Failed', error instanceof Error ? error.message : 'Failed to send quote');
     } finally {
       setSending(false);
     }
