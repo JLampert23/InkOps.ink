@@ -69,10 +69,12 @@ Deno.serve(async (req: Request) => {
     let profile = null;
 
     if (authHeader) {
-      const {
-        data: { user: authenticatedUser },
-        error: userError,
-      } = await supabase.auth.getUser();
+      // When verify_jwt = false, we need to use the service role client to get the user
+      // The auth header contains a valid JWT, but we need to decode it manually
+      const token = authHeader.replace('Bearer ', '');
+
+      // Use the admin client to get user by JWT
+      const { data: { user: authenticatedUser }, error: userError } = await supabaseAdmin.auth.getUser(token);
 
       console.log('User verification result:', {
         hasUser: !!authenticatedUser,
@@ -84,8 +86,8 @@ Deno.serve(async (req: Request) => {
       if (authenticatedUser) {
         user = authenticatedUser;
 
-        // Get user profile
-        const { data: userProfile } = await supabase
+        // Get user profile using admin client
+        const { data: userProfile } = await supabaseAdmin
           .from("user_profiles")
           .select("company_id, role, full_name, email")
           .eq("id", user.id)
@@ -102,7 +104,7 @@ Deno.serve(async (req: Request) => {
     if (!profile) {
       console.error('No authenticated user found');
       return new Response(
-        JSON.stringify({ error: "Authentication required" }),
+        JSON.stringify({ code: 401, message: "Invalid JWT" }),
         {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
