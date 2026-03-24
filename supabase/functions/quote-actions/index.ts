@@ -478,10 +478,16 @@ Deno.serve(async (req: Request) => {
         .eq("id", profile.company_id)
         .maybeSingle();
 
-      // Generate public approval URL with priority: custom domain > subdomain
+      // Generate public approval URL with priority: env var > custom domain > subdomain
       let approvalUrl: string;
-      if (companySettings?.customer_url) {
-        // Use verified custom domain (highest priority)
+      const mainDomain = Deno.env.get("MAIN_DOMAIN");
+
+      if (mainDomain) {
+        // Use main domain from environment variable (highest priority - for deployments without DNS)
+        const baseUrl = mainDomain.replace(/\/$/, '');
+        approvalUrl = `${baseUrl}/quote-approval/${approvalToken}`;
+      } else if (companySettings?.customer_url) {
+        // Use verified custom domain (second priority)
         const baseUrl = companySettings.customer_url.replace(/\/$/, '');
         approvalUrl = `${baseUrl}/quote-approval/${approvalToken}`;
       } else {
