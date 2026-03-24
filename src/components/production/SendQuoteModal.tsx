@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Send, Mail, Loader2, Eye, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotification } from '../../contexts/NotificationContext';
 import { ShortCodeEngine } from '../../services/shortcode-service';
 import DOMPurify from 'dompurify';
 import { getQuoteApprovalUrl } from '../../utils/portal-url';
@@ -35,6 +36,7 @@ export function SendQuoteModal({
   onSuccess,
 }: SendQuoteModalProps) {
   const { user } = useAuth();
+  const { showNotification } = useNotification();
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [customMessage, setCustomMessage] = useState('');
@@ -148,7 +150,11 @@ export function SendQuoteModal({
 
   const handleSend = async () => {
     if (!selectedTemplateId) {
-      alert('Please select an email template');
+      showNotification({
+        type: 'error',
+        title: 'Template Required',
+        message: 'Please select an email template',
+      });
       return;
     }
 
@@ -210,12 +216,20 @@ export function SendQuoteModal({
 
       console.log('Quote sent successfully:', data);
 
-      alert(`Quote sent successfully to ${customerEmail}`);
+      showNotification({
+        type: 'success',
+        title: 'Quote Sent',
+        message: `Quote sent successfully to ${customerEmail}`,
+      });
       onSuccess();
       onClose();
     } catch (error) {
       console.error('Error sending quote:', error);
-      alert(error instanceof Error ? error.message : 'Failed to send quote');
+      showNotification({
+        type: 'error',
+        title: 'Send Failed',
+        message: error instanceof Error ? error.message : 'Failed to send quote',
+      });
     } finally {
       setSending(false);
     }
