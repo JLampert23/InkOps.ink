@@ -3336,6 +3336,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
           garmentStyle={firstItem?.item_number || ''}
           garmentColor={firstItem?.color || ''}
           garmentFrontImageUrl={firstItem?.garment_front_image_url || ''}
+          garmentBackImageUrl={firstItem?.garment_back_image_url || firstItem?.garment_rear_image_url || ''}
           groupLabel={showMockupForGroup}
           onClose={() => setShowMockupForGroup(null)}
           onSave={async () => {

@@ -77,13 +77,12 @@ Deno.serve(async (req: Request) => {
       imageResponse.headers.get("Content-Type") || "image/jpeg";
     const imageBody = await imageResponse.arrayBuffer();
 
-    // Only reject as placeholder if the final URL looks like a placeholder AND
-    // the response is suspiciously small (real images are typically >5KB)
+    // Detect placeholder redirects (SanMar redirects to placeholder URLs for missing images)
     const finalUrl = imageResponse.url || "";
-    if (isPlaceholderUrl(finalUrl) && imageBody.byteLength < 5000) {
-      console.warn(`[ImageProxy] Placeholder detected: finalUrl=${finalUrl}, size=${imageBody.byteLength}`);
+    if (isPlaceholderUrl(finalUrl)) {
+      console.warn(`[ImageProxy] Placeholder URL detected: ${finalUrl}, size=${imageBody.byteLength}`);
       return new Response(
-        JSON.stringify({ error: "No image available for this product" }),
+        JSON.stringify({ error: "No image available (placeholder URL)" }),
         {
           status: 404,
           headers: { ...corsHeaders, "Content-Type": "application/json" },

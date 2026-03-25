@@ -28,6 +28,7 @@ interface MockupGeneratorProps {
   garmentStyle?: string;
   garmentColor?: string;
   garmentFrontImageUrl?: string;
+  garmentBackImageUrl?: string;
   groupLabel?: string;
   imprintId?: string;
   imprintLocation?: string;
@@ -83,6 +84,7 @@ export default function MockupGenerator({
   garmentStyle,
   garmentColor,
   garmentFrontImageUrl,
+  garmentBackImageUrl,
   groupLabel,
   imprintId,
   imprintLocation,
@@ -98,6 +100,8 @@ export default function MockupGenerator({
   const [proofId, setProofId] = useState<string | null>(null);
   const [selectedImprintId, setSelectedImprintId] = useState<string | null>(imprintId || null);
   const [garmentImageUrl, setGarmentImageUrl] = useState<string | null>(null);
+  const [garmentBackImageUrlState, setGarmentBackImageUrlState] = useState<string | null>(garmentBackImageUrl || null);
+  const [garmentView, setGarmentView] = useState<'front' | 'back'>('front');
   const [garmentBrand, setGarmentBrand] = useState<string>('');
   const [garmentDescription, setGarmentDescription] = useState<string>('');
 
@@ -2366,6 +2370,42 @@ export default function MockupGenerator({
           </div>
 
           <div className="flex-1 flex flex-col bg-gray-100 dark:bg-slate-950">
+            {/* Front/Back Toggle */}
+            <div className="flex justify-center gap-1 py-1.5 bg-white dark:bg-slate-800 border-b dark:border-slate-600">
+              <button
+                onClick={() => {
+                  setGarmentView('front');
+                  if (garmentFrontImageUrl) {
+                    setGarmentImageUrl(garmentFrontImageUrl);
+                  }
+                }}
+                className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                  garmentView === 'front'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-slate-600'
+                }`}
+              >
+                Front
+              </button>
+              <button
+                onClick={() => {
+                  if (garmentBackImageUrlState) {
+                    setGarmentView('back');
+                    setGarmentImageUrl(garmentBackImageUrlState);
+                  }
+                }}
+                disabled={!garmentBackImageUrlState}
+                className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                  garmentView === 'back'
+                    ? 'bg-blue-600 text-white'
+                    : garmentBackImageUrlState
+                      ? 'bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-slate-600'
+                      : 'bg-gray-100 dark:bg-slate-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
+                }`}
+              >
+                Back
+              </button>
+            </div>
             <div className="flex-1 flex items-center justify-center">
               <canvas
                 ref={canvasRef}
