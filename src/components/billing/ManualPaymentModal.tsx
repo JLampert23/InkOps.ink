@@ -41,12 +41,19 @@ export function ManualPaymentModal({
   // Fetch available fundraising credit
   useEffect(() => {
     async function fetchFundraisingCredit() {
-      if (!customerId) return;
+      console.log('ManualPaymentModal - customerId:', customerId);
+      if (!customerId) {
+        console.log('No customerId provided, skipping fundraising credit fetch');
+        return;
+      }
 
       setLoadingCredit(true);
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (!user) {
+          console.log('No user found');
+          return;
+        }
 
         const { data: profile } = await supabase
           .from('user_profiles')
@@ -54,16 +61,24 @@ export function ManualPaymentModal({
           .eq('id', user.id)
           .single();
 
-        if (!profile) return;
+        if (!profile) {
+          console.log('No profile found');
+          return;
+        }
 
-        const { data: credits } = await supabase
+        console.log('Fetching fundraising credits for customer:', customerId, 'company:', profile.company_id);
+
+        const { data: credits, error: creditsError } = await supabase
           .from('customer_fundraising_credits')
           .select('amount')
           .eq('customer_id', customerId)
           .eq('company_id', profile.company_id);
 
+        console.log('Fundraising credits query result:', { credits, error: creditsError });
+
         if (credits) {
           const total = credits.reduce((sum, credit) => sum + parseFloat(credit.amount.toString()), 0);
+          console.log('Total fundraising credit:', total);
           setAvailableFundraisingCredit(total);
         }
       } catch (error) {
@@ -93,7 +108,7 @@ export function ManualPaymentModal({
     }
 
     if (paymentType === 'fundraising_credit') {
-      if (amountNum > availableFundraisingCredit) {
+      if (availableFundraisingCredit > 0 && amountNum > availableFundraisingCredit) {
         newErrors.amount = `Amount cannot exceed available fundraising credit of $${availableFundraisingCredit.toFixed(2)}`;
       }
     }
@@ -299,15 +314,18 @@ export function ManualPaymentModal({
                       setErrors(newErrors);
                     }
                   }}
-                  disabled={submitting || loadingCredit || availableFundraisingCredit === 0}
+                  disabled={submitting || loadingCredit}
                   className={`p-4 rounded-lg border-2 transition-all ${
                     paymentType === 'fundraising_credit'
                       ? 'border-pink-600 bg-pink-50 dark:bg-pink-900/30 text-pink-900 dark:text-pink-100'
                       : 'border-gray-300 dark:border-slate-600 hover:border-gray-400 dark:hover:border-slate-500 text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-700'
-                  } ${submitting || loadingCredit || availableFundraisingCredit === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  } ${submitting || loadingCredit ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                   <Gift className="w-6 h-6 mx-auto mb-1" />
                   <p className="text-sm font-medium">Fundraising</p>
+                  {!loadingCredit && (
+                    <p className="text-xs mt-1 opacity-75">${availableFundraisingCredit.toFixed(2)}</p>
+                  )}
                 </button>
               )}
             </div>
@@ -322,19 +340,35 @@ export function ManualPaymentModal({
           {paymentType === 'fundraising_credit' && (
             <div className="bg-pink-50 dark:bg-pink-900/20 border border-pink-200 dark:border-pink-800 rounded-lg p-4">
               <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-semibold text-pink-900 dark:text-pink-200">Available Fundraising Credit</h4>
-                <p className="text-lg font-bold text-pink-900 dark:text-pink-100">${availableFundraisingCredit.toFixed(2)}</p>
+                <h4 className="text-sm font-semibold text-pink-900 dark:text-pink-200">
+                  {availableFundraisingCredit >= 0 ? 'Available Fundraising Credit' : 'Fundraising Credit Balance'}
+                </h4>
+                <p className={`text-lg font-bold ${availableFundraisingCredit >= 0 ? 'text-pink-900 dark:text-pink-100' : 'text-red-700 dark:text-red-400'}`}>
+                  ${availableFundraisingCredit.toFixed(2)}
+                </p>
               </div>
-              <p className="text-xs text-pink-700 dark:text-pink-300 mb-2">
-                This will deduct the payment amount from the customer's fundraising credit balance.
-              </p>
-              <button
-                type="button"
-                onClick={fillMaxFundraisingCredit}
-                className="text-xs text-pink-700 dark:text-pink-300 hover:text-pink-900 dark:hover:text-pink-100 underline"
-              >
-                Apply maximum available credit
-              </button>
+              {availableFundraisingCredit > 0 ? (
+                <>
+                  <p className="text-xs text-pink-700 dark:text-pink-300 mb-2">
+                    This will deduct the payment amount from the customer's fundraising credit balance.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={fillMaxFundraisingCredit}
+                    className="text-xs text-pink-700 dark:text-pink-300 hover:text-pink-900 dark:hover:text-pink-100 underline"
+                  >
+                    Apply maximum available credit
+                  </button>
+                </>
+              ) : availableFundraisingCredit === 0 ? (
+                <p className="text-xs text-pink-700 dark:text-pink-300">
+                  This customer has no fundraising credit available. Recording a payment will create a negative balance.
+                </p>
+              ) : (
+                <p className="text-xs text-red-700 dark:text-red-400">
+                  This customer has a negative fundraising credit balance of ${Math.abs(availableFundraisingCredit).toFixed(2)}. Recording a payment will further decrease the balance.
+                </p>
+              )}
             </div>
           )}
 
