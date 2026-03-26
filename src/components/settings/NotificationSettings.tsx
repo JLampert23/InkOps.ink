@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, Save, Loader2, Volume2, VolumeX, Mail } from 'lucide-react';
+import { Bell, Save, Loader2, Volume2, VolumeX, Mail, Send, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase-client';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -16,16 +16,28 @@ interface NotificationPreferences {
   email_notifications_enabled: boolean;
 }
 
+interface CompanySettings {
+  id: string;
+  notification_forwarding_email: string | null;
+  notification_forwarding_enabled: boolean;
+}
+
 export default function NotificationSettings() {
   const { user } = useAuth();
   const { showNotification } = useNotification();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
+  const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
+  const [forwardingEmail, setForwardingEmail] = useState('');
+  const [forwardingEnabled, setForwardingEnabled] = useState(false);
+  const [sendingTestEmail, setSendingTestEmail] = useState(false);
+  const [testEmailSent, setTestEmailSent] = useState(false);
 
   useEffect(() => {
     if (user) {
       loadPreferences();
+      loadCompanySettings();
     }
   }, [user]);
 
@@ -90,6 +102,109 @@ export default function NotificationSettings() {
     } catch (error) {
       console.error('Error creating default preferences:', error);
       showNotification('error', 'Failed to create notification preferences');
+    }
+  };
+
+  const loadCompanySettings = async () => {
+    try {
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('company_id')
+        .eq('id', user?.id)
+        .single();
+
+      if (!profile?.company_id) {
+        throw new Error('No company found for user');
+      }
+
+      const { data, error } = await supabase
+        .from('company_settings')
+        .select('id, notification_forwarding_email, notification_forwarding_enabled')
+        .eq('id', profile.company_id)
+        .single();
+
+      if (error) throw error;
+
+      setCompanySettings(data);
+      setForwardingEmail(data.notification_forwarding_email || '');
+      setForwardingEnabled(data.notification_forwarding_enabled || false);
+    } catch (error) {
+      console.error('Error loading company settings:', error);
+    }
+  };
+
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const handleSaveEmailForwarding = async () => {
+    if (!companySettings) return;
+
+    if (forwardingEnabled && forwardingEmail && !validateEmail(forwardingEmail)) {
+      showNotification('error', 'Please enter a valid email address');
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      const { error } = await supabase
+        .from('company_settings')
+        .update({
+          notification_forwarding_email: forwardingEmail || null,
+          notification_forwarding_enabled: forwardingEnabled,
+        })
+        .eq('id', companySettings.id);
+
+      if (error) throw error;
+
+      showNotification('success', 'Email forwarding settings saved successfully');
+      setTestEmailSent(false);
+    } catch (error) {
+      console.error('Error saving email forwarding settings:', error);
+      showNotification('error', 'Failed to save email forwarding settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSendTestEmail = async () => {
+    if (!companySettings || !forwardingEmail) return;
+
+    if (!validateEmail(forwardingEmail)) {
+      showNotification('error', 'Please enter a valid email address');
+      return;
+    }
+
+    try {
+      setSendingTestEmail(true);
+
+      const { data, error } = await supabase.functions.invoke('forward-notification-email', {
+        body: {
+          notification_id: 'test-notification',
+          company_id: companySettings.id,
+          notification_type: 'test',
+          title: 'Test Notification',
+          message: 'This is a test notification to verify your email forwarding configuration is working correctly.',
+          reference_type: 'Test',
+          reference_id: 'test-123',
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        setTestEmailSent(true);
+        showNotification('success', `Test email sent to ${forwardingEmail}`);
+      } else {
+        throw new Error(data?.error || 'Failed to send test email');
+      }
+    } catch (error) {
+      console.error('Error sending test email:', error);
+      showNotification('error', 'Failed to send test email. Please check your email configuration.');
+    } finally {
+      setSendingTestEmail(false);
     }
   };
 
@@ -228,6 +343,137 @@ export default function NotificationSettings() {
               />
             </div>
           </div>
+
+          {/* Email Forwarding (Admin Only) */}
+          {companySettings && (
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+              <div className="flex items-center gap-3 mb-4">
+                <Send className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                    Email Forwarding (Admin)
+                  </h3>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                    Forward all in-app notifications to an external email address
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Forwarding Email Address
+                  </label>
+                  <input
+                    type="email"
+                    value={forwardingEmail}
+                    onChange={(e) => {
+                      setForwardingEmail(e.target.value);
+                      setTestEmailSent(false);
+                    }}
+                    placeholder="manager@company.com"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    All notifications will be forwarded to this email address when enabled
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-900 dark:text-white">
+                      Enable Email Forwarding
+                    </div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      Send all notifications to the configured email address
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setForwardingEnabled(!forwardingEnabled);
+                      setTestEmailSent(false);
+                    }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${
+                      forwardingEnabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        forwardingEnabled ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleSendTestEmail}
+                    disabled={!forwardingEmail || sendingTestEmail || !validateEmail(forwardingEmail)}
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {sendingTestEmail ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Sending...
+                      </>
+                    ) : testEmailSent ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 text-green-600" />
+                        Test Email Sent
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        Send Test Email
+                      </>
+                    )}
+                  </button>
+
+                  {!validateEmail(forwardingEmail) && forwardingEmail && (
+                    <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-sm">
+                      <AlertCircle className="w-4 h-4" />
+                      Invalid email address
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-blue-900 dark:text-blue-100">
+                      <p className="font-medium mb-1">Important Notes:</p>
+                      <ul className="list-disc list-inside space-y-1 text-blue-800 dark:text-blue-200">
+                        <li>Email forwarding respects your notification type preferences above</li>
+                        <li>Only enabled notification types will be forwarded</li>
+                        <li>Make sure your Resend API key is configured in integrations</li>
+                        <li>Failed emails will not prevent notifications from appearing in-app</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4">
+                  <button
+                    onClick={handleSaveEmailForwarding}
+                    disabled={saving}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {saving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Save Email Forwarding
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 rounded-b-lg">
