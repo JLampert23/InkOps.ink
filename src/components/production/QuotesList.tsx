@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase-client';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useConfirmation } from '../../contexts/ConfirmationContext';
-import { FileText, Search, Plus, Clock, Send, CheckCircle, XCircle, AlertCircle, Loader2, CreditCard as Edit, Eye, Copy, RefreshCw, Trash2 } from 'lucide-react';
+import { FileText, Search, Plus, Clock, Send, CheckCircle, XCircle, AlertCircle, Loader2, CreditCard as Edit, Eye, Copy, RefreshCw, Trash2, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface QuotesListProps {
@@ -34,6 +34,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
   const [statusFilter, setStatusFilter] = useState<string>('active');
   const [duplicating, setDuplicating] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [reopening, setReopening] = useState<string | null>(null);
 
   useEffect(() => {
     loadQuotes();
@@ -158,6 +159,37 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
       showNotification('Failed to delete quote', 'error');
     } finally {
       setDeleting(null);
+    }
+  };
+
+  const handleReopen = async (quoteId: string, quoteNumber: string) => {
+    const confirmed = await confirm({
+      title: 'Reopen Quote',
+      message: `Reopen quote ${quoteNumber} for editing? This will change its status back to draft.`,
+      confirmLabel: 'Reopen',
+      variant: 'info',
+    });
+    if (!confirmed) return;
+
+    setReopening(quoteId);
+    try {
+      const { error } = await supabase
+        .from('quotes')
+        .update({
+          status: 'draft',
+          was_reopened: true
+        })
+        .eq('id', quoteId);
+
+      if (error) throw error;
+
+      showNotification(`Quote ${quoteNumber} reopened for editing`, 'success');
+      loadQuotes();
+    } catch (error) {
+      console.error('Error reopening quote:', error);
+      showNotification('Failed to reopen quote', 'error');
+    } finally {
+      setReopening(null);
     }
   };
 
@@ -436,6 +468,20 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
                               title="Edit Quote"
                             >
                               <Edit className="w-4 h-4" />
+                            </button>
+                          )}
+                          {quote.status === 'rejected' && (
+                            <button
+                              onClick={() => handleReopen(quote.id, quote.quote_number || 'N/A')}
+                              disabled={reopening === quote.id}
+                              className="p-2 text-gray-600 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors disabled:opacity-50"
+                              title="Reopen for Editing"
+                            >
+                              {reopening === quote.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <RotateCcw className="w-4 h-4" />
+                              )}
                             </button>
                           )}
                           <button
