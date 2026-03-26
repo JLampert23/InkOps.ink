@@ -122,19 +122,8 @@ export interface SanMarUnifiedResponse {
 const SANMAR_CATALOG_CDN = "https://cdnm.sanmar.com/catalog/images";
 
 function rewriteSanMarImageUrl(url: string): string {
-  if (!url) return url;
-  try {
-    const parsed = new URL(url);
-    if (parsed.pathname.startsWith("/imglib/")) {
-      const filename = parsed.pathname.split("/").pop() || "";
-      if (filename) {
-        return `${SANMAR_CATALOG_CDN}/${filename}`;
-      }
-    }
-  } catch {
-    // not a valid URL
-  }
-  return url;
+  // URLs from the Media Content Service are authoritative — return as-is.
+  return url || "";
 }
 
 export class PromoStandardsError extends Error {
@@ -645,7 +634,8 @@ export async function fetchSanMarMedia(
     SANMAR_PROMOSTANDARDS_ENDPOINTS.media,
     'getMediaContent',
     soapEnvelope,
-    1
+    1,
+    true
   );
 
   console.log(`[SanMar Media] Response XML length: ${responseXml.length}`);
