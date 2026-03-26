@@ -904,16 +904,6 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
               <Download className="w-4 h-4" />
               <span className="hidden sm:inline">Download PDF</span>
             </button>
-            <a
-              href={`https://www.printavo.com/invoices/${invoice.printavoInvoiceId}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-3 lg:px-4 py-2 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors whitespace-nowrap"
-            >
-              <ExternalLink className="w-4 h-4" />
-              <span className="hidden lg:inline">View in Printavo</span>
-              <span className="lg:hidden hidden sm:inline">Printavo</span>
-            </a>
           </div>
         </div>
       </div>
