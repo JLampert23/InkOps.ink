@@ -138,10 +138,11 @@ export default function NotificationSettings() {
     return emailRegex.test(email);
   };
 
-  const handleSaveEmailForwarding = async () => {
-    if (!companySettings) return;
+  const handleSaveAll = async () => {
+    if (!preferences) return;
 
-    if (forwardingEnabled && forwardingEmail && !validateEmail(forwardingEmail)) {
+    // Validate email if forwarding is enabled
+    if (companySettings && forwardingEnabled && forwardingEmail && !validateEmail(forwardingEmail)) {
       showNotification('error', 'Please enter a valid email address');
       return;
     }
@@ -149,21 +150,40 @@ export default function NotificationSettings() {
     try {
       setSaving(true);
 
-      const { error } = await supabase
-        .from('company_settings')
+      // Save notification preferences
+      const { error: prefsError } = await supabase
+        .from('user_notification_preferences')
         .update({
-          notification_forwarding_email: forwardingEmail || null,
-          notification_forwarding_enabled: forwardingEnabled,
+          quote_approved_enabled: preferences.quote_approved_enabled,
+          quote_declined_enabled: preferences.quote_declined_enabled,
+          payment_received_enabled: preferences.payment_received_enabled,
+          production_completed_enabled: preferences.production_completed_enabled,
+          sound_enabled: preferences.sound_enabled,
+          email_notifications_enabled: preferences.email_notifications_enabled,
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', companySettings.id);
+        .eq('id', preferences.id);
 
-      if (error) throw error;
+      if (prefsError) throw prefsError;
 
-      showNotification('success', 'Email forwarding settings saved successfully');
+      // Save email forwarding settings if company settings exist
+      if (companySettings) {
+        const { error: forwardingError } = await supabase
+          .from('company_settings')
+          .update({
+            notification_forwarding_email: forwardingEmail || null,
+            notification_forwarding_enabled: forwardingEnabled,
+          })
+          .eq('id', companySettings.id);
+
+        if (forwardingError) throw forwardingError;
+      }
+
+      showNotification('success', 'Settings saved successfully');
       setTestEmailSent(false);
     } catch (error) {
-      console.error('Error saving email forwarding settings:', error);
-      showNotification('error', 'Failed to save email forwarding settings');
+      console.error('Error saving settings:', error);
+      showNotification('error', 'Failed to save settings');
     } finally {
       setSaving(false);
     }
@@ -217,35 +237,6 @@ export default function NotificationSettings() {
     });
   };
 
-  const handleSave = async () => {
-    if (!preferences) return;
-
-    try {
-      setSaving(true);
-
-      const { error } = await supabase
-        .from('user_notification_preferences')
-        .update({
-          quote_approved_enabled: preferences.quote_approved_enabled,
-          quote_declined_enabled: preferences.quote_declined_enabled,
-          payment_received_enabled: preferences.payment_received_enabled,
-          production_completed_enabled: preferences.production_completed_enabled,
-          sound_enabled: preferences.sound_enabled,
-          email_notifications_enabled: preferences.email_notifications_enabled,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', preferences.id);
-
-      if (error) throw error;
-
-      showNotification('success', 'Notification preferences saved successfully');
-    } catch (error) {
-      console.error('Error saving notification preferences:', error);
-      showNotification('error', 'Failed to save notification preferences');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -452,25 +443,6 @@ export default function NotificationSettings() {
                   </div>
                 </div>
 
-                <div className="pt-4">
-                  <button
-                    onClick={handleSaveEmailForwarding}
-                    disabled={saving}
-                    className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {saving ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4" />
-                        Save Email Forwarding
-                      </>
-                    )}
-                  </button>
-                </div>
               </div>
             </div>
           )}
@@ -478,7 +450,7 @@ export default function NotificationSettings() {
 
         <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 rounded-b-lg">
           <button
-            onClick={handleSave}
+            onClick={handleSaveAll}
             disabled={saving}
             className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -490,7 +462,7 @@ export default function NotificationSettings() {
             ) : (
               <>
                 <Save className="w-4 h-4" />
-                Save Preferences
+                Save Settings
               </>
             )}
           </button>
