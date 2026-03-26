@@ -41,12 +41,19 @@ export function ManualPaymentModal({
   // Fetch available fundraising credit
   useEffect(() => {
     async function fetchFundraisingCredit() {
-      if (!customerId) return;
+      console.log('ManualPaymentModal - customerId:', customerId);
+      if (!customerId) {
+        console.log('No customerId provided, skipping fundraising credit fetch');
+        return;
+      }
 
       setLoadingCredit(true);
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (!user) {
+          console.log('No user found');
+          return;
+        }
 
         const { data: profile } = await supabase
           .from('user_profiles')
@@ -54,16 +61,24 @@ export function ManualPaymentModal({
           .eq('id', user.id)
           .single();
 
-        if (!profile) return;
+        if (!profile) {
+          console.log('No profile found');
+          return;
+        }
 
-        const { data: credits } = await supabase
+        console.log('Fetching fundraising credits for customer:', customerId, 'company:', profile.company_id);
+
+        const { data: credits, error: creditsError } = await supabase
           .from('customer_fundraising_credits')
           .select('amount')
           .eq('customer_id', customerId)
           .eq('company_id', profile.company_id);
 
+        console.log('Fundraising credits query result:', { credits, error: creditsError });
+
         if (credits) {
           const total = credits.reduce((sum, credit) => sum + parseFloat(credit.amount.toString()), 0);
+          console.log('Total fundraising credit:', total);
           setAvailableFundraisingCredit(total);
         }
       } catch (error) {

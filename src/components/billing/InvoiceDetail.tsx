@@ -1941,7 +1941,10 @@ export function InvoiceDetail({ invoiceId, onBack, onNavigateToCustomer }: Invoi
           invoiceNumber={invoice.visualId}
           invoiceTotal={invoice.total}
           invoiceBalance={invoice.amountOutstanding}
-          customerId={invoice.customerId || undefined}
+          customerId={(() => {
+            console.log('Passing customerId to ManualPaymentModal:', invoice.customerId);
+            return invoice.customerId || undefined;
+          })()}
           onClose={() => setShowPaymentModal(false)}
           onSuccess={handlePaymentSuccess}
         />
