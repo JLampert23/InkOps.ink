@@ -303,15 +303,20 @@ async function getCachedProduct(
     let mediaData = null;
 
     if (cachedImages && cachedImages.urls) {
-      logImageOperation("sanmar", style, "cache_hit", {
-        imageCount: (cachedImages.urls.frontImages?.length || 0) +
-                   (cachedImages.urls.rearImages?.length || 0)
-      });
-      mediaData = {
-        images: cachedImages.rawImages || [],
-        views: cachedImages.urls,
-      };
-    } else {
+      const cachedImageCount = (cachedImages.urls.frontImages?.length || 0) +
+                   (cachedImages.urls.rearImages?.length || 0);
+      if (cachedImageCount > 0) {
+        logImageOperation("sanmar", style, "cache_hit", { imageCount: cachedImageCount });
+        mediaData = {
+          images: cachedImages.rawImages || [],
+          views: cachedImages.urls,
+        };
+      } else {
+        console.log(`[SanMar] Image cache exists but has 0 images for ${style} - will re-fetch`);
+      }
+    }
+
+    if (!mediaData) {
       const { data: legacyMediaCache } = await supabaseAdmin
         .from("sanmar_media_cache")
         .select("data, expires_at")
@@ -321,11 +326,38 @@ async function getCachedProduct(
         .maybeSingle();
 
       if (legacyMediaCache && new Date(legacyMediaCache.expires_at) >= new Date()) {
-        mediaData = legacyMediaCache.data || null;
+        const legacyData = legacyMediaCache.data || null;
+        if (legacyData?.images?.length > 0) {
+          mediaData = legacyData;
+        }
       }
+    }
 
-      if (!mediaData?.images || mediaData.images.length === 0) {
-        console.log(`[SanMar] No cached images available for ${style}`);
+    // If still no media images from any cache, re-fetch from the API
+    if (!mediaData?.images || mediaData.images.length === 0) {
+      console.log(`[SanMar] No cached images for ${style} - fetching fresh media`);
+      try {
+        const mediaUrl = `${supabaseUrl}/functions/v1/sanmar-api?action=media&style=${encodeURIComponent(style)}&companyId=${encodeURIComponent(companyId)}`;
+        const mediaResponse = await fetch(mediaUrl, {
+          headers: { "Authorization": `Bearer ${supabaseServiceKey}` },
+        });
+        if (mediaResponse.ok) {
+          const mediaJson = await mediaResponse.json();
+          const freshMedia = mediaJson.data || null;
+          if (freshMedia?.images?.length > 0) {
+            const validImages = await filterValidImages(freshMedia.images);
+            if (validImages.length > 0) {
+              freshMedia.images = validImages;
+              mediaData = freshMedia;
+              console.log(`[SanMar] Fresh media fetch: ${validImages.length} valid images for ${style}`);
+              await setSanMarImageCache(supabaseAdmin, companyId, style, freshMedia);
+            } else {
+              console.log(`[SanMar] Fresh media fetch: all ${freshMedia.images.length} images were placeholders`);
+            }
+          }
+        }
+      } catch (mediaErr: any) {
+        console.warn(`[SanMar] Fresh media fetch failed for cached ${style}: ${mediaErr.message}`);
       }
     }
 
@@ -451,28 +483,33 @@ function colorWordsMatch(productColor: string, imageColor: string): boolean {
   return score >= 0.4;
 }
 
+function classifyImage(img: any): 'front' | 'back' | 'side' | 'lifestyle' | 'swatch' | 'other' {
+  const cls = (img.classTypeName || "").toLowerCase();
+  const url = (img.url || "").toLowerCase();
+  if (/front|\bfm\b|hero|main|primary/.test(cls) || /_fm[._]/.test(url) || /front/i.test(url)) return 'front';
+  if (/rear|back|\bbk\b/.test(cls) || /_bk[._]/.test(url) || /back/i.test(url)) return 'back';
+  if (/side|sleeve|profile|\bsd\b/.test(cls) || /_sd[._]/.test(url)) return 'side';
+  if (/lifestyle|casual|action/.test(cls)) return 'lifestyle';
+  if (/swatch|color/.test(cls)) return 'swatch';
+  return 'other';
+}
+
 function findFrontImage(images: any[]): any {
-  return images.find((img: any) => {
-    const cls = (img.classTypeName || "").toLowerCase();
-    const url = (img.url || "").toLowerCase();
-    return /front|fm/.test(cls) || /_fm[._]/.test(url);
-  });
+  // First: explicit front match
+  const explicit = images.find(img => classifyImage(img) === 'front');
+  if (explicit) return explicit;
+  // Second: prefer 'other' (unclassified) over side/back — it's more likely a front image
+  const other = images.find(img => classifyImage(img) === 'other');
+  if (other) return other;
+  return null;
 }
 
 function findRearImage(images: any[]): any {
-  return images.find((img: any) => {
-    const cls = (img.classTypeName || "").toLowerCase();
-    const url = (img.url || "").toLowerCase();
-    return /rear|back|bk/.test(cls) || /_bk[._]/.test(url);
-  });
+  return images.find(img => classifyImage(img) === 'back') || null;
 }
 
 function findSideImage(images: any[]): any {
-  return images.find((img: any) => {
-    const cls = (img.classTypeName || "").toLowerCase();
-    const url = (img.url || "").toLowerCase();
-    return /side|sleeve|profile/.test(cls) || /_sd[._]/.test(url);
-  });
+  return images.find(img => classifyImage(img) === 'side') || null;
 }
 
 async function transformSanMarData(
@@ -488,6 +525,17 @@ async function transformSanMarData(
   const mediaViews = apiData.media?.views || {};
   const hasCdn = cdnImages && Object.keys(cdnImages).length > 0;
   console.log(`[SanMar] Transform: ${mediaImages.length} media images, CDN colors: ${hasCdn ? Object.keys(cdnImages!).length : 0}`);
+
+  // Log classTypeName values to diagnose image classification
+  if (mediaImages.length > 0) {
+    const classTypes = [...new Set(mediaImages.map((img: any) => img.classTypeName || 'EMPTY'))];
+    console.log(`[SanMar] Media classTypeNames: ${JSON.stringify(classTypes)}`);
+    const sample = mediaImages.slice(0, 3).map((img: any) => ({
+      cls: img.classTypeName, color: img.color, partId: img.partId?.substring(0, 20),
+      classified: classifyImage(img), url: (img.url || '').substring(img.url?.lastIndexOf('/') || 0),
+    }));
+    console.log(`[SanMar] Sample images: ${JSON.stringify(sample)}`);
+  }
 
   const imagesByPartId = new Map<string, any[]>();
   for (const img of mediaImages) {

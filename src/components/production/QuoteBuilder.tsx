@@ -64,6 +64,7 @@ interface QuoteItem {
   qty_2xl: number;
   qty_3xl: number;
   qty_4xl?: number;
+  qty_5xl?: number;
   qty_sm?: number;
   qty_lxl?: number;
   qty_ysym?: number;
@@ -853,15 +854,15 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
   };
 
   const calculateSizeTotal = (item: QuoteItem): number => {
-    return (item.qty_yxs || 0) + (item.qty_ys || 0) + (item.qty_ym || 0) + (item.qty_yl || 0) + (item.qty_yxl || 0) +
-      (item.qty_xs || 0) + (item.qty_s || 0) + (item.qty_m || 0) + (item.qty_l || 0) + (item.qty_xl || 0) +
-      (item.qty_2xl || 0) + (item.qty_3xl || 0) + (item.qty_4xl || 0) +
-      (item.qty_sm || 0) + (item.qty_lxl || 0) + (item.qty_ysym || 0) + (item.qty_ylyxl || 0);
+    return (Number(item.qty_yxs) || 0) + (Number(item.qty_ys) || 0) + (Number(item.qty_ym) || 0) + (Number(item.qty_yl) || 0) + (Number(item.qty_yxl) || 0) +
+      (Number(item.qty_xs) || 0) + (Number(item.qty_s) || 0) + (Number(item.qty_m) || 0) + (Number(item.qty_l) || 0) + (Number(item.qty_xl) || 0) +
+      (Number(item.qty_2xl) || 0) + (Number(item.qty_3xl) || 0) + (Number(item.qty_4xl) || 0) + (Number(item.qty_5xl) || 0) +
+      (Number(item.qty_sm) || 0) + (Number(item.qty_lxl) || 0) + (Number(item.qty_ysym) || 0) + (Number(item.qty_ylyxl) || 0);
   };
 
   const calculateItemsTotal = (item: QuoteItem): number => {
     const sizeTotal = calculateSizeTotal(item);
-    const quantityValue = item.total_quantity || 0;
+    const quantityValue = Number(item.total_quantity) || 0;
     return sizeTotal + quantityValue;
   };
 
@@ -1894,7 +1895,7 @@ export function QuoteBuilder({ quoteId: initialQuoteId, initialCustomerId, initi
     // Unit price = garment with markup + imprints (if any)
     const calculatedUnitPrice = garmentCostWithMarkup + totalImprintPrice;
     const currentItem = group?.items[itemIdx];
-    const totalQuantity = currentItem?.total_quantity || 0;
+    const totalQuantity = currentItem ? calculateItemsTotal(currentItem) : 0;
 
     const newGroups = itemGroups.map(grp => {
       if (grp.id === groupId) {

@@ -630,14 +630,14 @@ export async function fetchSanMarMedia(
   xmlns:shar="http://www.promostandards.org/WSDL/MediaService/1.0.0/SharedObjects/">
   <soapenv:Header/>
   <soapenv:Body>
-    <ns:getMediaContentRequest>
+    <ns:GetMediaContentRequest>
       <shar:wsVersion>1.1.0</shar:wsVersion>
       <shar:id>${escapeXml(credentials.id)}</shar:id>
       <shar:password>${escapeXml(credentials.password)}</shar:password>
       <shar:cultureName>en-US</shar:cultureName>
       <shar:mediaType>Image</shar:mediaType>
       <shar:productId>${escapeXml(normalizedStyle)}</shar:productId>
-    </ns:getMediaContentRequest>
+    </ns:GetMediaContentRequest>
   </soapenv:Body>
 </soapenv:Envelope>`;
 
@@ -645,8 +645,7 @@ export async function fetchSanMarMedia(
     SANMAR_PROMOSTANDARDS_ENDPOINTS.media,
     'getMediaContent',
     soapEnvelope,
-    1,
-    true
+    1
   );
 
   console.log(`[SanMar Media] Response XML length: ${responseXml.length}`);
