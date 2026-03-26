@@ -8,7 +8,7 @@ const corsHeaders = {
     "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const ALLOWED_HOSTS = ["cdn.sanmar.com", "cdnm.sanmar.com", "www.sanmar.com", "sanmar.com"];
+const ALLOWED_HOSTS = ["cdn.sanmar.com", "cdnm.sanmar.com", "www.sanmar.com", "sanmar.com", "ws.sanmar.com"];
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
