@@ -21,6 +21,7 @@ import { PortalOrderHistory } from './components/portal/PortalOrderHistory';
 import { PortalDashboard } from './components/portal/PortalDashboard';
 import { PortalPaymentMethods } from './components/portal/PortalPaymentMethods';
 import { CustomerPortalPage } from './components/portal/CustomerPortalPage';
+import { NotificationBell } from './components/NotificationBell';
 import { hideInitialLoader } from './utils/loader';
 
 function getSubdomainFromHost(): string | null {
@@ -574,6 +575,7 @@ function AppContent() {
               )}
             </div>
             <div className="flex items-center gap-3">
+              <NotificationBell />
               {activeTab === 'customers' && (
                 <button
                   onClick={() => setShowCreateCustomerModal(true)}

@@ -429,7 +429,7 @@ export default function QuotesList({ onSelectQuote, onCreateQuote, onEditQuote }
                           >
                             <Eye className="w-4 h-4" />
                           </button>
-                          {(quote.status === 'draft' || quote.status === 'sent') && (
+                          {(quote.status === 'draft' || quote.status === 'sent' || quote.status === 'rejected') && (
                             <button
                               onClick={() => onEditQuote(quote.id)}
                               className="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
