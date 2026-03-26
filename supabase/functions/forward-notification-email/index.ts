@@ -136,7 +136,7 @@ Deno.serve(async (req: Request) => {
         },
         body: JSON.stringify({
           action: "decrypt",
-          data: companySettings.resend_api_key,
+          token: companySettings.resend_api_key,
         }),
       }
     );
@@ -145,7 +145,7 @@ Deno.serve(async (req: Request) => {
       throw new Error("Failed to decrypt API key");
     }
 
-    const { decrypted } = await decryptResponse.json();
+    const { result: decrypted } = await decryptResponse.json();
     const resendApiKey = decrypted;
 
     // Build email content
